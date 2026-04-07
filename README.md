@@ -4,6 +4,9 @@
 将来的には外部 repo `agent-canon` の subtree 取り込み先として使いますが、外部 repo を作る前でも `git clone <template>` 直後に shared canon を参照できるよう、template 側へ実体を含めています。
 
 含むもの:
+- `CLAUDE.md`
+- `.github/AGENTS.md`
+- `.github/copilot-instructions.md`
 - `agents/`
 - `.agents/skills/`
 - `.claude/agents/`
@@ -29,8 +32,6 @@
 - product root entrypoint
   - root `AGENTS.md`
   - root `.codex/config.toml`
-  - root `CLAUDE.md`
-  - root `.github/copilot-instructions.md`
 - implementation / experiment / environment 本体
   - `python/`
   - `experiments/`

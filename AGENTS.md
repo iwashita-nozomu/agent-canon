@@ -16,6 +16,7 @@
 
 ## Scope
 
+- Claude / Copilot runtime entrypoints
 - shared agent workflow
 - shared skill canon
 - Codex / Claude subagent inventory
