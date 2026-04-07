@@ -135,7 +135,7 @@ default の model split は、`gpt-5.4` が planning と final judgment、`gpt-5
 - agent runtime / skill 変更では `make agent-checks`
 - まず `make ci-quick`
 - 必要に応じて `make ci`
-- Python 変更では `pyright`、`pytest python/tests/`、`ruff check python/ --select D,E,F,I,UP` を確認する
+- Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP` を確認する
 - 文書変更では markdown / link check を使う
 - report を閉じる前には `documents/experiment-report-style.md` を確認する
 - 研究系 task では `critical-review` と `report-review` の decision state を確認し、必要なら `research-perspective-review` を追加する

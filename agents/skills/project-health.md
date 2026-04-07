@@ -13,7 +13,7 @@
 
 ## Core References
 
-- `documents/WORKFLOW_INVENTORY.md`
+- `documents/tools/README.md`
 - `documents/REVIEW_PROCESS.md`
 - `scripts/run_comprehensive_review.sh`
 - `scripts/docker_dependency_validator.py`

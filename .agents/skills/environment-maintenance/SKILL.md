@@ -11,5 +11,5 @@ description: Use when touching Docker, CI, dependencies, runtime compatibility, 
 1. Start from `agents/templates/environment_change_proposal.md` when proposing a new repo-wide tool or dependency.
 1. Update dependency definitions and related docs in the same change.
 1. Check CI and local validation commands together.
-1. Use `documents/coding-conventions-project.md`, `documents/WORKFLOW_INVENTORY.md`, `documents/server-host-contract.md`, and `docker/README.md`.
+1. Use `documents/coding-conventions-project.md`, `documents/tools/README.md`, `documents/server-host-contract.md`, and `docker/README.md`.
 1. Do not canonize host-global installs as the repository default.

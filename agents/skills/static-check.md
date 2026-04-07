@@ -14,7 +14,7 @@
 ## Core References
 
 - `agents/skills/static-validation.md`
-- `documents/WORKFLOW_INVENTORY.md`
+- `documents/tools/README.md`
 - `scripts/ci/run_all_checks.sh`
 - `scripts/ci/run_docs_checks.sh`
 - `scripts/ci/check_docker_build.sh`

@@ -7,7 +7,7 @@ import sys
 import unittest
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = (
     PROJECT_ROOT / "scripts" / "agent_tools" / "smoke_test_research_perspective_pack.py"
 )

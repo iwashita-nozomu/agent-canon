@@ -15,7 +15,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえます。
 ## Core References
 
 - `documents/coding-conventions-project.md`
-- `documents/WORKFLOW_INVENTORY.md`
+- `documents/tools/README.md`
 - `docker/README.md`
 - `docker/packs/`
 - `docker/codex-container-profiles.toml`
