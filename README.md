@@ -10,11 +10,19 @@
 - `.claude/skills/`
 - `.codex/README.md`
 - `.codex/agents/`
+- `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/REVIEW_PROCESS.md`
+- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
+- `documents/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/implementation-waterfall-workflow.md`
 - `documents/workflow-references.md`
+- `documents/worktree-lifecycle.md`
 - `scripts/agent_tools/`
+- `scripts/setup_worktree.sh`
+- `scripts/worktree_start.sh`
+- `scripts/tools/check_worktree_scopes.sh`
+- `scripts/tools/create_worktree.sh`
 - `scripts/tools/mirror_skill_shims.py`
 
 含まないもの:

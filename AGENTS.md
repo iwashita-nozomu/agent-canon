@@ -10,6 +10,8 @@
 - `agents/canonical/README.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 - `documents/AGENTS_COORDINATION.md`
+- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
+- `documents/worktree-lifecycle.md`
 - `.codex/README.md`
 
 ## Scope
@@ -18,6 +20,7 @@
 - shared skill canon
 - Codex / Claude subagent inventory
 - agent review / coordination documents
+- skill and worktree operation canon
 - agent support scripts
 
 ## Non-Goals
