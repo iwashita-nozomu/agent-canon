@@ -20,6 +20,8 @@
   - correctness / 設計 / 保守性レビュー
 - `python-review`
   - pyright / pytest / ruff を前提にした Python review
+- `long-form-writing`
+  - README、workflow、guide などの長文作成フロー
 - `docs-completeness-review`
   - 文書の欠落や説明不足のレビュー
 - `md-style-check`

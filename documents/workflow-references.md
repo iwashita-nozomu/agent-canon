@@ -96,6 +96,19 @@
 - [REFORMS: Consensus-based Recommendations for Machine-learning-based Science](https://reforms.cs.princeton.edu/)
   - ML-science reporting review の根拠です。
 
+## Long-Form Writing And Revision
+
+- [Reverse Outlining | John S. Knight Institute for Writing in the Disciplines](https://knight.as.cornell.edu/reverse-outlining)
+  - `summary statement` を固定し、reverse outline で focus / logic gap を見る構成の根拠です。
+- [Creating a Roadmap | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/creating-a-roadmap.pdf)
+  - roadmap、sentence outline、skeleton outline、section purpose を先に固定する構成の根拠です。
+- [Writing with Feedback on a Manuscript | Purdue OWL](https://owl.purdue.edu/owl/general_writing/the_writing_process/feedback/editor-reviewer_feedback.html)
+  - feedback を checklist 化して priority 順に処理する revision 運用の根拠です。
+- [Higher Order Concerns | Purdue OWL](https://owl.purdue.edu/owl/subject_specific_writing/professional_technical_writing/prioritizing_your_concerns_for_effective_business_writing/index.html)
+  - line edit より先に focus、purpose、organization を直す review 順序の根拠です。
+- [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
+  - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
+
 ## Related Local Canon
 
 - [references/README.md](/mnt/l/workspace/project_template/references/README.md)

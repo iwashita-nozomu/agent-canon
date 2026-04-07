@@ -7,6 +7,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
 
 - 実装変更:
   - `documents/implementation-waterfall-workflow.md`
+- 長文作成:
+  - `documents/long-form-writing-workflow.md`
 - 実験 run:
   - `documents/experiment-workflow.md`
 - research-driven な改善:
@@ -32,6 +34,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 | --- | --- | --- | --- |
 | repo の全体像を知りたい | `README.md`, `QUICK_START.md` | `documents/`, `scripts/`, `docker/` | `make ci-quick` |
 | Python 実装を直したい | `documents/coding-conventions-python.md`, `documents/implementation-waterfall-workflow.md` | `python/`, `tests/` | `make ci-quick` |
+| 長い README や guide を書きたい | `documents/long-form-writing-workflow.md` | `documents/`, `notes/`, `agents/` | `make docs-check` |
 | 文書だけ更新したい | `documents/README.md` | `documents/`, `notes/` | `make docs-check` |
 | Docker / 依存を更新したい | `docker/README.md` | `docker/`, `scripts/ci/` | `make docker-build-check` |
 | main server host の readiness を見たい | `documents/server-host-contract.md` | `documents/templates/`, `scripts/ci/` | `python3 scripts/ci/check_server_readiness.py` |
@@ -69,6 +72,9 @@ make ci
   - `notes/`
 - agent 間で共有する運用:
   - `agents/`
+
+README、workflow、guide、migration 文書のような長文では、先に `documents/long-form-writing-workflow.md` を読みます。
+長文では `document_flow_reviewer` と別 reviewer の両方を前提にします。
 
 ```bash
 make docs-check

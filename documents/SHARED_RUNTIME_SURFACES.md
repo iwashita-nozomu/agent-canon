@@ -34,6 +34,7 @@ root では次を symlink view として扱います。
 - `documents/experiment-workflow.md`
 - `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
+- `documents/long-form-writing-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`

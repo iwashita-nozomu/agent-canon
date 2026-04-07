@@ -280,6 +280,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/experiment_runner.md` への symlink view
 - `documents/implementation-waterfall-workflow.md`
   - `vendor/agent-canon/documents/implementation-waterfall-workflow.md` への symlink view
+- `documents/long-form-writing-workflow.md`
+  - `vendor/agent-canon/documents/long-form-writing-workflow.md` への symlink view
 - `documents/research-workflow.md`
   - `vendor/agent-canon/documents/research-workflow.md` への symlink view
 - `documents/workflow-references.md`

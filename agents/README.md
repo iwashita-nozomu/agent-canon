@@ -36,6 +36,8 @@
   - 実験結果に基づく改造 loop の自律実行
 - [skills/worktree-start.md](/mnt/l/workspace/project_template/agents/skills/worktree-start.md)
   - worktree kickoff、scope 初期化、action log 起点の固定
+- [skills/long-form-writing.md](/mnt/l/workspace/project_template/agents/skills/long-form-writing.md)
+  - README、workflow、guide などの長文作成フロー
 - [skills/from_another_agent.md](/mnt/l/workspace/project_template/agents/skills/from_another_agent.md)
   - 前回 agent run の carry-over note を current task へ接続
 - [skills/project-review.md](/mnt/l/workspace/project_template/agents/skills/project-review.md)

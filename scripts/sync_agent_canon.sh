@@ -84,6 +84,7 @@ documents/experiment-report-style.md:../${PREFIX}/documents/experiment-report-st
 documents/experiment-workflow.md:../${PREFIX}/documents/experiment-workflow.md
 documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
 documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
+documents/long-form-writing-workflow.md:../${PREFIX}/documents/long-form-writing-workflow.md
 documents/research-workflow.md:../${PREFIX}/documents/research-workflow.md
 documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md

@@ -29,6 +29,7 @@
 | `static-validation` | lint / test / docs / links の確認 | `agents/skills/static-validation.md` | `.agents/skills/static-validation/SKILL.md` |
 | `code-review` | correctness / 設計 / 保守性レビュー | `agents/skills/code-review.md` | `.agents/skills/code-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
+| `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `docs-completeness-review` | 文書の欠落や説明不足のレビュー | `agents/skills/docs-completeness-review.md` | `.agents/skills/docs-completeness-review/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `docs-consistency-review` | 文書間の矛盾と stale route の確認 | `agents/skills/docs-consistency-review.md` | `.agents/skills/docs-consistency-review/SKILL.md` |
@@ -55,6 +56,7 @@
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
 - 前の agent の carry-over を吸う必要がある task では `from_another_agent` を最初に見ます。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
+- 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop、`research-perspective-review` を大きい review pack として使います。
 - 実験結果を見ながら code change を継続反復する task では `experiment-change-loop` を使います。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。

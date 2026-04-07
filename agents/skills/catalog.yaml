@@ -53,6 +53,10 @@ skill_families:
     purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
     canonical_doc: agents/skills/python-review.md
     shim: .agents/skills/python-review/SKILL.md
+  - id: long-form-writing
+    purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
+    canonical_doc: agents/skills/long-form-writing.md
+    shim: .agents/skills/long-form-writing/SKILL.md
   - id: docs-completeness-review
     purpose: Review whether docs contain the sections, commands, rationale, and paths a reader needs.
     canonical_doc: agents/skills/docs-completeness-review.md

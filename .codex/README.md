@@ -21,6 +21,7 @@
   - `requirements_organizer`
   - `execution_planner`
   - `detailed_designer`
+  - `long_form_writer`
   - `literature_researcher`
   - `docs_workflow_steward`
   - 全 reviewer 系 role
@@ -42,6 +43,7 @@
 - `execution_planner`
 - `plan_reviewer`
 - `detailed_designer`
+- `long_form_writer`
 - `detailed_design_reviewer`
 - `document_flow_reviewer`
 - `explorer`
