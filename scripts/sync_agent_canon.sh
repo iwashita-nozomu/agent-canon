@@ -109,8 +109,10 @@ scripts/agent_tools:../${PREFIX}/scripts/agent_tools
 scripts/check_convention_consistency.py:../${PREFIX}/scripts/check_convention_consistency.py
 scripts/check_doc_test_triplet.py:../${PREFIX}/scripts/check_doc_test_triplet.py
 scripts/docker_dependency_validator.py:../${PREFIX}/scripts/docker_dependency_validator.py
+scripts/push_origin.sh:../${PREFIX}/scripts/push_origin.sh
 scripts/requirement_sync_validator.py:../${PREFIX}/scripts/requirement_sync_validator.py
 scripts/run_comprehensive_review.sh:../${PREFIX}/scripts/run_comprehensive_review.sh
+scripts/run_pytest_with_logs.sh:../${PREFIX}/scripts/run_pytest_with_logs.sh
 scripts/ci/check_experiment_registry.py:../../${PREFIX}/scripts/ci/check_experiment_registry.py
 scripts/ci/PRE_REVIEW_GUIDE.md:../../${PREFIX}/scripts/ci/PRE_REVIEW_GUIDE.md
 scripts/ci/check_docker_build.sh:../../${PREFIX}/scripts/ci/check_docker_build.sh
@@ -133,6 +135,11 @@ scripts/sync_agent_canon.sh:../${PREFIX}/scripts/sync_agent_canon.sh
 scripts/tools/audit_and_fix_links.py:../../${PREFIX}/scripts/tools/audit_and_fix_links.py
 scripts/tools/check_markdown_lint.py:../../${PREFIX}/scripts/tools/check_markdown_lint.py
 scripts/tools/check_markdown_math.py:../../${PREFIX}/scripts/tools/check_markdown_math.py
+scripts/tools/find_similar_documents.py:../../${PREFIX}/scripts/tools/find_similar_documents.py
+scripts/tools/fix_markdown_code_blocks.py:../../${PREFIX}/scripts/tools/fix_markdown_code_blocks.py
+scripts/tools/fix_markdown_docs.py:../../${PREFIX}/scripts/tools/fix_markdown_docs.py
+scripts/tools/fix_markdown_headers.py:../../${PREFIX}/scripts/tools/fix_markdown_headers.py
+scripts/tools/format_markdown.py:../../${PREFIX}/scripts/tools/format_markdown.py
 scripts/tools/mirror_skill_shims.py:../../${PREFIX}/scripts/tools/mirror_skill_shims.py
 scripts/tools/check_worktree_scopes.sh:../../${PREFIX}/scripts/tools/check_worktree_scopes.sh
 scripts/tools/create_worktree.sh:../../${PREFIX}/scripts/tools/create_worktree.sh

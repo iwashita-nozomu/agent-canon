@@ -59,8 +59,10 @@ root では次を symlink view として扱います。
 - `scripts/check_convention_consistency.py`
 - `scripts/check_doc_test_triplet.py`
 - `scripts/docker_dependency_validator.py`
+- `scripts/push_origin.sh`
 - `scripts/requirement_sync_validator.py`
 - `scripts/run_comprehensive_review.sh`
+- `scripts/run_pytest_with_logs.sh`
 - `scripts/ci/check_experiment_registry.py`
 - `scripts/ci/PRE_REVIEW_GUIDE.md`
 - `scripts/ci/check_docker_build.sh`
@@ -83,6 +85,11 @@ root では次を symlink view として扱います。
 - `scripts/tools/audit_and_fix_links.py`
 - `scripts/tools/check_markdown_lint.py`
 - `scripts/tools/check_markdown_math.py`
+- `scripts/tools/find_similar_documents.py`
+- `scripts/tools/fix_markdown_code_blocks.py`
+- `scripts/tools/fix_markdown_docs.py`
+- `scripts/tools/fix_markdown_headers.py`
+- `scripts/tools/format_markdown.py`
 - `scripts/worktree_start.sh`
 - `scripts/tools/check_worktree_scopes.sh`
 - `scripts/tools/create_worktree.sh`
