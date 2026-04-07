@@ -1,0 +1,69 @@
+# Shared Runtime Surfaces
+
+この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
+product root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
+
+## Surface Types
+
+### symlink view
+
+root では次を symlink view として扱います。
+
+- `AGENTS.md`
+- `agents/`
+- `.agents/`
+- `.claude/`
+- `CLAUDE.md`
+- `.github/AGENTS.md`
+- `.github/copilot-instructions.md`
+- `.codex/config.toml`
+- `.codex/README.md`
+- `.codex/agents`
+- `documents/agent-canon-subtree-migration.md`
+- `documents/BRANCH_SCOPE.md`
+- `documents/AGENTS_COORDINATION.md`
+- `documents/REVIEW_PROCESS.md`
+- `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
+- `documents/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/implementation-waterfall-workflow.md`
+- `documents/workflow-references.md`
+- `documents/worktree-lifecycle.md`
+- `notes/themes/from_another_agent.md`
+- `notes/worktrees/README.md`
+- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `python/tests/agent_tools/__init__.py`
+- `python/tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+- `python/tests/tools/test_mirror_skill_shims.py`
+- `scripts/agent_tools/`
+- `scripts/setup_worktree.sh`
+- `scripts/sync_agent_canon.sh`
+- `scripts/worktree_start.sh`
+- `scripts/tools/check_worktree_scopes.sh`
+- `scripts/tools/create_worktree.sh`
+- `scripts/tools/mirror_skill_shims.py`
+
+### synced root copy
+
+次は root 側に regular file を残しますが、正本は vendor 側です。
+
+- `.github/workflows/agent-coordination.yml`
+
+## Editing Rule
+
+- shared runtime surface を直すときは `vendor/agent-canon/` 側を編集します
+- root 側の symlink view や copy surface を直接編集しません
+- root copy が drift したら `bash scripts/sync_agent_canon.sh link-root` で復元します
+- drift を確認したいときは `bash scripts/sync_agent_canon.sh check` を使います
+
+## Validation
+
+```bash
+bash scripts/sync_agent_canon.sh check
+make agent-checks
+```
+
+## Product-Side Interpretation
+
+- `scripts/README.md` と `documents/tools/README.md` は product 側の実行入口です
+- shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします

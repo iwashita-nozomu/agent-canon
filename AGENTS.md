@@ -23,6 +23,7 @@
 - shared skill canon
 - Codex / Claude subagent inventory
 - agent review / coordination documents
+- shared runtime surface ownership document
 - subtree migration and sync operation canon
 - skill and worktree operation canon
 - carry-over note template

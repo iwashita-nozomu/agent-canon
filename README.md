@@ -20,6 +20,7 @@
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/REVIEW_PROCESS.md`
+- `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/implementation-waterfall-workflow.md`
