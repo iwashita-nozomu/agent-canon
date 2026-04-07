@@ -2,7 +2,7 @@
 
 このディレクトリは、shared agent canon の committed snapshot です。
 将来的には外部 repo `agent-canon` の subtree 取り込み先として使いますが、外部 repo を作る前でも `git clone <template>` 直後に shared canon を参照できるよう、template 側へ実体を含めています。
-agent/runtime の最小 surface だけでなく、experiment-oriented な agent set として再配布したい共通規約、review guide、registry tool、topic scaffold もここへ寄せます。
+agent/runtime の最小 surface だけでなく、experiment-oriented な agent set として再配布したい共通規約、review guide、validation / review runner、container runtime helper、registry tool、topic scaffold もここへ寄せます。
 
 含むもの:
 - `ROOT_AGENTS.md`
@@ -54,14 +54,35 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
+- `scripts/check_convention_consistency.py`
+- `scripts/check_doc_test_triplet.py`
+- `scripts/docker_dependency_validator.py`
+- `scripts/requirement_sync_validator.py`
+- `scripts/run_comprehensive_review.sh`
+- `scripts/ci/PRE_REVIEW_GUIDE.md`
+- `scripts/ci/check_docker_build.sh`
 - `scripts/ci/check_experiment_registry.py`
+- `scripts/ci/check_server_readiness.py`
+- `scripts/ci/container_runtime.py`
+- `scripts/ci/pre_review.sh`
+- `scripts/ci/run_all_checks.sh`
+- `scripts/ci/run_codex_in_repo_container.py`
+- `scripts/ci/run_container_pack.py`
+- `scripts/ci/run_docs_checks.sh`
+- `scripts/ci/run_in_repo_container.py`
+- `scripts/ci/run_python_in_dockerfile.py`
 - `scripts/experiments/`
 - `scripts/setup_worktree.sh`
+- `scripts/shared/error_handler.py`
 - `scripts/sync_agent_canon.sh`
+- `scripts/tools/audit_and_fix_links.py`
+- `scripts/tools/check_markdown_lint.py`
+- `scripts/tools/check_markdown_math.py`
 - `scripts/worktree_start.sh`
 - `scripts/tools/check_worktree_scopes.sh`
 - `scripts/tools/create_worktree.sh`
 - `scripts/tools/mirror_skill_shims.py`
+- `scripts/validation/triplet_validator.py`
 
 含まないもの:
 - product root entrypoint
