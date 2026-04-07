@@ -1,15 +1,15 @@
 # agent-canon subtree 移行計画
 
-この文書は、shared agent canon を別 repo `agent-canon` として切り出し、product template 側へ `git subtree` で取り込むための正本です。
-目的は、`git clone <template>` だけで新しい product を始められることを維持しながら、agent 運用の正本を upstream repo へ分離することです。
+この文書は、shared agent canon を別 repo `agent-canon` として切り出し、template root と派生 repo 側へ `git subtree` で取り込むための正本です。
+目的は、`git clone <template>` だけで新しい派生 repo を始められることを維持しながら、agent 運用の正本を upstream repo へ分離することです。
 この template ではすでに `vendor/agent-canon/` に committed snapshot を持ち、shared surface の大半を root symlink view に寄せています。
 将来的には experiment-oriented な agent set として `agent-canon` 単体で配布できるよう、実験運用の規約、review guide、validation / review runner、container runtime helper、registry tool、topic scaffold も shared canon 側へ寄せます。
 
 ## 1. この構成を選ぶ理由
 
-- `git clone <template>` だけで product を開始したい
-- product 側の worktree に、その時点の agent canon snapshot を閉じ込めたい
-- product 側で直した shared canon を、後から upstream `agent-canon` repo へ戻したい
+- `git clone <template>` だけで新しい派生 repo を開始したい
+- template / 派生 repo 側の worktree に、その時点の agent canon snapshot を閉じ込めたい
+- template / 派生 repo 側で直した shared canon を、後から upstream `agent-canon` repo へ戻したい
 - Codex の runtime discovery は root `AGENTS.md` と root `.codex/` を前提にしたい
 - sibling repo 参照や手動コピーには依存したくない
 
@@ -19,13 +19,13 @@
 
 - `agent-canon` を repo 外の sibling directory として自動 discovery させること
 - root `AGENTS.md` と root `.codex/` を無くすこと
-- branch を product variant ごとに長期運用すること
+- branch を template variant ごとに長期運用すること
 - 一回の変更で template から agent 関連を全部剥がすこと
 
 ## 3. 目標構成
 
 ```text
-product-repo/
+derived-repo/
 ├─ AGENTS.md
 ├─ CLAUDE.md
 ├─ .github/
@@ -93,10 +93,10 @@ product-repo/
 ```
 
 原則:
-- root `AGENTS.md` と root `.codex/` は product repo の runtime entrypoint として残します
+- root `AGENTS.md` と root `.codex/` は template / 派生 repo の runtime entrypoint として残します
 - shared canon の実体は `vendor/agent-canon/` の subtree snapshot に寄せます
 - shared canon を root から使う surface は symlink view に寄せます
-- product 固有の README、Docker、CI、実装、server 運用文書は root 側に残します
+- template / 派生 repo ごとに持つ README、Docker、CI、実装、server 運用文書は root 側に残します
 
 ## 4. 所有境界
 
@@ -183,20 +183,20 @@ shared canon の正本として扱う対象:
 - `vendor/agent-canon/AGENTS.md`
 - `vendor/agent-canon/README.md`
 
-### 4.2 product template に残すもの
+### 4.2 template / instance 側に残すもの
 
 - `README.md`
 - `docker/`
-- `scripts/` のうち product 固有 bootstrap / audit / security / exploratory / local convenience
-- product implementation と shared canon 以外の `python/`
+- `scripts/` のうち instance-local bootstrap / audit / security / exploratory / local convenience
+- template-default implementation と shared canon 以外の `python/`
 - `experiments/`
 - shared canon 以外の `notes/`
-- `documents/` のうち product / environment / server / experiment に閉じるもの
+- `documents/` のうち template / environment / server / experiment に閉じるもの
 
 補足:
 - `docker` 以外の全部を `agent-canon` へ移すわけではありません
-- implementation、experiment、server operation、generic project bootstrap は product template 側に残します
-- product 側の `experiments/` では `registry.toml`、topic 固有ディレクトリ、run artifact だけを正本に残し、shared scaffold と運用 guide は `agent-canon` へ寄せます
+- implementation、experiment、server operation、generic template bootstrap は root 側に残します
+- root 側の `experiments/` では `registry.toml`、topic 固有ディレクトリ、run artifact だけを正本に残し、shared scaffold と運用 guide は `agent-canon` へ寄せます
 - root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SHARED_RUNTIME_SURFACES.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKFLOW_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/coding-conventions-experiments.md`、`documents/experiment-critical-review.md`、`documents/experiment-registry.md`、`documents/experiment-report-style.md`、`documents/experiment-workflow.md`、`documents/experiment_runner.md`、`documents/implementation-waterfall-workflow.md`、`documents/research-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`documents/conventions/python/20_benchmark_policy.md`、`documents/conventions/python/30_experiment_directory_structure.md`、`experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`notes/experiments/README.md`、`notes/experiments/REPORT_TEMPLATE.md`、`notes/experiments/results/README.md`、`notes/knowledge/benchmark_vs_experiment.md`、`notes/knowledge/experiment_directory_planning.md`、`notes/knowledge/experiment_operations.md`、`notes/themes/from_another_agent.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`tests/agent_tools/__init__.py`、`tests/agent_tools/test_smoke_test_research_perspective_pack.py`、`tests/tools/test_mirror_skill_shims.py`、`tests/tools/test_run_managed_experiment.py`、`scripts/agent_tools/`、`scripts/check_convention_consistency.py`、`scripts/check_doc_test_triplet.py`、`scripts/docker_dependency_validator.py`、`scripts/requirement_sync_validator.py`、`scripts/run_comprehensive_review.sh`、`scripts/ci/PRE_REVIEW_GUIDE.md`、`scripts/ci/check_docker_build.sh`、`scripts/ci/check_experiment_registry.py`、`scripts/ci/check_server_readiness.py`、`scripts/ci/container_runtime.py`、`scripts/ci/pre_review.sh`、`scripts/ci/run_all_checks.sh`、`scripts/ci/run_codex_in_repo_container.py`、`scripts/ci/run_container_pack.py`、`scripts/ci/run_docs_checks.sh`、`scripts/ci/run_in_repo_container.py`、`scripts/ci/run_python_in_dockerfile.py`、`scripts/experiments/` 配下の helper、`scripts/setup_worktree.sh`、`scripts/shared/error_handler.py`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/audit_and_fix_links.py`、`scripts/tools/check_markdown_lint.py`、`scripts/tools/check_markdown_math.py`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py`、`scripts/validation/triplet_validator.py` は shared canon への symlink view にします
 - `.github/workflows/agent-coordination.yml` は shared canon 正本から root へ同期する copy surface にします
 
@@ -399,12 +399,12 @@ root 側は次のような薄い wrapper と symlink view にします。
 
 重要:
 - subtree 配下にも `AGENTS.md` は置けますが、通常は canon 開発 subtree 用 override としてのみ使います
-- product runtime の正面入口は root に固定します
+- root runtime の正面入口は root に固定します
 - shared canon の source of truth は root 側ではなく `vendor/agent-canon/` です
 
 ## 6. worktree と subtree の関係
 
-- product repo で worktree を切ると、その branch / commit に入っている `vendor/agent-canon/` snapshot がそのまま見えます
+- template / 派生 repo で worktree を切ると、その branch / commit に入っている `vendor/agent-canon/` snapshot がそのまま見えます
 - upstream `agent-canon` の最新が自動で流入するわけではありません
 - shared canon の更新は、明示的に subtree pull した branch にだけ反映されます
 
@@ -441,7 +441,7 @@ bash scripts/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 bash scripts/sync_agent_canon.sh pull
 ```
 
-### 7.5 product 側の shared canon 変更を upstream へ戻す
+### 7.5 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 
 ```bash
 bash scripts/sync_agent_canon.sh push
@@ -474,16 +474,16 @@ bash scripts/sync_agent_canon.sh status
 
 exit 条件:
 - upstream repo 単体で shared canon を保持できる
-- product 側に subtree add / split できる snapshot history を持てる
+- template / 派生 repo 側に subtree add / split できる snapshot history を持てる
 
-### Phase 2. product bootstrap command を追加する
+### Phase 2. template bootstrap command を追加する
 
 候補:
-- `scripts/bootstrap_product.py`
+- `scripts/bootstrap_derived_repo.py`
 - `scripts/new_product.sh`
 
 役割:
-- template clone 後の product 名差し替え
+- template clone 後の repo 名差し替え
 - subtree remote 設定
 - optional pack 選択
 
@@ -493,15 +493,15 @@ exit 条件:
 
 抑止:
 - root `AGENTS.md` と root `.codex/` の discovery path は最後まで消さない
-- wrapper は product 固有情報だけに絞る
+- wrapper は instance-local 情報だけに絞る
 
-### shared canon と product 固有文書が混ざる
+### shared canon と instance-local 文書が混ざる
 
 抑止:
 - `agent-canon` へ移す範囲を phase で分ける
-- Docker、server、experiment の文書は product 側に残す
+- Docker、server、experiment の文書は root 側に残す
 
-### product 側で直した canon を upstream へ戻せない
+### template / 派生 repo 側で直した canon を upstream へ戻せない
 
 抑止:
 - `vendor/agent-canon/` の変更は専用 commit に分ける
@@ -519,8 +519,8 @@ exit 条件:
 - upstream `agent-canon` repo が存在する
 - template repo が `vendor/agent-canon/` subtree snapshot を持つ
 - root `AGENTS.md` と root `.codex/` は root discovery path として機能する
-- product で worktree を切ったとき、その時点の shared canon snapshot が `vendor/agent-canon/` として見える
-- product 側で直した shared canon を `git subtree push` で upstream へ戻せる
+- template / 派生 repo で worktree を切ったとき、その時点の shared canon snapshot が `vendor/agent-canon/` として見える
+- template / 派生 repo 側で直した shared canon を `git subtree push` で upstream へ戻せる
 - upstream repo 作成前でも、`git clone <template>` 直後に `vendor/agent-canon/` snapshot が揃っている
 
 ## 11. 関連

@@ -1,7 +1,7 @@
 # ユーザー向けワークフローガイド
 
 この文書は、この template repo の workflow canon 入口です。
-workflow 系の正本は shared agent canon に寄せ、product root では同じ path を symlink view として使います。
+workflow 系の正本は shared agent canon に寄せ、template root と派生 repo root では同じ path を symlink view として使います。
 
 ## Workflow Canon
 
@@ -111,7 +111,7 @@ scope drift や cleanup readiness を見たいときは `worktree-health` を使
 
 ### 5. shared agent canon を同期するとき
 
-shared agent canon を別 repo に切り出したあとは、product 側では subtree snapshot を同期します。
+shared agent canon を別 repo に切り出したあとは、template / 派生 repo 側では subtree snapshot を同期します。
 
 ```bash
 bash scripts/sync_agent_canon.sh link-root
@@ -123,7 +123,7 @@ make agent-checks
 
 ownership と surface 種別は `documents/SHARED_RUNTIME_SURFACES.md` を参照します。
 
-product 側で shared canon を直した変更を upstream へ戻すときは、`vendor/agent-canon/` 配下だけを専用 commit に分けてから `push` を使います。
+template / 派生 repo 側で shared canon を直した変更を upstream へ戻すときは、`vendor/agent-canon/` 配下だけを専用 commit に分けてから `push` を使います。
 
 ### 6. closeout
 

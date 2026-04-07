@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 
 # Preserve the root wrapper path when this module is imported through a
-# symlinked runtime surface from the product checkout.
+# symlinked runtime surface from the template or derived checkout.
 WORKSPACE_ROOT = Path(__file__).absolute().parents[2]
 
 

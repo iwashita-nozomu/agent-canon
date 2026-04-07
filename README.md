@@ -85,12 +85,12 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `scripts/validation/triplet_validator.py`
 
 含まないもの:
-- product root entrypoint
+- template root entrypoint
   - root `AGENTS.md`
 - implementation / experiment / environment 本体
-  - product implementation と shared canon 以外の `python/`
-  - product 固有の `experiments/registry.toml`
-  - product 固有の `experiments/<topic>/`
+  - template-default implementation と shared canon 以外の `python/`
+  - 派生 repo ごとの `experiments/registry.toml`
+  - 派生 repo ごとの `experiments/<topic>/`
   - `docker/`
   - shared canon 以外の `notes/`
 

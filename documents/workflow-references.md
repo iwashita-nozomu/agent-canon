@@ -12,7 +12,7 @@
 - [Git - git-worktree Documentation](https://git-scm.com/docs/git-worktree)
   - worktree ごとに snapshot を持つ、という運用整理の根拠です。
 - [About Git subtree merges - GitHub Docs](https://docs.github.com/en/get-started/using-git/about-git-subtree-merges)
-  - shared canon を subtree として product repo へ取り込む運用整理の参考です。
+  - shared canon を subtree として template / 派生 repo へ取り込む運用整理の参考です。
 - [Models | OpenAI API](https://developers.openai.com/api/docs/models)
   - current model lineup と mainline chooser の根拠です。
 - [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)

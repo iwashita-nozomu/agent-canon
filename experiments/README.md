@@ -2,7 +2,7 @@
 
 `experiments/` は、server 上で回す実験コード、run ごとの生成物、1 run ごとの report をまとめる場所です。
 この template では、topic ごとの実験コードと run artifact を同じ tree に寄せます。
-shared canon では、このうち topic 共通の scaffold と report 導線だけを保持し、product 固有の `registry.toml` と `experiments/<topic>/` は root 側の正本に残します。
+shared canon では、このうち topic 共通の scaffold と report 導線だけを保持し、派生 repo ごとの `registry.toml` と `experiments/<topic>/` は root 側の正本に残します。
 
 ## 標準構成
 

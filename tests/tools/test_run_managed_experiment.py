@@ -223,7 +223,7 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
 def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
     tmp_path: Path,
 ) -> None:
-    """The checker should infer the product repo root from the invoked symlink path."""
+    """The checker should infer the derived repo root from the invoked symlink path."""
     repo_root = build_repo(tmp_path)
     script_path = repo_root / "scripts" / "ci" / "check_experiment_registry.py"
     script_path.parent.mkdir(parents=True, exist_ok=True)

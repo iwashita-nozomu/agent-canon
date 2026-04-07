@@ -1,7 +1,7 @@
 # Shared Runtime Surfaces
 
 この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
-product root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
+template root と派生 repo root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
 
 ## Surface Types
 
@@ -109,8 +109,8 @@ bash scripts/sync_agent_canon.sh check
 make agent-checks
 ```
 
-## Product-Side Interpretation
+## Root-Side Interpretation
 
-- `scripts/README.md` と `documents/tools/README.md` は product 側の実行入口です
-- `experiments/registry.toml`、topic 固有の `experiments/<topic>/`、product 固有 note は root 側の正本に残します
+- `scripts/README.md` と `documents/tools/README.md` は root 側の実行入口です
+- `experiments/registry.toml`、topic 固有の `experiments/<topic>/`、repo-local note は root 側の正本に残します
 - shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします
