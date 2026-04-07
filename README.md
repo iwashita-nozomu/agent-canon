@@ -10,8 +10,12 @@
 - `.claude/skills/`
 - `.codex/README.md`
 - `.codex/agents/`
-- agent 関連の `documents/`
-- agent 関連の `scripts/`
+- `documents/AGENTS_COORDINATION.md`
+- `documents/REVIEW_PROCESS.md`
+- `documents/implementation-waterfall-workflow.md`
+- `documents/workflow-references.md`
+- `scripts/agent_tools/`
+- `scripts/tools/mirror_skill_shims.py`
 
 含まないもの:
 - product root entrypoint
@@ -28,8 +32,10 @@
 更新:
 
 ```bash
-bash scripts/sync_agent_canon.sh snapshot
+bash scripts/sync_agent_canon.sh link-root
 ```
+
+既存の `snapshot` command は後方互換 alias として残しています。
 
 外部 repo ができたら、次で upstream sync へ移れます。
 
