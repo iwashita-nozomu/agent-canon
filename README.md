@@ -7,6 +7,7 @@
 - `CLAUDE.md`
 - `.github/AGENTS.md`
 - `.github/copilot-instructions.md`
+- `.codex/config.toml`
 - `agents/`
 - `.agents/skills/`
 - `.claude/agents/`
@@ -31,7 +32,6 @@
 含まないもの:
 - product root entrypoint
   - root `AGENTS.md`
-  - root `.codex/config.toml`
 - implementation / experiment / environment 本体
   - `python/`
   - `experiments/`
