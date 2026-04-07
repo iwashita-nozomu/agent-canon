@@ -25,6 +25,7 @@
 - agent review / coordination documents
 - subtree migration and sync operation canon
 - skill and worktree operation canon
+- worktree note templates
 - agent support scripts
 
 ## Non-Goals

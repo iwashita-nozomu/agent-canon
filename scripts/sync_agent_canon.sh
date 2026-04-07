@@ -77,6 +77,8 @@ documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPL
 documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
 documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
+notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
+notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
 scripts/agent_tools:../${PREFIX}/scripts/agent_tools
 scripts/setup_worktree.sh:../${PREFIX}/scripts/setup_worktree.sh
 scripts/sync_agent_canon.sh:../${PREFIX}/scripts/sync_agent_canon.sh

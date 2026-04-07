@@ -24,6 +24,8 @@
 - `documents/implementation-waterfall-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `notes/worktrees/README.md`
+- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `scripts/agent_tools/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`

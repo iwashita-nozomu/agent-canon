@@ -91,6 +91,8 @@ shared canon の正本として扱う対象:
 - `documents/implementation-waterfall-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `notes/worktrees/README.md`
+- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `scripts/agent_tools/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
@@ -114,7 +116,7 @@ shared canon の正本として扱う対象:
 補足:
 - `docker` 以外の全部を `agent-canon` へ移すわけではありません
 - implementation、experiment、server operation、generic project bootstrap は product template 側に残します
-- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/implementation-waterfall-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`scripts/agent_tools/`、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
+- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/implementation-waterfall-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`scripts/agent_tools/`、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
 
 ### 4.3 vendor-aware 化が必要な support surface
 
@@ -167,6 +169,10 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/workflow-references.md` への symlink view
 - `documents/worktree-lifecycle.md`
   - `vendor/agent-canon/documents/worktree-lifecycle.md` への symlink view
+- `notes/worktrees/README.md`
+  - `vendor/agent-canon/notes/worktrees/README.md` への symlink view
+- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+  - `vendor/agent-canon/notes/worktrees/WORKTREE_LOG_TEMPLATE.md` への symlink view
 - `agents/`
   - `vendor/agent-canon/agents/` への symlink view
 - `.agents/`
