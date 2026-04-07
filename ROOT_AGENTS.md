@@ -23,6 +23,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon, not in this wrapper.
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
+- `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a product-specific override is intentional.
 

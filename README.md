@@ -8,6 +8,7 @@
 - `CLAUDE.md`
 - `.github/AGENTS.md`
 - `.github/copilot-instructions.md`
+- `.github/workflows/agent-coordination.yml`
 - `.codex/config.toml`
 - `agents/`
 - `.agents/skills/`
@@ -24,8 +25,12 @@
 - `documents/implementation-waterfall-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `python/tests/agent_tools/__init__.py`
+- `python/tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+- `python/tests/tools/test_mirror_skill_shims.py`
 - `scripts/agent_tools/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
@@ -38,10 +43,10 @@
 - product root entrypoint
   - root `AGENTS.md`
 - implementation / experiment / environment 本体
-  - `python/`
+  - product implementation と shared canon 以外の `python/`
   - `experiments/`
   - `docker/`
-  - `notes/`
+  - shared canon 以外の `notes/`
 
 更新:
 

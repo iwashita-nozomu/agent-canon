@@ -77,8 +77,12 @@ documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPL
 documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
 documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
+notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
 notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
+python/tests/agent_tools/__init__.py:../../../${PREFIX}/python/tests/agent_tools/__init__.py
+python/tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../../${PREFIX}/python/tests/agent_tools/test_smoke_test_research_perspective_pack.py
+python/tests/tools/test_mirror_skill_shims.py:../../../${PREFIX}/python/tests/tools/test_mirror_skill_shims.py
 scripts/agent_tools:../${PREFIX}/scripts/agent_tools
 scripts/setup_worktree.sh:../${PREFIX}/scripts/setup_worktree.sh
 scripts/sync_agent_canon.sh:../${PREFIX}/scripts/sync_agent_canon.sh
@@ -86,6 +90,12 @@ scripts/tools/mirror_skill_shims.py:../../${PREFIX}/scripts/tools/mirror_skill_s
 scripts/tools/check_worktree_scopes.sh:../../${PREFIX}/scripts/tools/check_worktree_scopes.sh
 scripts/tools/create_worktree.sh:../../${PREFIX}/scripts/tools/create_worktree.sh
 scripts/worktree_start.sh:../${PREFIX}/scripts/worktree_start.sh
+EOF
+}
+
+build_copy_specs() {
+  cat <<EOF
+.github/workflows/agent-coordination.yml:${PREFIX}/.github/workflows/agent-coordination.yml
 EOF
 }
 
@@ -98,7 +108,18 @@ link_path() {
   ln -s "$target" "$abs_path"
 }
 
-ensure_link_root_safe() {
+copy_path() {
+  local path="$1"
+  local source="$2"
+  local abs_path="$ROOT_DIR/$path"
+  local abs_source="$ROOT_DIR/$source"
+  [ -e "$abs_source" ] || die "copy source '$source' does not exist"
+  rm -rf "$abs_path"
+  mkdir -p "$(dirname "$abs_path")"
+  cp "$abs_source" "$abs_path"
+}
+
+ensure_surface_sync_safe() {
   local force="${1:-0}"
   local -a paths=()
   local status=""
@@ -109,8 +130,14 @@ ensure_link_root_safe() {
   fi
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     paths+=("${spec%%:*}")
-  done < <(build_link_specs)
+  done < <(
+    {
+      build_link_specs
+      build_copy_specs
+    }
+  )
 
   [ "${#paths[@]}" -gt 0 ] || return
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
@@ -123,7 +150,7 @@ ensure_link_root_safe() {
 cmd_link_root() {
   local force="${1:-0}"
   ensure_prefix_exists
-  ensure_link_root_safe "$force"
+  ensure_surface_sync_safe "$force"
 
   local spec=""
   while IFS= read -r spec; do
@@ -131,6 +158,12 @@ cmd_link_root() {
     local target="${spec#*:}"
     link_path "$path" "$target"
   done < <(build_link_specs)
+
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    copy_path "$path" "$source"
+  done < <(build_copy_specs)
 }
 
 cmd_snapshot() {
@@ -196,6 +229,20 @@ cmd_status() {
       echo "link[$path]=missing"
     fi
   done < <(build_link_specs)
+
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    local abs_source="$ROOT_DIR/$source"
+    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
+      echo "copy[$path]=ok"
+    elif [ -e "$abs_path" ]; then
+      echo "copy[$path]=drift"
+    else
+      echo "copy[$path]=missing"
+    fi
+  done < <(build_copy_specs)
 }
 
 main() {

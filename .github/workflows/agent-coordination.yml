@@ -1,0 +1,1049 @@
+name: Agent Coordination
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Short task summary for the agent team run
+        required: true
+        default: manual-agent-run
+        type: string
+      owner:
+        description: Human or agent owning the run
+        required: true
+        default: github-actions
+        type: string
+      specialists:
+        description: Optional comma-separated specialist roles such as researcher,scheduler,infra_steward
+        required: false
+        default: ""
+        type: string
+      full_team:
+        description: Enable every specialist role for this run
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.bootstrap.outputs.run_id }}
+      report_dir: ${{ steps.bootstrap.outputs.report_dir }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Bootstrap agent run
+        id: bootstrap
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          flags=()
+          if [ "${{ inputs.full_team }}" = "true" ]; then
+            flags+=(--full-team)
+          fi
+          if [ -n "${normalized}" ]; then
+            IFS=',' read -ra roles <<< "${normalized}"
+            for role in "${roles[@]}"; do
+              [ -n "${role}" ] && flags+=(--enable "${role}")
+            done
+          fi
+          python3 scripts/agent_tools/bootstrap_agent_run.py \
+            --task "${{ inputs.task }}" \
+            --owner "${{ inputs.owner }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            "${flags[@]}" > bootstrap.txt
+          cat bootstrap.txt
+          run_id="$(grep '^RUN_ID=' bootstrap.txt | cut -d= -f2-)"
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "report_dir=reports/agents/${run_id}" >> "$GITHUB_OUTPUT"
+      - name: Upload bootstrap bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-bootstrap-${{ steps.bootstrap.outputs.run_id }}
+          path: ${{ steps.bootstrap.outputs.report_dir }}
+
+  manager:
+    needs: bootstrap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download bootstrap bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-bootstrap-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run manager stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/manager-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/manager-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_manager: intake confirmed for always-on spine"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/intent_brief.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role manager \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload manager bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-manager-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  manager_reviewer:
+    needs: [bootstrap, manager]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download manager bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-manager-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run manager reviewer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/manager-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/manager-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- approve: GitHub Actions keeps the always-on artifact spine explicit in CI."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/management_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role manager_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload manager review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-manager-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  manager_response:
+    needs: [bootstrap, manager_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download manager review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-manager-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run manager response stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/manager-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/manager-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| $(date -u '+%Y-%m-%dT%H:%M:%SZ') | manager | Resolve management review | GitHub Actions manager re-entered after review. | management_review.md |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/decision_log.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role manager \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload manager response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-manager-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  researcher:
+    needs: [bootstrap, manager_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download manager response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-manager-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run researcher stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",researcher,"* ]] \
+            && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
+            echo "researcher inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/research-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/research-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_researcher: specialist inputs collected for this run."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/research_notes.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role researcher \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload research bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-research-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  research_reviewer:
+    needs: [bootstrap, researcher]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download research bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-research-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run research reviewer stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",researcher,"* ]] \
+            && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
+            echo "research reviewer inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/research-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/research-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- approve: research notes are ready for manager aggregation."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/research_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role research_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload research review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-research-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  research_response:
+    needs: [bootstrap, research_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download research review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-research-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run research response stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",researcher,"* ]] \
+            && [[ ",${normalized}," != *,",research_reviewer,"* ]]; then
+            echo "research response inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/research-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/research-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_researcher_response: resolved research review feedback."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/research_notes.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role researcher \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload research response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-research-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  scheduler:
+    needs: [bootstrap, research_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download research response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-research-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run scheduler stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",scheduler,"* ]] \
+            && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
+            echo "scheduler inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/schedule-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/schedule-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| specialists | specialist sequencing is attached before design | manager response | artifact-only | open |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/schedule.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role scheduler \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload schedule bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-schedule-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  schedule_reviewer:
+    needs: [bootstrap, scheduler]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download schedule bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-schedule-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run schedule reviewer stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",scheduler,"* ]] \
+            && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
+            echo "schedule reviewer inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/schedule-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/schedule-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- approve: schedule is ready to hand back toward manager."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/schedule_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role schedule_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload schedule review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-schedule-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  schedule_response:
+    needs: [bootstrap, schedule_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download schedule review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-schedule-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run schedule response stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",scheduler,"* ]] \
+            && [[ ",${normalized}," != *,",schedule_reviewer,"* ]]; then
+            echo "schedule response inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/schedule-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/schedule-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_scheduler_response: resolved schedule review feedback."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/schedule.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role scheduler \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload schedule response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-schedule-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  infra_steward:
+    needs: [bootstrap, schedule_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download schedule response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-schedule-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run infra steward stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",infra_steward,"* ]] \
+            && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
+            echo "infra steward inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/infra-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/infra-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_infra_steward: infra constraints and rollout notes attached."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/infra_notes.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role infra_steward \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload infra bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-infra-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  infra_reviewer:
+    needs: [bootstrap, infra_steward]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download infra bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-infra-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run infra reviewer stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",infra_steward,"* ]] \
+            && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
+            echo "infra reviewer inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/infra-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/infra-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- approve: infra notes are ready to hand back toward manager."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/infra_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role infra_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload infra review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-infra-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  infra_response:
+    needs: [bootstrap, infra_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download infra review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-infra-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run infra response stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          if [ "${{ inputs.full_team }}" != "true" ] \
+            && [[ ",${normalized}," != *,",infra_steward,"* ]] \
+            && [[ ",${normalized}," != *,",infra_reviewer,"* ]]; then
+            echo "infra response inactive; pass-through"
+            exit 0
+          fi
+          report_snapshot="${RUNNER_TEMP}/infra-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/infra-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_infra_response: resolved infra review feedback."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/infra_notes.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role infra_steward \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload infra response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-infra-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  manager_specialist_response:
+    needs: [bootstrap, infra_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download infra response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-infra-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run manager specialist response stage
+        run: |
+          normalized="$(printf '%s' '${{ inputs.specialists }}' | tr -d ' ')"
+          activated="none"
+          if [ "${{ inputs.full_team }}" = "true" ]; then
+            activated="full-team"
+          elif [ -n "${normalized}" ]; then
+            activated="${normalized}"
+          fi
+          report_snapshot="${RUNNER_TEMP}/manager-specialist-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/manager-specialist-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| $(date -u '+%Y-%m-%dT%H:%M:%SZ') | manager | Aggregate specialist outputs | Activated specialists: ${activated}. | report bundle |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/decision_log.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role manager \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload manager specialist response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-manager-specialist-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  designer:
+    needs: [bootstrap, manager_specialist_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download manager specialist response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-manager-specialist-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run designer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/design-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/design-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_designer: CI workflow models the always-on handoff spine before verification"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/design_brief.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role designer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload design bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-design-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  design_reviewer:
+    needs: [bootstrap, designer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download design bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-design-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run design reviewer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/design-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/design-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| workflow | always-on roles stay explicit before verification | medium | open |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/design_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role design_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload design review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-design-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  design_response:
+    needs: [bootstrap, design_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download design review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-design-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run design response stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/design-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/design-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- github_actions_designer_response: resolved design review feedback."
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/design_brief.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role designer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload design response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-design-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  implementer:
+    needs: [bootstrap, design_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download design response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-design-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run implementer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/implementer-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/implementer-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| $(date -u '+%Y-%m-%dT%H:%M:%SZ') | implementer | Advance the always-on CI handoff | No repo edit is applied in the GitHub Actions placeholder stage. | .github/workflows/agent-coordination.yml |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/decision_log.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role implementer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload implementer bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-implementer-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  change_reviewer:
+    needs: [bootstrap, implementer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download implementer bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-implementer-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run change reviewer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/change-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/change-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| ci-placeholder | decision_log and artifact chain stay in sync | low | open |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/change_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role change_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload change review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-change-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  implementer_change_response:
+    needs: [bootstrap, change_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download change review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-change-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run implementer change response stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/implementer-change-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/implementer-change-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| $(date -u '+%Y-%m-%dT%H:%M:%SZ') | implementer | Resolve change review | Implementer re-entered after chunk review. | change_review.md |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/decision_log.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role implementer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload implementer change response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-implementer-change-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  final_reviewer:
+    needs: [bootstrap, implementer_change_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download implementer change response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-implementer-change-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run final reviewer stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/final-review-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/final-review-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| verifier runs only after the final review artifact exists | medium | open |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/final_review.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role final_reviewer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload final review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-final-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  implementer_final_response:
+    needs: [bootstrap, final_reviewer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download final review bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-final-review-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run implementer final response stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/implementer-final-response-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/implementer-final-response-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "| $(date -u '+%Y-%m-%dT%H:%M:%SZ') | implementer | Resolve final review | Implementer re-entered before verification. | final_review.md |"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/decision_log.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role implementer \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload implementer final response bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-implementer-final-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  verifier:
+    needs: [bootstrap, implementer_final_response]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Python and deps
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" || true
+          if [ -f docker/requirements.txt ]; then pip install -r docker/requirements.txt || true; fi
+      - name: Download implementer final response bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-implementer-final-response-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run pre-review checks
+        run: |
+          export AGENT_REPORT_DIR="${{ needs.bootstrap.outputs.report_dir }}"
+          export AGENT_ROLE="verifier"
+          export AGENT_ENFORCE_WRITE_SCOPE="1"
+          bash scripts/ci/pre_review.sh
+      - name: Upload verification bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-verification-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+
+  auditor:
+    needs: [bootstrap, verifier]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Download verification bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-run-verification-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}
+      - name: Run auditor stage
+        run: |
+          report_snapshot="${RUNNER_TEMP}/audit-report-before.json"
+          workspace_snapshot="${RUNNER_TEMP}/audit-workspace-before.json"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-out "${report_snapshot}" \
+            --workspace-snapshot-out "${workspace_snapshot}"
+          {
+            echo ""
+            echo "- audit_note: always-on and specialist handoff artifacts collected in GitHub Actions"
+          } >> "${{ needs.bootstrap.outputs.report_dir }}/retrospective.md"
+          python3 scripts/agent_tools/validate_role_write_scope.py \
+            --role auditor \
+            --report-dir "${{ needs.bootstrap.outputs.report_dir }}" \
+            --workspace-root "${GITHUB_WORKSPACE}" \
+            --report-snapshot-in "${report_snapshot}" \
+            --workspace-snapshot-in "${workspace_snapshot}"
+      - name: Upload audit bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-run-audit-${{ needs.bootstrap.outputs.run_id }}
+          path: ${{ needs.bootstrap.outputs.report_dir }}

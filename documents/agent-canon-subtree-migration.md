@@ -29,7 +29,9 @@ product-repo/
 ├─ CLAUDE.md
 ├─ .github/
 │  ├─ AGENTS.md
-│  └─ copilot-instructions.md
+│  ├─ copilot-instructions.md
+│  └─ workflows/
+│     └─ agent-coordination.yml
 ├─ .codex/
 │  ├─ config.toml
 │  └─ README.md
@@ -41,6 +43,10 @@ product-repo/
 │     ├─ .codex/agents/
 │     └─ shared agent-facing docs
 ├─ python/
+│  └─ tests/
+│     ├─ agent_tools/
+│     └─ tools/
+│        └─ test_mirror_skill_shims.py
 ├─ docker/
 ├─ documents/
 │  ├─ BRANCH_SCOPE.md
@@ -51,6 +57,9 @@ product-repo/
 │  ├─ implementation-waterfall-workflow.md
 │  ├─ workflow-references.md
 │  └─ worktree-lifecycle.md
+├─ notes/
+│  └─ themes/
+│     └─ from_another_agent.md
 └─ scripts/
    ├─ agent_tools/
    ├─ setup_worktree.sh
@@ -79,6 +88,7 @@ shared canon の正本として扱う対象:
 - `CLAUDE.md`
 - `.github/AGENTS.md`
 - `.github/copilot-instructions.md`
+- `.github/workflows/agent-coordination.yml`
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents/`
@@ -91,8 +101,12 @@ shared canon の正本として扱う対象:
 - `documents/implementation-waterfall-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `python/tests/agent_tools/__init__.py`
+- `python/tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+- `python/tests/tools/test_mirror_skill_shims.py`
 - `scripts/agent_tools/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
@@ -108,15 +122,16 @@ shared canon の正本として扱う対象:
 - `README.md`
 - `docker/`
 - `scripts/`
-- `python/`
+- product implementation と shared canon 以外の `python/`
 - `experiments/`
-- `notes/`
+- shared canon 以外の `notes/`
 - `documents/` のうち product / environment / server / experiment に閉じるもの
 
 補足:
 - `docker` 以外の全部を `agent-canon` へ移すわけではありません
 - implementation、experiment、server operation、generic project bootstrap は product template 側に残します
-- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/implementation-waterfall-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`scripts/agent_tools/`、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
+- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/implementation-waterfall-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`notes/themes/from_another_agent.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`python/tests/agent_tools/__init__.py`、`python/tests/agent_tools/test_smoke_test_research_perspective_pack.py`、`python/tests/tools/test_mirror_skill_shims.py`、`scripts/agent_tools/`、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
+- `.github/workflows/agent-coordination.yml` は shared canon 正本から root へ同期する copy surface にします
 
 ### 4.3 vendor-aware 化が必要な support surface
 
@@ -173,12 +188,20 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/notes/worktrees/README.md` への symlink view
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
   - `vendor/agent-canon/notes/worktrees/WORKTREE_LOG_TEMPLATE.md` への symlink view
+- `notes/themes/from_another_agent.md`
+  - `vendor/agent-canon/notes/themes/from_another_agent.md` への symlink view
 - `agents/`
   - `vendor/agent-canon/agents/` への symlink view
 - `.agents/`
   - `vendor/agent-canon/.agents/` への symlink view
 - `.claude/`
   - `vendor/agent-canon/.claude/` への symlink view
+- `python/tests/agent_tools/__init__.py`
+  - `vendor/agent-canon/python/tests/agent_tools/__init__.py` への symlink view
+- `python/tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+  - `vendor/agent-canon/python/tests/agent_tools/test_smoke_test_research_perspective_pack.py` への symlink view
+- `python/tests/tools/test_mirror_skill_shims.py`
+  - `vendor/agent-canon/python/tests/tools/test_mirror_skill_shims.py` への symlink view
 - `scripts/agent_tools/`
   - `vendor/agent-canon/scripts/agent_tools/` への symlink view
 - `scripts/setup_worktree.sh`
@@ -193,6 +216,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/scripts/tools/create_worktree.sh` への symlink view
 - `scripts/tools/mirror_skill_shims.py`
   - `vendor/agent-canon/scripts/tools/mirror_skill_shims.py` への symlink view
+- `.github/workflows/agent-coordination.yml`
+  - `vendor/agent-canon/.github/workflows/agent-coordination.yml` から root へ同期する copy surface
 
 重要:
 - subtree 配下にも `AGENTS.md` は置けますが、通常は canon 開発 subtree 用 override としてのみ使います

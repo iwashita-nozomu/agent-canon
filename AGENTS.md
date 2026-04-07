@@ -25,13 +25,16 @@
 - agent review / coordination documents
 - subtree migration and sync operation canon
 - skill and worktree operation canon
+- carry-over note template
 - worktree note templates
+- agent-specific CI workflow
+- agent-specific regression tests
 - agent support scripts
 
 ## Non-Goals
 
 - `docker/`
-- `python/`
+- product implementation と shared canon 以外の `python/`
 - `experiments/`
 - product-specific README / bootstrap / server contract
 
