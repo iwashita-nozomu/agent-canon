@@ -27,18 +27,40 @@ root では次を symlink view として扱います。
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/WORKFLOW_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/coding-conventions-experiments.md`
+- `documents/experiment-critical-review.md`
+- `documents/experiment-registry.md`
+- `documents/experiment-report-style.md`
 - `documents/experiment-workflow.md`
+- `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `documents/conventions/python/20_benchmark_policy.md`
+- `documents/conventions/python/30_experiment_directory_structure.md`
+- `experiments/README.md`
+- `experiments/_template`
+- `experiments/report/README.md`
+- `notes/experiments/README.md`
+- `notes/experiments/REPORT_TEMPLATE.md`
+- `notes/experiments/results/README.md`
+- `notes/knowledge/benchmark_vs_experiment.md`
+- `notes/knowledge/experiment_directory_planning.md`
+- `notes/knowledge/experiment_operations.md`
 - `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_mirror_skill_shims.py`
+- `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
+- `scripts/ci/check_experiment_registry.py`
+- `scripts/experiments/create_experiment_topic.py`
+- `scripts/experiments/registry_lib.py`
+- `scripts/experiments/run_managed_experiment.py`
+- `scripts/experiments/sync_experiment_registry_context.py`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
 - `scripts/worktree_start.sh`
@@ -69,4 +91,5 @@ make agent-checks
 ## Product-Side Interpretation
 
 - `scripts/README.md` と `documents/tools/README.md` は product 側の実行入口です
+- `experiments/registry.toml`、topic 固有の `experiments/<topic>/`、product 固有 note は root 側の正本に残します
 - shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします

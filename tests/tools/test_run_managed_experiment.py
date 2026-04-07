@@ -1,0 +1,336 @@
+"""Tests for the managed experiment run helper."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+CHECK_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "ci"
+    / "check_experiment_registry.py"
+)
+CREATE_TOPIC_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "experiments"
+    / "create_experiment_topic.py"
+)
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "experiments"
+    / "run_managed_experiment.py"
+)
+SYNC_CONTEXT_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "experiments"
+    / "sync_experiment_registry_context.py"
+)
+CANONICAL_ENTRYPOINT = "experiments/demo_topic/experimentcode.py"
+SMOKE_INNER_COMMAND = (
+    f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode smoke"
+)
+FORMAL_INNER_COMMAND = (
+    f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode formal"
+)
+RECURSIVE_RUNNER_COMMAND = (
+    "python3 scripts/experiments/run_managed_experiment.py --topic demo_topic"
+)
+
+
+def build_repo(tmp_path: Path) -> Path:
+    """Create a minimal fake repo layout for the helper."""
+    repo_root = tmp_path / "repo"
+    (repo_root / "experiments" / "_template" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "report").mkdir(parents=True)
+    (repo_root / "scripts" / "experiments").mkdir(parents=True)
+    (repo_root / "experiments" / "_template" / "README.md").write_text(
+        "# Experiment Topic Template\n\n"
+        "smoke: `python3 scripts/experiments/run_managed_experiment.py "
+        "--topic <topic> --use-registered-command smoke`\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "_template" / "cases.py").write_text(
+        "from __future__ import annotations\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "_template" / "experimentcode.py").write_text(
+        "from __future__ import annotations\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "_template" / "result" / "README.md").write_text(
+        "# Result Directory\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "demo_topic" / "README.md").write_text(
+        "# Demo Topic\n",
+        encoding="utf-8",
+    )
+    (repo_root / "scripts" / "experiments" / "run_managed_experiment.py").write_text(
+        "# placeholder\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "demo_topic" / "experimentcode.py").write_text(
+        "\n".join(
+            [
+                "from __future__ import annotations",
+                "",
+                "import argparse",
+                "from pathlib import Path",
+                "",
+                'parser = argparse.ArgumentParser()',
+                'parser.add_argument("--run-dir", required=True)',
+                'parser.add_argument("--mode", required=True)',
+                "args = parser.parse_args()",
+                "run_dir = Path(args.run_dir)",
+                "run_dir.mkdir(parents=True, exist_ok=True)",
+                "(run_dir / 'marker.txt').write_text(args.mode, encoding='utf-8')",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (repo_root / "experiments" / "registry.toml").write_text(
+        "\n".join(
+            [
+                "schema_version = 1",
+                "",
+                "[defaults]",
+                'managed_runner = "scripts/experiments/run_managed_experiment.py"',
+                'report_root = "experiments/report"',
+                'integration_branch = "main"',
+                'topic_template_dir = "experiments/_template"',
+                "",
+                "[[topics]]",
+                'name = "demo_topic"',
+                'status = "active"',
+                'topic_dir = "experiments/demo_topic"',
+                'topic_readme = "experiments/demo_topic/README.md"',
+                f'canonical_entrypoint = "{CANONICAL_ENTRYPOINT}"',
+                'result_root = "experiments/demo_topic/result"',
+                'report_root = "experiments/report"',
+                'default_variant = "formal"',
+                f'smoke_inner_command = "{SMOKE_INNER_COMMAND}"',
+                f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    return repo_root
+
+
+def test_run_managed_experiment_uses_registered_command_and_writes_manifest(tmp_path: Path) -> None:
+    """The helper should create canonical files for one successful registered run."""
+    repo_root = build_repo(tmp_path)
+    run_name = "demo_topic_smoke_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--use-registered-command",
+            "smoke",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
+    manifest = json.loads((result_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "completed"
+    assert manifest["exit_code"] == 0
+    assert manifest["command_source"] == "registered:smoke"
+    assert manifest["registered_command_match"] == "smoke"
+    assert manifest["registry"]["canonical_entrypoint"] == CANONICAL_ENTRYPOINT
+    assert (result_dir / "run.log").is_file()
+    assert (result_dir / "marker.txt").read_text(encoding="utf-8") == "smoke"
+    report_path = repo_root / "experiments" / "report" / f"{run_name}.md"
+    assert report_path.is_file()
+    assert run_name in report_path.read_text(encoding="utf-8")
+
+
+def test_run_managed_experiment_propagates_failure(tmp_path: Path) -> None:
+    """The helper should return the child exit code and mark the run failed."""
+    repo_root = build_repo(tmp_path)
+    run_name = "demo_topic_fail_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--",
+            sys.executable,
+            "-c",
+            "import sys; sys.exit(7)",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 7
+    manifest_path = (
+        repo_root / "experiments" / "demo_topic" / "result" / run_name / "run_manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["exit_code"] == 7
+    assert manifest["command_source"] == "manual"
+
+
+def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> None:
+    """The registry checker should pass for the generated demo registry."""
+    repo_root = build_repo(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "OK: experiment registry is valid" in result.stdout
+
+
+def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
+    tmp_path: Path,
+) -> None:
+    """The checker should infer the product repo root from the invoked symlink path."""
+    repo_root = build_repo(tmp_path)
+    script_path = repo_root / "scripts" / "ci" / "check_experiment_registry.py"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    script_path.symlink_to(CHECK_SCRIPT)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+        ],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert f"repo_root={repo_root}" in result.stdout
+    assert "OK: experiment registry is valid" in result.stdout
+
+
+def test_check_experiment_registry_rejects_recursive_runner_command(tmp_path: Path) -> None:
+    """The checker should fail when an inner command recursively calls the wrapper."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'smoke_inner_command = "{SMOKE_INNER_COMMAND}"',
+        f'smoke_inner_command = "{RECURSIVE_RUNNER_COMMAND}"',
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "must not call the managed runner recursively" in result.stdout
+
+
+def test_create_experiment_topic_scaffolds_directory_and_registry(tmp_path: Path) -> None:
+    """The scaffold script should copy the template and append a registry entry."""
+    repo_root = build_repo(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CREATE_TOPIC_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--active-branch",
+            "work/new-topic-20260406",
+            "new_topic",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    topic_dir = repo_root / "experiments" / "new_topic"
+    assert topic_dir.is_dir()
+    readme_text = (topic_dir / "README.md").read_text(encoding="utf-8")
+    assert "# new_topic" in readme_text
+    assert "<topic>" not in readme_text
+    registry_text = (repo_root / "experiments" / "registry.toml").read_text(encoding="utf-8")
+    assert 'name = "new_topic"' in registry_text
+    assert 'active_branch = "work/new-topic-20260406"' in registry_text
+
+
+def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(tmp_path: Path) -> None:
+    """The sync script should update branch and worktree metadata for one topic."""
+    repo_root = build_repo(tmp_path)
+    workspace_root = repo_root / ".worktrees" / "demo-topic"
+    workspace_root.mkdir(parents=True)
+    (workspace_root / "WORKTREE_SCOPE.md").write_text("# Scope\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SYNC_CONTEXT_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--workspace-root",
+            str(workspace_root),
+            "--branch",
+            "work/demo-topic-20260406",
+            "--branch-note",
+            "notes/branches/demo_topic.md",
+            "--topic",
+            "demo_topic",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    registry_text = (repo_root / "experiments" / "registry.toml").read_text(encoding="utf-8")
+    assert 'active_branch = "work/demo-topic-20260406"' in registry_text
+    assert 'active_worktree = ".worktrees/demo-topic"' in registry_text
+    assert 'scope_file = ".worktrees/demo-topic/WORKTREE_SCOPE.md"' in registry_text
+    assert 'branch_note = "notes/branches/demo_topic.md"' in registry_text

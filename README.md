@@ -2,6 +2,7 @@
 
 このディレクトリは、shared agent canon の committed snapshot です。
 将来的には外部 repo `agent-canon` の subtree 取り込み先として使いますが、外部 repo を作る前でも `git clone <template>` 直後に shared canon を参照できるよう、template 側へ実体を含めています。
+agent/runtime の最小 surface だけでなく、experiment-oriented な agent set として再配布したい共通規約、review guide、registry tool、topic scaffold もここへ寄せます。
 
 含むもの:
 - `ROOT_AGENTS.md`
@@ -24,18 +25,37 @@
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/WORKFLOW_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/coding-conventions-experiments.md`
+- `documents/experiment-critical-review.md`
+- `documents/experiment-registry.md`
+- `documents/experiment-report-style.md`
 - `documents/experiment-workflow.md`
+- `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `documents/conventions/python/20_benchmark_policy.md`
+- `documents/conventions/python/30_experiment_directory_structure.md`
+- `experiments/README.md`
+- `experiments/_template/`
+- `experiments/report/README.md`
+- `notes/experiments/README.md`
+- `notes/experiments/REPORT_TEMPLATE.md`
+- `notes/experiments/results/README.md`
+- `notes/knowledge/benchmark_vs_experiment.md`
+- `notes/knowledge/experiment_directory_planning.md`
+- `notes/knowledge/experiment_operations.md`
 - `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_mirror_skill_shims.py`
+- `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
+- `scripts/ci/check_experiment_registry.py`
+- `scripts/experiments/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
 - `scripts/worktree_start.sh`
@@ -48,7 +68,8 @@
   - root `AGENTS.md`
 - implementation / experiment / environment 本体
   - product implementation と shared canon 以外の `python/`
-  - `experiments/`
+  - product 固有の `experiments/registry.toml`
+  - product 固有の `experiments/<topic>/`
   - `docker/`
   - shared canon 以外の `notes/`
 

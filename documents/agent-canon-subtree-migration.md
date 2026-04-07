@@ -3,6 +3,7 @@
 この文書は、shared agent canon を別 repo `agent-canon` として切り出し、product template 側へ `git subtree` で取り込むための正本です。
 目的は、`git clone <template>` だけで新しい product を始められることを維持しながら、agent 運用の正本を upstream repo へ分離することです。
 この template ではすでに `vendor/agent-canon/` に committed snapshot を持ち、shared surface の大半を root symlink view に寄せています。
+将来的には experiment-oriented な agent set として `agent-canon` 単体で配布できるよう、実験運用の規約、review guide、registry tool、topic scaffold も shared canon 側へ寄せます。
 
 ## 1. この構成を選ぶ理由
 
@@ -100,18 +101,37 @@ shared canon の正本として扱う対象:
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/WORKFLOW_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/coding-conventions-experiments.md`
+- `documents/experiment-critical-review.md`
+- `documents/experiment-registry.md`
+- `documents/experiment-report-style.md`
 - `documents/experiment-workflow.md`
+- `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
+- `documents/conventions/python/20_benchmark_policy.md`
+- `documents/conventions/python/30_experiment_directory_structure.md`
+- `experiments/README.md`
+- `experiments/_template/`
+- `experiments/report/README.md`
+- `notes/experiments/README.md`
+- `notes/experiments/REPORT_TEMPLATE.md`
+- `notes/experiments/results/README.md`
+- `notes/knowledge/benchmark_vs_experiment.md`
+- `notes/knowledge/experiment_directory_planning.md`
+- `notes/knowledge/experiment_operations.md`
 - `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_mirror_skill_shims.py`
+- `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
+- `scripts/ci/check_experiment_registry.py`
+- `scripts/experiments/`
 - `scripts/setup_worktree.sh`
 - `scripts/sync_agent_canon.sh`
 - `scripts/worktree_start.sh`
@@ -134,7 +154,8 @@ shared canon の正本として扱う対象:
 補足:
 - `docker` 以外の全部を `agent-canon` へ移すわけではありません
 - implementation、experiment、server operation、generic project bootstrap は product template 側に残します
-- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SHARED_RUNTIME_SURFACES.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKFLOW_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/experiment-workflow.md`、`documents/implementation-waterfall-workflow.md`、`documents/research-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`notes/themes/from_another_agent.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`tests/agent_tools/__init__.py`、`tests/agent_tools/test_smoke_test_research_perspective_pack.py`、`tests/tools/test_mirror_skill_shims.py`、`scripts/agent_tools/`、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
+- product 側の `experiments/` では `registry.toml`、topic 固有ディレクトリ、run artifact だけを正本に残し、shared scaffold と運用 guide は `agent-canon` へ寄せます
+- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SHARED_RUNTIME_SURFACES.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKFLOW_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/coding-conventions-experiments.md`、`documents/experiment-critical-review.md`、`documents/experiment-registry.md`、`documents/experiment-report-style.md`、`documents/experiment-workflow.md`、`documents/experiment_runner.md`、`documents/implementation-waterfall-workflow.md`、`documents/research-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`documents/conventions/python/20_benchmark_policy.md`、`documents/conventions/python/30_experiment_directory_structure.md`、`experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`notes/experiments/README.md`、`notes/experiments/REPORT_TEMPLATE.md`、`notes/experiments/results/README.md`、`notes/knowledge/benchmark_vs_experiment.md`、`notes/knowledge/experiment_directory_planning.md`、`notes/knowledge/experiment_operations.md`、`notes/themes/from_another_agent.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`tests/agent_tools/__init__.py`、`tests/agent_tools/test_smoke_test_research_perspective_pack.py`、`tests/tools/test_mirror_skill_shims.py`、`tests/tools/test_run_managed_experiment.py`、`scripts/agent_tools/`、`scripts/ci/check_experiment_registry.py`、`scripts/experiments/` 配下の helper、`scripts/setup_worktree.sh`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py` は shared canon への symlink view にします
 - `.github/workflows/agent-coordination.yml` は shared canon 正本から root へ同期する copy surface にします
 
 ### 4.3 vendor-aware 化が必要な support surface
@@ -186,8 +207,18 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md` への symlink view
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
   - `vendor/agent-canon/documents/WORKTREE_SCOPE_TEMPLATE.md` への symlink view
+- `documents/coding-conventions-experiments.md`
+  - `vendor/agent-canon/documents/coding-conventions-experiments.md` への symlink view
+- `documents/experiment-critical-review.md`
+  - `vendor/agent-canon/documents/experiment-critical-review.md` への symlink view
+- `documents/experiment-registry.md`
+  - `vendor/agent-canon/documents/experiment-registry.md` への symlink view
+- `documents/experiment-report-style.md`
+  - `vendor/agent-canon/documents/experiment-report-style.md` への symlink view
 - `documents/experiment-workflow.md`
   - `vendor/agent-canon/documents/experiment-workflow.md` への symlink view
+- `documents/experiment_runner.md`
+  - `vendor/agent-canon/documents/experiment_runner.md` への symlink view
 - `documents/implementation-waterfall-workflow.md`
   - `vendor/agent-canon/documents/implementation-waterfall-workflow.md` への symlink view
 - `documents/research-workflow.md`
@@ -196,6 +227,28 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/workflow-references.md` への symlink view
 - `documents/worktree-lifecycle.md`
   - `vendor/agent-canon/documents/worktree-lifecycle.md` への symlink view
+- `documents/conventions/python/20_benchmark_policy.md`
+  - `vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md` への symlink view
+- `documents/conventions/python/30_experiment_directory_structure.md`
+  - `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md` への symlink view
+- `experiments/README.md`
+  - `vendor/agent-canon/experiments/README.md` への symlink view
+- `experiments/_template/`
+  - `vendor/agent-canon/experiments/_template/` への symlink view
+- `experiments/report/README.md`
+  - `vendor/agent-canon/experiments/report/README.md` への symlink view
+- `notes/experiments/README.md`
+  - `vendor/agent-canon/notes/experiments/README.md` への symlink view
+- `notes/experiments/REPORT_TEMPLATE.md`
+  - `vendor/agent-canon/notes/experiments/REPORT_TEMPLATE.md` への symlink view
+- `notes/experiments/results/README.md`
+  - `vendor/agent-canon/notes/experiments/results/README.md` への symlink view
+- `notes/knowledge/benchmark_vs_experiment.md`
+  - `vendor/agent-canon/notes/knowledge/benchmark_vs_experiment.md` への symlink view
+- `notes/knowledge/experiment_directory_planning.md`
+  - `vendor/agent-canon/notes/knowledge/experiment_directory_planning.md` への symlink view
+- `notes/knowledge/experiment_operations.md`
+  - `vendor/agent-canon/notes/knowledge/experiment_operations.md` への symlink view
 - `notes/worktrees/README.md`
   - `vendor/agent-canon/notes/worktrees/README.md` への symlink view
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
@@ -214,8 +267,20 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/tests/agent_tools/test_smoke_test_research_perspective_pack.py` への symlink view
 - `tests/tools/test_mirror_skill_shims.py`
   - `vendor/agent-canon/tests/tools/test_mirror_skill_shims.py` への symlink view
+- `tests/tools/test_run_managed_experiment.py`
+  - `vendor/agent-canon/tests/tools/test_run_managed_experiment.py` への symlink view
 - `scripts/agent_tools/`
   - `vendor/agent-canon/scripts/agent_tools/` への symlink view
+- `scripts/ci/check_experiment_registry.py`
+  - `vendor/agent-canon/scripts/ci/check_experiment_registry.py` への symlink view
+- `scripts/experiments/create_experiment_topic.py`
+  - `vendor/agent-canon/scripts/experiments/create_experiment_topic.py` への symlink view
+- `scripts/experiments/registry_lib.py`
+  - `vendor/agent-canon/scripts/experiments/registry_lib.py` への symlink view
+- `scripts/experiments/run_managed_experiment.py`
+  - `vendor/agent-canon/scripts/experiments/run_managed_experiment.py` への symlink view
+- `scripts/experiments/sync_experiment_registry_context.py`
+  - `vendor/agent-canon/scripts/experiments/sync_experiment_registry_context.py` への symlink view
 - `scripts/setup_worktree.sh`
   - `vendor/agent-canon/scripts/setup_worktree.sh` への symlink view
 - `scripts/sync_agent_canon.sh`
