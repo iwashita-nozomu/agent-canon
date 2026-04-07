@@ -310,7 +310,7 @@ agent が反復を自律実行する場合は、これに加えて iteration ご
 - 実験 script 内で partial run の resume protocol を作らない
 - 実験 script 内で ad hoc な result path 命名や手作業 rename をしない
 
-JAX / XLA env が必要な場合は `jax_util.xla_env` を使います。
+JAX / XLA env が必要な場合は、shared helper か runtime layer の既存入口を使います。
 
 ## 8. Spot Run 禁止
 

@@ -1,7 +1,7 @@
 {
   "version": 8,
   "team": {
-    "id": "jax_util_permanent_team",
+    "id": "repo_permanent_team",
     "report_root": "reports/agents",
     "branch_prefix": "agent",
     "worktree_scope_required": true,

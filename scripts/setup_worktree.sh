@@ -14,9 +14,9 @@ set -euo pipefail
 #      → ワークツリー: .worktrees/work-my-feature-20260330
 #
 #   2. カスタムワークツリーパス指定
-#      bash scripts/setup_worktree.sh results/smolyak-validation-20260328 \
-#        .worktrees/results-smolyak-validation-20260328
-#      → ワークツリー: .worktrees/results-smolyak-validation-20260328
+#      bash scripts/setup_worktree.sh results/example-validation-20260407 \
+#        .worktrees/results-example-validation-20260407
+#      → ワークツリー: .worktrees/results-example-validation-20260407
 #
 # 【前提条件】
 #   - リポジトリが clean 状態であることを推奨
