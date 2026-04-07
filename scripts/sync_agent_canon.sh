@@ -11,6 +11,7 @@ usage() {
   cat <<EOF
 Usage:
   bash scripts/sync_agent_canon.sh link-root
+  bash scripts/sync_agent_canon.sh check
   bash scripts/sync_agent_canon.sh snapshot
   bash scripts/sync_agent_canon.sh add <remote-url> [branch]
   bash scripts/sync_agent_canon.sh pull [branch]
@@ -170,6 +171,50 @@ cmd_snapshot() {
   cmd_link_root
 }
 
+cmd_check() {
+  ensure_prefix_exists
+
+  local spec=""
+  local failed=0
+
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local target="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ -L "$abs_path" ] && [ "$(readlink "$abs_path")" = "$target" ]; then
+      continue
+    fi
+    if [ -e "$abs_path" ]; then
+      echo "link[$path]=drift" >&2
+    else
+      echo "link[$path]=missing" >&2
+    fi
+    failed=1
+  done < <(build_link_specs)
+
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    local abs_source="$ROOT_DIR/$source"
+    if [ -f "$abs_path" ] && [ -f "$abs_source" ] && cmp -s "$abs_path" "$abs_source"; then
+      continue
+    fi
+    if [ -e "$abs_path" ]; then
+      echo "copy[$path]=drift" >&2
+    else
+      echo "copy[$path]=missing" >&2
+    fi
+    failed=1
+  done < <(build_copy_specs)
+
+  if [ "$failed" -ne 0 ]; then
+    die "shared surface drift detected; run 'bash scripts/sync_agent_canon.sh link-root'"
+  fi
+
+  echo "shared surface is in sync"
+}
+
 cmd_add() {
   local remote_url="$1"
   local branch="${2:-$DEFAULT_BRANCH}"
@@ -253,6 +298,9 @@ main() {
   case "$subcommand" in
     link-root)
       cmd_link_root
+      ;;
+    check)
+      cmd_check
       ;;
     snapshot)
       cmd_snapshot

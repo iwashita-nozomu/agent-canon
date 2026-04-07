@@ -52,6 +52,7 @@
 
 ```bash
 bash scripts/sync_agent_canon.sh link-root
+bash scripts/sync_agent_canon.sh check
 ```
 
 既存の `snapshot` command は後方互換 alias として残しています。

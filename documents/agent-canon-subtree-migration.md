@@ -240,6 +240,7 @@ root 側は次のような薄い wrapper と symlink view にします。
 
 ```bash
 bash scripts/sync_agent_canon.sh link-root
+bash scripts/sync_agent_canon.sh check
 ```
 
 ### 7.2 互換 alias
