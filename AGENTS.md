@@ -16,6 +16,7 @@
 
 ## Scope
 
+- root AGENTS runtime wrapper
 - Claude / Copilot runtime entrypoints
 - shared Codex config defaults
 - shared agent workflow
