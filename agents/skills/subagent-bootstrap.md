@@ -9,7 +9,7 @@ specialist delegation が必要な task で、run bundle、役割分担、write-
 - run artifact を残したい
 - specialist を使う
 - reviewer / implementer の責務を分けたい
-- 計画レビュー agent と詳細設計レビュー agent を分けたい
+- 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent を分けたい
 
 ## Core References
 
@@ -26,6 +26,6 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --owner "codex"
 ```
 
-repo-changing task では、最低でも `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer` を explicit に有効化します。
+repo-changing task では、最低でも `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を explicit に有効化します。
 調査が必要なら `researcher` と `research_reviewer` も追加します。
-計画レビュー agent と詳細設計レビュー agent は、同じ instance を使い回しません。
+計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。

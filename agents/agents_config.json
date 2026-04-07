@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, scoping, routing, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> implementation. Plan review and detailed design review are separate agents, and detailed design review is the most important pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, scoping, routing, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Plan review, detailed design review, and document flow review are separate agents, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -98,6 +98,26 @@
           "design_review"
         ],
         "notes": "The design reviewer independently checks the detailed design document, implementation readiness, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
+      }
+    },
+    {
+      "id": "document_flow_reviewer",
+      "owns": [
+        "top_down_readability_review",
+        "section_order_review",
+        "term_introduction_review",
+        "reader_path_review",
+        "document_coherence_review"
+      ],
+      "required_outputs": [
+        "document_flow_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "document_flow_review"
+        ],
+        "notes": "The document-flow reviewer reads the document linearly from the top and checks whether a first reader can follow the meaning without backtracking. It stays separate from the design reviewer."
       }
     },
     {
@@ -675,9 +695,19 @@
       "gate": "detailed design review feedback is resolved or escalated"
     },
     {
+      "from": "design_reviewer",
+      "to": "document_flow_reviewer",
+      "gate": "detailed design review is approved and the document is ready for top-down readthrough"
+    },
+    {
+      "from": "document_flow_reviewer",
+      "to": "designer",
+      "gate": "document flow review feedback is resolved or escalated"
+    },
+    {
       "from": "designer",
       "to": "implementer",
-      "gate": "detailed design is approved or escalated"
+      "gate": "detailed design and document flow reviews are approved or escalated"
     },
     {
       "from": "implementer",
@@ -783,6 +813,7 @@
         "research_review.md",
         "design_brief.md",
         "design_review.md",
+        "document_flow_review.md",
         "schedule.md",
         "schedule_review.md",
         "infra_notes.md",
@@ -850,6 +881,7 @@
         "research_review.md",
         "design_brief.md",
         "design_review.md",
+        "document_flow_review.md",
         "experiment_log.md",
         "experiment_review.md",
         "change_review.md",
@@ -864,7 +896,8 @@
     {
       "roles": [
         "designer",
-        "design_reviewer"
+        "design_reviewer",
+        "document_flow_reviewer"
       ],
       "mode": "isolated",
       "share_only": [
@@ -881,7 +914,8 @@
         "experiment_change_loop.md",
         "experiment_review.md",
         "design_brief.md",
-        "design_review.md"
+        "design_review.md",
+        "document_flow_review.md"
       ],
       "do_not_share": [
         "private_scratchpads",
@@ -900,6 +934,7 @@
         "management_review.md",
         "design_brief.md",
         "design_review.md",
+        "document_flow_review.md",
         "research_notes.md",
         "research_review.md",
         "schedule.md",
@@ -931,6 +966,7 @@
         "management_review.md",
         "design_brief.md",
         "design_review.md",
+        "document_flow_review.md",
         "research_notes.md",
         "research_review.md",
         "schedule.md",
@@ -961,6 +997,7 @@
         "intent_brief.md",
         "design_brief.md",
         "design_review.md",
+        "document_flow_review.md",
         "change_review.md",
         "final_review.md",
         "experiment_log.md",
@@ -1049,6 +1086,7 @@
     "management_review": "management_review.md",
     "design_brief": "design_brief.md",
     "design_review": "design_review.md",
+    "document_flow_review": "document_flow_review.md",
     "change_review": "change_review.md",
     "final_review": "final_review.md",
     "verification": "verification.txt",

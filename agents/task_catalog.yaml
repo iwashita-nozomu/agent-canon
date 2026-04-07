@@ -9,6 +9,7 @@ workflow_families:
         - manager_reviewer
         - designer
         - design_reviewer
+        - document_flow_reviewer
         - implementer
         - change_reviewer
         - final_reviewer
@@ -30,6 +31,7 @@ workflow_families:
         - manager_reviewer
         - designer
         - design_reviewer
+        - document_flow_reviewer
         - implementer
         - change_reviewer
         - final_reviewer
@@ -61,6 +63,7 @@ workflow_families:
         - manager_reviewer
         - designer
         - design_reviewer
+        - document_flow_reviewer
         - implementer
         - change_reviewer
         - final_reviewer
@@ -81,6 +84,7 @@ workflow_families:
         - manager_reviewer
         - designer
         - design_reviewer
+        - document_flow_reviewer
         - implementer
         - change_reviewer
         - final_reviewer

@@ -19,7 +19,7 @@
 
 ## Required Stage Agents
 
-<!-- Record which agent or subagent will handle requirements, research, execution planning, plan review, detailed design, detailed design review, and implementation. -->
+<!-- Record which agent or subagent will handle requirements, research, execution planning, plan review, detailed design, detailed design review, document flow review, and implementation. -->
 
 ## Ambiguities
 

@@ -47,7 +47,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 ### 1. 日常の実装変更
 
 1. 変更対象を決めます。
-1. `documents/implementation-waterfall-workflow.md` に従って、requirements と design を先に固定します。
+1. `documents/implementation-waterfall-workflow.md` に従って、requirements、plan、detailed design、document flow review を先に固定します。
 1. 変更前に baseline を確認します。
 1. 実装と文書を同じ変更でそろえます。
 1. `make ci-quick` で早い確認をします。

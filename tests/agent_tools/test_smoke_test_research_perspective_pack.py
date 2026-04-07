@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = (
     PROJECT_ROOT / "scripts" / "agent_tools" / "smoke_test_research_perspective_pack.py"
 )
+BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "agent_tools" / "bootstrap_agent_run.py"
 
 
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):
@@ -28,6 +30,37 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("SMOKE_TEST=pass", result.stdout)
+
+    def test_run_bundle_includes_document_flow_review_artifact(self) -> None:
+        """The always-on bundle should create the document flow review artifact."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-document-flow-review"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "document flow reviewer smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / run_id
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("document_flow_review.md", result.stdout)
+            self.assertTrue((report_dir / "document_flow_review.md").is_file())
 
 
 if __name__ == "__main__":

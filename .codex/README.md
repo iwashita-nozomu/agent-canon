@@ -43,6 +43,7 @@
 - `plan_reviewer`
 - `detailed_designer`
 - `detailed_design_reviewer`
+- `document_flow_reviewer`
 - `explorer`
 - `reviewer`
 - `worker`

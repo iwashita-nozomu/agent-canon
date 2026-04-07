@@ -19,4 +19,5 @@ Rules:
 - findings first
 - treat missing reuse analysis, weak design docs, or style drift as real blockers
 - do not act as the plan reviewer for the same pass
+- do not act as the document-flow reviewer for the same pass
 """

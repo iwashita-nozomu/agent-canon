@@ -52,19 +52,20 @@
 1. 計画レビュー
 1. 詳細設計
 1. 詳細設計レビュー
+1. 文書通読レビュー
 1. 実装
 1. 実装 checkpoint review
 1. 最終受け入れ review
 1. audit / gate close
 
-`Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビューを省略しません。
-また、`計画レビュー` と `詳細設計レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
+`Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
+また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 
 ### Gate 0. Subagent Bootstrap
 
 目的:
 - run bundle と review artifact を先に固定する
-- 要件 reviewer、計画 reviewer、詳細設計 reviewer を別 agent instance として割り当てる
+- 要件 reviewer、計画 reviewer、詳細設計 reviewer、文書通読 reviewer を別 agent instance として割り当てる
 
 最低限の記録:
 - `team_manifest.yaml`
@@ -77,7 +78,7 @@
 
 必須ルール:
 - repo-changing task では explicit subagent activation を省略しません
-- `計画レビュー` と `詳細設計レビュー` は別 agent instance で行います
+- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
 
 ### Gate 1. 要件整理
@@ -249,7 +250,32 @@ exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
 
-### Gate 7. 実装
+### Gate 7. 文書通読レビュー
+
+目的:
+- 文書を上から順に読んだときに、最初の reader が意味を追えるか確認する
+
+主担当:
+- `document_flow_reviewer`
+
+推奨 subagent:
+- `reviewer`
+- 文書差分が大きいなら追加で `project_reviewer`
+
+必須レビュー:
+- `document_flow_reviewer`
+  - section 順序、用語の先出し、前提の提示順、結論までの reader path を確認する
+  - 「途中で前提が出る」「定義前の語が出る」「どこを読めば判断できるか分からない」を blocker として扱う
+
+ルール:
+- `document_flow_reviewer` は `design_reviewer` と兼務させません
+- 文書主体の成果物では、top-down readthrough で major rewrite が必要なまま実装へ進みません
+
+exit 条件:
+- `document_flow_review.md` が `resolved` になっている
+- 上から順に読んだときの意味の飛び、定義不足、section order の問題が解消している
+
+### Gate 8. 実装
 
 目的:
 - 凍結済みの設計を実装へ落とす
@@ -280,7 +306,7 @@ exit 条件:
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
 
-### Gate 8. 最終受け入れ review
+### Gate 9. 最終受け入れ review
 
 目的:
 - 差分が設計どおりで、回帰やリスクが許容範囲に収まっているか確認する
@@ -317,7 +343,7 @@ exit 条件:
 - 実行した checks と未実行理由が説明できる
 - final acceptance review が `resolved` になっている
 
-### Gate 9. Audit And Gate Closure
+### Gate 10. Audit And Gate Closure
 
 目的:
 - 受け入れ条件を満たした変更だけを close する
@@ -351,7 +377,7 @@ exit 条件:
 - 設計不整合、file plan の見直し、rollback 方針の欠落:
   - Gate 4-5 へ戻す
 - 実装ミスや test failure だが設計は維持できる:
-  - Gate 6 に戻して修正する
+  - Gate 7 に戻して修正する
 - 実験結果やユーザー要望で別仮説になった:
   - 既存 pass を閉じ、新しい change request として Gate 0 からやり直す
 
@@ -370,9 +396,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ### Scoped Change
 
-- Gate 0 から Gate 8 をそのまま 1 pass で通します
+- Gate 0 から Gate 10 をそのまま 1 pass で通します
 - artifact は軽くて構いませんが、要件整理、計画、詳細設計、各 review の区別は崩しません
-- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer` を軽量版として必ず有効化します
+- `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を軽量版として必ず有効化します
 
 ### Research-Driven Change
 
@@ -391,7 +417,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 ### Platform And Environment
 
 - Gate 2-5 で rollout / rollback / environment impact を必ず固定します
-- Gate 7-8 で `docker/`、CI、runtime pack、関連 README の同期を確認します
+- Gate 8-9 で `docker/`、CI、runtime pack、関連 README の同期を確認します
 - `infra_reviewer` は詳細設計レビューだけでなく最終受け入れ review にも参加して構いません
 
 ## 8. reuse-first の必須ルール

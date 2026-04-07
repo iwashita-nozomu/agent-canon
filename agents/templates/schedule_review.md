@@ -10,7 +10,7 @@
 
 ## Reviewer Separation Review
 
-<!-- Check that plan review and detailed design review are assigned to different agents. -->
+<!-- Check that plan review, detailed design review, and document flow review are assigned to different agents. -->
 
 ## Subagent Adequacy Review
 

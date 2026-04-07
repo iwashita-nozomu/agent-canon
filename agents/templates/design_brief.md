@@ -16,6 +16,10 @@
 
 <!-- Record the existing coding and documentation style that implementation should follow. -->
 
+## Reader Path And Term Introduction
+
+<!-- Record the intended top-down reading order, which terms must be defined before use, and where the reader should reach the key decision points. -->
+
 ## File-By-File Design
 
 <!-- Describe the planned file edits, boundaries, interfaces, and expected diff shape in detail. -->

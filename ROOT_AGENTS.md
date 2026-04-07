@@ -22,6 +22,8 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 ## Shared Canon
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon, not in this wrapper.
+- Repo-changing tasks follow the staged flow in `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
+- Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -32,3 +34,4 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - `make agent-checks`
 - `make ci-quick`
 - `make docs-check`
+- `python3 -m pytest tests/ -q --tb=short`
