@@ -16,9 +16,20 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 
-# Preserve the root wrapper path when this module is imported through a
-# symlinked runtime surface from the template or derived checkout.
-WORKSPACE_ROOT = Path(__file__).absolute().parents[2]
+def detect_workspace_root() -> Path:
+    """Return the outer repo root even when the script is reached through a symlink view."""
+    markers = ("docker/packs/default.toml", "README.md")
+    search_roots = [Path.cwd().resolve(), Path(__file__).absolute().parent]
+    for search_root in search_roots:
+        for candidate in (search_root, *search_root.parents):
+            if all((candidate / marker).exists() for marker in markers):
+                return candidate
+    return Path(__file__).absolute().parents[2]
+
+
+# Preserve the template or derived checkout root when this module is imported
+# through a symlinked runtime surface from vendor/agent-canon.
+WORKSPACE_ROOT = detect_workspace_root()
 
 
 @dataclass(frozen=True)

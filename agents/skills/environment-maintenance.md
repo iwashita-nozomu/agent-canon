@@ -42,6 +42,8 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえます。
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
 - 依存追加の提案だけで終わらせず、validate と rollback まで記録します。
+- canonical container の `safe.directory` 方針は run-time entrypoint や ad hoc env に逃がさず、Docker image 側の明示設定として管理します。
+- host `uid:gid` や `HOME` を container 実行時に差し替える場合でも効くように、git safe directory は user-local ではなく container-wide に効く方法を優先します。
 
 ## Validation
 

@@ -17,6 +17,18 @@ Codex の入口、読順、skill path、subagent path を固定します。
 1. `agents/canonical/CODEX_WORKFLOW.md`
 1. 必要なら `agents/canonical/CODEX_SUBAGENTS.md`
 
+## First Update
+
+- `workflow=<family>`
+- `skills=<...>`
+- `review=<...>`
+
+## Session Commands
+
+- planning を含む session では、可能なら `/collab` の `Plan` mode を使う
+- runtime が `/agent` を提供する場合は subagent inventory を確認する
+- `/agent` がない場合は `.codex/agents/*.toml` を直接見る
+
 ## Runtime Paths
 
 - shared canon: `agents/`

@@ -9,9 +9,21 @@
 
 <!-- Rewrite the user's request in concrete, implementation-facing language. -->
 
+## Routing Declaration
+
+<!-- Record workflow=<family>, skills=<...>, review=<...> as they were declared in the first work update. -->
+
 ## Acceptance Criteria
 
 <!-- List the conditions that must be true for the task to count as done. -->
+
+## Context Sweep Hits
+
+<!-- Record the documents, notes, references, and prior decisions that were found before planning. -->
+
+## Library Sweep Hits
+
+<!-- Record the code, tests, scripts, and existing APIs that were checked for reuse before new implementation. -->
 
 ## Existing Code And Docs To Follow
 

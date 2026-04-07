@@ -9,6 +9,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 ## 1. 目的
 
 - stage ごとに適切な subagent / specialist を explicit に立てる
+- context sweep と library sweep を済ませる前に stage を始めない
 - 要件が固まる前に code を書き始めない
 - 計画が固まる前に詳細設計へ進まない
 - 詳細設計が固まる前に実装を広げない
@@ -78,6 +79,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 文書主体の整理が要る場合は `docs_workflow_steward`
 
 必須ルール:
+- Gate 0 の前に `documents/`、`notes/`、`references/` と local library の sweep を済ませます
 - repo-changing task では explicit subagent activation を省略しません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
@@ -111,6 +113,7 @@ exit 条件:
 - 何をもって完了とするかが 1 文で言える
 - どの family で扱うかが決まっている
 - 実装前に必要な review / validation が決まっている
+- 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言している
 - requirements review が `resolved` になっている
 
 ### Gate 2. 調査

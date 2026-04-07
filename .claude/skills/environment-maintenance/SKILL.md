@@ -13,3 +13,5 @@ description: Use when touching Docker, CI, dependencies, runtime compatibility, 
 1. Check CI and local validation commands together.
 1. Use `documents/coding-conventions-project.md`, `documents/tools/README.md`, `documents/server-host-contract.md`, and `docker/README.md`.
 1. Do not canonize host-global installs as the repository default.
+1. Keep canonical `safe.directory` policy in the Docker image itself rather than a runtime-only entrypoint hack.
+1. Prefer a container-wide git config mechanism that still works when the runtime remaps `uid:gid` or `HOME`.

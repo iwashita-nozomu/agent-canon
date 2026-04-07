@@ -65,8 +65,75 @@
 - Claude subagents: `.claude/agents/`
 - Codex runtime config: `.codex/`
 
+## Team Shape
+
+- Always-on roles:
+  - `manager`, `manager_reviewer`, `designer`, `design_reviewer`, `document_flow_reviewer`, `implementer`, `change_reviewer`, `final_reviewer`, `verifier`, `auditor`
+- Specialist roles:
+  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
+- `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
+- `designer` は常に `implementer` より前に走ります。
+- review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
+- `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
+- `implementer` だけが repo file を編集します。
+- `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。
+
+## Startup Contract
+
+- 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
+- repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
+- planning を含む Codex session では、可能なら `/collab` で `Plan` mode に切り替えます。
+- Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
+
+## Standard Commands
+
+repo-changing task の最小 bundle:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "scoped repo change" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer
+```
+
+調査つき変更:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "research-backed change" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable experimenter \
+  --enable experiment_reviewer
+```
+
+環境・Docker・CI 変更:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "platform or environment change" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable infra_steward \
+  --enable infra_reviewer
+```
+
+`scheduler` と `schedule_reviewer` のような paired specialist は同じ activation group を共有しますが、bundle の意図を曖昧にしないため両方を明示して構いません。
+
 ## 運用ルール
 
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
 - 実行環境固有の都合がある場合だけ、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` に最小限の差分を持たせます。
+- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/` と local library を先に探索します。
+- reuse sweep をせずに新しい file や module を増やしません。
+- stage reviewer の feedback を反映せずに次段へ handoff しません。
+- tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。

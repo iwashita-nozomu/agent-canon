@@ -14,6 +14,9 @@
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
+- planning を含む parent session では、可能なら `/collab` の `Plan` mode を使います
+- runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
+- 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
 
 ## Model Policy
 

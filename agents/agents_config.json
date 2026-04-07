@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, scoping, routing, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Plan review, detailed design review, and document flow review are separate agents, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Plan review, detailed design review, and document flow review are separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -18,7 +18,10 @@
         "user_intent_capture",
         "acceptance_criteria",
         "ambiguity_tracking",
+        "context_sweep",
+        "library_sweep",
         "planning",
+        "routing_declaration",
         "scope_locking",
         "specialist_activation",
         "permission_decisions",
@@ -38,7 +41,7 @@
           "decision_log",
           "team_manifest"
         ],
-        "notes": "The manager records intake, scoping, routing, and decisions only in the run artifact bundle."
+        "notes": "The manager records intake, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
       }
     },
     {
@@ -310,7 +313,7 @@
         "allowed_artifacts": [
           "schedule"
         ],
-        "notes": "Execution planning stays in the report bundle and must assign explicit stage owners before detailed design begins."
+        "notes": "Execution planning stays in the report bundle and must assign explicit stage owners, review separation, and subagent activation before detailed design begins."
       }
     },
     {
@@ -330,7 +333,7 @@
         "allowed_artifacts": [
           "schedule_review"
         ],
-        "notes": "The schedule reviewer checks execution order, reviewer separation, milestone realism, and sequencing risk. It must remain distinct from the design reviewer."
+        "notes": "The schedule reviewer checks execution order, reviewer separation, milestone realism, explicit stage activation, and sequencing risk. It must remain distinct from the design reviewer."
       }
     },
     {

@@ -10,7 +10,11 @@
 
 ## Routing Review
 
-<!-- Check whether the right specialist roles and explicit stage subagents were enabled. -->
+<!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. -->
+
+## Context And Library Sweep Review
+
+<!-- Check whether the required document sweep and reuse sweep were actually performed before planning. -->
 
 ## Reuse-First Review
 

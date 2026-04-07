@@ -33,9 +33,39 @@
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
-      --owner "codex-or-human"
+      --owner "codex-or-human" \
+      --workspace-root "$PWD" \
+      --enable scheduler \
+      --enable schedule_reviewer
+
+研究・実験つき変更:
+
+    python3 scripts/agent_tools/bootstrap_agent_run.py \
+      --task "research-backed change" \
+      --owner "codex" \
+      --workspace-root "$PWD" \
+      --enable scheduler \
+      --enable schedule_reviewer \
+      --enable researcher \
+      --enable research_reviewer \
+      --enable experimenter \
+      --enable experiment_reviewer
+
+環境変更:
+
+    python3 scripts/agent_tools/bootstrap_agent_run.py \
+      --task "platform or environment change" \
+      --owner "codex" \
+      --workspace-root "$PWD" \
+      --enable scheduler \
+      --enable schedule_reviewer \
+      --enable infra_steward \
+      --enable infra_reviewer
 
 `experimenter` が有効な run では `experiment_change_loop.md`、`infra_steward` が有効な run では `environment_change_proposal.md` も bundle に含めます。
+
+Codex parent session では、planning を含む場合に `/collab` の `Plan` mode を使って構いません。
+runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない runtime では `.codex/agents/*.toml` を正本にします。
 
 artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。
 
@@ -57,5 +87,8 @@ artifact-only role や review role の write scope を確認するときは、`v
 - role 定義と write policy は `agents/agents_config.json` を正本にします。
 - handoff、review、response、escalation の書式は `agents/COMMUNICATION_PROTOCOL.md` を正本にします。
 - 共通 workflow と skill routing は `agents/` 側で保守し、runtime entrypoint へ role 一覧を重複記載しません。
+- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/` と local library の sweep を先に行います。
+- 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
+- review feedback は、直前の execution role が反映してから次段へ handoff します。
 - `implementer` 以外が repo ファイルを直接編集する運用を正本にしません。
 - run 固有の artifact は `reports/agents/<run-id>/` に寄せ、repo-wide の正本と混ぜません。

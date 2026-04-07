@@ -259,7 +259,7 @@ def main() -> int:
         tty = defaults.tty
 
         mounts: list[str] = []
-        envs: list[str] = [f"HOME={container_home}", "AUTO_GIT_SAFE_DIRECTORY=1", "GIT_SAFE_DIRECTORIES=/workspace"]
+        envs: list[str] = [f"HOME={container_home}"]
 
         host_codex_home = Path.home() / ".codex"
         if share_host_codex_home and host_codex_home.is_dir():

@@ -45,8 +45,23 @@
 - Codex 用 subagent は `.codex/agents/` にあります。
 - subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
 - specialist を立ち上げる前に `subagent-bootstrap` を見て、repo-changing task では run bundle を先に作ります。
+- 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - 既定の流れは `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` です。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
 - 長文では、`document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します。
+
+標準 bundle:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "repo-changing task" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer
+```
+
+Codex で planning を含む session では、可能なら `/collab` の `Plan` mode を先に使います。
+runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。

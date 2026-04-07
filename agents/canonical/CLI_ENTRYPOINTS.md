@@ -25,6 +25,9 @@
 - task 実行の標準順序は `agents/canonical/CODEX_WORKFLOW.md`
 - subagent routing は `agents/canonical/CODEX_SUBAGENTS.md`
 - repo-wide の正本変更は `agents/` を先に更新する
+- 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
+- planning を含む parent session では、可能なら `/collab` の `Plan` mode を使う
+- runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
 
 ## Claude Code
 
@@ -66,7 +69,10 @@
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
-  --owner "human-or-agent"
+  --owner "human-or-agent" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer
 ```
 
 specialist を明示するとき:
@@ -75,10 +81,15 @@ specialist を明示するとき:
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
   --enable researcher \
   --enable research_reviewer \
   --enable experimenter \
   --enable experiment_reviewer
 ```
+
+環境変更では `infra_steward` と `infra_reviewer` を追加します。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。
