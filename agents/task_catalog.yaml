@@ -1,0 +1,192 @@
+version: 2
+
+workflow_families:
+  - id: scoped_change
+    name: Scoped Change
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - scheduler
+        - schedule_reviewer
+    tasks:
+      - T1
+      - T2
+      - T3
+
+  - id: research_driven_change
+    name: Research-Driven Change
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - researcher
+        - research_reviewer
+        - scheduler
+        - schedule_reviewer
+        - experimenter
+        - experiment_reviewer
+        - reproducibility_reviewer
+        - scientific_computing_reviewer
+        - benchmark_reviewer
+        - artifact_reviewer
+        - fair_data_reviewer
+        - ml_science_reviewer
+    tasks:
+      - T4
+      - T5
+      - T9
+
+  - id: large_delivery
+    name: Large Delivery
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - scheduler
+        - schedule_reviewer
+    tasks:
+      - T6
+      - T7
+
+  - id: platform_and_environment
+    name: Platform And Environment
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - infra_steward
+        - infra_reviewer
+        - scheduler
+        - schedule_reviewer
+    tasks:
+      - T8
+
+tasks:
+  - id: T1
+    name: local bug fix
+    family: scoped_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+  - id: T2
+    name: CI or flaky test fix
+    family: scoped_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+  - id: T3
+    name: docs and test sync
+    family: scoped_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+  - id: T4
+    name: research-backed implementation change
+    family: research_driven_change
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+    optional_review_packs:
+      - research_perspective_review
+  - id: T5
+    name: benchmark or experiment-driven optimization
+    family: research_driven_change
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+    optional_review_packs:
+      - research_perspective_review
+  - id: T6
+    name: large refactor
+    family: large_delivery
+    specialists:
+      - scheduler
+      - schedule_reviewer
+  - id: T7
+    name: new feature or API delivery
+    family: large_delivery
+    specialists:
+      - scheduler
+      - schedule_reviewer
+  - id: T8
+    name: environment, CI, Docker, or dependency update
+    family: platform_and_environment
+    specialists:
+      - infra_steward
+      - infra_reviewer
+      - scheduler
+      - schedule_reviewer
+  - id: T9
+    name: research workflow, artifact policy, or reporting policy change
+    family: research_driven_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - researcher
+      - research_reviewer
+      - experimenter
+      - experiment_reviewer
+      - reproducibility_reviewer
+      - scientific_computing_reviewer
+      - benchmark_reviewer
+      - artifact_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
+
+review_packs:
+  - id: research_perspective_review
+    name: Research Perspective Review
+    specialists:
+      - reproducibility_reviewer
+      - scientific_computing_reviewer
+      - benchmark_reviewer
+      - artifact_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
+    default_for_tasks:
+      - T9
+    optional_for_tasks:
+      - T4
+      - T5
+    when: methodology, artifact policy, benchmark protocol, or reporting policy changes substantially

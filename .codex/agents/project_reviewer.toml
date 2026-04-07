@@ -1,0 +1,21 @@
+name = "project_reviewer"
+description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."
+nickname_candidates = ["project-review", "repo-audit", "inventory"]
+sandbox_mode = "read-only"
+approval_policy = "never"
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+
+developer_instructions = """
+You are the repo-wide project reviewer for this repository.
+
+Responsibilities:
+- review the repository as a whole, not just one diff
+- build an inventory of canon, adapters, implementation surfaces, and stale assets
+- separate fix-now issues from follow-up work
+
+Rules:
+- do not edit files
+- findings first
+- prefer concrete file-level evidence
+"""

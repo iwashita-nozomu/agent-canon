@@ -1,0 +1,1074 @@
+{
+  "version": 8,
+  "team": {
+    "id": "jax_util_permanent_team",
+    "report_root": "reports/agents",
+    "branch_prefix": "agent",
+    "worktree_scope_required": true,
+    "default_runtime_policy": "design_first_single_writer_team",
+    "task_catalog": "agents/task_catalog.yaml",
+    "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
+    "canonical_runtime": "scripts/agent_tools/agent_team.py",
+    "summary": "The manager is the single front-door role for intake, scoping, routing, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> implementation. Plan review and detailed design review are separate agents, and detailed design review is the most important pre-implementation gate. Only implementer may modify repository source files."
+  },
+  "always_on_roles": [
+    {
+      "id": "manager",
+      "owns": [
+        "user_intent_capture",
+        "acceptance_criteria",
+        "ambiguity_tracking",
+        "planning",
+        "scope_locking",
+        "specialist_activation",
+        "permission_decisions",
+        "delegation",
+        "escalation",
+        "cross_role_handoffs"
+      ],
+      "required_outputs": [
+        "intent_brief.md",
+        "team_manifest.yaml",
+        "decision_log.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "intent_brief",
+          "decision_log",
+          "team_manifest"
+        ],
+        "notes": "The manager records intake, scoping, routing, and decisions only in the run artifact bundle."
+      }
+    },
+    {
+      "id": "manager_reviewer",
+      "owns": [
+        "scope_review",
+        "acceptance_review",
+        "routing_review"
+      ],
+      "required_outputs": [
+        "management_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "management_review"
+        ],
+        "notes": "The manager reviewer approves or challenges scope, acceptance criteria, and specialist activation."
+      }
+    },
+    {
+      "id": "designer",
+      "owns": [
+        "solution_design",
+        "module_boundary_design",
+        "change_plan",
+        "detailed_design_documentation",
+        "existing_code_reuse_plan",
+        "style_continuity_plan"
+      ],
+      "required_outputs": [
+        "design_brief.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "design_brief"
+        ],
+        "notes": "The designer produces the detailed design document before coding begins, including reuse-first choices and the existing writing/style conventions to follow."
+      }
+    },
+    {
+      "id": "design_reviewer",
+      "owns": [
+        "design_review",
+        "risk_review",
+        "simplicity_review",
+        "implementation_readiness_review",
+        "reuse_conformity_review"
+      ],
+      "required_outputs": [
+        "design_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "design_review"
+        ],
+        "notes": "The design reviewer independently checks the detailed design document, implementation readiness, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
+      }
+    },
+    {
+      "id": "implementer",
+      "owns": [
+        "code_and_docs_edits",
+        "local_validation",
+        "reuse_first_implementation"
+      ],
+      "required_outputs": [
+        "decision_log.md"
+      ],
+      "write_policy": {
+        "mode": "worktree_scope_plus_artifacts",
+        "allowed_artifacts": [
+          "decision_log"
+        ],
+        "requires_worktree_scope": true,
+        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must prefer extending existing code and mirroring existing style over introducing new patterns."
+      }
+    },
+    {
+      "id": "change_reviewer",
+      "owns": [
+        "implementation_review",
+        "regression_review",
+        "design_guardrails"
+      ],
+      "required_outputs": [
+        "change_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "change_review"
+        ],
+        "notes": "The implementation reviewer checks each coding chunk and may only update review artifacts."
+      }
+    },
+    {
+      "id": "final_reviewer",
+      "owns": [
+        "final_independent_review",
+        "ship_blockers",
+        "risk_summary"
+      ],
+      "required_outputs": [
+        "final_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "final_review"
+        ],
+        "notes": "The final reviewer performs an independent ship decision and remains artifact-only."
+      }
+    },
+    {
+      "id": "verifier",
+      "owns": [
+        "ci_execution",
+        "quality_gates"
+      ],
+      "required_outputs": [
+        "verification.txt"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "verification"
+        ],
+        "notes": "Verification may update only the verification artifact."
+      }
+    },
+    {
+      "id": "auditor",
+      "owns": [
+        "evidence_capture",
+        "closeout",
+        "retrospective"
+      ],
+      "required_outputs": [
+        "retrospective.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "retrospective"
+        ],
+        "notes": "Audit closeout is recorded only in retrospective artifacts."
+      }
+    }
+  ],
+  "specialist_roles": [
+    {
+      "id": "researcher",
+      "activation": "internet_or_algorithm_research_needed",
+      "owns": [
+        "external_research",
+        "algorithm_survey",
+        "source_collection"
+      ],
+      "required_outputs": [
+        "research_notes.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "research_notes"
+        ],
+        "notes": "Research findings are recorded in research notes, not direct repo edits."
+      }
+    },
+    {
+      "id": "research_reviewer",
+      "activation": "internet_or_algorithm_research_needed",
+      "owns": [
+        "source_quality_review",
+        "research_gap_review",
+        "citation_review"
+      ],
+      "required_outputs": [
+        "research_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "research_review"
+        ],
+        "notes": "The research reviewer checks source quality and whether the proposed research actually supports the plan."
+      }
+    },
+    {
+      "id": "experimenter",
+      "activation": "benchmark_or_experiment_loop_needed",
+      "owns": [
+        "baseline_execution",
+        "iterative_experiment_runs",
+        "result_capture",
+        "comparison_tracking"
+      ],
+      "required_outputs": [
+        "experiment_log.md",
+        "experiment_change_loop.md"
+      ],
+      "write_policy": {
+        "mode": "runtime_outputs_plus_artifacts",
+        "allowed_artifacts": [
+          "experiment_log",
+          "experiment_change_loop"
+        ],
+        "requires_worktree_scope": true,
+        "notes": "The experimenter may write only run artifacts and runtime output directories explicitly listed in WORKTREE_SCOPE.md. It may not edit repository source files."
+      }
+    },
+    {
+      "id": "experiment_reviewer",
+      "activation": "benchmark_or_experiment_loop_needed",
+      "owns": [
+        "critical_result_review",
+        "comparison_validity_review",
+        "overclaim_review"
+      ],
+      "required_outputs": [
+        "experiment_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "experiment_review"
+        ],
+        "notes": "The experiment reviewer critiques fairness, comparison targets, interpretation, and whether the next code change is actually justified by the evidence."
+      }
+    },
+    {
+      "id": "scheduler",
+      "activation": "explicit_execution_plan_required",
+      "owns": [
+        "execution_plan",
+        "dependency_tracking",
+        "delivery_checkpoints",
+        "subagent_stage_plan",
+        "validation_sequence_plan"
+      ],
+      "required_outputs": [
+        "schedule.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "schedule"
+        ],
+        "notes": "Execution planning stays in the report bundle and must assign explicit stage owners before detailed design begins."
+      }
+    },
+    {
+      "id": "schedule_reviewer",
+      "activation": "explicit_execution_plan_required",
+      "owns": [
+        "execution_plan_review",
+        "dependency_review",
+        "delivery_risk_review",
+        "reviewer_separation_review"
+      ],
+      "required_outputs": [
+        "schedule_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "schedule_review"
+        ],
+        "notes": "The schedule reviewer checks execution order, reviewer separation, milestone realism, and sequencing risk. It must remain distinct from the design reviewer."
+      }
+    },
+    {
+      "id": "infra_steward",
+      "activation": "ci_experiment_or_platform_work",
+      "owns": [
+        "infra_assessment",
+        "experiment_runner_design",
+        "automation_change_plan"
+      ],
+      "required_outputs": [
+        "infra_notes.md",
+        "environment_change_proposal.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "infra_notes",
+          "environment_change_proposal"
+        ],
+        "notes": "Infra stewardship proposes and reviews infra changes, while the implementer applies repo edits."
+      }
+    },
+    {
+      "id": "infra_reviewer",
+      "activation": "ci_experiment_or_platform_work",
+      "owns": [
+        "infra_safety_review",
+        "operational_risk_review",
+        "rollback_review"
+      ],
+      "required_outputs": [
+        "infra_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "infra_review"
+        ],
+        "notes": "The infra reviewer checks rollout, safety, and maintenance cost before coding begins."
+      }
+    },
+    {
+      "id": "reproducibility_reviewer",
+      "activation": "reproducibility_perspective_review_requested",
+      "owns": [
+        "provenance_review",
+        "seed_and_command_review",
+        "environment_capture_review",
+        "rerunability_review"
+      ],
+      "required_outputs": [
+        "reproducibility_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "reproducibility_review"
+        ],
+        "notes": "The reproducibility reviewer records rerunability findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "scientific_computing_reviewer",
+      "activation": "scientific_computing_perspective_review_requested",
+      "owns": [
+        "incremental_change_review",
+        "testing_and_automation_review",
+        "prototype_discipline_review"
+      ],
+      "required_outputs": [
+        "scientific_computing_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "scientific_computing_review"
+        ],
+        "notes": "The scientific computing reviewer records workflow and engineering findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "benchmark_reviewer",
+      "activation": "benchmark_perspective_review_requested",
+      "owns": [
+        "fairness_review",
+        "confounder_review",
+        "case_mix_review",
+        "benchmark_antipattern_review"
+      ],
+      "required_outputs": [
+        "benchmark_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "benchmark_review"
+        ],
+        "notes": "The benchmark reviewer records fairness and confounder findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "artifact_reviewer",
+      "activation": "artifact_perspective_review_requested",
+      "owns": [
+        "artifact_completeness_review",
+        "raw_result_review",
+        "environment_bundle_review",
+        "rerun_package_review"
+      ],
+      "required_outputs": [
+        "artifact_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "artifact_review"
+        ],
+        "notes": "The artifact reviewer records bundle-readiness findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "fair_data_reviewer",
+      "activation": "fair_data_perspective_review_requested",
+      "owns": [
+        "metadata_review",
+        "naming_review",
+        "result_path_review",
+        "reuse_review"
+      ],
+      "required_outputs": [
+        "fair_data_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "fair_data_review"
+        ],
+        "notes": "The fair data reviewer records metadata and reuse findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "ml_science_reviewer",
+      "activation": "ml_science_perspective_review_requested",
+      "owns": [
+        "assumption_review",
+        "limitation_review",
+        "uncertainty_review",
+        "reader_facing_reporting_review"
+      ],
+      "required_outputs": [
+        "ml_science_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "ml_science_review"
+        ],
+        "notes": "The ML-science reviewer records reporting and overclaim findings only in the perspective review artifact."
+      }
+    },
+    {
+      "id": "critical_guardian",
+      "tier": "governance",
+      "activation": "always_on",
+      "always_evaluates": [
+        "pull_requests",
+        "skill_executions",
+        "releases",
+        "scheduled_reviews"
+      ],
+      "owns": [
+        "critical_risk_assessment",
+        "security_threat_detection",
+        "architecture_validation",
+        "testing_completeness_check",
+        "dependency_conflict_analysis",
+        "implementation_gap_detection"
+      ],
+      "required_outputs": [
+        "critical_review.md"
+      ],
+      "authority": {
+        "can_block_merge": true,
+        "can_request_changes": true,
+        "can_downvote_health_score": true,
+        "escalation_capable": true
+      },
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "critical_review"
+        ],
+        "notes": "The critical guardian provides always-on critical assessment of risks, security threats, and implementation completeness. Can block merge on critical issues only. Provides alternative suggestions and gap analysis."
+      }
+    }
+  ],
+  "handoffs": [
+    {
+      "from": "manager",
+      "to": "manager_reviewer",
+      "gate": "intent, acceptance criteria, and scope package is written"
+    },
+    {
+      "from": "manager_reviewer",
+      "to": "manager",
+      "gate": "management review feedback is resolved or escalated"
+    },
+    {
+      "from": "manager",
+      "to": "researcher",
+      "gate": "research is required and intake package is approved"
+    },
+    {
+      "from": "manager",
+      "to": "scheduler",
+      "gate": "requirements package is approved and execution planning can begin"
+    },
+    {
+      "from": "manager",
+      "to": "infra_steward",
+      "gate": "task touches CI, experiments, docker, or platform automation and intake package is approved"
+    },
+    {
+      "from": "manager",
+      "to": "reproducibility_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "manager",
+      "to": "scientific_computing_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "manager",
+      "to": "benchmark_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "manager",
+      "to": "artifact_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "manager",
+      "to": "fair_data_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "manager",
+      "to": "ml_science_reviewer",
+      "gate": "research perspective review pack is requested and evidence is ready"
+    },
+    {
+      "from": "researcher",
+      "to": "research_reviewer",
+      "gate": "research notes are ready"
+    },
+    {
+      "from": "research_reviewer",
+      "to": "researcher",
+      "gate": "research review feedback is resolved or escalated"
+    },
+    {
+      "from": "researcher",
+      "to": "manager",
+      "gate": "research is approved or escalated"
+    },
+    {
+      "from": "designer",
+      "to": "experimenter",
+      "gate": "detailed design is approved and a baseline or validation protocol is defined"
+    },
+    {
+      "from": "experimenter",
+      "to": "experiment_reviewer",
+      "gate": "experiment log is ready"
+    },
+    {
+      "from": "experiment_reviewer",
+      "to": "experimenter",
+      "gate": "experiment review feedback is resolved or escalated"
+    },
+    {
+      "from": "experimenter",
+      "to": "implementer",
+      "gate": "baseline findings or validation feedback are approved or escalated"
+    },
+    {
+      "from": "reproducibility_reviewer",
+      "to": "manager",
+      "gate": "reproducibility perspective findings are recorded or escalated"
+    },
+    {
+      "from": "scientific_computing_reviewer",
+      "to": "manager",
+      "gate": "scientific computing perspective findings are recorded or escalated"
+    },
+    {
+      "from": "benchmark_reviewer",
+      "to": "manager",
+      "gate": "benchmark perspective findings are recorded or escalated"
+    },
+    {
+      "from": "artifact_reviewer",
+      "to": "manager",
+      "gate": "artifact perspective findings are recorded or escalated"
+    },
+    {
+      "from": "fair_data_reviewer",
+      "to": "manager",
+      "gate": "fair data perspective findings are recorded or escalated"
+    },
+    {
+      "from": "ml_science_reviewer",
+      "to": "manager",
+      "gate": "ml science perspective findings are recorded or escalated"
+    },
+    {
+      "from": "scheduler",
+      "to": "schedule_reviewer",
+      "gate": "execution plan is ready"
+    },
+    {
+      "from": "schedule_reviewer",
+      "to": "scheduler",
+      "gate": "plan review feedback is resolved or escalated"
+    },
+    {
+      "from": "scheduler",
+      "to": "manager",
+      "gate": "execution plan is approved or escalated"
+    },
+    {
+      "from": "infra_steward",
+      "to": "infra_reviewer",
+      "gate": "infra notes are ready"
+    },
+    {
+      "from": "infra_reviewer",
+      "to": "infra_steward",
+      "gate": "infra review feedback is resolved or escalated"
+    },
+    {
+      "from": "infra_steward",
+      "to": "manager",
+      "gate": "infra plan is approved or escalated"
+    },
+    {
+      "from": "manager",
+      "to": "designer",
+      "gate": "approved research and execution plan inputs are attached"
+    },
+    {
+      "from": "designer",
+      "to": "design_reviewer",
+      "gate": "detailed design brief is ready"
+    },
+    {
+      "from": "design_reviewer",
+      "to": "designer",
+      "gate": "detailed design review feedback is resolved or escalated"
+    },
+    {
+      "from": "designer",
+      "to": "implementer",
+      "gate": "detailed design is approved or escalated"
+    },
+    {
+      "from": "implementer",
+      "to": "experimenter",
+      "gate": "code change is ready for empirical validation"
+    },
+    {
+      "from": "implementer",
+      "to": "change_reviewer",
+      "gate": "one implementation chunk is ready"
+    },
+    {
+      "from": "change_reviewer",
+      "to": "implementer",
+      "gate": "implementation feedback resolved or escalated"
+    },
+    {
+      "from": "implementer",
+      "to": "final_reviewer",
+      "gate": "implementation complete and self-check done"
+    },
+    {
+      "from": "final_reviewer",
+      "to": "implementer",
+      "gate": "final review feedback is resolved or escalated"
+    },
+    {
+      "from": "implementer",
+      "to": "verifier",
+      "gate": "final review feedback resolved and final self-check done"
+    },
+    {
+      "from": "verifier",
+      "to": "auditor",
+      "gate": "required checks executed and recorded"
+    },
+    {
+      "from": "implementer",
+      "to": "critical_guardian",
+      "gate": "implementation is complete and ready for critical assessment"
+    },
+    {
+      "from": "final_reviewer",
+      "to": "critical_guardian",
+      "gate": "implementation ready for critical risk and security assessment"
+    },
+    {
+      "from": "experimenter",
+      "to": "critical_guardian",
+      "gate": "experimental results ready for critical validation"
+    },
+    {
+      "from": "critical_guardian",
+      "to": "manager_reviewer",
+      "gate": "critical assessment complete, escalation required or merge approval given"
+    }
+  ],
+  "context_policies": [
+    {
+      "roles": [
+        "manager",
+        "manager_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "decision_log.md",
+        "team_manifest.yaml",
+        "management_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "researcher",
+        "research_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "research_notes.md",
+        "research_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "experimenter",
+        "experiment_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "research_notes.md",
+        "research_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md",
+        "experiment_log.md",
+        "experiment_change_loop.md",
+        "experiment_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "scheduler",
+        "schedule_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "schedule.md",
+        "schedule_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "infra_steward",
+        "infra_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "reproducibility_reviewer",
+        "scientific_computing_reviewer",
+        "benchmark_reviewer",
+        "artifact_reviewer",
+        "fair_data_reviewer",
+        "ml_science_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "experiment_log.md",
+        "experiment_review.md",
+        "change_review.md",
+        "final_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "designer",
+        "design_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md",
+        "experiment_log.md",
+        "experiment_change_loop.md",
+        "experiment_review.md",
+        "design_brief.md",
+        "design_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "implementer",
+        "change_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md",
+        "experiment_log.md",
+        "experiment_change_loop.md",
+        "experiment_review.md",
+        "change_review.md",
+        "diff",
+        "verification.txt"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "implementer",
+        "final_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md",
+        "experiment_log.md",
+        "experiment_change_loop.md",
+        "experiment_review.md",
+        "change_review.md",
+        "final_review.md",
+        "diff",
+        "verification.txt"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "critical_guardian"
+      ],
+      "mode": "assessment_view",
+      "share_only": [
+        "intent_brief.md",
+        "design_brief.md",
+        "design_review.md",
+        "change_review.md",
+        "final_review.md",
+        "experiment_log.md",
+        "experiment_review.md",
+        "research_notes.md",
+        "research_review.md"
+      ],
+      "do_not_share": [
+        "hidden_chain_of_thought",
+        "private_debugging_notes"
+      ],
+      "notes": "Critical guardian has read-only access to all significant artifacts to perform comprehensive risk, security, and completeness assessment."
+    }
+  ],
+  "activation_rules": [
+    {
+      "role": "researcher",
+      "when": "algorithm choice, internet lookup, or external verification is needed"
+    },
+    {
+      "role": "research_reviewer",
+      "when": "researcher is active"
+    },
+    {
+      "role": "experimenter",
+      "when": "task needs baseline measurement, repeated experiment runs, or empirical validation loops"
+    },
+    {
+      "role": "experiment_reviewer",
+      "when": "experimenter is active"
+    },
+    {
+      "role": "scheduler",
+      "when": "repo-changing task needs explicit execution planning before detailed design"
+    },
+    {
+      "role": "schedule_reviewer",
+      "when": "scheduler is active"
+    },
+    {
+      "role": "infra_steward",
+      "when": "task touches CI, Docker, experiment runners, or platform automation"
+    },
+    {
+      "role": "infra_reviewer",
+      "when": "infra_steward is active"
+    },
+    {
+      "role": "reproducibility_reviewer",
+      "when": "research perspective review pack is requested for provenance, rerunability, or environment evidence"
+    },
+    {
+      "role": "scientific_computing_reviewer",
+      "when": "research perspective review pack is requested for workflow, automation, or prototype discipline"
+    },
+    {
+      "role": "benchmark_reviewer",
+      "when": "research perspective review pack is requested for benchmark fairness, confounders, or case-mix review"
+    },
+    {
+      "role": "artifact_reviewer",
+      "when": "research perspective review pack is requested for artifact completeness or rerun package review"
+    },
+    {
+      "role": "fair_data_reviewer",
+      "when": "research perspective review pack is requested for metadata, naming, or reuse review"
+    },
+    {
+      "role": "ml_science_reviewer",
+      "when": "research perspective review pack is requested for assumptions, limitations, uncertainty, or reader-facing reporting"
+    },
+    {
+      "role": "critical_guardian",
+      "when": "pull request created, skill execution completed, release initiated, or scheduled daily review at 02:00 UTC"
+    }
+  ],
+  "quality_gates": [
+    "make agent-checks",
+    "scripts/ci/pre_review.sh",
+    "make ci"
+  ],
+  "artifacts": {
+    "intent_brief": "intent_brief.md",
+    "decision_log": "decision_log.md",
+    "team_manifest": "team_manifest.yaml",
+    "management_review": "management_review.md",
+    "design_brief": "design_brief.md",
+    "design_review": "design_review.md",
+    "change_review": "change_review.md",
+    "final_review": "final_review.md",
+    "verification": "verification.txt",
+    "retrospective": "retrospective.md",
+    "research_notes": "research_notes.md",
+    "research_review": "research_review.md",
+    "experiment_log": "experiment_log.md",
+    "experiment_change_loop": "experiment_change_loop.md",
+    "experiment_review": "experiment_review.md",
+    "schedule": "schedule.md",
+    "schedule_review": "schedule_review.md",
+    "infra_notes": "infra_notes.md",
+    "environment_change_proposal": "environment_change_proposal.md",
+    "infra_review": "infra_review.md",
+    "reproducibility_review": "reproducibility_review.md",
+    "scientific_computing_review": "scientific_computing_review.md",
+    "benchmark_review": "benchmark_review.md",
+    "artifact_review": "artifact_review.md",
+    "fair_data_review": "fair_data_review.md",
+    "ml_science_review": "ml_science_review.md",
+    "critical_review": "critical_review.md"
+  }
+}
