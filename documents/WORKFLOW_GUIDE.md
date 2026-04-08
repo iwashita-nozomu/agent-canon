@@ -104,10 +104,30 @@ python3 scripts/tools/audit_and_fix_links.py --check documents
 
 ### 3. Docker / 環境を更新するとき
 
+Docker / tool / runtime に触る task では、最初に `T8` と `agents/templates/environment_change_proposal.md` を起点にします。先に「どの code requirement が今の環境で詰まっているか」を固定し、その後で surface を決めます。
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "platform or environment change" \
+  --task-id T8 \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
+proposal では最低限次を埋めます。
+
+- triggering code requirement
+- blocked command
+- runtime capability needed
+- source-of-truth surface
+- rollout / rollback
+- validation matrix
+
 Docker / tool / runtime に触る task では、少なくとも次を同じ変更で扱います。
 
 - `docker/Dockerfile`
 - `docker/requirements.txt`
+- devcontainer / runtime pack 相当面
 - `docker/README.md`
 - 必要なら `README.md`、`QUICK_START.md`、`documents/coding-conventions-project.md`
 

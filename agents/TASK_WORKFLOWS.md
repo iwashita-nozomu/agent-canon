@@ -206,11 +206,14 @@ single-writer ルール:
 - 必要に応じて `researcher`, `scheduler`, `experimenter`
 
 特徴:
+- `scheduler` と `schedule_reviewer` を省略せず、環境変更でも順序と handoff を固定する
 - rollout と rollback を先に考える
 - repo ルール、環境、automation を同時に更新する
+- code requirement、blocked command、必要 runtime capability を `environment_change_proposal.md` に先に固定する
 - 実装前に environment design を凍結し、acceptance gate で transition readiness を確認する
 - `infra_steward` と `infra_reviewer` は、実行計画と詳細設計の両方に入力を出す
 - `infra_reviewer` を詳細設計レビューと最終受け入れ review の両方へ参加させる
+- Docker を変える task では source-of-truth surface、同期対象、rollout / rollback、validation matrix を必ず同じ pass に残す
 - repo-wide な tool 導入案では理由、Docker 影響、validation、rollback を同時に残す
 
 ### 5. Comprehensive Development

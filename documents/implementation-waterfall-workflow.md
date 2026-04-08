@@ -457,8 +457,10 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ### Platform And Environment
 
-- Gate 2-5 で rollout / rollback / environment impact を必ず固定します
-- Gate 8-9 で `docker/`、CI、runtime pack、関連 README の同期を確認します
+- Gate 0-1 で code requirement、blocked command、必要 runtime capability を `environment_change_proposal.md` に固定します
+- Gate 2-5 で source-of-truth surface、同期対象、rollout / rollback / environment impact を必ず固定します
+- Gate 8-9 で `docker/`、CI、runtime pack、devcontainer、関連 README の同期を確認します
+- Docker を変える pass では `python3 scripts/docker_dependency_validator.py`、`make docker-build-check`、必要なら `make docker-build-check-host-docker` を validation plan に含めます
 - `infra_reviewer` は詳細設計レビューだけでなく最終受け入れ review にも参加して構いません
 
 ### Comprehensive Development

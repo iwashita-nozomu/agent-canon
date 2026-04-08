@@ -61,6 +61,7 @@
 分類規則:
 - code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
 - Docker / CI / dependency を触るなら `Platform And Environment`
+  - `environment-maintenance` と `environment_change_proposal.md` を先に起こし、code requirement と blocked command を固定する
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - chunk ごとの delivery なら `Large Delivery`
 - それ以外は `Scoped Change`

@@ -70,6 +70,7 @@
       --workspace-root "$PWD"
 
 `experimenter` が有効な run では `experiment_change_loop.md`、`infra_steward` が有効な run では `environment_change_proposal.md` も bundle に含めます。
+環境変更 run では `infra_steward` が requirements/plan/design の前に `triggering code requirement`、`blocked command`、`source-of-truth surface` を proposal に固定してから handoff します。
 `notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
 code change を含む run では `test_designer` が `test_plan.md` を作り、worker はそれを test 実装へ落とします。
 包括的開発では bundle に加えて `project_reviewer` を parent が read-only で立て、必要なら `docs_workflow_steward` と `python_reviewer` を追加します。
