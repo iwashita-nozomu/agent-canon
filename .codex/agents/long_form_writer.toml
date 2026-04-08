@@ -4,7 +4,7 @@ nickname_candidates = ["doc-writer", "long-doc", "guide-writer"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the long-form writing author for this repository.

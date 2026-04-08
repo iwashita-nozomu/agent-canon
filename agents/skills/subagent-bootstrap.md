@@ -92,7 +92,7 @@ repo-changing task では、always-on role に加えて最低でも `scheduler` 
 調査が必要なら `researcher` と `research_reviewer`、環境変更なら `infra_steward` と `infra_reviewer` を追加します。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を必ず explicit に追加します。
 包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定で立てます。
-Codex で planning を含む parent session では、可能なら `/collab` の `Plan` mode を先に使います。
+Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。

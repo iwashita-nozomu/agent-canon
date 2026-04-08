@@ -17,16 +17,18 @@
   - current model lineup と mainline chooser の根拠です。
 - [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)
   - `gpt-5.4` を planning、design、review の default 判断役に置く根拠です。
-- [GPT-5.4 mini Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
-  - `gpt-5.4-mini` を high-frequency subagent の default に置く根拠です。
 - [GPT-5.3-Codex Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.3-codex)
-  - coding-specialist override を残す根拠です。
+  - `gpt-5.3-codex` を coding-specialist の default に置く根拠です。
+- [All models | OpenAI API](https://developers.openai.com/api/docs/models/all)
+  - GPT-5.4 系を frontier default、Codex 系を coding-specialist family として分ける根拠です。
 - [Introducing GPT-5.4 | OpenAI](https://openai.com/index/introducing-gpt-5-4/)
-  - `gpt-5.4` が `GPT-5.3-Codex` の coding capability を mainline へ取り込んだ、という位置づけの根拠です。
+  - `gpt-5.4` を broad professional / judgment role に置く補助根拠です。
 - [Introducing GPT-5.4 mini and nano | OpenAI](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/)
-  - `gpt-5.4` が planning / coordination / final judgment、`gpt-5.4-mini` subagent が狭い並列 task を担う、という routing の直接根拠です。
+  - GPT-5.4 mini の得意領域が fast coding/subagents であること、対してこの repo では coding を Codex 系へ寄せるときの比較根拠です。
 - [Introducing GPT-5.3-Codex-Spark | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
   - `gpt-5.3-codex-spark` を smaller、text-only、128k の low-latency override に留める根拠です。
+- [Slash commands in Codex CLI | OpenAI Developers](https://developers.openai.com/codex/cli/slash-commands)
+  - `/plan`、`/model`、`/permissions` が session-level command であり、per-agent TOML に mode を持たせない根拠です。
 - [Introducing GPT-5.4 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/5/introducing-gpt54/)
   - practitioner 視点で、`gpt-5.4` が coding capability を mainline へ寄せたと読む補助資料です。
 - [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for $52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)

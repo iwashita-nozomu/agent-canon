@@ -36,7 +36,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - Repo-changing tasks follow the staged flow in `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。
-- Codex で planning を回すときは、可能なら parent session を `/collab` の `Plan` mode に切り替えます。
+- Codex で planning を回すときは、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 - 標準 bundle の入口は次です。
 

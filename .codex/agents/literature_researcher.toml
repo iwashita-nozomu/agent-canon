@@ -4,7 +4,7 @@ nickname_candidates = ["literature", "prior-art", "paper-survey"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the literature survey agent for this repository.

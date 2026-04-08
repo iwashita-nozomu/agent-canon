@@ -103,7 +103,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable logic_gap_reviewer
 ```
 
-Codex parent が planning を行う session では、可能なら `/collab` の `Plan` mode を先に有効化します。
+Codex parent が planning を行う session では、parent session 側の plan-mode command を先に有効化します。official Codex CLI では `/plan` です。
 
 包括的開発:
 

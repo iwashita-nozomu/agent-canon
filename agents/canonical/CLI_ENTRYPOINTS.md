@@ -26,7 +26,7 @@
 - subagent routing は `agents/canonical/CODEX_SUBAGENTS.md`
 - repo-wide の正本変更は `agents/` を先に更新する
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
-- planning を含む parent session では、可能なら `/collab` の `Plan` mode を使う
+- planning を含む parent session では、parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
 
 ## Claude Code

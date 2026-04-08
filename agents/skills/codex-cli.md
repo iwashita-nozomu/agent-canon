@@ -25,7 +25,7 @@ Codex の入口、読順、skill path、subagent path を固定します。
 
 ## Session Commands
 
-- planning を含む session では、可能なら `/collab` の `Plan` mode を使う
+- planning を含む session では、可能なら parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory を確認する
 - `/agent` がない場合は `.codex/agents/*.toml` を直接見る
 

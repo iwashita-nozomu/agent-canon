@@ -89,7 +89,7 @@
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
 - 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward` と `python_reviewer` を明示します。
 - 包括的開発では、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定 stack にします。
-- planning を含む Codex session では、可能なら `/collab` で `Plan` mode に切り替えます。
+- planning を含む Codex session では、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
 ## Standard Commands

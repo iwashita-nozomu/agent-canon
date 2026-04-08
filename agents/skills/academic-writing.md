@@ -27,7 +27,7 @@
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
-- Codex では、可能なら parent session を `/collab` の `Plan` mode に切り替える
+- Codex では、可能なら parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は inventory を確認し、使えない場合は `.codex/agents/*.toml` を見る
 - run bundle を先に作り、`notation_definition_reviewer` と `logic_gap_reviewer` を explicit に有効化する
 - draft 後に reverse outline を取る

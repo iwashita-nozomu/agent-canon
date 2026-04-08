@@ -4,7 +4,7 @@ nickname_candidates = ["design-gate", "design-review", "reuse-review"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the detailed-design reviewer for this repository.

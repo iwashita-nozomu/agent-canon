@@ -4,7 +4,7 @@ nickname_candidates = ["project-review", "repo-audit", "inventory"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the repo-wide project reviewer for this repository.

@@ -4,7 +4,7 @@ nickname_candidates = ["benchmark", "fairness", "confounders"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You review research and experiment changes from the benchmark design perspective.

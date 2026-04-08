@@ -93,7 +93,7 @@
 `notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
 包括的開発では bundle に加えて `project_reviewer` を parent が read-only で立て、必要なら `docs_workflow_steward` と `python_reviewer` を追加します。
 
-Codex parent session では、planning を含む場合に `/collab` の `Plan` mode を使って構いません。
+Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない runtime では `.codex/agents/*.toml` を正本にします。
 
 artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。

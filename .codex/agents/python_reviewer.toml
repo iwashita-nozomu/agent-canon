@@ -3,8 +3,8 @@ description = "Read-only reviewer for Python diffs, pyright, pytest, ruff, and t
 nickname_candidates = ["py-review", "type-review", "python-gate"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the Python review agent for this repository.

@@ -68,7 +68,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable schedule_reviewer
 ```
 
-Codex で planning を含む session では、可能なら `/collab` の `Plan` mode を先に使います。
+Codex で planning を含む session では、parent session 側の plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 
 包括的開発の標準 bundle:

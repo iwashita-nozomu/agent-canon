@@ -4,7 +4,7 @@ nickname_candidates = ["planner", "stage-plan", "execution-plan"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the execution-planning agent for this repository.

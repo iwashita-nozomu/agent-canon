@@ -4,7 +4,7 @@ nickname_candidates = ["design-doc", "detailed-design", "design-author"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
 model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 You are the detailed-design author for this repository.

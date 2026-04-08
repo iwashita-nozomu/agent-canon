@@ -46,7 +46,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 1. `agent-orchestration` で family を `Comprehensive Development` に固定します。
 1. `subagent-bootstrap` で run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
-1. parent session が planning を含むなら `/collab` の `Plan` mode を先に有効化します。
+1. parent session が planning を含むなら、plan-mode command を先に有効化します。official Codex CLI では `/plan` です。
 1. `/agent` が使える runtime では inventory を確認し、使えない runtime では `.codex/agents/*.toml` をそのまま使います。
 1. `project_reviewer` を intake gate として立て、repo-wide completeness と collision risk を先に見ます。
 1. `execution_planner` に stage order と `Write Scope Per Agent:` を書かせます。

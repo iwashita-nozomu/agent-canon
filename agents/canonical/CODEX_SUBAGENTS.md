@@ -19,13 +19,14 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の default は `gpt-5.4` `xhigh` を判断役に、`gpt-5.4-mini` `xhigh` を高頻度 subagent に使う
+- Codex の default は、文書・計画・review を `gpt-5.4` `high`、coding-specialist role を `gpt-5.3-codex` `high` に分ける
 - `gpt-5.3-codex-spark` は、超低遅延の狭い coding loop に限る manual override とみなす
-- `Plan` collaboration mode は session 単位の設定なので、要件整理と実行計画立案では parent 側で有効化し、subagent TOML には model / reasoning だけを持たせる
+- plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
 
 ## Codex Command Surface
 
-- planning を含む parent session では、可能なら `/collab` の `Plan` mode を使います
+- official Codex CLI では `/model` で model / reasoning、`/plan` で plan mode、`/permissions` で approval preset を切り替えます
+- これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
 - run bundle は `python3 scripts/agent_tools/bootstrap_agent_run.py ...` で先に作ります
@@ -139,17 +140,16 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 | Role Bucket | Roles | Model | Reasoning |
 | ----------- | ----- | ----- | --------- |
-| Requirements / Planning / Detailed Design | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `xhigh` |
-| Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `xhigh` |
-| High-Frequency Local Survey | `explorer` | `gpt-5.4-mini` | `xhigh` |
-| Implementation Default | `worker` | `gpt-5.4-mini` | `xhigh` |
-| Reviews | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `python_reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `xhigh` |
+| Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
+| Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
+| Codebase Survey / Implementation / Python Code Review | `explorer`, `worker`, `python_reviewer` | `gpt-5.3-codex` | `high` |
+| Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
 
 運用メモ:
-- OpenAI の現行 Codex 向け guidance に合わせ、`gpt-5.4` に planning、coordination、final judgment を任せ、`gpt-5.4-mini` subagent に狭い並列 task を割り当てます
-- interactive Codex で要件整理と実行計画立案を回すときは、可能なら parent session を `/collab` の `Plan` mode に切り替えてから planning specialist を起動します
-- `Plan` collaboration mode は session-level setting なので、`.codex/agents/*.toml` には書かず、この文書と `agents/canonical/CODEX_WORKFLOW.md` にだけ明記します
-- terminal 操作や patch 適性を強く優先したい implementation では、parent 判断で `worker` を `gpt-5.3-codex` に override して構いません
+- OpenAI の current docs では `gpt-5.4` は professional workflows 向けの default / highest-intelligence 枠、`gpt-5.3-codex` は agentic coding 専用最適化枠です
+- この repo ではそれに合わせて、文書・計画・review を `gpt-5.4`、coding-specialist role を `gpt-5.3-codex` に寄せます
+- repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
+- planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、parent 判断で `worker` を `gpt-5.3-codex-spark` に override して構いません
 - `gpt-5.3-codex-spark` は smaller / text-only / 128k context の preview 系なので、詳細設計、最終判断、重要 review の default には使いません
 
