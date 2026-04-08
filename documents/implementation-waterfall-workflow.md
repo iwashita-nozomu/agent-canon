@@ -57,6 +57,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 1. 詳細設計
 1. 詳細設計レビュー
 1. 文書通読レビュー
+1. テストケース設計
 1. 実装
 1. 実装 checkpoint review
 1. 最終受け入れ review
@@ -64,6 +65,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 
 `Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
 また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
+code を変える pass では、実装前に `test_designer` を独立に立て、static path と nasty case を test plan として固定します。
 
 ### Gate 0. Subagent Bootstrap
 
@@ -285,6 +287,34 @@ exit 条件:
 - `document_flow_review.md` が `resolved` になっている
 - 上から順に読んだときの意味の飛び、定義不足、section order の問題が解消している
 
+### Gate 7.5. テストケース設計
+
+目的:
+- 実装前に static path を洗い、境界ケース、failure path、regression-prone case を test plan に落とす
+
+主担当:
+- `test_designer`
+
+推奨 subagent:
+- `test_designer`
+- 必要に応じて `explorer`
+
+最低限の記録:
+- `Static Path Survey:`
+- `Nasty Cases:`
+- `Regression Cases To Keep:`
+- `Implementation Notes:`
+
+ルール:
+- `test_designer` は read-only とし、repo file は編集しません
+- 既存 test style、fixture layout、naming を先に調べ、そこへ寄せます
+- design や code path の静的解析から出る nasty case を曖昧な助言ではなく具体ケースとして残します
+- 実装者は test plan を読んで tests を同じ pass で落とし込みます
+
+exit 条件:
+- `test_plan.md` が作られている
+- boundary case、malformed input、error path、state transition、regression case が明示されている
+
 ### Gate 8. 実装
 
 目的:
@@ -299,6 +329,7 @@ exit 条件:
 ルール:
 - 実装は 1 つの change request に閉じます
 - docs と tests は同じ pass で更新します
+- `test_plan.md` の nasty case を最低限どこへ落とし込んだか説明できるようにします
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます

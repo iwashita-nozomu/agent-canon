@@ -79,6 +79,7 @@
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
+- code 変更では `test_designer` を実装前に立て、最も意地の悪い case を `test_plan.md` に固定します。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
 - `implementer` だけが repo file を編集します。
 - `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。

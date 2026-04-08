@@ -19,6 +19,7 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - docs_workflow_steward
+        - test_designer
         - python_reviewer
     tasks:
       - T1
@@ -45,6 +46,7 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - report_reviewer
+        - test_designer
         - python_reviewer
         - notation_definition_reviewer
         - logic_gap_reviewer
@@ -79,6 +81,7 @@ workflow_families:
       specialists:
         - scheduler
         - schedule_reviewer
+        - test_designer
         - python_reviewer
     tasks:
       - T6
@@ -104,6 +107,7 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - docs_workflow_steward
+        - test_designer
         - python_reviewer
     tasks:
       - T8
@@ -132,6 +136,7 @@ workflow_families:
         - infra_reviewer
         - project_reviewer
         - docs_workflow_steward
+        - test_designer
         - python_reviewer
         - report_reviewer
     tasks:
@@ -145,6 +150,7 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
+      - test_designer
       - python_reviewer
   - id: T2
     name: CI or flaky test fix
@@ -152,6 +158,7 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
+      - test_designer
       - python_reviewer
   - id: T3
     name: docs and test sync
@@ -160,6 +167,7 @@ tasks:
       - scheduler
       - schedule_reviewer
       - docs_workflow_steward
+      - test_designer
       - python_reviewer
   - id: T4
     name: research-backed implementation change
@@ -172,6 +180,7 @@ tasks:
       - experimenter
       - experiment_reviewer
       - report_reviewer
+      - test_designer
       - python_reviewer
   - id: T5
     name: benchmark or experiment-driven optimization
@@ -184,6 +193,7 @@ tasks:
       - experimenter
       - experiment_reviewer
       - report_reviewer
+      - test_designer
       - python_reviewer
   - id: T6
     name: large refactor
@@ -191,6 +201,7 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
+      - test_designer
       - python_reviewer
   - id: T7
     name: new feature or API delivery
@@ -198,6 +209,7 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
+      - test_designer
       - python_reviewer
   - id: T8
     name: environment, CI, Docker, or dependency update
@@ -208,6 +220,7 @@ tasks:
       - scheduler
       - schedule_reviewer
       - docs_workflow_steward
+      - test_designer
       - python_reviewer
   - id: T9
     name: research workflow, artifact policy, or reporting policy change
@@ -246,6 +259,7 @@ tasks:
       - critical_guardian
       - project_reviewer
       - docs_workflow_steward
+      - test_designer
       - python_reviewer
       - infra_steward
       - infra_reviewer
@@ -258,6 +272,7 @@ tasks:
       - critical_guardian
       - project_reviewer
       - docs_workflow_steward
+      - test_designer
       - python_reviewer
       - researcher
       - research_reviewer

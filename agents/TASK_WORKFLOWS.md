@@ -27,6 +27,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
    - `design_reviewer`
 1. 文書通読レビュー
    - `document_flow_reviewer`
+1. テストケース設計
+   - `test_designer`
 1. 実装
    - `implementer`
 1. 実装 checkpoint review
@@ -41,6 +43,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
+- code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で `docs-completeness-review` も通します
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、`docs-completeness-review` を別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
@@ -113,6 +116,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - `detailed_designer`
 - `detailed_design_reviewer`
 - `document_flow_reviewer`
+- `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
 - `python_reviewer`
@@ -137,6 +141,7 @@ single-writer ルール:
 標準フロー:
 1. 共通実装フローをそのまま 1 pass で通す
 1. 小さい変更でも `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を省略しない
+1. code や test を触る task では `test_designer` を省略しない
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 
@@ -235,6 +240,7 @@ single-writer ルール:
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
 - `python_reviewer` を implementation chunk review と final integration review の両方で使う
+- `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
 - 同一 worktree では `worker` だけが repo file を編集する
 - 同一 worktree では parallel write を許可しない
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く

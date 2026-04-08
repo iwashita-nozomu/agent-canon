@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -121,6 +121,27 @@
           "document_flow_review"
         ],
         "notes": "The document-flow reviewer reads the document linearly from the top and checks whether a first reader can follow the meaning without backtracking. It stays separate from the design reviewer."
+      }
+    },
+    {
+      "id": "test_designer",
+      "activation": "static_test_design_needed",
+      "owns": [
+        "static_path_survey",
+        "boundary_case_design",
+        "adversarial_case_design",
+        "failure_mode_inventory",
+        "regression_test_plan"
+      ],
+      "required_outputs": [
+        "test_plan.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "test_plan"
+        ],
+        "notes": "The test designer statically analyzes the approved design and existing code paths, then records the nastiest edge cases, failure modes, and regression-focused test plan before implementation expands."
       }
     },
     {
@@ -873,9 +894,24 @@
       "gate": "logic-gap review feedback is resolved or escalated"
     },
     {
+      "from": "design_reviewer",
+      "to": "test_designer",
+      "gate": "detailed design is approved and the implementation-target code path is ready for adversarial test design"
+    },
+    {
+      "from": "document_flow_reviewer",
+      "to": "test_designer",
+      "gate": "document flow review is approved and the design is ready for adversarial test design"
+    },
+    {
+      "from": "test_designer",
+      "to": "implementer",
+      "gate": "adversarial test plan is recorded and ready to constrain implementation"
+    },
+    {
       "from": "designer",
       "to": "implementer",
-      "gate": "detailed design, document flow, notation, and logic-gap reviews are approved or escalated"
+      "gate": "detailed design, document flow, notation, logic-gap, and test-design reviews are approved or escalated"
     },
     {
       "from": "implementer",
@@ -1119,6 +1155,7 @@
         "designer",
         "design_reviewer",
         "document_flow_reviewer",
+        "test_designer",
         "notation_definition_reviewer",
         "logic_gap_reviewer"
       ],
@@ -1139,6 +1176,7 @@
         "design_brief.md",
         "design_review.md",
         "document_flow_review.md",
+        "test_plan.md",
         "notation_definition_review.md",
         "logic_gap_review.md"
       ],
@@ -1353,6 +1391,10 @@
       "when": "Python source, tests, or Python-facing behavior changes"
     },
     {
+      "role": "test_designer",
+      "when": "task changes code, parsing, edge-case handling, tests, or public behavior and needs adversarial static test design before implementation"
+    },
+    {
       "role": "report_reviewer",
       "when": "task produces an experiment report, claim-heavy note, or other evidence-facing narrative output"
     },
@@ -1416,6 +1458,7 @@
     "infra_review": "infra_review.md",
     "project_review": "project_review.md",
     "docs_workflow_review": "docs_workflow_review.md",
+    "test_plan": "test_plan.md",
     "python_review": "python_review.md",
     "report_review": "report_review.md",
     "reproducibility_review": "reproducibility_review.md",

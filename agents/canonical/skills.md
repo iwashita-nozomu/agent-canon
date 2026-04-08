@@ -20,6 +20,8 @@
   - correctness / 設計 / 保守性レビュー
 - `python-review`
   - pyright / pytest / ruff を前提にした Python review
+- `test-design`
+  - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`
   - README、workflow、guide などの長文作成フロー
 - `academic-writing`

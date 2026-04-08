@@ -45,6 +45,7 @@ WRITING_AND_REVIEW_ROLE_IDS = {
 }
 CODING_ROLE_IDS = {
     "explorer",
+    "test_designer",
     "worker",
     "python_reviewer",
 }

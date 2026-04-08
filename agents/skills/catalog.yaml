@@ -53,6 +53,10 @@ skill_families:
     purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
     canonical_doc: agents/skills/python-review.md
     shim: .agents/skills/python-review/SKILL.md
+  - id: test-design
+    purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
+    canonical_doc: agents/skills/test-design.md
+    shim: .agents/skills/test-design/SKILL.md
   - id: long-form-writing
     purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
     canonical_doc: agents/skills/long-form-writing.md

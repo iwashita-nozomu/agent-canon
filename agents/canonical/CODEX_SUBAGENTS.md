@@ -43,6 +43,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | `designer` | `detailed_designer` |
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
+| `test_designer` | `test_designer` |
 | `notation_definition_reviewer` | `notation_definition_reviewer` |
 | `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `implementer` | `worker` |
@@ -71,6 +72,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
   - README、workflow、guide、migration 文書のような長文を roadmap-first に起草する
+- `test_designer`
+  - approved design と既存 code path を静的解析し、nasty case と regression case の test plan を起こす
 - `explorer`
   - 読み取り専用で codebase / docs / workflow の調査を行う
 - `reviewer`
@@ -117,6 +120,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 長文起草 | `long_form_writer`。README、workflow、guide、migration 文書では `long-form-writing` を前提に draft する |
 | 学術文章起草 | `long_form_writer`。論文、thesis chapter、scholarly note では `academic-writing` を前提に draft する |
 | 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見る |
+| テストケース設計 | 専用の `test_designer` instance。approved design と既存 code path を静的解析し、最も意地の悪い edge case と regression case を test plan に落とす |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
@@ -145,7 +149,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | ----------- | ----- | ----- | --------- |
 | Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
 | Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
-| Codebase Survey / Implementation / Python Code Review | `explorer`, `worker`, `python_reviewer` | `gpt-5.3-codex` | `high` |
+| Codebase Survey / Test Design / Implementation / Python Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer` | `gpt-5.3-codex` | `high` |
 | Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
 
 運用メモ:
