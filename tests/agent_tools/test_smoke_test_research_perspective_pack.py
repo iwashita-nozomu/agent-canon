@@ -217,6 +217,40 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertTrue((report_dir / "reproducibility_review.md").is_file())
             self.assertTrue((report_dir / "benchmark_review.md").is_file())
 
+    def test_run_bundle_can_enable_cpp_reviewer(self) -> None:
+        """C++ reviewer should create its review artifact when enabled."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-cpp-reviewer"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "cpp reviewer smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--enable",
+                    "cpp_reviewer",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / run_id
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("cpp_reviewer", result.stdout)
+            self.assertIn("cpp_review.md", result.stdout)
+            self.assertTrue((report_dir / "cpp_review.md").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

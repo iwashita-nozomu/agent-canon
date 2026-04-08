@@ -144,6 +144,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - `project_reviewer`
 - `docs_workflow_steward`
 - `python_reviewer`
+- `cpp_reviewer`
 - `worker`
 
 single-writer ルール:
@@ -261,13 +262,14 @@ single-writer ルール:
 - `project_reviewer`
 - `docs_workflow_steward`
 - `python_reviewer`
+- `cpp_reviewer`
 
 特徴:
 - 背骨は共通実装フローと `documents/implementation-waterfall-workflow.md` の gate をそのまま使う
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
-- `python_reviewer` を implementation chunk review と final integration review の両方で使う
+- `python_reviewer` と `cpp_reviewer` は言語差分に応じて implementation chunk review と final integration review に追加する
 - `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
 - 同一 worktree では `worker` だけが repo file を編集する
 - 同一 worktree では parallel write を許可しない

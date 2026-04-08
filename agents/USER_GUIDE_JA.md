@@ -26,6 +26,7 @@
 - どの skill を使うか迷う場合は、まず `repo-onboarding` か `codex-task-workflow` を見ます。
 - Codex で毎回同じ手順を踏みたい場合は `codex-task-workflow` を見ます。
 - Python 差分では `python-review` を既定で使います。
+- C / C++ 差分では `cpp-review` を既定候補にします。
 - 局所 diff を findings-first で見るときは `change-review` を使います。
 - Markdown 差分では `md-style-check` を使います。
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を使います。

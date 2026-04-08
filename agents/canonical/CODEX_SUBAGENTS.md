@@ -49,8 +49,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | `notation_definition_reviewer` | `notation_definition_reviewer` |
 | `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `implementer` | `worker` |
-| `change_reviewer` | `reviewer` or `python_reviewer` |
-| `final_reviewer` | `reviewer`, `project_reviewer`, `python_reviewer` の該当 reviewer |
+| `change_reviewer` | `reviewer` or `python_reviewer` or `cpp_reviewer` |
+| `final_reviewer` | `reviewer`, `project_reviewer`, `python_reviewer`, `cpp_reviewer` の該当 reviewer |
 | `critical_guardian` | `project_reviewer` |
 | `researcher` | `literature_researcher` or `explorer` |
 | `infra_steward` | parent + `docs_workflow_steward` or infrastructure-focused `worker` planning |
@@ -84,6 +84,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
   - 読み取り専用で diff と risk を findings-first で洗う
 - `python_reviewer`
   - Python diff を型、pytest、ruff 前提で洗う
+- `cpp_reviewer`
+  - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `worker`
   - bounded な実装変更を切り出す
 - `docs_workflow_steward`
@@ -131,8 +133,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | 実装 | bounded な切り出しだけを `worker` |
-| 実装後レビュー | `reviewer`、`python_reviewer` |
-| 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を intake / wrap-up の固定 stack として使う |
+| 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
+| 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
 運用ルール:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
@@ -156,7 +158,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | ----------- | ----- | ----- | --------- |
 | Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
 | Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
-| Codebase Survey / Test Design / Implementation / Python Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer` | `gpt-5.3-codex` | `high` |
+| Codebase Survey / Test Design / Implementation / Language-Specific Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex` | `high` |
 | Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
 
 運用メモ:

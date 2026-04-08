@@ -24,6 +24,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
+| `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
@@ -57,6 +58,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
+- C / C++ 差分では `cpp-review` を既定候補にします。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。

@@ -15,6 +15,7 @@
 
 - `agents/skills/change-review.md`
 - `agents/skills/python-review.md`
+- `agents/skills/cpp-review.md`
 - `documents/REVIEW_PROCESS.md`
 
 ## Expected Outcome
@@ -38,6 +39,7 @@
 1. API、config、doc、test の追随を確認します。
 1. findings を `fix now` と `follow-up` に分け、evidence を添えて返します。
 1. Python-heavy diff なら `python-review` を追加し、より厳密に閉じます。
+1. C / C++ heavy diff なら `cpp-review` を追加し、より厳密に閉じます。
 
 ## Findings Format
 
@@ -56,4 +58,5 @@
 
 - この repo の findings-first review の正本は `change-review` です。
 - Python 差分で pyright / pytest / ruff を強く見る場合は `python-review` を追加します。
+- C / C++ 差分で build / header / ownership を強く見る場合は `cpp-review` を追加します。
 - 実験主張の批判的評価は `critical-review` を使います。

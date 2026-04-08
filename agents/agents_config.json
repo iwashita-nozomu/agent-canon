@@ -639,6 +639,26 @@
       }
     },
     {
+      "id": "cpp_reviewer",
+      "activation": "cpp_change_review_needed",
+      "owns": [
+        "native_build_review",
+        "header_boundary_review",
+        "ownership_and_lifetime_review",
+        "cpp_behavior_review"
+      ],
+      "required_outputs": [
+        "cpp_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "cpp_review"
+        ],
+        "notes": "The C++ reviewer records native build, ABI, ownership, and test findings only in the C++ review artifact."
+      }
+    },
+    {
       "id": "report_reviewer",
       "activation": "report_or_claim_heavy_output_needed",
       "owns": [
@@ -971,6 +991,11 @@
       "gate": "python or test changes are ready for code-quality review"
     },
     {
+      "from": "implementer",
+      "to": "cpp_reviewer",
+      "gate": "C, C++, header, native build, or native test changes are ready for code-quality review"
+    },
+    {
       "from": "change_reviewer",
       "to": "implementer",
       "gate": "implementation feedback resolved or escalated"
@@ -979,6 +1004,11 @@
       "from": "python_reviewer",
       "to": "implementer",
       "gate": "python review feedback is resolved or escalated"
+    },
+    {
+      "from": "cpp_reviewer",
+      "to": "implementer",
+      "gate": "C++ review feedback is resolved or escalated"
     },
     {
       "from": "implementer",
@@ -1437,6 +1467,10 @@
       "when": "Python source, tests, or Python-facing behavior changes"
     },
     {
+      "role": "cpp_reviewer",
+      "when": "C or C++ source, headers, native tests, CMake files, or native-facing behavior changes"
+    },
+    {
       "role": "test_designer",
       "when": "task changes code, parsing, edge-case handling, tests, or public behavior and needs adversarial static test design before implementation"
     },
@@ -1508,6 +1542,7 @@
     "docs_workflow_review": "docs_workflow_review.md",
     "test_plan": "test_plan.md",
     "python_review": "python_review.md",
+    "cpp_review": "cpp_review.md",
     "report_review": "report_review.md",
     "reproducibility_review": "reproducibility_review.md",
     "scientific_computing_review": "scientific_computing_review.md",

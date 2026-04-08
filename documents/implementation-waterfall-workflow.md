@@ -246,6 +246,7 @@ exit 条件:
 推奨 subagent:
 - `reviewer`
 - Python 差分が中心なら追加で `python_reviewer`
+- C / C++ 差分が中心なら追加で `cpp_reviewer`
 - repo-wide 影響が大きければ `project_reviewer`
 
 必須レビュー:
@@ -355,6 +356,7 @@ exit 条件:
 主担当:
 - `final_reviewer`
 - 必要に応じて `python-review`
+- 必要に応じて `cpp-review`
 - 必要に応じて `md-style-check`
 - 必要に応じて `critical-review`
 
@@ -368,6 +370,8 @@ exit 条件:
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
 - 必要に応じて `python-review`
   - Python API、型境界、test coverage の不足を確認する
+- 必要に応じて `cpp-review`
+  - C / C++ API、header 境界、build evidence、ownership と error path の不足を確認する
 - 必要に応じて `md-style-check`
   - 文書体裁とリンク整合を確認する
 - 必要に応じて `critical-review`
@@ -473,7 +477,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
 - Gate 3 では `Single Writer Worktree:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
-- Gate 8-9 では `python_reviewer` と `project_reviewer` を固定で通し、slice 単位ではなく全体整合を見ます
+- Gate 8-9 では言語差分に応じて `python_reviewer` や `cpp_reviewer` と `project_reviewer` を通し、slice 単位ではなく全体整合を見ます
 - 同一 worktree では `worker` だけが repo file を編集します
 - 複数 writer が必要な場合は、writer ごとに worktree を分けてから統合します
 

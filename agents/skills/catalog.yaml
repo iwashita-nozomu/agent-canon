@@ -17,6 +17,10 @@ skill_families:
     purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
     canonical_doc: agents/skills/python-review.md
     shim: .agents/skills/python-review/SKILL.md
+  - id: cpp-review
+    purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
+    canonical_doc: agents/skills/cpp-review.md
+    shim: .agents/skills/cpp-review/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md

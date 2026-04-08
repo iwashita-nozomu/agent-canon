@@ -58,6 +58,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
 - worktree で作業する場合は `bash scripts/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。
+- Python 差分では `python-review`、C / C++ 差分では `cpp-review` を既定候補にします。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` に従い、integration worktree 上で `python3 scripts/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/` への昇格先を決めます。
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
@@ -81,3 +82,4 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - `make ci-quick`
 - `make docs-check`
 - `python3 -m pytest tests/ -q --tb=short`
+- C / C++ 変更では project-native configure / build / test evidence

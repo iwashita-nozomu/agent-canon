@@ -35,6 +35,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - `docs_workflow_steward`
 - `test_designer`
 - `python_reviewer`
+- `cpp_reviewer`
 
 ## Default Sequence
 
@@ -43,6 +44,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 1. parent session が planning を含むなら、plan-mode command を先に有効化します。official Codex CLI では `/plan` です。
 1. `/agent` が使える runtime では inventory を確認し、使えない runtime では `.codex/agents/*.toml` をそのまま使います。
 1. `project_reviewer` を intake gate として立て、repo-wide completeness と collision risk を先に見ます。
+1. Python 差分なら `python_reviewer`、C / C++ 差分なら `cpp_reviewer` を早めに追加し、言語別の build / test / boundary risk を先に見ます。
 1. `execution_planner` に stage order と `Write Scope Per Agent:` を書かせます。
 1. `plan_reviewer` に review separation、rollback point、parallel write safety を見させます。
 1. `detailed_designer` と `detailed_design_reviewer` を通したあと、長文があるなら `document_flow_reviewer` と docs reviewer を通します。

@@ -49,6 +49,7 @@ CODING_ROLE_IDS = {
     "test_designer",
     "worker",
     "python_reviewer",
+    "cpp_reviewer",
 }
 
 

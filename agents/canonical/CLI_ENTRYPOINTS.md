@@ -86,7 +86,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 環境変更では `--task-id T8`、学術文章では `--task-id T10` を起点にします。
 
-包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定 stack として立てます。
+包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定 stack として立てます。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \

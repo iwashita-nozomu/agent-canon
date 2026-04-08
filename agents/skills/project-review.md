@@ -61,4 +61,5 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 
 - 局所 diff のレビューだけなら `code-review` を使います。
 - Python 差分の静的解析中心レビューなら `python-review` を使います。
+- native 差分の build / header / ownership 中心レビューなら `cpp-review` を使います。
 - 実験 result や report の妥当性は `critical-review` と `report-review` を使います。

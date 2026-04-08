@@ -71,7 +71,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
-包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定で立てます。
+包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定で立てます。
 Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。

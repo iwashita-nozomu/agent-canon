@@ -10,6 +10,8 @@
   - findings-first review
 - `python-review`
   - pyright / pytest / ruff を前提にした Python review
+- `cpp-review`
+  - build / header / ownership を前提にした C / C++ review
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`
