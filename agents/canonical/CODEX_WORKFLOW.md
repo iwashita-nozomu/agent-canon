@@ -72,66 +72,38 @@
 
 Codex では、まず `agents/skills/README.md` から必要最小限の skill だけ選びます。
 user が skill を明示したい場合の第一推奨は `$skill-name` です。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
+細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 
 - repo 入口確認:
   - `repo-onboarding`
-- workflow 選択:
-  - `agent-orchestration`
-- 文書置き場:
-  - `artifact-placement`
-- run bundle / specialist 起動:
-  - `subagent-bootstrap`
-- validation:
-  - `static-check`
-  - `static-validation`
 - code review:
-- `code-review`
+  - `change-review`
 - Python diff:
   - `python-review`
 - test design:
   - `test-design`
 - paper writing:
   - `paper-writing`
-- docs completeness:
-  - `docs-completeness-review`
 - long-form docs:
   - `long-form-writing`
 - academic docs:
   - `academic-writing`
-- logic-heavy academic review:
-  - `logic-gap-review`
 - Markdown diff:
   - `md-style-check`
-- notation-heavy academic review:
-  - `notation-definition-review`
-- review:
-  - `change-review`
 - worktree kickoff:
   - `worktree-start`
 - worktree drift and cleanup:
   - `worktree-health`
 - experiment inner loop:
   - `experiment-lifecycle`
-- experiment/code-change loop:
-  - `experiment-change-loop`
 - tuning / research / experiment の backlog-driven outer loop:
   - `adaptive-improvement-loop`
 - literature and prior art:
   - `literature-survey`
 - research outer loop:
   - `research-workflow`
-- experiment report:
-  - `report-review`
-- research-wide review pack:
-  - `research-perspective-review`
-- repo-wide review:
-  - `project-review`
-- repo-wide integration review:
-  - `comprehensive-review`
 - 包括的 repo-wide delivery:
   - `comprehensive-development`
-- maintenance monitoring:
-  - `project-health`
 - environment and tool rollout:
   - `environment-maintenance`
 

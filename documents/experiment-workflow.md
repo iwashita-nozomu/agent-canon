@@ -13,7 +13,7 @@
 
 さらに、実験を進めながらコード自体を改造する必要がある場合は、結果とレポートを毎回生成し、サブエージェントによる批判的レビューを挟んで反復する workflow を標準にします。外部調査つき実装、性能改善、比較検証では、この文書を `Research-Driven Change` の inner loop として使います。outer loop の正本は [research-workflow.md](research-workflow.md) です。
 
-agent がこの反復を自律実行する場合の skill 入口は `agents/skills/experiment-change-loop.md`、loop 記録テンプレートは `agents/templates/experiment_change_loop.md` です。
+agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `agents/templates/experiment_change_loop.md` です。
 
 ## 1. この文書の役割
 

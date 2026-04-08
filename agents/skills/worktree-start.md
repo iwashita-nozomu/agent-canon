@@ -79,6 +79,6 @@
 ## Boundary
 
 - cleanup readiness や delete 可否の review は `worktree-health` を使います。
-- artifact の置き場に迷う場合は `artifact-placement` を使います。
-- repo-wide な routing や CI / Docker review は `project-review` を使います。
+- artifact の置き場は `agents/canonical/ARTIFACT_PLACEMENT.md` を正本にします。
+- repo-wide な routing や CI / Docker review は `comprehensive-development` か `environment-maintenance` を使います。
 - Docker / dependency / CI の変更が主題なら `environment-maintenance` を使います。

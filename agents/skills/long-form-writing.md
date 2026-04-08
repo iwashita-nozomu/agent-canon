@@ -15,8 +15,6 @@
 - `documents/long-form-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
-- `agents/skills/docs-completeness-review.md`
-- `agents/skills/docs-consistency-review.md`
 
 ## Mandatory Checklist
 
@@ -25,8 +23,8 @@
 - section ごとに `focus`、`purpose`、`support` を固定する
 - draft 後に reverse outline を取る
 - `document_flow_reviewer` を必ず通す
-- 別 reviewer で `docs-completeness-review` を必ず通す
-- 複数文書や entrypoint をまたぐなら `docs-consistency-review` を追加する
+- 別 reviewer で docs completeness review を必ず通す
+- 複数文書や entrypoint をまたぐなら docs consistency review を追加する
 - wording より先に higher-order concerns を直す
 
 ## Default Sequence
@@ -36,13 +34,12 @@
 1. reader order で draft する
 1. reverse outline で section order と gap を確認する
 1. `document_flow_reviewer` を通す
-1. 別 reviewer で `docs-completeness-review` を通す
-1. 必要なら `docs-consistency-review` を追加する
+1. 別 reviewer で docs completeness review を通す
+1. 必要なら docs consistency review を追加する
 1. `make docs-check` で閉じる
 
 ## Boundary
 
 - 論文、thesis chapter、scholarly note のような学術文章は `academic-writing` を優先します
-- 実験 report の review policy は `report-review` を優先します
-- repo-wide な workflow 改造は `agent-orchestration` も併用します
+- 実験 report の review policy は report review を優先します
 - Markdown の体裁だけなら `md-style-check` を使います

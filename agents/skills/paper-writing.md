@@ -19,7 +19,6 @@
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/academic-writing.md`
-- `agents/skills/citation-evidence-review.md`
 
 ## Mandatory Checklist
 
@@ -29,7 +28,7 @@
 - `notation ledger` と `paragraph claim map` を作る
 - run bundle を先に作り、`citation_evidence_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、`document_flow_reviewer` を explicit に有効化する
 - draft 後に reverse outline を取り、review 前に section role の重複を潰す
-- `document_flow_reviewer`、`citation-evidence-review`、`notation-definition-review`、`logic-gap-review`、別 reviewer の `docs-completeness-review` を必ず通す
+- `document_flow_reviewer`、citation review、notation review、logic-gap review、別 reviewer の docs completeness review を必ず通す
 
 ## Default Sequence
 
@@ -41,10 +40,10 @@
 1. reader order で draft する
 1. reverse outline を取る
 1. `document_flow_reviewer` を通す
-1. `citation_evidence_reviewer` に `citation-evidence-review` を通す
-1. `notation_definition_reviewer` に `notation-definition-review` を通す
-1. `logic_gap_reviewer` に `logic-gap-review` を通す
-1. 別 reviewer に `docs-completeness-review` を通す
+1. `citation_evidence_reviewer` に citation review を通す
+1. `notation_definition_reviewer` に notation review を通す
+1. `logic_gap_reviewer` に logic-gap review を通す
+1. 別 reviewer に docs completeness review を通す
 1. higher-order revision を終えてから line edit に入る
 1. `make docs-check` で閉じる
 
@@ -62,4 +61,4 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 - paper-like でない学術文章や method note は `academic-writing` を使います
 - 文献探索自体が主タスクなら `literature-survey` を先に使います
-- rebuttal や report の evidence traceability を主に見たいなら `report-review` を追加します
+- rebuttal や report の evidence traceability を主に見たいなら report review を追加します

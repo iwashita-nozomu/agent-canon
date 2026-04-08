@@ -57,6 +57,6 @@
 ## Boundary
 
 - 研究全体の outer loop は `research-workflow` を使います
-- 実験結果の批判的評価は `critical-review` を使います
-- reader-facing な report の確認は `report-review` を使います
+- 実験結果の批判的評価は critical review を使います
+- reader-facing な report の確認は report review を使います
 - repo-wide な workflow や review policy の外部根拠索引は `documents/workflow-references.md` に残します

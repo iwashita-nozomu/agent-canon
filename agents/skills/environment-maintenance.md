@@ -67,5 +67,5 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 
 ## Boundary
 
-- 実験 loop 自体の運用は `experiment-change-loop` または `research-workflow` を使います。
+- 実験 loop 自体の運用は `adaptive-improvement-loop` または `research-workflow` を使います。
 - 差分レビューは `change-review` を使います。

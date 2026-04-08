@@ -127,15 +127,15 @@ draft 後に、section と paragraph を 1 文で言い直します。
   - 記号、略語、technical term、仮定、domain / unit / index の definition-before-use と一貫性を確認する
 - `logic_gap_reviewer`
   - 主張の飛躍、暗黙の仮定、根拠不足、result から interpretation へのジャンプを確認する
-- 別 reviewer による `docs-completeness-review`
+- 別 reviewer による docs completeness review
   - 読者に必要な背景、条件、入力、出力、限界、decision point の不足を探す
 
 追加条件:
 
 - 投稿論文や thesis chapter では `citation_evidence_reviewer`
-- 複数文書を跨ぐなら `docs-consistency-review`
-- empirical claim が強いなら `critical-review`
-- report / response / rebuttal として出すなら `report-review`
+- 複数文書を跨ぐなら docs consistency review
+- empirical claim が強いなら critical review
+- report / response / rebuttal として出すなら report review
 
 `document_flow_reviewer`、`citation_evidence_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer は兼務させません。
 

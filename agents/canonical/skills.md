@@ -1,23 +1,13 @@
 # Canonical Skill Registry
 
-## Curated Skills
+## Public Skills
 
 - `repo-onboarding`
   - unfamiliar repo の入口確認
-- `agent-orchestration`
-  - workflow family 選択と handoff 整理
-- `artifact-placement`
-  - task 文書、run artifact、repo 正本の置き分け
-- `from_another_agent`
-  - 前回 run の carry-over と optional follow-up を吸う
-- `subagent-bootstrap`
-  - specialist 起動、report bundle、write-scope 整理
-- `static-check`
-  - 速い検査と基礎品質確認
-- `static-validation`
-  - lint / test / link / CI 確認
-- `code-review`
-  - correctness / 設計 / 保守性レビュー
+- `codex-task-workflow`
+  - Codex の context-independent task 実行フロー
+- `change-review`
+  - findings-first review
 - `python-review`
   - pyright / pytest / ruff を前提にした Python review
 - `test-design`
@@ -26,56 +16,43 @@
   - README、workflow、guide などの長文作成フロー
 - `academic-writing`
   - 論文、thesis chapter、scholarly note の作成フロー
-- `docs-completeness-review`
-  - 文書の欠落や説明不足のレビュー
-- `logic-gap-review`
-  - 学術文章の論理飛躍と根拠接続のレビュー
+- `paper-writing`
+  - 投稿論文、thesis chapter、paper section の作成フロー
 - `md-style-check`
   - Markdown の体裁とリンク確認
-- `docs-consistency-review`
-  - 文書間の矛盾と stale route の確認
-- `notation-definition-review`
-  - 記号、略語、定義順、一貫性のレビュー
-- `change-review`
-  - findings-first review
 - `worktree-start`
   - worktree 開始時の scope、action log、kickoff を整える
 - `worktree-health`
   - worktree の scope drift と cleanup risk を確認
-- `experiment-workflow`
-  - question, protocol, run, report の整理
 - `experiment-lifecycle`
   - 単一 run と review / rerun 分岐
-- `experiment-change-loop`
-  - 実験結果で改造 loop を閉じるまで回す
+- `adaptive-improvement-loop`
+  - 実験、調査、チューニング、比較改善の outer loop
 - `literature-survey`
   - 先行研究、関連文献、反証候補の整理
 - `research-workflow`
   - 外部調査、比較設計、run loop、decision state の整理
-- `critical-review`
-  - fairness, overclaim, missing evidence の確認
-- `report-review`
-  - experiment report の reader-facing review
-- `research-perspective-review`
-  - 研究系変更を複数視点で並列レビュー
-- `comprehensive-review`
-  - docs / tools / workflow の横断レビュー
-- `project-health`
-  - 継続運用、CI、drift の健全性確認
-- `project-review`
-  - repo-wide な棚卸しと全体レビュー
 - `comprehensive-development`
   - code / docs / tools / runtime をまたぐ包括的開発フロー
 - `environment-maintenance`
-  - Docker, CI, dependency, runtime 更新
-- `codex-cli`
-  - Codex 用の入口と skill path
-- `codex-task-workflow`
-  - Codex の context-independent task 実行フロー
-- `claude-code-cli`
-  - Claude Code 用の入口と subagent path
-- `copilot-cli`
-  - Copilot CLI / coding agent 用の入口と注意点
+  - Docker、CI、dependency、runtime 更新
+
+## Internal Review And Runtime Routines
+
+- docs completeness review
+- docs consistency review
+- citation review
+- notation review
+- logic-gap review
+- critical review
+- report review
+- research perspective review pack
+- artifact placement
+- subagent bootstrap
+- CLI adapter docs
+- static validation commands
+
+これらは workflow や subagent routing が要求する internal routine として扱い、public skill surface には出しません。
 
 ## Discovery Paths
 

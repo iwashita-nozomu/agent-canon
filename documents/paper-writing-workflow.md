@@ -114,16 +114,16 @@ paper writing では、次をすべて別 instance で通します。
   - notation、abbreviation、unit、index、assumption の定義順
 - `logic_gap_reviewer`
   - inferential jump、hidden assumption、result と interpretation の境界
-- 別 reviewer の `docs-completeness-review`
+- 別 reviewer の docs completeness review
   - section 欠落、decision point 欠落、reader context 欠落
 
 条件次第で追加します。
 
 - `report_reviewer`
   - rebuttal、response letter、claim-heavy narrative
-- `critical-review`
+- critical review
   - 強い empirical claim や比較 claim
-- `docs-consistency-review`
+- docs consistency review
   - 複数文書や appendix / supplement と跨るとき
 
 ### 7. Revision Order

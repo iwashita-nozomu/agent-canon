@@ -44,8 +44,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
-- README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で `docs-completeness-review` も通します
-- 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、`docs-completeness-review` を別 reviewer で通します
+- README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で docs completeness review も通します
+- 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
@@ -195,8 +195,8 @@ single-writer ルール:
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じない
 - ただし、1 回の repo 変更は 1 回の waterfall pass として閉じる
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
-- agent が code change と run を継続反復する場合は `experiment-change-loop` を追加する
-- methodology、artifact、reporting policy を大きく変えなくても、research-driven change では `research-perspective-review` を default にします
+- agent が code change と run を継続反復する場合は `adaptive-improvement-loop` を追加する
+- methodology、artifact、reporting policy を大きく変える場合は perspective reviewers を default にします
 - repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
 
 ### 3. Large Delivery
@@ -297,7 +297,7 @@ single-writer ルール:
 - repo に持ち帰る各 change は 1 回の waterfall pass として閉じます
 - `Question`、`Comparison Target`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を先に固定します
 - 1 iteration は 1 goal、1 change pass、1 decision state を原則にします
-- `experiment-change-loop` を inner loop に使い、`research-workflow` と `experiment-workflow` を下敷きにします
+- `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
 - tuning 中でも `test_designer`、`document_flow_reviewer`、`report_reviewer` を省略しません
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く

@@ -96,16 +96,14 @@ backlog は単なる思いつき置き場ではなく、優先順付きの実行
 - `verifier`
 - `auditor`
 
-cost を無視する run では、必要に応じて `research-perspective-review` も既定で追加します。
+cost を無視する run では、必要に応じて research perspective review pack も既定で追加します。
 
 ## 8. Relationship To Other Workflows
 
 - 外部調査と claim 更新の大枠:
   - [research-workflow.md](research-workflow.md)
 - 単一 run と rerun 分岐:
-  - [experiment-workflow.md](experiment-workflow.md)
-- 実験結果で code change を継続反復する skill:
-  - `agents/skills/experiment-change-loop.md`
+  - `agents/skills/experiment-lifecycle.md`
 - repo に持ち帰る各 change pass:
   - [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md)
 

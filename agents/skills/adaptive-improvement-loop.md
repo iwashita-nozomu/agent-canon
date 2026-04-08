@@ -18,9 +18,8 @@
 - `documents/research-workflow.md`
 - `documents/experiment-workflow.md`
 - `documents/implementation-waterfall-workflow.md`
-- `agents/skills/experiment-change-loop.md`
 - `agents/skills/research-workflow.md`
-- `agents/skills/report-review.md`
+- `agents/skills/experiment-lifecycle.md`
 
 ## Operating Rules
 
@@ -49,5 +48,5 @@
 
 - 外部調査そのものは `literature-survey` を追加します。
 - 単一 run の実行と rerun 分岐だけなら `experiment-lifecycle` を使います。
-- 実験結果で code change を 1 本ずつ回す内側の loop は `experiment-change-loop` を使います。
+- 単一 run の実行と rerun 分岐は `experiment-lifecycle` を使います。
 - repo-wide な通常開発や feature delivery には使わず、`implementation-waterfall-workflow.md` を使います。

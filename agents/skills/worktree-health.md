@@ -64,4 +64,4 @@
 ## Boundary
 
 - worktree 開始時の初期化は `worktree-start` を使います。
-- repo 全体レビューは `project-review` を使います。
+- repo 全体レビューや再編は `comprehensive-development` を使います。

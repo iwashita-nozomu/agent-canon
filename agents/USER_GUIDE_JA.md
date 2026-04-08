@@ -21,28 +21,22 @@
 - 共通 skill の正本は `.agents/skills/` にあります。
 - Claude では `.claude/skills/` の generated mirror を使います。正本は `.agents/skills/` です。
 - skill を明示したいときの第一推奨は `$skill-name` です。
-- 例: `$repo-onboarding`、`$research-workflow`、`$experiment-change-loop`、`$paper-writing`
+- 例: `$repo-onboarding`、`$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - plain text で skill 名を書く運用もできますが、`$skill-name` の方を既定にします。
-- どの skill を使うか迷う場合は、まず `repo-onboarding` か `agent-orchestration` を見ます。
+- どの skill を使うか迷う場合は、まず `repo-onboarding` か `codex-task-workflow` を見ます。
 - Codex で毎回同じ手順を踏みたい場合は `codex-task-workflow` を見ます。
 - Python 差分では `python-review` を既定で使います。
-- 局所 diff を findings-first で見るときは `code-review` か `change-review` を使います。
-- Markdown / report 差分では `md-style-check` と必要なら `report-review` を使います。
+- 局所 diff を findings-first で見るときは `change-review` を使います。
+- Markdown 差分では `md-style-check` を使います。
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を使います。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。
-- 文書の説明不足を拾うときは `docs-completeness-review` を使います。
 - 文献調査や関連研究整理では `literature-survey` を使います。
 - 研究系 task では `research-workflow` を外側の loop に使います。
-- 実験結果を見ながら code change を継続反復する場合は `experiment-change-loop` を使います。
+- 実験結果を見ながら code change、調査、チューニングを継続反復する場合は `adaptive-improvement-loop` を使います。
 - 単一 run の review / rerun 分岐は `experiment-lifecycle` を使います。
-- 研究設計や artifact 方針まで大きく触る場合は `research-perspective-review` を追加します。
 - worktree を切った直後は `worktree-start` で scope と action log を固定し、drift や cleanup 判断は `worktree-health` を使います。
-- repo 全体を横断して見るときは `project-review`、必要なら `comprehensive-review` と `project-health` を追加します。
 - code、docs、tools、runtime をまとめて rework する包括的変更では `comprehensive-development` を使います。
-- 文書の置き場で迷う場合は `artifact-placement` を見ます。
-- 前回 agent run から引き継ぐ TODO や optional follow-up がある場合は `from_another_agent` を先に見ます。
-- CLI 差分で迷う場合は `codex-cli`、`claude-code-cli`、`copilot-cli` を見ます。
 - Docker、CI、dependency、repo-wide tool 導入案では `environment-maintenance` を使います。
 
 ## subagent の使い方
@@ -50,7 +44,7 @@
 - Claude 専用 subagent は `.claude/agents/` にあります。
 - Codex 用 subagent は `.codex/agents/` にあります。
 - subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
-- specialist を立ち上げる前に `subagent-bootstrap` を見て、repo-changing task では run bundle を先に作ります。
+- repo-changing task では run bundle を先に作ります。
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - `skills=<...>` には `$skill-name` で指定した skill をそのまま並べます。
 - 例: `skills=$research-workflow,$literature-survey,$paper-writing`
@@ -61,7 +55,7 @@
 - 包括的開発では、同一 worktree の writer を 1 人に固定します。
 - 複数 writer が必要な場合は、同一 worktree ではなく複数 worktree に分けます。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
-- 長文では、`document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します。
+- 長文では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
 - 論文 draft では、さらに `citation_evidence_reviewer` を別 instance で通します。
 

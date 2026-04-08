@@ -19,9 +19,6 @@
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/literature-survey.md`
-- `agents/skills/citation-evidence-review.md`
-- `agents/skills/logic-gap-review.md`
-- `agents/skills/notation-definition-review.md`
 
 ## Mandatory Checklist
 
@@ -35,10 +32,10 @@
 - paper-like draft では `citation_evidence_reviewer` も explicit に有効化する
 - draft 後に reverse outline を取る
 - `document_flow_reviewer` を必ず通す
-- 別 reviewer で `notation-definition-review` を必ず通す
-- 別 reviewer で `logic-gap-review` を必ず通す
-- 別 reviewer で `docs-completeness-review` を必ず通す
-- empirical claim や report なら `critical-review`、必要なら `report-review` を追加する
+- 別 reviewer で notation review を必ず通す
+- 別 reviewer で logic-gap review を必ず通す
+- 別 reviewer で docs completeness review を必ず通す
+- empirical claim や report なら critical review、必要なら report review を追加する
 - 投稿論文や thesis chapter では `paper-writing` を優先 overlay とする
 
 ## Default Sequence
@@ -50,9 +47,9 @@
 1. reader order で draft する
 1. reverse outline を取る
 1. `document_flow_reviewer` を通す
-1. `notation_definition_reviewer` に `notation-definition-review` を通す
-1. `logic_gap_reviewer` に `logic-gap-review` を通す
-1. 別 reviewer に `docs-completeness-review` を通す
+1. `notation_definition_reviewer` に notation review を通す
+1. `logic_gap_reviewer` に logic-gap review を通す
+1. 別 reviewer に docs completeness review を通す
 1. higher-order revision を終えてから line edit に入る
 1. `make docs-check` で閉じる
 
@@ -70,4 +67,4 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 - 一般の README、workflow、migration 文書なら `long-form-writing` を使います
 - 文献調査自体が主タスクなら `literature-survey` を先に使います
-- experiment report の evidence traceability は `report-review` を優先します
+- experiment report の evidence traceability は report review を優先します
