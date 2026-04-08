@@ -45,6 +45,7 @@
 | `experiment-workflow` | question, protocol, run, report の整理 | `agents/skills/experiment-workflow.md` | `.agents/skills/experiment-workflow/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
 | `experiment-change-loop` | 実験結果で改造 loop を閉じるまで回す | `agents/skills/experiment-change-loop.md` | `.agents/skills/experiment-change-loop/SKILL.md` |
+| `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
 | `literature-survey` | 先行研究、関連文献、反証候補の整理 | `agents/skills/literature-survey.md` | `.agents/skills/literature-survey/SKILL.md` |
 | `research-workflow` | 外部調査、比較設計、run loop、decision state の整理 | `agents/skills/research-workflow.md` | `.agents/skills/research-workflow/SKILL.md` |
 | `critical-review` | 過大主張、比較条件、根拠不足の確認 | `agents/skills/critical-review.md` | `.agents/skills/critical-review/SKILL.md` |
@@ -68,6 +69,7 @@
 - paper section まで含む論文 draft では `paper-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop、`research-perspective-review` を大きい review pack として使います。
 - 実験結果を見ながら code change を継続反復する task では `experiment-change-loop` を使います。
+- tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な棚卸しや大きな workflow 整理では `project-review` と必要なら `comprehensive-review` を使います。

@@ -21,6 +21,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
   - `documents/worktree-lifecycle.md`
 - main integration:
   - `documents/main-integration-workflow.md`
+- adaptive tuning loop:
+  - `documents/adaptive-improvement-workflow.md`
 - workflow 根拠:
   - `documents/workflow-references.md`
 - notes の昇格と育成:
@@ -52,6 +54,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 | nested Codex を container 内で動かしたい | `docker/README.md` | `docker/`, `scripts/ci/`, `.state/` | `python3 scripts/ci/run_codex_in_repo_container.py --print-only` |
 | 実験を進めたい | `documents/experiment-workflow.md` | `experiments/`, `experiments/registry.toml`, `notes/`, `scripts/experiments/` | report と result の対応確認 |
 | research-driven な改善をしたい | `documents/research-workflow.md` | `documents/`, `experiments/`, `notes/` | review loop の完結 |
+| tuning、比較改善、探索的改造を backlog 付きで回したい | `documents/adaptive-improvement-workflow.md` | `documents/`, `experiments/`, `notes/`, `reports/agents/` | iteration backlog と decision state の更新 |
 | code / docs / tools / runtime をまとめて直したい | `agents/TASK_WORKFLOWS.md`, `agents/skills/comprehensive-development.md` | `agents/`, `documents/`, `scripts/`, `docker/`, `python/`, `tests/` | `make agent-checks` |
 | agent を使いたい | `agents/README.md` | `agents/`, `reports/agents/` | `make agent-checks` |
 | shared agent canon を subtree で同期したい | `documents/agent-canon-subtree-migration.md` | `vendor/`, `scripts/sync_agent_canon.sh` | `make agent-checks` |

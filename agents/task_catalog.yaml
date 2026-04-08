@@ -144,6 +144,39 @@ workflow_families:
       - T11
       - T12
 
+  - id: adaptive_improvement_loop
+    name: Adaptive Improvement Loop
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - document_flow_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - researcher
+        - research_reviewer
+        - scheduler
+        - schedule_reviewer
+        - experimenter
+        - experiment_reviewer
+        - report_reviewer
+        - test_designer
+        - python_reviewer
+        - reproducibility_reviewer
+        - scientific_computing_reviewer
+        - benchmark_reviewer
+        - artifact_reviewer
+        - fair_data_reviewer
+        - ml_science_reviewer
+    tasks:
+      - T13
+
 tasks:
   - id: T1
     name: local bug fix
@@ -280,6 +313,25 @@ tasks:
       - research_reviewer
       - infra_steward
       - infra_reviewer
+  - id: T13
+    name: adaptive tuning exploration and experiment-driven improvement loop
+    family: adaptive_improvement_loop
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+      - report_reviewer
+      - test_designer
+      - python_reviewer
+      - reproducibility_reviewer
+      - scientific_computing_reviewer
+      - benchmark_reviewer
+      - artifact_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
 
 review_packs:
   - id: research_perspective_review
@@ -295,6 +347,7 @@ review_packs:
       - T4
       - T5
       - T9
+      - T13
     when: methodology, artifact policy, benchmark protocol, or reporting policy changes substantially
   - id: academic_writing_review
     name: Academic Writing Review

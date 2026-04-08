@@ -1,0 +1,15 @@
+---
+name: adaptive-improvement-loop
+description: Use when experiments, research, tuning, and iterative code improvement should be managed as one backlog-driven agile outer loop.
+---
+
+# Adaptive Improvement Loop
+
+1. Read `agents/skills/adaptive-improvement-loop.md`.
+1. Read `documents/adaptive-improvement-workflow.md`.
+1. Read `documents/research-workflow.md`.
+1. Read `documents/experiment-workflow.md`.
+1. Keep the outer loop agile and backlog-driven, but keep each repo-changing pass inside `documents/implementation-waterfall-workflow.md`.
+1. Fix `Question`, `Comparison Target`, `Exit Criteria`, `Stop Budget`, and `Improvement Backlog` before choosing the next iteration.
+1. Keep one iteration goal and one change pass at a time.
+1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.

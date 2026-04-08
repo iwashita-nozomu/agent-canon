@@ -21,6 +21,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
+- `documents/adaptive-improvement-workflow.md`
 - `documents/notes-lifecycle.md`
 - `documents/paper-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`

@@ -117,6 +117,10 @@ skill_families:
     purpose: Run benchmark-driven code changes through implement, run, review, and explicit decision states until closure.
     canonical_doc: agents/skills/experiment-change-loop.md
     shim: .agents/skills/experiment-change-loop/SKILL.md
+  - id: adaptive-improvement-loop
+    purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven agile outer loop.
+    canonical_doc: agents/skills/adaptive-improvement-loop.md
+    shim: .agents/skills/adaptive-improvement-loop/SKILL.md
   - id: literature-survey
     purpose: Search for primary sources, prior art, contradictory evidence, and reusable bibliography structure.
     canonical_doc: agents/skills/literature-survey.md

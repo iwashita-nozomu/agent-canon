@@ -93,5 +93,6 @@
 - 外部調査そのものは `literature-survey` を使います。
 - 単一 run の設計と出力整理は `experiment-workflow` を使います。
 - 研究系変更の outer loop は `research-workflow` を使います。
+- tuning、調査、比較改善を backlog 付きで継続反復する outer loop では `adaptive-improvement-loop` を使います。
 - methodology、artifact、reporting policy を大きく変える場合は `research-perspective-review` を追加します。
 - run のために Docker、dependency、CI を触る場合は `environment-maintenance` を併用します。

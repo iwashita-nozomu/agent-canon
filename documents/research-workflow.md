@@ -52,7 +52,7 @@ decision は次の 4 つに固定します。
 
 この loop は 1 回で終える前提にしません。`report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り、結論を閉じることを禁止します。
 
-agent がこの loop を自律実行する場合は、routing skill として `agents/skills/experiment-change-loop.md` を使い、iteration の記録は `agents/templates/experiment_change_loop.md` を起点にします。
+agent がこの loop を自律実行する場合は、狭い code-change loop なら `agents/skills/experiment-change-loop.md` を使い、改善 backlog を持つ outer loop なら `agents/skills/adaptive-improvement-loop.md` を使います。iteration の記録は `agents/templates/experiment_change_loop.md` を起点にします。
 
 ## 3. 文献ベースの要点
 

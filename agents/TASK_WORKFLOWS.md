@@ -52,6 +52,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `scripts/ci/check_merge_structure.py` を省略しません
+- tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 
 ## Activation Quick Start
 
@@ -113,6 +114,16 @@ Codex parent が planning を行う session では、parent session 側の plan-
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
+反復改善:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "adaptive improvement loop" \
+  --task-id T13 \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
@@ -260,6 +271,35 @@ single-writer ルール:
 - `test_designer` は実装前に static path、failure mode、nasty edge case を洗い、worker が既存 test style で落とし込む
 - 同一 worktree では `worker` だけが repo file を編集する
 - 同一 worktree では parallel write を許可しない
+
+### 6. Adaptive Improvement Loop
+
+対象:
+- benchmark を見ながらの性能改善
+- tuning と比較実験を回しながらの段階的改造
+- 調査、実験、protocol refinement、code change をまとめた改善 loop
+
+追加ロール:
+- `researcher`
+- `research_reviewer`
+- `experimenter`
+- `experiment_reviewer`
+- `report_reviewer`
+- 必要に応じて `reproducibility_reviewer`
+- 必要に応じて `scientific_computing_reviewer`
+- 必要に応じて `benchmark_reviewer`
+- 必要に応じて `artifact_reviewer`
+- 必要に応じて `fair_data_reviewer`
+- 必要に応じて `ml_science_reviewer`
+
+特徴:
+- outer loop は agile、iteration backlog を持ちます
+- repo に持ち帰る各 change は 1 回の waterfall pass として閉じます
+- `Question`、`Comparison Target`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を先に固定します
+- 1 iteration は 1 goal、1 change pass、1 decision state を原則にします
+- `experiment-change-loop` を inner loop に使い、`research-workflow` と `experiment-workflow` を下敷きにします
+- tuning 中でも `test_designer`、`document_flow_reviewer`、`report_reviewer` を省略しません
+- `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く
 - `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
 - 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する

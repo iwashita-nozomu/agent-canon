@@ -73,6 +73,7 @@ documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-su
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
+documents/adaptive-improvement-workflow.md:../${PREFIX}/documents/adaptive-improvement-workflow.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/paper-writing-workflow.md:../${PREFIX}/documents/paper-writing-workflow.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
