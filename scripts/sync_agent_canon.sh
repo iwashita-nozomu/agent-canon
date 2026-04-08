@@ -88,6 +88,7 @@ documents/experiment-workflow.md:../${PREFIX}/documents/experiment-workflow.md
 documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
 documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
 documents/long-form-writing-workflow.md:../${PREFIX}/documents/long-form-writing-workflow.md
+documents/main-integration-workflow.md:../${PREFIX}/documents/main-integration-workflow.md
 documents/research-workflow.md:../${PREFIX}/documents/research-workflow.md
 documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
@@ -126,6 +127,7 @@ notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTRE
 tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
+tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
 scripts/agent_tools:../${PREFIX}/scripts/agent_tools
@@ -140,6 +142,7 @@ scripts/ci/check_experiment_registry.py:../../${PREFIX}/scripts/ci/check_experim
 scripts/ci/PRE_REVIEW_GUIDE.md:../../${PREFIX}/scripts/ci/PRE_REVIEW_GUIDE.md
 scripts/ci/check_docker_build.sh:../../${PREFIX}/scripts/ci/check_docker_build.sh
 scripts/ci/check_server_readiness.py:../../${PREFIX}/scripts/ci/check_server_readiness.py
+scripts/ci/check_merge_structure.py:../../${PREFIX}/scripts/ci/check_merge_structure.py
 scripts/ci/container_runtime.py:../../${PREFIX}/scripts/ci/container_runtime.py
 scripts/ci/pre_review.sh:../../${PREFIX}/scripts/ci/pre_review.sh
 scripts/ci/run_all_checks.sh:../../${PREFIX}/scripts/ci/run_all_checks.sh

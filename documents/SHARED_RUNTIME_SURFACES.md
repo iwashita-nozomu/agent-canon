@@ -38,6 +38,7 @@ root では次を symlink view として扱います。
 - `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
 - `documents/long-form-writing-workflow.md`
+- `documents/main-integration-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
@@ -76,6 +77,7 @@ root では次を symlink view として扱います。
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_check_agent_runtime_alignment.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+- `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
@@ -90,6 +92,7 @@ root では次を symlink view として扱います。
 - `scripts/ci/PRE_REVIEW_GUIDE.md`
 - `scripts/ci/check_docker_build.sh`
 - `scripts/ci/check_server_readiness.py`
+- `scripts/ci/check_merge_structure.py`
 - `scripts/ci/container_runtime.py`
 - `scripts/ci/pre_review.sh`
 - `scripts/ci/run_all_checks.sh`

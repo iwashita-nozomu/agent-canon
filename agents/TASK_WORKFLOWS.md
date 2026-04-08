@@ -50,6 +50,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
+- branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
+- 構成変更を含む統合では、専用 integration worktree と `scripts/ci/check_merge_structure.py` を省略しません
 
 ## Activation Quick Start
 

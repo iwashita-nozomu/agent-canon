@@ -35,6 +35,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `documents/experiment-workflow.md`
 - `documents/experiment_runner.md`
 - `documents/implementation-waterfall-workflow.md`
+- `documents/main-integration-workflow.md`
 - `documents/research-workflow.md`
 - `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
@@ -58,6 +59,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
+- `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_run_managed_experiment.py`
 - `scripts/agent_tools/`
@@ -69,6 +71,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `scripts/ci/PRE_REVIEW_GUIDE.md`
 - `scripts/ci/check_docker_build.sh`
 - `scripts/ci/check_experiment_registry.py`
+- `scripts/ci/check_merge_structure.py`
 - `scripts/ci/check_server_readiness.py`
 - `scripts/ci/container_runtime.py`
 - `scripts/ci/pre_review.sh`

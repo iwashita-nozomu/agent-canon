@@ -19,6 +19,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
   - `documents/research-workflow.md`
 - worktree lifecycle:
   - `documents/worktree-lifecycle.md`
+- main integration:
+  - `documents/main-integration-workflow.md`
 - workflow 根拠:
   - `documents/workflow-references.md`
 - notes の昇格と育成:
@@ -87,6 +89,7 @@ make agent-checks
 ```
 
 複数 writer が必要な場合は、同一 worktree ではなく別 worktree に分けてから統合します。
+file 構成変更を含む branch を `main` へ戻すときは、専用 integration worktree で merge と tree check を行います。
 
 ### 2. 文書だけを更新するとき
 

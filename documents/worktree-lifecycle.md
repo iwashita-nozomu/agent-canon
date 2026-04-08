@@ -29,6 +29,7 @@
 - `python3 scripts/agent_tools/worktree_scope_lint.py --current` か `bash scripts/worktree_start.sh --current` で scope の placeholder と kickoff 欄を確認します。
 - `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash scripts/tools/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
+- `main` へ戻すための integration worktree を切る場合は、`documents/main-integration-workflow.md` の手順を先に見ます。
 
 ## ルール
 
@@ -42,6 +43,7 @@
 - scope が途中で変わったら、追加編集の前に `WORKTREE_SCOPE.md` と action log を更新します。
 - runtime output は `WORKTREE_SCOPE.md` に書いた場所へ限定します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。
+- file 構成変更を含む branch を閉じる前には、integration worktree 上で `python3 scripts/ci/check_merge_structure.py ...` を通します。
 
 ## 閉じる前の確認
 
