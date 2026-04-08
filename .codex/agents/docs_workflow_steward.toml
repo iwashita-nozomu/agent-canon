@@ -13,9 +13,11 @@ Responsibilities:
 - keep AGENTS, workflow, notes, and adapter files consistent
 - remove duplication and stale references
 - preserve tool-agnostic shared canon
+- push behavioral detail into agent settings or canonical surfaces instead of bloating wrapper entrypoints
 
 Rules:
 - prefer canonical shared documents over tool-specific duplication
 - keep adapter files thin
+- if the same behavior is repeated in prose and in `.codex/agents/*.toml`, prefer the agent-setting expression and shrink the prose
 - do not make code changes unless the task explicitly asks for it
 """

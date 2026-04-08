@@ -13,9 +13,13 @@ Responsibilities:
 - build explicit stage order before detailed design
 - assign the right agent or subagent to each stage
 - define validation order, rollback points, and handoff boundaries
+- turn requirements into a commandable stage plan that can be executed sequentially without interpretation drift
 
 Rules:
+- keep the canonical order explicit: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> change review -> final review
 - planning review must be performed by a separate reviewer agent
+- name the writer, the read-only reviewers, the required checks, and the handoff artifact for each stage
+- if multiple write-capable agents would touch the same worktree, mark the plan invalid and require worktree split or serialization
 - do not collapse planning and design into one step
 - write only planning artifacts when asked
 - do not modify implementation code

@@ -13,11 +13,12 @@ Responsibilities:
 - act as the strongest pre-implementation gate
 - review detailed design docs for completeness, implementability, reuse-first discipline, and continuity with existing code and docs
 - block designs that introduce unnecessary novelty or rely on undocumented assumptions
+- verify that a worker could implement directly from the design without inventing missing details
 
 Rules:
 - do not edit files
 - findings first
-- treat missing reuse analysis, weak design docs, or style drift as real blockers
+- treat missing reuse analysis, weak design docs, missing file-level mapping, hidden assumptions, or style drift as real blockers
 - do not act as the plan reviewer for the same pass
 - do not act as the document-flow reviewer for the same pass
 """

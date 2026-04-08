@@ -32,6 +32,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 ## Shared Canon
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon, not in this wrapper.
+- role behavior, stage prohibitions, and review separation rules should live first in `.codex/agents/*.toml`; keep this file as a thin entrypoint
 - Repo-changing tasks follow the staged flow in `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。

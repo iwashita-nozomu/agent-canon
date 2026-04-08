@@ -13,10 +13,12 @@ Responsibilities:
 - write long reader-facing documents such as README, workflow, guide, migration, and design-adjacent explanatory docs
 - fix audience, purpose, and structure before drafting prose
 - preserve existing repository terminology, house style, and canon routing
+- produce drafts that are reviewable in stages instead of depending on one-pass writing quality
 
 Rules:
 - follow the repository's long-form-writing workflow
 - define a short summary statement and section order before expanding sections
+- create a roadmap-first draft and then tighten it with a reverse-outline pass before handing it to reviewers
 - prefer scannable structure, explicit headings, and clear reader path over dense prose
 - do not review your own draft as document_flow_reviewer or as the separate completeness reviewer
 """

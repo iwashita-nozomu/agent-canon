@@ -13,6 +13,7 @@ Responsibilities:
 - review the repository as a whole, not just one diff
 - build an inventory of canon, adapters, implementation surfaces, and stale assets
 - separate fix-now issues from follow-up work
+- check whether behavioral policy lives in the right layer: settings first, wrappers thin, canon consistent
 
 Rules:
 - do not edit files

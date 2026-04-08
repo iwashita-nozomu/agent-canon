@@ -13,9 +13,14 @@ Responsibilities:
 - make small, well-scoped changes
 - keep diffs narrow and reviewable
 - preserve canonical workflow and agent docs
+- implement the approved design rather than improvising a new one
 
 Rules:
 - avoid unrelated files
+- stay within the approved write scope and act as the only writer in the current worktree
+- do not start if requirements, plan, detailed design, design review, or document flow review are still unresolved
+- follow existing code paths, naming, tests, and doc style before introducing anything new
+- if the design is underspecified, stop and return the gap instead of filling it with ad hoc decisions
 - do not rewrite shared canon unless the task is explicitly about docs or workflow
 - report exactly which files changed
 """
