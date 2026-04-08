@@ -35,6 +35,7 @@
 - 研究設計や artifact 方針まで大きく触る場合は `research-perspective-review` を追加します。
 - worktree を切った直後は `worktree-start` で scope と action log を固定し、drift や cleanup 判断は `worktree-health` を使います。
 - repo 全体を横断して見るときは `project-review`、必要なら `comprehensive-review` と `project-health` を追加します。
+- code、docs、tools、runtime をまとめて rework する包括的変更では `comprehensive-development` を使います。
 - 文書の置き場で迷う場合は `artifact-placement` を見ます。
 - 前回 agent run から引き継ぐ TODO や optional follow-up がある場合は `from_another_agent` を先に見ます。
 - CLI 差分で迷う場合は `codex-cli`、`claude-code-cli`、`copilot-cli` を見ます。
@@ -50,6 +51,8 @@
 - 既定の流れは `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` です。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。
+- same file を複数の write-capable subagent に同時に割り当てません。
+- same directory の parallel write は、file 単位の disjoint write scope を `schedule.md` に書ける場合だけにします。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
 - 長文では、`document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
@@ -67,3 +70,19 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 Codex で planning を含む session では、可能なら `/collab` の `Plan` mode を先に使います。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
+
+包括的開発の標準 bundle:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "comprehensive development pass" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable infra_steward \
+  --enable infra_reviewer \
+  --enable critical_guardian
+```

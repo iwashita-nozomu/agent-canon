@@ -106,6 +106,33 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 Codex parent が planning を行う session では、可能なら `/collab` の `Plan` mode を先に有効化します。
 
+包括的開発:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "comprehensive development pass" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable infra_steward \
+  --enable infra_reviewer \
+  --enable critical_guardian
+```
+
+追加の Codex overlay:
+- `project_reviewer`
+- `docs_workflow_steward`
+- 必要に応じて `python_reviewer`
+
+parallel write ルール:
+- 同じ file を 2 つの write-capable subagent に同時に割り当てません
+- 同じディレクトリを複数 subagent が触ってよいのは、`schedule.md` に file 単位の disjoint write scope が書かれている場合だけです
+- file 境界が曖昧なら、親が 1 agent ずつ直列化するか、別 worktree に分けて統合します
+- parent は worker の結果を 1 本ずつ統合し、未統合の並列 patch を放置しません
+
 ## Workflow Families
 
 ### 1. Scoped Change
@@ -188,12 +215,43 @@ Codex parent が planning を行う session では、可能なら `/collab` の 
 - `infra_reviewer` を詳細設計レビューと最終受け入れ review の両方へ参加させる
 - repo-wide な tool 導入案では理由、Docker 影響、validation、rollback を同時に残す
 
+### 5. Comprehensive Development
+
+対象:
+- code、docs、tests、workflow、tools、Docker、CI をまたぐ repo-wide な整理
+- agent canon、tooling、implementation convention を同時に触る rearchitecture
+- 単一 chunk に閉じないが、1 つの umbrella plan で切りたい integrated delivery
+
+追加ロール:
+- `scheduler`
+- `schedule_reviewer`
+- `critical_guardian`
+- 必要に応じて `researcher`, `research_reviewer`
+- 必要に応じて `infra_steward`, `infra_reviewer`
+
+Codex overlay:
+- `project_reviewer`
+- `docs_workflow_steward`
+- 必要に応じて `python_reviewer`
+
+特徴:
+- 背骨は共通実装フローと `documents/implementation-waterfall-workflow.md` の gate をそのまま使う
+- task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
+- `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
+- `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
+- parallel 実装を使う場合でも、同じ file は 1 人の writer にしか割り当てない
+- 同じディレクトリを複数 worker が触る場合は、file 単位の disjoint write scope を `schedule.md` に書く
+- file 境界を切れない場合は、親が直列化するか別 worktree へ分けてから統合する
+- `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
+- 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する
+
 ## 選び方
 
 1. task が局所修正なら `Scoped Change`
 1. 外部調査や比較実験が必要なら `Research-Driven Change`
 1. chunk 設計が必要なら `Large Delivery`
 1. 環境や automation を触るなら `Platform And Environment`
+1. code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
 
 ## 関連
 

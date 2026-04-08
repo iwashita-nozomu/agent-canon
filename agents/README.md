@@ -44,6 +44,8 @@
   - 前回 agent run の carry-over note を current task へ接続
 - [skills/project-review.md](/mnt/l/workspace/project_template/agents/skills/project-review.md)
   - repo-wide review と棚卸し
+- [skills/comprehensive-development.md](/mnt/l/workspace/project_template/agents/skills/comprehensive-development.md)
+  - 包括的 repo-wide delivery の umbrella workflow
 - [skills/research-perspective-review.md](/mnt/l/workspace/project_template/agents/skills/research-perspective-review.md)
   - 研究系変更の並列 review pack
 - [skills/environment-maintenance.md](/mnt/l/workspace/project_template/agents/skills/environment-maintenance.md)
@@ -85,6 +87,7 @@
 
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
+- 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward` と `python_reviewer` を明示します。
 - planning を含む Codex session では、可能なら `/collab` で `Plan` mode に切り替えます。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
@@ -143,6 +146,24 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable infra_steward \
   --enable infra_reviewer
 ```
+
+包括的開発:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "comprehensive development pass" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable infra_steward \
+  --enable infra_reviewer \
+  --enable critical_guardian
+```
+
+同じディレクトリを複数 worker が触っても構いませんが、same file は 1 人の writer にしか割り当てません。境界が曖昧なら parent が直列化するか別 worktree に分けます。
 
 `scheduler` と `schedule_reviewer` のような paired specialist は同じ activation group を共有しますが、bundle の意図を曖昧にしないため両方を明示して構いません。
 

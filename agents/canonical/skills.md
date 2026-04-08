@@ -62,6 +62,8 @@
   - 継続運用、CI、drift の健全性確認
 - `project-review`
   - repo-wide な棚卸しと全体レビュー
+- `comprehensive-development`
+  - code / docs / tools / runtime をまたぐ包括的開発フロー
 - `environment-maintenance`
   - Docker, CI, dependency, runtime 更新
 - `codex-cli`

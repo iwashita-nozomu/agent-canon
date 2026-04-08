@@ -45,6 +45,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 | nested Codex を container 内で動かしたい | `docker/README.md` | `docker/`, `scripts/ci/`, `.state/` | `python3 scripts/ci/run_codex_in_repo_container.py --print-only` |
 | 実験を進めたい | `documents/experiment-workflow.md` | `experiments/`, `experiments/registry.toml`, `notes/`, `scripts/experiments/` | report と result の対応確認 |
 | research-driven な改善をしたい | `documents/research-workflow.md` | `documents/`, `experiments/`, `notes/` | review loop の完結 |
+| code / docs / tools / runtime をまとめて直したい | `agents/TASK_WORKFLOWS.md`, `agents/skills/comprehensive-development.md` | `agents/`, `documents/`, `scripts/`, `docker/`, `python/`, `tests/` | `make agent-checks` |
 | agent を使いたい | `agents/README.md` | `agents/`, `reports/agents/` | `make agent-checks` |
 | shared agent canon を subtree で同期したい | `documents/agent-canon-subtree-migration.md` | `vendor/`, `scripts/sync_agent_canon.sh` | `make agent-checks` |
 
@@ -66,6 +67,27 @@ python3 -m pyright
 python3 -m pytest tests/ -q --tb=short
 make ci
 ```
+
+### 1.5 包括的開発
+
+code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehensive Development` family を使います。背骨は通常の waterfall のままで、parallel 化する場合だけ file 単位の write scope を明示します。
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "comprehensive development pass" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable infra_steward \
+  --enable infra_reviewer \
+  --enable critical_guardian
+make agent-checks
+```
+
+same directory を複数 worker が触る場合も、same file は重複割当てしません。file 境界を切れない場合は直列化するか別 worktree に分けます。
 
 ### 2. 文書だけを更新するとき
 

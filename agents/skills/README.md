@@ -50,6 +50,7 @@
 | `comprehensive-review` | docs / tools / workflow の横断レビュー | `agents/skills/comprehensive-review.md` | `.agents/skills/comprehensive-review/SKILL.md` |
 | `project-health` | 継続運用、CI、drift の健全性確認 | `agents/skills/project-health.md` | `.agents/skills/project-health/SKILL.md` |
 | `project-review` | repo-wide な棚卸しと全体レビュー | `agents/skills/project-review.md` | `.agents/skills/project-review/SKILL.md` |
+| `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
 | `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
 
 ## Codex Defaults
@@ -65,6 +66,7 @@
 - 実験結果を見ながら code change を継続反復する task では `experiment-change-loop` を使います。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な棚卸しや大きな workflow 整理では `project-review` と必要なら `comprehensive-review` を使います。
+- repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
 
 ## Updating Skills

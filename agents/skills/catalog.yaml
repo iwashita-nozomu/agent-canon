@@ -137,6 +137,10 @@ skill_families:
     purpose: Run repo-wide review across inventory, workflow health, tooling health, and operational drift.
     canonical_doc: agents/skills/project-review.md
     shim: .agents/skills/project-review/SKILL.md
+  - id: comprehensive-development
+    purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
+    canonical_doc: agents/skills/comprehensive-development.md
+    shim: .agents/skills/comprehensive-development/SKILL.md
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md

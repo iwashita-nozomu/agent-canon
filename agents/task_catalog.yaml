@@ -101,6 +101,32 @@ workflow_families:
     tasks:
       - T8
 
+  - id: comprehensive_development
+    name: Comprehensive Development
+    roles:
+      always_on:
+        - manager
+        - manager_reviewer
+        - designer
+        - design_reviewer
+        - document_flow_reviewer
+        - implementer
+        - change_reviewer
+        - final_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - scheduler
+        - schedule_reviewer
+        - critical_guardian
+        - researcher
+        - research_reviewer
+        - infra_steward
+        - infra_reviewer
+    tasks:
+      - T11
+      - T12
+
 tasks:
   - id: T1
     name: local bug fix
@@ -192,6 +218,26 @@ tasks:
       - logic_gap_reviewer
     optional_review_packs:
       - academic_writing_review
+  - id: T11
+    name: repo-wide integrated delivery across code docs tools and runtime
+    family: comprehensive_development
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - critical_guardian
+      - infra_steward
+      - infra_reviewer
+  - id: T12
+    name: agent workflow tooling or canon rearchitecture
+    family: comprehensive_development
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - critical_guardian
+      - researcher
+      - research_reviewer
+      - infra_steward
+      - infra_reviewer
 
 review_packs:
   - id: research_perspective_review

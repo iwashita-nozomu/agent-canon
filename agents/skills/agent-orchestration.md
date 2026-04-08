@@ -25,3 +25,4 @@ task を workflow family に分類し、handoff、review、runtime entrypoint �
 - repo-editing task なら、requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation の順序
 - 最初の作業 update 用の `workflow=<family>`, `skills=<...>`, `review=<...>` 宣言
 - 必要な run bundle command と specialist activation
+- parallel write が要るなら file 単位の write-scope 方針

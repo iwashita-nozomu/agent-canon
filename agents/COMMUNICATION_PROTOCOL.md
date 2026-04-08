@@ -37,6 +37,21 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `evidence`
 - `status`
 
+## Write Scope Packet
+
+- `role`
+- `workspace`
+- `allowed_paths`
+- `forbidden_paths`
+- `owned_files`
+- `integration_owner`
+- `merge_strategy`
+
+write-capable role を複数使う場合は、handoff の前に write scope packet を残します。
+同じ file を 2 つの writer に同時に割り当てません。
+同じディレクトリを複数 writer が触る場合は、`owned_files` を file 単位で disjoint にします。
+file 境界を切れない場合は、同一 workspace の並列 write をやめ、別 worktree へ分けるか parent が直列化します。
+
 ## Escalation
 
 次では `manager` へ戻します。
