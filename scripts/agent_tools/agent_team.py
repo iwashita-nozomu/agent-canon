@@ -313,6 +313,8 @@ def create_run_bundle(
                 f"owner={owner}",
                 f"created_at_utc={created_at_iso}",
                 "status=pending",
+                "user_completion_report=locked",
+                "closeout_gate_status=pending",
                 "",
             ]
         ),

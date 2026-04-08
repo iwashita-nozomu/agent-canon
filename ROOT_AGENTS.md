@@ -60,6 +60,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - worktree で作業する場合は `bash scripts/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` に従い、integration worktree 上で `python3 scripts/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/` への昇格先を決めます。
+- user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -72,6 +73,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略してはいけません。
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
+- `verification.txt` が `status=pass` でない、または `closeout_gate.md` が `user_completion_report=unlocked` でない状態で user-facing 完了報告を出してはいけません。
 
 ## Validation
 

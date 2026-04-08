@@ -247,6 +247,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - repo に残す差分がある task では、validation 後に commit を作る
 - user が明示的に止めていなければ、final report の前に branch を push する
+- user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出さない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
 - review-only task や no-change task では commit / push を要求しない
@@ -265,5 +266,6 @@ cost を無視して review coverage を優先する run では、research-drive
 - 複数 writer を要する場合は、同一 worktree ではなく複数 worktree に分ける
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
+- `verification.txt` と `closeout_gate.md` が close 条件を満たすまで user-facing completion を返さない
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈にだけ依存する運用は repo 正本にしない

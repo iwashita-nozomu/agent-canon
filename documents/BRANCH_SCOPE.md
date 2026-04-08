@@ -30,6 +30,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](/mnt/l/wor
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push は `git push -u origin <branch-name>` を使います。
 - user-facing の完了報告は、原則として commit と push を終えてから行います。
+- さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで完了報告を出しません。
 - push を行わない task が許されるのは、review-only、no-change、または user が明示的に commit / push を止めた場合です。
 - push に失敗した場合は、完了扱いにせず、branch、commit、失敗理由を明記して報告します。
 

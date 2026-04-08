@@ -62,6 +62,43 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("document_flow_review.md", result.stdout)
             self.assertTrue((report_dir / "document_flow_review.md").is_file())
 
+    def test_run_bundle_starts_with_locked_completion_gate(self) -> None:
+        """Fresh bundles should lock user-facing completion until verifier/auditor closeout."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-closeout-gate"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "closeout gate smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / run_id
+            verification_text = (report_dir / "verification.txt").read_text(encoding="utf-8")
+            closeout_text = (report_dir / "closeout_gate.md").read_text(encoding="utf-8")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((report_dir / "closeout_gate.md").is_file())
+            self.assertIn("user_completion_report=locked", verification_text)
+            self.assertIn("closeout_gate_status=pending", verification_text)
+            self.assertIn("- user_completion_report: locked", closeout_text)
+            self.assertIn("- verifier_status: pending", closeout_text)
+            self.assertIn("- auditor_status: pending", closeout_text)
+
     def test_run_bundle_can_enable_academic_writing_reviewers(self) -> None:
         """Academic writing reviewers should create their review artifacts when enabled."""
         with tempfile.TemporaryDirectory() as tmp_dir:

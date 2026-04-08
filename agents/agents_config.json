@@ -224,14 +224,16 @@
         "retrospective"
       ],
       "required_outputs": [
+        "closeout_gate.md",
         "retrospective.md"
       ],
       "write_policy": {
         "mode": "artifacts_only",
         "allowed_artifacts": [
+          "closeout_gate",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded only in retrospective artifacts."
+        "notes": "Audit closeout is recorded in the closeout gate and retrospective artifacts."
       }
     }
   ],
@@ -1487,6 +1489,7 @@
     "change_review": "change_review.md",
     "final_review": "final_review.md",
     "verification": "verification.txt",
+    "closeout_gate": "closeout_gate.md",
     "retrospective": "retrospective.md",
     "research_notes": "research_notes.md",
     "research_review": "research_review.md",

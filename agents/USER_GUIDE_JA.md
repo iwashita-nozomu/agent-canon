@@ -58,6 +58,7 @@
 - 長文では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
 - 論文 draft では、さらに `citation_evidence_reviewer` を別 instance で通します。
+- 最後の user-facing 完了報告は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出しません。
 
 標準 bundle:
 

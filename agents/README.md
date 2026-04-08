@@ -162,3 +162,4 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - reuse sweep をせずに新しい file や module を増やしません。
 - stage reviewer の feedback を反映せずに次段へ handoff しません。
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。
+- user-facing completion は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで返しません。

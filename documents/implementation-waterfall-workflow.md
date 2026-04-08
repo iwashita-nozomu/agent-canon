@@ -398,6 +398,8 @@ exit 条件:
 - repo 正本の同期
 - closeout command の実行
 - commit / push の成否確認
+- `verification.txt` の `status=pass`
+- `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 
 必須レビュー:
 - `auditor`
@@ -406,6 +408,7 @@ exit 条件:
 exit 条件:
 - auditor review が `resolved` になっている
 - verifier が gate を閉じている
+- user-facing completion report の unlock 条件が `closeout_gate.md` に記録されている
 
 ## 5. 差し戻しルール
 
