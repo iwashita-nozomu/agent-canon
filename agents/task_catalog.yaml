@@ -192,7 +192,6 @@ tasks:
       - schedule_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T2
     name: CI or flaky test fix
     family: scoped_change
@@ -201,7 +200,6 @@ tasks:
       - schedule_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T3
     name: docs and test sync
     family: scoped_change
@@ -211,7 +209,6 @@ tasks:
       - docs_workflow_steward
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T4
     name: research-backed implementation change
     family: research_driven_change
@@ -225,7 +222,6 @@ tasks:
       - report_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T5
     name: benchmark or experiment-driven optimization
     family: research_driven_change
@@ -239,7 +235,6 @@ tasks:
       - report_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T6
     name: large refactor
     family: large_delivery
@@ -248,7 +243,6 @@ tasks:
       - schedule_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T7
     name: new feature or API delivery
     family: large_delivery
@@ -257,7 +251,6 @@ tasks:
       - schedule_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T8
     name: environment, CI, Docker, or dependency update
     family: platform_and_environment
@@ -269,7 +262,6 @@ tasks:
       - docs_workflow_steward
       - test_designer
       - python_reviewer
-      - cpp_reviewer
   - id: T9
     name: research workflow, artifact policy, or reporting policy change
     family: research_driven_change
@@ -310,7 +302,6 @@ tasks:
       - docs_workflow_steward
       - test_designer
       - python_reviewer
-      - cpp_reviewer
       - infra_steward
       - infra_reviewer
   - id: T12
@@ -324,7 +315,6 @@ tasks:
       - docs_workflow_steward
       - test_designer
       - python_reviewer
-      - cpp_reviewer
       - researcher
       - research_reviewer
       - infra_steward
@@ -342,7 +332,6 @@ tasks:
       - report_reviewer
       - test_designer
       - python_reviewer
-      - cpp_reviewer
       - reproducibility_reviewer
       - scientific_computing_reviewer
       - benchmark_reviewer
@@ -385,7 +374,6 @@ review_packs:
       - project_reviewer
       - docs_workflow_steward
       - python_reviewer
-      - cpp_reviewer
     default_for_tasks:
       - T11
       - T12

@@ -17,6 +17,28 @@ ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 DEFAULT_REPORT_ROOT = ROOT / "reports" / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
+PYTHON_SUFFIXES = {".py", ".pyi"}
+CPP_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cp",
+    ".cpp",
+    ".cxx",
+    ".h",
+    ".hh",
+    ".hpp",
+    ".hxx",
+    ".ixx",
+    ".tpp",
+    ".ipp",
+}
+CPP_PATH_MARKERS = (
+    "CMakeLists.txt",
+    "cmake/",
+    "src/",
+    "include/",
+    "lib/",
+)
 
 
 @dataclass(frozen=True)
@@ -133,6 +155,64 @@ def resolve_role(config: TeamConfig, role_name: str) -> Role:
 def task_ids(catalog: TaskCatalog) -> tuple[str, ...]:
     """Return known task ids from the catalog."""
     return tuple(str(task["id"]) for task in catalog.tasks)
+
+
+def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
+    """Return changed paths from git status when available."""
+    result = subprocess.run(
+        ["git", "-C", str(workspace_root), "status", "--short"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ()
+
+    changed: list[str] = []
+    for raw_line in result.stdout.splitlines():
+        line = raw_line.rstrip()
+        if len(line) < 4:
+            continue
+        path_part = line[3:]
+        if " -> " in path_part:
+            _, path_part = path_part.split(" -> ", 1)
+        normalized = path_part.strip()
+        if normalized and normalized not in changed:
+            changed.append(normalized)
+    return tuple(changed)
+
+
+def auto_language_specialists(
+    workspace_root: Path,
+    changed_paths: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Infer language-specific reviewers from changed paths."""
+    candidate_paths = changed_paths or discover_changed_paths(workspace_root)
+    selected: list[str] = []
+    for raw_path in candidate_paths:
+        normalized = raw_path.replace("\\", "/").lstrip("./")
+        suffix = Path(normalized).suffix.lower()
+        if (
+            "python_reviewer" not in selected
+            and (
+                normalized.startswith("python/")
+                or normalized.startswith("tests/")
+                or suffix in PYTHON_SUFFIXES
+            )
+        ):
+            selected.append("python_reviewer")
+        if (
+            "cpp_reviewer" not in selected
+            and (
+                suffix in CPP_SUFFIXES
+                or any(
+                    normalized == marker or normalized.startswith(marker)
+                    for marker in CPP_PATH_MARKERS
+                )
+            )
+        ):
+            selected.append("cpp_reviewer")
+    return tuple(selected)
 
 
 def resolve_task_spec(catalog: TaskCatalog, task_id: str) -> dict[str, object]:

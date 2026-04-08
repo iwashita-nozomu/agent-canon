@@ -9,6 +9,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 - `python/` 配下を触る
 - pyright warning を扱う
 - API や型境界を変える
+- `bootstrap_agent_run.py` の changed path 判定で `python_reviewer` が自動で足された
 
 ## Required Checks
 

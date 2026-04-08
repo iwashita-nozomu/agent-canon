@@ -251,6 +251,48 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("cpp_review.md", result.stdout)
             self.assertTrue((report_dir / "cpp_review.md").is_file())
 
+    def test_bootstrap_auto_enables_cpp_reviewer_from_changed_path_hint(self) -> None:
+        """Changed-path hints should auto-enable the C++ reviewer without explicit --enable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / "WORKTREE_SCOPE.md").write_text(
+                "# Worktree Scope\n\n## Editable Directories\n- `src`\n- `include`\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "native auto reviewer smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-auto-cpp-reviewer",
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--changed-path",
+                    "src/example.cpp",
+                    "--changed-path",
+                    "include/example.hpp",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / "test-auto-cpp-reviewer"
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
+            self.assertIn("cpp_reviewer", result.stdout)
+            self.assertTrue((report_dir / "cpp_review.md").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

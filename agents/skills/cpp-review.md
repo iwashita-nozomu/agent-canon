@@ -9,6 +9,7 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 - `src/`, `include/`, `lib/` 配下を触る
 - `CMakeLists.txt` や native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
+- `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
 
 ## Required Checks
 

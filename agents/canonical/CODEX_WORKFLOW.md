@@ -198,6 +198,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
       --workspace-root "$PWD"
 
 `--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
+language-specific reviewer は task catalog に固定せず、`bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
 
 包括的開発の固定 Codex stack:
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agent_team import (
     DEFAULT_REPORT_ROOT,
+    auto_language_specialists,
     create_run_bundle,
     default_specialists_for_task,
     load_team_config,
@@ -42,6 +43,17 @@ def build_parser(
         choices=specialist_choices,
         default=[],
         help="Enable a specialist role. Repeat the flag to enable multiple roles.",
+    )
+    parser.add_argument(
+        "--changed-path",
+        action="append",
+        default=[],
+        help="Optional changed path hint. Repeat to drive automatic language-specific reviewer selection.",
+    )
+    parser.add_argument(
+        "--no-auto-language-reviewers",
+        action="store_true",
+        help="Disable automatic language-specific reviewer selection from changed paths or git status.",
     )
     parser.add_argument(
         "--full-team",
@@ -84,6 +96,7 @@ def main() -> int:
     report_dir = report_root / run_id
     enabled_specialists = list(args.enable)
     task_default_specialists: tuple[str, ...] = ()
+    auto_specialists: tuple[str, ...] = ()
     if args.task_id is not None:
         task_default_specialists = default_specialists_for_task(
             config=config,
@@ -92,6 +105,14 @@ def main() -> int:
             include_default_review_packs=not args.no_default_review_packs,
         )
         for role_id in task_default_specialists:
+            if role_id not in enabled_specialists:
+                enabled_specialists.append(role_id)
+    if not args.no_auto_language_reviewers:
+        auto_specialists = auto_language_specialists(
+            workspace_root=workspace_root,
+            changed_paths=tuple(args.changed_path),
+        )
+        for role_id in auto_specialists:
             if role_id not in enabled_specialists:
                 enabled_specialists.append(role_id)
     roles = select_roles(config, enabled_specialists, args.full_team)
@@ -115,6 +136,8 @@ def main() -> int:
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
+    if not args.no_auto_language_reviewers:
+        print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
     if args.dry_run:
         print("DRY_RUN=1")
     else:
