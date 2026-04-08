@@ -126,6 +126,16 @@ paper writing では、次をすべて別 instance で通します。
 - docs consistency review
   - 複数文書や appendix / supplement と跨るとき
 
+開始時は次で run bundle と review 宣言を機械生成できます。
+
+```bash
+python3 scripts/agent_tools/doc_start.py \
+  --task "paper writing task" \
+  --kind paper \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
 ### 7. Revision Order
 
 1. section role の混線

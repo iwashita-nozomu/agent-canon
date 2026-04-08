@@ -139,6 +139,16 @@ draft 後に、section と paragraph を 1 文で言い直します。
 
 `document_flow_reviewer`、`citation_evidence_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer は兼務させません。
 
+開始時は次で run bundle と review 宣言を機械生成できます。
+
+```bash
+python3 scripts/agent_tools/doc_start.py \
+  --task "academic writing task" \
+  --kind academic \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
 ### 8. Revision Order を守る
 
 review 後は次の順で直します。

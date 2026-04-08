@@ -31,6 +31,7 @@
 
 1. `summary statement` を短く書く
 1. roadmap と section contract を作る
+1. 必要なら `python3 scripts/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
 1. reader order で draft する
 1. reverse outline で section order と gap を確認する
 1. `document_flow_reviewer` を通す

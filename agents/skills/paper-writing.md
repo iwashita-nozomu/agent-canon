@@ -50,9 +50,9 @@
 ## Standard Command
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 scripts/agent_tools/doc_start.py \
   --task "paper writing task" \
-  --task-id T10 \
+  --kind paper \
   --owner "codex" \
   --workspace-root "$PWD"
 ```

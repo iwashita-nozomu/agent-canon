@@ -56,9 +56,9 @@
 ## Standard Command
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 scripts/agent_tools/doc_start.py \
   --task "academic writing task" \
-  --task-id T10 \
+  --kind academic \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
