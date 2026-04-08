@@ -60,6 +60,8 @@
   - phase-based sequential development と、初期段階の限定的 iteration の整理に使った資料です。
 - [Technical Reviews and Audits - SEBoK](https://sebokwiki.org/wiki/Technical_Reviews_and_Audits)
   - decision gate と readiness review の根拠です。
+- [Design and Code Inspections to Reduce Errors in Program Development](https://web.mit.edu/16.35/OldFiles/www/lecturenotes/fagan.pdf)
+  - 独立 reviewer を役割分離して立てる inspection process の根拠です。
 - [What to look for in a code review | eng-practices](https://google.github.io/eng-practices/review/reviewer/looking-for.html)
   - local consistency、既存コードとの整合、関連文書更新確認を review 観点へ入れる根拠です。
 - [NASA Software Engineering Handbook](https://swehb.nasa.gov/download/attachments/76447896/SWE_Handbook_Rel0.1_March2011_RevC.pdf?api=v2)

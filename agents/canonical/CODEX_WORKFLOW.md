@@ -167,61 +167,43 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
+      --task-id T1 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer
+      --workspace-root "$PWD"
 
 研究・実験つき変更:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "research-backed change" \
+      --task-id T4 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable experimenter \
-      --enable experiment_reviewer
+      --workspace-root "$PWD"
 
 環境変更:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "platform or environment change" \
+      --task-id T8 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable infra_steward \
-      --enable infra_reviewer
+      --workspace-root "$PWD"
 
 学術文章:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "academic writing task" \
+      --task-id T10 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable notation_definition_reviewer \
-      --enable logic_gap_reviewer
+      --workspace-root "$PWD"
 
 包括的開発:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "comprehensive development pass" \
+      --task-id T12 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable infra_steward \
-      --enable infra_reviewer \
-      --enable critical_guardian
+      --workspace-root "$PWD"
+
+`--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
 
 包括的開発の固定 Codex stack:
 
@@ -237,6 +219,8 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 - `python_reviewer`
 - `worker`
 
+cost を無視して review coverage を優先する run では、research-driven change と comprehensive development は `--full-team` を許可します。
+
 ### 5. Implementation
 
 - 実装は `documents/implementation-waterfall-workflow.md` の gate に従って進める
@@ -245,6 +229,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を読み、別 reviewer で `docs-completeness-review` も通す
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通す
+- 研究・実験系の変更では `report_reviewer` と research perspective reviewers を default にし、optional 扱いを避ける
 - まず既存 code path、既存 helper、既存 style を調べ、再利用を優先する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
 - default worker は `gpt-5.3-codex` で、`gpt-5.3-codex-spark` は narrow override とみなす

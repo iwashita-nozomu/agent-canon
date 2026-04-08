@@ -57,14 +57,9 @@
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
+  --task-id T10 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable notation_definition_reviewer \
-  --enable logic_gap_reviewer
+  --workspace-root "$PWD"
 ```
 
 ## Boundary

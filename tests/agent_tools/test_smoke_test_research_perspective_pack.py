@@ -99,6 +99,44 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertTrue((report_dir / "notation_definition_review.md").is_file())
             self.assertTrue((report_dir / "logic_gap_review.md").is_file())
 
+    def test_task_id_expands_default_research_reviewers(self) -> None:
+        """Task-id bootstrap should expand default research reviewers and review packs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-id-t4"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "research-backed change",
+                    "--task-id",
+                    "T4",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / run_id
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("TASK_ID=T4", result.stdout)
+            self.assertIn("report_reviewer", result.stdout)
+            self.assertIn("python_reviewer", result.stdout)
+            self.assertTrue((report_dir / "report_review.md").is_file())
+            self.assertTrue((report_dir / "python_review.md").is_file())
+            self.assertTrue((report_dir / "reproducibility_review.md").is_file())
+            self.assertTrue((report_dir / "benchmark_review.md").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

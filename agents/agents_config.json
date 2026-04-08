@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, notation-definition review, and logic-gap review are separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -536,6 +536,86 @@
       }
     },
     {
+      "id": "project_reviewer",
+      "activation": "repo_wide_or_comprehensive_review_needed",
+      "owns": [
+        "repo_inventory_review",
+        "integration_risk_review",
+        "settings_vs_docs_review",
+        "stale_surface_review"
+      ],
+      "required_outputs": [
+        "project_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "project_review"
+        ],
+        "notes": "The project reviewer records repo-wide inventory and integration findings only in the project review artifact."
+      }
+    },
+    {
+      "id": "docs_workflow_steward",
+      "activation": "workflow_or_adapter_docs_change_needed",
+      "owns": [
+        "workflow_canon_review",
+        "adapter_surface_review",
+        "docs_duplication_review",
+        "runtime_entrypoint_cleanup_plan"
+      ],
+      "required_outputs": [
+        "docs_workflow_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "docs_workflow_review"
+        ],
+        "notes": "The docs-workflow steward records canon and adapter findings only in the docs-workflow review artifact."
+      }
+    },
+    {
+      "id": "python_reviewer",
+      "activation": "python_change_review_needed",
+      "owns": [
+        "pyright_review",
+        "pytest_review",
+        "ruff_review",
+        "python_behavior_review"
+      ],
+      "required_outputs": [
+        "python_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "python_review"
+        ],
+        "notes": "The Python reviewer records type, test, and lint findings only in the python review artifact."
+      }
+    },
+    {
+      "id": "report_reviewer",
+      "activation": "report_or_claim_heavy_output_needed",
+      "owns": [
+        "report_structure_review",
+        "evidence_traceability_review",
+        "claim_strength_review",
+        "reader_facing_report_review"
+      ],
+      "required_outputs": [
+        "report_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "report_review"
+        ],
+        "notes": "The report reviewer records report-structure and evidence-traceability findings only in the report review artifact."
+      }
+    },
+    {
       "id": "critical_guardian",
       "tier": "governance",
       "activation": "always_on",
@@ -599,6 +679,26 @@
     },
     {
       "from": "manager",
+      "to": "project_reviewer",
+      "gate": "repo-wide or comprehensive integration review is required and intake package is approved"
+    },
+    {
+      "from": "project_reviewer",
+      "to": "manager",
+      "gate": "project review findings are recorded or escalated"
+    },
+    {
+      "from": "manager",
+      "to": "docs_workflow_steward",
+      "gate": "task touches workflow docs, agent canon, adapters, or runtime entrypoints and intake package is approved"
+    },
+    {
+      "from": "docs_workflow_steward",
+      "to": "manager",
+      "gate": "docs-workflow findings are recorded or escalated"
+    },
+    {
+      "from": "manager",
       "to": "reproducibility_reviewer",
       "gate": "research perspective review pack is requested and evidence is ready"
     },
@@ -653,9 +753,19 @@
       "gate": "experiment log is ready"
     },
     {
+      "from": "experimenter",
+      "to": "report_reviewer",
+      "gate": "report draft, report-facing results, or claim-heavy narrative is ready"
+    },
+    {
       "from": "experiment_reviewer",
       "to": "experimenter",
       "gate": "experiment review feedback is resolved or escalated"
+    },
+    {
+      "from": "report_reviewer",
+      "to": "implementer",
+      "gate": "report review feedback is resolved or escalated"
     },
     {
       "from": "experimenter",
@@ -778,9 +888,19 @@
       "gate": "one implementation chunk is ready"
     },
     {
+      "from": "implementer",
+      "to": "python_reviewer",
+      "gate": "python or test changes are ready for code-quality review"
+    },
+    {
       "from": "change_reviewer",
       "to": "implementer",
       "gate": "implementation feedback resolved or escalated"
+    },
+    {
+      "from": "python_reviewer",
+      "to": "implementer",
+      "gate": "python review feedback is resolved or escalated"
     },
     {
       "from": "implementer",
@@ -924,6 +1044,49 @@
     },
     {
       "roles": [
+        "project_reviewer"
+      ],
+      "mode": "assessment_view",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "document_flow_review.md",
+        "change_review.md",
+        "final_review.md"
+      ],
+      "do_not_share": [
+        "hidden_chain_of_thought",
+        "private_debugging_notes"
+      ]
+    },
+    {
+      "roles": [
+        "docs_workflow_steward"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "document_flow_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
         "reproducibility_reviewer",
         "scientific_computing_reviewer",
         "benchmark_reviewer",
@@ -987,6 +1150,29 @@
     },
     {
       "roles": [
+        "experimenter",
+        "report_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "research_notes.md",
+        "research_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "document_flow_review.md",
+        "experiment_log.md",
+        "experiment_review.md",
+        "report_review.md"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
         "implementer",
         "change_reviewer"
       ],
@@ -1010,6 +1196,41 @@
         "experiment_change_loop.md",
         "experiment_review.md",
         "change_review.md",
+        "diff",
+        "verification.txt"
+      ],
+      "do_not_share": [
+        "private_scratchpads",
+        "hidden_chain_of_thought",
+        "direct_session_memory"
+      ]
+    },
+    {
+      "roles": [
+        "implementer",
+        "python_reviewer"
+      ],
+      "mode": "isolated",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "document_flow_review.md",
+        "notation_definition_review.md",
+        "logic_gap_review.md",
+        "research_notes.md",
+        "research_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "infra_notes.md",
+        "infra_review.md",
+        "environment_change_proposal.md",
+        "experiment_log.md",
+        "experiment_change_loop.md",
+        "experiment_review.md",
+        "change_review.md",
+        "python_review.md",
         "diff",
         "verification.txt"
       ],
@@ -1120,6 +1341,22 @@
       "when": "infra_steward is active"
     },
     {
+      "role": "project_reviewer",
+      "when": "task is comprehensive, repo-wide, workflow-heavy, or has integration risk across code, docs, tools, and runtime"
+    },
+    {
+      "role": "docs_workflow_steward",
+      "when": "task touches workflow docs, agent canon, adapters, entrypoints, or large reader-facing documentation"
+    },
+    {
+      "role": "python_reviewer",
+      "when": "Python source, tests, or Python-facing behavior changes"
+    },
+    {
+      "role": "report_reviewer",
+      "when": "task produces an experiment report, claim-heavy note, or other evidence-facing narrative output"
+    },
+    {
       "role": "reproducibility_reviewer",
       "when": "research perspective review pack is requested for provenance, rerunability, or environment evidence"
     },
@@ -1177,6 +1414,10 @@
     "infra_notes": "infra_notes.md",
     "environment_change_proposal": "environment_change_proposal.md",
     "infra_review": "infra_review.md",
+    "project_review": "project_review.md",
+    "docs_workflow_review": "docs_workflow_review.md",
+    "python_review": "python_review.md",
+    "report_review": "report_review.md",
     "reproducibility_review": "reproducibility_review.md",
     "scientific_computing_review": "scientific_computing_review.md",
     "benchmark_review": "benchmark_review.md",

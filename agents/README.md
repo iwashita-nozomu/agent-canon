@@ -99,10 +99,9 @@ repo-changing task の最小 bundle:
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "scoped repo change" \
+  --task-id T1 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer
+  --workspace-root "$PWD"
 ```
 
 調査つき変更:
@@ -110,14 +109,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
+  --task-id T4 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable experimenter \
-  --enable experiment_reviewer
+  --workspace-root "$PWD"
 ```
 
 学術文章:
@@ -125,14 +119,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
+  --task-id T10 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable notation_definition_reviewer \
-  --enable logic_gap_reviewer
+  --workspace-root "$PWD"
 ```
 
 環境・Docker・CI 変更:
@@ -140,12 +129,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
+  --task-id T8 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer
+  --workspace-root "$PWD"
 ```
 
 包括的開発:
@@ -153,20 +139,14 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
+  --task-id T12 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer \
-  --enable critical_guardian
+  --workspace-root "$PWD"
 ```
 
 包括的開発では、同一 worktree の writer は常に 1 人です。複数 writer が必要な場合は worktree を分けます。
 
-`scheduler` と `schedule_reviewer` のような paired specialist は同じ activation group を共有しますが、bundle の意図を曖昧にしないため両方を明示して構いません。
+`--task-id` を使うと、task catalog の default specialist と default review pack をそのまま bundle に展開できます。狭い例外だけ `--enable` を追加します。
 
 ## 運用ルール
 

@@ -33,65 +33,46 @@
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
+      --task-id T1 \
       --owner "codex-or-human" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer
+      --workspace-root "$PWD"
 
 研究・実験つき変更:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "research-backed change" \
+      --task-id T4 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable experimenter \
-      --enable experiment_reviewer
+      --workspace-root "$PWD"
 
 環境変更:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "platform or environment change" \
+      --task-id T8 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable infra_steward \
-      --enable infra_reviewer
+      --workspace-root "$PWD"
 
 学術文章:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "academic writing task" \
+      --task-id T10 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable notation_definition_reviewer \
-      --enable logic_gap_reviewer
+      --workspace-root "$PWD"
 
 包括的開発:
 
     python3 scripts/agent_tools/bootstrap_agent_run.py \
       --task "comprehensive development pass" \
+      --task-id T12 \
       --owner "codex" \
-      --workspace-root "$PWD" \
-      --enable scheduler \
-      --enable schedule_reviewer \
-      --enable researcher \
-      --enable research_reviewer \
-      --enable infra_steward \
-      --enable infra_reviewer \
-      --enable critical_guardian
+      --workspace-root "$PWD"
 
 `experimenter` が有効な run では `experiment_change_loop.md`、`infra_steward` が有効な run では `environment_change_proposal.md` も bundle に含めます。
 `notation_definition_reviewer` と `logic_gap_reviewer` が有効な run では、学術文章の記号定義と論理飛躍を別 reviewer で閉じます。
 包括的開発では bundle に加えて `project_reviewer` を parent が read-only で立て、必要なら `docs_workflow_steward` と `python_reviewer` を追加します。
+`--task-id` は task catalog の default specialist と default review pack をそのまま bundle に反映します。
 
 Codex parent session では、planning を含む場合に plan-mode command を使って構いません。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない runtime では `.codex/agents/*.toml` を正本にします。

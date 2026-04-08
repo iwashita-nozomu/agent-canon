@@ -69,43 +69,31 @@
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
+  --task-id T1 \
   --owner "human-or-agent" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer
+  --workspace-root "$PWD"
 ```
 
-specialist を明示するとき:
+task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
+  --task-id T4 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable experimenter \
-  --enable experiment_reviewer
+  --workspace-root "$PWD"
 ```
 
-環境変更では `infra_steward` と `infra_reviewer` を追加します。
+環境変更では `--task-id T8`、学術文章では `--task-id T10` を起点にします。
 
 包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定 stack として立てます。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
+  --task-id T12 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer \
-  --enable critical_guardian
+  --workspace-root "$PWD"
 ```
 
 包括的開発では、同一 worktree の writer を 1 人に固定します。複数 writer が必要な場合は worktree を分けます。

@@ -147,6 +147,7 @@ shared canon の正本として扱う対象:
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
+- `tests/agent_tools/test_check_agent_runtime_alignment.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_run_managed_experiment.py`
@@ -326,6 +327,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/.claude/` への symlink view
 - `tests/agent_tools/__init__.py`
   - `vendor/agent-canon/tests/agent_tools/__init__.py` への symlink view
+- `tests/agent_tools/test_check_agent_runtime_alignment.py`
+  - `vendor/agent-canon/tests/agent_tools/test_check_agent_runtime_alignment.py` への symlink view
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
   - `vendor/agent-canon/tests/agent_tools/test_smoke_test_research_perspective_pack.py` への symlink view
 - `tests/tools/test_mirror_skill_shims.py`

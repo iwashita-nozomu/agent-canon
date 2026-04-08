@@ -10,6 +10,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
@@ -67,6 +69,16 @@ class TeamConfig:
     artifacts: dict[str, str]
 
 
+@dataclass(frozen=True)
+class TaskCatalog:
+    """Materialized task catalog."""
+
+    raw: dict[str, object]
+    workflow_families: tuple[dict[str, object], ...]
+    tasks: tuple[dict[str, object], ...]
+    review_packs: tuple[dict[str, object], ...]
+
+
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -91,6 +103,20 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     )
 
 
+def load_task_catalog(config: TeamConfig) -> TaskCatalog:
+    """Load the task catalog referenced by the team config."""
+    catalog_path = ROOT / str(config.team["task_catalog"])
+    raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise RuntimeError(f"task catalog must parse as a mapping: {catalog_path}")
+    return TaskCatalog(
+        raw=raw,
+        workflow_families=_as_mapping_tuple(raw.get("workflow_families"), "workflow_families"),
+        tasks=_as_mapping_tuple(raw.get("tasks"), "tasks"),
+        review_packs=_as_mapping_tuple(raw.get("review_packs"), "review_packs"),
+    )
+
+
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
@@ -102,6 +128,73 @@ def resolve_role(config: TeamConfig, role_name: str) -> Role:
         if role_name == role.id:
             return role
     raise KeyError(f"unknown role: {role_name}")
+
+
+def task_ids(catalog: TaskCatalog) -> tuple[str, ...]:
+    """Return known task ids from the catalog."""
+    return tuple(str(task["id"]) for task in catalog.tasks)
+
+
+def resolve_task_spec(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
+    """Resolve one task id from the catalog."""
+    for task in catalog.tasks:
+        if task.get("id") == task_id:
+            return task
+    raise KeyError(f"unknown task id: {task_id}")
+
+
+def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, object]:
+    """Resolve one workflow family from the catalog."""
+    for family in catalog.workflow_families:
+        if family.get("id") == family_id:
+            return family
+    raise KeyError(f"unknown workflow family: {family_id}")
+
+
+def default_specialists_for_task(
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    task_id: str,
+    include_default_review_packs: bool = True,
+) -> tuple[str, ...]:
+    """Return task-default specialist ids including default review packs."""
+    task = resolve_task_spec(catalog, task_id)
+    family = resolve_workflow_family(catalog, str(task["family"]))
+    family_roles = family.get("roles", {})
+    if not isinstance(family_roles, dict):
+        raise RuntimeError(f"workflow family roles must be a mapping for {family['id']}")
+    family_specialists = _as_string_tuple(
+        family_roles.get("specialists"),
+        f"workflow_families[{family['id']}].roles.specialists",
+    )
+    selected: list[str] = []
+
+    for role_id in _as_string_tuple(task.get("specialists"), f"tasks[{task_id}].specialists"):
+        if role_id not in family_specialists:
+            raise RuntimeError(
+                f"task {task_id} specialist {role_id} is not declared in family {family['id']}"
+            )
+        resolve_role(config, role_id)
+        if role_id not in selected:
+            selected.append(role_id)
+
+    if include_default_review_packs:
+        for pack in catalog.review_packs:
+            default_tasks = _as_string_tuple(
+                pack.get("default_for_tasks"),
+                f"review_packs[{pack['id']}].default_for_tasks",
+            )
+            if task_id not in default_tasks:
+                continue
+            for role_id in _as_string_tuple(
+                pack.get("specialists"),
+                f"review_packs[{pack['id']}].specialists",
+            ):
+                resolve_role(config, role_id)
+                if role_id not in selected:
+                    selected.append(role_id)
+
+    return tuple(selected)
 
 
 def select_roles(
@@ -156,6 +249,22 @@ def render_template(template_name: str, replacements: dict[str, str]) -> str:
 def has_template(artifact_name: str) -> bool:
     """Return whether a template exists for one artifact filename."""
     return (TEMPLATE_ROOT / artifact_name).is_file()
+
+
+def required_output_templates_missing(
+    config: TeamConfig,
+    roles: tuple[Role, ...],
+    allowed_missing: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Return required output templates that are missing from agents/templates."""
+    missing: list[str] = []
+    for role in roles:
+        for output in role.required_outputs:
+            if output in allowed_missing:
+                continue
+            if output not in missing and not has_template(output):
+                missing.append(output)
+    return tuple(missing)
 
 
 def create_run_bundle(
@@ -661,3 +770,31 @@ def _path_snapshot_digest(path: Path) -> str:
     if path.is_file():
         return _file_sha256(path)
     return "__missing__"
+
+
+def _as_mapping_tuple(value: object, field_name: str) -> tuple[dict[str, object], ...]:
+    """Validate a list of mappings and return it as a tuple."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RuntimeError(f"{field_name} must be a list")
+    normalized: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise RuntimeError(f"{field_name} entries must be mappings")
+        normalized.append(dict(item))
+    return tuple(normalized)
+
+
+def _as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
+    """Validate a list of strings and return it as a tuple."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RuntimeError(f"{field_name} must be a list")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise RuntimeError(f"{field_name} entries must be strings")
+        normalized.append(item)
+    return tuple(normalized)

@@ -134,9 +134,11 @@ def validate_task_catalog() -> None:
     review_pack = find_by_id(data.get("review_packs"), "research_perspective_review")
     pack_specialists = review_pack.get("specialists", [])
     ensure(isinstance(pack_specialists, list), "review pack specialists must be a list")
-    ensure("T9" in review_pack.get("default_for_tasks", []), "review pack must default to T9")
-    ensure("T4" in review_pack.get("optional_for_tasks", []), "review pack should be optional for T4")
-    ensure("T5" in review_pack.get("optional_for_tasks", []), "review pack should be optional for T5")
+    default_for_tasks = review_pack.get("default_for_tasks", [])
+    ensure(isinstance(default_for_tasks, list), "review pack default_for_tasks must be a list")
+    ensure("T4" in default_for_tasks, "review pack must default to T4")
+    ensure("T5" in default_for_tasks, "review pack must default to T5")
+    ensure("T9" in default_for_tasks, "review pack must default to T9")
 
     for role_id in PERSPECTIVE_ROLE_IDS:
         ensure(role_id in family_specialists, f"research family missing specialist {role_id}")

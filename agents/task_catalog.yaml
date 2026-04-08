@@ -18,6 +18,8 @@ workflow_families:
       specialists:
         - scheduler
         - schedule_reviewer
+        - docs_workflow_steward
+        - python_reviewer
     tasks:
       - T1
       - T2
@@ -42,6 +44,8 @@ workflow_families:
         - research_reviewer
         - scheduler
         - schedule_reviewer
+        - report_reviewer
+        - python_reviewer
         - notation_definition_reviewer
         - logic_gap_reviewer
         - experimenter
@@ -75,6 +79,7 @@ workflow_families:
       specialists:
         - scheduler
         - schedule_reviewer
+        - python_reviewer
     tasks:
       - T6
       - T7
@@ -98,6 +103,8 @@ workflow_families:
         - infra_reviewer
         - scheduler
         - schedule_reviewer
+        - docs_workflow_steward
+        - python_reviewer
     tasks:
       - T8
 
@@ -123,6 +130,10 @@ workflow_families:
         - research_reviewer
         - infra_steward
         - infra_reviewer
+        - project_reviewer
+        - docs_workflow_steward
+        - python_reviewer
+        - report_reviewer
     tasks:
       - T11
       - T12
@@ -134,18 +145,22 @@ tasks:
     specialists:
       - scheduler
       - schedule_reviewer
+      - python_reviewer
   - id: T2
     name: CI or flaky test fix
     family: scoped_change
     specialists:
       - scheduler
       - schedule_reviewer
+      - python_reviewer
   - id: T3
     name: docs and test sync
     family: scoped_change
     specialists:
       - scheduler
       - schedule_reviewer
+      - docs_workflow_steward
+      - python_reviewer
   - id: T4
     name: research-backed implementation change
     family: research_driven_change
@@ -156,8 +171,8 @@ tasks:
       - schedule_reviewer
       - experimenter
       - experiment_reviewer
-    optional_review_packs:
-      - research_perspective_review
+      - report_reviewer
+      - python_reviewer
   - id: T5
     name: benchmark or experiment-driven optimization
     family: research_driven_change
@@ -168,20 +183,22 @@ tasks:
       - schedule_reviewer
       - experimenter
       - experiment_reviewer
-    optional_review_packs:
-      - research_perspective_review
+      - report_reviewer
+      - python_reviewer
   - id: T6
     name: large refactor
     family: large_delivery
     specialists:
       - scheduler
       - schedule_reviewer
+      - python_reviewer
   - id: T7
     name: new feature or API delivery
     family: large_delivery
     specialists:
       - scheduler
       - schedule_reviewer
+      - python_reviewer
   - id: T8
     name: environment, CI, Docker, or dependency update
     family: platform_and_environment
@@ -190,6 +207,8 @@ tasks:
       - infra_reviewer
       - scheduler
       - schedule_reviewer
+      - docs_workflow_steward
+      - python_reviewer
   - id: T9
     name: research workflow, artifact policy, or reporting policy change
     family: research_driven_change
@@ -200,6 +219,7 @@ tasks:
       - research_reviewer
       - experimenter
       - experiment_reviewer
+      - report_reviewer
       - reproducibility_reviewer
       - scientific_computing_reviewer
       - benchmark_reviewer
@@ -214,10 +234,9 @@ tasks:
       - schedule_reviewer
       - researcher
       - research_reviewer
+      - report_reviewer
       - notation_definition_reviewer
       - logic_gap_reviewer
-    optional_review_packs:
-      - academic_writing_review
   - id: T11
     name: repo-wide integrated delivery across code docs tools and runtime
     family: comprehensive_development
@@ -225,6 +244,9 @@ tasks:
       - scheduler
       - schedule_reviewer
       - critical_guardian
+      - project_reviewer
+      - docs_workflow_steward
+      - python_reviewer
       - infra_steward
       - infra_reviewer
   - id: T12
@@ -234,6 +256,9 @@ tasks:
       - scheduler
       - schedule_reviewer
       - critical_guardian
+      - project_reviewer
+      - docs_workflow_steward
+      - python_reviewer
       - researcher
       - research_reviewer
       - infra_steward
@@ -250,10 +275,9 @@ review_packs:
       - fair_data_reviewer
       - ml_science_reviewer
     default_for_tasks:
-      - T9
-    optional_for_tasks:
       - T4
       - T5
+      - T9
     when: methodology, artifact policy, benchmark protocol, or reporting policy changes substantially
   - id: academic_writing_review
     name: Academic Writing Review
@@ -267,3 +291,18 @@ review_packs:
       - T5
       - T9
     when: paper-like writing, thesis prose, symbol-dense text, or claim-heavy academic exposition needs separate notation and logic review
+  - id: repo_integration_review
+    name: Repo Integration Review
+    specialists:
+      - project_reviewer
+      - docs_workflow_steward
+      - python_reviewer
+    default_for_tasks:
+      - T11
+      - T12
+    optional_for_tasks:
+      - T3
+      - T6
+      - T7
+      - T8
+    when: repo-wide delivery needs integration review across code, docs, workflow, and runtime surfaces

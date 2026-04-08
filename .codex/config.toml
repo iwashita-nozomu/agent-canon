@@ -1,10 +1,10 @@
 # Project-scoped Codex settings.
-# Keep subagent fan-out shallow and explicit.
+# Allow broader review fan-out while keeping recursion shallow and explicit.
 
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 [agents]
-max_threads = 4
+max_threads = 8
 max_depth = 1
 job_max_runtime_seconds = 1800

@@ -75,15 +75,9 @@ code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehe
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
+  --task-id T12 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer \
-  --enable critical_guardian
+  --workspace-root "$PWD"
 make agent-checks
 ```
 

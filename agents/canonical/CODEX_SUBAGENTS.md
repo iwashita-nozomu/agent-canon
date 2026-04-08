@@ -30,6 +30,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
 - run bundle は `python3 scripts/agent_tools/bootstrap_agent_run.py ...` で先に作ります
+- `--task-id` を使うと、task catalog の task-default specialist と default review pack を bundle へ自動展開します
 
 ## Permanent Team To Codex Mapping
 
@@ -118,6 +119,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見る |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
+| report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | 実装 | bounded な切り出しだけを `worker` |
 | 実装後レビュー | `reviewer`、`python_reviewer` |
 | 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を intake / wrap-up の固定 stack として使う |
@@ -128,6 +130,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - 長文文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
+- research-driven change では `report_reviewer` と perspective reviewers を default にします
 
 ## Parallel Write Safety
 
@@ -178,10 +181,15 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 runtime inventory や review pack を変えたら、まず次を実行します。
 
+    python3 scripts/agent_tools/check_agent_runtime_alignment.py
     python3 scripts/agent_tools/smoke_test_research_perspective_pack.py
 
 この smoke test は次を確認します。
 
+- `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
+- `agents/agents_config.json` の required output が実テンプレートに結び付いている
+- `.codex/agents/*.toml` の model split が文書系 `gpt-5.4` / coding 系 `gpt-5.3-codex` に揃っている
+- temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_review` pack と `T9` がある
 - `.codex/agents/*.toml` に対応 subagent 定義がある

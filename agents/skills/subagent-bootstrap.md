@@ -23,10 +23,9 @@ specialist delegation が必要な task で、run bundle、役割分担、write-
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "repo-changing task" \
+  --task-id T1 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer
+  --workspace-root "$PWD"
 ```
 
 研究・実験つき変更:
@@ -34,14 +33,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
+  --task-id T4 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable experimenter \
-  --enable experiment_reviewer
+  --workspace-root "$PWD"
 ```
 
 環境変更:
@@ -49,12 +43,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
+  --task-id T8 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer
+  --workspace-root "$PWD"
 ```
 
 学術文章:
@@ -62,14 +53,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
+  --task-id T10 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable notation_definition_reviewer \
-  --enable logic_gap_reviewer
+  --workspace-root "$PWD"
 ```
 
 包括的開発:
@@ -77,20 +63,13 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
+  --task-id T12 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer \
-  --enable critical_guardian
+  --workspace-root "$PWD"
 ```
 
-repo-changing task では、always-on role に加えて最低でも `scheduler` と `schedule_reviewer` を explicit に有効化します。
-調査が必要なら `researcher` と `research_reviewer`、環境変更なら `infra_steward` と `infra_reviewer` を追加します。
-学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を必ず explicit に追加します。
+repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
+調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定で立てます。
 Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。

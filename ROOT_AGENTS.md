@@ -43,11 +43,12 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
+  --task-id T1 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer
+  --workspace-root "$PWD"
 ```
+
+- `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
 
 - Long README, workflow, guide, and migration docs should use `agents/skills/long-form-writing.md` and require subagent review before closeout.
 - Academic papers, thesis chapters, scholarly notes, and symbol-dense claim-heavy documents should use `agents/skills/academic-writing.md` and require separate notation and logic reviewers before closeout.

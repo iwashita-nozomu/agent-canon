@@ -54,10 +54,9 @@ repo-changing task の最小 bundle:
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "scoped repo change" \
+  --task-id T1 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer
+  --workspace-root "$PWD"
 ```
 
 研究・実験つき変更:
@@ -65,14 +64,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
+  --task-id T4 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable experimenter \
-  --enable experiment_reviewer
+  --workspace-root "$PWD"
 ```
 
 環境変更:
@@ -80,12 +74,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
+  --task-id T8 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer
+  --workspace-root "$PWD"
 ```
 
 学術文章:
@@ -93,14 +84,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
+  --task-id T10 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable notation_definition_reviewer \
-  --enable logic_gap_reviewer
+  --workspace-root "$PWD"
 ```
 
 Codex parent が planning を行う session では、parent session 側の plan-mode command を先に有効化します。official Codex CLI では `/plan` です。
@@ -110,16 +96,14 @@ Codex parent が planning を行う session では、parent session 側の plan-
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
+  --task-id T12 \
   --owner "codex" \
-  --workspace-root "$PWD" \
-  --enable scheduler \
-  --enable schedule_reviewer \
-  --enable researcher \
-  --enable research_reviewer \
-  --enable infra_steward \
-  --enable infra_reviewer \
-  --enable critical_guardian
+  --workspace-root "$PWD"
 ```
+
+補足:
+- `--task-id` を使うと、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します
+- cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で足します
 
 包括的開発の固定 Codex stack:
 - `requirements_organizer`
@@ -177,11 +161,12 @@ single-writer ルール:
 特徴:
 - research と experiment を evidence として回す
 - overclaim review を明示的に挟む
+- cost を気にしない default では、`report_reviewer` と research perspective reviewers を常時有効化します
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じない
 - ただし、1 回の repo 変更は 1 回の waterfall pass として閉じる
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
 - agent が code change と run を継続反復する場合は `experiment-change-loop` を追加する
-- methodology、artifact、reporting policy を大きく変える場合は `research-perspective-review` を追加する
+- methodology、artifact、reporting policy を大きく変えなくても、research-driven change では `research-perspective-review` を default にします
 - repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
 
 ### 3. Large Delivery
@@ -249,6 +234,7 @@ single-writer ルール:
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
+- `python_reviewer` を implementation chunk review と final integration review の両方で使う
 - 同一 worktree では `worker` だけが repo file を編集する
 - 同一 worktree では parallel write を許可しない
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く
