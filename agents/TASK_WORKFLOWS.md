@@ -122,16 +122,25 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable critical_guardian
 ```
 
-追加の Codex overlay:
+包括的開発の固定 Codex stack:
+- `requirements_organizer`
+- `literature_researcher`
+- `execution_planner`
+- `plan_reviewer`
+- `detailed_designer`
+- `detailed_design_reviewer`
+- `document_flow_reviewer`
 - `project_reviewer`
 - `docs_workflow_steward`
-- 必要に応じて `python_reviewer`
+- `python_reviewer`
+- `worker`
 
-parallel write ルール:
-- 同じ file を 2 つの write-capable subagent に同時に割り当てません
-- 同じディレクトリを複数 subagent が触ってよいのは、`schedule.md` に file 単位の disjoint write scope が書かれている場合だけです
-- file 境界が曖昧なら、親が 1 agent ずつ直列化するか、別 worktree に分けて統合します
-- parent は worker の結果を 1 本ずつ統合し、未統合の並列 patch を放置しません
+single-writer ルール:
+- 同一 worktree では `worker` だけが repo file を編集します
+- 同一 worktree で複数の write-capable subagent を走らせません
+- 同一ディレクトリの並列 write も許可しません
+- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます
+- parent は worktree ごとの結果を順番に統合します
 
 ## Workflow Families
 
@@ -226,22 +235,24 @@ parallel write ルール:
 - `scheduler`
 - `schedule_reviewer`
 - `critical_guardian`
-- 必要に応じて `researcher`, `research_reviewer`
-- 必要に応じて `infra_steward`, `infra_reviewer`
+- `researcher`
+- `research_reviewer`
+- `infra_steward`
+- `infra_reviewer`
 
-Codex overlay:
+固定 Codex stack:
 - `project_reviewer`
 - `docs_workflow_steward`
-- 必要に応じて `python_reviewer`
+- `python_reviewer`
 
 特徴:
 - 背骨は共通実装フローと `documents/implementation-waterfall-workflow.md` の gate をそのまま使う
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
-- parallel 実装を使う場合でも、同じ file は 1 人の writer にしか割り当てない
-- 同じディレクトリを複数 worker が触る場合は、file 単位の disjoint write scope を `schedule.md` に書く
-- file 境界を切れない場合は、親が直列化するか別 worktree へ分けてから統合する
+- 同一 worktree では `worker` だけが repo file を編集する
+- 同一 worktree では parallel write を許可しない
+- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く
 - `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
 - 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する
 

@@ -88,6 +88,7 @@
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
 - 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward` と `python_reviewer` を明示します。
+- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定 stack にします。
 - planning を含む Codex session では、可能なら `/collab` で `Plan` mode に切り替えます。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
@@ -163,7 +164,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable critical_guardian
 ```
 
-同じディレクトリを複数 worker が触っても構いませんが、same file は 1 人の writer にしか割り当てません。境界が曖昧なら parent が直列化するか別 worktree に分けます。
+包括的開発では、同一 worktree の writer は常に 1 人です。複数 writer が必要な場合は worktree を分けます。
 
 `scheduler` と `schedule_reviewer` のような paired specialist は同じ activation group を共有しますが、bundle の意図を曖昧にしないため両方を明示して構いません。
 

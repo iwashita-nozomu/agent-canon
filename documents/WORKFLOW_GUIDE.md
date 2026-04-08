@@ -70,7 +70,7 @@ make ci
 
 ### 1.5 包括的開発
 
-code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehensive Development` family を使います。背骨は通常の waterfall のままで、parallel 化する場合だけ file 単位の write scope を明示します。
+code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehensive Development` family を使います。背骨は通常の waterfall のままで、同一 worktree の writer は常に 1 人に固定します。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
@@ -87,7 +87,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 make agent-checks
 ```
 
-same directory を複数 worker が触る場合も、same file は重複割当てしません。file 境界を切れない場合は直列化するか別 worktree に分けます。
+複数 writer が必要な場合は、同一 worktree ではなく別 worktree に分けてから統合します。
 
 ### 2. 文書だけを更新するとき
 

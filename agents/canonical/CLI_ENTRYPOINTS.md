@@ -92,7 +92,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 環境変更では `infra_steward` と `infra_reviewer` を追加します。
 
-包括的開発では、次を起点にし、必要なら parent が `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を追加で立てます。
+包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定 stack として立てます。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
@@ -108,6 +108,6 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable critical_guardian
 ```
 
-parallel 実装を行う場合は、same directory を複数 worker が触っても構いませんが、same file は重複割当てしません。`schedule.md` に file 単位の write scope を書き、境界が曖昧なら別 worktree に分けます。
+包括的開発では、同一 worktree の writer を 1 人に固定します。複数 writer が必要な場合は worktree を分けます。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。

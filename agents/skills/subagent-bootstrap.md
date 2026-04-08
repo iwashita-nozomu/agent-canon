@@ -91,9 +91,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 repo-changing task では、always-on role に加えて最低でも `scheduler` と `schedule_reviewer` を explicit に有効化します。
 調査が必要なら `researcher` と `research_reviewer`、環境変更なら `infra_steward` と `infra_reviewer` を追加します。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を必ず explicit に追加します。
-包括的開発では bundle に加えて `project_reviewer` を integration gate として立て、必要なら `docs_workflow_steward` と `python_reviewer` を追加します。
+包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer` を固定で立てます。
 Codex で planning を含む parent session では、可能なら `/collab` の `Plan` mode を先に使います。
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。
-same file を複数の write-capable subagent に割り当てません。same directory の並列作業は file 単位の write scope を切れる場合だけにします。
+包括的開発では、同一 worktree の writer を `worker` 1 人に固定します。複数 writer が必要な場合は worktree を分けます。

@@ -3,6 +3,7 @@
 ## Purpose
 
 code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更を、1 本の umbrella workflow と explicit subagent routing で進めます。
+この skill では裁量を残さず、固定役割・固定順序・単一 writer で進めます。
 
 ## Use When
 
@@ -35,31 +36,31 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable critical_guardian
 ```
 
-Codex overlay:
+固定 Codex stack:
 
 - `project_reviewer`
 - `docs_workflow_steward`
-- 必要に応じて `python_reviewer`
+- `python_reviewer`
 
 ## Default Sequence
 
 1. `agent-orchestration` で family を `Comprehensive Development` に固定します。
 1. `subagent-bootstrap` で run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
 1. parent session が planning を含むなら `/collab` の `Plan` mode を先に有効化します。
-1. runtime が対応していれば `/agent` で inventory を確認し、`project_reviewer`、`docs_workflow_steward`、`python_reviewer` の追加有無を決めます。
-1. `project_reviewer` を intake overlay として立て、repo-wide completeness と collision risk を先に見ます。
+1. `/agent` が使える runtime では inventory を確認し、使えない runtime では `.codex/agents/*.toml` をそのまま使います。
+1. `project_reviewer` を intake gate として立て、repo-wide completeness と collision risk を先に見ます。
 1. `execution_planner` に stage order と `Write Scope Per Agent:` を書かせます。
 1. `plan_reviewer` に review separation、rollback point、parallel write safety を見させます。
 1. `detailed_designer` と `detailed_design_reviewer` を通したあと、長文があるなら `document_flow_reviewer` と docs reviewer を通します。
 1. `worker` は bounded slice だけを担当し、親が 1 本ずつ統合します。
 1. `project_reviewer` を closeout に再投入し、slice ごとではなく全体の integration risk を閉じます。
 
-## Parallel Write Rule
+## Single-Writer Rule
 
-- same file は 1 人の writer にしか割り当てません。
-- same directory を複数 worker が触る場合は、file 単位の disjoint write scope を `schedule.md` に書きます。
-- file 境界を切れない場合は、parallel write をやめるか別 worktree に分けます。
-- reviewer は read-only を保ち、write collision を plan review で潰します。
+- 同一 worktree の writer は `worker` 1 人に固定します。
+- same directory の parallel write を許可しません。
+- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます。
+- reviewer は read-only を保ち、single-writer rule の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary
 

@@ -121,6 +121,6 @@ artifact-only role や review role の write scope を確認するときは、`v
 - review feedback は、直前の execution role が反映してから次段へ handoff します。
 - 学術文章では `document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer を兼務させません。
 - `implementer` 以外が repo ファイルを直接編集する運用を正本にしません。
-- same file を複数の write-capable role / subagent に同時に割り当てません。
-- same directory の parallel write は、file 単位の disjoint write scope を artifact に残せる場合だけ許可します。
+- 包括的開発では、同一 worktree の writer を `implementer` 1 人に固定します。
+- 複数 writer が必要な場合は、同一 worktree ではなく複数 worktree に分けます。
 - run 固有の artifact は `reports/agents/<run-id>/` に寄せ、repo-wide の正本と混ぜません。

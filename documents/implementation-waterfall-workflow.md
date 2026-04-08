@@ -85,8 +85,8 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - repo-changing task では explicit subagent activation を省略しません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
-- parallel write-capable subagent を使う場合は、same file を重複割当てしません
-- same directory の parallel write は、Gate 3 の `schedule.md` に file 単位の disjoint write scope を書ける場合だけ許可します
+- 包括的開発では、同一 worktree の writer を 1 人に固定します
+- 包括的開発では、同一 worktree の parallel write を許可しません
 
 ### Gate 1. 要件整理
 
@@ -167,8 +167,8 @@ exit 条件:
 ルール:
 - 実行計画は詳細設計の前に必ず確定させます
 - どの subagent / role がどの stage を担当するか明記します
-- parallel worker を使う場合は、`Write Scope Per Agent:` を書き、same file を複数 writer に割り当てません
-- file 単位で切れない場合は、直列実装か別 worktree を明示します
+- 包括的開発では、`Single Writer Worktree:` と `Integration Order:` を書きます
+- 複数 writer が必要な場合は、worktree ごとの writer を明記します
 
 exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
@@ -434,12 +434,12 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - code、docs、tests、workflow、tools、runtime をまたぐ umbrella pass に使います
 - 背骨は 1 本の waterfall pass のままにし、surface ごとの差分を `schedule.md` の stage owner と write scope で切ります
-- Gate 0-1 では `project_reviewer` を intake overlay として使い、repo-wide completeness と collision risk を確認します
-- Gate 3 では file 単位の write scope と integration owner を必ず固定します
-- Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使って構いませんが、実装 worker と兼務させません
-- Gate 8-9 では `python_reviewer` と `project_reviewer` を必要に応じて追加し、slice 単位ではなく全体整合を見ます
-- same directory を複数 worker が触ること自体は許可しますが、same file の同時編集は許可しません
-- file 境界を切れない場合は、parallel write を中止するか別 worktree に分けて統合します
+- Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
+- Gate 3 では `Single Writer Worktree:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
+- Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
+- Gate 8-9 では `python_reviewer` と `project_reviewer` を固定で通し、slice 単位ではなく全体整合を見ます
+- 同一 worktree では `worker` だけが repo file を編集します
+- 複数 writer が必要な場合は、writer ごとに worktree を分けてから統合します
 
 ## 8. reuse-first の必須ルール
 
