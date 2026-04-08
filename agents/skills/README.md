@@ -9,6 +9,8 @@
 - `AGENTS.md` や `CLAUDE.md` には長い skill 説明を複製しません。
 - `.agents/skills/` は Codex / Copilot の auto-discovery path です。
 - `.claude/skills/` は `.agents/skills/` から生成する Claude 互換 mirror です。
+- 人間が skill を明示する場合の第一推奨は plain text ではなく `$skill-name` です。
+- 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - 新しい skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
 - この template では Python と Markdown を常に前提にするため、`python-review` と `md-style-check` は頻出 skill です。
 
@@ -61,6 +63,7 @@
 
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読みます。
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
+- user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
 - 前の agent の carry-over を吸う必要がある task では `from_another_agent` を最初に見ます。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。

@@ -20,6 +20,9 @@
 
 - 共通 skill の正本は `.agents/skills/` にあります。
 - Claude では `.claude/skills/` の generated mirror を使います。正本は `.agents/skills/` です。
+- skill を明示したいときの第一推奨は `$skill-name` です。
+- 例: `$repo-onboarding`、`$research-workflow`、`$experiment-change-loop`、`$paper-writing`
+- plain text で skill 名を書く運用もできますが、`$skill-name` の方を既定にします。
 - どの skill を使うか迷う場合は、まず `repo-onboarding` か `agent-orchestration` を見ます。
 - Codex で毎回同じ手順を踏みたい場合は `codex-task-workflow` を見ます。
 - Python 差分では `python-review` を既定で使います。
@@ -49,6 +52,8 @@
 - subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
 - specialist を立ち上げる前に `subagent-bootstrap` を見て、repo-changing task では run bundle を先に作ります。
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
+- `skills=<...>` には `$skill-name` で指定した skill をそのまま並べます。
+- 例: `skills=$research-workflow,$literature-survey,$paper-writing`
 - 既定の流れは `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` です。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
 - `詳細設計レビュー` を通す前に実装へ進みません。

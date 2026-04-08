@@ -28,6 +28,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補を確認します。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
+- skill を user-facing に明示する場合の既定表記は `$skill-name` です。
 
 ## Shared Canon
 
@@ -37,6 +38,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - code-changing tasks add `test_designer` before implementation and fix nasty cases into tests in the same pass.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。
+- skill を user から指定するときは `$research-workflow` や `$paper-writing` のような `$skill-name` を優先します。
 - Codex で planning を回すときは、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 - 標準 bundle の入口は次です。

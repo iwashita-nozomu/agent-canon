@@ -3,6 +3,7 @@
 このディレクトリは、repo におけるエージェント運用の人間向け正本ハブです。
 個別エージェント向けの runtime entrypoint は薄く保ち、詳細はここへ集約します。
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
+skill を user-facing に明示するときは `$skill-name` を第一推奨にします。
 
 ## 正本
 
@@ -94,6 +95,15 @@
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
 ## Standard Commands
+
+明示的な skill 指定例:
+
+```text
+$repo-onboarding
+$research-workflow
+$experiment-change-loop
+$paper-writing
+```
 
 repo-changing task の最小 bundle:
 
