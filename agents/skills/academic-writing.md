@@ -14,10 +14,12 @@
 ## Core References
 
 - `documents/academic-writing-workflow.md`
+- `documents/paper-writing-workflow.md`
 - `documents/long-form-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/literature-survey.md`
+- `agents/skills/citation-evidence-review.md`
 - `agents/skills/logic-gap-review.md`
 - `agents/skills/notation-definition-review.md`
 
@@ -30,12 +32,14 @@
 - Codex では、可能なら parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は inventory を確認し、使えない場合は `.codex/agents/*.toml` を見る
 - run bundle を先に作り、`notation_definition_reviewer` と `logic_gap_reviewer` を explicit に有効化する
+- paper-like draft では `citation_evidence_reviewer` も explicit に有効化する
 - draft 後に reverse outline を取る
 - `document_flow_reviewer` を必ず通す
 - 別 reviewer で `notation-definition-review` を必ず通す
 - 別 reviewer で `logic-gap-review` を必ず通す
 - 別 reviewer で `docs-completeness-review` を必ず通す
 - empirical claim や report なら `critical-review`、必要なら `report-review` を追加する
+- 投稿論文や thesis chapter では `paper-writing` を優先 overlay とする
 
 ## Default Sequence
 

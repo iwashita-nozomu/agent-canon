@@ -29,6 +29,7 @@ WRITING_AND_REVIEW_ROLE_IDS = {
     "plan_reviewer",
     "detailed_design_reviewer",
     "document_flow_reviewer",
+    "citation_evidence_reviewer",
     "notation_definition_reviewer",
     "logic_gap_reviewer",
     "reviewer",

@@ -16,6 +16,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - `max_depth = 1` を前提にし、subagent からの再帰的 fan-out を避ける
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
+- 論文 draft では `citation_evidence_reviewer` も別の subagent で行う
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
@@ -43,6 +44,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | `designer` | `detailed_designer` |
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
+| `citation_evidence_reviewer` | `citation_evidence_reviewer` |
 | `test_designer` | `test_designer` |
 | `notation_definition_reviewer` | `notation_definition_reviewer` |
 | `logic_gap_reviewer` | `logic_gap_reviewer` |
@@ -66,6 +68,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
   - 実装前の最重要 gate として設計文書を独立に確認する
 - `document_flow_reviewer`
   - 文書を上から順に読み、用語導入、section 順序、reader path が自然かを確認する
+- `citation_evidence_reviewer`
+  - 論文主張が citation、figure、table、derivation、appendix、result に辿れるかを確認する
 - `notation_definition_reviewer`
   - 記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認する
 - `logic_gap_reviewer`
@@ -119,7 +123,9 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 詳細設計レビュー | 専用の `detailed_design_reviewer` instance |
 | 長文起草 | `long_form_writer`。README、workflow、guide、migration 文書では `long-form-writing` を前提に draft する |
 | 学術文章起草 | `long_form_writer`。論文、thesis chapter、scholarly note では `academic-writing` を前提に draft する |
+| 論文 draft 起草 | `long_form_writer`。投稿論文や thesis chapter では `paper-writing` を前提に draft する |
 | 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見る |
+| citation / evidence trace review | 専用の `citation_evidence_reviewer` instance。paper claim が citation、figure、table、appendix、result に辿れるかを見る |
 | テストケース設計 | 専用の `test_designer` instance。approved design と既存 code path を静的解析し、最も意地の悪い edge case と regression case を test plan に落とす |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
@@ -134,6 +140,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - 長文文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
+- 論文 draft では `citation_evidence_reviewer` も追加します
 - research-driven change では `report_reviewer` と perspective reviewers を default にします
 
 ## Parallel Write Safety
@@ -150,7 +157,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
 | Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
 | Codebase Survey / Test Design / Implementation / Python Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer` | `gpt-5.3-codex` | `high` |
-| Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
+| Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
 
 運用メモ:
 - OpenAI の current docs では `gpt-5.4` は professional workflows 向けの default / highest-intelligence 枠、`gpt-5.3-codex` は agentic coding 専用最適化枠です

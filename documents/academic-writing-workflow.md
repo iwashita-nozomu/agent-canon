@@ -2,6 +2,7 @@
 
 この文書は、論文、thesis chapter、scholarly note、method note、claim-heavy な technical memo のような学術文章を作るときの正本です。
 一般の長文作成とは分けて扱い、論理、記号定義、根拠の接続を段階ごとに複数 reviewer で精査します。
+投稿論文や thesis chapter では、さらに `documents/paper-writing-workflow.md` を paper-specific overlay として使います。
 
 この workflow は、Purdue OWL、Cornell Knight Institute、MIT OpenCourseWare、PLOS Computational Biology の writing guide を repo 向けに再構成したものです。
 ここでの `claim contract`、`notation ledger`、`paragraph claim map`、`logic-gap review` は local interpretation です。
@@ -131,11 +132,12 @@ draft 後に、section と paragraph を 1 文で言い直します。
 
 追加条件:
 
+- 投稿論文や thesis chapter では `citation_evidence_reviewer`
 - 複数文書を跨ぐなら `docs-consistency-review`
 - empirical claim が強いなら `critical-review`
 - report / response / rebuttal として出すなら `report-review`
 
-`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer は兼務させません。
+`document_flow_reviewer`、`citation_evidence_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer は兼務させません。
 
 ### 8. Revision Order を守る
 
@@ -180,6 +182,7 @@ python3 scripts/tools/audit_and_fix_links.py --check documents notes
 ## Repo Interpretation
 
 - draft author は `long_form_writer` でよいが、学術文章では `academic-writing` skill を明示して進める
+- 投稿論文や thesis chapter では `paper-writing` skill を優先する
 - `notation ledger` と `paragraph claim map` は別紙でも run artifact でもよい
 - 設計文書が学術文章に近い密度になったら、この workflow を overlay として使ってよい
 - 長文一般の構成技法は `documents/long-form-writing-workflow.md` を併用する

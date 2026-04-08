@@ -32,7 +32,9 @@
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
+| `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
 | `docs-completeness-review` | 文書の欠落や説明不足のレビュー | `agents/skills/docs-completeness-review.md` | `.agents/skills/docs-completeness-review/SKILL.md` |
+| `citation-evidence-review` | 論文主張の citation / figure / table / evidence trace のレビュー | `agents/skills/citation-evidence-review.md` | `.agents/skills/citation-evidence-review/SKILL.md` |
 | `logic-gap-review` | 学術文章の論理飛躍と根拠接続のレビュー | `agents/skills/logic-gap-review.md` | `.agents/skills/logic-gap-review/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `docs-consistency-review` | 文書間の矛盾と stale route の確認 | `agents/skills/docs-consistency-review.md` | `.agents/skills/docs-consistency-review/SKILL.md` |
@@ -63,6 +65,7 @@
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
+- paper section まで含む論文 draft では `paper-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop、`research-perspective-review` を大きい review pack として使います。
 - 実験結果を見ながら code change を継続反復する task では `experiment-change-loop` を使います。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。

@@ -46,6 +46,7 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - report_reviewer
+        - citation_evidence_reviewer
         - test_designer
         - python_reviewer
         - notation_definition_reviewer
@@ -248,6 +249,7 @@ tasks:
       - researcher
       - research_reviewer
       - report_reviewer
+      - citation_evidence_reviewer
       - notation_definition_reviewer
       - logic_gap_reviewer
   - id: T11
@@ -297,6 +299,7 @@ review_packs:
   - id: academic_writing_review
     name: Academic Writing Review
     specialists:
+      - citation_evidence_reviewer
       - notation_definition_reviewer
       - logic_gap_reviewer
     default_for_tasks:
@@ -305,7 +308,7 @@ review_packs:
       - T4
       - T5
       - T9
-    when: paper-like writing, thesis prose, symbol-dense text, or claim-heavy academic exposition needs separate notation and logic review
+    when: paper-like writing, thesis prose, symbol-dense text, or claim-heavy academic exposition needs separate citation/evidence, notation, and logic review
   - id: repo_integration_review
     name: Repo Integration Review
     specialists:

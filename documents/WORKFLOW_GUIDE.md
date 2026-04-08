@@ -11,6 +11,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
   - `documents/long-form-writing-workflow.md`
 - 学術文章作成:
   - `documents/academic-writing-workflow.md`
+- 論文執筆:
+  - `documents/paper-writing-workflow.md`
 - 実験 run:
   - `documents/experiment-workflow.md`
 - research-driven な改善:
@@ -38,6 +40,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 | Python 実装を直したい | `documents/coding-conventions-python.md`, `documents/implementation-waterfall-workflow.md` | `python/`, `tests/` | `make ci-quick` |
 | 長い README や guide を書きたい | `documents/long-form-writing-workflow.md` | `documents/`, `notes/`, `agents/` | `make docs-check` |
 | 論文や thesis chapter を書きたい | `documents/academic-writing-workflow.md` | `documents/`, `notes/`, `agents/`, `references/` | `make docs-check` |
+| 投稿論文や thesis chapter の draft を組みたい | `documents/paper-writing-workflow.md` | `documents/`, `notes/`, `agents/`, `references/` | `make docs-check` |
 | 文書だけ更新したい | `documents/README.md` | `documents/`, `notes/` | `make docs-check` |
 | Docker / 依存を更新したい | `docker/README.md` | `docker/`, `scripts/ci/` | `make docker-build-check` |
 | main server host の readiness を見たい | `documents/server-host-contract.md` | `documents/templates/`, `scripts/ci/` | `python3 scripts/ci/check_server_readiness.py` |
@@ -95,6 +98,7 @@ make agent-checks
 README、workflow、guide、migration 文書のような長文では、先に `documents/long-form-writing-workflow.md` を読みます。
 長文では `document_flow_reviewer` と別 reviewer の両方を前提にします。
 学術文章では、さらに `documents/academic-writing-workflow.md` を読み、`notation_definition_reviewer` と `logic_gap_reviewer` も前提にします。
+投稿論文や thesis chapter では `documents/paper-writing-workflow.md` を読み、`citation_evidence_reviewer` も前提にします。
 
 ```bash
 make docs-check

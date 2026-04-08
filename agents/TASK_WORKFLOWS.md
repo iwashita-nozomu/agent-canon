@@ -46,6 +46,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で `docs-completeness-review` も通します
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、`docs-completeness-review` を別 reviewer で通します
+- 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
@@ -87,6 +88,16 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
+  --task-id T10 \
+  --owner "codex" \
+  --workspace-root "$PWD"
+```
+
+論文 draft:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "paper writing task" \
   --task-id T10 \
   --owner "codex" \
   --workspace-root "$PWD"
@@ -144,6 +155,7 @@ single-writer ルール:
 1. code や test を触る task では `test_designer` を省略しない
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
+1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
 
 ### 2. Research-Driven Change
 

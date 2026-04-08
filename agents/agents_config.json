@@ -358,6 +358,26 @@
       }
     },
     {
+      "id": "citation_evidence_reviewer",
+      "activation": "paper_or_claim_dense_writing_review_needed",
+      "owns": [
+        "citation_trace_review",
+        "support_matrix_review",
+        "evidence_location_review",
+        "source_match_review"
+      ],
+      "required_outputs": [
+        "citation_evidence_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "citation_evidence_review"
+        ],
+        "notes": "The citation-evidence reviewer checks whether reader-facing claims point to actual citations, figures, tables, derivations, or results and whether the cited support matches what the text says."
+      }
+    },
+    {
       "id": "notation_definition_reviewer",
       "activation": "academic_or_symbol_dense_writing_review_needed",
       "owns": [
@@ -875,8 +895,28 @@
     },
     {
       "from": "document_flow_reviewer",
+      "to": "citation_evidence_reviewer",
+      "gate": "document flow review is approved and the paper draft is ready for citation and evidence tracing"
+    },
+    {
+      "from": "citation_evidence_reviewer",
+      "to": "notation_definition_reviewer",
+      "gate": "citation-evidence review is approved and the document is ready for notation review"
+    },
+    {
+      "from": "citation_evidence_reviewer",
+      "to": "designer",
+      "gate": "citation-evidence review feedback is resolved or escalated"
+    },
+    {
+      "from": "document_flow_reviewer",
       "to": "notation_definition_reviewer",
       "gate": "document flow review is approved and the document is ready for notation review"
+    },
+    {
+      "from": "document_flow_reviewer",
+      "to": "logic_gap_reviewer",
+      "gate": "document flow review is approved and the document is ready for direct logic-gap review when notation review is not required"
     },
     {
       "from": "notation_definition_reviewer",
@@ -1363,6 +1403,10 @@
       "when": "scheduler is active"
     },
     {
+      "role": "citation_evidence_reviewer",
+      "when": "paper-writing is active or the document is citation-dense, figure-dense, or claim-heavy and must prove source-to-claim traceability"
+    },
+    {
       "role": "notation_definition_reviewer",
       "when": "academic-writing is active or the document is symbol-dense, abbreviation-dense, or notation-heavy"
     },
@@ -1451,6 +1495,7 @@
     "experiment_review": "experiment_review.md",
     "schedule": "schedule.md",
     "schedule_review": "schedule_review.md",
+    "citation_evidence_review": "citation_evidence_review.md",
     "notation_definition_review": "notation_definition_review.md",
     "logic_gap_review": "logic_gap_review.md",
     "infra_notes": "infra_notes.md",
