@@ -40,6 +40,7 @@
   - `explorer`
   - `worker`
   - `python_reviewer`
+  - `cpp_reviewer`
 - manual coding override
   - `gpt-5.3-codex-spark`
     - 極端に狭い低遅延 edit loop だけ
@@ -67,6 +68,7 @@
 - `project_reviewer`
 - `literature_researcher`
 - `python_reviewer`
+- `cpp_reviewer`
 - `report_reviewer`
 - `reproducibility_reviewer`
 - `scientific_computing_reviewer`
@@ -81,4 +83,5 @@ subagent inventory や research perspective pack を触ったら、次で bundle
 
 ```bash
 python3 scripts/agent_tools/smoke_test_research_perspective_pack.py
+python3 scripts/agent_tools/task_start.py --task "scoped change" --task-id T1 --owner "codex" --dry-run
 ```

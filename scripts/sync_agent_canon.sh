@@ -128,6 +128,7 @@ notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTRE
 tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
+tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
