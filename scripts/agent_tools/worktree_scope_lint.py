@@ -190,11 +190,39 @@ def lint_scope(workspace_root: Path) -> list[ScopeFinding]:
     action_log = extract_named_value(working_notes, "Action log path")
     if contains_placeholder(action_log):
         findings.append(ScopeFinding("error", "Working Notes During Execution の Action log path が未確定です。"))
+    else:
+        action_log_raw = strip_markdown_wrapping(action_log)
+        action_log_path = Path(action_log_raw)
+        if not action_log_path.is_absolute():
+            action_log_path = (ROOT / action_log_path).resolve()
+        if not action_log_path.is_file():
+            findings.append(
+                ScopeFinding("error", f"Action log file が存在しません: {action_log_path}")
+            )
+        else:
+            action_log_text = action_log_path.read_text(encoding="utf-8")
+            if "## Action Log" not in action_log_text:
+                findings.append(
+                    ScopeFinding("warning", f"Action log section が見つかりません: {action_log_path}")
+                )
+            if "kickoff" not in action_log_text and "resume" not in action_log_text:
+                findings.append(
+                    ScopeFinding("warning", f"Kickoff or resume entry が不足しています: {action_log_path}")
+                )
 
     branch_summary = extract_named_value(working_notes, "Branch summary path")
     branch = extract_named_value(summary, "Branch")
     if branch and "/" in branch and contains_placeholder(branch_summary):
         findings.append(ScopeFinding("warning", "複数 session を想定する branch なら Branch summary path も埋めてください。"))
+    elif branch_summary and not contains_placeholder(branch_summary):
+        branch_summary_raw = strip_markdown_wrapping(branch_summary)
+        branch_summary_path = Path(branch_summary_raw)
+        if not branch_summary_path.is_absolute():
+            branch_summary_path = (ROOT / branch_summary_path).resolve()
+        if not branch_summary_path.is_file():
+            findings.append(
+                ScopeFinding("warning", f"Branch summary file が存在しません: {branch_summary_path}")
+            )
 
     return findings
 

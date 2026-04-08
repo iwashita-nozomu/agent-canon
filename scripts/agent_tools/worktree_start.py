@@ -141,6 +141,29 @@ def ensure_branch_worktree(repo_root: Path, branch: str, worktree_path: str | No
     return requested_path.resolve(), "created"
 
 
+def bootstrap_worktree_notes(repo_root: Path, workspace_root: Path, branch: str) -> None:
+    """Create concrete note paths and fill scope placeholders."""
+    script = repo_root / "scripts" / "agent_tools" / "bootstrap_worktree_notes.py"
+    if not script.is_file():
+        return
+    subprocess.run(
+        [
+            "python3",
+            str(script),
+            "--repo-root",
+            str(repo_root),
+            "--workspace-root",
+            str(workspace_root),
+            "--branch",
+            branch,
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def parse_sections(scope_file: Path) -> dict[str, list[str]]:
     """Parse markdown headings into bullet-line lists."""
     sections: dict[str, list[str]] = {}
@@ -178,7 +201,17 @@ def resolve_action_log_path(workspace_root: Path, scope_file: Path) -> Path | No
     token = raw_value.split("`")
     candidate = token[1] if len(token) >= 3 else raw_value
     path = Path(candidate)
-    return path if path.is_absolute() else (workspace_root / path).resolve()
+    if path.is_absolute():
+        return path
+
+    repo_guess = run_optional(["git", "rev-parse", "--show-toplevel"], cwd=workspace_root)
+    if repo_guess.returncode == 0:
+        return (Path(repo_guess.stdout.strip()).resolve() / path).resolve()
+
+    for ancestor in (workspace_root, *workspace_root.parents):
+        if (ancestor / path.parent).exists() or (ancestor / "notes").is_dir():
+            return (ancestor / path).resolve()
+    return (workspace_root / path).resolve()
 
 
 def append_action_log_entry(action_log_path: Path, entry: str) -> None:
@@ -219,6 +252,8 @@ def main() -> int:
         status = "current-workspace"
 
     branch = current_branch(workspace_root)
+    if branch != "(unknown)":
+        bootstrap_worktree_notes(starting_root, workspace_root, branch)
     scope_file = workspace_root / "WORKTREE_SCOPE.md"
     findings = lint_scope(workspace_root)
     action_log_path = resolve_action_log_path(workspace_root, scope_file) if scope_file.is_file() else None
@@ -246,7 +281,8 @@ def main() -> int:
     print("NEXT_STEPS:")
     print("  1. Confirm action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
-    print("  3. Start editing only after the kickoff record is updated.")
+    print("  3. Use python3 scripts/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step.")
+    print("  4. Start editing only after the kickoff record is updated.")
     return 0
 
 

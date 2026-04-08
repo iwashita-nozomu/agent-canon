@@ -115,6 +115,19 @@ echo "PRE-REVIEW QA CHECKS"
 echo "=========================================="
 echo "JAX test platform: ${JAX_PLATFORMS}"
 
+if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
+    echo ""
+    echo -e "${BLUE}0️⃣  Worktree scope / action-log checks...${NC}"
+    if python3 scripts/agent_tools/worktree_scope_lint.py --current; then
+        echo -e "${GREEN}✅ Worktree scope / action-log checks passed${NC}"
+        write_report "worktree_scope=pass"
+    else
+        echo -e "${RED}❌ Worktree scope / action-log checks failed. Refresh WORKTREE_SCOPE.md and the action log.${NC}"
+        write_report "worktree_scope=fail"
+        fail_run
+    fi
+fi
+
 # 1. Type checking
 echo ""
 echo -e "${BLUE}1️⃣  Type Checking (Pyright strict mode)...${NC}"

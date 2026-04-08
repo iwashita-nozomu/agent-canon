@@ -24,3 +24,7 @@
 - 「確認済みの failure」と「まだ仮説段階」を混ぜません。
 - worktree を閉じる前に、次回も読む価値がある failure はここへ要約します。
 - topic keyword で検索しやすい file 名を使います。
+
+## Template
+
+- [FAILURE_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/failures/FAILURE_NOTE_TEMPLATE.md)

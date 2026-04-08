@@ -19,3 +19,8 @@
 - 観測ベースの知見と文献ベースの知見が混ざるときは区別できるようにします
 - 本文では branch 名や一時的な運用名をできるだけ主語にしません
 - 方法そのものを主語にし、内部履歴は `References` や `diary/` に回します
+- worktree action log や experiment note から昇格させるときは、個別 run の順序ではなく theme ごとにまとめ直します
+
+## Template
+
+- [THEME_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/themes/THEME_NOTE_TEMPLATE.md)

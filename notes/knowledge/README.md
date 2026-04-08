@@ -11,6 +11,11 @@
 - 詳細な背景は `notes/themes/` や `notes/experiments/` に分ける
 - `path resolution`、`environment setup`、`experiment operations` のような広い主語を使う
 - 実務メモであっても、文献で支えられる部分はできるだけ出典を付ける
+- worktree action log から昇格させるときは、時系列ではなく再利用単位にまとめ直す
+
+## Template
+
+- [KNOWLEDGE_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
 
 ## 典型トピック
 

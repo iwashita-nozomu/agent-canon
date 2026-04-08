@@ -46,6 +46,7 @@
 ## Required References Before Editing
 
 - [documents/worktree-lifecycle.md](/mnt/l/workspace/project_template/documents/worktree-lifecycle.md)
+- [documents/notes-lifecycle.md](/mnt/l/workspace/project_template/documents/notes-lifecycle.md)
 - [documents/coding-conventions-project.md](/mnt/l/workspace/project_template/documents/coding-conventions-project.md)
 - [notes/guardrails/README.md](/mnt/l/workspace/project_template/notes/guardrails/README.md)
 - [notes/failures/README.md](/mnt/l/workspace/project_template/notes/failures/README.md)
@@ -68,6 +69,7 @@
 - Experiment memo path: `notes/experiments/<topic>.md`
 - Branch summary path: `notes/branches/<branch_topic>.md`
 - Note template: `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- Append command: `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"`
 - worktree 内でも、最終配置と同じ相対パスで下書きする
 
 ## Required Checks Before Commit
@@ -83,4 +85,5 @@
 - 例: テストは触らない、結果 JSON は commit しない、runner だけ変更する、など。
 - 例: 変更した Markdown は `.markdownlint.json` を基準に確認する。
 - 例: scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次追記する。
+- 例: closeout 前に `documents/notes-lifecycle.md` を見て、knowledge/theme/failure へ昇格させる項目を決める。
 - 例: branch が複数 session 続く場合は `notes/branches/<branch_topic>.md` を維持する。

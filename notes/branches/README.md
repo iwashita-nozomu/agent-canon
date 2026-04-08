@@ -30,3 +30,7 @@
 1. branch を切ったら、必要に応じて同時にこのディレクトリへ branch summary を作ります。
 1. `WORKTREE_SCOPE.md` で指定した action log と carry-over target を、この summary から辿れるようにします。
 1. branch を閉じる前に、関連 note と final JSON のリンクを更新します。
+
+## Template
+
+- [BRANCH_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/branches/BRANCH_NOTE_TEMPLATE.md)

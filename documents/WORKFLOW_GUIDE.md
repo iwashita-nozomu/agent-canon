@@ -21,6 +21,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
   - `documents/worktree-lifecycle.md`
 - workflow 根拠:
   - `documents/workflow-references.md`
+- notes の昇格と育成:
+  - `documents/notes-lifecycle.md`
 
 workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents/canonical/CODEX_WORKFLOW.md` を使います。
 
@@ -181,6 +183,7 @@ template / 派生 repo 側で shared canon を直した変更を upstream へ戻
 
 1. 必要な validation を実行する
 1. action log や note を current state に更新する
+1. `documents/notes-lifecycle.md` を見て、worktree log から knowledge/theme/failure へ昇格させる項目を決める
 1. commit する
 1. `origin` へ push する
 1. そのあとで完了報告する

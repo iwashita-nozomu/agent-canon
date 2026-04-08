@@ -53,6 +53,9 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 - Long README, workflow, guide, and migration docs should use `agents/skills/long-form-writing.md` and require subagent review before closeout.
 - Academic papers, thesis chapters, scholarly notes, and symbol-dense claim-heavy documents should use `agents/skills/academic-writing.md` and require separate notation and logic reviewers before closeout.
+- 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
+- worktree で作業する場合は `bash scripts/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。
+- closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/` への昇格先を決めます。
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.

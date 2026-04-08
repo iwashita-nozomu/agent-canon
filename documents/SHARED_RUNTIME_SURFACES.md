@@ -23,6 +23,7 @@ root では次を symlink view として扱います。
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
+- `documents/notes-lifecycle.md`
 - `documents/paper-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
@@ -50,11 +51,14 @@ root では次を symlink view として扱います。
 - `notes/experiments/results/README.md`
 - `notes/README.md`
 - `notes/branches/README.md`
+- `notes/branches/BRANCH_NOTE_TEMPLATE.md`
 - `notes/failures/README.md`
+- `notes/failures/FAILURE_NOTE_TEMPLATE.md`
 - `notes/github-mirror-procedure.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `notes/knowledge/README.md`
+- `notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
 - `notes/knowledge/benchmark_levels_analysis.md`
 - `notes/knowledge/benchmark_vs_experiment.md`
 - `notes/knowledge/environment_setup.md`
@@ -65,6 +69,7 @@ root では次を symlink view として扱います。
 - `notes/knowledge/path_resolution.md`
 - `notes/knowledge/pyright_operations.md`
 - `notes/themes/README.md`
+- `notes/themes/THEME_NOTE_TEMPLATE.md`
 - `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`

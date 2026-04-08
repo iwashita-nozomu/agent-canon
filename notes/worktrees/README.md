@@ -16,6 +16,8 @@
 - scope 更新、編集開始、テスト実行、実験開始 / 停止、最終判断は append-only で追記します。
 - 1 行でよいので、何をしたか、何を見たか、次に何をするかが追える形にします。
 - worktree 内で先に書く場合も、最終配置と同じ相対パスに置きます。
+- 追記は `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` を既定にします。
+- work block を始めたら kickoff / resume、終えたら test / review / closeout を最低 1 行ずつ残します。
 
 ## Kickoff Minimum
 
@@ -30,6 +32,7 @@ worktree を作った直後は、最低限次を残します。
 ## Template
 
 - kickoff と継続記録には [WORKTREE_LOG_TEMPLATE.md](/mnt/l/workspace/project_template/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を使います。
+- closeout で再利用知識へ昇格させるときは `documents/notes-lifecycle.md` を見ます。
 
 ## What To Extract
 

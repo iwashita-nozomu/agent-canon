@@ -82,4 +82,13 @@ else
   echo "Template not found at $TEMPLATE; create WORKTREE_SCOPE.md manually in $WT_PATH"
 fi
 
+BOOTSTRAP_SCRIPT="scripts/agent_tools/bootstrap_worktree_notes.py"
+if [ -f "$BOOTSTRAP_SCRIPT" ]; then
+  python3 "$BOOTSTRAP_SCRIPT" \
+    --repo-root "$(pwd)" \
+    --workspace-root "$WT_PATH" \
+    --branch "$BRANCH" >/dev/null
+  echo "Bootstrapped worktree action log and branch summary paths"
+fi
+
 echo "Worktree ready at $WT_PATH"

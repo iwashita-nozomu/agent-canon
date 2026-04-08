@@ -21,6 +21,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
+- `documents/notes-lifecycle.md`
 - `documents/paper-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
@@ -46,8 +47,12 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `notes/experiments/REPORT_TEMPLATE.md`
 - `notes/experiments/results/README.md`
 - `notes/knowledge/benchmark_vs_experiment.md`
+- `notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
 - `notes/knowledge/experiment_directory_planning.md`
 - `notes/knowledge/experiment_operations.md`
+- `notes/branches/BRANCH_NOTE_TEMPLATE.md`
+- `notes/failures/FAILURE_NOTE_TEMPLATE.md`
+- `notes/themes/THEME_NOTE_TEMPLATE.md`
 - `notes/themes/from_another_agent.md`
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`

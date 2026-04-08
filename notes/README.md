@@ -46,6 +46,13 @@
 - `main` に持ち帰る実験結果は、完走した fresh run の最小 final JSON と要約 note に限ります。
 - partial run は診断材料として扱い、`notes/` の canonical result にはしません。
 
+## Growth Rule
+
+- 実行中の局所ログは `notes/worktrees/` に残します。
+- closeout 時に、再利用知識は `notes/knowledge/`、topic synthesis は `notes/themes/`、再発防止は `notes/failures/` へ昇格させます。
+- どこへ昇格させるか迷うときは `documents/notes-lifecycle.md` を見ます。
+- `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
+
 ## Action Log Rule
 
 - branch / worktree を例外運用する場合は、意味のある操作を 1 か所の append-only な note に逐次残します。
@@ -62,3 +69,4 @@
 - 重要情報をリンク先に逃がしすぎません。
 - 一度 `main` に置いた過去の note 本文はむやみに書き換えません。補足が必要なら追記で対応します。
 - host 固有の Git mirror や bare repo hook は `notes/github-mirror-procedure.md` に残します。
+- 新しい note は category ごとの template から始めて構いません。

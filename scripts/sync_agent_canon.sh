@@ -73,6 +73,7 @@ documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-su
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
+documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/paper-writing-workflow.md:../${PREFIX}/documents/paper-writing-workflow.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
 documents/SHARED_RUNTIME_SURFACES.md:../${PREFIX}/documents/SHARED_RUNTIME_SURFACES.md
@@ -100,11 +101,14 @@ notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TE
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
 notes/README.md:../${PREFIX}/notes/README.md
 notes/branches/README.md:../../${PREFIX}/notes/branches/README.md
+notes/branches/BRANCH_NOTE_TEMPLATE.md:../../${PREFIX}/notes/branches/BRANCH_NOTE_TEMPLATE.md
 notes/failures/README.md:../../${PREFIX}/notes/failures/README.md
+notes/failures/FAILURE_NOTE_TEMPLATE.md:../../${PREFIX}/notes/failures/FAILURE_NOTE_TEMPLATE.md
 notes/github-mirror-procedure.md:../${PREFIX}/notes/github-mirror-procedure.md
 notes/guardrails/README.md:../../${PREFIX}/notes/guardrails/README.md
 notes/guardrails/engineering_avoidances.md:../../${PREFIX}/notes/guardrails/engineering_avoidances.md
 notes/knowledge/README.md:../../${PREFIX}/notes/knowledge/README.md
+notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md:../../${PREFIX}/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md
 notes/knowledge/benchmark_levels_analysis.md:../../${PREFIX}/notes/knowledge/benchmark_levels_analysis.md
 notes/knowledge/benchmark_vs_experiment.md:../../${PREFIX}/notes/knowledge/benchmark_vs_experiment.md
 notes/knowledge/environment_setup.md:../../${PREFIX}/notes/knowledge/environment_setup.md
@@ -115,6 +119,7 @@ notes/knowledge/literature_intake.md:../../${PREFIX}/notes/knowledge/literature_
 notes/knowledge/path_resolution.md:../../${PREFIX}/notes/knowledge/path_resolution.md
 notes/knowledge/pyright_operations.md:../../${PREFIX}/notes/knowledge/pyright_operations.md
 notes/themes/README.md:../../${PREFIX}/notes/themes/README.md
+notes/themes/THEME_NOTE_TEMPLATE.md:../../${PREFIX}/notes/themes/THEME_NOTE_TEMPLATE.md
 notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
 notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
