@@ -1,6 +1,9 @@
 # Project-scoped Codex settings.
 # Keep subagent fan-out shallow and explicit.
 
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
 [agents]
 max_threads = 4
 max_depth = 1
