@@ -26,6 +26,7 @@
 - 局所 diff を findings-first で見るときは `code-review` か `change-review` を使います。
 - Markdown / report 差分では `md-style-check` と必要なら `report-review` を使います。
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を使います。
+- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 文書の説明不足を拾うときは `docs-completeness-review` を使います。
 - 文献調査や関連研究整理では `literature-survey` を使います。
 - 研究系 task では `research-workflow` を外側の loop に使います。
@@ -51,6 +52,7 @@
 - `詳細設計レビュー` を通す前に実装へ進みません。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
 - 長文では、`document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します。
+- 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
 
 標準 bundle:
 

@@ -57,10 +57,18 @@ skill_families:
     purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
     canonical_doc: agents/skills/long-form-writing.md
     shim: .agents/skills/long-form-writing/SKILL.md
+  - id: academic-writing
+    purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
+    canonical_doc: agents/skills/academic-writing.md
+    shim: .agents/skills/academic-writing/SKILL.md
   - id: docs-completeness-review
     purpose: Review whether docs contain the sections, commands, rationale, and paths a reader needs.
     canonical_doc: agents/skills/docs-completeness-review.md
     shim: .agents/skills/docs-completeness-review/SKILL.md
+  - id: logic-gap-review
+    purpose: Review academic documents for unsupported inferential jumps and missing claim-to-evidence links.
+    canonical_doc: agents/skills/logic-gap-review.md
+    shim: .agents/skills/logic-gap-review/SKILL.md
   - id: md-style-check
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
@@ -69,6 +77,10 @@ skill_families:
     purpose: Review contradictions, stale routes, and duplicated truth across docs.
     canonical_doc: agents/skills/docs-consistency-review.md
     shim: .agents/skills/docs-consistency-review/SKILL.md
+  - id: notation-definition-review
+    purpose: Review academic documents for definition-before-use and notation consistency.
+    canonical_doc: agents/skills/notation-definition-review.md
+    shim: .agents/skills/notation-definition-review/SKILL.md
   - id: change-review
     purpose: Review diffs for regressions, missing validation, and stale docs.
     canonical_doc: agents/skills/change-review.md

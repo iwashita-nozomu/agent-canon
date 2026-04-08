@@ -256,6 +256,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/agent-canon-subtree-migration.md` への symlink view
 - `documents/AGENTS_COORDINATION.md`
   - `vendor/agent-canon/documents/AGENTS_COORDINATION.md` への symlink view
+- `documents/academic-writing-workflow.md`
+  - `vendor/agent-canon/documents/academic-writing-workflow.md` への symlink view
 - `documents/REVIEW_PROCESS.md`
   - `vendor/agent-canon/documents/REVIEW_PROCESS.md` への symlink view
 - `documents/SHARED_RUNTIME_SURFACES.md`

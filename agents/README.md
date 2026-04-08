@@ -38,6 +38,8 @@
   - worktree kickoff、scope 初期化、action log 起点の固定
 - [skills/long-form-writing.md](/mnt/l/workspace/project_template/agents/skills/long-form-writing.md)
   - README、workflow、guide などの長文作成フロー
+- [skills/academic-writing.md](/mnt/l/workspace/project_template/agents/skills/academic-writing.md)
+  - 論文、thesis chapter、scholarly note の作成フロー
 - [skills/from_another_agent.md](/mnt/l/workspace/project_template/agents/skills/from_another_agent.md)
   - 前回 agent run の carry-over note を current task へ接続
 - [skills/project-review.md](/mnt/l/workspace/project_template/agents/skills/project-review.md)
@@ -70,11 +72,12 @@
 - Always-on roles:
   - `manager`, `manager_reviewer`, `designer`, `design_reviewer`, `document_flow_reviewer`, `implementer`, `change_reviewer`, `final_reviewer`, `verifier`, `auditor`
 - Specialist roles:
-  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
+  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
 - `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
+- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
 - `implementer` だけが repo file を編集します。
 - `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。
 
@@ -111,6 +114,21 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
   --enable research_reviewer \
   --enable experimenter \
   --enable experiment_reviewer
+```
+
+学術文章:
+
+```bash
+python3 scripts/agent_tools/bootstrap_agent_run.py \
+  --task "academic writing task" \
+  --owner "codex" \
+  --workspace-root "$PWD" \
+  --enable scheduler \
+  --enable schedule_reviewer \
+  --enable researcher \
+  --enable research_reviewer \
+  --enable notation_definition_reviewer \
+  --enable logic_gap_reviewer
 ```
 
 環境・Docker・CI 変更:

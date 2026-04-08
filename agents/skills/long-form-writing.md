@@ -42,6 +42,7 @@
 
 ## Boundary
 
+- 論文、thesis chapter、scholarly note のような学術文章は `academic-writing` を優先します
 - 実験 report の review policy は `report-review` を優先します
 - repo-wide な workflow 改造は `agent-orchestration` も併用します
 - Markdown の体裁だけなら `md-style-check` を使います

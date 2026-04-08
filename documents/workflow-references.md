@@ -109,6 +109,19 @@
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
   - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
 
+## Academic Writing, Logic, And Notation
+
+- [Ten simple rules for structuring papers](https://doi.org/10.1371/journal.pcbi.1005619)
+  - central contribution、context-content-conclusion、logical flow、results を claim sequence として積む構成、複数 reader からの feedback を得る process の根拠です。
+- [Flow in Scholarly Writing | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/Flow-Handout.pdf)
+  - sentence / paragraph / text の flow、support、transition、alignment を review 観点に入れる根拠です。
+- [Creating a Roadmap | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/creating-a-roadmap.pdf)
+  - roadmap、section purpose、skeleton outline を先に固定する根拠です。
+- [Writing with Feedback on a Manuscript | Purdue OWL](https://owl.purdue.edu/owl/general_writing/the_writing_process/feedback/editor-reviewer_feedback.html)
+  - feedback を checklist 化し、higher-order concerns から revision する根拠です。
+- [Writing Tips | MIT OpenCourseWare](https://ocw.mit.edu/courses/8-06-quantum-physics-iii-spring-2016/e498e7c0d2db9e3846df12bfdac3e10e_MIT8_06S16_TermPaper.pdf)
+  - scientific writing で ambiguity を避け、導入した quantity を明確に定義する根拠です。
+
 ## Related Local Canon
 
 - [references/README.md](/mnt/l/workspace/project_template/references/README.md)

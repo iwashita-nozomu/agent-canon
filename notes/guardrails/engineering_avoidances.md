@@ -10,6 +10,7 @@
 - 最初の update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言しない
 - repo-changing task で run bundle と explicit stage activation を省略する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務する
+- 学術文章で `notation_definition_reviewer` や `logic_gap_reviewer` を立てずに author 自己判断だけで閉じる
 - review feedback を反映せずに次段へ handoff する
 - 正本を更新せずに runtime entrypoint だけ直す
 - host-global install を repo の正本手順にする

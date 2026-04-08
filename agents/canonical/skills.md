@@ -22,12 +22,18 @@
   - pyright / pytest / ruff を前提にした Python review
 - `long-form-writing`
   - README、workflow、guide などの長文作成フロー
+- `academic-writing`
+  - 論文、thesis chapter、scholarly note の作成フロー
 - `docs-completeness-review`
   - 文書の欠落や説明不足のレビュー
+- `logic-gap-review`
+  - 学術文章の論理飛躍と根拠接続のレビュー
 - `md-style-check`
   - Markdown の体裁とリンク確認
 - `docs-consistency-review`
   - 文書間の矛盾と stale route の確認
+- `notation-definition-review`
+  - 記号、略語、定義順、一貫性のレビュー
 - `change-review`
   - findings-first review
 - `worktree-start`

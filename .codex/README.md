@@ -25,6 +25,8 @@
   - `execution_planner`
   - `detailed_designer`
   - `long_form_writer`
+  - `notation_definition_reviewer`
+  - `logic_gap_reviewer`
   - `literature_researcher`
   - `docs_workflow_steward`
   - 全 reviewer 系 role
@@ -49,6 +51,8 @@
 - `long_form_writer`
 - `detailed_design_reviewer`
 - `document_flow_reviewer`
+- `notation_definition_reviewer`
+- `logic_gap_reviewer`
 - `explorer`
 - `reviewer`
 - `worker`

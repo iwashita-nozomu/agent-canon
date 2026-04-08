@@ -13,6 +13,8 @@
 - 1 screen を超える長さの reader-facing 文書を書く
 - 複数 section の argument や decision path を持つ文書を書く
 
+学術論文、thesis chapter、scholarly note のような文書は `documents/academic-writing-workflow.md` を優先します。
+
 ## Core Principles
 
 - 先に `何を言う文書か` を固定してから書く
@@ -127,6 +129,7 @@ python3 scripts/tools/audit_and_fix_links.py --check documents notes
 - `summary statement` は task note、run artifact、または draft 冒頭メモでよい
 - `section contract` は大げさな別紙でなくてよいが、見出しごとの `focus/purpose/support` は実際に固定する
 - 長文作成 task では `long-form-writing` skill を明示的に読み、reviewer subagent を先に割り当てる
+- 記号密度が高い、または claim-heavy な academic 文書では `academic-writing` へ切り替える
 - 設計文書そのものは `implementation-waterfall-workflow.md` の gate に従い、ここでは writing 技法だけを補います
 
 ## External Basis

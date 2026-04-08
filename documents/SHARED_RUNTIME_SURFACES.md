@@ -22,6 +22,7 @@ root では次を symlink view として扱います。
 - `documents/agent-canon-subtree-migration.md`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
+- `documents/academic-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`

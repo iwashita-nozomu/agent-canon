@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Plan review, detailed design review, and document flow review are separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, notation-definition review, and logic-gap review are separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -334,6 +334,46 @@
           "schedule_review"
         ],
         "notes": "The schedule reviewer checks execution order, reviewer separation, milestone realism, explicit stage activation, and sequencing risk. It must remain distinct from the design reviewer."
+      }
+    },
+    {
+      "id": "notation_definition_reviewer",
+      "activation": "academic_or_symbol_dense_writing_review_needed",
+      "owns": [
+        "notation_review",
+        "definition_order_review",
+        "abbreviation_review",
+        "symbol_consistency_review"
+      ],
+      "required_outputs": [
+        "notation_definition_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "notation_definition_review"
+        ],
+        "notes": "The notation-definition reviewer checks whether symbols, abbreviations, technical terms, units, indices, and assumptions are defined before use and used consistently."
+      }
+    },
+    {
+      "id": "logic_gap_reviewer",
+      "activation": "academic_or_claim_dense_writing_review_needed",
+      "owns": [
+        "logic_gap_review",
+        "claim_to_evidence_review",
+        "hidden_assumption_review",
+        "result_interpretation_boundary_review"
+      ],
+      "required_outputs": [
+        "logic_gap_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "logic_gap_review"
+        ],
+        "notes": "The logic-gap reviewer checks whether major claims are supported, whether inferential jumps are explicit, and whether results are kept separate from interpretation."
       }
     },
     {
@@ -704,13 +744,28 @@
     },
     {
       "from": "document_flow_reviewer",
+      "to": "notation_definition_reviewer",
+      "gate": "document flow review is approved and the document is ready for notation review"
+    },
+    {
+      "from": "notation_definition_reviewer",
+      "to": "logic_gap_reviewer",
+      "gate": "notation review is approved and the document is ready for logic-gap review"
+    },
+    {
+      "from": "notation_definition_reviewer",
       "to": "designer",
-      "gate": "document flow review feedback is resolved or escalated"
+      "gate": "notation review feedback is resolved or escalated"
+    },
+    {
+      "from": "logic_gap_reviewer",
+      "to": "designer",
+      "gate": "logic-gap review feedback is resolved or escalated"
     },
     {
       "from": "designer",
       "to": "implementer",
-      "gate": "detailed design and document flow reviews are approved or escalated"
+      "gate": "detailed design, document flow, notation, and logic-gap reviews are approved or escalated"
     },
     {
       "from": "implementer",
@@ -900,7 +955,9 @@
       "roles": [
         "designer",
         "design_reviewer",
-        "document_flow_reviewer"
+        "document_flow_reviewer",
+        "notation_definition_reviewer",
+        "logic_gap_reviewer"
       ],
       "mode": "isolated",
       "share_only": [
@@ -918,7 +975,9 @@
         "experiment_review.md",
         "design_brief.md",
         "design_review.md",
-        "document_flow_review.md"
+        "document_flow_review.md",
+        "notation_definition_review.md",
+        "logic_gap_review.md"
       ],
       "do_not_share": [
         "private_scratchpads",
@@ -938,6 +997,8 @@
         "design_brief.md",
         "design_review.md",
         "document_flow_review.md",
+        "notation_definition_review.md",
+        "logic_gap_review.md",
         "research_notes.md",
         "research_review.md",
         "schedule.md",
@@ -970,6 +1031,8 @@
         "design_brief.md",
         "design_review.md",
         "document_flow_review.md",
+        "notation_definition_review.md",
+        "logic_gap_review.md",
         "research_notes.md",
         "research_review.md",
         "schedule.md",
@@ -1041,6 +1104,14 @@
       "when": "scheduler is active"
     },
     {
+      "role": "notation_definition_reviewer",
+      "when": "academic-writing is active or the document is symbol-dense, abbreviation-dense, or notation-heavy"
+    },
+    {
+      "role": "logic_gap_reviewer",
+      "when": "academic-writing is active or the document is claim-dense, citation-heavy, or inferentially complex"
+    },
+    {
       "role": "infra_steward",
       "when": "task touches CI, Docker, experiment runners, or platform automation"
     },
@@ -1101,6 +1172,8 @@
     "experiment_review": "experiment_review.md",
     "schedule": "schedule.md",
     "schedule_review": "schedule_review.md",
+    "notation_definition_review": "notation_definition_review.md",
+    "logic_gap_review": "logic_gap_review.md",
     "infra_notes": "infra_notes.md",
     "environment_change_proposal": "environment_change_proposal.md",
     "infra_review": "infra_review.md",

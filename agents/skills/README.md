@@ -30,9 +30,12 @@
 | `code-review` | correctness / 設計 / 保守性レビュー | `agents/skills/code-review.md` | `.agents/skills/code-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
+| `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `docs-completeness-review` | 文書の欠落や説明不足のレビュー | `agents/skills/docs-completeness-review.md` | `.agents/skills/docs-completeness-review/SKILL.md` |
+| `logic-gap-review` | 学術文章の論理飛躍と根拠接続のレビュー | `agents/skills/logic-gap-review.md` | `.agents/skills/logic-gap-review/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `docs-consistency-review` | 文書間の矛盾と stale route の確認 | `agents/skills/docs-consistency-review.md` | `.agents/skills/docs-consistency-review/SKILL.md` |
+| `notation-definition-review` | 記号、略語、定義順、一貫性のレビュー | `agents/skills/notation-definition-review.md` | `.agents/skills/notation-definition-review/SKILL.md` |
 | `change-review` | findings-first review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `worktree-start` | worktree 開始時の scope、action log、kickoff を整える | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
@@ -57,6 +60,7 @@
 - 前の agent の carry-over を吸う必要がある task では `from_another_agent` を最初に見ます。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
+- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop、`research-perspective-review` を大きい review pack として使います。
 - 実験結果を見ながら code change を継続反復する task では `experiment-change-loop` を使います。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。

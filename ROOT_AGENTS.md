@@ -49,6 +49,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```
 
 - Long README, workflow, guide, and migration docs should use `agents/skills/long-form-writing.md` and require subagent review before closeout.
+- Academic papers, thesis chapters, scholarly notes, and symbol-dense claim-heavy documents should use `agents/skills/academic-writing.md` and require separate notation and logic reviewers before closeout.
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -59,6 +60,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - 会話だけを根拠に実装へ進めてはいけません。
 - reuse sweep をせずに新しい file や module を増やしてはいけません。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
+- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略してはいけません。
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
 
 ## Validation

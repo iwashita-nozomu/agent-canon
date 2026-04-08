@@ -5,6 +5,7 @@
 
 この repo では workflow family の選択は `agents/TASK_WORKFLOWS.md` を使いますが、実装そのものの進め方はこの文書を共通ルールにします。
 README、workflow、guide、migration 文書のような長文では、加えて `documents/long-form-writing-workflow.md` を overlay として使います。
+論文、thesis chapter、scholarly note のような学術文章では、`documents/academic-writing-workflow.md` を優先 overlay として使います。
 
 ## 1. 目的
 
