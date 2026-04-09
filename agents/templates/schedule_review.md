@@ -20,6 +20,10 @@
 
 <!-- Note schedule risks or sequencing issues. -->
 
+## Revision Loop
+
+<!-- Record which stage the planner must revisit, what must change, and what blocks approval. -->
+
 ## Decision
 
 <!-- Record approve, revise, or escalate. -->

@@ -25,6 +25,10 @@
 
 <!-- Record concrete rewrite points needed to make the document readable in order. -->
 
+## Revision Loop
+
+<!-- Record what the designer must rewrite so the top-down reader path becomes approval-ready. -->
+
 ## Decision
 
 <!-- Record approve, revise, or escalate. -->

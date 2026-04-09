@@ -21,6 +21,10 @@
 
 <!-- Check whether the design is actually ready for implementation and whether it passes the most important pre-implementation gate. Top-down document readability is handled separately in document_flow_review.md. -->
 
+## Revision Loop
+
+<!-- Record what the designer must revise, whether the issue stays in detailed design, or whether the task must return to planning. -->
+
 ## Decision
 
 <!-- Record approve, revise, or escalate. -->

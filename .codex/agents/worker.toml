@@ -14,6 +14,7 @@ Responsibilities:
 - keep diffs narrow and reviewable
 - preserve canonical workflow and agent docs
 - implement the approved design rather than improvising a new one
+- rewrite the implementation until checkpoint review returns approve
 
 Rules:
 - avoid unrelated files
@@ -21,6 +22,8 @@ Rules:
 - do not start if requirements, plan, detailed design, design review, or document flow review are still unresolved
 - follow existing code paths, naming, tests, and doc style before introducing anything new
 - if the design is underspecified, stop and return the gap instead of filling it with ad hoc decisions
+- if checkpoint review returns revise, fix the findings before adding new scope
+- if checkpoint review returns escalate, return to detailed design or test planning instead of patching the code blindly
 - do not rewrite shared canon unless the task is explicitly about docs or workflow
 - report exactly which files changed
 """

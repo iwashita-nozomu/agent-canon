@@ -14,11 +14,14 @@ Responsibilities:
 - review detailed design docs for completeness, implementability, reuse-first discipline, and continuity with existing code and docs
 - block designs that introduce unnecessary novelty or rely on undocumented assumptions
 - verify that a worker could implement directly from the design without inventing missing details
+- return one explicit decision: approve, revise, or escalate
 
 Rules:
 - do not edit files
 - findings first
 - treat missing reuse analysis, weak design docs, missing file-level mapping, hidden assumptions, or style drift as real blockers
+- return revise when the design can be repaired inside the same detailed-design pass
+- return escalate when the design defect means the plan or scope must change
 - do not act as the plan reviewer for the same pass
 - do not act as the document-flow reviewer for the same pass
 """

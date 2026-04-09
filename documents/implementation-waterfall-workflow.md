@@ -16,6 +16,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 詳細設計が固まる前に実装を広げない
 - 実装、review、verification を段階ゲートで区切る
 - 各 pass で複数回の独立レビューを必須にする
+- `設計 -> レビュー`、`詳細設計 -> レビュー`、`実装 -> レビュー` を完了条件充足まで反復する
 - 変更要求 1 件につき 1 回の実装パスを閉じる
 - 差し戻しが必要な場合は、どの段へ戻すかを明示する
 - 新規実装より前に、既存コードと既存の書き方を徹底的に再利用する
@@ -66,6 +67,63 @@ README、workflow、guide、migration 文書のような長文では、加えて
 `Scoped Change` のような小さい差分でも、実行計画、計画レビュー、詳細設計、詳細設計レビュー、文書通読レビューを省略しません。
 また、`計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別エージェントで行います。とくに `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします。
 code を変える pass では、実装前に `test_designer` を独立に立て、static path と nasty case を test plan として固定します。
+
+## 4A. 反復サイクル
+
+この workflow は gate を 1 回通過して終わりではありません。次の 3 つの cycle を持ち、各 cycle は review decision が `approve` になるまで反復します。
+
+### Cycle A. 実行計画 -> 計画レビュー
+
+- 対象:
+  - Gate 3 実行計画立案
+  - Gate 4 計画レビュー
+- owner:
+  - `scheduler`
+- reviewer:
+  - `schedule_reviewer`
+- 反復規則:
+  - `schedule_review.md` の decision が `approve` でない限り Gate 3 に戻します
+  - `revise` は Gate 3 へ戻します
+  - `escalate` は Gate 1 または Gate 2 へ戻して scope / research を修正します
+- 完了条件:
+  - stage 順序、handoff、rollback、validation sequence が hidden step なしで実行できる
+  - review 分離と single-writer discipline が崩れていない
+
+### Cycle B. 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー
+
+- 対象:
+  - Gate 5 詳細設計
+  - Gate 6 詳細設計レビュー
+  - Gate 7 文書通読レビュー
+- owner:
+  - `designer`
+- reviewers:
+  - `design_reviewer`
+  - `document_flow_reviewer`
+- 反復規則:
+  - `design_review.md` または `document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
+  - `revise` は Gate 5 へ戻します
+  - `escalate` は Gate 3 へ戻して設計方針を組み替えます
+- 完了条件:
+  - 実装者が文書だけ読んで着手できる
+  - reuse-first、style-following、reader path が blocker なしで揃っている
+
+### Cycle C. 実装 -> 実装 checkpoint review
+
+- 対象:
+  - Gate 9 実装
+  - Gate 10 実装 checkpoint review
+- owner:
+  - `implementer`
+- reviewer:
+  - `change_reviewer`
+- 反復規則:
+  - `change_review.md` の decision が `approve` でない限り Gate 9 に戻します
+  - `revise` は Gate 9 へ戻します
+  - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
+- 完了条件:
+  - diff が approved design と test plan に一致する
+  - regression、style drift、stale path、missing test が blocker なしになる
 
 ### Gate 0. Subagent Bootstrap
 
@@ -202,9 +260,12 @@ exit 条件:
 ルール:
 - 計画レビュー agent を詳細設計レビュー agent と兼務させません
 - stage の飛ばしや merge は認めません
+- `schedule_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
+- `revise` または `escalate` のまま Gate 5 へ進みません
 
 exit 条件:
 - `schedule_review.md` が `resolved` になっている
+- decision が `approve` になっている
 
 ### Gate 5. 詳細設計
 
@@ -232,6 +293,7 @@ exit 条件:
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
+- Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
@@ -265,10 +327,12 @@ exit 条件:
 - `詳細設計レビュー` は計画レビューより重い gate とします
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
+- `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 
 exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
+- decision が `approve` になっている
 
 ### Gate 7. 文書通読レビュー
 

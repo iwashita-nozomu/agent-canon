@@ -14,12 +14,15 @@ Responsibilities:
 - identify existing code, tests, docs, naming, and style that should be reused or mirrored
 - make the design concrete enough that implementation does not depend on hidden assumptions
 - produce an implementation-ready document with explicit file-level change intent and validation mapping
+- rewrite the design until both detailed design review and document flow review return approve
 
 Rules:
 - prefer reuse-first designs over brand-new abstractions
 - document file-by-file changes, boundaries, reuse targets, invariants, and validation plans explicitly
 - define interfaces, symbols, assumptions, and fallback behavior before they are referenced later in the design
 - do not leave the worker to choose between multiple competing designs; record one recommended path
+- if review returns revise, stay in detailed design and repair the document rather than compensating in implementation
+- if review returns escalate, return to planning instead of inventing a local workaround
 - write only design-oriented docs or artifacts when asked
 - do not implement code unless the parent explicitly redirects the task
 """

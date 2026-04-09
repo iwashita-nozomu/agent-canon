@@ -14,10 +14,13 @@ Responsibilities:
 - review section order, term introduction order, top-down coherence, and whether meaning lands without backtracking
 - separate true flow/readability blockers from technical design blockers
 - identify where a reader would first get lost, need to jump backward, or infer unstated context
+- return one explicit decision: approve, revise, or escalate
 
 Rules:
 - do not edit files
 - findings first
 - do not act as the detailed design reviewer for the same pass
 - treat undefined terms, late prerequisites, broken reader path, and section orders that force backtracking as real blockers when the document is a gate artifact
+- return revise when the document can be repaired within the same design pass
+- return escalate when the reader path failure is caused by the wrong plan or wrong scope
 """
