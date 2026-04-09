@@ -30,6 +30,7 @@ def detect_workspace_root() -> Path:
 # Preserve the template or derived checkout root when this module is imported
 # through a symlinked runtime surface from vendor/agent-canon.
 WORKSPACE_ROOT = detect_workspace_root()
+HOST_CODEX_HOME = Path.home() / ".codex"
 
 
 @dataclass(frozen=True)
@@ -300,6 +301,7 @@ def build_run_command(
     gpus: str | None = None,
     user: str | None = None,
     tty: bool = False,
+    auto_mount_host_codex_home: bool = True,
 ) -> list[str]:
     """Build one container run command."""
     resolved_workspace = workspace_root.resolve()
@@ -319,6 +321,8 @@ def build_run_command(
         run_command.extend(["--gpus", resolved_gpus])
 
     run_command.extend(["-v", f"{resolved_workspace}:{resolved_mount}"])
+    if auto_mount_host_codex_home and HOST_CODEX_HOME.is_dir() and not any(":/root/.codex" in mount for mount in combined_mounts):
+        run_command.extend(["-v", f"{HOST_CODEX_HOME}:/root/.codex"])
     for mount in combined_mounts:
         run_command.extend(["-v", mount])
     for env_item in combined_env:

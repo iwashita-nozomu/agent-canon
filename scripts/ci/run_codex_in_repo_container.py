@@ -308,6 +308,7 @@ def main() -> int:
             mounts=tuple(mounts),
             user=user,
             tty=tty,
+            auto_mount_host_codex_home=False,
         )
 
         print_label_and_command("build", build_command)
