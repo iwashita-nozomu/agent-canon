@@ -38,6 +38,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 | `research-workflow` | 外部調査、比較設計、run loop、decision state の整理 | `agents/skills/research-workflow.md` | `.agents/skills/research-workflow/SKILL.md` |
 | `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
 | `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
+| `user-preference-sync` | user preference note を stable な AGENTS guidance へ昇格 | `agents/skills/user-preference-sync.md` | `.agents/skills/user-preference-sync/SKILL.md` |
 
 ## Internal Review And Runtime Routines
 
@@ -62,6 +63,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
+- `notes/themes/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。
 
 ## Updating Skills
 

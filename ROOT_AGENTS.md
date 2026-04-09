@@ -10,6 +10,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - `agents/README.md`
 - `agents/TASK_WORKFLOWS.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
+- `notes/themes/USER_PREFERENCES.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `documents/AGENTS_COORDINATION.md`
@@ -29,6 +30,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補を確認します。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
+- durable な user preference を観測したら `python3 scripts/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `notes/themes/USER_PREFERENCES.md` へ追記します。
 
 ## Shared Canon
 
@@ -52,6 +54,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 ```
 
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
+- `notes/themes/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
 
 - Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。

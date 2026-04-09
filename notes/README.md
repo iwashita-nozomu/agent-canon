@@ -52,6 +52,7 @@
 - closeout 時に、再利用知識は `notes/knowledge/`、topic synthesis は `notes/themes/`、再発防止は `notes/failures/` へ昇格させます。
 - どこへ昇格させるか迷うときは `documents/notes-lifecycle.md` を見ます。
 - `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
+- 会話から抽出した durable preference は `notes/themes/USER_PREFERENCES.md` に集約します。
 
 ## Action Log Rule
 

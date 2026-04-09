@@ -73,3 +73,7 @@ skill_families:
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
     shim: .agents/skills/environment-maintenance/SKILL.md
+  - id: user-preference-sync
+    purpose: Distill durable user preferences from notes into stable AGENTS.md guidance.
+    canonical_doc: agents/skills/user-preference-sync.md
+    shim: .agents/skills/user-preference-sync/SKILL.md
