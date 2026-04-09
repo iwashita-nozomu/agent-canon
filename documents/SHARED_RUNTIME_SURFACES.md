@@ -20,6 +20,7 @@ root では次を symlink view として扱います。
 - `.codex/README.md`
 - `.codex/agents`
 - `documents/agent-canon-subtree-migration.md`
+- `documents/agent-canon-pr-workflow.md`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
@@ -91,6 +92,7 @@ root では次を symlink view として扱います。
 - `scripts/run_pytest_with_logs.sh`
 - `scripts/ci/check_experiment_registry.py`
 - `scripts/ci/PRE_REVIEW_GUIDE.md`
+- `scripts/ci/check_agent_canon_pr.sh`
 - `scripts/ci/check_docker_build.sh`
 - `scripts/ci/check_server_readiness.py`
 - `scripts/ci/check_merge_structure.py`
@@ -128,6 +130,7 @@ root では次を symlink view として扱います。
 次は root 側に regular file を残しますが、正本は vendor 側です。
 
 - `.github/workflows/agent-coordination.yml`
+- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
 
 ## Editing Rule
 
@@ -141,6 +144,7 @@ root では次を symlink view として扱います。
 ```bash
 bash scripts/sync_agent_canon.sh check
 make agent-checks
+make agent-canon-pr-check
 ```
 
 ## Root-Side Interpretation

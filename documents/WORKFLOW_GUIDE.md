@@ -21,6 +21,8 @@ workflow 系の正本は shared agent canon に寄せ、template root と派生 
   - `documents/worktree-lifecycle.md`
 - main integration:
   - `documents/main-integration-workflow.md`
+- agent-canon PR:
+  - `documents/agent-canon-pr-workflow.md`
 - adaptive tuning loop:
   - `documents/adaptive-improvement-workflow.md`
 - workflow 根拠:
@@ -58,6 +60,7 @@ workflow の具体的な role routing は `agents/TASK_WORKFLOWS.md` と `agents
 | code / docs / tools / runtime をまとめて直したい | `agents/TASK_WORKFLOWS.md`, `agents/skills/comprehensive-development.md` | `agents/`, `documents/`, `scripts/`, `docker/`, `python/`, `tests/` | `make agent-checks` |
 | agent を使いたい | `agents/README.md` | `agents/`, `reports/agents/` | `make agent-checks` |
 | shared agent canon を subtree で同期したい | `documents/agent-canon-subtree-migration.md` | `vendor/`, `scripts/sync_agent_canon.sh` | `make agent-checks` |
+| shared agent canon の PR を整えたい | `documents/agent-canon-pr-workflow.md` | `vendor/agent-canon/`, `scripts/ci/check_agent_canon_pr.sh`, `.github/PULL_REQUEST_TEMPLATE/` | `make agent-canon-pr-check` |
 
 ## 標準フロー
 
@@ -182,6 +185,7 @@ make agent-checks
 ownership と surface 種別は `documents/SHARED_RUNTIME_SURFACES.md` を参照します。
 
 template / 派生 repo 側で shared canon を直した変更を upstream へ戻すときは、`vendor/agent-canon/` 配下だけを専用 commit に分けてから `push` を使います。
+PR を作るときは `documents/agent-canon-pr-workflow.md` に従い、`make agent-canon-pr-check` と `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 
 ### 6. closeout
 

@@ -70,6 +70,7 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-subtree-migration.md
+documents/agent-canon-pr-workflow.md:../${PREFIX}/documents/agent-canon-pr-workflow.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
@@ -146,6 +147,7 @@ scripts/run_comprehensive_review.sh:../${PREFIX}/scripts/run_comprehensive_revie
 scripts/run_pytest_with_logs.sh:../${PREFIX}/scripts/run_pytest_with_logs.sh
 scripts/ci/check_experiment_registry.py:../../${PREFIX}/scripts/ci/check_experiment_registry.py
 scripts/ci/PRE_REVIEW_GUIDE.md:../../${PREFIX}/scripts/ci/PRE_REVIEW_GUIDE.md
+scripts/ci/check_agent_canon_pr.sh:../../${PREFIX}/scripts/ci/check_agent_canon_pr.sh
 scripts/ci/check_docker_build.sh:../../${PREFIX}/scripts/ci/check_docker_build.sh
 scripts/ci/check_jax_export_stack.py:../../${PREFIX}/scripts/ci/check_jax_export_stack.py
 scripts/ci/check_server_readiness.py:../../${PREFIX}/scripts/ci/check_server_readiness.py
@@ -185,6 +187,7 @@ EOF
 build_copy_specs() {
   cat <<EOF
 .github/workflows/agent-coordination.yml:${PREFIX}/.github/workflows/agent-coordination.yml
+.github/PULL_REQUEST_TEMPLATE/agent_canon.md:${PREFIX}/.github/PULL_REQUEST_TEMPLATE/agent_canon.md
 EOF
 }
 

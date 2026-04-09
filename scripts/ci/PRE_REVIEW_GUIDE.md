@@ -171,6 +171,12 @@ scripts/ci/pre_review.sh
 scripts/ci/pre_review.sh
 ```
 
+`vendor/agent-canon/` を触った PR では、`pre_review.sh` だけでは足りません。次を追加します。
+
+```bash
+make agent-canon-pr-check
+```
+
 ---
 
 ## 📊 出力例

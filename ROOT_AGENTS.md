@@ -71,6 +71,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
+- shared canon PR では `documents/agent-canon-pr-workflow.md` を使い、`make agent-canon-pr-check` を merge 前の固定 gate にします。
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a repo-local override is intentional.
 
 ## Close-Out Prohibitions

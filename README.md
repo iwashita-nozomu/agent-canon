@@ -18,6 +18,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `.codex/README.md`
 - `.codex/agents/`
 - `documents/agent-canon-subtree-migration.md`
+- `documents/agent-canon-pr-workflow.md`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
@@ -70,6 +71,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `scripts/requirement_sync_validator.py`
 - `scripts/run_comprehensive_review.sh`
 - `scripts/ci/PRE_REVIEW_GUIDE.md`
+- `scripts/ci/check_agent_canon_pr.sh`
 - `scripts/ci/check_docker_build.sh`
 - `scripts/ci/check_experiment_registry.py`
 - `scripts/ci/check_merge_structure.py`
@@ -86,6 +88,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 - `scripts/setup_worktree.sh`
 - `scripts/shared/error_handler.py`
 - `scripts/sync_agent_canon.sh`
+- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
 - `scripts/tools/audit_and_fix_links.py`
 - `scripts/tools/check_markdown_lint.py`
 - `scripts/tools/check_markdown_math.py`
@@ -110,6 +113,7 @@ agent/runtime の最小 surface だけでなく、experiment-oriented な agent 
 ```bash
 bash scripts/sync_agent_canon.sh link-root
 bash scripts/sync_agent_canon.sh check
+make agent-canon-pr-check
 ```
 
 既存の `snapshot` command は後方互換 alias として残しています。
