@@ -44,6 +44,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
+- 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で docs completeness review も通します
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
@@ -217,6 +218,10 @@ single-writer ルール:
 - 各 chunk は独立した waterfall pass として閉じる
 - 各 chunk で checkpoint review を複数回に増やせる
 - 逐次 review と最終 review を分ける
+- 大規模 refactor では `$behavior-preserving-refactor` を追加します
+- refactor pass では feature 追加を同じ pass に混ぜません
+- refactor pass では `refactor_safety_case.md` を起こし、挙動保存契約、削除対象、path mapping、merge structure check を先に固定します
+- refactor pass では `project_reviewer` と `docs_workflow_steward` を default specialist にし、cross-module drift と stale route を落とします
 
 ### 4. Platform And Environment
 

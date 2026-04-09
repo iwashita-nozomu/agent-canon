@@ -56,6 +56,44 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
 
+    def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
+        """Large refactor should advertise the dedicated refactor skill."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "large refactor",
+                    "--task-id",
+                    "T6",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-large-refactor",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--changed-path",
+                    "python/example.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "SUGGESTED_SKILLS=$codex-task-workflow,$behavior-preserving-refactor",
+                result.stdout,
+            )
+
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
         with tempfile.TemporaryDirectory() as tmp_dir:

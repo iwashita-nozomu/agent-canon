@@ -225,14 +225,18 @@ exit 条件:
 - `File-By-File Design:`
 - `Interfaces And Boundaries:`
 - `Validation And Rollback Plan:`
+- refactor pass では追加で `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を残します
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
+- refactor pass では semantic delta を feature 追加として混ぜません
+- refactor pass では path mapping と remove list を実装前に固定します
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
 - 新規 abstraction より reuse-first の方針が説明できる
+- refactor pass では move / rename / split と挙動保存境界が文書だけで追える
 
 ### Gate 6. 詳細設計レビュー
 
@@ -254,10 +258,13 @@ exit 条件:
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
 - 必要に応じて `infra_reviewer`
   - infra / runtime 影響が設計文書に落ちているか確認する
+- `project_reviewer`
+  - refactor pass では stale path、cross-module drift、delete 漏れを確認する
 
 ルール:
 - `詳細設計レビュー` は計画レビューより重い gate とします
 - design reviewer が未解消の懸念を残したまま実装へ進みません
+- refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
 
 exit 条件:
 - `design_review.md` が `resolved` になっている

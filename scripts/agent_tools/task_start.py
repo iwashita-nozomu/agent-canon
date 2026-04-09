@@ -99,6 +99,8 @@ def suggested_skills(task_id: str | None, workflow_family_id: str | None) -> tup
         selected.append("$comprehensive-development")
     elif workflow_family_id == "adaptive_improvement_loop":
         selected.append("$adaptive-improvement-loop")
+    if task_id == "T6":
+        selected.append("$behavior-preserving-refactor")
     if task_id == "T10":
         selected.append("$paper-writing")
     return tuple(dict.fromkeys(selected))

@@ -25,6 +25,10 @@ skill_families:
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
+  - id: behavior-preserving-refactor
+    purpose: Run large refactors as behavior-preserving structural change with explicit safety contracts.
+    canonical_doc: agents/skills/behavior-preserving-refactor.md
+    shim: .agents/skills/behavior-preserving-refactor/SKILL.md
   - id: long-form-writing
     purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
     canonical_doc: agents/skills/long-form-writing.md

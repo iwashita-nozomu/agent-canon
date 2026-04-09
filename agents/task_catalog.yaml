@@ -85,6 +85,8 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - test_designer
+        - project_reviewer
+        - docs_workflow_steward
         - python_reviewer
         - cpp_reviewer
     tasks:
@@ -242,6 +244,8 @@ tasks:
       - scheduler
       - schedule_reviewer
       - test_designer
+      - project_reviewer
+      - docs_workflow_steward
       - python_reviewer
   - id: T7
     name: new feature or API delivery
