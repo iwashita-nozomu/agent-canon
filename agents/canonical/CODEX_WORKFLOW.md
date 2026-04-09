@@ -123,7 +123,7 @@ user が skill を明示したい場合は `$skill-name` を使います。例: 
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
-- durable な user preference を観測したら、その場で `python3 scripts/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
+- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
 
 ### 2. Workflow Selection
 
@@ -158,7 +158,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 最小コマンド:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
       --task-id T1 \
       --owner "codex" \
@@ -166,7 +166,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 研究・実験つき変更:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "research-backed change" \
       --task-id T4 \
       --owner "codex" \
@@ -174,7 +174,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 環境変更:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "platform or environment change" \
       --task-id T8 \
       --owner "codex" \
@@ -182,7 +182,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 学術文章:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "academic writing task" \
       --task-id T10 \
       --owner "codex" \
@@ -190,7 +190,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 包括的開発:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "comprehensive development pass" \
       --task-id T12 \
       --owner "codex" \
@@ -198,7 +198,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 反復改善:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "adaptive improvement loop" \
       --task-id T13 \
       --owner "codex" \

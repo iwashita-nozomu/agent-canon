@@ -51,4 +51,4 @@
 ## 整理ルール
 
 - 新しい skill を追加するときは `agents/canonical/skills.md` を更新します。
-- Claude mirror が必要なら `python3 scripts/tools/mirror_skill_shims.py --target .claude/skills --prune` を実行します。
+- Claude mirror が必要なら `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune` を実行します。

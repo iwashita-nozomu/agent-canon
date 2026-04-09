@@ -64,7 +64,7 @@
 標準 bundle:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "repo-changing task" \
   --task-id T1 \
   --owner "codex" \
@@ -77,7 +77,7 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 包括的開発の標準 bundle:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

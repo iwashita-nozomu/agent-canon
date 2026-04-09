@@ -16,4 +16,4 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-exec "$PYTHON_BIN" scripts/ci/run_container_pack.py "$@"
+exec "$PYTHON_BIN" tools/ci/run_container_pack.py "$@"

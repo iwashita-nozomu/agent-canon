@@ -30,7 +30,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は `python3 scripts/agent_tools/bootstrap_agent_run.py ...` で先に作ります
+- run bundle は `python3 tools/agent_tools/bootstrap_agent_run.py ...` で先に作ります
 - `--task-id` を使うと、task catalog の task-default specialist と default review pack を bundle へ自動展開します
 
 ## Permanent Team To Codex Mapping
@@ -194,8 +194,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 runtime inventory や review pack を変えたら、まず次を実行します。
 
-    python3 scripts/agent_tools/check_agent_runtime_alignment.py
-    python3 scripts/agent_tools/smoke_test_research_perspective_pack.py
+    python3 tools/agent_tools/check_agent_runtime_alignment.py
+    python3 tools/agent_tools/smoke_test_research_perspective_pack.py
 
 この smoke test は次を確認します。
 

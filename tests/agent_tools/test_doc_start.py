@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DOC_START_SCRIPT = PROJECT_ROOT / "scripts" / "agent_tools" / "doc_start.py"
+DOC_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "doc_start.py"
 
 
 class DocStartTest(unittest.TestCase):

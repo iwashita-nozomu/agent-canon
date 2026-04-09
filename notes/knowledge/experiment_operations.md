@@ -44,7 +44,7 @@
 
 ## 運用チェックリスト
 
-- `scripts/setup_worktree.sh` で作られた `WORKTREE_SCOPE.md` を埋める
+- `tools/setup_worktree.sh` で作られた `WORKTREE_SCOPE.md` を埋める
 - `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` を action log の正本にする
 - 実装を `main` に取り込む前に関連テストを実行する
 - ドキュメント更新はコード変更と同時に持ち帰る

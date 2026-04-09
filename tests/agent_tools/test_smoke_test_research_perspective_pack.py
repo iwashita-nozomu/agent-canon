@@ -10,9 +10,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = (
-    PROJECT_ROOT / "scripts" / "agent_tools" / "smoke_test_research_perspective_pack.py"
+    PROJECT_ROOT / "tools" / "agent_tools" / "smoke_test_research_perspective_pack.py"
 )
-BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "scripts" / "agent_tools" / "bootstrap_agent_run.py"
+BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 
 
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):

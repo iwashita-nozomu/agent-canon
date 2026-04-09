@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "scripts" / "agent_tools" / "check_agent_runtime_alignment.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
 
 
 class AgentRuntimeAlignmentTest(unittest.TestCase):

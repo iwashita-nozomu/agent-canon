@@ -8,9 +8,9 @@ set -euo pipefail
 #       プロジェクト品質を検証
 #
 # 使用方法:
-#   bash scripts/ci/run_all_checks.sh           # 全テスト・解析実行
-#   bash scripts/ci/run_all_checks.sh --quick   # 高速モード（ruff skip）
-#   bash scripts/ci/run_all_checks.sh --verbose # 詳細出力
+#   bash tools/ci/run_all_checks.sh           # 全テスト・解析実行
+#   bash tools/ci/run_all_checks.sh --quick   # 高速モード（ruff skip）
+#   bash tools/ci/run_all_checks.sh --verbose # 詳細出力
 #
 # 前提条件:
 #   - Docker 環境、または requirements.txt のパッケージ導入済み
@@ -83,7 +83,7 @@ EXIT_CODE=0
 
 if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
   echo "0️⃣a worktree scope / action-log checks を実行中..."
-  if "$PYTHON_BIN" scripts/agent_tools/worktree_scope_lint.py --current 2>&1; then
+  if "$PYTHON_BIN" tools/agent_tools/worktree_scope_lint.py --current 2>&1; then
     echo "✅ worktree scope / action-log checks 成功"
   else
     echo "❌ worktree scope / action-log checks 失敗"
@@ -94,13 +94,13 @@ fi
 
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
-if "$PYTHON_BIN" scripts/tools/mirror_skill_shims.py --target .claude/skills --prune --check 2>&1; then
+if "$PYTHON_BIN" tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check 2>&1; then
   echo "✅ skill mirror sync 成功"
 else
   echo "❌ skill mirror sync 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" scripts/agent_tools/smoke_test_research_perspective_pack.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/smoke_test_research_perspective_pack.py 2>&1; then
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
@@ -110,7 +110,7 @@ echo ""
 
 # 1. Markdown / link checks
 echo "1️⃣  documentation checks を実行中..."
-if bash scripts/ci/run_docs_checks.sh 2>&1; then
+if bash tools/ci/run_docs_checks.sh 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"
@@ -120,7 +120,7 @@ echo ""
 
 # 2. experiment registry checks
 echo "2️⃣  experiment registry checks を実行中..."
-if "$PYTHON_BIN" scripts/ci/check_experiment_registry.py 2>&1; then
+if "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"

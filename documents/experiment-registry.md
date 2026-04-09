@@ -52,20 +52,20 @@ durable な正本は常に topic 名です。
 手で編集してもよいですが、通常は次を使います。
 
 ```bash
-python3 scripts/experiments/create_experiment_topic.py <topic>
-python3 scripts/experiments/sync_experiment_registry_context.py --topic <topic>
+python3 tools/experiments/create_experiment_topic.py <topic>
+python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
 ```
 
 ## server 実行ルール
 
-- formal run は `scripts/experiments/run_managed_experiment.py` を使います。
+- formal run は `tools/experiments/run_managed_experiment.py` を使います。
 - 可能なら `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
 
 ## validation
 
 ```bash
-python3 scripts/ci/check_experiment_registry.py
+python3 tools/ci/check_experiment_registry.py
 make experiment-check
 ```
 

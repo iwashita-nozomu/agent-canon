@@ -19,11 +19,11 @@ echo "agent_canon_remote=${REMOTE_URL}"
 echo ""
 
 echo "1️⃣  shared surface status"
-bash scripts/sync_agent_canon.sh status
+bash tools/sync_agent_canon.sh status
 echo ""
 
 echo "2️⃣  shared surface drift check"
-bash scripts/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh check
 echo ""
 
 echo "3️⃣  changed shared canon paths"
@@ -43,4 +43,4 @@ make ci-quick
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"
-echo "NEXT_ACTION=Open_or_update_agent-canon_PR_then_merge_and_run_bash_scripts/sync_agent_canon.sh_push"
+echo "NEXT_ACTION=Open_or_update_agent-canon_PR_then_merge_and_run_bash_tools/sync_agent_canon.sh_push"

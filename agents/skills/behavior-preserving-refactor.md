@@ -27,7 +27,7 @@
 1. old path と new path の対応を `Path Mapping:` として残します。
 1. implementation 前に `test_designer` で regression case と nasty case を固定します。
 1. 既存 test が薄い場合は baseline capture を追加してから rework します。
-1. closeout 前に `python3 scripts/ci/check_merge_structure.py ...` の要否を確認します。
+1. closeout 前に `python3 tools/ci/check_merge_structure.py ...` の要否を確認します。
 
 ## Review Emphasis
 

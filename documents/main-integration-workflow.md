@@ -29,7 +29,7 @@
    - 例:
 
 ```bash
-bash scripts/worktree_start.sh integrate/<topic>-YYYYMMDD .worktrees/integrate-<topic>
+bash tools/worktree_start.sh integrate/<topic>-YYYYMMDD .worktrees/integrate-<topic>
 ```
 
 1. integration worktree で source branch を merge する
@@ -44,7 +44,7 @@ git merge --no-ff work/<topic>-YYYYMMDD
    - source branch と integration commit の tree shape を比較します。
 
 ```bash
-python3 scripts/ci/check_merge_structure.py \
+python3 tools/ci/check_merge_structure.py \
   --source work/<topic>-YYYYMMDD \
   --target origin/main \
   --compare-commit HEAD
@@ -79,6 +79,6 @@ git merge --ff-only integrate/<topic>-YYYYMMDD
 次がそろっていれば、構成変更の統合として合格です。
 
 - source branch で structural path として変わった path が integration commit でも同じ state にある
-- `python3 scripts/ci/check_merge_structure.py ...` が pass
+- `python3 tools/ci/check_merge_structure.py ...` が pass
 - `make ci-quick` が pass
 - 必要な note、doc、test が `main` から辿れる

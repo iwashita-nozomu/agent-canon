@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "scripts" / "tools" / "mirror_skill_shims.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "mirror_skill_shims.py"
 
 
 class MirrorSkillShimsTest(unittest.TestCase):

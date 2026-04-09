@@ -6,7 +6,7 @@ Detect similar markdown documents under `documents/` (excluding templates and le
 and produce a report plus simple merge-draft files for manual review.
 
 Usage:
-  python3 scripts/tools/find_similar_documents.py [--min 0.5]
+  python3 tools/docs/find_similar_documents.py [--min 0.5]
 
 Outputs:
   - reports/similar_documents_report.txt

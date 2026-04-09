@@ -56,10 +56,10 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 
 ## Validation
 
-- `python3 scripts/docker_dependency_validator.py`
+- `python3 tools/docker_dependency_validator.py`
 - `make docker-build-check`
 - `make docker-build-check-host-docker`
-- `python3 scripts/ci/run_container_pack.py --pack docker/packs/default.toml --print-only`
+- `python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only`
 - `make server-check`
 - `make ci-quick`
 - 必要なら `make ci`

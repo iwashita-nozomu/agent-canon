@@ -54,7 +54,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
-- 構成変更を含む統合では、専用 integration worktree と `scripts/ci/check_merge_structure.py` を省略しません
+- 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 
 ## Activation Quick Start
@@ -62,7 +62,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 repo-changing task の最小 bundle:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "scoped repo change" \
   --task-id T1 \
   --owner "codex" \
@@ -72,7 +72,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 研究・実験つき変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -82,7 +82,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 環境変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
   --owner "codex" \
@@ -92,7 +92,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 学術文章:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -102,7 +102,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 論文 draft:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "paper writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -114,7 +114,7 @@ Codex parent が planning を行う session では、parent session 側の plan-
 包括的開発:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \
@@ -124,7 +124,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 反復改善:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "adaptive improvement loop" \
   --task-id T13 \
   --owner "codex" \

@@ -72,5 +72,5 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 1. `agents/skills/<family>.md` を更新する
 1. `agents/skills/catalog.yaml` を更新する
 1. `.agents/skills/<family>/SKILL.md` を更新する
-1. Claude mirror が必要なら `python3 scripts/tools/mirror_skill_shims.py --target .claude/skills --prune` を実行する
+1. Claude mirror が必要なら `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune` を実行する
 1. 必要なら `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md` の routing を更新する

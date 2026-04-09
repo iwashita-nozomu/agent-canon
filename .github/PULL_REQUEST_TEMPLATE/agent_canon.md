@@ -11,8 +11,8 @@
 
 ## Validation
 
-- [ ] `bash scripts/sync_agent_canon.sh link-root`
-- [ ] `bash scripts/sync_agent_canon.sh check`
+- [ ] `bash tools/sync_agent_canon.sh link-root`
+- [ ] `bash tools/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
 
 Validation output:
@@ -37,7 +37,7 @@ Integration notes:
 
 ## Upstream Sync
 
-- [ ] After template `main` merge, run `bash scripts/sync_agent_canon.sh push`
+- [ ] After template `main` merge, run `bash tools/sync_agent_canon.sh push`
 - [ ] Upstream sync is intentionally deferred and explained below
 
 Upstream sync note:

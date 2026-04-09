@@ -15,9 +15,9 @@
 
 - `agents/skills/static-validation.md`
 - `documents/tools/README.md`
-- `scripts/ci/run_all_checks.sh`
-- `scripts/ci/run_docs_checks.sh`
-- `scripts/ci/check_docker_build.sh`
+- `tools/ci/run_all_checks.sh`
+- `tools/ci/run_docs_checks.sh`
+- `tools/ci/check_docker_build.sh`
 
 ## Expected Outcome
 

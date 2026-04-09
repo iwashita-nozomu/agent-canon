@@ -16,12 +16,12 @@ specialist delegation が必要な task で、run bundle、役割分担、write-
 - `agents/TASK_WORKFLOWS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
-- `scripts/agent_tools/bootstrap_agent_run.py`
+- `tools/agent_tools/bootstrap_agent_run.py`
 
 ## Standard Command
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "repo-changing task" \
   --task-id T1 \
   --owner "codex" \
@@ -31,7 +31,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 研究・実験つき変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -41,7 +41,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 環境変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
   --owner "codex" \
@@ -51,7 +51,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 学術文章:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -61,7 +61,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 包括的開発:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

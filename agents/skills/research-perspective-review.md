@@ -50,4 +50,4 @@ scope が狭い場合だけ、使わない視点を明示して subset に落と
 - findings-first の perspective review
 - perspective ごとの findings と follow-up
 - `fix now`、`follow-up`、`delete-ok` の切り分け
-- runtime smoke test が必要なときは `python3 scripts/agent_tools/smoke_test_research_perspective_pack.py`
+- runtime smoke test が必要なときは `python3 tools/agent_tools/smoke_test_research_perspective_pack.py`

@@ -3,7 +3,7 @@
 # pre_review.sh — PR 前の自動 QA チェック
 #
 # 使用方法:
-#   scripts/ci/pre_review.sh
+#   tools/ci/pre_review.sh
 #
 # このスクリプトは以下を実行します:
 #   1. Type checking (Pyright strict mode)
@@ -36,7 +36,7 @@ if [ -n "${REPORT_DIR}" ]; then
     if [ -n "${AGENT_ROLE_NAME}" ] && [ "${ENFORCE_WRITE_SCOPE}" = "1" ]; then
         REPORT_SNAPSHOT_FILE="$(mktemp)"
         WORKSPACE_SNAPSHOT_FILE="$(mktemp)"
-        python3 scripts/agent_tools/validate_role_write_scope.py \
+        python3 tools/agent_tools/validate_role_write_scope.py \
             --report-dir "${REPORT_DIR}" \
             --workspace-root "${WORKSPACE_ROOT}" \
             --report-snapshot-out "${REPORT_SNAPSHOT_FILE}" \
@@ -68,7 +68,7 @@ enforce_write_scope() {
     fi
     local cmd=(
         python3
-        scripts/agent_tools/validate_role_write_scope.py
+        tools/agent_tools/validate_role_write_scope.py
         --role "${AGENT_ROLE_NAME}"
         --report-dir "${REPORT_DIR}"
         --workspace-root "${WORKSPACE_ROOT}"
@@ -118,7 +118,7 @@ echo "JAX test platform: ${JAX_PLATFORMS}"
 if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
     echo ""
     echo -e "${BLUE}0️⃣  Worktree scope / action-log checks...${NC}"
-    if python3 scripts/agent_tools/worktree_scope_lint.py --current; then
+    if python3 tools/agent_tools/worktree_scope_lint.py --current; then
         echo -e "${GREEN}✅ Worktree scope / action-log checks passed${NC}"
         write_report "worktree_scope=pass"
     else

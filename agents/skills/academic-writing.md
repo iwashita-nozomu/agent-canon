@@ -56,7 +56,7 @@
 ## Standard Command
 
 ```bash
-python3 scripts/agent_tools/doc_start.py \
+python3 tools/agent_tools/doc_start.py \
   --task "academic writing task" \
   --kind academic \
   --owner "codex" \

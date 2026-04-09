@@ -8,7 +8,7 @@
     "default_runtime_policy": "design_first_single_writer_team",
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
-    "canonical_runtime": "scripts/agent_tools/agent_team.py",
+    "canonical_runtime": "tools/agent_tools/agent_team.py",
     "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
@@ -1512,7 +1512,7 @@
   ],
   "quality_gates": [
     "make agent-checks",
-    "scripts/ci/pre_review.sh",
+    "tools/ci/pre_review.sh",
     "make ci"
   ],
   "artifacts": {

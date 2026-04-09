@@ -9,7 +9,7 @@ import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-SCRIPT = PROJECT_ROOT / "scripts" / "ci" / "check_merge_structure.py"
+SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_merge_structure.py"
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

@@ -67,7 +67,7 @@
 標準 bundle を作るときは次を使います。
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
   --task-id T1 \
   --owner "human-or-agent" \
@@ -77,7 +77,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 task catalog の default specialist と default review pack をそのまま使うのが既定です。狭い例外だけ `--enable` で足します。
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -89,7 +89,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 包括的開発では、次を起点にし、`project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定 stack として立てます。
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

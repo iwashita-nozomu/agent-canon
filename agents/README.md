@@ -102,7 +102,7 @@ $paper-writing
 repo-changing task の最小 bundle:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "scoped repo change" \
   --task-id T1 \
   --owner "codex" \
@@ -112,7 +112,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 調査つき変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -122,7 +122,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 学術文章:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -132,7 +132,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 環境・Docker・CI 変更:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
   --owner "codex" \
@@ -142,7 +142,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 包括的開発:
 
 ```bash
-python3 scripts/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

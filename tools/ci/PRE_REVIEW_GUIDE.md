@@ -1,6 +1,6 @@
 # pre_review.sh スクリプト — 使用ガイド
 
-**ファイル**: `/workspace/scripts/ci/pre_review.sh`
+**ファイル**: `/workspace/tools/ci/pre_review.sh`
 **作成日**: 2026-03-21
 **用途**: PR 前の自動 QA チェック
 
@@ -22,14 +22,14 @@
 ### 基本的な実行
 
 ```bash
-scripts/ci/pre_review.sh
+tools/ci/pre_review.sh
 ```
 
 ### 実行例
 
 ```bash
 $ cd /workspace
-$ scripts/ci/pre_review.sh
+$ tools/ci/pre_review.sh
 
 ==========================================
 PRE-REVIEW QA CHECKS
@@ -71,7 +71,7 @@ python3 -m pip install pyright pytest pydocstyle ruff
 docker build docker -t project-template:latest
 
 # コンテナ内で実行
-docker run -it -v /workspace:/workspace project-template:latest /workspace/scripts/ci/pre_review.sh
+docker run -it -v /workspace:/workspace project-template:latest /workspace/tools/ci/pre_review.sh
 ```
 
 ---
@@ -151,7 +151,7 @@ python3 -m ruff check python tests --select E,F,I,D,UP
 ```text
 1. コード修正
    ↓
-2. scripts/ci/pre_review.sh 実行
+2. tools/ci/pre_review.sh 実行
    ↓
 3. 全チェック通過?
    ├─ YES: コミット + PR 作成
@@ -165,10 +165,10 @@ python3 -m ruff check python tests --select E,F,I,D,UP
 git checkout -b work/my-feature
 
 # 実装 → 定期的に実行
-scripts/ci/pre_review.sh
+tools/ci/pre_review.sh
 
 # PR 直前に最終確認
-scripts/ci/pre_review.sh
+tools/ci/pre_review.sh
 ```
 
 `vendor/agent-canon/` を触った PR では、`pre_review.sh` だけでは足りません。次を追加します。
@@ -219,7 +219,7 @@ PRE-REVIEW QA CHECKS
 
 [Pyright の詳細エラー出力...]
 
-scripts/ci/pre_review.sh: line 29: exit 1
+tools/ci/pre_review.sh: line 29: exit 1
 ```
 
 → 型エラーを修正して再実行
@@ -228,20 +228,20 @@ scripts/ci/pre_review.sh: line 29: exit 1
 
 ## 🛠️ トラブルシューティング
 
-### 問題: "command not found: scripts/ci/pre_review.sh"
+### 問題: "command not found: tools/ci/pre_review.sh"
 
 **原因**: 実行権限がない or パスが間違っている
 
 **対策**:
 ```bash
 # 1. 実行権限確認
-ls -l scripts/ci/pre_review.sh
+ls -l tools/ci/pre_review.sh
 
 # 2. 実行権限がなければ追加
-chmod +x scripts/ci/pre_review.sh
+chmod +x tools/ci/pre_review.sh
 
 # 3. フルパスで実行
-/workspace/scripts/ci/pre_review.sh
+/workspace/tools/ci/pre_review.sh
 ```
 
 ---
@@ -280,7 +280,7 @@ python3 -m ruff check python tests --select E,F,I,D,UP
 
 ```yaml
 - name: Run pre-review checks
-  run: scripts/ci/pre_review.sh
+  run: tools/ci/pre_review.sh
 ```
 
 ### または個別実行
@@ -309,7 +309,7 @@ python3 -m ruff check python tests --select E,F,I,D,UP
 # 例: import cycle 検出を追加する場合
 
 # 1. スクリプト編集
-nano scripts/ci/pre_review.sh
+nano tools/ci/pre_review.sh
 
 # 2. 新チェック セクション追加
 # 5. Import cycle check
@@ -318,7 +318,7 @@ echo -e "${BLUE}5️⃣  Checking for import cycles...${NC}"
 python3 -m pylint --rcfile=.pylintrc python/ 2>/dev/null || true
 
 # 3. テスト
-scripts/ci/pre_review.sh
+tools/ci/pre_review.sh
 
 # 4. 必要に応じて README 更新
 ```

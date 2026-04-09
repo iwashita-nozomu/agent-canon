@@ -34,9 +34,9 @@ echo "📝 Documentation checks"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-"$PYTHON_BIN" scripts/tools/check_markdown_lint.py "${MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" scripts/tools/check_markdown_math.py "${MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" scripts/tools/audit_and_fix_links.py --check "${MARKDOWN_TARGETS[@]}"
+"$PYTHON_BIN" tools/docs/check_markdown_lint.py "${MARKDOWN_TARGETS[@]}"
+"$PYTHON_BIN" tools/docs/check_markdown_math.py "${MARKDOWN_TARGETS[@]}"
+"$PYTHON_BIN" tools/docs/audit_and_fix_links.py --check "${MARKDOWN_TARGETS[@]}"
 
 echo ""
 echo "Documentation checks completed successfully"

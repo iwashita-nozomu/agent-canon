@@ -8,7 +8,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - `vendor/agent-canon/` 配下の変更
 - shared runtime surface を増減する変更
 - `.github/workflows/agent-coordination.yml` のような synced root copy の変更
-- `scripts/sync_agent_canon.sh` の link / copy spec を変える変更
+- `tools/sync_agent_canon.sh` の link / copy spec を変える変更
 - workflow、skill、subagent、review policy、agent helper の変更
 
 ## 固定ルール
@@ -17,10 +17,10 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
-- shared surface を増減したら `bash scripts/sync_agent_canon.sh link-root` を同じ pass で実行します。
+- shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` を省略しません。
-- template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash scripts/sync_agent_canon.sh push` を実行します。
+- template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash tools/sync_agent_canon.sh push` を実行します。
 
 ## Branch ルール
 
@@ -44,8 +44,8 @@ git checkout -b canon/<topic>-YYYYMMDD
 3. shared surface を再同期する
 
 ```bash
-bash scripts/sync_agent_canon.sh link-root
-bash scripts/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
 ```
 
 4. PR 前の validation を流す
@@ -74,14 +74,14 @@ make agent-canon-pr-check
 7. merge する
 
 - file 構成変更がある場合は integration worktree で merge します。
-- `python3 scripts/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
+- `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 
 8. merge 後に upstream `agent-canon` を更新する
 
 ```bash
 git checkout main
 git pull --ff-only origin main
-bash scripts/sync_agent_canon.sh push
+bash tools/sync_agent_canon.sh push
 ```
 
 9. local working clone がある場合は fast-forward する
@@ -95,10 +95,10 @@ git -C /mnt/l/workspace/agent-canon pull --ff-only
 次をすべて満たしたときだけ shared canon PR を完了扱いにします。
 
 - `make agent-canon-pr-check` が pass
-- root shared surface が `bash scripts/sync_agent_canon.sh check` で clean
+- root shared surface が `bash tools/sync_agent_canon.sh check` で clean
 - PR 本文に changed surface と validation が記録されている
 - file 構成変更がある場合は integration worktree merge と tree check が完了
-- template `main` へ merge 後、`bash scripts/sync_agent_canon.sh push` の実行計画または実行結果が残っている
+- template `main` へ merge 後、`bash tools/sync_agent_canon.sh push` の実行計画または実行結果が残っている
 
 ## 禁止事項
 
@@ -113,6 +113,6 @@ git -C /mnt/l/workspace/agent-canon pull --ff-only
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
 - `documents/main-integration-workflow.md`
-- `scripts/sync_agent_canon.sh`
-- `scripts/ci/check_agent_canon_pr.sh`
+- `tools/sync_agent_canon.sh`
+- `tools/ci/check_agent_canon_pr.sh`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`

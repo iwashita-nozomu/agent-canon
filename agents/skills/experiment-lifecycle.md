@@ -17,7 +17,7 @@
 - `documents/experiment-workflow.md`
 - `documents/experiment-registry.md`
 - `documents/research-workflow.md`
-- `scripts/experiments/run_managed_experiment.py`
+- `tools/experiments/run_managed_experiment.py`
 
 ## Role In Research-Driven Change
 

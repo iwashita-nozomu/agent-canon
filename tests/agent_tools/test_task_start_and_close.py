@@ -9,9 +9,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TASK_START_SCRIPT = PROJECT_ROOT / "scripts" / "agent_tools" / "task_start.py"
-TASK_CLOSE_SCRIPT = PROJECT_ROOT / "scripts" / "agent_tools" / "task_close.py"
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "scripts" / "agent_tools" / "bootstrap_agent_run.py"
+TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
+TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
+BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 
 
 class TaskStartAndCloseTest(unittest.TestCase):

@@ -77,49 +77,7 @@ root では次を symlink view として扱います。
 - `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_run_managed_experiment.py`
-- `scripts/agent_tools/`
-- `scripts/check_convention_consistency.py`
-- `scripts/check_doc_test_triplet.py`
-- `scripts/docker_dependency_validator.py`
-- `scripts/push_origin.sh`
-- `scripts/requirement_sync_validator.py`
-- `scripts/run_comprehensive_review.sh`
-- `scripts/run_pytest_with_logs.sh`
-- `scripts/ci/check_experiment_registry.py`
-- `scripts/ci/PRE_REVIEW_GUIDE.md`
-- `scripts/ci/check_agent_canon_pr.sh`
-- `scripts/ci/check_docker_build.sh`
-- `scripts/ci/check_server_readiness.py`
-- `scripts/ci/check_merge_structure.py`
-- `scripts/ci/container_runtime.py`
-- `scripts/ci/pre_review.sh`
-- `scripts/ci/render_devcontainer_compose.py`
-- `scripts/ci/run_all_checks.sh`
-- `scripts/ci/run_codex_in_repo_container.py`
-- `scripts/ci/run_container_pack.py`
-- `scripts/ci/run_docs_checks.sh`
-- `scripts/ci/run_in_repo_container.py`
-- `scripts/ci/run_python_in_dockerfile.py`
-- `scripts/experiments/create_experiment_topic.py`
-- `scripts/experiments/registry_lib.py`
-- `scripts/experiments/run_managed_experiment.py`
-- `scripts/experiments/sync_experiment_registry_context.py`
-- `scripts/setup_worktree.sh`
-- `scripts/shared/error_handler.py`
-- `scripts/sync_agent_canon.sh`
-- `scripts/tools/audit_and_fix_links.py`
-- `scripts/tools/check_markdown_lint.py`
-- `scripts/tools/check_markdown_math.py`
-- `scripts/tools/find_similar_documents.py`
-- `scripts/tools/fix_markdown_code_blocks.py`
-- `scripts/tools/fix_markdown_docs.py`
-- `scripts/tools/fix_markdown_headers.py`
-- `scripts/tools/format_markdown.py`
-- `scripts/worktree_start.sh`
-- `scripts/tools/check_worktree_scopes.sh`
-- `scripts/tools/create_worktree.sh`
-- `scripts/tools/mirror_skill_shims.py`
-- `scripts/validation/triplet_validator.py`
+- `tools/`
 
 ### synced root copy
 
@@ -132,13 +90,13 @@ root では次を symlink view として扱います。
 
 - shared runtime surface を直すときは `vendor/agent-canon/` 側を編集します
 - root 側の symlink view や copy surface を直接編集しません
-- root copy が drift したら `bash scripts/sync_agent_canon.sh link-root` で復元します
-- drift を確認したいときは `bash scripts/sync_agent_canon.sh check` を使います
+- root copy が drift したら `bash tools/sync_agent_canon.sh link-root` で復元します
+- drift を確認したいときは `bash tools/sync_agent_canon.sh check` を使います
 
 ## Validation
 
 ```bash
-bash scripts/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh check
 make agent-checks
 make agent-canon-pr-check
 ```

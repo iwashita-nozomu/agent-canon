@@ -4,7 +4,7 @@
 # スキルファイル section 12 の自動化スクリプトを一括実行
 # 
 # 用法:
-#   ./scripts/run_comprehensive_review.sh [--parallel] [--report]
+#   ./tools/run_comprehensive_review.sh [--parallel] [--report]
 #
 # オプション:
 #   --parallel     ツールを並行実行（高速化）
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
         --verbose) VERBOSE=true; shift ;;
         --help)
             cat <<'EOF'
-Usage: ./scripts/run_comprehensive_review.sh [--parallel] [--report] [--verbose]
+Usage: ./tools/run_comprehensive_review.sh [--parallel] [--report] [--verbose]
 
 Runs static checks, tests, and workflow validators used in the comprehensive
 review flow. Logs are written under ./logs/.

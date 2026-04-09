@@ -22,13 +22,13 @@
 
 - [WORKTREE_SCOPE_TEMPLATE.md](/mnt/l/workspace/project_template/documents/WORKTREE_SCOPE_TEMPLATE.md) を基に、worktree root の `WORKTREE_SCOPE.md` を current state へ合わせます。
 - [WORKTREE_LOG_TEMPLATE.md](/mnt/l/workspace/project_template/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
-- 継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
+- 継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
 - kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。
 - この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch`、必要なら `active_worktree` と `scope_file` を合わせます。
 - branch が複数 session 続く、または handoff 前提なら `notes/branches/` に summary を置きます。
 - `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で踏みやすい avoid pattern と既知 failure を確認します。
-- `python3 scripts/agent_tools/worktree_scope_lint.py --current` か `bash scripts/worktree_start.sh --current` で scope の placeholder と kickoff 欄を確認します。
-- `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash scripts/tools/check_worktree_scopes.sh` を実行します。
+- `python3 tools/agent_tools/worktree_scope_lint.py --current` か `bash tools/worktree_start.sh --current` で scope の placeholder と kickoff 欄を確認します。
+- `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
 - `main` へ戻すための integration worktree を切る場合は、`documents/main-integration-workflow.md` の手順を先に見ます。
 
@@ -45,7 +45,7 @@
 - scope が途中で変わったら、追加編集の前に `WORKTREE_SCOPE.md` と action log を更新します。
 - runtime output は `WORKTREE_SCOPE.md` に書いた場所へ限定します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。
-- file 構成変更を含む branch を閉じる前には、integration worktree 上で `python3 scripts/ci/check_merge_structure.py ...` を通します。
+- file 構成変更を含む branch を閉じる前には、integration worktree 上で `python3 tools/ci/check_merge_structure.py ...` を通します。
 
 ## 閉じる前の確認
 

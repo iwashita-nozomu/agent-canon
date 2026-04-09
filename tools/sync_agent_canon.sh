@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
@@ -10,13 +10,13 @@ FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 usage() {
   cat <<EOF
 Usage:
-  bash scripts/sync_agent_canon.sh link-root
-  bash scripts/sync_agent_canon.sh check
-  bash scripts/sync_agent_canon.sh snapshot
-  bash scripts/sync_agent_canon.sh add <remote-url> [branch]
-  bash scripts/sync_agent_canon.sh pull [branch]
-  bash scripts/sync_agent_canon.sh push [branch]
-  bash scripts/sync_agent_canon.sh status
+  bash tools/sync_agent_canon.sh link-root
+  bash tools/sync_agent_canon.sh check
+  bash tools/sync_agent_canon.sh snapshot
+  bash tools/sync_agent_canon.sh add <remote-url> [branch]
+  bash tools/sync_agent_canon.sh pull [branch]
+  bash tools/sync_agent_canon.sh push [branch]
+  bash tools/sync_agent_canon.sh status
 
 Environment overrides:
   AGENT_CANON_PREFIX
@@ -132,51 +132,7 @@ tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
-scripts/agent_tools:../${PREFIX}/scripts/agent_tools
-scripts/check_convention_consistency.py:../${PREFIX}/scripts/check_convention_consistency.py
-scripts/check_doc_test_triplet.py:../${PREFIX}/scripts/check_doc_test_triplet.py
-scripts/docker_dependency_validator.py:../${PREFIX}/scripts/docker_dependency_validator.py
-scripts/push_origin.sh:../${PREFIX}/scripts/push_origin.sh
-scripts/requirement_sync_validator.py:../${PREFIX}/scripts/requirement_sync_validator.py
-scripts/run_comprehensive_review.sh:../${PREFIX}/scripts/run_comprehensive_review.sh
-scripts/run_pytest_with_logs.sh:../${PREFIX}/scripts/run_pytest_with_logs.sh
-scripts/ci/check_experiment_registry.py:../../${PREFIX}/scripts/ci/check_experiment_registry.py
-scripts/ci/PRE_REVIEW_GUIDE.md:../../${PREFIX}/scripts/ci/PRE_REVIEW_GUIDE.md
-scripts/ci/check_agent_canon_pr.sh:../../${PREFIX}/scripts/ci/check_agent_canon_pr.sh
-scripts/ci/check_docker_build.sh:../../${PREFIX}/scripts/ci/check_docker_build.sh
-scripts/ci/check_jax_export_stack.py:../../${PREFIX}/scripts/ci/check_jax_export_stack.py
-scripts/ci/check_server_readiness.py:../../${PREFIX}/scripts/ci/check_server_readiness.py
-scripts/ci/check_merge_structure.py:../../${PREFIX}/scripts/ci/check_merge_structure.py
-scripts/ci/container_runtime.py:../../${PREFIX}/scripts/ci/container_runtime.py
-scripts/ci/pre_review.sh:../../${PREFIX}/scripts/ci/pre_review.sh
-scripts/ci/render_devcontainer_compose.py:../../${PREFIX}/scripts/ci/render_devcontainer_compose.py
-scripts/ci/run_all_checks.sh:../../${PREFIX}/scripts/ci/run_all_checks.sh
-scripts/ci/run_codex_in_repo_container.py:../../${PREFIX}/scripts/ci/run_codex_in_repo_container.py
-scripts/ci/run_container_pack.py:../../${PREFIX}/scripts/ci/run_container_pack.py
-scripts/ci/run_docs_checks.sh:../../${PREFIX}/scripts/ci/run_docs_checks.sh
-scripts/ci/run_in_repo_container.py:../../${PREFIX}/scripts/ci/run_in_repo_container.py
-scripts/ci/run_repo_program.py:../../${PREFIX}/scripts/ci/run_repo_program.py
-scripts/ci/run_python_in_dockerfile.py:../../${PREFIX}/scripts/ci/run_python_in_dockerfile.py
-scripts/experiments/create_experiment_topic.py:../../${PREFIX}/scripts/experiments/create_experiment_topic.py
-scripts/experiments/registry_lib.py:../../${PREFIX}/scripts/experiments/registry_lib.py
-scripts/experiments/run_managed_experiment.py:../../${PREFIX}/scripts/experiments/run_managed_experiment.py
-scripts/experiments/sync_experiment_registry_context.py:../../${PREFIX}/scripts/experiments/sync_experiment_registry_context.py
-scripts/setup_worktree.sh:../${PREFIX}/scripts/setup_worktree.sh
-scripts/shared/error_handler.py:../../${PREFIX}/scripts/shared/error_handler.py
-scripts/sync_agent_canon.sh:../${PREFIX}/scripts/sync_agent_canon.sh
-scripts/tools/audit_and_fix_links.py:../../${PREFIX}/scripts/tools/audit_and_fix_links.py
-scripts/tools/check_markdown_lint.py:../../${PREFIX}/scripts/tools/check_markdown_lint.py
-scripts/tools/check_markdown_math.py:../../${PREFIX}/scripts/tools/check_markdown_math.py
-scripts/tools/find_similar_documents.py:../../${PREFIX}/scripts/tools/find_similar_documents.py
-scripts/tools/fix_markdown_code_blocks.py:../../${PREFIX}/scripts/tools/fix_markdown_code_blocks.py
-scripts/tools/fix_markdown_docs.py:../../${PREFIX}/scripts/tools/fix_markdown_docs.py
-scripts/tools/fix_markdown_headers.py:../../${PREFIX}/scripts/tools/fix_markdown_headers.py
-scripts/tools/format_markdown.py:../../${PREFIX}/scripts/tools/format_markdown.py
-scripts/tools/mirror_skill_shims.py:../../${PREFIX}/scripts/tools/mirror_skill_shims.py
-scripts/tools/check_worktree_scopes.sh:../../${PREFIX}/scripts/tools/check_worktree_scopes.sh
-scripts/tools/create_worktree.sh:../../${PREFIX}/scripts/tools/create_worktree.sh
-scripts/validation/triplet_validator.py:../../${PREFIX}/scripts/validation/triplet_validator.py
-scripts/worktree_start.sh:../${PREFIX}/scripts/worktree_start.sh
+tools:${PREFIX}/tools
 EOF
 }
 
@@ -296,7 +252,7 @@ cmd_check() {
   done < <(build_copy_specs)
 
   if [ "$failed" -ne 0 ]; then
-    die "shared surface drift detected; run 'bash scripts/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"
   fi
 
   echo "shared surface is in sync"

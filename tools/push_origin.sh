@@ -9,7 +9,7 @@ TARGET_BRANCH=""
 
 show_help() {
   cat <<'EOF'
-Usage: bash scripts/push_origin.sh [OPTIONS]
+Usage: bash tools/push_origin.sh [OPTIONS]
 
 Push the current branch to origin as the canonical remote reflection step.
 

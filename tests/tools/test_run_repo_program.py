@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "run_repo_program.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "run_repo_program.py"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -21,25 +21,25 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
 def test_print_only_python_file_uses_python_runner_and_env_check() -> None:
     """Python files should resolve to python3 and include env-check by default."""
-    result = run_cli("--print-only", "scripts/ci/check_jax_export_stack.py")
+    result = run_cli("--print-only", "tools/ci/check_jax_export_stack.py")
 
     assert result.returncode == 0, result.stderr
     assert "env-check:" in result.stdout
-    assert "python3 /workspace/scripts/ci/check_jax_export_stack.py" in result.stdout
+    assert "python3 /workspace/tools/ci/check_jax_export_stack.py" in result.stdout
 
 
 def test_print_only_shell_script_uses_bash() -> None:
     """Shell scripts should resolve through bash."""
     result = run_cli(
         "--print-only",
-        "scripts/ci/check_docker_build.sh",
+        "tools/ci/check_docker_build.sh",
         "--",
         "--pack",
         "docker/packs/default.toml",
     )
 
     assert result.returncode == 0, result.stderr
-    assert "/bin/bash /workspace/scripts/ci/check_docker_build.sh --pack docker/packs/default.toml" in result.stdout
+    assert "/bin/bash /workspace/tools/ci/check_docker_build.sh --pack docker/packs/default.toml" in result.stdout
 
 
 def test_print_only_command_without_workspace_file_runs_directly() -> None:

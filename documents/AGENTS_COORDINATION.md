@@ -31,7 +31,7 @@
 
 標準の run bundle を作るときは次を使います。
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "short task summary" \
       --task-id T1 \
       --owner "codex-or-human" \
@@ -39,7 +39,7 @@
 
 研究・実験つき変更:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "research-backed change" \
       --task-id T4 \
       --owner "codex" \
@@ -47,7 +47,7 @@
 
 環境変更:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "platform or environment change" \
       --task-id T8 \
       --owner "codex" \
@@ -55,7 +55,7 @@
 
 学術文章:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "academic writing task" \
       --task-id T10 \
       --owner "codex" \
@@ -63,7 +63,7 @@
 
 包括的開発:
 
-    python3 scripts/agent_tools/bootstrap_agent_run.py \
+    python3 tools/agent_tools/bootstrap_agent_run.py \
       --task "comprehensive development pass" \
       --task-id T12 \
       --owner "codex" \
@@ -82,13 +82,13 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 
 artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。
 
-    python3 scripts/agent_tools/validate_role_write_scope.py \
+    python3 tools/agent_tools/validate_role_write_scope.py \
       --report-dir reports/agents/<run-id> \
       --workspace-root "$PWD" \
       --report-snapshot-out /tmp/agent-report-before.json \
       --workspace-snapshot-out /tmp/agent-workspace-before.json
 
-    python3 scripts/agent_tools/validate_role_write_scope.py \
+    python3 tools/agent_tools/validate_role_write_scope.py \
       --role change_reviewer \
       --report-dir reports/agents/<run-id> \
       --report-snapshot-in /tmp/agent-report-before.json \

@@ -22,12 +22,12 @@
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `notes/branches/README.md`
 - `reports/agents/<run-id>/user_request_contract.md`
-- `scripts/setup_worktree.sh`
-- `scripts/worktree_start.sh`
-- `scripts/agent_tools/worktree_start.py`
-- `scripts/agent_tools/worktree_scope_lint.py`
-- `scripts/experiments/sync_experiment_registry_context.py`
-- `scripts/tools/check_worktree_scopes.sh`
+- `tools/setup_worktree.sh`
+- `tools/worktree_start.sh`
+- `tools/agent_tools/worktree_start.py`
+- `tools/agent_tools/worktree_scope_lint.py`
+- `tools/experiments/sync_experiment_registry_context.py`
+- `tools/docs/check_worktree_scopes.sh`
 
 ## Expected Outcome
 
@@ -36,7 +36,7 @@
 - user request contract の path が決まり、action log から clause ID を辿れる
 - 必要なら branch summary の path が決まり、handoff 先をそこから辿れる
 - 初期状態の `git` / worktree チェック結果と次の一手が残っている
-- `python3 scripts/agent_tools/work_log.py ...` で継続ログを追記できる
+- `python3 tools/agent_tools/work_log.py ...` で継続ログを追記できる
 
 ## Mandatory Checklist
 
@@ -52,32 +52,32 @@
 - `git status --short --branch` を確認し、unexpected dirty state があれば action log に残す
 - `git worktree list --porcelain` を確認し、duplicate / stale worktree が無いか見る
 - `notes/guardrails/README.md` と `notes/failures/README.md` を読み、今の task で踏みやすい avoid pattern と既知 failure を確認する
-- `python3 scripts/agent_tools/worktree_scope_lint.py --current` か `bash scripts/worktree_start.sh --current` で scope の placeholder や stale field を潰す
-- 複数 worktree がある、または stale な再開で不安がある場合は `bash scripts/tools/check_worktree_scopes.sh` を実行する
+- `python3 tools/agent_tools/worktree_scope_lint.py --current` か `bash tools/worktree_start.sh --current` で scope の placeholder や stale field を潰す
+- 複数 worktree がある、または stale な再開で不安がある場合は `bash tools/docs/check_worktree_scopes.sh` を実行する
 - conflict risk、scope drift、carry-over 漏れの兆候があれば、編集前に action log に残す
 
 ## Default Kickoff Sequence
 
-1. `bash scripts/worktree_start.sh <branch-name> [worktree-path]` か `python3 scripts/agent_tools/worktree_start.py --current` で worktree の kickoff summary を出し、`WORKTREE_SCOPE.md` と action log の不足を洗います。
-1. `documents/WORKTREE_SCOPE_TEMPLATE.md` を基に `WORKTREE_SCOPE.md` を current state へ合わせて更新し、`python3 scripts/agent_tools/worktree_scope_lint.py --current` で placeholder や stale field を確認します。
+1. `bash tools/worktree_start.sh <branch-name> [worktree-path]` か `python3 tools/agent_tools/worktree_start.py --current` で worktree の kickoff summary を出し、`WORKTREE_SCOPE.md` と action log の不足を洗います。
+1. `documents/WORKTREE_SCOPE_TEMPLATE.md` を基に `WORKTREE_SCOPE.md` を current state へ合わせて更新し、`python3 tools/agent_tools/worktree_scope_lint.py --current` で placeholder や stale field を確認します。
 1. experiment topic を持つ branch なら `experiments/registry.toml` の entry を見て、`active_branch`、必要なら `active_worktree` と `scope_file` を current state に合わせます。
 1. `notes/worktrees/WORKTREE_LOG_TEMPLATE.md` を基に action log を作るか更新し、最初の kickoff entry を書きます。
-1. 以後の継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
+1. 以後の継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
 1. `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で避けるべき既知 pattern を拾います。
-1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash scripts/tools/check_worktree_scopes.sh` を実行します。
+1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
 1. 次の一手と carry-over 先を action log に書いてから編集を始めます。
 
 ## Default Commands
 
-- `bash scripts/worktree_start.sh <branch-name> [worktree-path]`
-- `python3 scripts/agent_tools/worktree_start.py --current`
-- `python3 scripts/agent_tools/worktree_scope_lint.py --current`
-- `python3 scripts/experiments/sync_experiment_registry_context.py --topic <topic> --branch <branch>`
+- `bash tools/worktree_start.sh <branch-name> [worktree-path]`
+- `python3 tools/agent_tools/worktree_start.py --current`
+- `python3 tools/agent_tools/worktree_scope_lint.py --current`
+- `python3 tools/experiments/sync_experiment_registry_context.py --topic <topic> --branch <branch>`
 - `cp notes/worktrees/WORKTREE_LOG_TEMPLATE.md notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
-- `python3 scripts/agent_tools/work_log.py --kind edit --request-clause-id R1 --message "..." --next "..."`
+- `python3 tools/agent_tools/work_log.py --kind edit --request-clause-id R1 --message "..." --next "..."`
 - `git status --short --branch`
 - `git worktree list --porcelain`
-- `bash scripts/tools/check_worktree_scopes.sh`
+- `bash tools/docs/check_worktree_scopes.sh`
 
 ## Boundary
 

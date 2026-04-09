@@ -8,7 +8,7 @@ Features:
 - Ensure a single blank line after header lines
 
 Usage:
-  python3 scripts/tools/fix_markdown_docs.py [--apply]
+  python3 tools/docs/fix_markdown_docs.py [--apply]
 
 This script is conservative and only performs small formatting fixes.
 """

@@ -28,8 +28,8 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - root surface を戻すときは次を使います。
 
 ```bash
-bash scripts/sync_agent_canon.sh link-root
-bash scripts/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
 ```
 
 ## upstream sync
@@ -37,7 +37,7 @@ bash scripts/sync_agent_canon.sh check
 template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
 
 ```bash
-bash scripts/sync_agent_canon.sh push
+bash tools/sync_agent_canon.sh push
 ```
 
 pull / push / PR の詳細は `documents/agent-canon-pr-workflow.md` を見ます。

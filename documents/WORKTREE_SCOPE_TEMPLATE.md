@@ -71,7 +71,7 @@
 - Branch summary path: `notes/branches/<branch_topic>.md`
 - User request contract path: `reports/agents/<run-id>/user_request_contract.md`
 - Note template: `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- Append command: `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
+- Append command: `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
 - worktree 内でも、最終配置と同じ相対パスで下書きする
 
 ## Required Checks Before Commit

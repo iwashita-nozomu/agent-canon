@@ -134,7 +134,7 @@ def ensure_branch_worktree(repo_root: Path, branch: str, worktree_path: str | No
                 f"{requested_path} ({actual_branch})"
             )
 
-    cmd = ["bash", "scripts/setup_worktree.sh", branch]
+    cmd = ["bash", "tools/setup_worktree.sh", branch]
     if worktree_path is not None:
         cmd.append(worktree_path)
     subprocess.run(cmd, cwd=repo_root, check=True)
@@ -281,7 +281,7 @@ def main() -> int:
     print("NEXT_STEPS:")
     print("  1. Confirm action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
-    print("  3. Use python3 scripts/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step.")
+    print("  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step.")
     print("  4. Start editing only after the kickoff record is updated.")
     return 0
 

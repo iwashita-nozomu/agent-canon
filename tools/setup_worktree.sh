@@ -9,12 +9,12 @@ set -euo pipefail
 #
 # 【使用方法】
 #   1. 標準的な使い方（デフォルトパス）
-#      bash scripts/setup_worktree.sh work/my-feature-20260330
+#      bash tools/setup_worktree.sh work/my-feature-20260330
 #      → ブランチ: work/my-feature-20260330
 #      → ワークツリー: .worktrees/work-my-feature-20260330
 #
 #   2. カスタムワークツリーパス指定
-#      bash scripts/setup_worktree.sh results/example-validation-20260407 \
+#      bash tools/setup_worktree.sh results/example-validation-20260407 \
 #        .worktrees/results-example-validation-20260407
 #      → ワークツリー: .worktrees/results-example-validation-20260407
 #
@@ -82,7 +82,7 @@ else
   echo "Template not found at $TEMPLATE; create WORKTREE_SCOPE.md manually in $WT_PATH"
 fi
 
-BOOTSTRAP_SCRIPT="scripts/agent_tools/bootstrap_worktree_notes.py"
+BOOTSTRAP_SCRIPT="tools/agent_tools/bootstrap_worktree_notes.py"
 if [ -f "$BOOTSTRAP_SCRIPT" ]; then
   python3 "$BOOTSTRAP_SCRIPT" \
     --repo-root "$(pwd)" \

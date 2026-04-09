@@ -9,25 +9,25 @@ from pathlib import Path
 
 CHECK_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "scripts"
+    / "tools"
     / "ci"
     / "check_experiment_registry.py"
 )
 CREATE_TOPIC_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "scripts"
+    / "tools"
     / "experiments"
     / "create_experiment_topic.py"
 )
 SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "scripts"
+    / "tools"
     / "experiments"
     / "run_managed_experiment.py"
 )
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "scripts"
+    / "tools"
     / "experiments"
     / "sync_experiment_registry_context.py"
 )
@@ -39,7 +39,7 @@ FORMAL_INNER_COMMAND = (
     f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode formal"
 )
 RECURSIVE_RUNNER_COMMAND = (
-    "python3 scripts/experiments/run_managed_experiment.py --topic demo_topic"
+    "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
 )
 
 
@@ -49,10 +49,10 @@ def build_repo(tmp_path: Path) -> Path:
     (repo_root / "experiments" / "_template" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
-    (repo_root / "scripts" / "experiments").mkdir(parents=True)
+    (repo_root / "tools" / "experiments").mkdir(parents=True)
     (repo_root / "experiments" / "_template" / "README.md").write_text(
         "# Experiment Topic Template\n\n"
-        "smoke: `python3 scripts/experiments/run_managed_experiment.py "
+        "smoke: `python3 tools/experiments/run_managed_experiment.py "
         "--topic <topic> --use-registered-command smoke`\n",
         encoding="utf-8",
     )
@@ -72,7 +72,7 @@ def build_repo(tmp_path: Path) -> Path:
         "# Demo Topic\n",
         encoding="utf-8",
     )
-    (repo_root / "scripts" / "experiments" / "run_managed_experiment.py").write_text(
+    (repo_root / "tools" / "experiments" / "run_managed_experiment.py").write_text(
         "# placeholder\n",
         encoding="utf-8",
     )
@@ -102,7 +102,7 @@ def build_repo(tmp_path: Path) -> Path:
                 "schema_version = 1",
                 "",
                 "[defaults]",
-                'managed_runner = "scripts/experiments/run_managed_experiment.py"',
+                'managed_runner = "tools/experiments/run_managed_experiment.py"',
                 'report_root = "experiments/report"',
                 'integration_branch = "main"',
                 'topic_template_dir = "experiments/_template"',
@@ -225,7 +225,7 @@ def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
 ) -> None:
     """The checker should infer the derived repo root from the invoked symlink path."""
     repo_root = build_repo(tmp_path)
-    script_path = repo_root / "scripts" / "ci" / "check_experiment_registry.py"
+    script_path = repo_root / "tools" / "ci" / "check_experiment_registry.py"
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.symlink_to(CHECK_SCRIPT)
 

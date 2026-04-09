@@ -82,7 +82,7 @@
 subagent inventory や research perspective pack を触ったら、次で bundle と runtime surface を確認します。
 
 ```bash
-python3 scripts/agent_tools/smoke_test_research_perspective_pack.py
-python3 scripts/agent_tools/task_start.py --task "scoped change" --task-id T1 --owner "codex" --dry-run
-python3 scripts/agent_tools/doc_start.py --task "paper writing task" --kind paper --owner "codex" --dry-run
+python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+python3 tools/agent_tools/task_start.py --task "scoped change" --task-id T1 --owner "codex" --dry-run
+python3 tools/agent_tools/doc_start.py --task "paper writing task" --kind paper --owner "codex" --dry-run
 ```

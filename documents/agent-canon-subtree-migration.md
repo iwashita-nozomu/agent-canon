@@ -54,11 +54,11 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
 template repo 側では次を使います。
 
 ```bash
-bash scripts/sync_agent_canon.sh status
-bash scripts/sync_agent_canon.sh link-root
-bash scripts/sync_agent_canon.sh check
-bash scripts/sync_agent_canon.sh pull
-bash scripts/sync_agent_canon.sh push
+bash tools/sync_agent_canon.sh status
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh pull
+bash tools/sync_agent_canon.sh push
 ```
 
 - `link-root`:
@@ -75,13 +75,13 @@ bash scripts/sync_agent_canon.sh push
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は repo-local implementation change と同じ PR に混ぜません。
 - PR 前の機械 gate は `make agent-canon-pr-check` を使います。
-- merge 後は `bash scripts/sync_agent_canon.sh push` で upstream `agent-canon` を更新します。
+- merge 後は `bash tools/sync_agent_canon.sh push` で upstream `agent-canon` を更新します。
 
 ## 完了条件
 
 次をすべて満たしたときだけ subtree 変更を完了扱いにします。
 
-- `bash scripts/sync_agent_canon.sh check` が pass
+- `bash tools/sync_agent_canon.sh check` が pass
 - `make agent-canon-pr-check` が pass
 - root 側の shared surface が構成どおりに再同期されている
 - template 側の PR merge 後に upstream `agent-canon` push を実行したか、未実行理由が明示されている
@@ -92,22 +92,22 @@ bash scripts/sync_agent_canon.sh push
 - `documents/WORKFLOW_GUIDE.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-pr-workflow.md`
-- `scripts/shared/error_handler.py`
-- `scripts/validation/triplet_validator.py`
-- `scripts/tools/audit_and_fix_links.py`
-- `scripts/tools/check_markdown_lint.py`
-- `scripts/tools/check_markdown_math.py`
-- `scripts/tools/mirror_skill_shims.py`
-- `scripts/agent_tools/bootstrap_agent_run.py`
-- `scripts/agent_tools/smoke_test_research_perspective_pack.py`
-- `scripts/agent_tools/validate_role_write_scope.py`
-- `scripts/agent_tools/agent_team.py`
-- `scripts/agent_tools/worktree_scope_lint.py`
-- `scripts/agent_tools/worktree_start.py`
-- `scripts/setup_worktree.sh`
-- `scripts/worktree_start.sh`
-- `scripts/tools/check_worktree_scopes.sh`
-- `scripts/tools/create_worktree.sh`
+- `tools/shared/error_handler.py`
+- `tools/validation/triplet_validator.py`
+- `tools/docs/audit_and_fix_links.py`
+- `tools/docs/check_markdown_lint.py`
+- `tools/docs/check_markdown_math.py`
+- `tools/docs/mirror_skill_shims.py`
+- `tools/agent_tools/bootstrap_agent_run.py`
+- `tools/agent_tools/smoke_test_research_perspective_pack.py`
+- `tools/agent_tools/validate_role_write_scope.py`
+- `tools/agent_tools/agent_team.py`
+- `tools/agent_tools/worktree_scope_lint.py`
+- `tools/agent_tools/worktree_start.py`
+- `tools/setup_worktree.sh`
+- `tools/worktree_start.sh`
+- `tools/docs/check_worktree_scopes.sh`
+- `tools/docs/create_worktree.sh`
 
 ## 5. wrapper の考え方
 
@@ -209,72 +209,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/tests/tools/test_mirror_skill_shims.py` への symlink view
 - `tests/tools/test_run_managed_experiment.py`
   - `vendor/agent-canon/tests/tools/test_run_managed_experiment.py` への symlink view
-- `scripts/agent_tools/`
-  - `vendor/agent-canon/scripts/agent_tools/` への symlink view
-- `scripts/check_convention_consistency.py`
-  - `vendor/agent-canon/scripts/check_convention_consistency.py` への symlink view
-- `scripts/check_doc_test_triplet.py`
-  - `vendor/agent-canon/scripts/check_doc_test_triplet.py` への symlink view
-- `scripts/docker_dependency_validator.py`
-  - `vendor/agent-canon/scripts/docker_dependency_validator.py` への symlink view
-- `scripts/requirement_sync_validator.py`
-  - `vendor/agent-canon/scripts/requirement_sync_validator.py` への symlink view
-- `scripts/run_comprehensive_review.sh`
-  - `vendor/agent-canon/scripts/run_comprehensive_review.sh` への symlink view
-- `scripts/ci/PRE_REVIEW_GUIDE.md`
-  - `vendor/agent-canon/scripts/ci/PRE_REVIEW_GUIDE.md` への symlink view
-- `scripts/ci/check_docker_build.sh`
-  - `vendor/agent-canon/scripts/ci/check_docker_build.sh` への symlink view
-- `scripts/ci/check_experiment_registry.py`
-  - `vendor/agent-canon/scripts/ci/check_experiment_registry.py` への symlink view
-- `scripts/ci/check_server_readiness.py`
-  - `vendor/agent-canon/scripts/ci/check_server_readiness.py` への symlink view
-- `scripts/ci/container_runtime.py`
-  - `vendor/agent-canon/scripts/ci/container_runtime.py` への symlink view
-- `scripts/ci/pre_review.sh`
-  - `vendor/agent-canon/scripts/ci/pre_review.sh` への symlink view
-- `scripts/ci/run_all_checks.sh`
-  - `vendor/agent-canon/scripts/ci/run_all_checks.sh` への symlink view
-- `scripts/ci/run_codex_in_repo_container.py`
-  - `vendor/agent-canon/scripts/ci/run_codex_in_repo_container.py` への symlink view
-- `scripts/ci/run_container_pack.py`
-  - `vendor/agent-canon/scripts/ci/run_container_pack.py` への symlink view
-- `scripts/ci/run_docs_checks.sh`
-  - `vendor/agent-canon/scripts/ci/run_docs_checks.sh` への symlink view
-- `scripts/ci/run_in_repo_container.py`
-  - `vendor/agent-canon/scripts/ci/run_in_repo_container.py` への symlink view
-- `scripts/ci/run_python_in_dockerfile.py`
-  - `vendor/agent-canon/scripts/ci/run_python_in_dockerfile.py` への symlink view
-- `scripts/experiments/create_experiment_topic.py`
-  - `vendor/agent-canon/scripts/experiments/create_experiment_topic.py` への symlink view
-- `scripts/experiments/registry_lib.py`
-  - `vendor/agent-canon/scripts/experiments/registry_lib.py` への symlink view
-- `scripts/experiments/run_managed_experiment.py`
-  - `vendor/agent-canon/scripts/experiments/run_managed_experiment.py` への symlink view
-- `scripts/experiments/sync_experiment_registry_context.py`
-  - `vendor/agent-canon/scripts/experiments/sync_experiment_registry_context.py` への symlink view
-- `scripts/setup_worktree.sh`
-  - `vendor/agent-canon/scripts/setup_worktree.sh` への symlink view
-- `scripts/shared/error_handler.py`
-  - `vendor/agent-canon/scripts/shared/error_handler.py` への symlink view
-- `scripts/sync_agent_canon.sh`
-  - `vendor/agent-canon/scripts/sync_agent_canon.sh` への symlink view
-- `scripts/tools/audit_and_fix_links.py`
-  - `vendor/agent-canon/scripts/tools/audit_and_fix_links.py` への symlink view
-- `scripts/tools/check_markdown_lint.py`
-  - `vendor/agent-canon/scripts/tools/check_markdown_lint.py` への symlink view
-- `scripts/tools/check_markdown_math.py`
-  - `vendor/agent-canon/scripts/tools/check_markdown_math.py` への symlink view
-- `scripts/worktree_start.sh`
-  - `vendor/agent-canon/scripts/worktree_start.sh` への symlink view
-- `scripts/tools/check_worktree_scopes.sh`
-  - `vendor/agent-canon/scripts/tools/check_worktree_scopes.sh` への symlink view
-- `scripts/tools/create_worktree.sh`
-  - `vendor/agent-canon/scripts/tools/create_worktree.sh` への symlink view
-- `scripts/tools/mirror_skill_shims.py`
-  - `vendor/agent-canon/scripts/tools/mirror_skill_shims.py` への symlink view
-- `scripts/validation/triplet_validator.py`
-  - `vendor/agent-canon/scripts/validation/triplet_validator.py` への symlink view
+- `tools/`
+  - `vendor/agent-canon/tools/` への symlink view
 - `.github/workflows/agent-coordination.yml`
   - `vendor/agent-canon/.github/workflows/agent-coordination.yml` から root へ同期する copy surface
 
@@ -298,8 +234,8 @@ root 側は次のような薄い wrapper と symlink view にします。
 ### 7.1 root symlink surface を修復
 
 ```bash
-bash scripts/sync_agent_canon.sh link-root
-bash scripts/sync_agent_canon.sh check
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
 ```
 
 ### 7.2 互換 alias
@@ -307,31 +243,31 @@ bash scripts/sync_agent_canon.sh check
 既存の `snapshot` command は後方互換のため `link-root` の alias として残します。
 
 ```bash
-bash scripts/sync_agent_canon.sh snapshot
+bash tools/sync_agent_canon.sh snapshot
 ```
 
 ### 7.3 初回取り込み
 
 ```bash
-bash scripts/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
+bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 ```
 
 ### 7.4 upstream から更新取得
 
 ```bash
-bash scripts/sync_agent_canon.sh pull
+bash tools/sync_agent_canon.sh pull
 ```
 
 ### 7.5 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 
 ```bash
-bash scripts/sync_agent_canon.sh push
+bash tools/sync_agent_canon.sh push
 ```
 
 ### 7.6 現在の設定確認
 
 ```bash
-bash scripts/sync_agent_canon.sh status
+bash tools/sync_agent_canon.sh status
 ```
 
 ## 8. 移行フェーズ
@@ -411,4 +347,4 @@ exit 条件:
 - [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/documents/WORKFLOW_GUIDE.md)
 - [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
 - [README.md](/mnt/l/workspace/project_template/vendor/README.md)
-- [sync_agent_canon.sh](/mnt/l/workspace/project_template/scripts/sync_agent_canon.sh)
+- [sync_agent_canon.sh](/mnt/l/workspace/project_template/tools/sync_agent_canon.sh)

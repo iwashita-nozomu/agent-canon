@@ -56,4 +56,4 @@ git push --mirror <mirror-remote>
 ## Related
 
 - `notes/knowledge/git_mirroring.md`
-- `scripts/push_origin.sh`
+- `tools/push_origin.sh`
