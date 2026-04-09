@@ -133,6 +133,7 @@ tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
+tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
 scripts/agent_tools:../${PREFIX}/scripts/agent_tools
 scripts/check_convention_consistency.py:../${PREFIX}/scripts/check_convention_consistency.py
 scripts/check_doc_test_triplet.py:../${PREFIX}/scripts/check_doc_test_triplet.py
@@ -154,6 +155,7 @@ scripts/ci/run_codex_in_repo_container.py:../../${PREFIX}/scripts/ci/run_codex_i
 scripts/ci/run_container_pack.py:../../${PREFIX}/scripts/ci/run_container_pack.py
 scripts/ci/run_docs_checks.sh:../../${PREFIX}/scripts/ci/run_docs_checks.sh
 scripts/ci/run_in_repo_container.py:../../${PREFIX}/scripts/ci/run_in_repo_container.py
+scripts/ci/run_repo_program.py:../../${PREFIX}/scripts/ci/run_repo_program.py
 scripts/ci/run_python_in_dockerfile.py:../../${PREFIX}/scripts/ci/run_python_in_dockerfile.py
 scripts/experiments/create_experiment_topic.py:../../${PREFIX}/scripts/experiments/create_experiment_topic.py
 scripts/experiments/registry_lib.py:../../${PREFIX}/scripts/experiments/registry_lib.py
