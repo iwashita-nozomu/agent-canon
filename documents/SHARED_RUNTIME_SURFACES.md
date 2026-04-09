@@ -98,6 +98,7 @@ root では次を symlink view として扱います。
 - `scripts/ci/check_merge_structure.py`
 - `scripts/ci/container_runtime.py`
 - `scripts/ci/pre_review.sh`
+- `scripts/ci/render_devcontainer_compose.py`
 - `scripts/ci/run_all_checks.sh`
 - `scripts/ci/run_codex_in_repo_container.py`
 - `scripts/ci/run_container_pack.py`

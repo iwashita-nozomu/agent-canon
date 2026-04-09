@@ -154,6 +154,7 @@ scripts/ci/check_server_readiness.py:../../${PREFIX}/scripts/ci/check_server_rea
 scripts/ci/check_merge_structure.py:../../${PREFIX}/scripts/ci/check_merge_structure.py
 scripts/ci/container_runtime.py:../../${PREFIX}/scripts/ci/container_runtime.py
 scripts/ci/pre_review.sh:../../${PREFIX}/scripts/ci/pre_review.sh
+scripts/ci/render_devcontainer_compose.py:../../${PREFIX}/scripts/ci/render_devcontainer_compose.py
 scripts/ci/run_all_checks.sh:../../${PREFIX}/scripts/ci/run_all_checks.sh
 scripts/ci/run_codex_in_repo_container.py:../../${PREFIX}/scripts/ci/run_codex_in_repo_container.py
 scripts/ci/run_container_pack.py:../../${PREFIX}/scripts/ci/run_container_pack.py

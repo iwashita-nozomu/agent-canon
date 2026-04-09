@@ -66,6 +66,38 @@ class ContainerPack:
     runtime: RuntimeSpec
 
 
+@dataclass(frozen=True)
+class HostRuntimeFeatures:
+    """Describe host-dependent runtime features shared across container entrypoints."""
+
+    has_gpu: bool
+    has_mnt_git: bool
+    has_host_codex_home: bool
+
+
+def detect_host_runtime_features() -> HostRuntimeFeatures:
+    """Detect host-dependent runtime features once."""
+    has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None
+    has_mnt_git = Path("/mnt/git").is_dir()
+    has_host_codex_home = HOST_CODEX_HOME.is_dir()
+    return HostRuntimeFeatures(
+        has_gpu=has_gpu,
+        has_mnt_git=has_mnt_git,
+        has_host_codex_home=has_host_codex_home,
+    )
+
+
+def default_host_mounts(*, auto_mount_host_codex_home: bool = True) -> tuple[str, ...]:
+    """Return host mounts that should appear in canonical container entrypoints."""
+    mounts: list[str] = []
+    features = detect_host_runtime_features()
+    if features.has_mnt_git:
+        mounts.append("/mnt/git:/mnt/git")
+    if auto_mount_host_codex_home and features.has_host_codex_home:
+        mounts.append(f"{HOST_CODEX_HOME}:/root/.codex")
+    return tuple(mounts)
+
+
 def workspace_path(path_like: str | Path) -> Path:
     """Resolve a workspace-relative path."""
     candidate = Path(path_like)
@@ -321,9 +353,8 @@ def build_run_command(
         run_command.extend(["--gpus", resolved_gpus])
 
     run_command.extend(["-v", f"{resolved_workspace}:{resolved_mount}"])
-    if auto_mount_host_codex_home and HOST_CODEX_HOME.is_dir() and not any(":/root/.codex" in mount for mount in combined_mounts):
-        run_command.extend(["-v", f"{HOST_CODEX_HOME}:/root/.codex"])
-    for mount in combined_mounts:
+    auto_mounts = default_host_mounts(auto_mount_host_codex_home=auto_mount_host_codex_home)
+    for mount in (*auto_mounts, *combined_mounts):
         run_command.extend(["-v", mount])
     for env_item in combined_env:
         run_command.extend(["-e", env_item])
