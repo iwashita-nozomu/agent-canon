@@ -160,7 +160,7 @@
           "decision_log"
         ],
         "requires_worktree_scope": true,
-        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must prefer extending existing code and mirroring existing style over introducing new patterns."
+        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code and mirror existing style before introducing any new pattern."
       }
     },
     {

@@ -14,4 +14,4 @@
 
 ## Conclusions
 
-<!-- Summarize what should influence the implementation. -->
+<!-- Summarize what must influence the implementation. -->

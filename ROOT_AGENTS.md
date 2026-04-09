@@ -33,12 +33,12 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 ## Shared Canon
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon, not in this wrapper.
-- role behavior, stage prohibitions, and review separation rules should live first in `.codex/agents/*.toml`; keep this file as a thin entrypoint
+- role behavior, stage prohibitions, and review separation rules は `.codex/agents/*.toml` を正本にします。この file は薄い entrypoint のまま保ちます
 - Repo-changing tasks follow the staged flow in `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
 - code-changing tasks add `test_designer` before implementation and fix nasty cases into tests in the same pass.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。
-- skill を user から指定するときは `$research-workflow` や `$paper-writing` のような `$skill-name` を優先します。
+- skill を user から指定するときは `$research-workflow` や `$paper-writing` のような `$skill-name` を使います。
 - Codex で planning を回すときは、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 - 標準 bundle の入口は次です。
@@ -53,8 +53,8 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
 
-- Long README, workflow, guide, and migration docs should use `agents/skills/long-form-writing.md` and require subagent review before closeout.
-- Academic papers, thesis chapters, scholarly notes, and symbol-dense claim-heavy documents should use `agents/skills/academic-writing.md` and require separate notation and logic reviewers before closeout.
+- Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。
+- Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
 - worktree で作業する場合は `bash scripts/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。

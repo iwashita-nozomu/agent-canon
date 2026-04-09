@@ -3,7 +3,7 @@
 この文書は、agent ごとの入口差分をまとめた正本です。
 共有ルールは `agents/` に寄せ、各 CLI では薄い入口だけを使います。
 
-## 共通原則
+## 共通ルール
 
 - repo root で起動する
 - まず `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` の対応入口を読む

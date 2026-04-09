@@ -3,7 +3,7 @@
 ## Purpose
 
 実験、調査、チューニング、比較検証をまとめて回しながら、改善 backlog を iteration 単位で潰していく outer loop を定めます。
-通常の実装 pass は waterfall のままにし、改善全体だけを agile に扱います。
+実装 pass は waterfall に固定し、改善全体だけを agile に扱います。
 
 ## Use When
 
@@ -49,4 +49,4 @@
 - 外部調査そのものは `literature-survey` を追加します。
 - 単一 run の実行と rerun 分岐だけなら `experiment-lifecycle` を使います。
 - 単一 run の実行と rerun 分岐は `experiment-lifecycle` を使います。
-- repo-wide な通常開発や feature delivery には使わず、`implementation-waterfall-workflow.md` を使います。
+- repo-wide な feature delivery には使わず、`implementation-waterfall-workflow.md` を使います。

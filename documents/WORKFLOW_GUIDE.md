@@ -80,7 +80,7 @@ make ci
 
 ### 1.5 包括的開発
 
-code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehensive Development` family を使います。背骨は通常の waterfall のままで、同一 worktree の writer は常に 1 人に固定します。
+code、docs、tools、runtime をまたぐ repo-wide な変更では、`Comprehensive Development` family を使います。背骨は waterfall に固定し、同一 worktree の writer は常に 1 人に固定します。
 
 ```bash
 python3 scripts/agent_tools/bootstrap_agent_run.py \

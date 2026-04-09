@@ -18,7 +18,7 @@
 
 ## Reuse-First Review
 
-<!-- Check whether the intake package identifies existing code and docs that implementation should follow. -->
+<!-- Check whether the intake package identifies existing code and docs that implementation must follow. -->
 
 ## Decision
 

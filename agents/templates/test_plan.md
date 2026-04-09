@@ -19,4 +19,4 @@
 
 ## Implementation Notes
 
-<!-- Record where the worker should add or extend tests while mirroring existing test style. -->
+<!-- Record where the worker must add or extend tests while mirroring existing test style. -->

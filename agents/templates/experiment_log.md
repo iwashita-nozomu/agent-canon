@@ -39,4 +39,4 @@
 
 ## Run Reflection
 
-<!-- Which commit, run directory, and execution context this run belongs to, and what should be reflected next. -->
+<!-- Which commit, run directory, and execution context this run belongs to, and what must be reflected next. -->

@@ -9,7 +9,7 @@
 - `AGENTS.md` や `CLAUDE.md` には長い skill 説明を複製しません。
 - `.agents/skills/` は Codex / Copilot の auto-discovery path です。
 - `.claude/skills/` は `.agents/skills/` から生成する Claude 互換 mirror です。
-- 人間が skill を明示する場合の第一推奨は plain text ではなく `$skill-name` です。
+- 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
 

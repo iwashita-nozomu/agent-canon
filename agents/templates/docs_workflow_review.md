@@ -6,7 +6,7 @@
 
 ## Canon And Adapter Findings
 
-<!-- Record duplication, stale wrapper text, and cases where settings should replace prose. -->
+<!-- Record duplication, stale wrapper text, and cases where settings must replace prose. -->
 
 ## Required Canon Updates
 

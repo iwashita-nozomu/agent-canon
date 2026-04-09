@@ -3,7 +3,7 @@
 このディレクトリは、repo におけるエージェント運用の人間向け正本ハブです。
 個別エージェント向けの runtime entrypoint は薄く保ち、詳細はここへ集約します。
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
-skill を user-facing に明示するときは `$skill-name` を第一推奨にします。
+skill を user-facing に明示するときは `$skill-name` を使います。
 
 ## 正本
 

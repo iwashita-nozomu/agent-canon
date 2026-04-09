@@ -28,7 +28,7 @@
 ## Check Selection
 
 - agent runtime、skill、mirror を触ったら `make agent-checks` を先に実行します。
-- 通常の code / docs 変更では、まず `make ci-quick` を基礎 gate にします。
+- code / docs 変更では、まず `make ci-quick` を基礎 gate にします。
 - Markdown 中心の変更では `make docs-check` を追加します。
 - Docker / runtime / dependency 変更では `make docker-build-check` を追加します。
 - 失敗が出た場合は、ad hoc にコマンドを増やす前に、どの gate が不足しているかを明示します。

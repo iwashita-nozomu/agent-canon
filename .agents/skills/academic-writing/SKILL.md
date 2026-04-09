@@ -6,7 +6,7 @@ description: Use when drafting a paper, thesis chapter, scholarly note, or other
 # Academic Writing
 
 1. Read `agents/skills/academic-writing.md`.
-1. In Codex, prefer `/collab` `Plan` mode before planning and use `/agent` to inspect available subagents when the runtime supports it.
+1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
 1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
 1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.
 1. Bootstrap a run bundle and explicitly enable `notation_definition_reviewer` and `logic_gap_reviewer`.

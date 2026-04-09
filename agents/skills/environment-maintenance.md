@@ -44,7 +44,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- repo-wide に必要な Python tool は、原則として `docker/requirements.txt` と `docker/Dockerfile` に載せます。
+- repo-wide に必要な Python tool は `docker/requirements.txt` と `docker/Dockerfile` の両方に載せます。
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
 - Docker 変更では `docker/Dockerfile` だけで閉じず、`docker/requirements.txt`、runtime pack、devcontainer、関連 README の要否を同じ pass で判定します。

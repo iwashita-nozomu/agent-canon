@@ -30,7 +30,7 @@
 - Is the baseline comparison on the same cases and conditions?
 - Does the abstract actually state the main result and its scope?
 - Does the Results section report observations before explanations?
-- Does the Discussion introduce new evidence that should have been in Results?
+- Does the Discussion introduce new evidence that had to be placed in Results?
 - Are axis names, units, and linear/log scale explicit on every key figure?
 - Does each major conclusion point to a supporting figure or table?
 - Was the dimension / level sweep contiguous, and if not, was the exception justified?

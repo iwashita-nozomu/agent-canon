@@ -71,7 +71,7 @@
 ## Minimal Skill Set
 
 Codex では、まず `agents/skills/README.md` から必要最小限の skill だけ選びます。
-user が skill を明示したい場合の第一推奨は `$skill-name` です。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
+user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 
 - repo 入口確認:

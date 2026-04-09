@@ -1,6 +1,6 @@
 ---
 name: adaptive-improvement-loop
-description: Use when experiments, research, tuning, and iterative code improvement should be managed as one backlog-driven agile outer loop.
+description: Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop.
 ---
 
 # Adaptive Improvement Loop

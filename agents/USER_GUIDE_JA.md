@@ -20,13 +20,13 @@
 
 - 共通 skill の正本は `.agents/skills/` にあります。
 - Claude では `.claude/skills/` の generated mirror を使います。正本は `.agents/skills/` です。
-- skill を明示したいときの第一推奨は `$skill-name` です。
+- skill を明示したいときは `$skill-name` を使います。
 - 例: `$repo-onboarding`、`$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
-- plain text で skill 名を書く運用もできますが、`$skill-name` の方を既定にします。
+- plain text で skill 名を書く運用もできますが、既定表記は `$skill-name` です。
 - どの skill を使うか迷う場合は、まず `repo-onboarding` か `codex-task-workflow` を見ます。
 - Codex で毎回同じ手順を踏みたい場合は `codex-task-workflow` を見ます。
 - Python 差分では `python-review` を既定で使います。
-- C / C++ 差分では `cpp-review` を既定候補にします。
+- C / C++ 差分では `cpp-review` を既定で使います。
 - 局所 diff を findings-first で見るときは `change-review` を使います。
 - Markdown 差分では `md-style-check` を使います。
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を使います。

@@ -27,7 +27,7 @@
 
 ## Existing Code And Docs To Follow
 
-<!-- Capture the local modules, tests, docs, and writing patterns that implementation should mimic or reuse. -->
+<!-- Capture the local modules, tests, docs, and writing patterns that implementation must mimic or reuse. -->
 
 ## Required Stage Agents
 

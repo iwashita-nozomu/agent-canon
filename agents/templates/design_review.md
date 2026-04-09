@@ -19,7 +19,7 @@
 
 ## Implementation Readiness Review
 
-<!-- Check whether the design is actually ready for implementation and should pass the most important pre-implementation gate. Top-down document readability is handled separately in document_flow_review.md. -->
+<!-- Check whether the design is actually ready for implementation and whether it passes the most important pre-implementation gate. Top-down document readability is handled separately in document_flow_review.md. -->
 
 ## Decision
 

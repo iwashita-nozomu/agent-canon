@@ -10,15 +10,15 @@
 
 ## Existing Code And Docs To Reuse
 
-<!-- List the local modules, helpers, tests, docs, and naming patterns that should be reused or mirrored. -->
+<!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->
 
 ## Patterns And Writing Style To Mirror
 
-<!-- Record the existing coding and documentation style that implementation should follow. -->
+<!-- Record the existing coding and documentation style that implementation must follow. -->
 
 ## Reader Path And Term Introduction
 
-<!-- Record the intended top-down reading order, which terms must be defined before use, and where the reader should reach the key decision points. -->
+<!-- Record the intended top-down reading order, which terms must be defined before use, and where the reader must reach the key decision points. -->
 
 ## File-By-File Design
 

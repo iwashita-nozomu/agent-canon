@@ -61,7 +61,7 @@
 
 ### Figures
 
-<!-- Each figure should state axis names, units, linear/log scale, and at least one sentence on how to read it. -->
+<!-- Each figure must state axis names, units, linear/log scale, and at least one sentence on how to read it. -->
 
 ## Discussion
 
