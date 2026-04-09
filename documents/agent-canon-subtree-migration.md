@@ -1,223 +1,97 @@
-# agent-canon subtree 移行計画
+# agent-canon subtree 構成
 
-この文書は、shared agent canon を別 repo `agent-canon` として切り出し、template root と派生 repo 側へ `git subtree` で取り込むための正本です。
-目的は、`git clone <template>` だけで新しい派生 repo を始められることを維持しながら、agent 運用の正本を upstream repo へ分離することです。
-この template ではすでに `vendor/agent-canon/` に committed snapshot を持ち、shared surface の大半を root symlink view に寄せています。
-将来的には experiment-oriented な agent set として `agent-canon` 単体で配布できるよう、実験運用の規約、review guide、validation / review runner、container runtime helper、registry tool、topic scaffold も shared canon 側へ寄せます。
+この文書は、`agent-canon` maintainer が subtree 構成を保守するときの正本です。
+template 利用者向けの短い説明は root 側の `documents/agent-canon-subtree-migration.md` を見ます。
 
-## 1. この構成を選ぶ理由
+## 目的
 
-- `git clone <template>` だけで新しい派生 repo を開始したい
-- template / 派生 repo 側の worktree に、その時点の agent canon snapshot を閉じ込めたい
-- template / 派生 repo 側で直した shared canon を、後から upstream `agent-canon` repo へ戻したい
-- Codex の runtime discovery は root `AGENTS.md` と root `.codex/` を前提にしたい
-- sibling repo 参照や手動コピーには依存したくない
+- `git clone <template>` 直後でも shared canon を使える状態を保つ
+- shared canon の source of truth を upstream `agent-canon` repo と `vendor/agent-canon/` snapshot に固定する
+- template root には runtime discovery に必要な surface だけを残す
+- template 利用者向けの入口文書は root regular file として残す
 
-この条件では、`submodule` より `subtree` の方が扱いやすく、repo 外参照より再現性が高いです。
+## 固定構成
 
-## 2. 非目標
+- upstream repo:
+  - `agent-canon`
+- template / 派生 repo 側の snapshot:
+  - `vendor/agent-canon/`
+- root 側の shared runtime surface:
+  - `documents/SHARED_RUNTIME_SURFACES.md` に載っている symlink view または synced copy
+- root 側の template entrypoint:
+  - `README.md`
+  - `QUICK_START.md`
+  - `documents/README.md`
+  - `documents/WORKFLOW_GUIDE.md`
+  - `scripts/README.md`
+  - `notes/README.md`
 
-- `agent-canon` を repo 外の sibling directory として自動 discovery させること
-- root `AGENTS.md` と root `.codex/` を無くすこと
-- branch を template variant ごとに長期運用すること
-- 一回の変更で template から agent 関連を全部剥がすこと
+## 所有境界
 
-## 3. 目標構成
+- `vendor/agent-canon/`:
+  - workflow canon
+  - skill canon
+  - subagent 定義
+  - shared notes template
+  - shared CI / review / runtime helper
+  - subtree / PR / shared surface ownership 文書
+- root 側:
+  - template 利用者向けの入口
+  - implementation 本体
+  - environment / server / template bootstrap
+  - repo-local experiment topic
+  - repo-local notes
 
-```text
-derived-repo/
-├─ AGENTS.md
-├─ CLAUDE.md
-├─ .github/
-│  ├─ AGENTS.md
-│  ├─ copilot-instructions.md
-│  └─ workflows/
-│     └─ agent-coordination.yml
-├─ .codex/
-│  ├─ config.toml
-│  └─ README.md
-├─ vendor/
-│  └─ agent-canon/
-│     ├─ agents/
-│     ├─ .agents/
-│     ├─ .claude/
-│     ├─ .codex/agents/
-│     └─ shared agent-facing docs
-├─ tests/
-│  ├─ agent_tools/
-│  └─ tools/
-│     └─ test_mirror_skill_shims.py
-├─ docker/
-├─ documents/
-│  ├─ BRANCH_SCOPE.md
-│  ├─ AGENTS_COORDINATION.md
-│  ├─ REVIEW_PROCESS.md
-│  ├─ SKILL_IMPLEMENTATION_GUIDE.md
-│  ├─ WORKTREE_SCOPE_TEMPLATE.md
-│  ├─ implementation-waterfall-workflow.md
-│  ├─ workflow-references.md
-│  └─ worktree-lifecycle.md
-├─ notes/
-│  └─ themes/
-│     └─ from_another_agent.md
-└─ scripts/
-   ├─ agent_tools/
-   ├─ ci/
-   │  ├─ pre_review.sh
-   │  ├─ run_all_checks.sh
-   │  ├─ run_docs_checks.sh
-   │  ├─ check_docker_build.sh
-   │  ├─ check_experiment_registry.py
-   │  ├─ run_container_pack.py
-   │  ├─ run_python_in_dockerfile.py
-   │  ├─ run_codex_in_repo_container.py
-   │  └─ check_server_readiness.py
-   ├─ check_doc_test_triplet.py
-   ├─ check_convention_consistency.py
-   ├─ docker_dependency_validator.py
-   ├─ requirement_sync_validator.py
-   ├─ run_comprehensive_review.sh
-   ├─ setup_worktree.sh
-   ├─ shared/
-   │  └─ error_handler.py
-   ├─ validation/
-   │  └─ triplet_validator.py
-   ├─ worktree_start.sh
-   └─ tools/
-      ├─ audit_and_fix_links.py
-      ├─ check_markdown_lint.py
-      ├─ check_markdown_math.py
-      ├─ check_worktree_scopes.sh
-      ├─ create_worktree.sh
-      └─ mirror_skill_shims.py
+## 編集ルール
+
+- shared canon を直すときは `vendor/agent-canon/` 側を編集します。
+- root 側の symlink view や synced copy を直接編集しません。
+- shared surface を増減したら、同じ pass で link spec と ownership 文書を更新します。
+- root 側の入口文書を変える場合でも、shared canon の説明は `agent-canon` 側の正本に寄せます。
+
+## 同期ルール
+
+template repo 側では次を使います。
+
+```bash
+bash scripts/sync_agent_canon.sh status
+bash scripts/sync_agent_canon.sh link-root
+bash scripts/sync_agent_canon.sh check
+bash scripts/sync_agent_canon.sh pull
+bash scripts/sync_agent_canon.sh push
 ```
 
-原則:
-- root `AGENTS.md` と root `.codex/` は template / 派生 repo の runtime entrypoint として残します
-- shared canon の実体は `vendor/agent-canon/` の subtree snapshot に寄せます
-- shared canon を root から使う surface は symlink view に寄せます
-- template / 派生 repo ごとに持つ README、Docker、CI、実装、server 運用文書は root 側に残します
+- `link-root`:
+  - root の symlink view と synced copy を vendor 正本から再構成する
+- `check`:
+  - root surface と vendor 正本の drift を検出する
+- `pull`:
+  - upstream `agent-canon` の更新を template 側 snapshot へ取り込む
+- `push`:
+  - template 側で育った shared canon を upstream `agent-canon` へ戻す
 
-## 4. 所有境界
+## PR ルール
 
-### 4.1 `agent-canon` へ移すもの
+- shared canon 変更は dedicated branch と dedicated PR に分けます。
+- shared canon 変更は repo-local implementation change と同じ PR に混ぜません。
+- PR 前の機械 gate は `make agent-canon-pr-check` を使います。
+- merge 後は `bash scripts/sync_agent_canon.sh push` で upstream `agent-canon` を更新します。
 
-shared canon の正本として扱う対象:
-- `agents/`
-- `.agents/`
-- `.claude/`
-- `ROOT_AGENTS.md`
-- `CLAUDE.md`
-- `.github/AGENTS.md`
-- `.github/copilot-instructions.md`
-- `.github/workflows/agent-coordination.yml`
-- `.codex/config.toml`
-- `.codex/README.md`
-- `.codex/agents/`
-- `documents/agent-canon-subtree-migration.md`
-- `documents/BRANCH_SCOPE.md`
-- `documents/AGENTS_COORDINATION.md`
-- `documents/REVIEW_PROCESS.md`
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
-- `documents/WORKFLOW_GUIDE.md`
-- `documents/WORKTREE_SCOPE_TEMPLATE.md`
-- `documents/coding-conventions-experiments.md`
-- `documents/experiment-critical-review.md`
-- `documents/experiment-registry.md`
-- `documents/experiment-report-style.md`
-- `documents/experiment-workflow.md`
-- `documents/experiment_runner.md`
-- `documents/implementation-waterfall-workflow.md`
-- `documents/research-workflow.md`
-- `documents/workflow-references.md`
-- `documents/worktree-lifecycle.md`
-- `documents/conventions/python/20_benchmark_policy.md`
-- `documents/conventions/python/30_experiment_directory_structure.md`
-- `experiments/README.md`
-- `experiments/_template/`
-- `experiments/report/README.md`
-- `notes/experiments/README.md`
-- `notes/experiments/REPORT_TEMPLATE.md`
-- `notes/experiments/results/README.md`
-- `notes/knowledge/benchmark_vs_experiment.md`
-- `notes/knowledge/experiment_directory_planning.md`
-- `notes/knowledge/experiment_operations.md`
-- `notes/themes/from_another_agent.md`
-- `notes/worktrees/README.md`
-- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- `tests/agent_tools/__init__.py`
-- `tests/agent_tools/test_check_agent_runtime_alignment.py`
-- `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
-- `tests/tools/test_mirror_skill_shims.py`
-- `tests/tools/test_run_managed_experiment.py`
-- `scripts/agent_tools/`
-- `scripts/check_convention_consistency.py`
-- `scripts/check_doc_test_triplet.py`
-- `scripts/docker_dependency_validator.py`
-- `scripts/requirement_sync_validator.py`
-- `scripts/run_comprehensive_review.sh`
-- `scripts/ci/PRE_REVIEW_GUIDE.md`
-- `scripts/ci/check_docker_build.sh`
-- `scripts/ci/check_experiment_registry.py`
-- `scripts/ci/check_server_readiness.py`
-- `scripts/ci/container_runtime.py`
-- `scripts/ci/pre_review.sh`
-- `scripts/ci/run_all_checks.sh`
-- `scripts/ci/run_codex_in_repo_container.py`
-- `scripts/ci/run_container_pack.py`
-- `scripts/ci/run_docs_checks.sh`
-- `scripts/ci/run_in_repo_container.py`
-- `scripts/ci/run_python_in_dockerfile.py`
-- `scripts/experiments/`
-- `scripts/setup_worktree.sh`
-- `scripts/shared/error_handler.py`
-- `scripts/sync_agent_canon.sh`
-- `scripts/tools/audit_and_fix_links.py`
-- `scripts/tools/check_markdown_lint.py`
-- `scripts/tools/check_markdown_math.py`
-- `scripts/worktree_start.sh`
-- `scripts/validation/triplet_validator.py`
-- `scripts/tools/check_worktree_scopes.sh`
-- `scripts/tools/create_worktree.sh`
-- `scripts/tools/mirror_skill_shims.py`
-- `vendor/agent-canon/AGENTS.md`
-- `vendor/agent-canon/README.md`
+## 完了条件
 
-### 4.2 template / instance 側に残すもの
+次をすべて満たしたときだけ subtree 変更を完了扱いにします。
+
+- `bash scripts/sync_agent_canon.sh check` が pass
+- `make agent-canon-pr-check` が pass
+- root 側の shared surface が構成どおりに再同期されている
+- template 側の PR merge 後に upstream `agent-canon` push を実行したか、未実行理由が明示されている
+
+## 参照先
 
 - `README.md`
-- `docker/`
-- `scripts/` のうち instance-local bootstrap / audit / security / exploratory / local convenience
-- template-default implementation と shared canon 以外の `python/`
-- `experiments/`
-- shared canon 以外の `notes/`
-- `documents/` のうち template / environment / server / experiment に閉じるもの
-
-補足:
-- `docker` 以外の全部を `agent-canon` へ移すわけではありません
-- implementation、experiment、server operation、generic template bootstrap は root 側に残します
-- root 側の `experiments/` では `registry.toml`、topic 固有ディレクトリ、run artifact だけを正本に残し、shared scaffold と運用 guide は `agent-canon` へ寄せます
-- root の `AGENTS.md`、`agents/`、`.agents/`、`.claude/`、`CLAUDE.md`、`.github/AGENTS.md`、`.github/copilot-instructions.md`、`.codex/config.toml`、`.codex/agents`、`.codex/README.md`、`documents/agent-canon-subtree-migration.md`、`documents/BRANCH_SCOPE.md`、`documents/AGENTS_COORDINATION.md`、`documents/REVIEW_PROCESS.md`、`documents/SHARED_RUNTIME_SURFACES.md`、`documents/SKILL_IMPLEMENTATION_GUIDE.md`、`documents/WORKFLOW_GUIDE.md`、`documents/WORKTREE_SCOPE_TEMPLATE.md`、`documents/coding-conventions-experiments.md`、`documents/experiment-critical-review.md`、`documents/experiment-registry.md`、`documents/experiment-report-style.md`、`documents/experiment-workflow.md`、`documents/experiment_runner.md`、`documents/implementation-waterfall-workflow.md`、`documents/research-workflow.md`、`documents/workflow-references.md`、`documents/worktree-lifecycle.md`、`documents/conventions/python/20_benchmark_policy.md`、`documents/conventions/python/30_experiment_directory_structure.md`、`experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`notes/experiments/README.md`、`notes/experiments/REPORT_TEMPLATE.md`、`notes/experiments/results/README.md`、`notes/knowledge/benchmark_vs_experiment.md`、`notes/knowledge/experiment_directory_planning.md`、`notes/knowledge/experiment_operations.md`、`notes/themes/from_another_agent.md`、`notes/worktrees/README.md`、`notes/worktrees/WORKTREE_LOG_TEMPLATE.md`、`tests/agent_tools/__init__.py`、`tests/agent_tools/test_smoke_test_research_perspective_pack.py`、`tests/tools/test_mirror_skill_shims.py`、`tests/tools/test_run_managed_experiment.py`、`scripts/agent_tools/`、`scripts/check_convention_consistency.py`、`scripts/check_doc_test_triplet.py`、`scripts/docker_dependency_validator.py`、`scripts/requirement_sync_validator.py`、`scripts/run_comprehensive_review.sh`、`scripts/ci/PRE_REVIEW_GUIDE.md`、`scripts/ci/check_docker_build.sh`、`scripts/ci/check_experiment_registry.py`、`scripts/ci/check_server_readiness.py`、`scripts/ci/container_runtime.py`、`scripts/ci/pre_review.sh`、`scripts/ci/run_all_checks.sh`、`scripts/ci/run_codex_in_repo_container.py`、`scripts/ci/run_container_pack.py`、`scripts/ci/run_docs_checks.sh`、`scripts/ci/run_in_repo_container.py`、`scripts/ci/run_python_in_dockerfile.py`、`scripts/experiments/` 配下の helper、`scripts/setup_worktree.sh`、`scripts/shared/error_handler.py`、`scripts/sync_agent_canon.sh`、`scripts/worktree_start.sh`、`scripts/tools/audit_and_fix_links.py`、`scripts/tools/check_markdown_lint.py`、`scripts/tools/check_markdown_math.py`、`scripts/tools/check_worktree_scopes.sh`、`scripts/tools/create_worktree.sh`、`scripts/tools/mirror_skill_shims.py`、`scripts/validation/triplet_validator.py` は shared canon への symlink view にします
-- `.github/workflows/agent-coordination.yml` は shared canon 正本から root へ同期する copy surface にします
-
-### 4.3 vendor-aware 化が必要な support surface
-
-shared canon を vendor 正本へ寄せても、root path はそのまま使えるようにします。
-この template では次を root symlink view にしたので、呼び出し側の path は変えずに済みます。
-
-- `scripts/check_convention_consistency.py`
-- `scripts/check_doc_test_triplet.py`
-- `scripts/docker_dependency_validator.py`
-- `scripts/ci/pre_review.sh`
-- `scripts/ci/run_all_checks.sh`
-- `scripts/ci/run_docs_checks.sh`
-- `scripts/ci/check_docker_build.sh`
-- `scripts/ci/run_container_pack.py`
-- `scripts/ci/run_python_in_dockerfile.py`
-- `scripts/ci/run_codex_in_repo_container.py`
-- `scripts/ci/check_server_readiness.py`
-- `scripts/run_comprehensive_review.sh`
+- `documents/WORKFLOW_GUIDE.md`
+- `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/agent-canon-pr-workflow.md`
 - `scripts/shared/error_handler.py`
 - `scripts/validation/triplet_validator.py`
 - `scripts/tools/audit_and_fix_links.py`

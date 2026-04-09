@@ -19,8 +19,6 @@ root では次を symlink view として扱います。
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents`
-- `documents/agent-canon-subtree-migration.md`
-- `documents/agent-canon-pr-workflow.md`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/academic-writing-workflow.md`
@@ -28,9 +26,7 @@ root では次を symlink view として扱います。
 - `documents/notes-lifecycle.md`
 - `documents/paper-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
-- `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
-- `documents/WORKFLOW_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/coding-conventions-experiments.md`
 - `documents/experiment-critical-review.md`
@@ -52,7 +48,6 @@ root では次を symlink view として扱います。
 - `notes/experiments/README.md`
 - `notes/experiments/REPORT_TEMPLATE.md`
 - `notes/experiments/results/README.md`
-- `notes/README.md`
 - `notes/branches/README.md`
 - `notes/branches/BRANCH_NOTE_TEMPLATE.md`
 - `notes/failures/README.md`

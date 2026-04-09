@@ -69,8 +69,6 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .codex/agents:../${PREFIX}/.codex/agents
 .github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
-documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-subtree-migration.md
-documents/agent-canon-pr-workflow.md:../${PREFIX}/documents/agent-canon-pr-workflow.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
@@ -78,9 +76,7 @@ documents/adaptive-improvement-workflow.md:../${PREFIX}/documents/adaptive-impro
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/paper-writing-workflow.md:../${PREFIX}/documents/paper-writing-workflow.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
-documents/SHARED_RUNTIME_SURFACES.md:../${PREFIX}/documents/SHARED_RUNTIME_SURFACES.md
 documents/SKILL_IMPLEMENTATION_GUIDE.md:../${PREFIX}/documents/SKILL_IMPLEMENTATION_GUIDE.md
-documents/WORKFLOW_GUIDE.md:../${PREFIX}/documents/WORKFLOW_GUIDE.md
 documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPLATE.md
 documents/coding-conventions-experiments.md:../${PREFIX}/documents/coding-conventions-experiments.md
 documents/experiment-critical-review.md:../${PREFIX}/documents/experiment-critical-review.md
@@ -102,7 +98,6 @@ experiments/report/README.md:../../${PREFIX}/experiments/report/README.md
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
-notes/README.md:../${PREFIX}/notes/README.md
 notes/branches/README.md:../../${PREFIX}/notes/branches/README.md
 notes/branches/BRANCH_NOTE_TEMPLATE.md:../../${PREFIX}/notes/branches/BRANCH_NOTE_TEMPLATE.md
 notes/failures/README.md:../../${PREFIX}/notes/failures/README.md
