@@ -13,6 +13,10 @@
 
 <!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
 
+## User Request Trace Review
+
+<!-- Record whether the diff satisfies the declared clause IDs and whether it drifted into work the user did not request. -->
+
 ## Revision Loop
 
 <!-- Record what the implementer must revise before the next checkpoint review. -->

@@ -9,6 +9,14 @@
 
 <!-- Rewrite the user's request in concrete, implementation-facing language. -->
 
+## Atomic User Request Clauses
+
+<!-- Split the user request into clause IDs that will be tracked in user_request_contract.md. -->
+
+## Must-Not-Do Drift
+
+<!-- Record forbidden drift, explicit exclusions, and work the user did not ask for. -->
+
 ## Routing Declaration
 
 <!-- Record workflow=<family>, skills=<...>, review=<...> as they were declared in the first work update. -->

@@ -21,6 +21,7 @@
 - `notes/worktrees/README.md`
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `notes/branches/README.md`
+- `reports/agents/<run-id>/user_request_contract.md`
 - `scripts/setup_worktree.sh`
 - `scripts/worktree_start.sh`
 - `scripts/agent_tools/worktree_start.py`
@@ -32,6 +33,7 @@
 
 - `WORKTREE_SCOPE.md` が current state に合わせて埋まっている
 - action log の path が決まり、最初の kickoff entry が残っている
+- user request contract の path が決まり、action log から clause ID を辿れる
 - 必要なら branch summary の path が決まり、handoff 先をそこから辿れる
 - 初期状態の `git` / worktree チェック結果と次の一手が残っている
 - `python3 scripts/agent_tools/work_log.py ...` で継続ログを追記できる
@@ -43,6 +45,7 @@
 - `Required References Before Editing` に broad directory 名ではなく concrete file や確認対象 command を書く
 - `Main Carry-Over Targets` と `Working Notes During Execution` に action log path、branch summary path、主な result の置き場を書く
 - `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` の path を決め、最初の kickoff entry を追記する
+- `reports/agents/<run-id>/user_request_contract.md` の path を決め、最初の action がどの clause ID を処理するか固定する
 - この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch` と必要なら `scope_file` / `active_worktree` を更新する
 - branch が複数 session 続く、または handoff する場合は `notes/branches/<branch_topic>.md` を作るか更新する
 - この branch で必要な pre-commit check を `WORKTREE_SCOPE.md` に固定する
@@ -59,7 +62,7 @@
 1. `documents/WORKTREE_SCOPE_TEMPLATE.md` を基に `WORKTREE_SCOPE.md` を current state へ合わせて更新し、`python3 scripts/agent_tools/worktree_scope_lint.py --current` で placeholder や stale field を確認します。
 1. experiment topic を持つ branch なら `experiments/registry.toml` の entry を見て、`active_branch`、必要なら `active_worktree` と `scope_file` を current state に合わせます。
 1. `notes/worktrees/WORKTREE_LOG_TEMPLATE.md` を基に action log を作るか更新し、最初の kickoff entry を書きます。
-1. 以後の継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` を既定にします。
+1. 以後の継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
 1. `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で避けるべき既知 pattern を拾います。
 1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash scripts/tools/check_worktree_scopes.sh` を実行します。
 1. 次の一手と carry-over 先を action log に書いてから編集を始めます。
@@ -71,7 +74,7 @@
 - `python3 scripts/agent_tools/worktree_scope_lint.py --current`
 - `python3 scripts/experiments/sync_experiment_registry_context.py --topic <topic> --branch <branch>`
 - `cp notes/worktrees/WORKTREE_LOG_TEMPLATE.md notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
-- `python3 scripts/agent_tools/work_log.py --kind edit --message "..." --next "..."`
+- `python3 scripts/agent_tools/work_log.py --kind edit --request-clause-id R1 --message "..." --next "..."`
 - `git status --short --branch`
 - `git worktree list --porcelain`
 - `bash scripts/tools/check_worktree_scopes.sh`

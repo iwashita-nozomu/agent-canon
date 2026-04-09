@@ -53,6 +53,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn("SUGGESTED_SKILLS=$codex-task-workflow,$comprehensive-development", result.stdout)
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
+            self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
+            self.assertIn("REQUEST_CONTRACT=", result.stdout)
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
 
@@ -176,6 +178,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
             (report_dir / "closeout_gate.md").write_text(
                 "\n".join(
                     [
@@ -185,6 +201,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
+                        "- request_contract_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -209,6 +226,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
 
 
 if __name__ == "__main__":

@@ -64,13 +64,17 @@ def main() -> int:
 
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"
+    request_contract_path = report_dir / "user_request_contract.md"
     if not verification_path.is_file():
         raise SystemExit(f"verification.txt not found: {verification_path}")
     if not closeout_path.is_file():
         raise SystemExit(f"closeout_gate.md not found: {closeout_path}")
+    if not request_contract_path.is_file():
+        raise SystemExit(f"user_request_contract.md not found: {request_contract_path}")
 
     verification = parse_kv_lines(verification_path)
     closeout = parse_markdown_status(closeout_path)
+    request_contract = parse_markdown_status(request_contract_path)
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -79,6 +83,9 @@ def main() -> int:
         "closeout_auditor_status": closeout.get("auditor_status") == "resolved",
         "required_reviews_complete": closeout.get("required_reviews_complete") == "yes",
         "validation_complete": closeout.get("validation_complete") == "yes",
+        "request_contract_complete": closeout.get("request_contract_complete") == "yes",
+        "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
+        "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -92,6 +99,10 @@ def main() -> int:
     print(f"CLOSEOUT_AUDITOR_STATUS={closeout.get('auditor_status', '')}")
     print(f"REQUIRED_REVIEWS_COMPLETE={closeout.get('required_reviews_complete', '')}")
     print(f"VALIDATION_COMPLETE={closeout.get('validation_complete', '')}")
+    print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
+    print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
+    print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")
+    print(f"UNRESOLVED_CLAUSE_IDS={request_contract.get('unresolved_clause_ids', '')}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

@@ -22,7 +22,8 @@
 
 - [WORKTREE_SCOPE_TEMPLATE.md](/mnt/l/workspace/project_template/documents/WORKTREE_SCOPE_TEMPLATE.md) を基に、worktree root の `WORKTREE_SCOPE.md` を current state へ合わせます。
 - [WORKTREE_LOG_TEMPLATE.md](/mnt/l/workspace/project_template/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
-- 継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` を既定にします。
+- 継続ログは `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
+- kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。
 - この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch`、必要なら `active_worktree` と `scope_file` を合わせます。
 - branch が複数 session 続く、または handoff 前提なら `notes/branches/` に summary を置きます。
 - `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で踏みやすい avoid pattern と既知 failure を確認します。
@@ -40,6 +41,7 @@
 - worktree root には必要に応じて `WORKTREE_SCOPE.md` を置き、テンプレートは [WORKTREE_SCOPE_TEMPLATE.md](/mnt/l/workspace/project_template/documents/WORKTREE_SCOPE_TEMPLATE.md) を使います。
 - branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](/mnt/l/workspace/project_template/documents/BRANCH_SCOPE.md) と `notes/branches/` を使います。
 - 例外運用中の action log は kickoff から `notes/worktrees/` に残します。
+- action log の各 entry には、いま処理している `request_clause_ids=` を残します。
 - scope が途中で変わったら、追加編集の前に `WORKTREE_SCOPE.md` と action log を更新します。
 - runtime output は `WORKTREE_SCOPE.md` に書いた場所へ限定します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。

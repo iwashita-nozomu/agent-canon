@@ -15,6 +15,7 @@
 - Scope refreshed at:
 - Action log path:
 - Branch summary path:
+- User request contract path:
 - Kickoff checks completed:
 - Next step after kickoff:
 
@@ -68,8 +69,9 @@
 - Action log path: `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
 - Experiment memo path: `notes/experiments/<topic>.md`
 - Branch summary path: `notes/branches/<branch_topic>.md`
+- User request contract path: `reports/agents/<run-id>/user_request_contract.md`
 - Note template: `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- Append command: `python3 scripts/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"`
+- Append command: `python3 scripts/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
 - worktree 内でも、最終配置と同じ相対パスで下書きする
 
 ## Required Checks Before Commit
@@ -84,6 +86,6 @@
 - ここに、この worktree 固有の制約を書きます。
 - 例: テストは触らない、結果 JSON は commit しない、runner だけ変更する、など。
 - 例: 変更した Markdown は `.markdownlint.json` を基準に確認する。
-- 例: scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次追記する。
+- 例: scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次追記する。各 entry には `request_clause_ids=` を入れる。
 - 例: closeout 前に `documents/notes-lifecycle.md` を見て、knowledge/theme/failure へ昇格させる項目を決める。
 - 例: branch が複数 session 続く場合は `notes/branches/<branch_topic>.md` を維持する。

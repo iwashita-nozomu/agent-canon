@@ -120,6 +120,7 @@ user が skill を明示したい場合は `$skill-name` を使います。例: 
 
 - context sweep と library sweep を先に行う
 - 変更対象と acceptance criteria を短く固定する
+- `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
 - durable な user preference を観測したら、その場で `python3 scripts/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
@@ -205,6 +206,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 `--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
 language-specific reviewer は task catalog に固定せず、`bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
+run bundle を起こしたら、`intent_brief.md` だけで進めず、`user_request_contract.md` を planning 前に埋めます。stage artifact、handoff、review では clause ID を明示します。
 
 包括的開発の固定 Codex stack:
 
@@ -258,7 +260,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - repo に残す差分がある task では、validation 後に commit を作る
 - user が明示的に止めていなければ、final report の前に branch を push する
-- user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出さない
+- user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
 - closeout 前に `notes/themes/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
@@ -278,6 +280,6 @@ cost を無視して review coverage を優先する run では、research-drive
 - 複数 writer を要する場合は、同一 worktree ではなく複数 worktree に分ける
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
-- `verification.txt` と `closeout_gate.md` が close 条件を満たすまで user-facing completion を返さない
+- `verification.txt`、`closeout_gate.md`、`user_request_contract.md` が close 条件を満たすまで user-facing completion を返さない
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈にだけ依存する運用は repo 正本にしない

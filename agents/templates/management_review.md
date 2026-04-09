@@ -8,6 +8,10 @@
 
 <!-- Check whether user intent, acceptance criteria, and scope are concrete enough. -->
 
+## User Request Coverage Review
+
+<!-- Check whether user_request_contract.md captures every must-do, must-not-do, and completion-evidence clause without silent drops. -->
+
 ## Routing Review
 
 <!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. -->

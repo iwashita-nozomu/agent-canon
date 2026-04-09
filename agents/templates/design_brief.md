@@ -20,6 +20,10 @@
 
 <!-- Record the intended top-down reading order, which terms must be defined before use, and where the reader must reach the key decision points. -->
 
+## Request Clause Mapping
+
+<!-- Record which user-request clause IDs this design satisfies and which clause IDs remain outside this pass. -->
+
 ## File-By-File Design
 
 <!-- Describe the planned file edits, boundaries, interfaces, and expected diff shape in detail. -->

@@ -31,6 +31,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
 - durable な user preference を観測したら `python3 scripts/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `notes/themes/USER_PREFERENCES.md` へ追記します。
+- repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
 
 ## Shared Canon
 
@@ -55,6 +56,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
 - `notes/themes/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
+- user request clause を持たない planning、design、implementation、review は無効です。active work は必ず clause ID に結び付けます。
 
 - Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
@@ -65,6 +67,7 @@ python3 scripts/agent_tools/bootstrap_agent_run.py \
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` に従い、integration worktree 上で `python3 scripts/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/` への昇格先を決めます。
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
+- user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - If a shared surface drifts, repair it with `bash scripts/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.

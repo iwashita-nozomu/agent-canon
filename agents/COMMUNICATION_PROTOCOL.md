@@ -22,6 +22,7 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `from`
 - `to`
 - `stage`
+- `request_clause_ids`
 - `summary`
 - `requested_action`
 - `artifacts`
@@ -31,6 +32,7 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 
 ## Review Packet
 
+- `request_clause_ids`
 - `finding`
 - `severity`
 - `required_change`

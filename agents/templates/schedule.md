@@ -9,6 +9,11 @@
 | Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |
 | ----- | ----------- | ------------ | ------ | ------------- | ------ |
 
+## Clause Coverage
+
+| Clause ID | Covered By Stage | Review Gate | Status |
+| --------- | ---------------- | ----------- | ------ |
+
 ## Explicit Subagents
 
 <!-- Record the concrete Codex / Claude subagents or permanent team roles used for each stage. -->

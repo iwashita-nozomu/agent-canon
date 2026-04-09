@@ -174,10 +174,13 @@ def main() -> int:
         f"skills={','.join(selected_skills) or '-'}, "
         f"review={','.join(review_roles) or '-'}"
     )
+    request_contract_path = report_dir / "user_request_contract.md"
 
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    print(f"REQUEST_CONTRACT={request_contract_path}")
+    print("REQUEST_CONTRACT_REQUIRED=yes")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"WORKFLOW_FAMILY={workflow_family_id}")

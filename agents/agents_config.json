@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "scripts/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, and escalation. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -17,6 +17,7 @@
       "owns": [
         "user_intent_capture",
         "acceptance_criteria",
+        "user_request_traceability",
         "ambiguity_tracking",
         "context_sweep",
         "library_sweep",
@@ -31,6 +32,7 @@
       ],
       "required_outputs": [
         "intent_brief.md",
+        "user_request_contract.md",
         "team_manifest.yaml",
         "decision_log.md"
       ],
@@ -38,10 +40,11 @@
         "mode": "artifacts_only",
         "allowed_artifacts": [
           "intent_brief",
+          "user_request_contract",
           "decision_log",
           "team_manifest"
         ],
-        "notes": "The manager records intake, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
+        "notes": "The manager records intake, user request clauses, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
       }
     },
     {
@@ -1514,6 +1517,7 @@
   ],
   "artifacts": {
     "intent_brief": "intent_brief.md",
+    "user_request_contract": "user_request_contract.md",
     "decision_log": "decision_log.md",
     "team_manifest": "team_manifest.yaml",
     "management_review": "management_review.md",

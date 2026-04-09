@@ -10,6 +10,7 @@
 - auditor_status: pending
 - required_reviews_complete: no
 - validation_complete: no
+- request_contract_complete: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -22,6 +23,7 @@
 - auditor_status: resolved
 - required_reviews_complete: yes
 - validation_complete: yes
+- request_contract_complete: yes
 - commit_created: yes
 - push_completed: yes
 

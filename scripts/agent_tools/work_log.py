@@ -18,6 +18,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--message", required=True, help="What happened in this step.")
     parser.add_argument("--next", default="", help="Explicit next step.")
     parser.add_argument(
+        "--request-clause-id",
+        action="append",
+        default=[],
+        help="User request clause id covered by this log entry. Repeat to add multiple ids.",
+    )
+    parser.add_argument(
         "--ref",
         action="append",
         default=[],
@@ -37,15 +43,18 @@ def main() -> int:
     action_log_path = resolve_action_log_path(workspace_root, scope_path)
     if action_log_path is None:
         raise SystemExit("Action log path is unresolved in WORKTREE_SCOPE.md")
+    if not args.request_clause_id:
+        raise SystemExit("At least one --request-clause-id is required.")
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
+    clause_suffix = " | request_clause_ids: " + ",".join(args.request_clause_id)
     ref_suffix = ""
     if args.ref:
         ref_suffix = " | refs: " + ", ".join(args.ref)
     next_suffix = ""
     if args.next:
         next_suffix = f" | next: {args.next}"
-    entry = f"`{timestamp} | {args.kind} | {args.message}{ref_suffix}{next_suffix}`"
+    entry = f"`{timestamp} | {args.kind} | {args.message}{clause_suffix}{ref_suffix}{next_suffix}`"
     append_action_log_entry(action_log_path, entry)
     print(f"ACTION_LOG={action_log_path}")
     print(entry)
