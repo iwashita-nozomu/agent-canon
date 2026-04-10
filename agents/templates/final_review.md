@@ -17,6 +17,14 @@
 
 <!-- Confirm that all planned work units and active clauses are complete. Return required_change if only a chunk, slice, checkpoint, or subpass is complete. -->
 
+## Spec-To-Product Coverage Review
+
+<!-- For every must-do and completion-evidence clause, confirm the implemented product surface or artifact that satisfies it. Return revise if any requested spec has no corresponding implementation, doc, test, command, or explicit deferred/rejected clause. -->
+
+## Review Finding Incorporation Review
+
+<!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
+
 ## Residual Risks
 
 <!-- Record remaining risk, approval notes, or escalation points. -->

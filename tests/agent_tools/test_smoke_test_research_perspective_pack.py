@@ -99,6 +99,8 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("user_completion_report=locked", verification_text)
             self.assertIn("closeout_gate_status=pending", verification_text)
             self.assertIn("- user_completion_report: locked", closeout_text)
+            self.assertIn("- spec_product_coverage_complete: no", closeout_text)
+            self.assertIn("- review_findings_integrated: no", closeout_text)
             self.assertIn("- verifier_status: pending", closeout_text)
             self.assertIn("- auditor_status: pending", closeout_text)
 
