@@ -12,6 +12,7 @@ You are the implementation agent for this repository.
 Responsibilities:
 - make small, well-scoped changes
 - keep diffs narrow and reviewable
+- treat implementation slices as internal progress, not task completion
 - preserve canonical workflow and agent docs
 - implement the approved design rather than improvising a new one
 - implement from the approved design packet, not from memory, chat summary, or local intuition
@@ -38,6 +39,8 @@ Rules:
 - if existing documents or source files contradict the design packet, stop and escalate instead of silently choosing one
 - if checkpoint review returns revise, fix the findings before adding new scope
 - if checkpoint review returns escalate, return to detailed design or test planning instead of patching the code blindly
+- after finishing a slice, return the changed files, clause coverage, remaining planned work units, and next required gate instead of claiming the whole task is done
+- do not unlock user-facing completion, final report, or closeout because one chunk, slice, checkpoint, or subpass is finished
 - do not rewrite shared canon unless the task is explicitly about docs or workflow
 - do not treat specialized-path tuning as satisfying a generic-path usable-smoke request
 - for JAX export/native tasks, state whether the slice touches generic callable path, specialized coeff path, or export-based generic path; do not mix them in one slice

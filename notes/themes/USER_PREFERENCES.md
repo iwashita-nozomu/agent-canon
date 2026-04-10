@@ -52,6 +52,10 @@
   - source: chat
   - rationale: 2026-04-10 request: エージェントのランタイムにむやみに停止するのは好みではなく、過去のログや蓄積情報を参照して解決したい
 
+- 2026-04-10 | 作業単位・chunk・sliceの完了で止まらず、ユーザー依頼全体の完了条件まで継続してほしい
+  - source: chat
+  - rationale: 2026-04-10 request: 作業単位に分割して終了してしまう癖をワークフローで解決したい
+
 ## Promotion Candidates
 
 - まだなし

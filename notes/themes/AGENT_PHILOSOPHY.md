@@ -65,6 +65,12 @@
   - confidence: likely
   - evidence: 2026-04-10 request to delegate possible work to Codex Spark because rate limits are strict
 
+- 2026-04-10 | work-principle | chunks, slices, checkpoints, and subpasses are internal progress; user-facing completion waits for all planned work units, active clauses, final review, validation, closeout gate, commit, and push
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to fix the habit of stopping after work-unit decomposition
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

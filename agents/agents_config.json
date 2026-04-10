@@ -993,7 +993,7 @@
     {
       "from": "implementer",
       "to": "change_reviewer",
-      "gate": "one implementation chunk is ready"
+      "gate": "one implementation chunk is ready for checkpoint review, not user-facing completion"
     },
     {
       "from": "implementer",

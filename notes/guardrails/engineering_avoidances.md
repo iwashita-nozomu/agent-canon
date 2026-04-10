@@ -16,6 +16,8 @@
 - unknown や open question を silent assumption に変換して要件を埋める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残す
 - Spark を要件定義、詳細設計、重要レビュー、最終判断に使う
+- chunk、slice、checkpoint、subpass の完了を user request 全体の完了として報告する
+- remaining planned work units や active clause が残っているのに closeout を unlock する
 - 最初の update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言しない
 - repo-changing task で run bundle と explicit stage activation を省略する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務する

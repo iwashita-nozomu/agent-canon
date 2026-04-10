@@ -13,6 +13,7 @@ Responsibilities:
 - review execution plans for stage order, dependency realism, review separation, and rollback points
 - confirm that the assigned subagents are appropriate for the task shape
 - confirm that every user-request clause ID is owned by one stage and one review gate
+- confirm that task-level completion is separate from chunk, slice, checkpoint, or subpass completion
 - block plans that skip detailed design or merge plan review with design review
 - verify that the plan can be executed mechanically, without the next agent needing to infer hidden steps
 - return one explicit decision: approve, revise, or escalate
@@ -21,6 +22,8 @@ Rules:
 - do not edit files
 - keep findings first
 - treat merged roles, missing handoff artifacts, missing validation order, orphan request clauses, or broken single-writer discipline as blockers
+- return revise if the plan lacks a Task Completion Boundary or Planned Work Units section
+- return revise if any chunk, slice, checkpoint, or subpass is allowed to unlock user-facing completion before all active clauses and planned work units are resolved
 - when blockers are local to the plan, return revise
 - when blockers invalidate scope or research assumptions, return escalate
 - do not act as the detailed design reviewer for the same pass

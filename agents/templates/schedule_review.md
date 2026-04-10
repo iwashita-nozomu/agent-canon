@@ -16,6 +16,10 @@
 
 <!-- Check that the chosen subagents are appropriate for requirements, research, planning, design, and implementation. -->
 
+## Completion Boundary Review
+
+<!-- Check that the schedule separates task-level completion from chunks, slices, checkpoints, and subpasses. Return revise if user-facing completion can unlock before all active clauses and planned work units are resolved. -->
+
 ## Risks
 
 <!-- Note schedule risks or sequencing issues. -->

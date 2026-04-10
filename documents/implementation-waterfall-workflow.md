@@ -469,6 +469,7 @@ exit 条件:
 - bounded な切り出しだけを `worker` に渡す
 
 ルール:
+- chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Implementation Source Packet` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、実装 summary に読んだ design artifact と section を残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
 - design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
@@ -484,11 +485,15 @@ exit 条件:
 - approved design または局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を worker が作りません
 - strictly local な一時変数名だけは、隣接コードの明白な pattern を mirror し、reusable API、file path、test name、user-facing surface に出ない場合に限って worker が決められます
 - naming gap を見つけたら、実装で埋めずに Gate 5-6 へ戻します
+- 実装 slice が終わったら、changed files、clause coverage、remaining planned work units、next required gate を記録して次段へ進みます
+- 予定 work unit や active clause が残っている場合は、実装完了ではなく次の work unit へ進みます
 
 必須レビュー:
 - `change_reviewer`
   - 各 changed slice が design artifact、design section、source packet entry、test plan item、request clause ID を引用しているか確認する
   - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
+  - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
+  - remaining planned work units と next required gate が実装 handoff に残っているか確認する
   - implementation checkpoint review として、構造、境界、明白な回帰、設計逸脱を早期に確認する
   - `Large Delivery` では chunk ごとに最低 1 回
   - `Platform And Environment` では rollout 影響が見える時点で最低 1 回
@@ -496,6 +501,7 @@ exit 条件:
 exit 条件:
 - 差分が requirements / plan / design に一致している
 - 各 changed slice が design artifact、design section、test plan item、request clause ID を引用している
+- remaining planned work units がない、または次の work unit と gate が明記されている
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate implementation"` が pass している
@@ -558,6 +564,7 @@ exit 条件:
 - commit / push の成否確認
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
+- `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 
 必須レビュー:
@@ -568,6 +575,7 @@ exit 条件:
 - auditor review が `resolved` になっている
 - verifier が gate を閉じている
 - user-facing completion report の unlock 条件が `closeout_gate.md` に記録されている
+- chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
 - user request clause の未解決がない
 
 ## 5. 差し戻しルール
@@ -613,8 +621,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 ### Large Delivery
 
 - `scheduler` が chunk を先に固定します
-- 各 chunk は独立した waterfall pass として閉じます
-- chunk 間の横断変更は、次 chunk の Gate 1 に持ち越します
+- 各 chunk は checkpoint review までを独立 subpass として閉じます
+- chunk completion は user-facing completion ではありません
+- chunk 間の横断変更は、umbrella pass の completion boundary に残し、必要なら次 chunk の Gate 1 に持ち越します
 - 各 chunk の前に詳細設計文書を起こし、詳細設計レビューを通します
 - 各 chunk で checkpoint review を複数回に増やして構いません
 

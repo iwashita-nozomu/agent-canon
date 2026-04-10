@@ -63,6 +63,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
+- chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
+- user-facing completion は、全 active clause、全 planned work unit、final review、validation、closeout gate、commit / push が揃ったときだけ返します
 - branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
@@ -232,7 +234,8 @@ single-writer ルール:
 特徴:
 - milestone と chunk 境界を先に固定する
 - milestone ごとに実行計画と詳細設計を分ける
-- 各 chunk は独立した waterfall pass として閉じる
+- 各 chunk は checkpoint review までの subpass として閉じる
+- chunk completion は umbrella request の completion ではない
 - 各 chunk で checkpoint review を複数回に増やせる
 - 逐次 review と最終 review を分ける
 - 大規模 refactor では `$behavior-preserving-refactor` を追加します
@@ -321,7 +324,7 @@ single-writer ルール:
 - repo に持ち帰る各 extension は 1 回の waterfall pass として閉じます
 - `Question`、`Comparison Target`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を先に固定します
 - 1 iteration は 1 extension、1 waterfall run-id、1 change pass、1 decision state に固定します
-- 2 つ目の extension に入る前に、直前 extension の waterfall gate check、final review、`task-close`、commit / push を終えます
+- 2 つ目の extension に入る前に、直前 extension の waterfall gate check、final review、`task-close`、commit / push を終えます。ただし、outer backlog 全体の completion と iteration completion を混同しません
 - `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
 - tuning 中でも `test_designer`、`document_flow_reviewer`、`report_reviewer` を省略しません
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います

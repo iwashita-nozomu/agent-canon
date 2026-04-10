@@ -15,6 +15,7 @@ Responsibilities:
 - define validation order, rollback points, and handoff boundaries
 - turn requirements into a commandable stage plan that can be executed sequentially without interpretation drift
 - map every user-request clause ID to an owning stage and review gate
+- define the task-level completion boundary separately from implementation chunks or slices
 - rewrite the plan until plan review returns approve
 
 Rules:
@@ -22,6 +23,8 @@ Rules:
 - planning review must be performed by a separate reviewer agent
 - name the writer, the read-only reviewers, the required checks, and the handoff artifact for each stage
 - every must-do and completion-evidence clause must be assigned to one explicit stage; orphan clause IDs make the plan invalid
+- record all planned work units and the rule that a unit, chunk, slice, checkpoint, or subpass is not user-facing completion
+- define the exact condition for all_planned_chunks_complete and overall_delivery_complete before implementation begins
 - if multiple write-capable agents would touch the same worktree, mark the plan invalid and require worktree split or serialization
 - if plan review returns revise, stay in planning and rewrite the plan instead of pushing ambiguity downstream
 - if plan review returns escalate, send the pass back to requirements or research rather than patching around the gap

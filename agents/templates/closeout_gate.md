@@ -11,6 +11,8 @@
 - required_reviews_complete: no
 - validation_complete: no
 - request_contract_complete: no
+- all_planned_chunks_complete: no
+- overall_delivery_complete: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -24,8 +26,14 @@
 - required_reviews_complete: yes
 - validation_complete: yes
 - request_contract_complete: yes
+- all_planned_chunks_complete: yes
+- overall_delivery_complete: yes
 - commit_created: yes
 - push_completed: yes
+
+## Completion Boundary Evidence
+
+<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete or explain why closeout remains locked. -->
 
 ## Evidence
 

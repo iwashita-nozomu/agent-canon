@@ -260,6 +260,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は会話文脈を実装入力にせず、各 implementation slice の前に design artifact path、design section、test plan item、request clause ID を明示する
 - `Implementation Source Packet` がない、または design と現行 repo docs / code が矛盾する場合は実装せず Gate 5-6 へ戻る
 - `spark_worker` は design trace、naming、test plan、write scope が固定済みの低リスクsliceだけに使い、設計判断、scope判断、review判断へ使わない
+- chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
 - worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
 - worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
@@ -299,6 +300,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - repo に残す差分がある task では、validation 後に commit を作る
 - user が明示的に止めていなければ、final report の前に branch を push する
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
+- `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
 - JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence が揃うまで completion evidence にしない

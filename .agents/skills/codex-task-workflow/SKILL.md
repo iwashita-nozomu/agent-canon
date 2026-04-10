@@ -21,4 +21,5 @@ description: Use when Codex needs a context-independent execution path for a rep
 1. Before implementation, read the approved `design_brief.md` `Implementation Source Packet` and `Design-To-Implementation Trace`; cite the design artifact path, design section, test-plan item, and user-request clause IDs for each changed slice.
 1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
 1. Under rate-limit pressure, move only fully design-traced, low-risk implementation slices to `spark_worker`; keep requirements, design, review, and scope judgment off Spark.
+1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, final review, validation, closeout gate, commit, and push are complete.
 1. Validate with `make ci-quick` first and escalate to broader checks only when needed.

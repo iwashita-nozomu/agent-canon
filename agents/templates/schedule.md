@@ -14,6 +14,15 @@
 | Clause ID | Covered By Stage | Review Gate | Status |
 | --------- | ---------------- | ----------- | ------ |
 
+## Planned Work Units
+
+| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |
+| ------- | ---------- | ----- | ------------------- | --------- | ------ |
+
+## Task Completion Boundary
+
+<!-- Define what must be true before user-facing completion: all active clauses resolved, all planned work units complete, final review approved, validation complete, closeout gate unlocked, commit and push done. A chunk, slice, checkpoint, or subpass is internal progress only. -->
+
 ## Explicit Subagents
 
 <!-- Record the concrete Codex / Claude subagents or permanent team roles used for each stage. -->
