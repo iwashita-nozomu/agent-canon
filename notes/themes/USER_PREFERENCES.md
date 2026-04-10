@@ -56,6 +56,9 @@
   - source: chat
   - rationale: 2026-04-10 request: 作業単位に分割して終了してしまう癖をワークフローで解決したい
 
+- 2026-04-10 | Token efficiency: when a task has repeatable shell steps, prefer small bash scripts or batched shell commands instead of spending many turns/tokens on manual command-by-command narration.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
