@@ -53,6 +53,16 @@ git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 bash tools/sync_agent_canon.sh ensure-latest
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
+(
+  cd "${AGENT_CANON_TEST_WORK}"
+  printf "fresh clone no-subtree fallback marker\n" > .fresh-clone-agent-canon-no-subtree-marker
+  git add .fresh-clone-agent-canon-no-subtree-marker
+  git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon without subtree" >/dev/null
+  git push origin main >/dev/null
+)
+mkdir -p "${TMP_DIR}/missing-git-exec"
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/sync_agent_canon.sh ensure-latest
+test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks
 make ci-quick
 

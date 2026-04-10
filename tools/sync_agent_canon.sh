@@ -321,18 +321,56 @@ commit_sync_paths_if_needed() {
     -m "agent-canon-prefix: $PREFIX"
 }
 
+find_commit_by_tree() {
+  local tree_sha="$1"
+  local history_head="$2"
+  local commit=""
+
+  while IFS= read -r commit; do
+    if [ "$(git -C "$ROOT_DIR" rev-parse "$commit^{tree}")" = "$tree_sha" ]; then
+      echo "$commit"
+      return
+    fi
+  done < <(git -C "$ROOT_DIR" rev-list "$history_head")
+
+  return 1
+}
+
+materialize_cached_snapshot_diff() {
+  local base_sha="$1"
+  local remote_sha="$2"
+  local status=""
+  local path=""
+
+  while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+    case "$status" in
+      D)
+        rm -f "$ROOT_DIR/$PREFIX/$path"
+        ;;
+      *)
+        git -C "$ROOT_DIR" checkout-index -f -u -- "$PREFIX/$path"
+        ;;
+    esac
+  done < <(git -C "$ROOT_DIR" diff --name-status --no-renames -z "$base_sha" "$remote_sha" --)
+}
+
+apply_snapshot_diff() {
+  local base_sha="$1"
+  local remote_sha="$2"
+
+  git -C "$ROOT_DIR" diff --binary "$base_sha" "$remote_sha" -- | git -C "$ROOT_DIR" apply --cached --directory="$PREFIX"
+  materialize_cached_snapshot_diff "$base_sha" "$remote_sha"
+}
+
 import_fast_forward_snapshot() {
   local local_split="$1"
   local remote_sha="$2"
-  local method="fast_forward_snapshot_import"
+  local method="${3:-fast_forward_snapshot_import}"
 
-  if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
-    method="diverged_snapshot_import"
-    echo "agent_canon_snapshot_import=diverged_history"
-  fi
+  git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha" || die "subtree pull failed and snapshot import is unsafe because local and remote agent-canon histories diverged"
 
   echo "agent_canon_update_method=$method"
-  git -C "$ROOT_DIR" diff --binary "$local_split" "$remote_sha" -- | git -C "$ROOT_DIR" apply --index --directory="$PREFIX"
+  apply_snapshot_diff "$local_split" "$remote_sha"
   cmd_link_root 1
   commit_sync_paths_if_needed "$remote_sha" "$method"
 }
@@ -341,6 +379,7 @@ import_snapshot_from_prefix_tree() {
   local local_tree="$1"
   local remote_sha="$2"
   local method="$3"
+  local local_snapshot=""
 
   if git -C "$ROOT_DIR" diff --quiet "$local_tree" "$remote_sha" --; then
     echo "agent_canon_latest=already_current_tree"
@@ -348,10 +387,8 @@ import_snapshot_from_prefix_tree() {
     return
   fi
 
-  echo "agent_canon_update_method=$method"
-  git -C "$ROOT_DIR" diff --binary "$local_tree" "$remote_sha" -- | git -C "$ROOT_DIR" apply --index --directory="$PREFIX"
-  cmd_link_root 1
-  commit_sync_paths_if_needed "$remote_sha" "$method"
+  local_snapshot="$(find_commit_by_tree "$local_tree" "$remote_sha")" || die "git subtree is unavailable and snapshot import is unsafe because the local prefix tree is not present in remote agent-canon history"
+  import_fast_forward_snapshot "$local_snapshot" "$remote_sha" "$method"
 }
 
 split_prefix_or_empty() {
