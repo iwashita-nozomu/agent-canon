@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "tools/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, and detailed design review remains the strongest pre-implementation gate. Detailed design fixes identifier naming before implementation. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate. Detailed design fixes identifier naming before implementation. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -215,7 +215,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer checks each coding chunk and may only update review artifacts."
+        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause coverage for that chunk, records fix-now findings, and may only update review artifacts."
       }
     },
     {
@@ -237,7 +237,7 @@
         "allowed_artifacts": [
           "final_review"
         ],
-        "notes": "The final reviewer performs an independent ship decision and remains artifact-only."
+        "notes": "The final reviewer performs an independent ship decision, must reject partial spec-to-product coverage or unapplied fix-now review findings, and remains artifact-only."
       }
     },
     {
@@ -274,7 +274,7 @@
           "closeout_gate",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate and retrospective artifacts."
+        "notes": "Audit closeout is recorded in the closeout gate and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes and review_findings_integrated=yes are evidenced."
       }
     }
   ],
@@ -1125,7 +1125,7 @@
     {
       "from": "implementer",
       "to": "final_reviewer",
-      "gate": "implementation complete and self-check done"
+      "gate": "implementation complete, self-check done, and every active request clause has mapped product evidence or explicit deferral"
     },
     {
       "from": "final_reviewer",
@@ -1135,7 +1135,7 @@
     {
       "from": "implementer",
       "to": "verifier",
-      "gate": "final review feedback resolved and final self-check done"
+      "gate": "final review feedback resolved, final self-check done, and review finding incorporation evidence recorded"
     },
     {
       "from": "verifier",

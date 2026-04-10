@@ -79,6 +79,12 @@
   - confidence: tentative
   - evidence: 2026-04-10 request about agent knowledge/philosophy/personality formation
 
+- 2026-04-10 | interaction-observation | Closeout must verify specification-to-product coverage and review-finding incorporation, not just that a minimal implementation and tests exist.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User reported a recurring pattern of closing after minimal implementation, possibly ignoring code review, and implementing only part of the specification.
+
 ## Task Retrospectives
 
 - まだなし

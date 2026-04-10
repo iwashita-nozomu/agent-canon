@@ -85,7 +85,12 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             "final_review.md",
             require_filled=True,
             require_approve=True,
-            required_sections=("## Design Trace Acceptance",),
+            required_sections=(
+                "## Design Trace Acceptance",
+                "## Planned Work Completion Review",
+                "## Spec-To-Product Coverage Review",
+                "## Review Finding Incorporation Review",
+            ),
         ),
     ),
 }

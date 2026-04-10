@@ -86,6 +86,9 @@ def main() -> int:
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "all_planned_chunks_complete": closeout.get("all_planned_chunks_complete") == "yes",
         "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
+        "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
+        == "yes",
+        "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "commit_created": closeout.get("commit_created") == "yes",
@@ -104,6 +107,11 @@ def main() -> int:
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
     print(f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}")
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
+    print(
+        "SPEC_PRODUCT_COVERAGE_COMPLETE="
+        f"{closeout.get('spec_product_coverage_complete', '')}"
+    )
+    print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
     print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")
     print(f"UNRESOLVED_CLAUSE_IDS={request_contract.get('unresolved_clause_ids', '')}")

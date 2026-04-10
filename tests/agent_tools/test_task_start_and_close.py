@@ -208,6 +208,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -234,6 +236,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
             self.assertIn("ALL_PLANNED_CHUNKS_COMPLETE=yes", result.stdout)
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
+            self.assertIn("SPEC_PRODUCT_COVERAGE_COMPLETE=yes", result.stdout)
+            self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:
@@ -284,6 +288,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: no",
                         "- overall_delivery_complete: no",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -310,6 +316,83 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("all_planned_chunks_complete", result.stdout)
             self.assertIn("overall_delivery_complete", result.stdout)
+
+    def test_task_close_rejects_partial_spec_or_ignored_review_findings(self) -> None:
+        """task_close should fail when spec coverage or review integration is incomplete."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-partial-spec"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "verification.txt").write_text(
+                "\n".join(
+                    [
+                        f"run_id={run_id}",
+                        "task=partial spec closeout smoke",
+                        "owner=codex",
+                        "created_at_utc=2026-04-08T00:00:00Z",
+                        "status=pass",
+                        "user_completion_report=unlocked",
+                        "closeout_gate_status=resolved",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "closeout_gate.md").write_text(
+                "\n".join(
+                    [
+                        "# Closeout Gate",
+                        "",
+                        "- verifier_status: pass",
+                        "- auditor_status: resolved",
+                        "- required_reviews_complete: yes",
+                        "- validation_complete: yes",
+                        "- request_contract_complete: yes",
+                        "- all_planned_chunks_complete: yes",
+                        "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: no",
+                        "- review_findings_integrated: no",
+                        "- commit_created: yes",
+                        "- push_completed: yes",
+                        "- user_completion_report: unlocked",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("spec_product_coverage_complete", result.stdout)
+            self.assertIn("review_findings_integrated", result.stdout)
 
 
 if __name__ == "__main__":

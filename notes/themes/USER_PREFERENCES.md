@@ -62,6 +62,9 @@
 - 2026-04-10 | Token reduction target is not primarily user-facing explanation; reduce command-generation overhead and subagent prompt/context tokens by batching repeatable shell work and delegating only when material.
   - source: chat
 
+- 2026-04-10 | Do not close tasks at minimal implementation or partial-spec coverage; require reviewer-confirmed evidence that implementation covers the full requested specification and that review findings were reflected before completion.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
