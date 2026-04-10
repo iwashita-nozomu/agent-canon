@@ -81,3 +81,7 @@ skill_families:
     purpose: Distill durable user preferences from notes into stable AGENTS.md guidance.
     canonical_doc: agents/skills/user-preference-sync.md
     shim: .agents/skills/user-preference-sync/SKILL.md
+  - id: agent-learning
+    purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
+    canonical_doc: agents/skills/agent-learning.md
+    shim: .agents/skills/agent-learning/SKILL.md

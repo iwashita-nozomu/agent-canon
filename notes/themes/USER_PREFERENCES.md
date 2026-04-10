@@ -16,7 +16,9 @@
 
 ## Provisional Preferences
 
-- まだなし
+- 2026-04-10 | agent の作業哲学、知識、対話から得た学習を task / dialogue ごとに更新可能な仕組みにしたい
+  - source: chat
+  - rationale: 2026-04-10 の依頼: エージェントの知識・哲学・人格形成を継続更新したい
 
 ## Promotion Candidates
 

@@ -71,6 +71,7 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
+documents/agent-learning-workflow.md:../${PREFIX}/documents/agent-learning-workflow.md
 documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
 documents/adaptive-improvement-workflow.md:../${PREFIX}/documents/adaptive-improvement-workflow.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
@@ -118,6 +119,7 @@ notes/knowledge/path_resolution.md:../../${PREFIX}/notes/knowledge/path_resoluti
 notes/knowledge/pyright_operations.md:../../${PREFIX}/notes/knowledge/pyright_operations.md
 notes/themes/README.md:../../${PREFIX}/notes/themes/README.md
 notes/themes/THEME_NOTE_TEMPLATE.md:../../${PREFIX}/notes/themes/THEME_NOTE_TEMPLATE.md
+notes/themes/AGENT_PHILOSOPHY.md:../../${PREFIX}/notes/themes/AGENT_PHILOSOPHY.md
 notes/themes/USER_PREFERENCES.md:../../${PREFIX}/notes/themes/USER_PREFERENCES.md
 notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
 notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
@@ -126,6 +128,7 @@ tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
+tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py

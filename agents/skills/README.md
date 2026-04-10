@@ -40,6 +40,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 | `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
 | `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
 | `user-preference-sync` | user preference note を stable な AGENTS guidance へ昇格 | `agents/skills/user-preference-sync.md` | `.agents/skills/user-preference-sync/SKILL.md` |
+| `agent-learning` | agent の作業哲学、対話学習、task retrospective を蓄積 | `agents/skills/agent-learning.md` | `.agents/skills/agent-learning/SKILL.md` |
 
 ## Internal Review And Runtime Routines
 
@@ -66,6 +67,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 - repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
 - `notes/themes/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。
+- `notes/themes/AGENT_PHILOSOPHY.md` の更新や agent-side learning の整理では `agent-learning` を使います。
 
 ## Updating Skills
 

@@ -113,6 +113,21 @@
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
   - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
 
+## Agent Learning, Memory, And Philosophy
+
+- [Reflective Equilibrium - Stanford Encyclopedia of Philosophy](https://plato.stanford.edu/entries/reflective-equilibrium/)
+  - 個別判断と一般原則を相互調整し、task observation と agent philosophy を往復させる根拠です。
+- [The Reflective Practitioner: How Professionals Think in Action - WorldCat](https://search.worldcat.org/title/The-reflective-practitioner-how-professionals-think-in-action/oclc/1166337782)
+  - reflection-in-action と実践後 reflection を task retrospective として残す根拠です。
+- [Situated Knowledges - New Materialism Almanac](https://newmaterialism.eu/almanac/s/situated-knowledges.html)
+  - knowledge を立場、実践、scope と結び付け、observation に source / evidence / confidence を付ける根拠です。原典は Haraway (1988), Feminist Studies, DOI `10.2307/3178066` です。
+- [About Value Sensitive Design - VSD Lab](https://vsdesign.org/vsd/)
+  - human values を design process 全体で扱い、user preference、agent philosophy、repo rule の出所を分ける根拠です。
+- [The Extended Mind - Clark and Chalmers](https://fitelson.org/prosem/clark_chalmers.pdf)
+  - notes を agent の外部記憶、language-based scaffold として扱い、毎回読む runtime note にする根拠です。
+- [Deep Reinforcement Learning from Human Preferences](https://arxiv.org/abs/1706.03741)
+  - human feedback を preference 更新へ使う発想の技術的参考です。この repo では raw feedback ではなく evidence 付き observation を明示的に記録します。
+
 ## Academic Writing, Logic, And Notation
 
 - [Ten simple rules for structuring papers](https://doi.org/10.1371/journal.pcbi.1005619)

@@ -17,7 +17,8 @@ SECTION_HEADERS = {
 }
 DEFAULT_NOTE_TEXT = """# User Preferences
 
-この file は、会話から抽出した user の coding philosophy、review expectation、document preference を逐次追記する append-first note です。
+この file は、会話から抽出した user の coding philosophy、review expectation、
+document preference を逐次追記する append-first note です。
 `AGENTS.md` へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
 ## Use
@@ -59,7 +60,11 @@ class PreferenceEntry:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description="Append one user preference observation.")
-    parser.add_argument("--preference", required=True, help="Observed durable preference statement.")
+    parser.add_argument(
+        "--preference",
+        required=True,
+        help="Observed durable preference statement.",
+    )
     parser.add_argument(
         "--kind",
         default="provisional",
@@ -68,7 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--source", default="chat", help="Source label. Default: chat")
     parser.add_argument("--rationale", help="Optional reason or evidence summary.")
-    parser.add_argument("--observed-on", default=str(date.today()), help="Observation date. Default: today")
+    parser.add_argument(
+        "--observed-on",
+        default=str(date.today()),
+        help="Observation date. Default: today",
+    )
     parser.add_argument(
         "--note-path",
         default=DEFAULT_NOTE_PATH,
@@ -112,10 +121,11 @@ def insert_under_section(text: str, section_header: str, rendered_entry: str) ->
     while insert_at < len(lines) and not lines[insert_at].startswith("## "):
         insert_at += 1
 
-    entry_lines = rendered_entry.splitlines()
-    payload = ["", *entry_lines]
-    if insert_at < len(lines) and lines[insert_at - 1].strip() != "":
+    payload = rendered_entry.splitlines()
+    if insert_at > 0 and lines[insert_at - 1].strip() != "":
         payload.insert(0, "")
+    if insert_at < len(lines) and lines[insert_at].startswith("## "):
+        payload.append("")
     lines[insert_at:insert_at] = payload
     return "\n".join(lines).rstrip() + "\n"
 

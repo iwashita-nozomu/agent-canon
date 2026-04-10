@@ -26,3 +26,5 @@
 - [THEME_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/themes/THEME_NOTE_TEMPLATE.md)
 - [USER_PREFERENCES.md](/mnt/l/workspace/project_template/notes/themes/USER_PREFERENCES.md)
   - 会話から抽出した user preference の固定入口です。まずここへ追記し、十分に安定した項目だけを `AGENTS.md` へ昇格します。
+- [AGENT_PHILOSOPHY.md](/mnt/l/workspace/project_template/notes/themes/AGENT_PHILOSOPHY.md)
+  - agent の作業哲学、対話から得た学習、task retrospective の固定入口です。まずここへ追記し、十分に安定した項目だけを workflow、guardrail、`AGENTS.md` へ昇格します。

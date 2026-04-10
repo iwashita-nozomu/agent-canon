@@ -53,6 +53,7 @@
 - どこへ昇格させるか迷うときは `documents/notes-lifecycle.md` を見ます。
 - `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
 - 会話から抽出した durable preference は `notes/themes/USER_PREFERENCES.md` に集約します。
+- agent-side の作業哲学、対話から得た学習、task retrospective は `notes/themes/AGENT_PHILOSOPHY.md` に集約します。
 
 ## Action Log Rule
 
