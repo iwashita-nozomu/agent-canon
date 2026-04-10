@@ -342,6 +342,12 @@ import_snapshot_from_prefix_tree() {
   local remote_sha="$2"
   local method="$3"
 
+  if git -C "$ROOT_DIR" diff --quiet "$local_tree" "$remote_sha" --; then
+    echo "agent_canon_latest=already_current_tree"
+    cmd_link_root 1
+    return
+  fi
+
   echo "agent_canon_update_method=$method"
   git -C "$ROOT_DIR" diff --binary "$local_tree" "$remote_sha" -- | git -C "$ROOT_DIR" apply --index --directory="$PREFIX"
   cmd_link_root 1
