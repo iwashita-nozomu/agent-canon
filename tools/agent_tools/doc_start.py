@@ -20,12 +20,22 @@ from agent_team import (
 DOC_KIND_MAP = {
     "long-form": {
         "workflow_family": "Scoped Change",
-        "skills": ("$codex-task-workflow", "$long-form-writing"),
+        "skills": (
+            "$codex-task-workflow",
+            "$agent-orchestration",
+            "$subagent-bootstrap",
+            "$long-form-writing",
+        ),
         "enable": (),
     },
     "academic": {
         "workflow_family": "Research-Driven Change",
-        "skills": ("$codex-task-workflow", "$academic-writing"),
+        "skills": (
+            "$codex-task-workflow",
+            "$agent-orchestration",
+            "$subagent-bootstrap",
+            "$academic-writing",
+        ),
         "enable": (
             "notation_definition_reviewer",
             "logic_gap_reviewer",
@@ -33,7 +43,12 @@ DOC_KIND_MAP = {
     },
     "paper": {
         "workflow_family": "Research-Driven Change",
-        "skills": ("$codex-task-workflow", "$paper-writing"),
+        "skills": (
+            "$codex-task-workflow",
+            "$agent-orchestration",
+            "$subagent-bootstrap",
+            "$paper-writing",
+        ),
         "enable": (
             "citation_evidence_reviewer",
             "notation_definition_reviewer",

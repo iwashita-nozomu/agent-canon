@@ -8,6 +8,8 @@ import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
+import yaml
+
 from agent_team import (
     ROOT,
     create_run_bundle,
@@ -21,6 +23,7 @@ from agent_team import (
 
 
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
+SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
     "manager_reviewer",
@@ -113,10 +116,16 @@ def validate_team_config_references() -> None:
     """Check role references inside the team config."""
     config = load_team_config()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
+    codex_agent_ids = set(parse_codex_agents())
 
     for role in config.always_on_roles + config.specialist_roles:
         ensure(role.required_outputs, f"{role.id} must declare required_outputs")
         ensure(role.write_policy.allowed_artifacts, f"{role.id} must declare allowed_artifacts")
+        for codex_agent_id in role.codex_agents:
+            ensure(
+                codex_agent_id in codex_agent_ids,
+                f"{role.id} references missing Codex agent: {codex_agent_id}",
+            )
         for output in role.required_outputs:
             ensure(
                 output.endswith((".md", ".yaml", ".txt")),
@@ -132,6 +141,12 @@ def validate_team_config_references() -> None:
                 mapped in role.required_outputs,
                 f"{role.id} artifact mapping mismatch: {artifact_key} -> {mapped}",
             )
+
+    implementer = resolve_role(config, "implementer")
+    ensure(
+        implementer.codex_agents[:2] == ("spark_worker", "worker"),
+        "implementer codex_agents must start with spark_worker,worker",
+    )
 
     missing_templates = required_output_templates_missing(
         config,
@@ -191,6 +206,31 @@ def validate_task_catalog_references() -> None:
             ensure(task_id in task_ids(catalog), f"review pack {pack['id']} default task missing: {task_id}")
         for task_id in pack.get("optional_for_tasks", []):
             ensure(task_id in task_ids(catalog), f"review pack {pack['id']} optional task missing: {task_id}")
+
+
+def validate_public_skill_shims() -> None:
+    """Check that public skill catalog entries have discoverable SKILL.md shims."""
+    catalog_path = ROOT / "agents" / "skills" / "catalog.yaml"
+    data = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    ensure(isinstance(data, dict), "skill catalog must parse as a mapping")
+    families = data.get("skill_families", [])
+    ensure(isinstance(families, list), "skill_families must be a list")
+
+    for entry in families:
+        ensure(isinstance(entry, dict), "skill_families entries must be mappings")
+        skill_id = str(entry["id"])
+        canonical_doc = ROOT / str(entry["canonical_doc"])
+        shim = ROOT / str(entry["shim"])
+        ensure(canonical_doc.is_file(), f"{skill_id} canonical doc missing: {canonical_doc}")
+        ensure(shim.is_file(), f"{skill_id} shim missing: {shim}")
+        ensure(
+            shim.resolve().is_relative_to(SKILL_SHIM_ROOT.resolve()),
+            f"{skill_id} shim is outside the Codex skill root: {shim}",
+        )
+        text = shim.read_text(encoding="utf-8")
+        ensure(text.startswith("---\n"), f"{skill_id} shim must start with YAML frontmatter")
+        ensure("\n---\n" in text[4:], f"{skill_id} shim YAML frontmatter must close")
+        ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
 
 
 def validate_bundle_outputs() -> None:
@@ -290,6 +330,7 @@ def main() -> int:
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()
+    validate_public_skill_shims()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0

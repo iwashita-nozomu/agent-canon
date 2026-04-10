@@ -14,6 +14,9 @@
   "always_on_roles": [
     {
       "id": "manager",
+      "codex_agents": [
+        "requirements_organizer"
+      ],
       "owns": [
         "user_intent_capture",
         "acceptance_criteria",
@@ -50,6 +53,9 @@
     },
     {
       "id": "manager_reviewer",
+      "codex_agents": [
+        "manager_reviewer"
+      ],
       "owns": [
         "scope_review",
         "acceptance_review",
@@ -71,6 +77,9 @@
     },
     {
       "id": "designer",
+      "codex_agents": [
+        "detailed_designer"
+      ],
       "owns": [
         "solution_design",
         "module_boundary_design",
@@ -93,6 +102,9 @@
     },
     {
       "id": "design_reviewer",
+      "codex_agents": [
+        "detailed_design_reviewer"
+      ],
       "owns": [
         "design_review",
         "risk_review",
@@ -114,6 +126,9 @@
     },
     {
       "id": "document_flow_reviewer",
+      "codex_agents": [
+        "document_flow_reviewer"
+      ],
       "owns": [
         "top_down_readability_review",
         "section_order_review",
@@ -134,6 +149,9 @@
     },
     {
       "id": "test_designer",
+      "codex_agents": [
+        "test_designer"
+      ],
       "activation": "static_test_design_needed",
       "owns": [
         "static_path_survey",
@@ -155,6 +173,10 @@
     },
     {
       "id": "implementer",
+      "codex_agents": [
+        "spark_worker",
+        "worker"
+      ],
       "owns": [
         "code_and_docs_edits",
         "local_validation",
@@ -175,6 +197,11 @@
     },
     {
       "id": "change_reviewer",
+      "codex_agents": [
+        "reviewer",
+        "python_reviewer",
+        "cpp_reviewer"
+      ],
       "owns": [
         "implementation_review",
         "regression_review",
@@ -193,6 +220,10 @@
     },
     {
       "id": "final_reviewer",
+      "codex_agents": [
+        "reviewer",
+        "project_reviewer"
+      ],
       "owns": [
         "final_independent_review",
         "ship_blockers",
@@ -250,6 +281,10 @@
   "specialist_roles": [
     {
       "id": "researcher",
+      "codex_agents": [
+        "literature_researcher",
+        "explorer"
+      ],
       "activation": "internet_or_algorithm_research_needed",
       "owns": [
         "external_research",
@@ -269,6 +304,9 @@
     },
     {
       "id": "research_reviewer",
+      "codex_agents": [
+        "reviewer"
+      ],
       "activation": "internet_or_algorithm_research_needed",
       "owns": [
         "source_quality_review",
@@ -288,6 +326,9 @@
     },
     {
       "id": "experimenter",
+      "codex_agents": [
+        "worker"
+      ],
       "activation": "benchmark_or_experiment_loop_needed",
       "owns": [
         "baseline_execution",
@@ -311,6 +352,9 @@
     },
     {
       "id": "experiment_reviewer",
+      "codex_agents": [
+        "reviewer"
+      ],
       "activation": "benchmark_or_experiment_loop_needed",
       "owns": [
         "critical_result_review",
@@ -330,6 +374,9 @@
     },
     {
       "id": "scheduler",
+      "codex_agents": [
+        "execution_planner"
+      ],
       "activation": "explicit_execution_plan_required",
       "owns": [
         "execution_plan",
@@ -351,6 +398,9 @@
     },
     {
       "id": "schedule_reviewer",
+      "codex_agents": [
+        "plan_reviewer"
+      ],
       "activation": "explicit_execution_plan_required",
       "owns": [
         "execution_plan_review",
@@ -371,6 +421,9 @@
     },
     {
       "id": "citation_evidence_reviewer",
+      "codex_agents": [
+        "citation_evidence_reviewer"
+      ],
       "activation": "paper_or_claim_dense_writing_review_needed",
       "owns": [
         "citation_trace_review",
@@ -391,6 +444,9 @@
     },
     {
       "id": "notation_definition_reviewer",
+      "codex_agents": [
+        "notation_definition_reviewer"
+      ],
       "activation": "academic_or_symbol_dense_writing_review_needed",
       "owns": [
         "notation_review",
@@ -411,6 +467,9 @@
     },
     {
       "id": "logic_gap_reviewer",
+      "codex_agents": [
+        "logic_gap_reviewer"
+      ],
       "activation": "academic_or_claim_dense_writing_review_needed",
       "owns": [
         "logic_gap_review",
@@ -431,6 +490,10 @@
     },
     {
       "id": "infra_steward",
+      "codex_agents": [
+        "docs_workflow_steward",
+        "worker"
+      ],
       "activation": "ci_experiment_or_platform_work",
       "owns": [
         "infra_assessment",
@@ -452,6 +515,9 @@
     },
     {
       "id": "infra_reviewer",
+      "codex_agents": [
+        "reviewer"
+      ],
       "activation": "ci_experiment_or_platform_work",
       "owns": [
         "infra_safety_review",
@@ -471,6 +537,9 @@
     },
     {
       "id": "reproducibility_reviewer",
+      "codex_agents": [
+        "reproducibility_reviewer"
+      ],
       "activation": "reproducibility_perspective_review_requested",
       "owns": [
         "provenance_review",
@@ -491,6 +560,9 @@
     },
     {
       "id": "scientific_computing_reviewer",
+      "codex_agents": [
+        "scientific_computing_reviewer"
+      ],
       "activation": "scientific_computing_perspective_review_requested",
       "owns": [
         "incremental_change_review",
@@ -510,6 +582,9 @@
     },
     {
       "id": "benchmark_reviewer",
+      "codex_agents": [
+        "benchmark_reviewer"
+      ],
       "activation": "benchmark_perspective_review_requested",
       "owns": [
         "fairness_review",
@@ -530,6 +605,9 @@
     },
     {
       "id": "artifact_reviewer",
+      "codex_agents": [
+        "artifact_reviewer"
+      ],
       "activation": "artifact_perspective_review_requested",
       "owns": [
         "artifact_completeness_review",
@@ -550,6 +628,9 @@
     },
     {
       "id": "fair_data_reviewer",
+      "codex_agents": [
+        "fair_data_reviewer"
+      ],
       "activation": "fair_data_perspective_review_requested",
       "owns": [
         "metadata_review",
@@ -570,6 +651,9 @@
     },
     {
       "id": "ml_science_reviewer",
+      "codex_agents": [
+        "ml_science_reviewer"
+      ],
       "activation": "ml_science_perspective_review_requested",
       "owns": [
         "assumption_review",
@@ -590,6 +674,9 @@
     },
     {
       "id": "project_reviewer",
+      "codex_agents": [
+        "project_reviewer"
+      ],
       "activation": "repo_wide_or_comprehensive_review_needed",
       "owns": [
         "repo_inventory_review",
@@ -610,6 +697,9 @@
     },
     {
       "id": "docs_workflow_steward",
+      "codex_agents": [
+        "docs_workflow_steward"
+      ],
       "activation": "workflow_or_adapter_docs_change_needed",
       "owns": [
         "workflow_canon_review",
@@ -630,6 +720,9 @@
     },
     {
       "id": "python_reviewer",
+      "codex_agents": [
+        "python_reviewer"
+      ],
       "activation": "python_change_review_needed",
       "owns": [
         "pyright_review",
@@ -650,6 +743,9 @@
     },
     {
       "id": "cpp_reviewer",
+      "codex_agents": [
+        "cpp_reviewer"
+      ],
       "activation": "cpp_change_review_needed",
       "owns": [
         "native_build_review",
@@ -670,6 +766,9 @@
     },
     {
       "id": "report_reviewer",
+      "codex_agents": [
+        "report_reviewer"
+      ],
       "activation": "report_or_claim_heavy_output_needed",
       "owns": [
         "report_structure_review",
@@ -690,6 +789,9 @@
     },
     {
       "id": "critical_guardian",
+      "codex_agents": [
+        "project_reviewer"
+      ],
       "tier": "governance",
       "activation": "always_on",
       "always_evaluates": [

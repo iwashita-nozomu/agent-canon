@@ -60,7 +60,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("document_flow_review.md", result.stdout)
+            self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
             self.assertTrue((report_dir / "document_flow_review.md").is_file())
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            self.assertIn("    codex_agents:\n      - spark_worker\n      - worker", manifest_text)
 
     def test_run_bundle_starts_with_locked_completion_gate(self) -> None:
         """Fresh bundles should lock user-facing completion until verifier/auditor closeout."""

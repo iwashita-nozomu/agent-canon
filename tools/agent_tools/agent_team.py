@@ -60,6 +60,7 @@ class Role:
     required_outputs: tuple[str, ...]
     activation: str
     write_policy: WritePolicy
+    codex_agents: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -427,7 +428,7 @@ def build_manifest(
         f"  report_dir: {str(report_dir)!r}",
         f"  workspace_root: {str(workspace_root)!r}",
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
-        f"  team_runtime: {str(ROOT / 'scripts' / 'agent_tools' / 'agent_team.py')!r}",
+        f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
         "roles:",
     ]
@@ -441,6 +442,10 @@ def build_manifest(
         lines.append(f"  - id: {role.id}")
         lines.append(f"    activation: {role.activation}")
         lines.append("    status: pending")
+        if role.codex_agents:
+            lines.append("    codex_agents:")
+            for codex_agent in role.codex_agents:
+                lines.append(f"      - {codex_agent}")
         lines.append("    owns:")
         for responsibility in role.owns:
             lines.append(f"      - {responsibility}")
@@ -654,6 +659,7 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
         required_outputs=tuple(str(item) for item in raw_role["required_outputs"]),
         activation=str(raw_role.get("activation", default_activation)),
         write_policy=write_policy,
+        codex_agents=tuple(str(item) for item in raw_role.get("codex_agents", ())),
     )
 
 

@@ -20,7 +20,16 @@ from agent_team import (
     select_roles,
     specialist_role_ids,
     task_ids,
+    TeamConfig,
 )
+
+
+def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
+    """Return Codex subagent candidates for one permanent role."""
+    for role in config.always_on_roles + config.specialist_roles:
+        if role.id == role_id:
+            return role.codex_agents
+    return ()
 
 
 def build_parser(
@@ -90,7 +99,7 @@ def build_parser(
 
 def suggested_skills(task_id: str | None, workflow_family_id: str | None) -> tuple[str, ...]:
     """Return a minimal suggested public skill set."""
-    selected = ["$codex-task-workflow"]
+    selected = ["$codex-task-workflow", "$agent-orchestration", "$subagent-bootstrap"]
     if workflow_family_id == "research_driven_change":
         selected.append("$research-workflow")
     elif workflow_family_id == "platform_and_environment":
@@ -190,6 +199,7 @@ def main() -> int:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(f"START_DECLARATION={start_declaration}")
+    print(f"IMPLEMENTATION_CODEX_AGENTS={','.join(codex_agents_for_role(config, 'implementer'))}")
     if args.dry_run:
         print("DRY_RUN=1")
     else:

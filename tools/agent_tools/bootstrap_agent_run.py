@@ -18,7 +18,16 @@ from agent_team import (
     select_roles,
     specialist_role_ids,
     task_ids,
+    TeamConfig,
 )
+
+
+def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
+    """Return Codex subagent candidates for one permanent role."""
+    for role in config.always_on_roles + config.specialist_roles:
+        if role.id == role_id:
+            return role.codex_agents
+    return ()
 
 
 def build_parser(
@@ -138,6 +147,7 @@ def main() -> int:
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
+    print(f"IMPLEMENTATION_CODEX_AGENTS={','.join(codex_agents_for_role(config, 'implementer'))}")
     if args.dry_run:
         print("DRY_RUN=1")
     else:

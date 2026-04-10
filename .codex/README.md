@@ -42,10 +42,13 @@
   - `worker`
   - `python_reviewer`
   - `cpp_reviewer`
-- manual coding override
+- design-traced narrow implementation default
   - `gpt-5.3-codex-spark`
     - `spark_worker`
-    - 設計packetで完全に切れる狭い低遅延 edit loop
+- broad or ambiguous implementation fallback
+  - `gpt-5.3-codex`
+    - `worker`
+    - 設計解釈、conflict resolution、architecture-sensitive edit
 - repo default は `high`
   - `xhigh` は parent が必要と判断したときだけ manual escalation として使う
 - mode の扱い

@@ -9,6 +9,14 @@ skill_families:
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .agents/skills/codex-task-workflow/SKILL.md
+  - id: agent-orchestration
+    purpose: Select workflow family, skills, review roles, and runtime entrypoints before execution.
+    canonical_doc: agents/skills/agent-orchestration.md
+    shim: .agents/skills/agent-orchestration/SKILL.md
+  - id: subagent-bootstrap
+    purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
+    canonical_doc: agents/skills/subagent-bootstrap.md
+    shim: .agents/skills/subagent-bootstrap/SKILL.md
   - id: change-review
     purpose: Review diffs for regressions, missing validation, and stale docs.
     canonical_doc: agents/skills/change-review.md

@@ -16,12 +16,15 @@
 ## Public Skill Surface
 
 CLI に出す公開 skill は、user が直接選ぶ価値が高いものだけに絞ります。
-review の細粒度 checklist、CLI adapter、artifact placement、subagent bootstrap、validation helper は public skill ではなく canonical docs と subagent routing に寄せます。
+review の細粒度 checklist、CLI adapter、artifact placement、validation helper は public skill ではなく canonical docs と subagent routing に寄せます。
+workflow selection と subagent bootstrap は task 開始時に使い忘れると実害が出るため public skill として出します。
 
 | Family | Purpose | Canonical Doc | Discovery Shim |
 | ------ | ------- | ------------- | -------------- |
 | `repo-onboarding` | unfamiliar repo の最短入口確認 | `agents/skills/repo-onboarding.md` | `.agents/skills/repo-onboarding/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
+| `agent-orchestration` | workflow family、skill、review、runtime entrypoint の選択 | `agents/skills/agent-orchestration.md` | `.agents/skills/agent-orchestration/SKILL.md` |
+| `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
 | `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
@@ -45,7 +48,8 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 ## Internal Review And Runtime Routines
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
-- artifact placement、subagent bootstrap、CLI adapter、static validation は `agents/canonical/` と `documents/REVIEW_PROCESS.md` の責務に寄せます。
+- artifact placement、CLI adapter、static validation は `agents/canonical/` と `documents/REVIEW_PROCESS.md` の責務に寄せます。
+- agent orchestration と subagent bootstrap は public skill としても出し、task 開始時に runtime が拾えるようにします。
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
 
 ## Codex Defaults
@@ -54,6 +58,7 @@ review の細粒度 checklist、CLI adapter、artifact placement、subagent boot
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
+- repo-changing task では `agent-orchestration` と `subagent-bootstrap` を `codex-task-workflow` に加えて使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
