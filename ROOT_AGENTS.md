@@ -59,6 +59,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
 - `notes/themes/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
 - `notes/themes/AGENT_PHILOSOPHY.md` は毎回読む runtime note とし、stable な作業哲学だけを periodic sweep で workflow / guardrail / `AGENTS.md` へ昇格します。
+- repo-local virtual environment は作りません。`python3-venv`、`python -m venv`、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を使いません。
 - user request clause を持たない planning、design、implementation、review は無効です。active work は必ず clause ID に結び付けます。
 
 - Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。

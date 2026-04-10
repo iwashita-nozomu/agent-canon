@@ -21,7 +21,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `sync_agent_canon.sh`
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
-  - `docker_dependency_validator.py`
+  - `docker_dependency_validator.sh`
   - `check_doc_test_triplet.py`
 
 ## 含めないもの

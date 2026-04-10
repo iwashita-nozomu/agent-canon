@@ -68,6 +68,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`n
 - code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
 - Docker / CI / dependency を触るなら `Platform And Environment`
   - `environment-maintenance` と `environment_change_proposal.md` を先に起こし、code requirement と blocked command を固定する
+  - repo-local virtual environment を作らず、environment validation には `bash tools/docker_dependency_validator.sh` を使う
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - tuning、比較改善、探索的 protocol refinement を backlog 付きで回すなら `Adaptive Improvement Loop`
 - chunk ごとの delivery なら `Large Delivery`

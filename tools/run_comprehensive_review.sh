@@ -136,7 +136,7 @@ if [ "$RUN_PARALLEL" = true ]; then
     "$PYTHON_BIN" "$SCRIPT_DIR/check_convention_consistency.py" > "$LOG_DIR/convention_check.log" 2>&1 &
     PID_CONVENTION=$!
     
-    "$PYTHON_BIN" "$SCRIPT_DIR/docker_dependency_validator.py" > "$LOG_DIR/docker_check.log" 2>&1 &
+    bash "$SCRIPT_DIR/docker_dependency_validator.sh" > "$LOG_DIR/docker_check.log" 2>&1 &
     PID_DOCKER=$!
     
     "$PYTHON_BIN" "$SCRIPT_DIR/requirement_sync_validator.py" > "$LOG_DIR/requirement_check.log" 2>&1 &
@@ -187,7 +187,7 @@ else
     
     log_info ""
     log_info "6️⃣/7️⃣ Docker Dependency Validation..."
-    if "$PYTHON_BIN" "$SCRIPT_DIR/docker_dependency_validator.py" > "$LOG_DIR/docker_check.log" 2>&1; then
+    if bash "$SCRIPT_DIR/docker_dependency_validator.sh" > "$LOG_DIR/docker_check.log" 2>&1; then
         log_success "docker check: OK"
     else
         log_error "docker check: FAILED"

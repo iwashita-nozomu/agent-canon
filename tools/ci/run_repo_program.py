@@ -172,7 +172,7 @@ def build_env_check_command() -> list[str]:
             "set -euo pipefail",
             "python3 --version",
             "python3 -m pip --version",
-            "python3 tools/docker_dependency_validator.py",
+            "bash tools/docker_dependency_validator.sh",
             "if command -v cmake >/dev/null 2>&1; then cmake --version; fi",
             "if command -v ninja >/dev/null 2>&1; then ninja --version; fi",
             "if command -v docker >/dev/null 2>&1; then docker --version; fi",
