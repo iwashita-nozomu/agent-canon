@@ -291,8 +291,8 @@ review コメントの粒度は次を目安にします。
 
 ローカルの入口は次です。
 
-- [references/README.md](/mnt/l/workspace/project_template/references/README.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [references/README.md](../references/README.md)
+- [workflow-references.md](workflow-references.md)
 
 ### 批判的レビュー・再現性
 

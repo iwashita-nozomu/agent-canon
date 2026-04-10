@@ -664,9 +664,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_WORKFLOW.md)
-- [documents/WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/documents/WORKFLOW_GUIDE.md)
-- [documents/research-workflow.md](/mnt/l/workspace/project_template/documents/research-workflow.md)
-- [documents/experiment-workflow.md](/mnt/l/workspace/project_template/documents/experiment-workflow.md)
-- [documents/workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../vendor/agent-canon/agents/TASK_WORKFLOWS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md)
+- [documents/WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md)
+- [documents/research-workflow.md](research-workflow.md)
+- [documents/experiment-workflow.md](experiment-workflow.md)
+- [documents/workflow-references.md](workflow-references.md)

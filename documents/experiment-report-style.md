@@ -346,8 +346,8 @@ repo では、次のラベルで observation と interpretation を分けると�
 
 ローカルの入口は次です。
 
-- [references/README.md](/mnt/l/workspace/project_template/references/README.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [references/README.md](../references/README.md)
+- [workflow-references.md](workflow-references.md)
 
 - George Mason University Writing Center, [Writing an IMRaD Report](https://www.stat.cmu.edu/~brian/valerie/617-2022/week01/imrad%20advice/Writing_an_IMRAD_report.pdf)
 - George Mason University Writing Center, [Scientific (IMRaD) Research Reports — Results and Discussion Section](https://writingcenter.gmu.edu/writing-resources/imrad/imrad-results-discussion)

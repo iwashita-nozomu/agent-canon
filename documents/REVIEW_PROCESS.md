@@ -126,7 +126,7 @@ findings は少なくとも次に分けます。
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
-- [agents/canonical/ARTIFACT_PLACEMENT.md](/mnt/l/workspace/project_template/agents/canonical/ARTIFACT_PLACEMENT.md)
-- [agents/skills/README.md](/mnt/l/workspace/project_template/agents/skills/README.md)
-- [documents/workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../vendor/agent-canon/agents/TASK_WORKFLOWS.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../vendor/agent-canon/agents/canonical/ARTIFACT_PLACEMENT.md)
+- [agents/skills/README.md](../agents/skills/README.md)
+- [documents/workflow-references.md](workflow-references.md)
