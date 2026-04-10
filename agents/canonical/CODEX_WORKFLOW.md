@@ -85,6 +85,18 @@ agent の作業哲学と対話から得た学習を見落とさないため、`n
 - chunk ごとの delivery なら `Large Delivery`
 - それ以外は `Scoped Change`
 
+## Completion Bar
+
+user-facing completion は、最小実装、1 chunk、1 slice、checkpoint pass、または一部仕様の実装ではありません。
+closeout 前に reviewer と auditor は次を明示的に確認します。
+
+- 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
+- request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- required review の `fix now` findings が実装へ反映され、必要なら再レビューされている
+- 反映しない findings は follow-up ではなく、今回の completion を阻害しない理由と escalation が artifact に記録されている
+
+`closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、`user_completion_report` を `unlocked` にしてはいけません。
+
 ## Minimal Skill Set
 
 Codex では、まず `agents/skills/README.md` から必要最小限の skill だけ選びます。
@@ -307,6 +319,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - user が明示的に止めていなければ、final report の前に branch を push する
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
+- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
 - JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence が揃うまで completion evidence にしない

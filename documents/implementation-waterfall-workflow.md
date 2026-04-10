@@ -565,6 +565,7 @@ exit 条件:
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
+- `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 
 必須レビュー:
@@ -576,6 +577,8 @@ exit 条件:
 - verifier が gate を閉じている
 - user-facing completion report の unlock 条件が `closeout_gate.md` に記録されている
 - chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
+- 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
+- required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
 - user request clause の未解決がない
 
 ## 5. 差し戻しルール
