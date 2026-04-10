@@ -28,6 +28,10 @@
 
 <!-- Describe the planned file edits, boundaries, interfaces, and expected diff shape in detail. -->
 
+## Identifier And Naming Plan
+
+<!-- List every new or renamed variable, function, class, file, CLI flag, config key, and public API surface. For each item, record the chosen name, local precedent, rejected alternatives if relevant, and whether the name is implementation-blocking. -->
+
 ## Validation And Rollback Plan
 
 <!-- Describe how the design will be validated and what rollback or fallback path exists. -->

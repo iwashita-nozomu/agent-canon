@@ -51,6 +51,9 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
+- 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
+- 詳細設計では、新規または rename する identifier、path、CLI flag、config key、public API の naming plan を固定します
+- 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します

@@ -20,6 +20,9 @@ Rules:
 - prefer reuse-first designs over brand-new abstractions
 - document file-by-file changes, boundaries, reuse targets, invariants, and validation plans explicitly
 - define interfaces, symbols, assumptions, and fallback behavior before they are referenced later in the design
+- include an identifier and naming plan for every new or renamed variable, function, class, file, CLI flag, config key, and public API surface
+- derive names from existing local precedent first; if no precedent exists, document the reason, rejected alternatives, and review point
+- do not leave naming, API shape, path layout, or boundary choices for the worker to invent
 - do not leave the worker to choose between multiple competing designs; record one recommended path
 - if review returns revise, stay in detailed design and repair the document rather than compensating in implementation
 - if review returns escalate, return to planning instead of inventing a local workaround

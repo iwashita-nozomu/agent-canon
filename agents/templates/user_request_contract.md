@@ -14,18 +14,24 @@
 
 ## Must-Do Clauses
 
-| Clause ID | User Wording | Operational Interpretation | Owner Stage | Evidence Path | Status |
-| --------- | ------------ | -------------------------- | ----------- | ------------- | ------ |
+| Clause ID | Source Bucket | User Wording Or Evidence | Operational Interpretation | Owner Stage | Evidence Path | Status |
+| --------- | ------------- | ------------------------- | -------------------------- | ----------- | ------------- | ------ |
 
 ## Must-Not-Do Clauses
 
-| Clause ID | Forbidden Drift | Why It Is Forbidden | Guard Stage | Evidence Path | Status |
-| --------- | --------------- | ------------------- | ----------- | ------------- | ------ |
+| Clause ID | Source Bucket | Forbidden Drift | Why It Is Forbidden | Guard Stage | Evidence Path | Status |
+| --------- | ------------- | --------------- | ------------------- | ----------- | ------------- | ------ |
 
 ## Completion Evidence Clauses
 
-| Clause ID | Required Evidence | Where It Must Appear | Owner Stage | Status |
-| --------- | ----------------- | -------------------- | ----------- | ------ |
+| Clause ID | Source Bucket | Required Evidence | Where It Must Appear | Owner Stage | Status |
+| --------- | ------------- | ----------------- | -------------------- | ----------- | ------ |
+
+## Source Bucket Rules
+
+- Allowed buckets: `current_request`, `durable_user_preference`, `repo_or_code_precedent`, `domain_or_external_constraint`, `unknown_or_open_question`.
+- Durable user preferences do not become task requirements unless the current request or repo evidence supports the conversion.
+- Unknowns stay unresolved, deferred, or escalated; they are not converted into silent assumptions.
 
 ## Deferred Or Rejected Clauses
 

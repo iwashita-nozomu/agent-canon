@@ -57,15 +57,15 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`
-  - 変更要求、scope、acceptance criteria、reuse target を整理する
+  - 変更要求、source bucket、scope、acceptance criteria、reuse target を整理する
 - `execution_planner`
   - stage 順序、担当 subagent、validation 順序、rollback point を固定する
 - `plan_reviewer`
   - 実行計画の順序、review 分離、rollback readiness を確認する
 - `detailed_designer`
-  - reuse-first の detailed design 文書を起こす
+  - reuse-first の detailed design 文書と identifier naming plan を起こす
 - `detailed_design_reviewer`
-  - 実装前の最重要 gate として設計文書を独立に確認する
+  - 実装前の最重要 gate として設計文書と identifier naming plan を独立に確認する
 - `document_flow_reviewer`
   - 文書を上から順に読み、用語導入、section 順序、reader path が自然かを確認する
 - `citation_evidence_reviewer`
@@ -87,7 +87,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `worker`
-  - bounded な実装変更を切り出す
+  - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
 - `project_reviewer`

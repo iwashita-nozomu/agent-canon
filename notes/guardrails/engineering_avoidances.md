@@ -7,6 +7,8 @@
 - 会話だけを根拠に実装、設計変更、文書改訂へ進める
 - `documents/`、`notes/`、`references/` の context sweep をせずに着手する
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
+- 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
+- unknown や open question を silent assumption に変換して要件を埋める
 - 最初の update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言しない
 - repo-changing task で run bundle と explicit stage activation を省略する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務する
@@ -29,6 +31,7 @@
 - user request が generic path の usable smoke を求めているのに、specialized path の tuning だけで完了扱いにする
 - scope で禁止された runner 変更、function fusion、別経路追加を、性能改善のために横滑りで入れる
 - user request clause にない実装 slice を「ついで」として入れる
+- 詳細設計または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を worker が自由裁量で作る
 - worktree scope を更新せずに編集範囲を広げる
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を現在の worktree に流用する
 - `WORKTREE_SCOPE.md` の `Editable Directories` 外や `Read-Only Or Avoid Directories` 内を編集する

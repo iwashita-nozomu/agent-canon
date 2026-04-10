@@ -20,6 +20,14 @@
   - source: chat
   - rationale: 2026-04-10 の依頼: エージェントの知識・哲学・人格形成を継続更新したい
 
+- 2026-04-10 | 要件定義では、過去ログ由来のユーザー特性と、今回の要求・repo 実態・domain 制約・未確定事項を分けて扱いたい
+  - source: chat
+  - rationale: 2026-04-10 request: requirements definition should be more careful; user traits can be extracted separately but should not replace task-specific requirements
+
+- 2026-04-10 | 変数名や identifier を worker が自由裁量で決めるのではなく、既存 precedent または詳細設計に結び付けたい
+  - source: chat
+  - rationale: 2026-04-10 request asking whether variable names can be decided freely
+
 ## Promotion Candidates
 
 - まだなし

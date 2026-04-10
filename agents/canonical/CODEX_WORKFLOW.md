@@ -126,6 +126,8 @@ user が skill を明示したい場合は `$skill-name` を使います。例: 
 - context sweep と library sweep を先に行う
 - 変更対象と acceptance criteria を短く固定する
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
+- 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
+- durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
 - durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
@@ -249,6 +251,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - cross-process export worker には live Python object reference を渡さず、serializable manifest と reconstruction recipe を渡す
 - `LoadedProgram` のような runtime materialization は compile DAG node にせず、runtime vertex / lifetime scope として扱う
 - まず既存 code path、既存 helper、既存 style を調べ、再利用を優先する
+- worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
 - default worker は `gpt-5.3-codex` で、`gpt-5.3-codex-spark` は narrow override とみなす
 - same-worktree single-writer rule は `worker.toml` と planning/reviewer TOML を正本にする

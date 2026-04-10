@@ -17,6 +17,10 @@
 
 <!-- Check whether existing code, naming, APIs, tests, and docs style are being followed. -->
 
+## Identifier And Naming Review
+
+<!-- Check whether every new or renamed identifier, path, CLI flag, config key, and public API is fixed by the design or local precedent. Return revise if the worker would need to invent any reusable or user-facing name. -->
+
 ## Implementation Readiness Review
 
 <!-- Check whether the design is actually ready for implementation and whether it passes the most important pre-implementation gate. Top-down document readability is handled separately in document_flow_review.md. -->

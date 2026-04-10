@@ -17,7 +17,17 @@
 
 ## Working Principles
 
-- まだなし
+- 2026-04-10 | work-principle | requirements は current request、durable user preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分離してから planning へ渡す
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to make requirements definition more careful beyond user traits from prior logs
+
+- 2026-04-10 | work-principle | identifier naming は worker の自由裁量にせず、既存 precedent または詳細設計の naming plan に結び付ける
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request about whether variable names can be decided freely
 
 ## Interaction Observations
 

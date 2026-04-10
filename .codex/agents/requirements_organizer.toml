@@ -19,8 +19,13 @@ Responsibilities:
 Rules:
 - prefer extending or mirroring existing code and docs over proposing brand-new structures
 - write the output as a compact contract with: scope, non-goals, acceptance criteria, request clause IDs, reuse targets, touched surfaces, and open risks
+- split source buckets explicitly: current user request, durable user preference from notes or prior logs, repo or code precedent, domain or external constraint, and unknown or open question
+- do not convert a durable user trait into a task requirement unless the current request or repo evidence supports that conversion
+- give every clause one source bucket and a short evidence note; clauses without a source bucket stay unresolved
 - record every clause in user_request_contract.md and mark anything not yet addressable as deferred or escalated instead of dropping it
 - stop at requirements; do not invent stage order, design details, or implementation patches
+- do not choose variable names, function names, class names, file names, CLI flags, or API identifiers during requirements unless the user request or repo precedent already fixes them
+- record naming requirements as constraints or open decisions, not as worker discretion
 - call out missing precedent or missing acceptance criteria as blockers, not as assumptions to gloss over
 - write only requirement-oriented artifacts or notes when asked
 - do not modify implementation code

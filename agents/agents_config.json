@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "tools/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses, and detailed design review remains the strongest pre-implementation gate. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets, and detailed design review remains the strongest pre-implementation gate. Detailed design fixes identifier naming before implementation. Only implementer may modify repository source files."
   },
   "always_on_roles": [
     {
@@ -18,6 +18,7 @@
         "user_intent_capture",
         "acceptance_criteria",
         "user_request_traceability",
+        "requirement_source_bucket_tracking",
         "ambiguity_tracking",
         "context_sweep",
         "library_sweep",
@@ -44,7 +45,7 @@
           "decision_log",
           "team_manifest"
         ],
-        "notes": "The manager records intake, user request clauses, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
+        "notes": "The manager records intake, source-bucketed user request clauses, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
       }
     },
     {
@@ -52,6 +53,7 @@
       "owns": [
         "scope_review",
         "acceptance_review",
+        "source_bucket_review",
         "routing_review"
       ],
       "required_outputs": [
@@ -62,7 +64,7 @@
         "allowed_artifacts": [
           "management_review"
         ],
-        "notes": "The manager reviewer approves or challenges scope, acceptance criteria, and specialist activation."
+        "notes": "The manager reviewer approves or challenges scope, acceptance criteria, source-bucket separation, and specialist activation."
       }
     },
     {
@@ -73,7 +75,8 @@
         "change_plan",
         "detailed_design_documentation",
         "existing_code_reuse_plan",
-        "style_continuity_plan"
+        "style_continuity_plan",
+        "identifier_naming_plan"
       ],
       "required_outputs": [
         "design_brief.md"
@@ -83,7 +86,7 @@
         "allowed_artifacts": [
           "design_brief"
         ],
-        "notes": "The designer produces the detailed design document before coding begins, including reuse-first choices and the existing writing/style conventions to follow."
+        "notes": "The designer produces the detailed design document before coding begins, including reuse-first choices, identifier naming plan, and the existing writing/style conventions to follow."
       }
     },
     {
@@ -93,7 +96,8 @@
         "risk_review",
         "simplicity_review",
         "implementation_readiness_review",
-        "reuse_conformity_review"
+        "reuse_conformity_review",
+        "identifier_naming_review"
       ],
       "required_outputs": [
         "design_review.md"
@@ -103,7 +107,7 @@
         "allowed_artifacts": [
           "design_review"
         ],
-        "notes": "The design reviewer independently checks the detailed design document, implementation readiness, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
+        "notes": "The design reviewer independently checks the detailed design document, implementation readiness, identifier naming plan, and whether existing code, naming, and writing style are being followed. This is the most important pre-implementation review gate."
       }
     },
     {
@@ -152,7 +156,8 @@
       "owns": [
         "code_and_docs_edits",
         "local_validation",
-        "reuse_first_implementation"
+        "reuse_first_implementation",
+        "approved_naming_followthrough"
       ],
       "required_outputs": [
         "decision_log.md"
@@ -163,7 +168,7 @@
           "decision_log"
         ],
         "requires_worktree_scope": true,
-        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code and mirror existing style before introducing any new pattern."
+        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code, mirror existing style, and follow approved naming before introducing any new pattern."
       }
     },
     {
