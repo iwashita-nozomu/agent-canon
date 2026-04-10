@@ -5,6 +5,10 @@ skill_families:
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
     shim: .agents/skills/repo-onboarding/SKILL.md
+  - id: start-repository
+    purpose: Start a new repository from the template clone, including bare remotes and project-local agent-canon seeding.
+    canonical_doc: agents/skills/start-repository.md
+    shim: .agents/skills/start-repository/SKILL.md
   - id: codex-task-workflow
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
