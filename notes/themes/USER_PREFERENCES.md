@@ -40,6 +40,10 @@
   - source: chat
   - rationale: 2026-04-10 request: Agile を強化し、一つの拡張ごとにウォーターフォールで回すループにしたい
 
+- 2026-04-10 | 文書や詳細設計がある状態では、実装を設計文書ベースで行い、会話や推測で上書きしない
+  - source: chat
+  - rationale: 2026-04-10 request: 文書がある状態で実装が文書を無視することが多い
+
 ## Promotion Candidates
 
 - まだなし

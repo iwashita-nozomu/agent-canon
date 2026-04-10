@@ -47,6 +47,12 @@
   - confidence: likely
   - evidence: 2026-04-10 request to strengthen Agile as one waterfall loop per extension
 
+- 2026-04-10 | work-principle | implementation は approved design packet を読んで artifact/section を引用してから始め、設計と違う場合は Gate 5/6 に戻す
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to organize implementation around existing documents/design
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

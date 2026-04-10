@@ -22,6 +22,7 @@ class ArtifactCheck:
     path: str
     require_filled: bool = False
     require_approve: bool = False
+    required_sections: tuple[str, ...] = ()
 
 
 GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
@@ -34,18 +35,43 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
         ArtifactCheck("schedule_review.md", require_filled=True, require_approve=True),
     ),
     "design": (
-        ArtifactCheck("design_brief.md", require_filled=True),
-        ArtifactCheck("design_review.md", require_filled=True, require_approve=True),
+        ArtifactCheck(
+            "design_brief.md",
+            require_filled=True,
+            required_sections=(
+                "## Implementation Source Packet",
+                "## Design-To-Implementation Trace",
+            ),
+        ),
+        ArtifactCheck(
+            "design_review.md",
+            require_filled=True,
+            require_approve=True,
+            required_sections=(
+                "## Implementation Source Packet Review",
+                "## Design-To-Implementation Trace Review",
+            ),
+        ),
         ArtifactCheck("document_flow_review.md", require_filled=True, require_approve=True),
     ),
     "test": (
         ArtifactCheck("test_plan.md", require_filled=True),
     ),
     "implementation": (
-        ArtifactCheck("change_review.md", require_filled=True, require_approve=True),
+        ArtifactCheck(
+            "change_review.md",
+            require_filled=True,
+            require_approve=True,
+            required_sections=("## Design-Base Implementation Review",),
+        ),
     ),
     "final": (
-        ArtifactCheck("final_review.md", require_filled=True, require_approve=True),
+        ArtifactCheck(
+            "final_review.md",
+            require_filled=True,
+            require_approve=True,
+            required_sections=("## Design Trace Acceptance",),
+        ),
     ),
 }
 
@@ -103,6 +129,27 @@ def decision_is_approve(text: str) -> bool:
     return bool(decisions) and decisions[-1] == "approve"
 
 
+def section_has_content(text: str, heading: str) -> bool:
+    """Return whether a markdown section exists and has non-placeholder content."""
+    lines = text.splitlines()
+    in_section = False
+    body: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_section:
+                break
+            in_section = stripped == heading
+            continue
+        if in_section:
+            body.append(line)
+    if not in_section:
+        return False
+    body_text = PLACEHOLDER_PATTERN.sub("", "\n".join(body))
+    body_text = "\n".join(line for line in body_text.splitlines() if line.strip()).strip()
+    return bool(body_text)
+
+
 def table_body_rows(text: str, heading: str) -> list[str]:
     """Return non-header table rows under one markdown section."""
     rows: list[str] = []
@@ -142,6 +189,10 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
     text = path.read_text(encoding="utf-8")
     if check.require_filled and ("<!--" in text or is_placeholder_only_section(text)):
         blockers.append(f"{check.path}:template_or_placeholder_remaining")
+    for section in check.required_sections:
+        if not section_has_content(text, section):
+            slug = section.removeprefix("## ").lower().replace(" ", "_")
+            blockers.append(f"{check.path}:section_empty_or_missing:{slug}")
     if check.path == "user_request_contract.md":
         blockers.extend(check_user_request_contract(text))
     if check.require_approve and not decision_is_approve(text):

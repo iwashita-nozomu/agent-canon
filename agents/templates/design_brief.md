@@ -12,6 +12,10 @@
 
 <!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->
 
+## Implementation Source Packet
+
+<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, code paths, tests, and external references if any. Mark each item required or not used. -->
+
 ## Patterns And Writing Style To Mirror
 
 <!-- Record the existing coding and documentation style that implementation must follow. -->
@@ -27,6 +31,10 @@
 ## File-By-File Design
 
 <!-- Describe the planned file edits, boundaries, interfaces, and expected diff shape in detail. -->
+
+## Design-To-Implementation Trace
+
+<!-- For each planned edit, map design section, user-request clause ID, source/reuse document or code path, test-plan item, and expected validation evidence. The worker must cite this mapping before editing. -->
 
 ## Identifier And Naming Plan
 

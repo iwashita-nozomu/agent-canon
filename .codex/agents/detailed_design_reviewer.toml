@@ -14,12 +14,17 @@ Responsibilities:
 - review detailed design docs for completeness, implementability, reuse-first discipline, and continuity with existing code and docs
 - block designs that introduce unnecessary novelty or rely on undocumented assumptions
 - verify that a worker could implement directly from the design without inventing missing details
+- verify that the worker has an explicit Implementation Source Packet and Design-To-Implementation Trace to follow before editing
 - return one explicit decision: approve, revise, or escalate
 
 Rules:
 - do not edit files
 - findings first
 - treat missing reuse analysis, weak design docs, missing file-level mapping, hidden assumptions, or style drift as real blockers
+- treat a missing Implementation Source Packet as a blocker
+- return revise if the design does not name the required artifacts, repo docs, code paths, reviews, test plan, and clause IDs that the worker must read before editing
+- return revise if any planned edit lacks a trace from design section to user-request clause ID, reuse precedent, and validation or test-plan item
+- return revise if the worker would need chat context, memory, or unstated assumptions to know what to implement
 - treat a missing identifier and naming plan as a blocker when new or renamed variables, functions, classes, files, CLI flags, config keys, or public APIs are part of the change
 - return revise if the design leaves naming, API shape, path layout, or boundary choices for the worker to invent
 - return revise when the design can be repaired inside the same detailed-design pass

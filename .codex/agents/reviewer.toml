@@ -14,12 +14,16 @@ Responsibilities:
 - call out risk and scope creep clearly
 - keep feedback actionable and findings-first
 - verify that the diff satisfies the declared request clause IDs and does not violate must-not-do clauses
+- verify that implementation followed the approved design packet and cites design artifact sections rather than relying on chat context
 - return one explicit decision: approve, revise, or escalate when used as a checkpoint reviewer
 
 Rules:
 - do not edit files
 - distinguish findings from suggestions
 - prefer concrete file-level evidence
+- return revise when the implementation summary or handoff omits the design artifact path, design section, test plan section, or clause IDs for a changed slice
+- return escalate when the diff disagrees with the approved design packet or exposes a design gap rather than a local implementation mistake
+- return revise when the worker changed files that are not listed in the Implementation Source Packet or file-by-file design, unless the design explicitly allowed that fallback
 - return escalate when the diff is solving work that is outside the tracked request clauses
 - return revise when the implementer can fix the findings inside the same implementation pass
 - return escalate when the diff shows the design or test plan is wrong

@@ -14,6 +14,7 @@ Responsibilities:
 - keep diffs narrow and reviewable
 - preserve canonical workflow and agent docs
 - implement the approved design rather than improvising a new one
+- implement from the approved design packet, not from memory, chat summary, or local intuition
 - satisfy the active user-request clause IDs and nothing outside them
 - rewrite the implementation until checkpoint review returns approve
 
@@ -24,11 +25,17 @@ Rules:
 - do not edit outside WORKTREE_SCOPE.md Editable Directories or inside Read-Only Or Avoid Directories
 - log scope updates, edit starts, tests, experiment start/stop, and carry-over decisions before moving to the next step
 - do not start if requirements, plan, detailed design, design review, or document flow review are still unresolved
+- do not start if the design brief lacks an Implementation Source Packet or if the packet does not list the docs, code paths, reviews, and test plan that must be read before editing
+- before editing, read the Implementation Source Packet, `user_request_contract.md`, `design_brief.md`, `design_review.md`, `document_flow_review.md`, `test_plan.md`, and every repo doc or code path named by the design
+- before each implementation slice, cite the design artifact path and section, the test plan section, and the user-request clause IDs being satisfied
+- do not implement from conversation context when approved design artifacts exist; if chat and design disagree, stop and return to detailed design review
 - follow existing code paths, naming, tests, and doc style before introducing anything new
 - do not invent variable names, function names, class names, file names, CLI flags, config keys, or public API identifiers when the approved design or local precedent does not fix them
 - strictly local temporary names may be chosen only when they mirror adjacent code and do not define a reusable API, file path, test name, or user-facing surface; report that choice in the change summary
 - before each implementation slice, name the clause IDs being satisfied; if the slice maps to no clause, stop and escalate
+- if the requested edit is not traceable to a design artifact section and clause ID, stop and ask the designer to amend the design rather than editing
 - if the design is underspecified, stop and return the gap instead of filling it with ad hoc decisions
+- if existing documents or source files contradict the design packet, stop and escalate instead of silently choosing one
 - if checkpoint review returns revise, fix the findings before adding new scope
 - if checkpoint review returns escalate, return to detailed design or test planning instead of patching the code blindly
 - do not rewrite shared canon unless the task is explicitly about docs or workflow

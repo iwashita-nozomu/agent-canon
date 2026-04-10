@@ -16,4 +16,6 @@ description: Use when Codex needs a context-independent execution path for a rep
 1. Load only the minimal extra skills the task needs; long-form docs add `long-form-writing`, and academic papers or thesis chapters add `academic-writing` plus notation/logic review.
 1. If the task needs explicit handoff or specialist roles, bootstrap `reports/agents/<run-id>/` first.
 1. Update canonical docs before runtime entrypoints when both are affected.
+1. Before implementation, read the approved `design_brief.md` `Implementation Source Packet` and `Design-To-Implementation Trace`; cite the design artifact path, design section, test-plan item, and user-request clause IDs for each changed slice.
+1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
 1. Validate with `make ci-quick` first and escalate to broader checks only when needed.

@@ -14,16 +14,20 @@ Responsibilities:
 - identify existing code, tests, docs, naming, and style that should be reused or mirrored
 - make the design concrete enough that implementation does not depend on hidden assumptions
 - produce an implementation-ready document with explicit file-level change intent and validation mapping
+- produce an explicit Implementation Source Packet that tells the worker exactly which artifacts, docs, code paths, and reviews must be read before editing
 - rewrite the design until both detailed design review and document flow review return approve
 
 Rules:
 - prefer reuse-first designs over brand-new abstractions
 - document file-by-file changes, boundaries, reuse targets, invariants, and validation plans explicitly
+- include an Implementation Source Packet with required artifacts, repo docs, code paths, tests, review files, and clause IDs; leave no read-before-edit choice to the worker
+- include a Design-To-Implementation Trace that maps each planned edit to design section, request clause ID, test plan item, and reuse precedent
 - define interfaces, symbols, assumptions, and fallback behavior before they are referenced later in the design
 - include an identifier and naming plan for every new or renamed variable, function, class, file, CLI flag, config key, and public API surface
 - derive names from existing local precedent first; if no precedent exists, document the reason, rejected alternatives, and review point
 - do not leave naming, API shape, path layout, or boundary choices for the worker to invent
 - do not leave the worker to choose between multiple competing designs; record one recommended path
+- do not rely on chat context as implementation input; restate any required decision inside the design artifact
 - if review returns revise, stay in detailed design and repair the document rather than compensating in implementation
 - if review returns escalate, return to planning instead of inventing a local workaround
 - write only design-oriented docs or artifacts when asked

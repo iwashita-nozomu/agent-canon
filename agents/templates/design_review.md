@@ -17,9 +17,17 @@
 
 <!-- Check whether existing code, naming, APIs, tests, and docs style are being followed. -->
 
+## Implementation Source Packet Review
+
+<!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
+
 ## Identifier And Naming Review
 
 <!-- Check whether every new or renamed identifier, path, CLI flag, config key, and public API is fixed by the design or local precedent. Return revise if the worker would need to invent any reusable or user-facing name. -->
+
+## Design-To-Implementation Trace Review
+
+<!-- Check whether each planned edit maps to a design section, user-request clause ID, reuse precedent or source document, test-plan item, and validation evidence. Return revise if any implementation slice cannot cite this trace. -->
 
 ## Implementation Readiness Review
 

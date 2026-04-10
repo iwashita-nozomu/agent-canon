@@ -14,6 +14,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 要件が固まる前に code を書き始めない
 - 計画が固まる前に詳細設計へ進まない
 - 詳細設計が固まる前に実装を広げない
+- 実装は承認済みの設計文書 packet を読んでから始める
 - 実装、review、verification を段階ゲートで区切る
 - 各 pass で複数回の独立レビューを必須にする
 - `設計 -> レビュー`、`詳細設計 -> レビュー`、`実装 -> レビュー` を完了条件充足まで反復する
@@ -113,6 +114,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `escalate` は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
   - 実装者が文書だけ読んで着手できる
+  - `Implementation Source Packet` と `Design-To-Implementation Trace` が揃っている
   - reuse-first、style-following、reader path が blocker なしで揃っている
 
 ### Cycle C. 実装 -> 実装 checkpoint review
@@ -130,6 +132,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
 - 完了条件:
   - diff が approved design と test plan に一致する
+  - 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
   - regression、style drift、stale path、missing test が blocker なしになる
 
 ### Gate 0. Subagent Bootstrap
@@ -318,8 +321,10 @@ exit 条件:
 
 最低限の記録:
 - `Existing Code And Docs To Reuse:`
+- `Implementation Source Packet:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
+- `Design-To-Implementation Trace:`
 - `Interfaces And Boundaries:`
 - `Identifier And Naming Plan:`
 - `Validation And Rollback Plan:`
@@ -327,16 +332,21 @@ exit 条件:
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、code path、test path、外部 reference を列挙します
+- `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - 新規または rename する variable、function、class、file、CLI flag、config key、public API identifier は、既存 precedent、採用名、却下した代替案、review 観点を明記します
 - 既存 precedent がある場合はそれを採用し、ない場合は理由を文書化して Gate 6 で確認します
 - worker が naming、API shape、path layout、boundary choice を発明しなくてよい状態まで詳細設計を詰めます
+- worker が会話文脈や記憶を実装入力にしなくてよい状態まで、必要な判断を設計文書内に再掲します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
+- worker が編集前に読む文書と code path が `Implementation Source Packet` だけで分かる
+- 各予定差分が `Design-To-Implementation Trace` で clause、source、test、validation へ結び付いている
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
 - refactor pass では move / rename / split と挙動保存境界が文書だけで追える
@@ -359,6 +369,9 @@ exit 条件:
 必須レビュー:
 - `design_reviewer`
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
+  - `Implementation Source Packet` が編集前に読む artifact、repo docs、code path、test plan を列挙しているか確認する
+  - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
+  - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
   - identifier naming plan が既存 precedent または明示 rationale に結び付いているか確認する
   - worker が reusable / user-facing な名前を発明する余地が残っていないか確認する
 - 必要に応じて `infra_reviewer`
@@ -370,12 +383,14 @@ exit 条件:
 - `詳細設計レビュー` は計画レビューより重い gate とします
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
+- `Implementation Source Packet` または `Design-To-Implementation Trace` の不足は `revise` blocker とします
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
 - `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 
 exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
+- implementation source packet と design-to-implementation trace の懸念が解消している
 - naming plan の懸念が解消している
 - decision が `approve` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している
@@ -446,11 +461,15 @@ exit 条件:
 - bounded な切り出しだけを `worker` に渡す
 
 ルール:
+- 実装前に `Implementation Source Packet` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、実装 summary に読んだ design artifact と section を残します
+- 会話、記憶、直感を、承認済み設計文書より優先しません
+- design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
 - 実装は 1 つの change request に閉じます
 - docs と tests は同じ pass で更新します
 - `test_plan.md` の nasty case を最低限どこへ落とし込んだか説明できるようにします
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
+- design section、request clause ID、test plan item に trace できない変更は実装しません
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
 - 既存コード、既存 helper、既存 naming、既存 test style、既存 docs style を優先します
 - 完全な新規実装より、既存実装の拡張、既存 pattern の模倣、既存 file layout の踏襲を優先します
@@ -460,12 +479,15 @@ exit 条件:
 
 必須レビュー:
 - `change_reviewer`
+  - 各 changed slice が design artifact、design section、source packet entry、test plan item、request clause ID を引用しているか確認する
+  - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
   - implementation checkpoint review として、構造、境界、明白な回帰、設計逸脱を早期に確認する
   - `Large Delivery` では chunk ごとに最低 1 回
   - `Platform And Environment` では rollout 影響が見える時点で最低 1 回
 
 exit 条件:
 - 差分が requirements / plan / design に一致している
+- 各 changed slice が design artifact、design section、test plan item、request clause ID を引用している
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate implementation"` が pass している
@@ -490,6 +512,7 @@ exit 条件:
 必須レビュー:
 - `final_reviewer`
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
+  - final diff が approved design section、Implementation Source Packet、request clause ID、test plan item に trace できるか確認する
 - 必要に応じて `python-review`
   - Python API、型境界、test coverage の不足を確認する
 - 必要に応じて `cpp-review`

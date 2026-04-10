@@ -5,6 +5,10 @@
 ## Avoid
 
 - 会話だけを根拠に実装、設計変更、文書改訂へ進める
+- 承認済み design packet があるのに、文書を読まず会話文脈、記憶、推測で実装する
+- `Implementation Source Packet` や `Design-To-Implementation Trace` がないまま worker が編集を始める
+- design artifact path、design section、test plan item、request clause ID を引用できない実装 slice を進める
+- design packet と repo docs / code の矛盾を worker がその場で解釈して実装する
 - `documents/`、`notes/`、`references/` の context sweep をせずに着手する
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
 - 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
