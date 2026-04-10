@@ -35,6 +35,12 @@
   - confidence: likely
   - evidence: 2026-04-10 request to keep agent-canon updated every time
 
+- 2026-04-10 | work-principle | waterfall workflow は最終 closeout だけでなく、requirements、plan、design、test、implementation、final の中間 gate を機械チェックで fail closed にする
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request reporting weak waterfall flow and mid-process errors
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

@@ -32,6 +32,10 @@
   - source: chat
   - rationale: 2026-04-10 request: 毎回毎回agent-canonは最新化したい
 
+- 2026-04-10 | ウォーターフォール開発では途中 gate のエラー検出と再開先を弱くせず、各段で機械的に止めたい
+  - source: chat
+  - rationale: 2026-04-10 request: ウォーターフォールの開発フローが弱く、途中でエラーがある
+
 ## Promotion Candidates
 
 - まだなし

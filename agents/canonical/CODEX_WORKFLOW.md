@@ -225,6 +225,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 `--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
 language-specific reviewer は task catalog に固定せず、`bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
 run bundle を起こしたら、`intent_brief.md` だけで進めず、`user_request_contract.md` を planning 前に埋めます。stage artifact、handoff、review では clause ID を明示します。
+各 waterfall gate を次段へ進める前に `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <gate>"` で中間 gate を確認します。
 
 包括的開発の固定 Codex stack:
 
@@ -247,6 +248,7 @@ cost を無視して review coverage を優先する run では、research-drive
 ### 5. Implementation
 
 - 実装は `documents/implementation-waterfall-workflow.md` の gate に従って進める
+- Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
 - worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
 - worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする

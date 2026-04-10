@@ -132,6 +132,7 @@ tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
+tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py

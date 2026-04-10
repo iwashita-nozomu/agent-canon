@@ -6,7 +6,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 ## 含めるもの
 
 - `agent_tools/`
-  - task/doc start、close gate、work log、runtime smoke
+  - task/doc start、waterfall gate、close gate、work log、runtime smoke
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
 - `docs/`
@@ -24,6 +24,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
   - `check_doc_test_triplet.py`
+  - `agent_tools/waterfall_gate_check.py`
 
 ## 含めないもの
 
