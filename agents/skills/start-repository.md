@@ -16,6 +16,7 @@ project slug、display name、project bare repo、project-local `agent-canon` ba
 
 - `documents/template-bootstrap.md`
 - `scripts/README.md`
+- `scripts/start_repository.sh`
 - `scripts/init_from_template.sh`
 - `documents/agent-canon-subtree-migration.md`
 - `tools/sync_agent_canon.sh`
@@ -26,7 +27,7 @@ project slug、display name、project bare repo、project-local `agent-canon` ba
 1. 必要なら dry run します。
 
 ```bash
-bash scripts/init_from_template.sh \
+bash scripts/start_repository.sh \
   --project-slug your-project \
   --display-name "Your Project" \
   --dry-run
@@ -35,7 +36,7 @@ bash scripts/init_from_template.sh \
 1. 初期化します。既定では `/mnt/git/<project-slug>-agent-canon.git` を作成し、`vendor/agent-canon/` snapshot を `main` として seed します。
 
 ```bash
-bash scripts/init_from_template.sh \
+bash scripts/start_repository.sh \
   --project-slug your-project \
   --display-name "Your Project"
 ```
@@ -43,7 +44,7 @@ bash scripts/init_from_template.sh \
 1. project-local agent-canon bare repo 名を固定したい場合は明示します。
 
 ```bash
-bash scripts/init_from_template.sh \
+bash scripts/start_repository.sh \
   --project-slug your-project \
   --display-name "Your Project" \
   --agent-canon-bare-repo your-project-agent-canon.git
@@ -52,18 +53,16 @@ bash scripts/init_from_template.sh \
 1. shared `agent-canon` remote を使い続ける場合だけ opt out します。
 
 ```bash
-bash scripts/init_from_template.sh \
+bash scripts/start_repository.sh \
   --project-slug your-project \
   --display-name "Your Project" \
   --skip-agent-canon-bare-repo
 ```
 
-1. 初期化後に確認します。
+1. 初期化変更を commit したあとに確認します。
 
 ```bash
-make agent-canon-ensure-latest
-make fresh-clone-check
-make ci-quick
+bash scripts/start_repository.sh --validate-only
 ```
 
 ## Safety Rules
