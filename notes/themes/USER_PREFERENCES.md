@@ -36,6 +36,10 @@
   - source: chat
   - rationale: 2026-04-10 request: ウォーターフォールの開発フローが弱く、途中でエラーがある
 
+- 2026-04-10 | Agile / adaptive improvement は、拡張 1 件ごとに独立した waterfall pass として回したい
+  - source: chat
+  - rationale: 2026-04-10 request: Agile を強化し、一つの拡張ごとにウォーターフォールで回すループにしたい
+
 ## Promotion Candidates
 
 - まだなし

@@ -311,9 +311,10 @@ single-writer ルール:
 
 特徴:
 - outer loop は agile、iteration backlog を持ちます
-- repo に持ち帰る各 change は 1 回の waterfall pass として閉じます
+- repo に持ち帰る各 extension は 1 回の waterfall pass として閉じます
 - `Question`、`Comparison Target`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を先に固定します
-- 1 iteration は 1 goal、1 change pass、1 decision state に固定します
+- 1 iteration は 1 extension、1 waterfall run-id、1 change pass、1 decision state に固定します
+- 2 つ目の extension に入る前に、直前 extension の waterfall gate check、final review、`task-close`、commit / push を終えます
 - `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
 - tuning 中でも `test_designer`、`document_flow_reviewer`、`report_reviewer` を省略しません
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
@@ -328,6 +329,7 @@ single-writer ルール:
 1. chunk 設計が必要なら `Large Delivery`
 1. 環境や automation を触るなら `Platform And Environment`
 1. code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
+1. tuning、実験、調査、比較改善を backlog で継続するなら `Adaptive Improvement Loop`
 
 ## 関連
 

@@ -41,6 +41,12 @@
   - confidence: likely
   - evidence: 2026-04-10 request reporting weak waterfall flow and mid-process errors
 
+- 2026-04-10 | work-principle | adaptive improvement は agile outer loop に Extension Backlog を持たせ、各 extension を 1 waterfall run-id、1 change pass、1 decision state として閉じてから次へ進む
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to strengthen Agile as one waterfall loop per extension
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

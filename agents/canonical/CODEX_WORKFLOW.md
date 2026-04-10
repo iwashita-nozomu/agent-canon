@@ -81,6 +81,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`n
   - repo-local virtual environment を作らず、environment validation には `bash tools/docker_dependency_validator.sh` を使う
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - tuning、比較改善、探索的 protocol refinement を backlog 付きで回すなら `Adaptive Improvement Loop`
+  - Agile outer loop とし、1 extension ごとに 1 waterfall run-id / 1 waterfall pass / 1 decision state へ分解する
 - chunk ごとの delivery なら `Large Delivery`
 - それ以外は `Scoped Change`
 
@@ -221,6 +222,9 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
       --task-id T13 \
       --owner "codex" \
       --workspace-root "$PWD"
+
+Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
+次の extension へ進む前に、直前 extension の中間 `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 
 `--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
 language-specific reviewer は task catalog に固定せず、`bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。

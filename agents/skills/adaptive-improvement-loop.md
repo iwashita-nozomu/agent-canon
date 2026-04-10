@@ -24,8 +24,9 @@
 ## Operating Rules
 
 - outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
-- 1 iteration につき 1 goal、1 change pass、1 decision state を基本にします。
+- 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
+- 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
 - 改善を採用しないときも、`What We Learned:` を note に残します。
@@ -38,6 +39,8 @@
 - `Stop Budget:`
 - `Improvement Backlog:`
 - `Iteration Goal:`
+- `Extension:`
+- `Waterfall Run ID:`
 - `Candidate Change:`
 - `Expected Effect:`
 - `Validation Plan:`
@@ -47,6 +50,5 @@
 ## Boundary
 
 - 外部調査そのものは `literature-survey` を追加します。
-- 単一 run の実行と rerun 分岐だけなら `experiment-lifecycle` を使います。
 - 単一 run の実行と rerun 分岐は `experiment-lifecycle` を使います。
 - repo-wide な feature delivery には使わず、`implementation-waterfall-workflow.md` を使います。

@@ -14,6 +14,8 @@
 
 要するに、この workflow は「開発全体を無秩序にアジャイル化する」ものではありません。
 outer loop は agile、inner change pass は waterfall です。
+各 backlog item は `Extension` と呼び、1 extension は必ず 1 waterfall pass と 1 run-id に対応させます。
+同じ iteration で 2 つの extension を混ぜません。
 
 ## 2. 対象
 
@@ -25,36 +27,45 @@ outer loop は agile、inner change pass は waterfall です。
 
 ## 3. 基本ルール
 
-- 1 iteration では、狙いを 1 つに絞ります。
-- 1 iteration で repo に持ち帰る code change は 1 つの waterfall pass として閉じます。
+- 1 iteration では、狙いを 1 つの extension に絞ります。
+- 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
+- 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。
+- 2 つ目の extension に入る前に、直前 extension の `make waterfall-gate-check`、final review、`task-close`、commit / push を終えます。
 - baseline と comparison target は loop の途中で勝手に差し替えません。
 - run ごとの result、decision、next action を明示し、なんとなく次へ進みません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。
 - tuning 中でも、既存コード再利用と既存 style の踏襲を優先します。
+- `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
 
 ## 4. Canonical Outer Loop
 
 1. 改善 backlog を固定する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
-1. backlog から今回の 1 iteration goal を選ぶ
+1. backlog から今回の 1 extension を選ぶ
+1. extension ごとの waterfall run-id を作る
 1. 必要なら外部調査と precedent 調査を追加する
 1. baseline か current state を同じ protocol で記録する
-1. 今回の 1 change pass を waterfall で実行する
+1. 今回の 1 extension を waterfall で実行する
+1. 各 waterfall gate で `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <gate>"` を通す
 1. fresh run で比較する
 1. `experiment_reviewer` と `report_reviewer` が iteration outcome をレビューする
 1. decision state を確定する
-1. backlog を更新し、次 iteration へ進むか loop を閉じる
+1. waterfall pass の `task-close`、commit、push を終える
+1. backlog を更新し、次 extension へ進むか loop を閉じる
 
 ## 5. Iteration Backlog
 
-各 iteration の着手前に、最低でも次を backlog に持ちます。
+各 extension の着手前に、最低でも次を backlog に持ちます。
 
+- `Backlog ID:`
+- `Extension:`
 - `Candidate Change:`
 - `Why This Iteration Now:`
 - `Expected Effect:`
 - `Risk:`
 - `Validation Plan:`
 - `Stop Condition For This Iteration:`
+- `Waterfall Run ID:`
 
 backlog は単なる思いつき置き場ではなく、優先順付きの実行待ち列として扱います。
 
@@ -123,3 +134,4 @@ close 前には、少なくとも次を残します。
 - `What We Learned:`
 - `Next Best Backlog Item Or Stop Reason:`
 - `Notes Promotion Decision:`
+- 各 extension の waterfall run-id、gate evidence、decision state
