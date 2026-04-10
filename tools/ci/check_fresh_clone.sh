@@ -39,6 +39,7 @@ AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
 AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD)"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
 git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
+git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
 (
   cd "${AGENT_CANON_TEST_WORK}"
