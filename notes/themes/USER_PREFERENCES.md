@@ -59,6 +59,9 @@
 - 2026-04-10 | Token efficiency: when a task has repeatable shell steps, prefer small bash scripts or batched shell commands instead of spending many turns/tokens on manual command-by-command narration.
   - source: chat
 
+- 2026-04-10 | Token reduction target is not primarily user-facing explanation; reduce command-generation overhead and subagent prompt/context tokens by batching repeatable shell work and delegating only when material.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
