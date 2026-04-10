@@ -367,7 +367,10 @@ import_fast_forward_snapshot() {
   local remote_sha="$2"
   local method="${3:-fast_forward_snapshot_import}"
 
-  git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha" || die "subtree pull failed and snapshot import is unsafe because local and remote agent-canon histories diverged"
+  if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    method="diverged_snapshot_import"
+    echo "agent_canon_snapshot_import=diverged_history"
+  fi
 
   echo "agent_canon_update_method=$method"
   apply_snapshot_diff "$local_split" "$remote_sha"
