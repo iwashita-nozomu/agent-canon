@@ -65,6 +65,9 @@
 - 2026-04-10 | Do not close tasks at minimal implementation or partial-spec coverage; require reviewer-confirmed evidence that implementation covers the full requested specification and that review findings were reflected before completion.
   - source: chat
 
+- 2026-04-10 | C++ native autodiff runtime should be GPU-first by default; CPU is an exceptional compile/configure fallback only for environments without GPU, not an equal backend choice.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
