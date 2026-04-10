@@ -260,7 +260,12 @@ bash tools/sync_agent_canon.sh pull
 ```
 
 `ensure-latest` は task 開始時の入口です。
-clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ subtree pull します。
+clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ更新します。
+`agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は、`agent-canon` remote を自動追加します。
+別の upstream を使う場合は `AGENT_CANON_REMOTE_URL` を指定します。
+通常は `git subtree pull --squash` を使います。
+fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
+local と remote が diverge している場合は、shared canon の上書きを避けるため停止します。
 dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
 
 ### 7.5 template / 派生 repo 側の shared canon 変更を upstream へ戻す

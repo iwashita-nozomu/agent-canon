@@ -22,6 +22,7 @@ Usage:
 Environment overrides:
   AGENT_CANON_PREFIX
   AGENT_CANON_REMOTE_NAME
+  AGENT_CANON_REMOTE_URL
   AGENT_CANON_BRANCH
   AGENT_CANON_FORCE_RELINK=1
 EOF
@@ -52,6 +53,31 @@ ensure_remote() {
 
 require_existing_remote() {
   git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1 || die "remote '$REMOTE_NAME' is not configured"
+}
+
+default_remote_url() {
+  if [ -n "${AGENT_CANON_REMOTE_URL:-}" ]; then
+    echo "$AGENT_CANON_REMOTE_URL"
+    return
+  fi
+  if [ -d "/mnt/git/agent-canon.git" ]; then
+    echo "/mnt/git/agent-canon.git"
+    return
+  fi
+  return 0
+}
+
+ensure_existing_remote_or_default() {
+  local remote_url=""
+  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+    return
+  fi
+  remote_url="$(default_remote_url)"
+  if [ -z "$remote_url" ]; then
+    die "remote '$REMOTE_NAME' is not configured; set AGENT_CANON_REMOTE_URL or run 'git remote add $REMOTE_NAME <agent-canon-url>'"
+  fi
+  git -C "$ROOT_DIR" remote add "$REMOTE_NAME" "$remote_url"
+  echo "agent_canon_remote_added=$remote_url"
 }
 
 ensure_prefix_exists() {
@@ -264,6 +290,71 @@ cmd_check() {
   echo "shared surface is in sync"
 }
 
+stage_sync_paths() {
+  local spec=""
+  git -C "$ROOT_DIR" add -A -- "$PREFIX"
+
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    git -C "$ROOT_DIR" add -A -- "${spec%%:*}"
+  done < <(
+    {
+      build_link_specs
+      build_copy_specs
+    }
+  )
+}
+
+commit_sync_paths_if_needed() {
+  local remote_sha="$1"
+  local method="$2"
+
+  stage_sync_paths
+  if git -C "$ROOT_DIR" diff --cached --quiet; then
+    return
+  fi
+
+  git -C "$ROOT_DIR" commit \
+    -m "chore: sync agent-canon snapshot" \
+    -m "agent-canon-remote: $remote_sha" \
+    -m "agent-canon-update-method: $method" \
+    -m "agent-canon-prefix: $PREFIX"
+}
+
+import_fast_forward_snapshot() {
+  local local_split="$1"
+  local remote_sha="$2"
+
+  git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha" || die "subtree pull failed and snapshot import is unsafe because local and remote agent-canon histories diverged"
+
+  echo "agent_canon_update_method=fast_forward_snapshot_import"
+  git -C "$ROOT_DIR" diff --binary "$local_split" "$remote_sha" -- | git -C "$ROOT_DIR" apply --index --directory="$PREFIX"
+  cmd_link_root 1
+  commit_sync_paths_if_needed "$remote_sha" "fast_forward_snapshot_import"
+}
+
+pull_or_import_snapshot() {
+  local branch="$1"
+  local local_split="$2"
+  local remote_sha="$3"
+  local pull_log=""
+
+  pull_log="$(mktemp)"
+  if git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash >"$pull_log" 2>&1; then
+    cat "$pull_log"
+    rm -f "$pull_log"
+    echo "agent_canon_update_method=subtree_pull"
+    cmd_link_root 1
+    commit_sync_paths_if_needed "$remote_sha" "subtree_pull"
+    return
+  fi
+
+  cat "$pull_log" >&2
+  rm -f "$pull_log"
+  echo "agent_canon_subtree_pull=failed"
+  import_fast_forward_snapshot "$local_split" "$remote_sha"
+}
+
 cmd_add() {
   local remote_url="$1"
   local branch="${2:-$DEFAULT_BRANCH}"
@@ -276,11 +367,15 @@ cmd_add() {
 
 cmd_pull() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  local local_split=""
+  local remote_sha=""
+
   require_clean_worktree
-  require_existing_remote
+  ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
-  git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash
-  cmd_link_root 1
+  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  local_split="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"
+  pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
 }
 
 cmd_ensure_latest() {
@@ -289,7 +384,7 @@ cmd_ensure_latest() {
   local remote_sha=""
 
   ensure_prefix_exists
-  require_existing_remote
+  ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
   local_split="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"
@@ -319,8 +414,7 @@ cmd_ensure_latest() {
 
   require_clean_worktree
   echo "agent_canon_latest=pulling_remote"
-  git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash
-  cmd_link_root 1
+  pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
 }
 
 cmd_push() {

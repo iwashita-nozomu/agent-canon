@@ -20,6 +20,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - top-level helper
   - `sync_agent_canon.sh`
     - `ensure-latest` は task 開始時に upstream `agent-canon` と local subtree snapshot を揃えます。
+    - `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は自動追加します。
+    - fresh clone で subtree metadata が無い場合は、fast-forward 更新に限って snapshot import へ切り替えます。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`

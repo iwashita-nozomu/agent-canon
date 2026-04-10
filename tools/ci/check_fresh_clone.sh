@@ -34,6 +34,24 @@ assert data["services"]["workspace"]["working_dir"] == "/workspace"
 PY
 
 bash tools/sync_agent_canon.sh check
+AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
+AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
+AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD)"
+git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
+git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
+git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
+(
+  cd "${AGENT_CANON_TEST_WORK}"
+  printf "fresh clone fallback marker\n" > .fresh-clone-agent-canon-marker
+  git add .fresh-clone-agent-canon-marker
+  git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon snapshot" >/dev/null
+  git push origin main >/dev/null
+)
+git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
+git config user.name "Fresh Clone Check"
+git config user.email "fresh-clone-check@example.invalid"
+bash tools/sync_agent_canon.sh ensure-latest
+test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 make agent-checks
 make ci-quick
 
