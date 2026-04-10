@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import tempfile
-import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from agent_team import (
     ROOT,

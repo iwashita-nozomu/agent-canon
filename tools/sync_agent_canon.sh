@@ -321,16 +321,78 @@ commit_sync_paths_if_needed() {
     -m "agent-canon-prefix: $PREFIX"
 }
 
+find_commit_by_tree() {
+  local tree_sha="$1"
+  local history_head="$2"
+  local commit=""
+
+  while IFS= read -r commit; do
+    if [ "$(git -C "$ROOT_DIR" rev-parse "$commit^{tree}")" = "$tree_sha" ]; then
+      echo "$commit"
+      return
+    fi
+  done < <(git -C "$ROOT_DIR" rev-list "$history_head")
+
+  return 1
+}
+
+materialize_cached_snapshot_diff() {
+  local base_sha="$1"
+  local remote_sha="$2"
+  local status=""
+  local path=""
+
+  while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+    case "$status" in
+      D)
+        rm -f "$ROOT_DIR/$PREFIX/$path"
+        ;;
+      *)
+        git -C "$ROOT_DIR" checkout-index -f -u -- "$PREFIX/$path"
+        ;;
+    esac
+  done < <(git -C "$ROOT_DIR" diff --name-status --no-renames -z "$base_sha" "$remote_sha" --)
+}
+
+apply_snapshot_diff() {
+  local base_sha="$1"
+  local remote_sha="$2"
+
+  git -C "$ROOT_DIR" diff --binary "$base_sha" "$remote_sha" -- | git -C "$ROOT_DIR" apply --cached --directory="$PREFIX"
+  materialize_cached_snapshot_diff "$base_sha" "$remote_sha"
+}
+
 import_fast_forward_snapshot() {
   local local_split="$1"
   local remote_sha="$2"
+  local method="${3:-fast_forward_snapshot_import}"
 
   git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha" || die "subtree pull failed and snapshot import is unsafe because local and remote agent-canon histories diverged"
 
-  echo "agent_canon_update_method=fast_forward_snapshot_import"
-  git -C "$ROOT_DIR" diff --binary "$local_split" "$remote_sha" -- | git -C "$ROOT_DIR" apply --index --directory="$PREFIX"
+  echo "agent_canon_update_method=$method"
+  apply_snapshot_diff "$local_split" "$remote_sha"
   cmd_link_root 1
-  commit_sync_paths_if_needed "$remote_sha" "fast_forward_snapshot_import"
+  commit_sync_paths_if_needed "$remote_sha" "$method"
+}
+
+import_snapshot_from_prefix_tree() {
+  local local_tree="$1"
+  local remote_sha="$2"
+  local method="$3"
+  local local_snapshot=""
+
+  if git -C "$ROOT_DIR" diff --quiet "$local_tree" "$remote_sha" --; then
+    echo "agent_canon_latest=already_current_tree"
+    cmd_link_root 1
+    return
+  fi
+
+  local_snapshot="$(find_commit_by_tree "$local_tree" "$remote_sha")" || die "git subtree is unavailable and snapshot import is unsafe because the local prefix tree is not present in remote agent-canon history"
+  import_fast_forward_snapshot "$local_snapshot" "$remote_sha" "$method"
+}
+
+split_prefix_or_empty() {
+  git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null || true
 }
 
 pull_or_import_snapshot() {
@@ -374,25 +436,49 @@ cmd_pull() {
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
-  local_split="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"
-  pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+  local_split="$(split_prefix_or_empty)"
+  if [ -n "$local_split" ]; then
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+    return
+  fi
+
+  echo "agent_canon_local_split=unavailable"
+  import_snapshot_from_prefix_tree "$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")" "$remote_sha" "snapshot_import_no_subtree"
 }
 
 cmd_ensure_latest() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  local local_tree=""
   local local_split=""
+  local remote_tree=""
   local remote_sha=""
 
   ensure_prefix_exists
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
-  local_split="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"
+  remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
+  local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
+  local_split="$(split_prefix_or_empty)"
 
-  echo "agent_canon_local_split=$local_split"
+  if [ -n "$local_split" ]; then
+    echo "agent_canon_local_split=$local_split"
+  else
+    echo "agent_canon_local_split=unavailable"
+  fi
   echo "agent_canon_remote=$remote_sha"
 
-  if [ "$local_split" = "$remote_sha" ]; then
+  if [ "$local_tree" = "$remote_tree" ]; then
+    echo "agent_canon_latest=already_current_tree"
+    if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+      cmd_check
+    else
+      cmd_link_root 1
+    fi
+    return
+  fi
+
+  if [ -n "$local_split" ] && [ "$local_split" = "$remote_sha" ]; then
     echo "agent_canon_latest=already_current"
     if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
       cmd_check
@@ -402,7 +488,7 @@ cmd_ensure_latest() {
     return
   fi
 
-  if git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
+  if [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
     echo "agent_canon_latest=local_contains_remote"
     if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
       cmd_check
@@ -414,7 +500,11 @@ cmd_ensure_latest() {
 
   require_clean_worktree
   echo "agent_canon_latest=pulling_remote"
-  pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+  if [ -n "$local_split" ]; then
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+  else
+    import_snapshot_from_prefix_tree "$local_tree" "$remote_sha" "snapshot_import_no_subtree"
+  fi
 }
 
 cmd_push() {
