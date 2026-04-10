@@ -372,6 +372,12 @@ import_fast_forward_snapshot() {
     echo "agent_canon_snapshot_import=diverged_history"
   fi
 
+  if git -C "$ROOT_DIR" diff --quiet "$local_split" "$remote_sha" --; then
+    echo "agent_canon_latest=already_current_snapshot"
+    cmd_link_root 1
+    return
+  fi
+
   echo "agent_canon_update_method=$method"
   apply_snapshot_diff "$local_split" "$remote_sha"
   cmd_link_root 1
