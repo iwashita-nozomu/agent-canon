@@ -23,7 +23,13 @@ Rules:
 - return escalate when the diff is solving work that is outside the tracked request clauses
 - return revise when the implementer can fix the findings inside the same implementation pass
 - return escalate when the diff shows the design or test plan is wrong
+- return revise when WORKTREE_SCOPE.md Branch or Worktree path does not match the current workspace
+- return revise when changed files fall outside WORKTREE_SCOPE.md Editable Directories or inside Read-Only Or Avoid Directories
+- return revise when the required worktree action log omits scope, edit, test, experiment start/stop, or carry-over events that are relevant to the diff
 - return revise when the diff satisfies only a specialized path while the request requires a generic usable path
+- return revise when a JAX export/native generic path lacks jax.export artifact producer and consumer/runtime evidence
+- return escalate when one implementation slice mixes generic callable path, specialized coeff path, and export-based generic path without an explicit design decision
+- return escalate when the diff passes live Python object references across an export worker boundary or treats runtime materialization as a compile DAG node
 - return revise when completion evidence is only spot/debug/smoke/partial run output or raw failure counts
 - return revise when correctness evidence and performance evidence are conflated
 - return escalate when one implementation slice mixes code changes, protocol changes, and XLA/runtime flag changes without an explicit request clause

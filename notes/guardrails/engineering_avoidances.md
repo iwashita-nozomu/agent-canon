@@ -29,7 +29,19 @@
 - scope で禁止された runner 変更、function fusion、別経路追加を、性能改善のために横滑りで入れる
 - user request clause にない実装 slice を「ついで」として入れる
 - worktree scope を更新せずに編集範囲を広げる
+- stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を現在の worktree に流用する
+- `WORKTREE_SCOPE.md` の `Editable Directories` 外や `Read-Only Or Avoid Directories` 内を編集する
+- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残さず進める
 - raw 結果だけ残して、読み方や判断を note / report に落とさない
+- JAX の任意 callable を current native runtime が直接理解できるものとして扱う
+- generic callable path、specialized coeff path、export-based generic path を 1 つの実装 slice で混同する
+- generic path の完了条件を specialized coeff path の evidence だけで満たした扱いにする
+- export worker に live Python object reference を渡す。cross-process 境界では serializable manifest と reconstruction recipe を使う
+- runtime materialization を compile DAG node として扱う。`LoadedProgram` は runtime vertex / lifetime scope に属する
+- external runner が process model を持つのに、bridge-local な追加 process spawn を足す
+- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
+- 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にする
+- failure-onset dimension を記録せず、implementation bug と真の frontier limit を混同する
 - `notes/` に置くべき一時メモを `documents/` へ混ぜる
 - validation を飛ばして commit / push だけ進める
 - required review、validation、commit / push を省略して完了扱いにする

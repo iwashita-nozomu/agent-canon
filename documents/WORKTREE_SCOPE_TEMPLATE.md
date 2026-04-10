@@ -84,6 +84,8 @@
 ## Additional Rules
 
 - ここに、この worktree 固有の制約を書きます。
+- Branch と Worktree path は current state と一致させる。一致しない `WORKTREE_SCOPE.md` を別 worktree へ流用しない。
+- `Editable Directories` 外と `Read-Only Or Avoid Directories` 内は編集しない。
 - 例: テストは触らない、結果 JSON は commit しない、runner だけ変更する、など。
 - 例: 変更した Markdown は `.markdownlint.json` を基準に確認する。
 - 例: scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次追記する。各 entry には `request_clause_ids=` を入れる。

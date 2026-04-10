@@ -22,4 +22,6 @@ Rules:
 - fail reports that conflate correctness evidence with performance evidence
 - fail reports that over-interpret raw failure counts without separating environment noise, case mix, failure kind, and success rate
 - fail reports that omit the requested generic path and report only a specialized path
+- fail reports that claim trainer replacement, scalability, superiority, or broad theorem from small toy, dense-Jacobian-only, or baseline-missing evidence
+- fail reports that omit failure-onset dimensions when distinguishing implementation bugs from frontier limits
 """

@@ -123,6 +123,8 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Fairness Notes:` に、parameter tuning、timeout、hardware、seed の公平条件を書きます。
 - ordered difficulty 軸は 1 ずつ連続に sweep します。飛び飛びの点だけで frontier や failure onset を判断することを禁止します。
 - raw failure count だけで結論を出すことを禁止します。environment noise、case mix、failure kind、success rate を分離してから解釈します。
+- failure-onset dimension を記録せずに、implementation bug と真の frontier limit を区別した扱いにすることを禁止します。
+- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張することを禁止します。
 
 ### Step 4. 作業場所と出力先を決める
 

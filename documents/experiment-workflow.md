@@ -316,6 +316,9 @@ carry-over のルールは次です。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで完了扱いにしません。
 - scope で禁止された runner 変更、function fusion、別経路追加を性能改善のついでに入れません。
+- failure-onset dimension を残さず、implementation bug と真の frontier limit を混同しません。
+- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張しません。
+- 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にしません。
 
 ## 3. コード改造を伴う反復ワークフロー
 

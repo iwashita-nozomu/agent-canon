@@ -229,6 +229,8 @@ cost を無視して review coverage を優先する run では、research-drive
 ### 5. Implementation
 
 - 実装は `documents/implementation-waterfall-workflow.md` の gate に従って進める
+- worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
+- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
@@ -237,6 +239,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
 - code 変更では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
 - 研究・実験系の変更では `report_reviewer` と research perspective reviewers を default にし、optional 扱いを避ける
+- JAX export / native runtime の task では、最初の implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
+- cross-process export worker には live Python object reference を渡さず、serializable manifest と reconstruction recipe を渡す
+- `LoadedProgram` のような runtime materialization は compile DAG node にせず、runtime vertex / lifetime scope として扱う
 - まず既存 code path、既存 helper、既存 style を調べ、再利用を優先する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
 - default worker は `gpt-5.3-codex` で、`gpt-5.3-codex-spark` は narrow override とみなす
@@ -263,7 +268,10 @@ cost を無視して review coverage を優先する run では、research-drive
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
+- JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence が揃うまで completion evidence にしない
 - 実験・性能改善では、spot run、debug run、smoke run、partial run、raw failure count だけを completion evidence にしない
+- small toy、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張しない
+- failure-onset dimension を記録せず、implementation bug と真の frontier limit を混同しない
 - 実験・性能改善では、correctness evidence と performance evidence を別項目で示し、片方だけで両方を満たした扱いにしない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
