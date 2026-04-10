@@ -27,6 +27,8 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 
 ## Required Before Implementation
 
+- task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` snapshot を upstream `agent-canon` の最新にします。
+- task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補を確認します。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。

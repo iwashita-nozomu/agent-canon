@@ -19,6 +19,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - generic validation helper
 - top-level helper
   - `sync_agent_canon.sh`
+    - `ensure-latest` は task 開始時に upstream `agent-canon` と local subtree snapshot を揃えます。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`

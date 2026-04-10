@@ -6,6 +6,7 @@ description: Use when Codex needs a context-independent execution path for a rep
 # Codex Task Workflow
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
+1. On a clean worktree, run `make agent-canon-ensure-latest` before planning or implementation; if dirty, record why it is blocked and rerun after commit or stash.
 1. Sweep `documents/`, `notes/`, `references/`, and local implementation directories before planning or implementation.
 1. Classify the task with `agents/TASK_WORKFLOWS.md` before touching files.
 1. In the first work update, declare `workflow=<family>`, `skills=<...>`, `review=<...>`.

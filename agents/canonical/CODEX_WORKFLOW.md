@@ -6,6 +6,7 @@
 ## Start Here
 
 1. `AGENTS.md` を読む
+1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
 1. `notes/themes/USER_PREFERENCES.md` を読む
 1. `notes/themes/AGENT_PHILOSOPHY.md` を読む
 1. `agents/README.md` を読む
@@ -20,6 +21,15 @@
 1. 必要なら `.agents/skills/` から該当 skill を読む
 
 ## Required Intake Sweep
+
+### Agent Canon Freshness
+
+task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent-canon` に合わせます。
+
+- clean worktree では `make agent-canon-ensure-latest` を実行します
+- dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
+- `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
+- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` の実行または未実行理由を残します
 
 ### Context Sweep
 

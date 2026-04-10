@@ -15,6 +15,7 @@ Usage:
   bash tools/sync_agent_canon.sh snapshot
   bash tools/sync_agent_canon.sh add <remote-url> [branch]
   bash tools/sync_agent_canon.sh pull [branch]
+  bash tools/sync_agent_canon.sh ensure-latest [branch]
   bash tools/sync_agent_canon.sh push [branch]
   bash tools/sync_agent_canon.sh status
 
@@ -281,6 +282,46 @@ cmd_pull() {
   cmd_link_root 1
 }
 
+cmd_ensure_latest() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local local_split=""
+  local remote_sha=""
+
+  ensure_prefix_exists
+  require_existing_remote
+  git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
+  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  local_split="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"
+
+  echo "agent_canon_local_split=$local_split"
+  echo "agent_canon_remote=$remote_sha"
+
+  if [ "$local_split" = "$remote_sha" ]; then
+    echo "agent_canon_latest=already_current"
+    if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+      cmd_check
+    else
+      cmd_link_root 1
+    fi
+    return
+  fi
+
+  if git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
+    echo "agent_canon_latest=local_contains_remote"
+    if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+      cmd_check
+    else
+      cmd_link_root 1
+    fi
+    return
+  fi
+
+  require_clean_worktree
+  echo "agent_canon_latest=pulling_remote"
+  git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash
+  cmd_link_root 1
+}
+
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
   require_clean_worktree
@@ -358,6 +399,9 @@ main() {
       ;;
     pull)
       cmd_pull "${2:-$DEFAULT_BRANCH}"
+      ;;
+    ensure-latest)
+      cmd_ensure_latest "${2:-$DEFAULT_BRANCH}"
       ;;
     push)
       cmd_push "${2:-$DEFAULT_BRANCH}"

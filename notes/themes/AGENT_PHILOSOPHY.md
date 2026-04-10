@@ -29,6 +29,12 @@
   - confidence: likely
   - evidence: 2026-04-10 request about whether variable names can be decided freely
 
+- 2026-04-10 | work-principle | task 開始時に clean worktree なら agent-canon ensure-latest を実行し、dirty で止まる場合は理由を明示して commit / stash 後に再実行する
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to keep agent-canon updated every time
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

@@ -255,8 +255,13 @@ bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 ### 7.4 upstream から更新取得
 
 ```bash
+bash tools/sync_agent_canon.sh ensure-latest
 bash tools/sync_agent_canon.sh pull
 ```
+
+`ensure-latest` は task 開始時の入口です。
+clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ subtree pull します。
+dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
 
 ### 7.5 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 

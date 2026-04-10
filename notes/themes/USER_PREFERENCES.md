@@ -28,6 +28,10 @@
   - source: chat
   - rationale: 2026-04-10 request asking whether variable names can be decided freely
 
+- 2026-04-10 | task 開始時に agent-canon を毎回最新化してから作業したい
+  - source: chat
+  - rationale: 2026-04-10 request: 毎回毎回agent-canonは最新化したい
+
 ## Promotion Candidates
 
 - まだなし
