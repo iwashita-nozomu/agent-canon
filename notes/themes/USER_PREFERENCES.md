@@ -68,6 +68,9 @@
 - 2026-04-10 | C++ native autodiff runtime should be GPU-first by default; CPU is an exceptional compile/configure fallback only for environments without GPU, not an equal backend choice.
   - source: chat
 
+- 2026-04-10 | C++ native autodiff custom primitives should not expose a separate scalar primitive concept; scalar-like values should be represented through rank-0 / 0D tensor value primitives where practical.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
