@@ -22,6 +22,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の default は、文書・計画・review を `gpt-5.4` `high`、coding-specialist role を `gpt-5.3-codex` `high` に分ける
 - `gpt-5.3-codex-spark` は、超低遅延の狭い coding loop に限る manual override とみなす
+- rate-limit pressure が強い場合は、設計packetで完全に切れる狭い実装sliceを `spark_worker` へ移し、設計・レビュー・判断は `gpt-5.4` / `gpt-5.3-codex` 側に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
 
 ## Codex Command Surface
@@ -38,7 +39,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | Permanent Team Role | Codex Subagent / Parent Role |
 | ------------------- | ---------------------------- |
 | `manager` | parent + `requirements_organizer` |
-| `manager_reviewer` | parent review gate or `reviewer` |
+| `manager_reviewer` | `manager_reviewer` |
 | `scheduler` | `execution_planner` |
 | `schedule_reviewer` | `plan_reviewer` |
 | `designer` | `detailed_designer` |
@@ -58,6 +59,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`
   - 変更要求、source bucket、scope、acceptance criteria、reuse target を整理する
+- `manager_reviewer`
+  - 要件 contract、source bucket、accumulated context resolution、unknown handling を独立に確認する
 - `execution_planner`
   - stage 順序、担当 subagent、validation 順序、rollback point を固定する
 - `plan_reviewer`
@@ -88,6 +91,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
+- `spark_worker`
+  - approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
 - `project_reviewer`
@@ -118,6 +123,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | Stage | Default Subagent Pattern |
 | ----- | ------------------------ |
 | 要件整理 | `requirements_organizer`。local precedent 調査が要るなら `explorer` を補助に使う |
+| 要件レビュー | 専用の `manager_reviewer` instance。notes、docs、prior logs、local precedent で解決できる unknown が残っていないかを見る |
 | 調査 | 外部文献は `literature_researcher`、local precedent は `explorer` |
 | 実行計画立案 | `execution_planner` |
 | 計画レビュー | 専用の `plan_reviewer` instance |
@@ -133,6 +139,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | 実装 | bounded な切り出しだけを `worker` |
+| 低リスク実装slice | design trace、naming、validation が固定済みの slice だけを `spark_worker` |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
 | 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
@@ -159,7 +166,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
 | Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
 | Codebase Survey / Test Design / Implementation / Language-Specific Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex` | `high` |
-| Reviews And Final Judgment | `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
+| Low-Latency Narrow Implementation | `spark_worker` | `gpt-5.3-codex-spark` | `high` |
+| Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
 
 運用メモ:
 - OpenAI の current docs では `gpt-5.4` は professional workflows 向けの default / highest-intelligence 枠、`gpt-5.3-codex` は agentic coding 専用最適化枠です
@@ -167,7 +175,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、parent 判断で `worker` を `gpt-5.3-codex-spark` に override して構いません
-- `gpt-5.3-codex-spark` は smaller / text-only / 128k context の preview 系なので、詳細設計、最終判断、重要 review の default には使いません
+- `gpt-5.3-codex-spark` は `spark_worker` で使い、詳細設計、最終判断、重要 review の default には使いません
+- `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
 
 ## Research Perspective Review Pack
 

@@ -53,6 +53,18 @@
   - confidence: likely
   - evidence: 2026-04-10 request to organize implementation around existing documents/design
 
+- 2026-04-10 | work-principle | requirements は user に戻す前に accumulated context sweep で解決し、残った unknown だけを deferred/escalation に残す
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to avoid unnecessary runtime stops by using past logs and accumulated information
+
+- 2026-04-10 | work-principle | Spark は design trace が固定済みの狭い implementation slice に使い、requirements/design/review/final judgment には使わない
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-10 request to delegate possible work to Codex Spark because rate limits are strict
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

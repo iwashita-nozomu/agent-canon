@@ -16,6 +16,14 @@
 
 <!-- Check whether each clause is labeled as current_request, durable_user_preference, repo_or_code_precedent, domain_or_external_constraint, or unknown_or_open_question, and whether durable preferences are not silently converted into task requirements. -->
 
+## Accumulated Context Resolution Review
+
+<!-- Check whether open questions were first resolved against notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. Return revise if the agent asked the user or left unknowns without this sweep. -->
+
+## Unknown Handling Review
+
+<!-- Check whether unknown_or_open_question appears only in deferred or escalation entries, not in active must-do, must-not-do, or completion-evidence clauses. Return escalate only when accumulated context cannot resolve a scope-changing unknown. -->
+
 ## Routing Review
 
 <!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. -->

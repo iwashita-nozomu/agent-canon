@@ -22,6 +22,7 @@
 
 - `gpt-5.4` + `high`
   - `requirements_organizer`
+  - `manager_reviewer`
   - `execution_planner`
   - `detailed_designer`
   - `long_form_writer`
@@ -43,7 +44,8 @@
   - `cpp_reviewer`
 - manual coding override
   - `gpt-5.3-codex-spark`
-    - 極端に狭い低遅延 edit loop だけ
+    - `spark_worker`
+    - 設計packetで完全に切れる狭い低遅延 edit loop
 - repo default は `high`
   - `xhigh` は parent が必要と判断したときだけ manual escalation として使う
 - mode の扱い
@@ -53,6 +55,7 @@
 ## Current Agents
 
 - `requirements_organizer`
+- `manager_reviewer`
 - `execution_planner`
 - `plan_reviewer`
 - `detailed_designer`
@@ -64,6 +67,7 @@
 - `explorer`
 - `reviewer`
 - `worker`
+- `spark_worker`
 - `docs_workflow_steward`
 - `project_reviewer`
 - `literature_researcher`

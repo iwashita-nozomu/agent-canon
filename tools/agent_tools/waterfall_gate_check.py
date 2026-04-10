@@ -27,8 +27,23 @@ class ArtifactCheck:
 
 GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
     "requirements": (
-        ArtifactCheck("user_request_contract.md", require_filled=True),
-        ArtifactCheck("management_review.md", require_filled=True, require_approve=True),
+        ArtifactCheck(
+            "user_request_contract.md",
+            require_filled=True,
+            required_sections=(
+                "## Requirements Resolution Sweep",
+                "## Resolved From Accumulated Context",
+            ),
+        ),
+        ArtifactCheck(
+            "management_review.md",
+            require_filled=True,
+            require_approve=True,
+            required_sections=(
+                "## Accumulated Context Resolution Review",
+                "## Unknown Handling Review",
+            ),
+        ),
     ),
     "plan": (
         ArtifactCheck("schedule.md", require_filled=True),
@@ -177,6 +192,15 @@ def check_user_request_contract(text: str) -> list[str]:
         blockers.append("user_request_contract.md:must_do_clauses_empty")
     if not table_body_rows(text, "## Completion Evidence Clauses"):
         blockers.append("user_request_contract.md:completion_evidence_empty")
+    for heading in (
+        "## Must-Do Clauses",
+        "## Must-Not-Do Clauses",
+        "## Completion Evidence Clauses",
+    ):
+        for row in table_body_rows(text, heading):
+            if "unknown_or_open_question" in row:
+                slug = heading.removeprefix("## ").lower().replace("-", "_").replace(" ", "_")
+                blockers.append(f"user_request_contract.md:active_unknown_clause:{slug}")
     return blockers
 
 

@@ -16,6 +16,109 @@ GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_che
 class WaterfallGateCheckTest(unittest.TestCase):
     """Verify that intermediate waterfall gates fail closed."""
 
+    def test_requirements_gate_rejects_active_unknown_clause(self) -> None:
+        """Requirements should defer unknowns instead of leaving them active."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "unknown-requirement"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "## Requirements Resolution Sweep",
+                        "Checked notes, documents, and local code precedent.",
+                        "## Resolved From Accumulated Context",
+                        (
+                            "| Clause ID | Resolved From | Evidence Path | Resolution | "
+                            "Remaining Risk |"
+                        ),
+                        (
+                            "| --------- | ------------- | ------------- | ---------- | "
+                            "-------------- |"
+                        ),
+                        (
+                            "| T1-C0 | repo_or_code_precedent | documents/ | "
+                            "Existing workflow applies. | none |"
+                        ),
+                        "## Must-Do Clauses",
+                        (
+                            "| Clause ID | Source Bucket | User Wording Or Evidence | "
+                            "Operational Interpretation | Owner Stage | Evidence Path | Status |"
+                        ),
+                        (
+                            "| --------- | ------------- | ------------------------- | "
+                            "-------------------------- | ----------- | ------------- | ------ |"
+                        ),
+                        (
+                            "| T1-C1 | unknown_or_open_question | unclear | decide later | "
+                            "requirements | user_request_contract.md | active |"
+                        ),
+                        "## Must-Not-Do Clauses",
+                        (
+                            "| Clause ID | Source Bucket | Forbidden Drift | Why It Is Forbidden | "
+                            "Guard Stage | Evidence Path | Status |"
+                        ),
+                        (
+                            "| --------- | ------------- | --------------- | ------------------- | "
+                            "----------- | ------------- | ------ |"
+                        ),
+                        "## Completion Evidence Clauses",
+                        (
+                            "| Clause ID | Source Bucket | Required Evidence | "
+                            "Where It Must Appear | Owner Stage | Status |"
+                        ),
+                        (
+                            "| --------- | ------------- | ----------------- | "
+                            "-------------------- | ----------- | ------ |"
+                        ),
+                        (
+                            "| T1-E1 | current_request | requirements review | "
+                            "management_review.md | requirements | active |"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "management_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Management Review",
+                        "",
+                        "## Scope Review",
+                        "Scope is concrete.",
+                        "## Accumulated Context Resolution Review",
+                        "Resolution sweep is recorded.",
+                        "## Unknown Handling Review",
+                        "No unknowns should remain active.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "requirements",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            expected_blocker = "user_request_contract.md:active_unknown_clause:must_do_clauses"
+            self.assertIn(expected_blocker, result.stdout)
+
     def test_design_gate_rejects_fresh_template_bundle(self) -> None:
         """A fresh bundle should not pass design gate without filled reviews."""
         with tempfile.TemporaryDirectory() as tmp_dir:

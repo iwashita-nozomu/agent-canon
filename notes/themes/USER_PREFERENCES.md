@@ -44,6 +44,14 @@
   - source: chat
   - rationale: 2026-04-10 request: 文書がある状態で実装が文書を無視することが多い
 
+- 2026-04-10 | レートリミットが厳しいため、Codex Sparkに移譲できる低リスク実装sliceは移譲したい
+  - source: chat
+  - rationale: 2026-04-10 request: codexSparkに移譲できるところはしていきたい、レートリミットが厳しい
+
+- 2026-04-10 | 要件定義では、むやみに停止せず、過去ログ・notes・repo precedentで解決できる曖昧さは解決してから残差だけを確認したい
+  - source: chat
+  - rationale: 2026-04-10 request: エージェントのランタイムにむやみに停止するのは好みではなく、過去のログや蓄積情報を参照して解決したい
+
 ## Promotion Candidates
 
 - まだなし

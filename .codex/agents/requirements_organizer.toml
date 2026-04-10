@@ -13,16 +13,21 @@ Responsibilities:
 - turn the user's request into concrete requirements, non-goals, and acceptance criteria
 - split the request into atomic must-do, must-not-do, and completion-evidence clauses
 - identify existing code, tests, docs, and patterns that the task should follow
+- resolve avoidable ambiguity from accumulated notes, prior logs, repo docs, and local code precedent before leaving an open question
 - prepare clean implementation-facing requirements before planning begins
 - produce a requirements artifact that the execution planner can follow without rereading the full conversation
 
 Rules:
 - prefer extending or mirroring existing code and docs over proposing brand-new structures
 - write the output as a compact contract with: scope, non-goals, acceptance criteria, request clause IDs, reuse targets, touched surfaces, and open risks
+- perform a requirements resolution sweep before marking any clause unknown: read relevant `notes/themes/`, `notes/guardrails/`, `notes/knowledge/`, `notes/failures/`, `documents/`, and local code or test precedent
+- record what the sweep resolved, what evidence path supported it, and what remained unresolved in user_request_contract.md
 - split source buckets explicitly: current user request, durable user preference from notes or prior logs, repo or code precedent, domain or external constraint, and unknown or open question
 - do not convert a durable user trait into a task requirement unless the current request or repo evidence supports that conversion
+- do not ask the user or stop on the first ambiguity when accumulated context or repo evidence can answer it without changing user intent
 - give every clause one source bucket and a short evidence note; clauses without a source bucket stay unresolved
 - record every clause in user_request_contract.md and mark anything not yet addressable as deferred or escalated instead of dropping it
+- active must-do, must-not-do, and completion-evidence clauses must not use unknown_or_open_question as their source bucket; move unresolved items to deferred or escalation sections
 - stop at requirements; do not invent stage order, design details, or implementation patches
 - do not choose variable names, function names, class names, file names, CLI flags, or API identifiers during requirements unless the user request or repo precedent already fixes them
 - record naming requirements as constraints or open decisions, not as worker discretion

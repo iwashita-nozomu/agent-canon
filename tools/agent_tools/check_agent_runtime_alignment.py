@@ -23,6 +23,7 @@ from agent_team import (
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
+    "manager_reviewer",
     "execution_planner",
     "detailed_designer",
     "long_form_writer",
@@ -51,6 +52,9 @@ CODING_ROLE_IDS = {
     "python_reviewer",
     "cpp_reviewer",
 }
+SPARK_CODING_ROLE_IDS = {
+    "spark_worker",
+}
 
 
 def ensure(condition: bool, message: str) -> None:
@@ -70,7 +74,8 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
 def validate_codex_agent_settings() -> None:
     """Check that Codex agent settings use the expected model split."""
     configs = parse_codex_agents()
-    missing = sorted((WRITING_AND_REVIEW_ROLE_IDS | CODING_ROLE_IDS) - set(configs))
+    required_role_ids = WRITING_AND_REVIEW_ROLE_IDS | CODING_ROLE_IDS | SPARK_CODING_ROLE_IDS
+    missing = sorted(required_role_ids - set(configs))
     ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
 
     for role_id in sorted(WRITING_AND_REVIEW_ROLE_IDS):
@@ -90,6 +95,18 @@ def validate_codex_agent_settings() -> None:
             f"{role_id} model_reasoning_effort must be high",
         )
         ensure(config.get("model") == "gpt-5.3-codex", f"{role_id} model must be gpt-5.3-codex")
+
+    for role_id in sorted(SPARK_CODING_ROLE_IDS):
+        config = configs[role_id]
+        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
+        ensure(
+            config.get("model_reasoning_effort") == "high",
+            f"{role_id} model_reasoning_effort must be high",
+        )
+        ensure(
+            config.get("model") == "gpt-5.3-codex-spark",
+            f"{role_id} model must be gpt-5.3-codex-spark",
+        )
 
 
 def validate_team_config_references() -> None:

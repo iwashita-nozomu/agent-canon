@@ -174,6 +174,8 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - `Validation Plan:`
 - `User Request Clause IDs:`
 - `Requirement Source Buckets:`
+- `Requirements Resolution Sweep:`
+- `Resolved From Accumulated Context:`
 - `Unknowns And Open Questions:`
 
 主担当:
@@ -187,6 +189,8 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - `manager_reviewer`
   - scope、non-goals、acceptance criteria、validation plan の粗さを確認する
   - 各 clause の source bucket が妥当か確認する
+  - notes、guardrails、knowledge、failures、documents、prior logs、local code / tests の sweep で解決できる unknown が残っていないか確認する
+  - active clause に `unknown_or_open_question` が混ざっていないか確認する
   - 過去ログ由来の user trait が、今回 task の requirement に混入していないか確認する
   - family 選択が妥当か確認する
 
@@ -203,8 +207,11 @@ source bucket:
   - まだ決められない項目。silent assumption にせず deferred / escalated にする
 
 ルール:
+- 不明点はすぐユーザーへ戻さず、まず `documents/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
+- 蓄積情報で user intent、scope、acceptance criteria を変えずに解決できる場合は、evidence path とともに `Resolved From Accumulated Context` へ記録します
 - durable user preference は、今回の request や repo evidence と結び付いたときだけ task requirement に昇格します
-- unknown は requirement として採用せず、open question、deferred clause、または escalation として残します
+- unknown は requirement として採用せず、resolution sweep 後に open question、deferred clause、または escalation として残します
+- active な must-do、must-not-do、completion-evidence clause には `unknown_or_open_question` を使いません
 - 変数名、関数名、class 名、file 名、CLI flag、config key、public API identifier は、user request または repo precedent が固定している場合だけ Gate 1 で固定します
 - naming が未確定の場合は worker の裁量にせず、Gate 5 の identifier naming plan で扱う open decision にします
 
@@ -214,6 +221,7 @@ exit 条件:
 - 実装前に必要な review / validation が決まっている
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言している
 - すべての clause が source bucket を持ち、unknown が silent assumption になっていない
+- 解決可能な unknown を accumulated context で解決し、残った unknown は deferred / escalated へ移している
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate requirements"` が pass している
 - requirements review が `resolved` になっている
 

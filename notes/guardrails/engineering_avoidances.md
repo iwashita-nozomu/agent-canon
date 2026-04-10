@@ -12,7 +12,10 @@
 - `documents/`、`notes/`、`references/` の context sweep をせずに着手する
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
 - 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
+- notes、guardrails、documents、prior logs、local code / tests で解決できる曖昧さを調べずにユーザーへ戻す
 - unknown や open question を silent assumption に変換して要件を埋める
+- active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残す
+- Spark を要件定義、詳細設計、重要レビュー、最終判断に使う
 - 最初の update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言しない
 - repo-changing task で run bundle と explicit stage activation を省略する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務する

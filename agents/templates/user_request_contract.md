@@ -12,6 +12,15 @@
 - deferred_clause_ids:
 - unresolved_clause_ids:
 
+## Requirements Resolution Sweep
+
+<!-- Record the accumulated context searched before leaving any open question: notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. -->
+
+## Resolved From Accumulated Context
+
+| Clause ID | Resolved From | Evidence Path | Resolution | Remaining Risk |
+| --------- | ------------- | ------------- | ---------- | -------------- |
+
 ## Must-Do Clauses
 
 | Clause ID | Source Bucket | User Wording Or Evidence | Operational Interpretation | Owner Stage | Evidence Path | Status |
@@ -32,6 +41,8 @@
 - Allowed buckets: `current_request`, `durable_user_preference`, `repo_or_code_precedent`, `domain_or_external_constraint`, `unknown_or_open_question`.
 - Durable user preferences do not become task requirements unless the current request or repo evidence supports the conversion.
 - Unknowns stay unresolved, deferred, or escalated; they are not converted into silent assumptions.
+- Active must-do, must-not-do, and completion-evidence clauses must not use `unknown_or_open_question`; unresolved items must move to Deferred Or Rejected Clauses after the resolution sweep.
+- Do not stop at the first ambiguity if accumulated notes, repo docs, local code, tests, or prior logs can resolve it without changing user intent.
 
 ## Deferred Or Rejected Clauses
 
