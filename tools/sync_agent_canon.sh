@@ -137,6 +137,7 @@ notes/knowledge/README.md:../../${PREFIX}/notes/knowledge/README.md
 notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md:../../${PREFIX}/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md
 notes/knowledge/benchmark_levels_analysis.md:../../${PREFIX}/notes/knowledge/benchmark_levels_analysis.md
 notes/knowledge/benchmark_vs_experiment.md:../../${PREFIX}/notes/knowledge/benchmark_vs_experiment.md
+notes/knowledge/coding_decision_methods.md:../../${PREFIX}/notes/knowledge/coding_decision_methods.md
 notes/knowledge/environment_setup.md:../../${PREFIX}/notes/knowledge/environment_setup.md
 notes/knowledge/experiment_directory_planning.md:../../${PREFIX}/notes/knowledge/experiment_directory_planning.md
 notes/knowledge/experiment_operations.md:../../${PREFIX}/notes/knowledge/experiment_operations.md

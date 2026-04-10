@@ -26,5 +26,6 @@
 - [benchmark_levels_analysis.md](./benchmark_levels_analysis.md)
 - [path_resolution.md](./path_resolution.md)
 - [pyright_operations.md](./pyright_operations.md)
+- [coding_decision_methods.md](./coding_decision_methods.md)
 - [literature_intake.md](./literature_intake.md)
 - [git_mirroring.md](./git_mirroring.md)
