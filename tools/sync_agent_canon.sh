@@ -404,11 +404,21 @@ split_prefix_or_empty() {
   git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null || true
 }
 
+has_subtree_metadata() {
+  git -C "$ROOT_DIR" log --format=%B --grep="git-subtree-dir: $PREFIX" --max-count=1 HEAD >/dev/null 2>&1
+}
+
 pull_or_import_snapshot() {
   local branch="$1"
   local local_split="$2"
   local remote_sha="$3"
   local pull_log=""
+
+  if ! has_subtree_metadata; then
+    echo "agent_canon_subtree_pull=skipped_no_subtree_metadata"
+    import_fast_forward_snapshot "$local_split" "$remote_sha"
+    return
+  fi
 
   pull_log="$(mktemp)"
   if git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$branch" --squash >"$pull_log" 2>&1; then
