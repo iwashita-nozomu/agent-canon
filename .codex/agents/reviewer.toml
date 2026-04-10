@@ -23,4 +23,9 @@ Rules:
 - return escalate when the diff is solving work that is outside the tracked request clauses
 - return revise when the implementer can fix the findings inside the same implementation pass
 - return escalate when the diff shows the design or test plan is wrong
+- return revise when the diff satisfies only a specialized path while the request requires a generic usable path
+- return revise when completion evidence is only spot/debug/smoke/partial run output or raw failure counts
+- return revise when correctness evidence and performance evidence are conflated
+- return escalate when one implementation slice mixes code changes, protocol changes, and XLA/runtime flag changes without an explicit request clause
+- return revise when experiment scripts duplicate runner, scheduler, GPU-slot, timeout-cleanup, pid-registry, or monitoring-loop responsibilities
 """

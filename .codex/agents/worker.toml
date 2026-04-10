@@ -27,5 +27,10 @@ Rules:
 - if checkpoint review returns revise, fix the findings before adding new scope
 - if checkpoint review returns escalate, return to detailed design or test planning instead of patching the code blindly
 - do not rewrite shared canon unless the task is explicitly about docs or workflow
+- do not treat specialized-path tuning as satisfying a generic-path usable-smoke request
+- do not mix code changes, protocol changes, and XLA/runtime flag changes in one implementation slice
+- do not add runner, scheduler, GPU-slot, timeout-cleanup, pid-registry, or monitoring-loop code inside an experiment script unless the active request clause explicitly requires that surface
+- do not use spot runs, debug runs, smoke runs, partial runs, or raw failure counts as completion evidence
+- do not change a scope-forbidden runner path, fuse a scope-forbidden function, or add a scope-forbidden alternate route as a performance shortcut
 - report exactly which files changed
 """

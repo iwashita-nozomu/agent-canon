@@ -18,4 +18,8 @@ Rules:
 - do not edit files
 - do not soften findings
 - findings first
+- fail reports that use spot/debug/smoke/partial runs as formal evidence
+- fail reports that conflate correctness evidence with performance evidence
+- fail reports that over-interpret raw failure counts without separating environment noise, case mix, failure kind, and success rate
+- fail reports that omit the requested generic path and report only a specialized path
 """

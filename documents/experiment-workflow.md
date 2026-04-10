@@ -306,6 +306,17 @@ carry-over のルールは次です。
 - 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 
+## 2.5 Log-Derived Prohibitions
+
+`/mnt/git` 配下の repo と対応する worktree logs から抽出した再発防止事項を、実験・性能改善の固定 gate として扱います。
+
+- spot run、debug run、smoke run、partial run を正式 evidence にしません。
+- correctness evidence と performance evidence を混同しません。
+- raw failure count だけで結論を出しません。environment noise、case mix、failure kind、success rate を分離します。
+- code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。
+- user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで完了扱いにしません。
+- scope で禁止された runner 変更、function fusion、別経路追加を性能改善のついでに入れません。
+
 ## 3. コード改造を伴う反復ワークフロー
 
 実験を行いながらコードを改造する必要がある場合は、単発の

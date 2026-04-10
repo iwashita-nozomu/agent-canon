@@ -56,6 +56,11 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
+- `/mnt/git` 配下の log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
+- specialized path の tuning だけで generic path の usable smoke を満たした扱いにしません
+- spot run、debug run、smoke run、partial run は正式な comparison evidence や method 採否の根拠にしません
+- correctness evidence と performance evidence を同じ evidence として扱いません
+- code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません
 
 ## Activation Quick Start
 

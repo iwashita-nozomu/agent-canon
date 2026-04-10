@@ -24,6 +24,9 @@
 - 各結果の provenance を残します。使った code、commit、branch、command、seed、environment、入力条件を追えるようにします。
 - run は fresh 実行で完走させます。途中停止 run を resume の正本にせず、停止理由を記録して 0 からやり直します。
 - claim は evidence に合わせます。実験範囲を越えた一般化を避け、仮定と限界を本文で明示します。
+- correctness evidence と performance evidence を混同しません。正しさの parity test は性能の証拠ではなく、速度比較は数式上の正しさの証拠ではありません。
+- code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
+- user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで close しません。
 
 ## 2.5 Research-Driven Change の canonical loop
 
@@ -119,6 +122,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Dataset / Case Range:` に、どの problem class と difficulty range を見るかを書きます。
 - `Fairness Notes:` に、parameter tuning、timeout、hardware、seed の公平条件を書きます。
 - ordered difficulty 軸は 1 ずつ連続に sweep します。飛び飛びの点だけで frontier や failure onset を判断することを禁止します。
+- raw failure count だけで結論を出すことを禁止します。environment noise、case mix、failure kind、success rate を分離してから解釈します。
 
 ### Step 4. 作業場所と出力先を決める
 

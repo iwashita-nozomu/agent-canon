@@ -78,6 +78,11 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 - 会話だけを根拠に実装へ進めてはいけません。
 - reuse sweep をせずに新しい file や module を増やしてはいけません。
+- `notes/guardrails/engineering_avoidances.md` の log-derived avoid を無視してはいけません。
+- user request が generic path の usable smoke を求めているのに、specialized path の tuning だけで完了扱いにしてはいけません。
+- spot run、debug run、smoke run、partial run を正式 evidence や比較表の根拠にしてはいけません。
+- correctness evidence と performance evidence を混同してはいけません。
+- code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜてはいけません。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略してはいけません。
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
