@@ -69,6 +69,9 @@
 - 2026-04-11 | Repo-changing tasks must leave a concrete TODO artifact and a chronological work log until closeout.
   - source: chat
 
+- 2026-04-11 | Do not stop to ask for push permission when push is a natural completion step; push directly unless I explicitly stop it or an external block exists.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

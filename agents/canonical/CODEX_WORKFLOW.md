@@ -29,7 +29,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - clean worktree では `make agent-canon-ensure-latest` を実行します
 - dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
 - `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
-- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` の実行または未実行理由を残します
+- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
 
 ### Context Sweep
 
@@ -333,6 +333,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 実験・性能改善では、correctness evidence と performance evidence を別項目で示し、片方だけで両方を満たした扱いにしない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
+- push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
 - closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
 - closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
 - review-only task や no-change task では commit / push を要求しない
@@ -351,6 +352,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 複数 writer を要する場合は、同一 worktree ではなく複数 worktree に分ける
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
+- tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。止めるのは user が明示的に止めた場合か external block がある場合だけとする
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` が close 条件を満たすまで user-facing completion を返さない
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈にだけ依存する運用は repo 正本にしない

@@ -86,6 +86,12 @@
   - confidence: tentative
   - evidence: User reported a recurring pattern of closing after minimal implementation, possibly ignoring code review, and implementing only part of the specification.
 
+- 2026-04-11 | interaction-observation | When push is a natural completion step for a tracked repo change, do not surface a separate push proposal; execute push directly unless the user explicitly forbids it or an external block exists.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: 2026-04-11 user: '毎回Pushの運用はやりすぎかもしれません... Pushするのが自然なら許可を取らずにpushです'
+
 ## Task Retrospectives
 
 - まだなし
