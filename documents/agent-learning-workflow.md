@@ -1,6 +1,6 @@
 # Agent Learning Workflow
 
-この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく repo 内の note と tool へ固定する手順です。
+この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。
 
 ## Purpose
 
@@ -8,6 +8,7 @@
 - raw chat ではなく、短い observation と evidence に圧縮して残す
 - 毎 task の closeout で、学習すべき項目があるか確認する
 - stable になった項目だけを `AGENTS.md`、workflow、review rule へ昇格する
+- 自己学習と対話記録の追記を template local artifact ではなく shared canon workflow の責務として扱う
 
 ## Literature Basis
 
@@ -20,12 +21,14 @@
 
 ## Canonical Notes
 
-- `notes/themes/USER_PREFERENCES.md`
+- `memory/USER_PREFERENCES.md`
   - user の coding philosophy、review expectation、document preference
-- `notes/themes/AGENT_PHILOSOPHY.md`
+- `memory/AGENT_PHILOSOPHY.md`
   - agent の作業哲学、判断原則、対話から得た再発防止、task retrospective
 - `notes/guardrails/engineering_avoidances.md`
   - 既に失敗ログから確定した禁止事項
+
+`memory/` は shared canon 側の正本です。template root では runtime view を使いますが、closeout では canon update として扱います。
 
 ## Logging Rule
 
@@ -73,6 +76,7 @@ closeout 前に次を確認します。
 1. agent の作業哲学や対話上の再発防止は `AGENT_PHILOSOPHY.md` に入れるべきか
 1. 確定した禁止事項は `engineering_avoidances.md` に昇格すべきか
 1. stable な項目は `AGENTS.md`、`CODEX_WORKFLOW.md`、review TOML に昇格すべきか
+1. `memory/` への追記が shared canon 側の更新として commit / push まで反映されたか
 
 ## Promotion Rule
 

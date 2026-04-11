@@ -2,7 +2,7 @@
 
 ## Purpose
 
-agent の作業哲学、対話から得た学習、task retrospective を `notes/themes/AGENT_PHILOSOPHY.md` に蓄積し、stable な項目だけを workflow や `AGENTS.md` へ昇格します。
+agent の作業哲学、対話から得た学習、task retrospective を `memory/AGENT_PHILOSOPHY.md` に蓄積し、stable な項目だけを workflow や `AGENTS.md` へ昇格します。
 
 ## Use When
 
@@ -10,12 +10,13 @@ agent の作業哲学、対話から得た学習、task retrospective を `notes
 - task closeout で、次回以降の agent 行動を変える観測がある
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい
 - raw chat ではなく、evidence 付きの短い observation として残したい
+- self-learning と対話記録の追記を shared canon 側の責務として閉じたい
 
 ## Core References
 
 - `documents/agent-learning-workflow.md`
-- `notes/themes/AGENT_PHILOSOPHY.md`
-- `notes/themes/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
+- `memory/USER_PREFERENCES.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `documents/notes-lifecycle.md`
 - `documents/workflow-references.md`
@@ -27,6 +28,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `notes
 - raw transcript を貼らず、短い observation に圧縮する
 - source、evidence、scope、confidence を書く
 - task-local な一時指示を stable philosophy にしない
+- `memory/` への追記を template local artifact だけで終わらせず、shared canon update として closeout する
 - promotion candidate は `AGENTS.md` へ直書きせず、periodic sweep で昇格する
 - 確定した禁止事項は `engineering_avoidances.md` への昇格候補にする
 

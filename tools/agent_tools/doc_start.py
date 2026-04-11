@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_team import (
-    DEFAULT_REPORT_ROOT,
     create_run_bundle,
     load_team_config,
     make_run_id,
+    resolve_report_root,
     select_roles,
     specialist_role_ids,
 )
@@ -85,8 +85,10 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
     )
     parser.add_argument(
         "--report-root",
-        default=str(DEFAULT_REPORT_ROOT),
-        help="Directory that will contain per-run report folders.",
+        help=(
+            "Optional directory that will contain per-run report folders. Defaults to "
+            "<workspace-root>/reports/agents."
+        ),
     )
     parser.add_argument(
         "--workspace-root",
@@ -107,8 +109,8 @@ def main() -> int:
     args = build_parser(specialist_role_ids(config)).parse_args()
     created_at = datetime.now(timezone.utc).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
-    report_root = Path(args.report_root).resolve()
     workspace_root = Path(args.workspace_root).resolve()
+    report_root = resolve_report_root(args.report_root, workspace_root)
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
 

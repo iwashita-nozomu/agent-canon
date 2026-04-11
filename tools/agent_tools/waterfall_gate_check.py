@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from agent_team import DEFAULT_REPORT_ROOT
+from agent_team import resolve_report_root
 
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -111,8 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--report-root",
-        default=str(DEFAULT_REPORT_ROOT),
-        help="Directory that contains per-run report folders.",
+        help=(
+            "Optional directory that contains per-run report folders. Defaults to "
+            "./reports/agents relative to the current workspace."
+        ),
     )
     return parser
 
@@ -123,7 +125,7 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
         raise SystemExit("Provide exactly one of --run-id or --report-dir.")
     if args.report_dir:
         return Path(args.report_dir).resolve()
-    return (Path(args.report_root).resolve() / str(args.run_id)).resolve()
+    return (resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)).resolve()
 
 
 def is_placeholder_only_section(text: str) -> bool:

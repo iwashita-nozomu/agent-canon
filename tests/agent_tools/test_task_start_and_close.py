@@ -100,6 +100,36 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_bootstrap_defaults_report_root_to_workspace_reports_agents(self) -> None:
+        """bootstrap_agent_run should default report output under the workspace root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            run_id = "test-default-workspace-report-root"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "workspace-local report root",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
+            self.assertTrue(report_dir.is_dir())
+
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -227,6 +257,99 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_dir),
                 ],
                 cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_defaults_report_root_to_workspace_cwd(self) -> None:
+        """task_close --run-id should resolve reports/agents under the current workspace."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            run_id = "test-task-close-workspace-default"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "workspace closeout ready",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            (report_dir / "verification.txt").write_text(
+                "\n".join(
+                    [
+                        f"run_id={run_id}",
+                        "task=workspace closeout ready",
+                        "owner=codex",
+                        "created_at_utc=2026-04-08T00:00:00Z",
+                        "status=pass",
+                        "user_completion_report=unlocked",
+                        "closeout_gate_status=resolved",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "closeout_gate.md").write_text(
+                "\n".join(
+                    [
+                        "# Closeout Gate",
+                        "",
+                        "- verifier_status: pass",
+                        "- auditor_status: resolved",
+                        "- required_reviews_complete: yes",
+                        "- validation_complete: yes",
+                        "- request_contract_complete: yes",
+                        "- all_planned_chunks_complete: yes",
+                        "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
+                        "- commit_created: yes",
+                        "- push_completed: yes",
+                        "- user_completion_report: unlocked",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
                 check=False,
                 capture_output=True,
                 text=True,

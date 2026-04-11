@@ -198,7 +198,7 @@ source bucket:
 - `current_request`
   - 今回の user request に明示された requirement
 - `durable_user_preference`
-  - `notes/themes/USER_PREFERENCES.md` や過去ログから抽出された user tendency
+  - `memory/USER_PREFERENCES.md` や過去ログから抽出された user tendency
 - `repo_or_code_precedent`
   - 既存 code、test、docs、workflow から分かる制約
 - `domain_or_external_constraint`
@@ -207,7 +207,7 @@ source bucket:
   - まだ決められない項目。silent assumption にせず deferred / escalated にする
 
 ルール:
-- 不明点はすぐユーザーへ戻さず、まず `documents/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
+- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
 - 蓄積情報で user intent、scope、acceptance criteria を変えずに解決できる場合は、evidence path とともに `Resolved From Accumulated Context` へ記録します
 - durable user preference は、今回の request や repo evidence と結び付いたときだけ task requirement に昇格します
 - unknown は requirement として採用せず、resolution sweep 後に open question、deferred clause、または escalation として残します
