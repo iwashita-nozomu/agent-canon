@@ -42,9 +42,9 @@ root では次を symlink view として扱います。
 - `documents/worktree-lifecycle.md`
 - `documents/conventions/python/20_benchmark_policy.md`
 - `documents/conventions/python/30_experiment_directory_structure.md`
-- `experiments/README.md`
-- `experiments/_template`
-- `experiments/report/README.md`
+- `memory/README.md`
+- `memory/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
 - `notes/experiments/README.md`
 - `notes/experiments/REPORT_TEMPLATE.md`
 - `notes/experiments/results/README.md`
@@ -104,5 +104,5 @@ make agent-canon-pr-check
 ## Root-Side Interpretation
 
 - `scripts/README.md` と `documents/tools/README.md` は root 側の実行入口です
-- `experiments/registry.toml`、topic 固有の `experiments/<topic>/`、repo-local note は root 側の正本に残します
+- `experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`experiments/registry.toml`、topic 固有の `experiments/<topic>/`、`reports/`、repo-local note は root 側の正本に残します
 - shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします

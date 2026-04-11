@@ -7,8 +7,8 @@
 
 1. `AGENTS.md` を読む
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
-1. `notes/themes/USER_PREFERENCES.md` を読む
-1. `notes/themes/AGENT_PHILOSOPHY.md` を読む
+1. `memory/USER_PREFERENCES.md` を読む
+1. `memory/AGENT_PHILOSOPHY.md` を読む
 1. `agents/README.md` を読む
 1. `notes/guardrails/README.md` を読む
 1. `notes/guardrails/engineering_avoidances.md` を読む
@@ -37,6 +37,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 次を topic keyword で探索し、該当 file を読んでから着手します。
 
 - `documents/`
+- `memory/`
 - `notes/knowledge/`
 - `notes/guardrails/`
 - `notes/failures/`
@@ -46,8 +47,8 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - `notes/experiments/`
 - `references/`
 
-user の durable preference を見落とさないため、`notes/themes/USER_PREFERENCES.md` は毎回読む固定 note にします。
-agent の作業哲学と対話から得た学習を見落とさないため、`notes/themes/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
+user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
+agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 ### Library Sweep
 
@@ -160,8 +161,8 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
-- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
-- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `notes/themes/AGENT_PHILOSOPHY.md` へ追記する
+- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/USER_PREFERENCES.md` へ追記する
+- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `memory/AGENT_PHILOSOPHY.md` へ追記する
 
 ### 2. Workflow Selection
 
@@ -329,8 +330,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - 実験・性能改善では、correctness evidence と performance evidence を別項目で示し、片方だけで両方を満たした扱いにしない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
-- closeout 前に `notes/themes/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
-- closeout 前に `notes/themes/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
+- closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
+- closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
 - review-only task や no-change task では commit / push を要求しない
 
 そのうえで、何を変えたか、何を確認したか、何を確認していないかを短く残して完了する

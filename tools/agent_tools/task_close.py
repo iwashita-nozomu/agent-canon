@@ -7,7 +7,7 @@ import argparse
 import re
 from pathlib import Path
 
-from agent_team import DEFAULT_REPORT_ROOT
+from agent_team import resolve_report_root
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,8 +22,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--report-dir", help="Explicit run directory to inspect.")
     parser.add_argument(
         "--report-root",
-        default=str(DEFAULT_REPORT_ROOT),
-        help="Directory that contains per-run report folders.",
+        help=(
+            "Optional directory that contains per-run report folders. Defaults to "
+            "./reports/agents relative to the current workspace."
+        ),
     )
     return parser
 
@@ -60,7 +62,7 @@ def main() -> int:
     if args.report_dir:
         report_dir = Path(args.report_dir).resolve()
     else:
-        report_dir = (Path(args.report_root).resolve() / str(args.run_id)).resolve()
+        report_dir = (resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)).resolve()
 
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"

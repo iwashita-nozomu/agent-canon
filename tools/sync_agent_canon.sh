@@ -120,9 +120,9 @@ documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
-experiments/README.md:../${PREFIX}/experiments/README.md
-experiments/_template:../${PREFIX}/experiments/_template
-experiments/report/README.md:../../${PREFIX}/experiments/report/README.md
+memory/README.md:../${PREFIX}/memory/README.md
+memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
+memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md

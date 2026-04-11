@@ -14,7 +14,7 @@
 
 ## Requirements Resolution Sweep
 
-<!-- Record the accumulated context searched before leaving any open question: notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. -->
+<!-- Record the accumulated context searched before leaving any open question: memory, notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. -->
 
 ## Resolved From Accumulated Context
 

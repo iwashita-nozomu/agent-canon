@@ -169,12 +169,12 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md` への symlink view
 - `documents/conventions/python/30_experiment_directory_structure.md`
   - `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md` への symlink view
-- `experiments/README.md`
-  - `vendor/agent-canon/experiments/README.md` への symlink view
-- `experiments/_template/`
-  - `vendor/agent-canon/experiments/_template/` への symlink view
-- `experiments/report/README.md`
-  - `vendor/agent-canon/experiments/report/README.md` への symlink view
+- `memory/README.md`
+  - `vendor/agent-canon/memory/README.md` への symlink view
+- `memory/USER_PREFERENCES.md`
+  - `vendor/agent-canon/memory/USER_PREFERENCES.md` への symlink view
+- `memory/AGENT_PHILOSOPHY.md`
+  - `vendor/agent-canon/memory/AGENT_PHILOSOPHY.md` への symlink view
 - `notes/experiments/README.md`
   - `vendor/agent-canon/notes/experiments/README.md` への symlink view
 - `notes/experiments/REPORT_TEMPLATE.md`

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-DEFAULT_NOTE_PATH = "notes/themes/AGENT_PHILOSOPHY.md"
+DEFAULT_NOTE_PATH = "memory/AGENT_PHILOSOPHY.md"
 SECTION_HEADERS = {
     "work-principle": "## Working Principles",
     "interaction-observation": "## Interaction Observations",
@@ -27,11 +27,12 @@ DEFAULT_NOTE_TEXT = """# Agent Philosophy
 
 ## Use
 
-- user preference は `notes/themes/USER_PREFERENCES.md` に残します。
+- user preference は `memory/USER_PREFERENCES.md` に残します。
 - agent 自身の作業哲学、判断癖、対話上の再発防止、作業後 retrospective はこの note に残します。
 - 会話ログを raw に貼らず、1 observation 1 entry の短い抽象化として残します。
 - source、evidence、scope、confidence を明示し、推測と確定事項を混ぜません。
 - stable な運用 rule へ昇格するまでは、`AGENTS.md` や runtime entrypoint へ直接書きません。
+- shared canon の `memory/` を正本にし、template 側では runtime view を使います。
 
 ## Stable Philosophy
 
