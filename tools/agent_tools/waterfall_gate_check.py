@@ -68,6 +68,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             "design_brief.md",
             require_filled=True,
             required_sections=(
+                "## Upstream Requirement Packet",
                 "## Implementation Source Packet",
                 "## Design-To-Implementation Trace",
             ),
@@ -77,6 +78,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             require_filled=True,
             require_approve=True,
             required_sections=(
+                "## Upstream Requirement Packet Review",
                 "## Implementation Source Packet Review",
                 "## Design-To-Implementation Trace Review",
             ),

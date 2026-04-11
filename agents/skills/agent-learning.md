@@ -2,7 +2,7 @@
 
 ## Purpose
 
-agent の作業哲学、対話から得た学習、task retrospective を `memory/candidates/`、`memory/methods/`、`memory/global/AGENT_PHILOSOPHY.md` に段階的に蓄積し、stable な項目だけを workflow や `AGENTS.md` へ昇格します。
+agent の作業哲学、対話から得た学習、task retrospective を `memory/AGENT_PHILOSOPHY.md` に蓄積し、stable な項目だけを workflow や `AGENTS.md` へ昇格します。
 
 ## Use When
 
@@ -15,11 +15,8 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 ## Core References
 
 - `documents/agent-learning-workflow.md`
-- `memory/global/AGENT_PHILOSOPHY.md`
-- `memory/global/USER_PREFERENCES.md`
-- `memory/methods/`
-- `memory/candidates/`
-- `memory/subagent_loadouts.yaml`
+- `memory/AGENT_PHILOSOPHY.md`
+- `memory/USER_PREFERENCES.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `documents/notes-lifecycle.md`
 - `documents/workflow-references.md`
@@ -39,7 +36,6 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 
 ```bash
 python3 tools/agent_tools/log_agent_learning.py \
-  --role manager \
   --kind interaction-observation \
   --statement "<agent-side learning>" \
   --source chat \
@@ -50,7 +46,6 @@ python3 tools/agent_tools/log_agent_learning.py \
 
 ```bash
 python3 tools/agent_tools/log_agent_learning.py \
-  --role implementer \
   --kind task-retrospective \
   --statement "<what should change next time>" \
   --source closeout \

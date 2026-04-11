@@ -1,0 +1,1 @@
+../../memory/AGENT_PHILOSOPHY.md

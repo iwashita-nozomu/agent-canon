@@ -237,6 +237,11 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "Implement the approved small change.",
                         "## Existing Code And Docs To Reuse",
                         "Mirror `tools/agent_tools/task_close.py`.",
+                        "## Upstream Requirement Packet",
+                        (
+                            "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
+                            "and `documents/implementation-waterfall-workflow.md`."
+                        ),
                         "## Implementation Source Packet",
                         (
                             "Read `user_request_contract.md`, `design_review.md`, "
@@ -264,6 +269,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "",
                         "## Findings",
                         "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design cites the governing requirement and workflow documents.",
                         "## Implementation Source Packet Review",
                         "The packet names every required read-before-edit artifact.",
                         "## Design-To-Implementation Trace Review",
@@ -399,6 +406,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "",
                         "## Findings",
                         "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design cites the governing requirement and workflow documents.",
                         "## Implementation Source Packet Review",
                         "The packet names every required read-before-edit artifact.",
                         "## Design-To-Implementation Trace Review",
@@ -445,6 +454,85 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 "design_brief.md:section_empty_or_missing:implementation_source_packet"
             )
             self.assertIn(expected_blocker, result.stdout)
+
+    def test_design_gate_rejects_missing_upstream_requirement_packet(self) -> None:
+        """Design gate should fail when the design omits upstream document references."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-upstream-packet"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "design_brief.md").write_text(
+                "\n".join(
+                    [
+                        "# Detailed Design Brief",
+                        "",
+                        "## Goals",
+                        "Implement the approved small change.",
+                        "## Existing Code And Docs To Reuse",
+                        "Mirror `tools/agent_tools/task_close.py`.",
+                        "## Implementation Source Packet",
+                        "Read `user_request_contract.md` and `design_review.md`.",
+                        "## Design-To-Implementation Trace",
+                        "Slice A maps T1-C1 to `tools/agent_tools/task_close.py`.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "design_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Detailed Design Review",
+                        "",
+                        "## Findings",
+                        "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design should cite the governing requirement docs.",
+                        "## Implementation Source Packet Review",
+                        "The packet names every required read-before-edit artifact.",
+                        "## Design-To-Implementation Trace Review",
+                        "Each planned edit maps to the request clause and test plan.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "document_flow_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Document Flow Review",
+                        "",
+                        "## Findings",
+                        "No blockers.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "design",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_brief.md:section_empty_or_missing:upstream_requirement_packet",
+                result.stdout,
+            )
 
 
 if __name__ == "__main__":

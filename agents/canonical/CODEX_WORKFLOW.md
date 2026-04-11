@@ -7,9 +7,8 @@
 
 1. `AGENTS.md` を読む
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
-1. `memory/global/USER_PREFERENCES.md` を読む
-1. `memory/global/AGENT_PHILOSOPHY.md` を読む
-1. `memory/subagent_loadouts.yaml` を読み、自分の role の固定 read surface を確認する
+1. `memory/USER_PREFERENCES.md` を読む
+1. `memory/AGENT_PHILOSOPHY.md` を読む
 1. `agents/README.md` を読む
 1. `notes/guardrails/README.md` を読む
 1. `notes/guardrails/engineering_avoidances.md` を読む
@@ -48,9 +47,8 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - `notes/experiments/`
 - `references/`
 
-user の durable preference を見落とさないため、`memory/global/USER_PREFERENCES.md` は毎回読む固定 note にします。
-agent の作業哲学と対話から得た学習を見落とさないため、`memory/global/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
-role 固有の方法 memory と candidate memory は `memory/subagent_loadouts.yaml` で固定し、subagent ごとに読む file を prose ではなく machine route で決めます。
+user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
+agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 ### Library Sweep
 
@@ -164,8 +162,8 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
-- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/global/USER_PREFERENCES.md` へ追記する
-- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --role <role> --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行し、`memory/subagent_loadouts.yaml` の route に従って `memory/candidates/` または `memory/methods/` / `memory/global/` へ追記する
+- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/USER_PREFERENCES.md` へ追記する
+- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `memory/AGENT_PHILOSOPHY.md` へ追記する
 
 ### 2. Workflow Selection
 
@@ -278,9 +276,11 @@ cost を無視して review coverage を優先する run では、research-drive
 - 実装は `documents/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Implementation Source Packet` と `Design-To-Implementation Trace` を読み、そこにある artifact、repo docs、code path、test plan を読了する
+- 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - worker は会話文脈を実装入力にせず、各 implementation slice の前に design artifact path、design section、test plan item、request clause ID を明示する
 - `Implementation Source Packet` がない、または design と現行 repo docs / code が矛盾する場合は実装せず Gate 5-6 へ戻る
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
+- 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
 - repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する
@@ -336,8 +336,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
 - push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
-- closeout 前に `memory/global/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
-- closeout 前に `memory/global/AGENT_PHILOSOPHY.md`、`memory/methods/`、`memory/candidates/` を見直し、task retrospective、interaction observation、promotion candidate の昇格先を `agent-learning` で判断する
+- closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
+- closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
 - review-only task や no-change task では commit / push を要求しない
 
 そのうえで、何を変えたか、何を確認したか、何を確認していないかを短く残して完了する

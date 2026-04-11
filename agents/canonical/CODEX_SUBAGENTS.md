@@ -7,7 +7,6 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 ## Principles
 
 - role behavior は docs より `.codex/agents/*.toml` を優先します
-- role ごとの固定 memory read surface は `memory/subagent_loadouts.yaml` を優先します
 - parent agent が最終編集責任を持つ
 - routing と required review を決める前に subagent を乱立させない
 - repo-changing task では、stage ごとに適切な subagent を explicit に立てる
@@ -148,6 +147,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の禁止事項を重複記述しません
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
+- designer / implementer を起動するときは、`team_manifest.yaml` の `document_packet.read_before_work` か `task_start.py` / `bootstrap_agent_run.py` の packet 出力をそのまま渡します
 - 長文文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
 - 論文 draft では `citation_evidence_reviewer` も追加します
@@ -195,7 +195,6 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - skill shim: `.agents/skills/`
 - Codex project config: `.codex/config.toml`
 - Codex subagent definitions: `.codex/agents/*.toml`
-- role memory routing: `memory/subagent_loadouts.yaml`
 
 設定運用メモ:
 - stage 固有の禁止事項を増やしたいときは、この文書より先に `.codex/agents/*.toml` を更新します

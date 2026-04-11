@@ -17,6 +17,10 @@
 
 <!-- Check whether existing code, naming, APIs, tests, and docs style are being followed. -->
 
+## Upstream Requirement Packet Review
+
+<!-- Check whether the design explicitly cites the upstream documented requirement packet: request contract, schedule, intent brief, waterfall docs, and other governing documents. Return revise if the design appears to rely on chat-only memory. -->
+
 ## Implementation Source Packet Review
 
 <!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->

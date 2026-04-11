@@ -15,7 +15,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
-MEMORY_LOADOUT_PATH = ROOT / "memory" / "subagent_loadouts.yaml"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
 PYTHON_SUFFIXES = {".py", ".pyi"}
@@ -40,6 +39,76 @@ CPP_PATH_MARKERS = (
     "include/",
     "lib/",
 )
+ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
+    "manager": {
+        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "notes": "Requirements and planning start from explicit documented clauses and stage plan.",
+    },
+    "designer": {
+        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "workspace_paths": [
+            "documents/implementation-waterfall-workflow.md",
+            "agents/canonical/CODEX_WORKFLOW.md",
+        ],
+        "notes": "Detailed design must read upstream documented requirements and waterfall rules before design begins.",
+    },
+    "design_reviewer": {
+        "artifact_keys": ["user_request_contract", "schedule", "design_brief"],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Design review checks the same upstream packet and the resulting design brief.",
+    },
+    "test_designer": {
+        "artifact_keys": ["user_request_contract", "schedule", "design_brief", "design_review"],
+        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "notes": "Test design derives cases from the approved design packet.",
+    },
+    "implementer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "document_flow_review",
+            "test_plan",
+        ],
+        "workspace_paths": [
+            "documents/implementation-waterfall-workflow.md",
+            "agents/canonical/CODEX_WORKFLOW.md",
+        ],
+        "must_cite_before_edit": True,
+        "notes": "Implementation must read and cite the approved design packet before editing.",
+    },
+    "change_reviewer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "test_plan",
+            "change_review",
+        ],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Checkpoint review verifies that implementation cited the approved packet.",
+    },
+    "final_reviewer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "test_plan",
+            "final_review",
+        ],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Final review verifies whole-request traceability back to the approved packet.",
+    },
+    "scheduler": {
+        "artifact_keys": ["user_request_contract", "schedule"],
+        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "notes": "Scheduling reads explicit requirement and plan surfaces.",
+    },
+}
 
 
 def resolve_report_root(
@@ -93,15 +162,20 @@ class RoleWriteScope:
 
 
 @dataclass(frozen=True)
-class RoleMemoryLoadout:
-    """Resolved fixed memory read and write surfaces for one role."""
+class DocumentPacketEntry:
+    """One explicit path a role must read before work."""
+
+    path: Path
+    rationale: str
+
+
+@dataclass(frozen=True)
+class RoleDocumentPacket:
+    """Resolved explicit document packet for one role."""
 
     role_id: str
-    read_files: tuple[Path, ...]
-    method_files: tuple[Path, ...]
-    candidate_file: Path | None
-    allow_method_write: bool
-    allow_global_write: bool
+    read_before_work: tuple[DocumentPacketEntry, ...]
+    must_cite_before_edit: bool
     notes: str
 
 
@@ -168,14 +242,6 @@ def load_task_catalog(config: TeamConfig) -> TaskCatalog:
     )
 
 
-def load_memory_loadouts(path: Path = MEMORY_LOADOUT_PATH) -> dict[str, object]:
-    """Load the machine-readable role-to-memory routing config."""
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise RuntimeError(f"memory loadout config must parse as a mapping: {path}")
-    return data
-
-
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
@@ -187,63 +253,6 @@ def resolve_role(config: TeamConfig, role_name: str) -> Role:
         if role_name == role.id:
             return role
     raise KeyError(f"unknown role: {role_name}")
-
-
-def resolve_role_memory_loadout(
-    role_name: str,
-    loadouts: dict[str, object] | None = None,
-) -> RoleMemoryLoadout:
-    """Resolve one role's fixed memory loadout."""
-    raw = loadouts if loadouts is not None else load_memory_loadouts()
-    global_read_files = _as_string_tuple(raw.get("global_read_files"), "global_read_files")
-    method_files_raw = raw.get("method_files")
-    candidate_files_raw = raw.get("candidate_files")
-    role_loadouts_raw = raw.get("role_loadouts")
-    if not isinstance(method_files_raw, dict):
-        raise RuntimeError("memory loadout method_files must be a mapping")
-    if not isinstance(candidate_files_raw, dict):
-        raise RuntimeError("memory loadout candidate_files must be a mapping")
-    if not isinstance(role_loadouts_raw, dict):
-        raise RuntimeError("memory loadout role_loadouts must be a mapping")
-    if role_name not in role_loadouts_raw:
-        raise KeyError(f"memory loadout missing role: {role_name}")
-    entry = role_loadouts_raw[role_name]
-    if not isinstance(entry, dict):
-        raise RuntimeError(f"memory loadout entry must be a mapping for role {role_name}")
-
-    method_keys = _as_string_tuple(entry.get("method_reads"), f"role_loadouts[{role_name}].method_reads")
-    resolved_global_files = tuple((ROOT / relative).resolve() for relative in global_read_files)
-    resolved_method_files = []
-    for key in method_keys:
-        relative = method_files_raw.get(key)
-        if not isinstance(relative, str):
-            raise RuntimeError(f"memory loadout method key missing or invalid: {key}")
-        resolved_method_files.append((ROOT / relative).resolve())
-
-    candidate_file: Path | None = None
-    candidate_key = entry.get("candidate_file")
-    if candidate_key is not None:
-        if not isinstance(candidate_key, str):
-            raise RuntimeError(f"memory loadout candidate key must be a string for role {role_name}")
-        relative = candidate_files_raw.get(candidate_key)
-        if not isinstance(relative, str):
-            raise RuntimeError(f"memory loadout candidate key missing or invalid: {candidate_key}")
-        candidate_file = (ROOT / relative).resolve()
-
-    read_files = list(resolved_global_files)
-    read_files.extend(resolved_method_files)
-    if candidate_file is not None:
-        read_files.append(candidate_file)
-
-    return RoleMemoryLoadout(
-        role_id=role_name,
-        read_files=tuple(read_files),
-        method_files=tuple(resolved_method_files),
-        candidate_file=candidate_file,
-        allow_method_write=bool(entry.get("allow_method_write", False)),
-        allow_global_write=bool(entry.get("allow_global_write", False)),
-        notes=str(entry.get("notes", "")),
-    )
 
 
 def task_ids(catalog: TaskCatalog) -> tuple[str, ...]:
@@ -412,6 +421,47 @@ def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ..
     return tuple(unique_artifacts)
 
 
+def resolve_role_document_packet(
+    config: TeamConfig,
+    role: Role,
+    report_dir: Path,
+    workspace_root: Path,
+) -> RoleDocumentPacket:
+    """Resolve explicit read-before-work packet for one role."""
+    spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
+    artifact_keys = _as_string_tuple(
+        spec.get("artifact_keys"),
+        f"document_packet[{role.id}].artifact_keys",
+    )
+    workspace_paths = _as_string_tuple(
+        spec.get("workspace_paths"),
+        f"document_packet[{role.id}].workspace_paths",
+    )
+    entries: list[DocumentPacketEntry] = []
+    for artifact_key in artifact_keys:
+        if artifact_key not in config.artifacts:
+            raise RuntimeError(f"document packet artifact key missing for role {role.id}: {artifact_key}")
+        entries.append(
+            DocumentPacketEntry(
+                path=(report_dir / config.artifacts[artifact_key]).resolve(),
+                rationale=f"run artifact:{artifact_key}",
+            )
+        )
+    for relative_path in workspace_paths:
+        entries.append(
+            DocumentPacketEntry(
+                path=(workspace_root / relative_path).resolve(),
+                rationale=f"workspace doc:{relative_path}",
+            )
+        )
+    return RoleDocumentPacket(
+        role_id=role.id,
+        read_before_work=tuple(entries),
+        must_cite_before_edit=bool(spec.get("must_cite_before_edit", False)),
+        notes=str(spec.get("notes", "")),
+    )
+
+
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
     """Load and fill a text template from agents/templates."""
     content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
@@ -512,7 +562,6 @@ def build_manifest(
     workspace_root: Path,
 ) -> str:
     """Build the team manifest yaml."""
-    memory_loadouts = load_memory_loadouts()
     lines = [
         "run:",
         f"  id: {run_id}",
@@ -523,7 +572,6 @@ def build_manifest(
         f"  workspace_root: {str(workspace_root)!r}",
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
-        f"  memory_loadout_config: {str(MEMORY_LOADOUT_PATH)!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
         "roles:",
     ]
@@ -568,20 +616,17 @@ def build_manifest(
         lines.append("      allowed_directories:")
         for path in scope.allowed_directories:
             lines.append(f"        - {str(path)!r}")
-        memory_loadout = resolve_role_memory_loadout(role.id, memory_loadouts)
-        lines.append("    memory_loadout:")
-        lines.append(f"      allow_method_write: {str(memory_loadout.allow_method_write).lower()}")
-        lines.append(f"      allow_global_write: {str(memory_loadout.allow_global_write).lower()}")
-        if memory_loadout.notes:
-            lines.append(f"      notes: {memory_loadout.notes!r}")
-        if memory_loadout.candidate_file is not None:
-            lines.append(f"      candidate_file: {str(memory_loadout.candidate_file)!r}")
-        lines.append("      method_files:")
-        for path in memory_loadout.method_files:
-            lines.append(f"        - {str(path)!r}")
-        lines.append("      read_files:")
-        for path in memory_loadout.read_files:
-            lines.append(f"        - {str(path)!r}")
+        document_packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+        lines.append("    document_packet:")
+        lines.append(
+            f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
+        )
+        if document_packet.notes:
+            lines.append(f"      notes: {document_packet.notes!r}")
+        lines.append("      read_before_work:")
+        for entry in document_packet.read_before_work:
+            lines.append(f"        - path: {str(entry.path)!r}")
+            lines.append(f"          rationale: {entry.rationale!r}")
     lines.append("context_policies:")
     for policy in config.context_policies:
         lines.append("  - roles:")

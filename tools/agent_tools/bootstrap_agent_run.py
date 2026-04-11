@@ -8,13 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_team import (
-    MEMORY_LOADOUT_PATH,
     auto_language_specialists,
     create_run_bundle,
     default_specialists_for_task,
     load_team_config,
     load_task_catalog,
     make_run_id,
+    resolve_role_document_packet,
     select_roles,
     specialist_role_ids,
     task_ids,
@@ -29,6 +29,18 @@ def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
         if role.id == role_id:
             return role.codex_agents
     return ()
+
+
+def document_packet_output(
+    config: TeamConfig,
+    role_id: str,
+    report_dir: Path,
+    workspace_root: Path,
+) -> str:
+    """Render one role's explicit document packet as a CSV-like path list."""
+    role = next(role for role in config.always_on_roles + config.specialist_roles if role.id == role_id)
+    packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+    return ",".join(str(entry.path) for entry in packet.read_before_work)
 
 
 def build_parser(
@@ -148,13 +160,17 @@ def main() -> int:
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
-    print(f"MEMORY_LOADOUT_CONFIG={MEMORY_LOADOUT_PATH}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
     print(f"IMPLEMENTATION_CODEX_AGENTS={','.join(codex_agents_for_role(config, 'implementer'))}")
+    print(f"DESIGN_DOCUMENT_PACKET={document_packet_output(config, 'designer', report_dir, workspace_root)}")
+    print(
+        "IMPLEMENTATION_DOCUMENT_PACKET="
+        f"{document_packet_output(config, 'implementer', report_dir, workspace_root)}"
+    )
     if args.dry_run:
         print("DRY_RUN=1")
     else:

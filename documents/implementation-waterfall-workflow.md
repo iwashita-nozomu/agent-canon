@@ -201,7 +201,7 @@ source bucket:
 - `current_request`
   - 今回の user request に明示された requirement
 - `durable_user_preference`
-  - `memory/global/USER_PREFERENCES.md` や過去ログから抽出された user tendency
+  - `memory/USER_PREFERENCES.md` や過去ログから抽出された user tendency
 - `repo_or_code_precedent`
   - 既存 code、test、docs、workflow から分かる制約
 - `domain_or_external_constraint`
@@ -333,6 +333,7 @@ exit 条件:
 
 最低限の記録:
 - `Existing Code And Docs To Reuse:`
+- `Upstream Requirement Packet:`
 - `Implementation Source Packet:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
@@ -344,19 +345,23 @@ exit 条件:
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
+- `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、code path、test path、外部 reference を列挙します
+- `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - 新規または rename する variable、function、class、file、CLI flag、config key、public API identifier は、既存 precedent、採用名、却下した代替案、review 観点を明記します
 - 既存 precedent がある場合はそれを採用し、ない場合は理由を文書化して Gate 6 で確認します
 - worker が naming、API shape、path layout、boundary choice を発明しなくてよい状態まで詳細設計を詰めます
 - worker が会話文脈や記憶を実装入力にしなくてよい状態まで、必要な判断を設計文書内に再掲します
+- worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
+- designer が upstream 文書だけ読んで詳細設計に着手できる
 - worker が編集前に読む文書と code path が `Implementation Source Packet` だけで分かる
 - 各予定差分が `Design-To-Implementation Trace` で clause、source、test、validation へ結び付いている
 - 新規 abstraction より reuse-first の方針が説明できる

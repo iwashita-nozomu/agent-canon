@@ -97,13 +97,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
-            self.assertIn("MEMORY_LOADOUT_CONFIG=", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT=", result.stdout)
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
@@ -175,12 +176,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
-            self.assertIn("MEMORY_LOADOUT_CONFIG=", result.stdout)
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
+            self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
-            self.assertIn("  memory_loadout_config:", manifest_text)
-            self.assertIn("    memory_loadout:", manifest_text)
+            self.assertIn("document_packet:", manifest_text)
+            self.assertIn("must_cite_before_edit: true", manifest_text)
+            self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""

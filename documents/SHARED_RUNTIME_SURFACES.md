@@ -43,10 +43,8 @@ root では次を symlink view として扱います。
 - `documents/conventions/python/20_benchmark_policy.md`
 - `documents/conventions/python/30_experiment_directory_structure.md`
 - `memory/README.md`
-- `memory/global`
-- `memory/methods`
-- `memory/candidates`
-- `memory/subagent_loadouts.yaml`
+- `memory/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
 - `notes/experiments/README.md`
 - `notes/experiments/REPORT_TEMPLATE.md`
 - `notes/experiments/results/README.md`
