@@ -21,6 +21,7 @@ from agent_team import (
     load_task_catalog,
     load_team_config,
     required_output_templates_missing,
+    resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
     resolve_role,
     task_ids,
@@ -63,6 +64,17 @@ CODING_ROLE_IDS = {
 SPARK_CODING_ROLE_IDS = {
     "spark_worker",
 }
+
+
+def resolve_packet_probe_workspace() -> Path:
+    """Return the workspace root that should be used for packet path existence checks."""
+    candidate = ROOT.parent.parent.resolve()
+    try:
+        if (candidate / "vendor" / "agent-canon").resolve() == ROOT.resolve():
+            return candidate
+    except FileNotFoundError:
+        pass
+    return ROOT.resolve()
 
 
 def ensure(condition: bool, message: str) -> None:
@@ -177,8 +189,10 @@ def validate_team_config_references() -> None:
     for rule in config.activation_rules:
         ensure(rule["role"] in role_ids, f"activation rule references unknown role: {rule['role']}")
 
-    packet_probe_workspace = ROOT
+    packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
+    for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
+        ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
     for role in config.always_on_roles + config.specialist_roles:
         packet = resolve_role_document_packet(
             config=config,

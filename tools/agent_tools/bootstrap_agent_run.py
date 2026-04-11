@@ -15,6 +15,7 @@ from agent_team import (
     load_task_catalog,
     make_run_id,
     resolve_role_document_packet,
+    resolve_cross_cutting_document_packet,
     select_roles,
     specialist_role_ids,
     task_ids,
@@ -41,6 +42,11 @@ def document_packet_output(
     role = next(role for role in config.always_on_roles + config.specialist_roles if role.id == role_id)
     packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
     return ",".join(str(entry.path) for entry in packet.read_before_work)
+
+
+def cross_cutting_document_packet_output(workspace_root: Path) -> str:
+    """Render the common cross-cutting document packet."""
+    return ",".join(str(entry.path) for entry in resolve_cross_cutting_document_packet(workspace_root))
 
 
 def build_parser(
@@ -166,6 +172,7 @@ def main() -> int:
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
     print(f"IMPLEMENTATION_CODEX_AGENTS={','.join(codex_agents_for_role(config, 'implementer'))}")
+    print(f"CROSS_CUTTING_DOCUMENT_PACKET={cross_cutting_document_packet_output(workspace_root)}")
     print(f"DESIGN_DOCUMENT_PACKET={document_packet_output(config, 'designer', report_dir, workspace_root)}")
     print(
         "IMPLEMENTATION_DOCUMENT_PACKET="

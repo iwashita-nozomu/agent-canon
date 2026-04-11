@@ -7,18 +7,36 @@
 
 1. `AGENTS.md` を読む
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
-1. `memory/USER_PREFERENCES.md` を読む
-1. `memory/AGENT_PHILOSOPHY.md` を読む
-1. `agents/README.md` を読む
-1. `notes/guardrails/README.md` を読む
-1. `notes/guardrails/engineering_avoidances.md` を読む
+1. Base Runtime Packet を読む
+1. Cross-Cutting Packet を読む
 1. `agents/skills/README.md` を読む
-1. `documents/coding-conventions-python.md` を読む
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. 実装を伴う task では `documents/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
 1. 必要なら `.agents/skills/` から該当 skill を読む
+
+Base Runtime Packet:
+
+- `README.md`
+- `documents/WORKFLOW_GUIDE.md`
+- `agents/README.md`
+- `agents/TASK_WORKFLOWS.md`
+- `agents/canonical/CODEX_WORKFLOW.md`
+
+Cross-Cutting Packet:
+
+- `documents/REVIEW_PROCESS.md`
+- `documents/AGENTS_COORDINATION.md`
+- `documents/coding-conventions-python.md`
+- `documents/notes-lifecycle.md`
+- `documents/agent-learning-workflow.md`
+- `documents/agent-canon-subtree-migration.md`
+- `notes/guardrails/README.md`
+- `notes/guardrails/engineering_avoidances.md`
+- `docker/README.md`
+- `memory/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
 
 ## Required Intake Sweep
 
@@ -176,6 +194,7 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - run 固有のメモは `reports/agents/<run-id>/`
 - repo-wide の恒久文書は `agents/` か `documents/`
 - 知見の蓄積は `notes/`
+- packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET` の順で handoff に使う
 
 ### 4. Run Bootstrap
 
@@ -205,6 +224,14 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
       --task-id T1 \
       --owner "codex" \
       --workspace-root "$PWD"
+
+bundle 出力には少なくとも次が含まれます。
+
+- `CROSS_CUTTING_DOCUMENT_PACKET`
+- `DESIGN_DOCUMENT_PACKET`
+- `IMPLEMENTATION_DOCUMENT_PACKET`
+
+parent は subagent handoff でこの packet path 群を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
 
 研究・実験つき変更:
 

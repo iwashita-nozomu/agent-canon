@@ -17,6 +17,10 @@
 
 <!-- Check whether existing code, naming, APIs, tests, and docs style are being followed. -->
 
+## Cross-Doc Coverage Review
+
+<!-- Check whether the design looked beyond the parent document chain and covered relevant cross-cutting docs such as review policy, guardrails, notes lifecycle, learning workflow, and migration/integration docs. Return revise if the design stayed inside one document branch and missed adjacent governing docs. -->
+
 ## Upstream Requirement Packet Review
 
 <!-- Check whether the design explicitly cites the upstream documented requirement packet: request contract, schedule, intent brief, waterfall docs, and other governing documents. Return revise if the design appears to rely on chat-only memory. -->

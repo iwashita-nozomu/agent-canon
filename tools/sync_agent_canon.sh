@@ -122,6 +122,8 @@ documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
 memory/README.md:../${PREFIX}/memory/README.md
+memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
+memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
 memory/global:../${PREFIX}/memory/global
 memory/methods:../${PREFIX}/memory/methods
 memory/candidates:../${PREFIX}/memory/candidates
@@ -173,8 +175,6 @@ EOF
 
 build_removed_legacy_paths() {
   cat <<EOF
-memory/AGENT_PHILOSOPHY.md
-memory/USER_PREFERENCES.md
 notes/themes/AGENT_PHILOSOPHY.md
 notes/themes/USER_PREFERENCES.md
 EOF

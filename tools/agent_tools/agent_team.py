@@ -109,6 +109,19 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         "notes": "Scheduling reads explicit requirement and plan surfaces.",
     },
 }
+COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
+    "documents/REVIEW_PROCESS.md",
+    "documents/AGENTS_COORDINATION.md",
+    "documents/coding-conventions-python.md",
+    "documents/notes-lifecycle.md",
+    "documents/agent-learning-workflow.md",
+    "documents/agent-canon-subtree-migration.md",
+    "notes/guardrails/README.md",
+    "notes/guardrails/engineering_avoidances.md",
+    "docker/README.md",
+    "memory/USER_PREFERENCES.md",
+    "memory/AGENT_PHILOSOPHY.md",
+)
 
 
 def resolve_report_root(
@@ -177,6 +190,17 @@ class RoleDocumentPacket:
     read_before_work: tuple[DocumentPacketEntry, ...]
     must_cite_before_edit: bool
     notes: str
+
+
+def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[DocumentPacketEntry, ...]:
+    """Resolve the common cross-cutting document packet for one workspace."""
+    return tuple(
+        DocumentPacketEntry(
+            path=(workspace_root / relative_path).resolve(),
+            rationale=f"cross_cutting_doc:{relative_path}",
+        )
+        for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
+    )
 
 
 @dataclass(frozen=True)
@@ -438,22 +462,38 @@ def resolve_role_document_packet(
         f"document_packet[{role.id}].workspace_paths",
     )
     entries: list[DocumentPacketEntry] = []
+    seen_paths: set[Path] = set()
+
+    def add_entry(entry: DocumentPacketEntry) -> None:
+        resolved_path = entry.path.resolve()
+        if resolved_path in seen_paths:
+            return
+        seen_paths.add(resolved_path)
+        entries.append(
+            DocumentPacketEntry(
+                path=resolved_path,
+                rationale=entry.rationale,
+            )
+        )
+
     for artifact_key in artifact_keys:
         if artifact_key not in config.artifacts:
             raise RuntimeError(f"document packet artifact key missing for role {role.id}: {artifact_key}")
-        entries.append(
+        add_entry(
             DocumentPacketEntry(
                 path=(report_dir / config.artifacts[artifact_key]).resolve(),
                 rationale=f"run artifact:{artifact_key}",
             )
         )
     for relative_path in workspace_paths:
-        entries.append(
+        add_entry(
             DocumentPacketEntry(
                 path=(workspace_root / relative_path).resolve(),
                 rationale=f"workspace doc:{relative_path}",
             )
         )
+    for entry in resolve_cross_cutting_document_packet(workspace_root):
+        add_entry(entry)
     return RoleDocumentPacket(
         role_id=role.id,
         read_before_work=tuple(entries),
@@ -573,14 +613,16 @@ def build_manifest(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
-        "roles:",
     ]
     communication_protocol = config.team.get("communication_protocol")
     if communication_protocol is not None:
-        lines.insert(
-            9,
-            f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}",
-        )
+        lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
+    lines.append("  cross_cutting_document_packet:")
+    cross_cutting_packet = resolve_cross_cutting_document_packet(workspace_root)
+    for entry in cross_cutting_packet:
+        lines.append(f"    - path: {str(entry.path)!r}")
+        lines.append(f"      rationale: {entry.rationale!r}")
+    lines.append("roles:")
     for role in roles:
         lines.append(f"  - id: {role.id}")
         lines.append(f"    activation: {role.activation}")

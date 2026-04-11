@@ -10,19 +10,34 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 
-## Read First
+## Read Packets
+
+### Base Runtime Packet
 
 - `README.md`
 - `documents/WORKFLOW_GUIDE.md`
 - `agents/README.md`
 - `agents/TASK_WORKFLOWS.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
-- `memory/USER_PREFERENCES.md`
-- `memory/AGENT_PHILOSOPHY.md`
+
+### Cross-Cutting Packet
+
+- `documents/REVIEW_PROCESS.md`
+- `documents/AGENTS_COORDINATION.md`
+- `documents/coding-conventions-python.md`
+- `documents/notes-lifecycle.md`
+- `documents/agent-learning-workflow.md`
+- `documents/agent-canon-subtree-migration.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
-- `documents/AGENTS_COORDINATION.md`
 - `docker/README.md`
+- `memory/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
+
+### Task Packet
+
+- task 固有の workflow、design、implementation packet は `task_start.py` / `bootstrap_agent_run.py` の packet 出力を使って補います。
+- 文書を木構造で辿るだけで終わらせず、Base Runtime Packet と Cross-Cutting Packet を先に読んでから task 固有 packet へ入ります。
 
 ## Template Context
 
@@ -68,6 +83,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
+- `task_start.py` / `bootstrap_agent_run.py` が出す `CROSS_CUTTING_DOCUMENT_PACKET` を、designer / implementer / reviewer への handoff で省略しません。
 - `memory/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
 - `memory/AGENT_PHILOSOPHY.md` は毎回読む runtime note とし、stable な作業哲学だけを periodic sweep で workflow / guardrail / `AGENTS.md` へ昇格します。
 - 自己学習と対話記録の追記は shared canon `memory/` の責務として扱い、template-local note だけ更新して closeout しません。

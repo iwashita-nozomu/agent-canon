@@ -13,6 +13,10 @@
 
 <!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
 
+## Cross-Doc Coverage Review
+
+<!-- Check whether the implementer and parent used the cross-cutting packet rather than relying only on one workflow branch. Return revise if relevant review, guardrail, migration, or lifecycle docs were omitted from the implementation basis. -->
+
 ## Design-Base Implementation Review
 
 <!-- Check whether each changed slice cites an approved design artifact path and section, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise for missing citations. Return escalate for design drift or design gaps. -->
