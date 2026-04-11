@@ -72,6 +72,9 @@
 - 2026-04-11 | Do not stop to ask for push permission when push is a natural completion step; push directly unless I explicitly stop it or an external block exists.
   - source: chat
 
+- 2026-04-11 | サブエージェントを実際に起動し、handoff では tree 順の文書探索ではなく packet path を明示してほしい
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
