@@ -37,6 +37,42 @@ class UpdateAgentCanonTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+        status = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=target,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if status:
+            subprocess.run(
+                ["git", "config", "user.name", "Update Agent Canon Test"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "update-agent-canon@example.invalid"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "test: overlay current working tree"],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
     def test_register_local_bare_seeds_remote_and_plan_uses_configured_remote(self) -> None:
         """register-local-bare should seed the bare repo and wire the remote."""
@@ -44,6 +80,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             root = Path(tmp_dir)
             clone_dir = root / "clone"
             bare_repo = root / "derived-agent-canon.git"
+            proposal_branch = "canon-proposal/derived-agent-canon"
             self.clone_repo(clone_dir)
 
             register = subprocess.run(
@@ -53,6 +90,8 @@ class UpdateAgentCanonTest(unittest.TestCase):
                     "register-local-bare",
                     "--bare-repo",
                     str(bare_repo),
+                    "--proposal-branch",
+                    proposal_branch,
                 ],
                 cwd=clone_dir,
                 check=False,
@@ -79,6 +118,30 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             self.assertEqual(remote_url, str(bare_repo))
+            stored_branch = subprocess.run(
+                ["git", "config", "--get", "agent-canon.proposalBranch"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(stored_branch, proposal_branch)
+            self.assertEqual(
+                subprocess.run(
+                    [
+                        "git",
+                        "--git-dir",
+                        str(bare_repo),
+                        "rev-parse",
+                        "--verify",
+                        f"refs/heads/{proposal_branch}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).returncode,
+                0,
+            )
 
             plan = subprocess.run(
                 ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
@@ -89,6 +152,67 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("agent_canon_plan_remote_source=configured", plan.stdout)
+
+    def test_push_proposal_uses_configured_proposal_branch(self) -> None:
+        """push-proposal should update the configured remote branch."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "derived-agent-canon.git"
+            proposal_branch = "canon-proposal/test-derived"
+            self.clone_repo(clone_dir)
+
+            subprocess.run(
+                [
+                    "bash",
+                    str(clone_dir / "tools" / "update_agent_canon.sh"),
+                    "register-local-bare",
+                    "--bare-repo",
+                    str(bare_repo),
+                    "--proposal-branch",
+                    proposal_branch,
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            marker = clone_dir / "vendor" / "agent-canon" / ".proposal-branch-marker"
+            marker.write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", str(marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: update proposal branch snapshot",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            push = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "push-proposal"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(push.returncode, 0, push.stderr)
+            proposal_tree = subprocess.run(
+                ["git", "--git-dir", str(bare_repo), "ls-tree", "-r", "--name-only", proposal_branch],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertIn(".proposal-branch-marker", proposal_tree)
 
     def test_plan_reports_snapshot_import_without_subtree_binary(self) -> None:
         """Plan should report the no-subtree route when git-subtree is unavailable."""
