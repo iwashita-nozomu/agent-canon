@@ -71,6 +71,15 @@
 - 2026-04-10 | C++ native autodiff custom primitives should not expose a separate scalar primitive concept; scalar-like values should be represented through rank-0 / 0D tensor value primitives where practical.
   - source: chat
 
+- 2026-04-11 | 一部を先に実装するという進め方は禁止。完了扱いは全要件を満たす一括実装のみ。
+  - source: chat
+
+- 2026-04-11 | 無理に拡張前提の抽象を増やさず、読みやすいコードを優先する。
+  - source: chat
+
+- 2026-04-11 | 冗長な API と実装の重複を避け、コードも文書も核の経路を優先して整理してほしい
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
