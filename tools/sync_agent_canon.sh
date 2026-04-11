@@ -398,8 +398,8 @@ import_fast_forward_snapshot() {
   local method="${3:-fast_forward_snapshot_import}"
 
   if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
-    method="diverged_snapshot_import"
     echo "agent_canon_snapshot_import=diverged_history"
+    die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH'; update the proposal branch or merge the shared canon changes before running ensure-latest"
   fi
 
   if git -C "$ROOT_DIR" diff --quiet "$local_split" "$remote_sha" --; then
@@ -528,6 +528,9 @@ cmd_plan() {
     route="already_current_split"
   elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
     route="local_contains_remote"
+  elif [ -n "$local_split" ] && ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    route="diverged_local_history"
+    requires_clean="yes"
   elif [ -n "$local_split" ] && [ "$subtree_metadata" = "yes" ]; then
     route="subtree_pull"
     requires_clean="yes"
@@ -654,6 +657,11 @@ cmd_ensure_latest() {
       cmd_link_root 1
     fi
     return
+  fi
+
+  if [ -n "$local_split" ] && ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    echo "agent_canon_snapshot_import=diverged_history"
+    die "local shared-canon history diverged from '$REMOTE_NAME/$branch'; merge shared canon changes into upstream or push the proposal branch before ensure-latest"
   fi
 
   require_clean_worktree

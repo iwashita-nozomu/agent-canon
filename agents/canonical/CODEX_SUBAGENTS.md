@@ -13,7 +13,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 調査、レビュー、文書整備は分ける
 - 再帰的 fan-out は避ける
 - 探索、レビュー、仕様確認の並列化は使うが、parallel write-heavy implementation は避ける
-- `max_depth = 1` を前提にし、subagent からの再帰的 fan-out を避ける
+- subagent の depth や fan-out は固定値で規定せず、task の複雑さ、review の独立性、write scope 分離で決める
+- 追加の subagent 層を立てるときは、parent が owner、input packet、expected output、write scope を明示する
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
 - 論文 draft では `citation_evidence_reviewer` も別の subagent で行う

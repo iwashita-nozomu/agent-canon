@@ -29,7 +29,8 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - clean worktree では `make agent-canon-ensure-latest` を実行します
 - dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
 - `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
-- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
+- upstream より local shared canon が進んでいて remote history が local split の祖先なら pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
+- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、proposal branch の push または maintainer merge を先に解消します
 
 ### Context Sweep
 
@@ -193,6 +194,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
 default の model split は、`gpt-5.4` が planning、writing、final judgment を担当し、`gpt-5.3-codex` が code survey と broad implementation を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.4` / `gpt-5.3-codex` 側に残します。
+- subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 

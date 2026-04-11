@@ -5,9 +5,10 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 
 ## Subagent Usage
 
-- trivial な単発編集を除き、planning、detailed design、review、implementation は stage ごとに適切な subagent を使います。
+- repo-changing task では、requirements / planning / detailed design / review / implementation を parent 1 人で抱え込まず、stage ごとに適切な subagent を明示して進めます。例外は trivial な単発編集だけで、その場合も run bundle に parent 直処理の理由を残します。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
+- subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 
 ## Read First
 
