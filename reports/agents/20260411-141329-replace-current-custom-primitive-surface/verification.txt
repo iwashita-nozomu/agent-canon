@@ -1,0 +1,9 @@
+run_id=20260411-141329-replace-current-custom-primitive-surface
+task=replace current custom primitive surface with raw ABI primitive contract integrated with Kokkos and Enzyme
+owner=codex
+created_at_utc=2026-04-11T14:13:29Z
+status=pass
+user_completion_report=locked
+closeout_gate_status=pending
+validation_commands=cmake --build build/cpp/enzyme-autodiff --target native_autodiff_smoke -- -j4;ctest --test-dir build/cpp/enzyme-autodiff --output-on-failure;cmake -S . -B build/cpp/native-autodiff-package -DPROJECT_TEMPLATE_ENABLE_CPP_SMOKE=ON -DCMAKE_CXX_COMPILER=/usr/lib/llvm-15/bin/clang++ -DCMAKE_PREFIX_PATH=/opt/enzyme -DCMAKE_INSTALL_PREFIX=/workspace/.state/cpp-install/native-autodiff-package;cmake --build build/cpp/native-autodiff-package --target install -- -j4;cmake -S tests/cpp/package_consumer -B build/cpp/package-consumer -DCMAKE_CXX_COMPILER=/usr/lib/llvm-15/bin/clang++ -DCMAKE_PREFIX_PATH=/workspace/.state/cpp-install/native-autodiff-package;/opt/enzyme;cmake --build build/cpp/package-consumer -- -j4;ctest --test-dir build/cpp/package-consumer --output-on-failure;cmake --build build/cpp/backend-dependency-gpu-smoke -- -j4;ctest --test-dir build/cpp/backend-dependency-gpu-smoke --output-on-failure;make docs-check;make agent-checks;python3 -m pytest tests/ -q --tb=short;make ci-quick;git diff --check
+notes=root/package/backend build and ctest passed; docs-check, agent-checks, pytest, ci-quick, and git diff --check passed
