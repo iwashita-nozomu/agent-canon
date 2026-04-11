@@ -255,9 +255,15 @@ bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 ### 7.4 upstream から更新取得
 
 ```bash
+bash tools/update_agent_canon.sh plan
+bash tools/update_agent_canon.sh apply
 bash tools/sync_agent_canon.sh ensure-latest
 bash tools/sync_agent_canon.sh pull
 ```
+
+derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
+`plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。
+`apply` は最終的に `ensure-latest` を呼びます。
 
 `ensure-latest` は task 開始時の入口です。
 clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ更新します。
@@ -279,6 +285,16 @@ bash tools/sync_agent_canon.sh push
 ```bash
 bash tools/sync_agent_canon.sh status
 ```
+
+### 7.7 project-local bare repo を登録
+
+```bash
+bash tools/update_agent_canon.sh register-local-bare \
+  --bare-repo /mnt/git/<project>-agent-canon.git
+```
+
+この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
+既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
 
 ## 8. 移行フェーズ
 

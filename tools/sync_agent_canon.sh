@@ -10,6 +10,7 @@ FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 usage() {
   cat <<EOF
 Usage:
+  bash tools/sync_agent_canon.sh plan [branch]
   bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
   bash tools/sync_agent_canon.sh snapshot
@@ -165,6 +166,7 @@ tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
+tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
 tools:${PREFIX}/tools
 EOF
 }
@@ -409,6 +411,115 @@ has_subtree_metadata() {
   git -C "$ROOT_DIR" log --format=%B --grep="git-subtree-dir: $PREFIX" --max-count=1 HEAD >/dev/null 2>&1
 }
 
+print_plan_summary() {
+  local branch="$1"
+  local remote_url="$2"
+  local remote_source="$3"
+  local remote_sha="$4"
+  local remote_tree="$5"
+  local local_tree="$6"
+  local local_split="$7"
+  local subtree_metadata="$8"
+  local route="$9"
+  local dirty="${10}"
+  local requires_clean="${11}"
+
+  echo "agent_canon_plan_branch=$branch"
+  if [ -n "$remote_url" ]; then
+    echo "agent_canon_plan_remote_url=$remote_url"
+  else
+    echo "agent_canon_plan_remote_url=<unset>"
+  fi
+  echo "agent_canon_plan_remote_source=$remote_source"
+  if [ -n "$remote_sha" ]; then
+    echo "agent_canon_plan_remote_sha=$remote_sha"
+    echo "agent_canon_plan_remote_tree=$remote_tree"
+  else
+    echo "agent_canon_plan_remote_sha=<unavailable>"
+    echo "agent_canon_plan_remote_tree=<unavailable>"
+  fi
+  echo "agent_canon_plan_local_tree=$local_tree"
+  if [ -n "$local_split" ]; then
+    echo "agent_canon_plan_local_split=$local_split"
+  else
+    echo "agent_canon_plan_local_split=unavailable"
+  fi
+  echo "agent_canon_plan_has_subtree_metadata=$subtree_metadata"
+  echo "agent_canon_plan_dirty_worktree=$dirty"
+  echo "agent_canon_plan_route=$route"
+  echo "agent_canon_plan_requires_clean=$requires_clean"
+  echo "agent_canon_plan_apply_command=bash tools/sync_agent_canon.sh ensure-latest $branch"
+}
+
+cmd_plan() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local local_tree=""
+  local local_split=""
+  local remote_tree=""
+  local remote_sha=""
+  local remote_url=""
+  local remote_source="unset"
+  local subtree_metadata="no"
+  local route="remote_unconfigured"
+  local requires_clean="no"
+  local dirty="no"
+
+  ensure_prefix_exists
+  local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
+  local_split="$(split_prefix_or_empty)"
+  if has_subtree_metadata; then
+    subtree_metadata="yes"
+  fi
+  if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+    dirty="yes"
+  fi
+
+  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+    remote_url="$(git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME")"
+    remote_source="configured"
+  else
+    remote_url="$(default_remote_url)"
+    if [ -n "$remote_url" ]; then
+      remote_source="default"
+    fi
+  fi
+
+  if [ -z "$remote_url" ]; then
+    print_plan_summary \
+      "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
+      "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean"
+    return
+  fi
+
+  git -C "$ROOT_DIR" fetch "$remote_url" "$branch"
+  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
+
+  if [ "$local_tree" = "$remote_tree" ]; then
+    route="already_current_tree"
+  elif [ -n "$local_split" ] && [ "$local_split" = "$remote_sha" ]; then
+    route="already_current_split"
+  elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
+    route="local_contains_remote"
+  elif [ -n "$local_split" ] && [ "$subtree_metadata" = "yes" ]; then
+    route="subtree_pull"
+    requires_clean="yes"
+  elif [ -n "$local_split" ]; then
+    route="snapshot_import_no_subtree_metadata"
+    requires_clean="yes"
+  elif find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
+    route="snapshot_import_no_subtree"
+    requires_clean="yes"
+  else
+    route="snapshot_import_unsafe_tree_not_in_remote"
+    requires_clean="yes"
+  fi
+
+  print_plan_summary \
+    "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
+    "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean"
+}
+
 pull_or_import_snapshot() {
   local branch="$1"
   local local_split="$2"
@@ -591,6 +702,9 @@ main() {
   case "$subcommand" in
     link-root)
       cmd_link_root
+      ;;
+    plan)
+      cmd_plan "${2:-$DEFAULT_BRANCH}"
       ;;
     check)
       cmd_check
