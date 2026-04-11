@@ -10,7 +10,14 @@ echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
+rsync -a --delete --exclude .git "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 cd "${CLONE_DIR}"
+if [[ -n "$(git status --short)" ]]; then
+  git config user.name "Fresh Clone Check"
+  git config user.email "fresh-clone-check@example.invalid"
+  git add -A
+  git commit -m "test: overlay current working tree for fresh clone check" >/dev/null
+fi
 
 for path in AGENTS.md agents .agents .claude .codex/config.toml documents/WORKFLOW_GUIDE.md documents/paper-writing-workflow.md; do
   if [ ! -e "${path}" ]; then
@@ -51,7 +58,9 @@ git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
 git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
-bash tools/sync_agent_canon.sh ensure-latest
+bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-plan.txt"
+grep -q "agent_canon_plan_route=subtree_pull" "${TMP_DIR}/agent-canon-plan.txt"
+bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
@@ -61,7 +70,9 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
   git push origin main >/dev/null
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/sync_agent_canon.sh ensure-latest
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+grep -q "agent_canon_plan_route=snapshot_import_no_subtree" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks
 make ci-quick

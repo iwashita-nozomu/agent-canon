@@ -19,9 +19,14 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - generic validation helper
 - top-level helper
   - `sync_agent_canon.sh`
+    - `plan` は derived repo から見た update route を read-only で出します。
     - `ensure-latest` は task 開始時に upstream `agent-canon` と local subtree snapshot を揃えます。
     - `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は自動追加します。
     - fresh clone で subtree metadata が無い場合は、fast-forward 更新に限って snapshot import へ切り替えます。
+  - `update_agent_canon.sh`
+    - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
+    - `apply` は `ensure-latest` を thin wrapper として呼びます。
+    - `register-local-bare` は project-local bare repo を seed し、`agent-canon` remote を設定します。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
