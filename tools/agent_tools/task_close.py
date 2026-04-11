@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from agent_team import resolve_report_root
+from report_artifact_checks import check_schedule_artifact, check_work_log_artifact
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,6 +54,11 @@ def parse_markdown_status(path: Path) -> dict[str, str]:
     return data
 
 
+def join_blockers(blockers: list[str]) -> str:
+    """Render blocker list for terminal output."""
+    return ",".join(blockers) if blockers else ""
+
+
 def main() -> int:
     """Run the closeout check."""
     args = build_parser().parse_args()
@@ -67,16 +73,24 @@ def main() -> int:
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"
     request_contract_path = report_dir / "user_request_contract.md"
+    schedule_path = report_dir / "schedule.md"
+    work_log_path = report_dir / "work_log.md"
     if not verification_path.is_file():
         raise SystemExit(f"verification.txt not found: {verification_path}")
     if not closeout_path.is_file():
         raise SystemExit(f"closeout_gate.md not found: {closeout_path}")
     if not request_contract_path.is_file():
         raise SystemExit(f"user_request_contract.md not found: {request_contract_path}")
+    if not schedule_path.is_file():
+        raise SystemExit(f"schedule.md not found: {schedule_path}")
+    if not work_log_path.is_file():
+        raise SystemExit(f"work_log.md not found: {work_log_path}")
 
     verification = parse_kv_lines(verification_path)
     closeout = parse_markdown_status(closeout_path)
     request_contract = parse_markdown_status(request_contract_path)
+    schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
+    work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -93,6 +107,8 @@ def main() -> int:
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
+        "todo_artifact_complete": not schedule_blockers,
+        "work_log_complete": not work_log_blockers,
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -117,6 +133,10 @@ def main() -> int:
     print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
     print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")
     print(f"UNRESOLVED_CLAUSE_IDS={request_contract.get('unresolved_clause_ids', '')}")
+    print(f"TODO_ARTIFACT_COMPLETE={'yes' if not schedule_blockers else 'no'}")
+    print(f"TODO_ARTIFACT_BLOCKERS={join_blockers(schedule_blockers)}")
+    print(f"WORK_LOG_COMPLETE={'yes' if not work_log_blockers else 'no'}")
+    print(f"WORK_LOG_BLOCKERS={join_blockers(work_log_blockers)}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

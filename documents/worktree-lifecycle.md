@@ -24,7 +24,7 @@
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` を current branch と current filesystem path に一致させます。不一致のまま編集を始めません。
 - [WORKTREE_LOG_TEMPLATE.md](/mnt/l/workspace/project_template/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
 - 継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
-- kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。
+- kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。これにより `work_log.py` 1 回で action log と run bundle `work_log.md` を両方更新できます。
 - この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch`、必要なら `active_worktree` と `scope_file` を合わせます。
 - branch が複数 session 続く、または handoff 前提なら `notes/branches/` に summary を置きます。
 - `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で踏みやすい avoid pattern と既知 failure を確認します。
@@ -44,7 +44,7 @@
 - branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](/mnt/l/workspace/project_template/documents/BRANCH_SCOPE.md) と `notes/branches/` を使います。
 - 例外運用中の action log は kickoff から `notes/worktrees/` に残します。
 - action log の各 entry には、いま処理している `request_clause_ids=` を残します。
-- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次残します。
+- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次残します。repo-changing task では同じ step を run bundle `work_log.md` にも残します。
 - scope が途中で変わったら、追加編集の前に `WORKTREE_SCOPE.md` と action log を更新します。
 - `Editable Directories` 外と `Read-Only Or Avoid Directories` 内は編集しません。
 - runtime output は `WORKTREE_SCOPE.md` に書いた場所へ限定します。

@@ -66,6 +66,9 @@
 - 2026-04-10 | Do not close tasks at minimal implementation or partial-spec coverage; require reviewer-confirmed evidence that implementation covers the full requested specification and that review findings were reflected before completion.
   - source: chat
 
+- 2026-04-11 | Repo-changing tasks must leave a concrete TODO artifact and a chronological work log until closeout.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

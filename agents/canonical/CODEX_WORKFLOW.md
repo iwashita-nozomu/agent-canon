@@ -155,6 +155,7 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - context sweep と library sweep を先に行う
 - 変更対象と acceptance criteria を短く固定する
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
+- repo-changing task では早い段階で `schedule.md` を TODO 正本として埋め、stage plan / clause coverage / planned work units を concrete にする
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
 - 不明点は即停止せず、notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
@@ -280,8 +281,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
+- repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する
 - worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
-- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける
+- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける。`WORKTREE_SCOPE.md` に contract path がある場合は `work_log.py` で run bundle `work_log.md` も同時に更新する
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
@@ -321,6 +323,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
+- `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
 - JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence が揃うまで completion evidence にしない

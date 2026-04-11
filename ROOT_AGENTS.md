@@ -36,6 +36,8 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `memory/USER_PREFERENCES.md` へ追記します。
 - agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `memory/AGENT_PHILOSOPHY.md` へ追記します。
 - repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
+- repo-changing task では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
+- repo-changing task では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
 
 ## Shared Canon
 
@@ -69,7 +71,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
-- worktree で作業する場合は `bash tools/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。
+- worktree で作業する場合は `bash tools/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。`WORKTREE_SCOPE.md` に `user_request_contract.md` が入っていれば、同じコマンドで action log と run bundle の `work_log.md` を両方更新できます。
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current state と一致しない場合は編集を始めず、`python3 tools/agent_tools/worktree_scope_lint.py --current` で直します。
 - worktree では `Editable Directories` 外と `Read-Only Or Avoid Directories` 内を編集してはいけません。scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に残します。
 - Python 差分では `python-review`、C / C++ 差分では `cpp-review` を既定候補にし、bootstrap は changed path から reviewer を自動で足します。
@@ -102,6 +104,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を根拠に closeout してはいけません。
 - worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
+- `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - `verification.txt` が `status=pass` でない、または `closeout_gate.md` が `user_completion_report=unlocked` でない状態で user-facing 完了報告を出してはいけません。
 
 ## Validation

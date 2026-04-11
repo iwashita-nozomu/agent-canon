@@ -9,9 +9,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agent_team import resolve_report_root
+from report_artifact_checks import (
+    check_schedule_artifact,
+    check_work_log_artifact,
+    is_placeholder_only_section,
+    section_has_content,
+    table_body_rows,
+)
 
 
-PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 DECISION_PATTERN = re.compile(r"\b(approve|revise|escalate)\b", re.IGNORECASE)
 
 
@@ -46,7 +52,15 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
         ),
     ),
     "plan": (
-        ArtifactCheck("schedule.md", require_filled=True),
+        ArtifactCheck(
+            "schedule.md",
+            require_filled=True,
+            required_sections=(
+                "## Stage Plan",
+                "## Clause Coverage",
+                "## Planned Work Units",
+            ),
+        ),
         ArtifactCheck("schedule_review.md", require_filled=True, require_approve=True),
     ),
     "design": (
@@ -92,6 +106,11 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
                 "## Review Finding Incorporation Review",
             ),
         ),
+        ArtifactCheck(
+            "work_log.md",
+            require_filled=True,
+            required_sections=("## Entries",),
+        ),
     ),
 }
 
@@ -128,68 +147,10 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
     return (resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)).resolve()
 
 
-def is_placeholder_only_section(text: str) -> bool:
-    """Return whether the artifact still looks like an untouched template."""
-    stripped = PLACEHOLDER_PATTERN.sub("", text).strip()
-    stripped = "\n".join(
-        line
-        for line in stripped.splitlines()
-        if line.strip()
-        and not line.strip().startswith("#")
-        and not line.strip().startswith("- Run ID:")
-        and not line.strip().startswith("- Task:")
-        and not line.strip().startswith("- Owner:")
-        and not line.strip().startswith("- Created At")
-        and not line.strip().startswith("|")
-    ).strip()
-    return not stripped
-
-
 def decision_is_approve(text: str) -> bool:
     """Return whether the artifact contains an approve decision."""
     decisions = [match.group(1).lower() for match in DECISION_PATTERN.finditer(text)]
     return bool(decisions) and decisions[-1] == "approve"
-
-
-def section_has_content(text: str, heading: str) -> bool:
-    """Return whether a markdown section exists and has non-placeholder content."""
-    lines = text.splitlines()
-    in_section = False
-    body: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            if in_section:
-                break
-            in_section = stripped == heading
-            continue
-        if in_section:
-            body.append(line)
-    if not in_section:
-        return False
-    body_text = PLACEHOLDER_PATTERN.sub("", "\n".join(body))
-    body_text = "\n".join(line for line in body_text.splitlines() if line.strip()).strip()
-    return bool(body_text)
-
-
-def table_body_rows(text: str, heading: str) -> list[str]:
-    """Return non-header table rows under one markdown section."""
-    rows: list[str] = []
-    in_section = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            in_section = stripped == heading
-            continue
-        if not in_section or not stripped.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-        if not cells or all(not cell or set(cell) <= {"-"} for cell in cells):
-            continue
-        if any(cell in {"Clause ID", "Source Bucket"} for cell in cells):
-            continue
-        rows.append(stripped)
-    return rows
 
 
 def check_user_request_contract(text: str) -> list[str]:
@@ -226,6 +187,10 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
             blockers.append(f"{check.path}:section_empty_or_missing:{slug}")
     if check.path == "user_request_contract.md":
         blockers.extend(check_user_request_contract(text))
+    elif check.path == "schedule.md":
+        blockers.extend(check_schedule_artifact(text))
+    elif check.path == "work_log.md":
+        blockers.extend(check_work_log_artifact(text))
     if check.require_approve and not decision_is_approve(text):
         blockers.append(f"{check.path}:decision_not_approve")
     return blockers

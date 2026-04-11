@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -37,6 +37,8 @@
       "required_outputs": [
         "intent_brief.md",
         "user_request_contract.md",
+        "schedule.md",
+        "work_log.md",
         "team_manifest.yaml",
         "decision_log.md"
       ],
@@ -45,10 +47,12 @@
         "allowed_artifacts": [
           "intent_brief",
           "user_request_contract",
+          "schedule",
+          "work_log",
           "decision_log",
           "team_manifest"
         ],
-        "notes": "The manager records intake, source-bucketed user request clauses, context sweep, library sweep, routing declarations, and decisions only in the run artifact bundle."
+        "notes": "The manager records intake, source-bucketed user request clauses, context sweep, library sweep, routing declarations, the canonical task TODO schedule, the run-local work log, and decisions only in the run artifact bundle."
       }
     },
     {
@@ -184,15 +188,17 @@
         "approved_naming_followthrough"
       ],
       "required_outputs": [
-        "decision_log.md"
+        "decision_log.md",
+        "work_log.md"
       ],
       "write_policy": {
         "mode": "worktree_scope_plus_artifacts",
         "allowed_artifacts": [
-          "decision_log"
+          "decision_log",
+          "work_log"
         ],
         "requires_worktree_scope": true,
-        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code, mirror existing style, and follow approved naming before introducing any new pattern."
+        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
       }
     },
     {
@@ -1628,6 +1634,7 @@
     "intent_brief": "intent_brief.md",
     "user_request_contract": "user_request_contract.md",
     "decision_log": "decision_log.md",
+    "work_log": "work_log.md",
     "team_manifest": "team_manifest.yaml",
     "management_review": "management_review.md",
     "design_brief": "design_brief.md",

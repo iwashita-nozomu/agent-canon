@@ -214,6 +214,25 @@ def resolve_action_log_path(workspace_root: Path, scope_file: Path) -> Path | No
     return (workspace_root / path).resolve()
 
 
+def resolve_user_request_contract_path(workspace_root: Path, scope_file: Path) -> Path | None:
+    """Return the user request contract path from WORKTREE_SCOPE.md when available."""
+    sections = parse_sections(scope_file)
+    for section_name in ("Working Notes During Execution", "Kickoff Status"):
+        raw_value = extract_named_value(sections.get(section_name, []), "User request contract path")
+        if not raw_value or "<" in raw_value or "<run-id>" in raw_value:
+            continue
+        token = raw_value.split("`")
+        candidate = token[1] if len(token) >= 3 else raw_value
+        path = Path(candidate)
+        if path.is_absolute():
+            return path
+        repo_guess = run_optional(["git", "rev-parse", "--show-toplevel"], cwd=workspace_root)
+        if repo_guess.returncode == 0:
+            return (Path(repo_guess.stdout.strip()).resolve() / path).resolve()
+        return (workspace_root / path).resolve()
+    return None
+
+
 def append_action_log_entry(action_log_path: Path, entry: str) -> None:
     """Append one entry to the action log, creating a minimal file when missing."""
     action_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -281,7 +300,9 @@ def main() -> int:
     print("NEXT_STEPS:")
     print("  1. Confirm action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
-    print("  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step.")
+    print(
+        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step."
+    )
     print("  4. Start editing only after the kickoff record is updated.")
     return 0
 
