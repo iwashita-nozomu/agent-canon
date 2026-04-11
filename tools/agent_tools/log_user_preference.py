@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-DEFAULT_NOTE_PATH = "memory/USER_PREFERENCES.md"
+DEFAULT_NOTE_PATH = "memory/global/USER_PREFERENCES.md"
 SECTION_HEADERS = {
     "stable": "## Stable Preferences",
     "provisional": "## Provisional Preferences",
@@ -27,7 +27,7 @@ document preference を逐次追記する append-first note です。
 - task 固有の一時指示ではなく、今後も効く傾向だけを残します。
 - `AGENTS.md` に直接書かず、まずこの note に入れます。
 - periodic sweep では repeated で durable な項目だけを `AGENTS.md` へ昇格します。
-- shared canon の `memory/` を正本にし、template 側では runtime view を使います。
+- shared canon の `memory/global/` を正本にし、template 側では runtime view を使います。
 
 ## Stable Preferences
 
@@ -149,6 +149,7 @@ def main() -> int:
     updated = insert_under_section(note_text, SECTION_HEADERS[args.kind], rendered)
     note_path.write_text(updated, encoding="utf-8")
     print(f"PREFERENCE_NOTE={note_path}")
+    print("PREFERENCE_LAYER=global")
     print(f"PREFERENCE_KIND={args.kind}")
     print(f"PREFERENCE_TEXT={args.preference.strip()}")
     return 0

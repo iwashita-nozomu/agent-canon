@@ -15,13 +15,16 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
 from agent_team import (
+    MEMORY_LOADOUT_PATH,
     ROOT,
     create_run_bundle,
     default_specialists_for_task,
+    load_memory_loadouts,
     load_task_catalog,
     load_team_config,
     required_output_templates_missing,
     resolve_role,
+    resolve_role_memory_loadout,
     task_ids,
 )
 
@@ -61,6 +64,11 @@ CODING_ROLE_IDS = {
 }
 SPARK_CODING_ROLE_IDS = {
     "spark_worker",
+}
+REVIEW_ONLY_ROLE_IDS = {
+    "verifier",
+    "auditor",
+    "critical_guardian",
 }
 
 
@@ -175,6 +183,40 @@ def validate_team_config_references() -> None:
 
     for rule in config.activation_rules:
         ensure(rule["role"] in role_ids, f"activation rule references unknown role: {rule['role']}")
+
+
+def validate_memory_loadout_references() -> None:
+    """Check memory route coverage and reviewer write restrictions."""
+    config = load_team_config()
+    role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
+    ensure(MEMORY_LOADOUT_PATH.is_file(), f"memory loadout config missing: {MEMORY_LOADOUT_PATH}")
+    raw = load_memory_loadouts()
+    role_loadouts = raw.get("role_loadouts")
+    ensure(isinstance(role_loadouts, dict), "memory role_loadouts must be a mapping")
+    missing_roles = sorted(role_ids - set(role_loadouts))
+    ensure(not missing_roles, f"memory loadout missing roles: {', '.join(missing_roles)}")
+
+    review_roles = {
+        role_id
+        for role_id in role_ids
+        if role_id.endswith("_reviewer") or role_id in REVIEW_ONLY_ROLE_IDS
+    }
+    for role_id in sorted(role_ids):
+        loadout = resolve_role_memory_loadout(role_id, raw)
+        ensure(loadout.read_files, f"{role_id} must have fixed memory read files")
+        for path in loadout.read_files:
+            ensure(path.is_file(), f"{role_id} memory file missing: {path}")
+        if loadout.candidate_file is not None:
+            ensure(loadout.candidate_file.is_file(), f"{role_id} candidate file missing: {loadout.candidate_file}")
+        if role_id in review_roles:
+            ensure(
+                not loadout.allow_method_write,
+                f"{role_id} must not write method memory directly",
+            )
+            ensure(
+                not loadout.allow_global_write,
+                f"{role_id} must not write global memory directly",
+            )
 
 
 def validate_task_catalog_references() -> None:
@@ -333,6 +375,7 @@ def main() -> int:
     """Run all runtime-alignment checks."""
     validate_codex_agent_settings()
     validate_team_config_references()
+    validate_memory_loadout_references()
     validate_task_catalog_references()
     validate_public_skill_shims()
     validate_bundle_outputs()

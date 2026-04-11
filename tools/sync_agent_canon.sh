@@ -122,8 +122,10 @@ documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
 memory/README.md:../${PREFIX}/memory/README.md
-memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
-memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
+memory/global:../${PREFIX}/memory/global
+memory/methods:../${PREFIX}/memory/methods
+memory/candidates:../${PREFIX}/memory/candidates
+memory/subagent_loadouts.yaml:../${PREFIX}/memory/subagent_loadouts.yaml
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
@@ -148,8 +150,6 @@ notes/knowledge/path_resolution.md:../../${PREFIX}/notes/knowledge/path_resoluti
 notes/knowledge/pyright_operations.md:../../${PREFIX}/notes/knowledge/pyright_operations.md
 notes/themes/README.md:../../${PREFIX}/notes/themes/README.md
 notes/themes/THEME_NOTE_TEMPLATE.md:../../${PREFIX}/notes/themes/THEME_NOTE_TEMPLATE.md
-notes/themes/AGENT_PHILOSOPHY.md:../../${PREFIX}/notes/themes/AGENT_PHILOSOPHY.md
-notes/themes/USER_PREFERENCES.md:../../${PREFIX}/notes/themes/USER_PREFERENCES.md
 notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
 notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
@@ -168,6 +168,15 @@ tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
 tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
 tools:${PREFIX}/tools
+EOF
+}
+
+build_removed_legacy_paths() {
+  cat <<EOF
+memory/AGENT_PHILOSOPHY.md
+memory/USER_PREFERENCES.md
+notes/themes/AGENT_PHILOSOPHY.md
+notes/themes/USER_PREFERENCES.md
 EOF
 }
 
@@ -217,6 +226,10 @@ ensure_surface_sync_safe() {
       build_copy_specs
     }
   )
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    paths+=("$path")
+  done < <(build_removed_legacy_paths)
 
   [ "${#paths[@]}" -gt 0 ] || return
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
@@ -243,6 +256,11 @@ cmd_link_root() {
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rm -rf "$ROOT_DIR/$path"
+  done < <(build_removed_legacy_paths)
 }
 
 cmd_snapshot() {
@@ -285,6 +303,15 @@ cmd_check() {
     fi
     failed=1
   done < <(build_copy_specs)
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+      echo "legacy[$path]=present" >&2
+      failed=1
+    fi
+  done < <(build_removed_legacy_paths)
 
   if [ "$failed" -ne 0 ]; then
     die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"

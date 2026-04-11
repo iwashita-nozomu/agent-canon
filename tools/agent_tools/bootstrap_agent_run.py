@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_team import (
+    MEMORY_LOADOUT_PATH,
     auto_language_specialists,
     create_run_bundle,
     default_specialists_for_task,
@@ -147,6 +148,7 @@ def main() -> int:
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    print(f"MEMORY_LOADOUT_CONFIG={MEMORY_LOADOUT_PATH}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")

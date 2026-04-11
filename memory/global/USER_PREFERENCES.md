@@ -9,7 +9,7 @@
 - task 固有の一時指示ではなく、今後も効く傾向だけを残します。
 - `AGENTS.md` に直接書かず、まずこの note に入れます。
 - periodic sweep では repeated で durable な項目だけを `AGENTS.md` へ昇格します。
-- shared canon の `memory/` を正本にし、template 側では runtime view を使います。
+- shared canon の `memory/global/` を正本にし、template 側では runtime view を使います。
 
 ## Stable Preferences
 
@@ -71,6 +71,10 @@
 
 - 2026-04-11 | Do not stop to ask for push permission when push is a natural completion step; push directly unless I explicitly stop it or an external block exists.
   - source: chat
+
+- 2026-04-11 | メモリーは階層化し、方法ベースに整理し、各サブエージェントが固定 read surface を持つ方がよい
+  - source: chat
+  - rationale: 2026-04-11 user requested method-based hierarchical memory and mechanically fixed per-subagent reads
 
 ## Promotion Candidates
 

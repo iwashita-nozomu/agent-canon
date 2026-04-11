@@ -15,6 +15,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
+MEMORY_LOADOUT_PATH = ROOT / "memory" / "subagent_loadouts.yaml"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
 PYTHON_SUFFIXES = {".py", ".pyi"}
@@ -92,6 +93,19 @@ class RoleWriteScope:
 
 
 @dataclass(frozen=True)
+class RoleMemoryLoadout:
+    """Resolved fixed memory read and write surfaces for one role."""
+
+    role_id: str
+    read_files: tuple[Path, ...]
+    method_files: tuple[Path, ...]
+    candidate_file: Path | None
+    allow_method_write: bool
+    allow_global_write: bool
+    notes: str
+
+
+@dataclass(frozen=True)
 class TeamConfig:
     """Materialized team configuration."""
 
@@ -154,6 +168,14 @@ def load_task_catalog(config: TeamConfig) -> TaskCatalog:
     )
 
 
+def load_memory_loadouts(path: Path = MEMORY_LOADOUT_PATH) -> dict[str, object]:
+    """Load the machine-readable role-to-memory routing config."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise RuntimeError(f"memory loadout config must parse as a mapping: {path}")
+    return data
+
+
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
@@ -165,6 +187,63 @@ def resolve_role(config: TeamConfig, role_name: str) -> Role:
         if role_name == role.id:
             return role
     raise KeyError(f"unknown role: {role_name}")
+
+
+def resolve_role_memory_loadout(
+    role_name: str,
+    loadouts: dict[str, object] | None = None,
+) -> RoleMemoryLoadout:
+    """Resolve one role's fixed memory loadout."""
+    raw = loadouts if loadouts is not None else load_memory_loadouts()
+    global_read_files = _as_string_tuple(raw.get("global_read_files"), "global_read_files")
+    method_files_raw = raw.get("method_files")
+    candidate_files_raw = raw.get("candidate_files")
+    role_loadouts_raw = raw.get("role_loadouts")
+    if not isinstance(method_files_raw, dict):
+        raise RuntimeError("memory loadout method_files must be a mapping")
+    if not isinstance(candidate_files_raw, dict):
+        raise RuntimeError("memory loadout candidate_files must be a mapping")
+    if not isinstance(role_loadouts_raw, dict):
+        raise RuntimeError("memory loadout role_loadouts must be a mapping")
+    if role_name not in role_loadouts_raw:
+        raise KeyError(f"memory loadout missing role: {role_name}")
+    entry = role_loadouts_raw[role_name]
+    if not isinstance(entry, dict):
+        raise RuntimeError(f"memory loadout entry must be a mapping for role {role_name}")
+
+    method_keys = _as_string_tuple(entry.get("method_reads"), f"role_loadouts[{role_name}].method_reads")
+    resolved_global_files = tuple((ROOT / relative).resolve() for relative in global_read_files)
+    resolved_method_files = []
+    for key in method_keys:
+        relative = method_files_raw.get(key)
+        if not isinstance(relative, str):
+            raise RuntimeError(f"memory loadout method key missing or invalid: {key}")
+        resolved_method_files.append((ROOT / relative).resolve())
+
+    candidate_file: Path | None = None
+    candidate_key = entry.get("candidate_file")
+    if candidate_key is not None:
+        if not isinstance(candidate_key, str):
+            raise RuntimeError(f"memory loadout candidate key must be a string for role {role_name}")
+        relative = candidate_files_raw.get(candidate_key)
+        if not isinstance(relative, str):
+            raise RuntimeError(f"memory loadout candidate key missing or invalid: {candidate_key}")
+        candidate_file = (ROOT / relative).resolve()
+
+    read_files = list(resolved_global_files)
+    read_files.extend(resolved_method_files)
+    if candidate_file is not None:
+        read_files.append(candidate_file)
+
+    return RoleMemoryLoadout(
+        role_id=role_name,
+        read_files=tuple(read_files),
+        method_files=tuple(resolved_method_files),
+        candidate_file=candidate_file,
+        allow_method_write=bool(entry.get("allow_method_write", False)),
+        allow_global_write=bool(entry.get("allow_global_write", False)),
+        notes=str(entry.get("notes", "")),
+    )
 
 
 def task_ids(catalog: TaskCatalog) -> tuple[str, ...]:
@@ -433,6 +512,7 @@ def build_manifest(
     workspace_root: Path,
 ) -> str:
     """Build the team manifest yaml."""
+    memory_loadouts = load_memory_loadouts()
     lines = [
         "run:",
         f"  id: {run_id}",
@@ -443,6 +523,7 @@ def build_manifest(
         f"  workspace_root: {str(workspace_root)!r}",
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
+        f"  memory_loadout_config: {str(MEMORY_LOADOUT_PATH)!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
         "roles:",
     ]
@@ -486,6 +567,20 @@ def build_manifest(
             lines.append(f"        - {str(path)!r}")
         lines.append("      allowed_directories:")
         for path in scope.allowed_directories:
+            lines.append(f"        - {str(path)!r}")
+        memory_loadout = resolve_role_memory_loadout(role.id, memory_loadouts)
+        lines.append("    memory_loadout:")
+        lines.append(f"      allow_method_write: {str(memory_loadout.allow_method_write).lower()}")
+        lines.append(f"      allow_global_write: {str(memory_loadout.allow_global_write).lower()}")
+        if memory_loadout.notes:
+            lines.append(f"      notes: {memory_loadout.notes!r}")
+        if memory_loadout.candidate_file is not None:
+            lines.append(f"      candidate_file: {str(memory_loadout.candidate_file)!r}")
+        lines.append("      method_files:")
+        for path in memory_loadout.method_files:
+            lines.append(f"        - {str(path)!r}")
+        lines.append("      read_files:")
+        for path in memory_loadout.read_files:
             lines.append(f"        - {str(path)!r}")
     lines.append("context_policies:")
     for policy in config.context_policies:

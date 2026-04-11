@@ -5,12 +5,12 @@
 
 ## Use
 
-- user preference は `memory/USER_PREFERENCES.md` に残します。
+- user preference は `memory/global/USER_PREFERENCES.md` に残します。
 - agent 自身の作業哲学、判断癖、対話上の再発防止、作業後 retrospective はこの note に残します。
 - 会話ログを raw に貼らず、1 observation 1 entry の短い抽象化として残します。
 - source、evidence、scope、confidence を明示し、推測と確定事項を混ぜません。
 - stable な運用 rule へ昇格するまでは、`AGENTS.md` や runtime entrypoint へ直接書きません。
-- shared canon の `memory/` を正本にし、template 側では runtime view を使います。
+- shared canon の `memory/global/` を正本にし、template 側では runtime view を使います。
 
 ## Stable Philosophy
 
@@ -71,6 +71,12 @@
   - scope: repo-wide
   - confidence: likely
   - evidence: 2026-04-10 request to fix the habit of stopping after work-unit decomposition
+
+- 2026-04-11 | work-principle | Subagent memory should route through fixed role loadouts, with reviewer-originated learning stopping at candidates until promotion.
+  - source: chat
+  - scope: repo-wide
+  - confidence: likely
+  - evidence: 2026-04-11 discussion about hierarchical method-based memory and fixed subagent read files
 
 ## Interaction Observations
 

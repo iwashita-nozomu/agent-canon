@@ -1,10 +1,11 @@
 # Agent Learning Workflow
 
-この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。
+この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の階層化された `memory/` と tool へ固定する手順です。
 
 ## Purpose
 
 - user preference と agent philosophy を混同しない
+- role ごとの方法 memory と repo-wide memory を混同しない
 - raw chat ではなく、短い observation と evidence に圧縮して残す
 - 毎 task の closeout で、学習すべき項目があるか確認する
 - stable になった項目だけを `AGENTS.md`、workflow、review rule へ昇格する
@@ -21,14 +22,33 @@
 
 ## Canonical Notes
 
-- `memory/USER_PREFERENCES.md`
+- `memory/global/USER_PREFERENCES.md`
   - user の coding philosophy、review expectation、document preference
-- `memory/AGENT_PHILOSOPHY.md`
+- `memory/global/AGENT_PHILOSOPHY.md`
   - agent の作業哲学、判断原則、対話から得た再発防止、task retrospective
+- `memory/methods/*.md`
+  - method-based memory。role 固有ではなく requirements、planning、design、implementation、review などの方法を置く
+- `memory/candidates/*.md`
+  - 未昇格 observation。reviewer 系はここまでで止める
+- `memory/subagent_loadouts.yaml`
+  - role ごとの固定 read surface と write route
 - `notes/guardrails/engineering_avoidances.md`
   - 既に失敗ログから確定した禁止事項
 
 `memory/` は shared canon 側の正本です。template root では runtime view を使いますが、closeout では canon update として扱います。
+
+## Memory Layers
+
+1. `reports/agents/<run-id>/`
+   - run-local
+1. `memory/candidates/`
+   - 未昇格 candidate
+1. `memory/methods/`
+   - 方法ベース memory
+1. `memory/global/`
+   - repo-wide durable memory
+1. workflow / `AGENTS.md`
+   - stable rule
 
 ## Logging Rule
 
@@ -36,6 +56,7 @@ durable な観測を得たら次を使います。
 
 ```bash
 python3 tools/agent_tools/log_agent_learning.py \
+  --role manager \
   --kind interaction-observation \
   --statement "ユーザーは agent の人格形成を raw chat ではなく repo 内の更新可能な作業哲学として扱いたい" \
   --source chat \
@@ -73,7 +94,7 @@ python3 tools/agent_tools/log_user_preference.py \
 closeout 前に次を確認します。
 
 1. user preference は `USER_PREFERENCES.md` に入れるべきか
-1. agent の作業哲学や対話上の再発防止は `AGENT_PHILOSOPHY.md` に入れるべきか
+1. agent の作業哲学や対話上の再発防止は `memory/candidates/`、`memory/methods/`、`memory/global/AGENT_PHILOSOPHY.md` のどこへ入れるべきか
 1. 確定した禁止事項は `engineering_avoidances.md` に昇格すべきか
 1. stable な項目は `AGENTS.md`、`CODEX_WORKFLOW.md`、review TOML に昇格すべきか
 1. `memory/` への追記が shared canon 側の更新として commit / push まで反映されたか
@@ -81,6 +102,7 @@ closeout 前に次を確認します。
 ## Promotion Rule
 
 - 1 回限りの task-local 指示は昇格しません。
+- reviewer role は `memory/candidates/` までしか直書きしません。
 - 反復して観測された、または user が明示的に durable とした項目だけを promotion candidate にします。
 - `AGENTS.md` へ昇格するときは短い rule にし、source、rationale、例は note 側に残します。
 - agent personality は自由作文にしません。repo の作業品質を改善する observable rule として残します。

@@ -71,6 +71,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - Specialist roles:
   - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
 - `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
+- role ごとの固定 memory read surface は `memory/subagent_loadouts.yaml` を正本にします。
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。

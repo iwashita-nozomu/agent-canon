@@ -201,7 +201,7 @@ source bucket:
 - `current_request`
   - 今回の user request に明示された requirement
 - `durable_user_preference`
-  - `memory/USER_PREFERENCES.md` や過去ログから抽出された user tendency
+  - `memory/global/USER_PREFERENCES.md` や過去ログから抽出された user tendency
 - `repo_or_code_precedent`
   - 既存 code、test、docs、workflow から分かる制約
 - `domain_or_external_constraint`

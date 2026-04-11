@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`memory/USER_PREFERENCES.md` に蓄積した観測から、repo-wide で durable な user preference だけを `AGENTS.md` へ昇格します。
+`memory/global/USER_PREFERENCES.md` に蓄積した観測から、repo-wide で durable な user preference だけを `AGENTS.md` へ昇格します。
 
 ## Use When
 
@@ -13,13 +13,13 @@
 ## Core References
 
 - `AGENTS.md`
-- `memory/USER_PREFERENCES.md`
+- `memory/global/USER_PREFERENCES.md`
 - `documents/notes-lifecycle.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 
 ## Sync Rules
 
-1. `memory/USER_PREFERENCES.md` を読み、重複、反復、明示的な durable preference を cluster します。
+1. `memory/global/USER_PREFERENCES.md` を読み、重複、反復、明示的な durable preference を cluster します。
 1. task 固有の一時指示は `AGENTS.md` へ上げません。
 1. repo-wide に効く stable item だけを `AGENTS.md` の短い bullet に昇格します。
 1. `AGENTS.md` へ上げた項目は wording を短くし、理由や会話履歴は note 側に残します。

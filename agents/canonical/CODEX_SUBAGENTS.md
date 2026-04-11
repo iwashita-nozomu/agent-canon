@@ -7,6 +7,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 ## Principles
 
 - role behavior は docs より `.codex/agents/*.toml` を優先します
+- role ごとの固定 memory read surface は `memory/subagent_loadouts.yaml` を優先します
 - parent agent が最終編集責任を持つ
 - routing と required review を決める前に subagent を乱立させない
 - repo-changing task では、stage ごとに適切な subagent を explicit に立てる
@@ -194,6 +195,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - skill shim: `.agents/skills/`
 - Codex project config: `.codex/config.toml`
 - Codex subagent definitions: `.codex/agents/*.toml`
+- role memory routing: `memory/subagent_loadouts.yaml`
 
 設定運用メモ:
 - stage 固有の禁止事項を増やしたいときは、この文書より先に `.codex/agents/*.toml` を更新します

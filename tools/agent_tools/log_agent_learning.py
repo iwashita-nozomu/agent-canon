@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-DEFAULT_NOTE_PATH = "memory/AGENT_PHILOSOPHY.md"
+import yaml
+
+DEFAULT_NOTE_PATH = "memory/global/AGENT_PHILOSOPHY.md"
+DEFAULT_LOADOUT_PATH = "memory/subagent_loadouts.yaml"
 SECTION_HEADERS = {
     "work-principle": "## Working Principles",
     "interaction-observation": "## Interaction Observations",
@@ -18,21 +21,14 @@ SECTION_HEADERS = {
     "stable": "## Stable Philosophy",
     "failure-avoidance": "## Promotion Candidates",
 }
-DEFAULT_NOTE_TEXT = """# Agent Philosophy
 
-この file は、agent の作業哲学、対話から得た学習、repo-wide な判断原則を
-逐次追記する append-first note です。
-`AGENTS.md` や workflow 正本へ入れる前の観測をここへ集め、
-十分に安定した項目だけを periodic sweep で昇格させます。
 
-## Use
+def default_note_text(title: str, layer_description: str) -> str:
+    """Return default note content for one learning layer."""
+    return f"""# {title}
 
-- user preference は `memory/USER_PREFERENCES.md` に残します。
-- agent 自身の作業哲学、判断癖、対話上の再発防止、作業後 retrospective はこの note に残します。
-- 会話ログを raw に貼らず、1 observation 1 entry の短い抽象化として残します。
-- source、evidence、scope、confidence を明示し、推測と確定事項を混ぜません。
-- stable な運用 rule へ昇格するまでは、`AGENTS.md` や runtime entrypoint へ直接書きません。
-- shared canon の `memory/` を正本にし、template 側では runtime view を使います。
+この file は、{layer_description} を置く append-first note です。
+raw chat を直接置かず、短い observation と evidence に圧縮して残します。
 
 ## Stable Philosophy
 
@@ -73,6 +69,81 @@ class AgentLearningEntry:
     observed_on: str
 
 
+def load_loadout_config(loadout_path: Path) -> dict[str, object]:
+    """Load the machine-readable role routing config."""
+    data = yaml.safe_load(loadout_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise RuntimeError(f"memory loadout config must parse as a mapping: {loadout_path}")
+    return data
+
+
+def resolve_loadout_relative_path(loadout_path: Path, configured_path: str) -> Path:
+    """Resolve a configured path relative to the loadout file when needed."""
+    candidate = Path(configured_path)
+    if candidate.is_absolute():
+        return candidate
+    return (loadout_path.parent / candidate).resolve()
+
+
+def resolve_note_path(
+    *,
+    note_path_arg: str | None,
+    loadout_path: Path,
+    role: str | None,
+    target_layer: str | None,
+    method: str | None,
+) -> tuple[Path, str]:
+    """Resolve the target note path and effective layer."""
+    if role is None:
+        if note_path_arg is not None:
+            return Path(note_path_arg), target_layer or "global"
+        return Path(DEFAULT_NOTE_PATH), target_layer or "global"
+
+    if note_path_arg is not None:
+        raise ValueError("--note-path cannot be combined with --role; use fixed routing")
+
+    config = load_loadout_config(loadout_path)
+    role_loadouts = config.get("role_loadouts")
+    method_files = config.get("method_files")
+    candidate_files = config.get("candidate_files")
+    if not isinstance(role_loadouts, dict):
+        raise RuntimeError("role_loadouts must be a mapping")
+    if not isinstance(method_files, dict):
+        raise RuntimeError("method_files must be a mapping")
+    if not isinstance(candidate_files, dict):
+        raise RuntimeError("candidate_files must be a mapping")
+    if role not in role_loadouts or not isinstance(role_loadouts[role], dict):
+        raise ValueError(f"unknown role in loadout config: {role}")
+    entry = role_loadouts[role]
+    effective_layer = target_layer or "candidate"
+
+    if effective_layer == "candidate":
+        candidate_key = entry.get("candidate_file")
+        if not isinstance(candidate_key, str):
+            raise ValueError(f"role {role} does not declare a candidate route")
+        relative = candidate_files.get(candidate_key)
+        if not isinstance(relative, str):
+            raise ValueError(f"candidate route missing for key: {candidate_key}")
+        return resolve_loadout_relative_path(loadout_path, relative), effective_layer
+
+    if effective_layer == "method":
+        if not bool(entry.get("allow_method_write", False)):
+            raise ValueError(f"role {role} may not write method memory directly")
+        if method is None:
+            raise ValueError("--method is required when --target-layer method is used")
+        relative = method_files.get(method)
+        if not isinstance(relative, str):
+            raise ValueError(f"unknown method memory key: {method}")
+        return resolve_loadout_relative_path(loadout_path, relative), effective_layer
+
+    if effective_layer == "global":
+        if not bool(entry.get("allow_global_write", False)):
+            raise ValueError(f"role {role} may not write global memory directly")
+        return Path(DEFAULT_NOTE_PATH), effective_layer
+
+    raise ValueError(f"unsupported target layer: {effective_layer}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description="Append one agent-learning observation.")
@@ -93,10 +164,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Confidence label. Default: tentative",
     )
     parser.add_argument("--observed-on", default=str(date.today()), help="Observation date.")
+    parser.add_argument("--role", help="Optional role id used for fixed route resolution.")
+    parser.add_argument(
+        "--target-layer",
+        choices=("candidate", "method", "global"),
+        help="Optional explicit layer. With --role, default is candidate. Without --role, default is global.",
+    )
+    parser.add_argument("--method", help="Method memory key when --target-layer method is used.")
+    parser.add_argument(
+        "--loadout-path",
+        default=DEFAULT_LOADOUT_PATH,
+        help=f"Role loadout config path. Default: {DEFAULT_LOADOUT_PATH}",
+    )
     parser.add_argument(
         "--note-path",
-        default=DEFAULT_NOTE_PATH,
-        help=f"Agent philosophy note path. Default: {DEFAULT_NOTE_PATH}",
+        help=f"Optional explicit note path. Without --role, default: {DEFAULT_NOTE_PATH}",
     )
     return parser
 
@@ -106,7 +188,8 @@ def ensure_note_exists(note_path: Path) -> None:
     if note_path.exists():
         return
     note_path.parent.mkdir(parents=True, exist_ok=True)
-    note_path.write_text(DEFAULT_NOTE_TEXT, encoding="utf-8")
+    title = note_path.stem.replace("_", " ").title()
+    note_path.write_text(default_note_text(title, note_path.name), encoding="utf-8")
 
 
 def entry_text(entry: AgentLearningEntry) -> str:
@@ -150,7 +233,13 @@ def insert_under_section(text: str, section_header: str, rendered_entry: str) ->
 def main() -> int:
     """Append one agent-learning entry."""
     args = build_parser().parse_args()
-    note_path = Path(args.note_path)
+    note_path, effective_layer = resolve_note_path(
+        note_path_arg=args.note_path,
+        loadout_path=Path(args.loadout_path),
+        role=args.role.strip() if args.role else None,
+        target_layer=args.target_layer,
+        method=args.method.strip() if args.method else None,
+    )
     ensure_note_exists(note_path)
     note_text = note_path.read_text(encoding="utf-8")
     rendered = entry_text(
@@ -166,7 +255,10 @@ def main() -> int:
     )
     updated = insert_under_section(note_text, SECTION_HEADERS[args.kind], rendered)
     note_path.write_text(updated, encoding="utf-8")
-    print(f"AGENT_PHILOSOPHY_NOTE={note_path}")
+    print(f"AGENT_LEARNING_NOTE={note_path}")
+    print(f"AGENT_LEARNING_LAYER={effective_layer}")
+    if args.role:
+        print(f"AGENT_LEARNING_ROLE={args.role.strip()}")
     print(f"AGENT_LEARNING_KIND={args.kind}")
     print(f"AGENT_LEARNING_TEXT={args.statement.strip()}")
     return 0

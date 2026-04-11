@@ -1,0 +1,241 @@
+version: 1
+global_read_files:
+  - memory/global/USER_PREFERENCES.md
+  - memory/global/AGENT_PHILOSOPHY.md
+method_files:
+  requirements: memory/methods/requirements.md
+  planning: memory/methods/planning.md
+  design: memory/methods/design.md
+  implementation: memory/methods/implementation.md
+  testing: memory/methods/testing.md
+  review: memory/methods/review.md
+  verification: memory/methods/verification.md
+  research: memory/methods/research.md
+  operations: memory/methods/operations.md
+candidate_files:
+  manager: memory/candidates/manager.md
+  design: memory/candidates/design.md
+  implementation: memory/candidates/implementation.md
+  testing: memory/candidates/testing.md
+  research: memory/candidates/research.md
+  review: memory/candidates/review.md
+  verification: memory/candidates/verification.md
+  operations: memory/candidates/operations.md
+promotion_flow:
+  - from: run-local
+    to: candidate
+    gate: immediate observation capture
+  - from: candidate
+    to: method
+    gate: repeated evidence or explicit user confirmation
+  - from: method
+    to: global
+    gate: repo-wide durability confirmed
+  - from: global
+    to: workflow_or_agents
+    gate: stable promotion sweep
+role_loadouts:
+  manager:
+    method_reads: [requirements, planning]
+    candidate_file: manager
+    allow_method_write: true
+    allow_global_write: true
+    notes: Intake and routing role. May promote durable planning and requirements habits.
+  manager_reviewer:
+    method_reads: [requirements, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Review role. Reviewer learning stops at candidates until promoted elsewhere.
+  designer:
+    method_reads: [design]
+    candidate_file: design
+    allow_method_write: true
+    allow_global_write: true
+    notes: Design role may promote reusable design method.
+  design_reviewer:
+    method_reads: [design, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Design review remains candidate-only.
+  document_flow_reviewer:
+    method_reads: [design, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Document-flow review remains candidate-only.
+  test_designer:
+    method_reads: [testing, review]
+    candidate_file: testing
+    allow_method_write: true
+    allow_global_write: false
+    notes: Test design may promote testing method but does not write global philosophy directly.
+  implementer:
+    method_reads: [implementation, testing]
+    candidate_file: implementation
+    allow_method_write: true
+    allow_global_write: true
+    notes: The single writer role may promote implementation method and durable philosophy.
+  change_reviewer:
+    method_reads: [review, implementation]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Chunk review remains candidate-only.
+  final_reviewer:
+    method_reads: [review, verification]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Final review remains candidate-only.
+  verifier:
+    method_reads: [verification]
+    candidate_file: verification
+    allow_method_write: false
+    allow_global_write: false
+    notes: Verification findings stop at candidate memory.
+  auditor:
+    method_reads: [verification, review]
+    candidate_file: verification
+    allow_method_write: false
+    allow_global_write: false
+    notes: Closeout findings stop at candidate memory.
+  researcher:
+    method_reads: [research, planning]
+    candidate_file: research
+    allow_method_write: true
+    allow_global_write: true
+    notes: Research role may promote reusable research method.
+  research_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Research review remains candidate-only.
+  experimenter:
+    method_reads: [research, testing]
+    candidate_file: research
+    allow_method_write: true
+    allow_global_write: false
+    notes: Experiment execution may promote method but not global directly.
+  experiment_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Experiment review remains candidate-only.
+  scheduler:
+    method_reads: [planning]
+    candidate_file: manager
+    allow_method_write: true
+    allow_global_write: false
+    notes: Scheduler may refine planning method.
+  schedule_reviewer:
+    method_reads: [planning, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Plan review remains candidate-only.
+  citation_evidence_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Citation/evidence review remains candidate-only.
+  notation_definition_reviewer:
+    method_reads: [design, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Notation review remains candidate-only.
+  logic_gap_reviewer:
+    method_reads: [design, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Logic-gap review remains candidate-only.
+  infra_steward:
+    method_reads: [operations, planning]
+    candidate_file: operations
+    allow_method_write: true
+    allow_global_write: true
+    notes: Environment and workflow steward may promote operational method and durable philosophy.
+  infra_reviewer:
+    method_reads: [operations, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Infra review remains candidate-only.
+  reproducibility_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  scientific_computing_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  benchmark_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  artifact_reviewer:
+    method_reads: [verification, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  fair_data_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  ml_science_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Perspective review remains candidate-only.
+  project_reviewer:
+    method_reads: [operations, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Project review remains candidate-only.
+  docs_workflow_steward:
+    method_reads: [operations, design]
+    candidate_file: operations
+    allow_method_write: true
+    allow_global_write: true
+    notes: Docs workflow stewardship may promote operational and doc-flow method.
+  python_reviewer:
+    method_reads: [review, implementation]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Language-specific review remains candidate-only.
+  cpp_reviewer:
+    method_reads: [review, implementation]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Language-specific review remains candidate-only.
+  report_reviewer:
+    method_reads: [research, review]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Report review remains candidate-only.
+  critical_guardian:
+    method_reads: [review, verification]
+    candidate_file: review
+    allow_method_write: false
+    allow_global_write: false
+    notes: Critical guard role remains candidate-only.
