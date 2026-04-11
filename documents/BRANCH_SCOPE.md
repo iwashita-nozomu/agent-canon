@@ -32,6 +32,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](/mnt/l/wor
 - user-facing の完了報告は、原則として commit と push を終えてから行います。
 - さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで完了報告を出しません。
 - push を行わない task が許されるのは、review-only、no-change、または user が明示的に commit / push を止めた場合です。
+- push が自然な完了条件に含まれる task では、agent は push の許可を取りに戻りません。required review と validation が揃い、repo policy 的に自然ならそのまま push します。
 - push に失敗した場合は、完了扱いにせず、branch、commit、失敗理由を明記して報告します。
 
 ## 5. Conflict 解決と merge / rebase

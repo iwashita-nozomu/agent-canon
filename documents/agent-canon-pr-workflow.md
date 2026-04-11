@@ -22,6 +22,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - PR 前の validation は `make agent-canon-pr-check` を使います。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` を省略しません。
 - template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash tools/sync_agent_canon.sh push` を実行します。
+- push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
 
 ## Branch ルール
 
@@ -73,7 +74,7 @@ make agent-canon-pr-check
 6. PR を作る
 
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
-- 変更した surface、validation、upstream sync plan を PR 本文に書きます。
+- 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
 
 7. merge する
 
@@ -112,7 +113,7 @@ bash tools/update_agent_canon.sh push-proposal
 - root shared surface が `bash tools/sync_agent_canon.sh check` で clean
 - PR 本文に changed surface と validation が記録されている
 - file 構成変更がある場合は integration worktree merge と tree check が完了
-- template `main` へ merge 後、`bash tools/sync_agent_canon.sh push` の実行計画または実行結果が残っている
+- template `main` へ merge 後、`bash tools/sync_agent_canon.sh push` の実行結果、または external block / user stop による未実行理由が残っている
 
 ## 禁止事項
 
