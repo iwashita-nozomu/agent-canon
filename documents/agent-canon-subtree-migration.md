@@ -257,6 +257,8 @@ bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 ```bash
 bash tools/update_agent_canon.sh plan
 bash tools/update_agent_canon.sh apply
+bash tools/update_agent_canon.sh proposal-branch
+bash tools/update_agent_canon.sh push-proposal
 bash tools/sync_agent_canon.sh ensure-latest
 bash tools/sync_agent_canon.sh pull
 ```
@@ -264,6 +266,7 @@ bash tools/sync_agent_canon.sh pull
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
 `plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。
 `apply` は最終的に `ensure-latest` を呼びます。
+shared canon の差分を maintainer に渡すときは `proposal-branch` で既定 branch を確認し、`push-proposal` でその branch へ push します。
 
 `ensure-latest` は task 開始時の入口です。
 clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ更新します。
@@ -295,6 +298,7 @@ bash tools/update_agent_canon.sh register-local-bare \
 
 この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
 既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
+同時に `canon-proposal/<project-slug>` を既定 proposal branch として用意し、clone の git config に保存します。
 
 ## 8. 移行フェーズ
 

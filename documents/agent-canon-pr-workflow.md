@@ -17,6 +17,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
+- 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` を省略しません。
@@ -25,15 +26,18 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 ## Branch ルール
 
 - branch 名は `canon/<topic>-YYYYMMDD` を使います。
+- 派生 repo から集める受け口 branch は `canon-proposal/<repo-slug>` を既定にします。
 - shared canon 以外の implementation change と同じ branch に混ぜません。
 - shared canon 変更と repo-local implementation change の両方が必要な場合は branch と PR を分けます。
 
 ## 標準手順
 
-1. branch を切る
+1. 派生 repo から proposal branch がある場合は先に取り込む
 
 ```bash
+git fetch <derived-agent-canon-remote> canon-proposal/<repo-slug>
 git checkout -b canon/<topic>-YYYYMMDD
+git merge --no-ff FETCH_HEAD
 ```
 
 2. `vendor/agent-canon/` 側を編集する
@@ -88,6 +92,16 @@ bash tools/sync_agent_canon.sh push
 
 ```bash
 git -C /mnt/l/workspace/agent-canon pull --ff-only
+```
+
+## 派生 repo 側の shared canon 提案
+
+派生 repo では、shared canon の差分を直接 `main` へ push しません。
+repo ごとの proposal branch に積み、maintainer が整理用 branch へ merge します。
+
+```bash
+bash tools/update_agent_canon.sh proposal-branch
+bash tools/update_agent_canon.sh push-proposal
 ```
 
 ## PR 完了条件

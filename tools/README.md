@@ -26,7 +26,9 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - `apply` は `ensure-latest` を thin wrapper として呼びます。
-    - `register-local-bare` は project-local bare repo を seed し、`agent-canon` remote を設定します。
+    - `proposal-branch` は shared canon 差分の既定 push 先 branch を表示します。
+    - `push-proposal` は shared canon 差分を repo 専用 proposal branch へ push します。
+    - `register-local-bare` は project-local bare repo を seed し、proposal branch を用意し、`agent-canon` remote を設定します。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
