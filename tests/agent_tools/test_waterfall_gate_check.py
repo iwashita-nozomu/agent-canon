@@ -164,6 +164,65 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertIn("WATERFALL_GATE_READY=no", result.stdout)
             self.assertIn("design_review.md:decision_not_approve", result.stdout)
 
+    def test_plan_gate_rejects_empty_todo_surface(self) -> None:
+        """Plan gate should fail when schedule.md does not contain concrete TODO rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "empty-plan"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "schedule.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule",
+                        "",
+                        "## Stage Plan",
+                        "| Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |",
+                        "| ----- | ----------- | ------------ | ------ | ------------- | ------ |",
+                        "| requirements | manager | manager_reviewer | contract | fixed | done |",
+                        "## Clause Coverage",
+                        "| Clause ID | Covered By Stage | Review Gate | Status |",
+                        "| --------- | ---------------- | ----------- | ------ |",
+                        "| T1-C1 | requirements | requirements | done |",
+                        "## Planned Work Units",
+                        "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
+                        "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "schedule_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Schedule Review",
+                        "",
+                        "## Findings",
+                        "No blockers.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "plan",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("schedule.md:planned_work_units_empty", result.stdout)
+
     def test_design_gate_accepts_filled_approved_artifacts(self) -> None:
         """A filled design bundle should pass when both design reviews approve."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -249,6 +308,68 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("WATERFALL_GATE_READY=yes", result.stdout)
             self.assertIn("NEXT_ACTION=proceed_to_next_waterfall_gate", result.stdout)
+
+    def test_final_gate_rejects_empty_work_log(self) -> None:
+        """Final gate should fail when work_log.md has no concrete entries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "final-empty-work-log"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "final_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Final Review",
+                        "",
+                        "## Ship Blockers",
+                        "| Finding | Severity | Status |",
+                        "| ------- | -------- | ------ |",
+                        "| none | info | resolved |",
+                        "## Design Trace Acceptance",
+                        "Trace is complete.",
+                        "## Planned Work Completion Review",
+                        "All planned work units are complete.",
+                        "## Spec-To-Product Coverage Review",
+                        "Every clause has a product surface.",
+                        "## Review Finding Incorporation Review",
+                        "All fix-now findings were integrated.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "work_log.md").write_text(
+                "\n".join(
+                    [
+                        "# Work Log",
+                        "",
+                        "## Purpose",
+                        "- Required run log.",
+                        "",
+                        "## Entries",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "final",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("work_log.md:section_empty_or_missing:entries", result.stdout)
 
     def test_design_gate_rejects_missing_source_packet(self) -> None:
         """A design review should not pass when the design lacks source packet trace."""

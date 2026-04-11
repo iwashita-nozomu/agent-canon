@@ -14,6 +14,52 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 
 
+def write_ready_schedule(report_dir: Path) -> None:
+    """Write a filled schedule artifact."""
+    (report_dir / "schedule.md").write_text(
+        "\n".join(
+            [
+                "# Schedule",
+                "",
+                "## Stage Plan",
+                "| Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |",
+                "| ----- | ----------- | ------------ | ------ | ------------- | ------ |",
+                "| requirements | manager | manager_reviewer | contract | fixed | done |",
+                "## Clause Coverage",
+                "| Clause ID | Covered By Stage | Review Gate | Status |",
+                "| --------- | ---------------- | ----------- | ------ |",
+                "| T1-C1 | requirements | requirements | done |",
+                "## Planned Work Units",
+                "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
+                "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
+                "| W1 | T1-C1 | codex | tests | final | done |",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_ready_work_log(report_dir: Path) -> None:
+    """Write a filled work-log artifact."""
+    (report_dir / "work_log.md").write_text(
+        "\n".join(
+            [
+                "# Work Log",
+                "",
+                "## Purpose",
+                "- Record meaningful execution steps.",
+                "",
+                "## Entries",
+                "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | request_clause_ids: T1-C1 | next: implement`",
+                "- `2026-04-08 09:30 JST | test | passed closeout checks | request_clause_ids: T1-C1 | next: close`",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
@@ -129,6 +175,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertTrue(report_dir.is_dir())
+            self.assertTrue((report_dir / "work_log.md").is_file())
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
@@ -248,6 +295,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
 
             result = subprocess.run(
                 [
@@ -341,6 +390,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
 
             result = subprocess.run(
                 [
@@ -421,6 +472,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
 
             result = subprocess.run(
                 [
@@ -498,6 +551,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
 
             result = subprocess.run(
                 [
@@ -516,6 +571,102 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("spec_product_coverage_complete", result.stdout)
             self.assertIn("review_findings_integrated", result.stdout)
+
+    def test_task_close_rejects_empty_work_log(self) -> None:
+        """task_close should fail when the run-local work log is still empty."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-empty-work-log"
+            report_dir = report_root / run_id
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "closeout ready except work log",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (report_dir / "verification.txt").write_text(
+                "\n".join(
+                    [
+                        f"run_id={run_id}",
+                        "task=closeout ready except work log",
+                        "owner=codex",
+                        "created_at_utc=2026-04-08T00:00:00Z",
+                        "status=pass",
+                        "user_completion_report=unlocked",
+                        "closeout_gate_status=resolved",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "closeout_gate.md").write_text(
+                "\n".join(
+                    [
+                        "# Closeout Gate",
+                        "",
+                        "- verifier_status: pass",
+                        "- auditor_status: resolved",
+                        "- required_reviews_complete: yes",
+                        "- validation_complete: yes",
+                        "- request_contract_complete: yes",
+                        "- all_planned_chunks_complete: yes",
+                        "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
+                        "- commit_created: yes",
+                        "- push_completed: yes",
+                        "- user_completion_report: unlocked",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_schedule(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("WORK_LOG_COMPLETE=no", result.stdout)
+            self.assertIn("work_log_complete", result.stdout)
 
 
 if __name__ == "__main__":

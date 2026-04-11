@@ -16,6 +16,8 @@
 
 ## Planned Work Units
 
+<!-- This table is the canonical task TODO surface. Keep concrete work units and statuses here until closeout. -->
+
 | Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |
 | ------- | ---------- | ----- | ------------------- | --------- | ------ |
 

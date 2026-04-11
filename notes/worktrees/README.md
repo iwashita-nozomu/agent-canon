@@ -16,7 +16,7 @@
 - scope 更新、編集開始、テスト実行、実験開始 / 停止、最終判断は append-only で追記します。
 - 1 行でよいので、何をしたか、何を見たか、次に何をするかが追える形にします。
 - worktree 内で先に書く場合も、最終配置と同じ相対パスに置きます。
-- 追記は `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` を既定にします。
+- 追記は `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` を既定にします。`WORKTREE_SCOPE.md` に contract path が入っていれば、同じ command で run bundle `work_log.md` も更新されます。
 - work block を始めたら kickoff / resume、終えたら test / review / closeout を最低 1 行ずつ残します。
 
 ## Kickoff Minimum

@@ -37,7 +37,7 @@
 
 ## Completion Boundary Evidence
 
-<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete or explain why closeout remains locked. -->
+<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
 
 ## Spec-To-Product Coverage Evidence
 
