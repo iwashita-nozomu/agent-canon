@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -23,6 +24,31 @@ REPO_ROOT = resolve_repo_root()
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
 
+    def prefix_snapshot_sha(self, repo: Path) -> str:
+        """Return a stable snapshot SHA for vendor/agent-canon in the clone."""
+        split = subprocess.run(
+            ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if split.returncode == 0:
+            return split.stdout.strip()
+        return subprocess.run(
+            [
+                "git",
+                "commit-tree",
+                "HEAD:vendor/agent-canon",
+                "-m",
+                "test: seed agent-canon snapshot",
+            ],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
     def clone_repo(self, target: Path) -> None:
         """Clone the current repository into one temporary target."""
         subprocess.run(
@@ -31,12 +57,22 @@ class UpdateAgentCanonTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        subprocess.run(
-            ["rsync", "-a", "--delete", "--exclude", ".git", f"{REPO_ROOT}/", str(target)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        if shutil.which("rsync") is not None:
+            subprocess.run(
+                ["rsync", "-a", "--delete", "--exclude", ".git", f"{REPO_ROOT}/", str(target)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            for source in REPO_ROOT.iterdir():
+                if source.name == ".git":
+                    continue
+                destination = target / source.name
+                if source.is_dir():
+                    shutil.copytree(source, destination, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source, destination)
         status = subprocess.run(
             ["git", "status", "--short"],
             cwd=target,
@@ -224,13 +260,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             missing_exec = root / "missing-git-exec"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.prefix_snapshot_sha(clone_dir)
             subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],

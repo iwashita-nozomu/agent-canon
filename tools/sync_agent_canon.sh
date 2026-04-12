@@ -640,10 +640,24 @@ cmd_ensure_latest() {
 
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  local local_split=""
+  local push_sha=""
   require_clean_worktree
   require_existing_remote
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
-  git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch"
+  local_split="$(split_prefix_or_empty)"
+  if [ -n "$local_split" ]; then
+    echo "agent_canon_push_method=subtree_split"
+    if git subtree --help >/dev/null 2>&1; then
+      git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch"
+      return
+    fi
+    push_sha="$local_split"
+  else
+    push_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: push agent-canon snapshot")"
+    echo "agent_canon_push_method=commit_tree_snapshot"
+  fi
+  git -C "$ROOT_DIR" push --force "$REMOTE_NAME" "${push_sha}:refs/heads/${branch}"
 }
 
 cmd_status() {

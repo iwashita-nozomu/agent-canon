@@ -152,8 +152,12 @@ seed_snapshot_into_bare() {
   fi
 
   if git subtree --help >/dev/null 2>&1; then
-    seed_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD)"
-    echo "agent_canon_seed_method=subtree_split"
+    if seed_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"; then
+      echo "agent_canon_seed_method=subtree_split"
+    else
+      seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
+      echo "agent_canon_seed_method=commit_tree_snapshot"
+    fi
   else
     seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
     echo "agent_canon_seed_method=commit_tree_snapshot"
