@@ -19,7 +19,6 @@ root では次を symlink view として扱います。
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents`
-- `agents/`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/notes-lifecycle.md`
