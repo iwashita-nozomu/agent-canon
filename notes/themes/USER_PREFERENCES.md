@@ -80,6 +80,12 @@
 - 2026-04-11 | 冗長な API と実装の重複を避け、コードも文書も核の経路を優先して整理してほしい
   - source: chat
 
+- 2026-04-11 | Keep the native autodiff core narrow and readable; avoid redundant APIs/protocols and unnecessary extensibility.
+  - source: chat
+
+- 2026-04-12 | Avoid staged wording such as 'first'; detailed design should be framed as a closed complete scope rather than an incremental starting subset.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

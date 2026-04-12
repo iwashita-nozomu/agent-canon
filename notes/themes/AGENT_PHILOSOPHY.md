@@ -85,6 +85,12 @@
   - confidence: tentative
   - evidence: User reported a recurring pattern of closing after minimal implementation, possibly ignoring code review, and implementing only part of the specification.
 
+- 2026-04-11 | interaction-observation | When the user is pruning core API surface, prefer converging to one canonical protocol before adding sugar or extension points.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: The user repeatedly asked to remove redundant routes, keep code readable, and make CustomPrimitiveSpec the only protocol before adding sugar.
+
 ## Task Retrospectives
 
 - まだなし

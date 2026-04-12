@@ -2,6 +2,7 @@
 
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
 The shared agent canon lives in `vendor/agent-canon/`, and the root discovery paths are runtime views into that snapshot.
+Almost all workflows need to use /subagent.
 
 ## Read First
 
