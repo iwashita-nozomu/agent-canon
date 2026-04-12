@@ -31,7 +31,11 @@
 
 ## Revision Loop
 
-<!-- Record what the implementer must revise before the next checkpoint review. -->
+<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the full required review set on the refreshed diff. -->
+
+## Post-Review Fix Rerun Requirement
+
+<!-- If this review requires any fix, state that every required review family must rerun on the updated diff before closeout, even when the implementer believes the fix is tiny. List the review artifacts that must be refreshed. -->
 
 ## Follow-Up
 

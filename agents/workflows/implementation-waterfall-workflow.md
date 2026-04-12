@@ -496,6 +496,7 @@ exit 条件:
 - naming gap を見つけたら、実装で埋めずに Gate 5-6 へ戻します
 - 実装 slice が終わったら、changed files、clause coverage、remaining planned work units、next required gate を記録して次段へ進みます
 - 予定 work unit や active clause が残っている場合は、実装完了ではなく次の work unit へ進みます
+- review artifact の指摘を受けて修正したら、その修正が tiny fix でも Gate 8 から required review family を最新 diff でやり直します。前の approve は失効します
 
 必須レビュー:
 - `change_reviewer`
@@ -546,7 +547,7 @@ exit 条件:
   - claim、evidence、overclaim を確認する
 
 ルール:
-- 設計を変えない軽微修正だけは、この gate 内で戻して構いません
+- review で戻されたあとに入れる修正は、設計を変えない tiny fix でもこの gate 内だけで閉じません。Gate 8 に戻して差分を更新し、Gate 8 と Gate 9 の required review を最新 diff に対してやり直します
 - 新しい requirement が必要なら Gate 1 に戻します
 - 計画変更が必要なら Gate 3 に戻します
 - 設計変更が必要なら Gate 5 に戻します
@@ -555,6 +556,7 @@ exit 条件:
 - `required_change` が解消している
 - 実行した checks と未実行理由が説明できる
 - final acceptance review が `resolved` になっている
+- `final_review.md` に post-fix full review rerun review が記録され、review-driven fix の後に full required review set を rerun したことが追える
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate final"` が pass している
 
 ### Gate 10. Audit And Gate Closure
@@ -575,6 +577,7 @@ exit 条件:
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
+- `closeout_gate.md` の `post_fix_full_review_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 - `schedule.md` の TODO 行が空ではない
 - `work_log.md` に meaningful step が記録されている
@@ -590,6 +593,7 @@ exit 条件:
 - chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
 - required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
+- review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
 - user request clause の未解決がない
 
 ## 5. 差し戻しルール

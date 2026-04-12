@@ -105,6 +105,7 @@ def main() -> int:
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
+        "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
         "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "todo_artifact_complete": not schedule_blockers,
@@ -130,6 +131,10 @@ def main() -> int:
         f"{closeout.get('spec_product_coverage_complete', '')}"
     )
     print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
+    print(
+        "POST_FIX_FULL_REVIEW_COMPLETE="
+        f"{closeout.get('post_fix_full_review_complete', '')}"
+    )
     print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
     print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")
     print(f"UNRESOLVED_CLAUSE_IDS={request_contract.get('unresolved_clause_ids', '')}")

@@ -106,6 +106,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
                 "## Planned Work Completion Review",
                 "## Spec-To-Product Coverage Review",
                 "## Review Finding Incorporation Review",
+                "## Post-Fix Full Review Rerun Review",
             ),
         ),
         ArtifactCheck(

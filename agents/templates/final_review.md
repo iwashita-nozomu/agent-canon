@@ -29,6 +29,10 @@
 
 <!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
 
+## Post-Fix Full Review Rerun Review
+
+<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the full required review set was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last full review pass. Return revise if any tiny fix skipped the rerun. -->
+
 ## Residual Risks
 
 <!-- Record remaining risk, approval notes, or escalation points. -->

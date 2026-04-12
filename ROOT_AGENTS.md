@@ -103,7 +103,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
-- user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes` かつ `review_findings_integrated=yes` になるまで出してはいけません。
+- user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` になるまで出してはいけません。
 - If a shared surface drifts, repair it with `bash tools/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -120,6 +120,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - export worker に live Python object reference を渡してはいけません。cross-process 境界は serializable manifest と reconstruction recipe で渡します。
 - spot run、debug run、smoke run、partial run を正式 evidence や比較表の根拠にしてはいけません。
 - 最小実装、仕様の一部だけの実装、または未反映の required review findings が残る状態で完了扱いにしてはいけません。
+- review を受けて修正したあと、tiny fix だからといって full required review set を省略して closeout してはいけません。
 - correctness evidence と performance evidence を混同してはいけません。
 - code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜてはいけません。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
