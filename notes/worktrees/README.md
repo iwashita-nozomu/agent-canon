@@ -1,7 +1,7 @@
 # Worktree Notes
 
 このディレクトリには、active な worktree の kickoff から closeout までを追う action log と carry-over note を置きます。
-研究・実験改造の全体手順は [documents/research-workflow.md](../../documents/research-workflow.md) を参照してください。
+研究・実験改造の全体手順は [agents/workflows/research-workflow.md](../../agents/workflows/research-workflow.md) を参照してください。
 
 ## Purpose
 

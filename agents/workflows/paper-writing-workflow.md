@@ -3,7 +3,7 @@
 この文書は、投稿論文、thesis chapter、scholarly paper section のような paper-like 文書を書くときの正本です。
 学術文章一般より paper structure の拘束を強くし、section ごとの役割、citation/evidence trace、figure/table/appendix の参照順を複数 reviewer で精査します。
 
-この workflow は `documents/academic-writing-workflow.md` の paper-specific overlay です。
+この workflow は `agents/workflows/academic-writing-workflow.md` の paper-specific overlay です。
 記号と論理だけでなく、citation と evidence の対応を独立 reviewer で閉じる点が違いです。
 
 ## Use When
@@ -163,6 +163,6 @@ python3 tools/docs/audit_and_fix_links.py --check documents notes
 
 ## Relationship To Other Workflows
 
-- 長文一般の構成技法は `documents/long-form-writing-workflow.md`
-- 学術文章一般の原則は `documents/academic-writing-workflow.md`
-- 文献探索が主 task なら `documents/research-workflow.md`
+- 長文一般の構成技法は `agents/workflows/long-form-writing-workflow.md`
+- 学術文章一般の原則は `agents/workflows/academic-writing-workflow.md`
+- 文献探索が主 task なら `agents/workflows/research-workflow.md`

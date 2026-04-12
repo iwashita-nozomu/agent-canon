@@ -240,7 +240,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "## Upstream Requirement Packet",
                         (
                             "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
-                            "and `documents/implementation-waterfall-workflow.md`."
+                            "and `agents/workflows/implementation-waterfall-workflow.md`."
                         ),
                         "## Implementation Source Packet",
                         (

@@ -42,13 +42,13 @@ CPP_PATH_MARKERS = (
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
-        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
         "notes": "Requirements and planning start from explicit documented clauses and stage plan.",
     },
     "designer": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
         "workspace_paths": [
-            "documents/implementation-waterfall-workflow.md",
+            "agents/workflows/implementation-waterfall-workflow.md",
             "agents/canonical/CODEX_WORKFLOW.md",
         ],
         "notes": "Detailed design must read upstream documented requirements and waterfall rules before design begins.",
@@ -60,7 +60,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     },
     "test_designer": {
         "artifact_keys": ["user_request_contract", "schedule", "design_brief", "design_review"],
-        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
         "notes": "Test design derives cases from the approved design packet.",
     },
     "implementer": {
@@ -73,7 +73,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "test_plan",
         ],
         "workspace_paths": [
-            "documents/implementation-waterfall-workflow.md",
+            "agents/workflows/implementation-waterfall-workflow.md",
             "agents/canonical/CODEX_WORKFLOW.md",
         ],
         "must_cite_before_edit": True,
@@ -105,7 +105,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     },
     "scheduler": {
         "artifact_keys": ["user_request_contract", "schedule"],
-        "workspace_paths": ["documents/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
         "notes": "Scheduling reads explicit requirement and plan surfaces.",
     },
 }
@@ -114,7 +114,7 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/AGENTS_COORDINATION.md",
     "documents/coding-conventions-python.md",
     "documents/notes-lifecycle.md",
-    "documents/agent-learning-workflow.md",
+    "agents/workflows/agent-learning-workflow.md",
     "documents/agent-canon-subtree-migration.md",
     "notes/guardrails/README.md",
     "notes/guardrails/engineering_avoidances.md",

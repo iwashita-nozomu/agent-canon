@@ -41,7 +41,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](/mnt/l/wor
 - 履歴を読みやすく保つため、ローカル整理には `rebase` を使って構いません。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
 - 別 branch と同じファイルを触っている場合は、先に `notes/branches/` と `notes/worktrees/` で衝突リスクを明示します。
-- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`documents/main-integration-workflow.md` の手順で統合します。
+- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/workflows/main-integration-workflow.md` の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
 - 構成変更がある統合では、専用 integration worktree 上の merge commit を作り、`python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。

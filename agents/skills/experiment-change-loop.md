@@ -17,8 +17,8 @@
 - `agents/skills/research-workflow.md`
 - `agents/skills/critical-review.md`
 - `agents/skills/report-review.md`
-- `documents/experiment-workflow.md`
-- `documents/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
+- `agents/workflows/research-workflow.md`
 - `agents/templates/experiment_change_loop.md`
 
 ## Inputs

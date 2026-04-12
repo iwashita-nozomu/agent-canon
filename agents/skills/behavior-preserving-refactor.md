@@ -14,9 +14,9 @@
 ## Core References
 
 - `agents/TASK_WORKFLOWS.md`
-- `documents/implementation-waterfall-workflow.md`
+- `agents/workflows/implementation-waterfall-workflow.md`
 - `documents/REVIEW_PROCESS.md`
-- `documents/main-integration-workflow.md`
+- `agents/workflows/main-integration-workflow.md`
 
 ## Required Contract
 

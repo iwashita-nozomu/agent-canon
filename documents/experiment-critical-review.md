@@ -3,9 +3,9 @@
 この文書は、実験コード、結果レポート、図表、結論の妥当性を批判的にレビューするための正本です。
 個別の実験 topic に依存しない review 観点をまとめ、`experiment_reviewer`、`report_reviewer`、`change_reviewer` が共通に参照できる形にします。
 
-実験全体の標準手順は [experiment-workflow.md](experiment-workflow.md) を参照してください。
+実験全体の標準手順は [experiment-workflow.md](/mnt/l/workspace/project_template/agents/workflows/experiment-workflow.md) を参照してください。
 レポート本文の構成は [experiment-report-style.md](experiment-report-style.md) を参照してください。
-問い、比較対象、逐次改造の流れは [research-workflow.md](research-workflow.md) を参照してください。
+問い、比較対象、逐次改造の流れは [research-workflow.md](/mnt/l/workspace/project_template/agents/workflows/research-workflow.md) を参照してください。
 
 ## 1. 目的
 
@@ -292,7 +292,7 @@ review コメントの粒度は次を目安にします。
 ローカルの入口は次です。
 
 - [references/README.md](/mnt/l/workspace/project_template/references/README.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
 
 ### 批判的レビュー・再現性
 

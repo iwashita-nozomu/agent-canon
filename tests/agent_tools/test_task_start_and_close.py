@@ -107,6 +107,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertIn("/docker/README.md", result.stdout)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
@@ -186,6 +187,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertIn("/docker/README.md", result.stdout)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
@@ -196,6 +198,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertIn("/docker/README.md", manifest_text)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""

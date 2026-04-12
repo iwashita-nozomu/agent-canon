@@ -145,9 +145,9 @@
 
 - [references/README.md](/mnt/l/workspace/project_template/references/README.md)
   - reference 置き場の入口です。
-- [documents/research-workflow.md](/mnt/l/workspace/project_template/documents/research-workflow.md)
+- [agents/workflows/research-workflow.md](/mnt/l/workspace/project_template/agents/workflows/research-workflow.md)
   - 研究・実験改造の正本です。
-- [documents/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/documents/implementation-waterfall-workflow.md)
+- [agents/workflows/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/agents/workflows/implementation-waterfall-workflow.md)
   - 実装パスのウォーターフォール正本です。
 - [documents/experiment-critical-review.md](/mnt/l/workspace/project_template/documents/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。

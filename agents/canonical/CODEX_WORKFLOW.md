@@ -11,7 +11,7 @@
 1. Cross-Cutting Packet を読む
 1. `agents/skills/README.md` を読む
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
-1. 実装を伴う task では `documents/implementation-waterfall-workflow.md` を読む
+1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
 1. 必要なら `.agents/skills/` から該当 skill を読む
@@ -19,7 +19,7 @@
 Base Runtime Packet:
 
 - `README.md`
-- `documents/WORKFLOW_GUIDE.md`
+- `agents/workflows/README.md`
 - `agents/README.md`
 - `agents/TASK_WORKFLOWS.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
@@ -30,7 +30,7 @@ Cross-Cutting Packet:
 - `documents/AGENTS_COORDINATION.md`
 - `documents/coding-conventions-python.md`
 - `documents/notes-lifecycle.md`
-- `documents/agent-learning-workflow.md`
+- `agents/workflows/agent-learning-workflow.md`
 - `documents/agent-canon-subtree-migration.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
@@ -302,7 +302,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 5. Implementation
 
-- 実装は `documents/implementation-waterfall-workflow.md` の gate に従って進める
+- 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Implementation Source Packet` と `Design-To-Implementation Trace` を読み、そこにある artifact、repo docs、code path、test plan を読了する
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する

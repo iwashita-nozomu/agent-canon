@@ -14,10 +14,10 @@
 
 ## Core References
 
-- `documents/adaptive-improvement-workflow.md`
-- `documents/research-workflow.md`
-- `documents/experiment-workflow.md`
-- `documents/implementation-waterfall-workflow.md`
+- `agents/workflows/adaptive-improvement-workflow.md`
+- `agents/workflows/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
+- `agents/workflows/implementation-waterfall-workflow.md`
 - `agents/skills/research-workflow.md`
 - `agents/skills/experiment-lifecycle.md`
 

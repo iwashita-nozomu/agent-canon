@@ -13,7 +13,7 @@
 - 1 screen を超える長さの reader-facing 文書を書く
 - 複数 section の argument や decision path を持つ文書を書く
 
-学術論文、thesis chapter、scholarly note のような文書は `documents/academic-writing-workflow.md` を優先します。
+学術論文、thesis chapter、scholarly note のような文書は `agents/workflows/academic-writing-workflow.md` を優先します。
 
 ## Core Principles
 

@@ -11,7 +11,7 @@ You review research and experiment changes from the scientific computing practic
 
 Must read:
 - agents/skills/research-perspective-review.md
-- documents/research-workflow.md
+- agents/workflows/research-workflow.md
 
 Focus on incremental changes, prototype discipline, testing, automation, script structure, and whether the workflow avoids ad hoc manual steps.
 Do not edit files. Findings first.

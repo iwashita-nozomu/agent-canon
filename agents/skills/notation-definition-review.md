@@ -12,8 +12,8 @@
 
 ## Core References
 
-- `documents/academic-writing-workflow.md`
-- `documents/long-form-writing-workflow.md`
+- `agents/workflows/academic-writing-workflow.md`
+- `agents/workflows/long-form-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 
 ## Mandatory Checklist

@@ -11,7 +11,7 @@ You review research and experiment changes from the benchmark design perspective
 
 Must read:
 - agents/skills/research-perspective-review.md
-- documents/research-workflow.md
+- agents/workflows/research-workflow.md
 - documents/experiment-critical-review.md
 
 Focus on fairness, case mix, baselines, hidden confounders, measurement rules, anti-patterns, and unsupported benchmark conclusions.

@@ -4,8 +4,8 @@
 対象は `python/`、`documents/`、`agents/`、`docker/`、`scripts/` など、repo に持ち帰る変更全般です。
 
 この repo では workflow family の選択は `agents/TASK_WORKFLOWS.md` を使いますが、実装そのものの進め方はこの文書を共通ルールにします。
-README、workflow、guide、migration 文書のような長文では、加えて `documents/long-form-writing-workflow.md` を overlay として使います。
-論文、thesis chapter、scholarly note のような学術文章では、`documents/academic-writing-workflow.md` を優先 overlay として使います。
+README、workflow、guide、migration 文書のような長文では、加えて `agents/workflows/long-form-writing-workflow.md` を overlay として使います。
+論文、thesis chapter、scholarly note のような学術文章では、`agents/workflows/academic-writing-workflow.md` を優先 overlay として使います。
 
 ## 1. 目的
 
@@ -680,7 +680,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
 - [agents/canonical/CODEX_WORKFLOW.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_WORKFLOW.md)
-- [documents/WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/documents/WORKFLOW_GUIDE.md)
-- [documents/research-workflow.md](/mnt/l/workspace/project_template/documents/research-workflow.md)
-- [documents/experiment-workflow.md](/mnt/l/workspace/project_template/documents/experiment-workflow.md)
-- [documents/workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [agents/workflows/README.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
+- [agents/workflows/research-workflow.md](/mnt/l/workspace/project_template/agents/workflows/research-workflow.md)
+- [agents/workflows/experiment-workflow.md](/mnt/l/workspace/project_template/agents/workflows/experiment-workflow.md)
+- [agents/workflows/workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)

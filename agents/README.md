@@ -13,6 +13,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
   - チーム定義と write policy
 - [TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
   - workflow family と task 選択
+- [workflows/README.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
+  - workflow canon の入口
 - [COMMUNICATION_PROTOCOL.md](/mnt/l/workspace/project_template/agents/COMMUNICATION_PROTOCOL.md)
   - handoff / review / escalation の正本
 - [task_catalog.yaml](/mnt/l/workspace/project_template/agents/task_catalog.yaml)

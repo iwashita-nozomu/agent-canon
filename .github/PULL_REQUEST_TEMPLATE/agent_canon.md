@@ -31,7 +31,7 @@ paste the key pass lines here
 ## Integration
 
 - [ ] No file-structure change is included
-- [ ] File-structure change is included and `documents/main-integration-workflow.md` will be used
+- [ ] File-structure change is included and `agents/workflows/main-integration-workflow.md` will be used
 
 Integration notes:
 

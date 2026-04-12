@@ -19,12 +19,10 @@ root では次を symlink view として扱います。
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents`
+- `agents/`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
-- `documents/academic-writing-workflow.md`
-- `documents/adaptive-improvement-workflow.md`
 - `documents/notes-lifecycle.md`
-- `documents/paper-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
@@ -32,13 +30,7 @@ root では次を symlink view として扱います。
 - `documents/experiment-critical-review.md`
 - `documents/experiment-registry.md`
 - `documents/experiment-report-style.md`
-- `documents/experiment-workflow.md`
 - `documents/experiment_runner.md`
-- `documents/implementation-waterfall-workflow.md`
-- `documents/long-form-writing-workflow.md`
-- `documents/main-integration-workflow.md`
-- `documents/research-workflow.md`
-- `documents/workflow-references.md`
 - `documents/worktree-lifecycle.md`
 - `documents/conventions/python/20_benchmark_policy.md`
 - `documents/conventions/python/30_experiment_directory_structure.md`
@@ -104,5 +96,6 @@ make agent-canon-pr-check
 ## Root-Side Interpretation
 
 - `scripts/README.md` と `documents/tools/README.md` は root 側の実行入口です
+- workflow canon は `agents/workflows/` にあり、root では `agents/` symlink view 経由で参照します
 - `experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`experiments/registry.toml`、topic 固有の `experiments/<topic>/`、`reports/`、repo-local note は root 側の正本に残します
 - shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします

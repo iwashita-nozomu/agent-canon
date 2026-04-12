@@ -4,7 +4,7 @@
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[documents/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/documents/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/agents/workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
@@ -65,7 +65,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
 - user-facing completion は、全 active clause、全 planned work unit、final review、validation、closeout gate、commit / push が揃ったときだけ返します
-- branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
+- branch 側で file 構成変更をした pass は、closeout 前に `agents/workflows/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 - `/mnt/git` 配下の log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
@@ -290,7 +290,7 @@ single-writer ルール:
 - `cpp_reviewer`
 
 特徴:
-- 背骨は共通実装フローと `documents/implementation-waterfall-workflow.md` の gate をそのまま使う
+- 背骨は共通実装フローと `agents/workflows/implementation-waterfall-workflow.md` の gate をそのまま使う
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
@@ -347,5 +347,5 @@ single-writer ルール:
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
 - `agents/canonical/CLI_ENTRYPOINTS.md`
-- `documents/experiment-workflow.md`
-- `documents/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
+- `agents/workflows/research-workflow.md`

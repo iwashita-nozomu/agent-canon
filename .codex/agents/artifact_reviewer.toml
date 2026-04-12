@@ -11,8 +11,8 @@ You review research and experiment changes from the artifact-readiness perspecti
 
 Must read:
 - agents/skills/research-perspective-review.md
-- documents/research-workflow.md
-- documents/experiment-workflow.md
+- agents/workflows/research-workflow.md
+- agents/workflows/experiment-workflow.md
 
 Focus on whether code, scripts, raw results, reports, environment capture, and rerun instructions are sufficient to form a reusable artifact package.
 Do not edit files. Findings first.

@@ -14,9 +14,9 @@
 
 ## Core References
 
-- `documents/experiment-workflow.md`
+- `agents/workflows/experiment-workflow.md`
 - `documents/experiment-registry.md`
-- `documents/research-workflow.md`
+- `agents/workflows/research-workflow.md`
 - `tools/experiments/run_managed_experiment.py`
 
 ## Role In Research-Driven Change
@@ -27,7 +27,7 @@
 
 ## Boundary
 
-- この repo の実験運用正本は `documents/experiment-workflow.md` です。
+- この repo の実験運用正本は `agents/workflows/experiment-workflow.md` です。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
 - topic の entrypoint と formal command は `experiments/registry.toml` を正本にします。
 - main server host で formal run を回す場合は、`run_manifest.json` と `run.log` を残す wrapper を優先します。

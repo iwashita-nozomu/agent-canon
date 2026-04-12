@@ -1,7 +1,7 @@
 # 実験ディレクトリ構成
 
 この章は、このリポジトリで experiment をどこへ置くかを定めます。
-研究の問い、数式、比較設計、段階的改造の手順は `documents/research-workflow.md` を正本とします。
+研究の問い、数式、比較設計、段階的改造の手順は `agents/workflows/research-workflow.md` を正本とします。
 
 ## 要約
 

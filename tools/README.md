@@ -58,5 +58,5 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 ## 関連文書
 
 - `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon-pr-workflow.md`
+- `agents/workflows/agent-canon-pr-workflow.md`
 - `documents/agent-canon-subtree-migration.md`

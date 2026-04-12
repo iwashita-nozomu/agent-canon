@@ -99,11 +99,7 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
-documents/agent-learning-workflow.md:../${PREFIX}/documents/agent-learning-workflow.md
-documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
-documents/adaptive-improvement-workflow.md:../${PREFIX}/documents/adaptive-improvement-workflow.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
-documents/paper-writing-workflow.md:../${PREFIX}/documents/paper-writing-workflow.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
 documents/SKILL_IMPLEMENTATION_GUIDE.md:../${PREFIX}/documents/SKILL_IMPLEMENTATION_GUIDE.md
 documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPLATE.md
@@ -111,13 +107,7 @@ documents/coding-conventions-experiments.md:../${PREFIX}/documents/coding-conven
 documents/experiment-critical-review.md:../${PREFIX}/documents/experiment-critical-review.md
 documents/experiment-registry.md:../${PREFIX}/documents/experiment-registry.md
 documents/experiment-report-style.md:../${PREFIX}/documents/experiment-report-style.md
-documents/experiment-workflow.md:../${PREFIX}/documents/experiment-workflow.md
 documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
-documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
-documents/long-form-writing-workflow.md:../${PREFIX}/documents/long-form-writing-workflow.md
-documents/main-integration-workflow.md:../${PREFIX}/documents/main-integration-workflow.md
-documents/research-workflow.md:../${PREFIX}/documents/research-workflow.md
-documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
@@ -175,6 +165,18 @@ EOF
 
 build_removed_legacy_paths() {
   cat <<EOF
+documents/WORKFLOW_GUIDE.md
+documents/academic-writing-workflow.md
+documents/adaptive-improvement-workflow.md
+documents/agent-canon-pr-workflow.md
+documents/agent-learning-workflow.md
+documents/experiment-workflow.md
+documents/implementation-waterfall-workflow.md
+documents/long-form-writing-workflow.md
+documents/main-integration-workflow.md
+documents/paper-writing-workflow.md
+documents/research-workflow.md
+documents/workflow-references.md
 notes/themes/AGENT_PHILOSOPHY.md
 notes/themes/USER_PREFERENCES.md
 EOF

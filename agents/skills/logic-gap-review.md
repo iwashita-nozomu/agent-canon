@@ -12,7 +12,7 @@
 
 ## Core References
 
-- `documents/academic-writing-workflow.md`
+- `agents/workflows/academic-writing-workflow.md`
 - `agents/skills/critical-review.md`
 - `documents/REVIEW_PROCESS.md`
 

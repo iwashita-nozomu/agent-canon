@@ -22,7 +22,7 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
   - `README.md`
   - `QUICK_START.md`
   - `documents/README.md`
-  - `documents/WORKFLOW_GUIDE.md`
+  - `agents/workflows/README.md`
   - `scripts/README.md`
   - `notes/README.md`
 
@@ -89,9 +89,9 @@ bash tools/sync_agent_canon.sh push
 ## 参照先
 
 - `README.md`
-- `documents/WORKFLOW_GUIDE.md`
+- `agents/workflows/README.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon-pr-workflow.md`
+- `agents/workflows/agent-canon-pr-workflow.md`
 - `tools/shared/error_handler.py`
 - `tools/validation/triplet_validator.py`
 - `tools/docs/audit_and_fix_links.py`
@@ -131,14 +131,14 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/agent-canon-subtree-migration.md` への symlink view
 - `documents/AGENTS_COORDINATION.md`
   - `vendor/agent-canon/documents/AGENTS_COORDINATION.md` への symlink view
-- `documents/academic-writing-workflow.md`
-  - `vendor/agent-canon/documents/academic-writing-workflow.md` への symlink view
+- `agents/workflows/academic-writing-workflow.md`
+  - `vendor/agent-canon/agents/workflows/academic-writing-workflow.md` への symlink view
 - `documents/REVIEW_PROCESS.md`
   - `vendor/agent-canon/documents/REVIEW_PROCESS.md` への symlink view
 - `documents/SHARED_RUNTIME_SURFACES.md`
   - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` への symlink view
-- `documents/WORKFLOW_GUIDE.md`
-  - `vendor/agent-canon/documents/WORKFLOW_GUIDE.md` への symlink view
+- `agents/workflows/README.md`
+  - `vendor/agent-canon/agents/workflows/README.md` への symlink view
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
   - `vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md` への symlink view
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
@@ -151,18 +151,18 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/experiment-registry.md` への symlink view
 - `documents/experiment-report-style.md`
   - `vendor/agent-canon/documents/experiment-report-style.md` への symlink view
-- `documents/experiment-workflow.md`
-  - `vendor/agent-canon/documents/experiment-workflow.md` への symlink view
+- `agents/workflows/experiment-workflow.md`
+  - `vendor/agent-canon/agents/workflows/experiment-workflow.md` への symlink view
 - `documents/experiment_runner.md`
   - `vendor/agent-canon/documents/experiment_runner.md` への symlink view
-- `documents/implementation-waterfall-workflow.md`
-  - `vendor/agent-canon/documents/implementation-waterfall-workflow.md` への symlink view
-- `documents/long-form-writing-workflow.md`
-  - `vendor/agent-canon/documents/long-form-writing-workflow.md` への symlink view
-- `documents/research-workflow.md`
-  - `vendor/agent-canon/documents/research-workflow.md` への symlink view
-- `documents/workflow-references.md`
-  - `vendor/agent-canon/documents/workflow-references.md` への symlink view
+- `agents/workflows/implementation-waterfall-workflow.md`
+  - `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md` への symlink view
+- `agents/workflows/long-form-writing-workflow.md`
+  - `vendor/agent-canon/agents/workflows/long-form-writing-workflow.md` への symlink view
+- `agents/workflows/research-workflow.md`
+  - `vendor/agent-canon/agents/workflows/research-workflow.md` への symlink view
+- `agents/workflows/workflow-references.md`
+  - `vendor/agent-canon/agents/workflows/workflow-references.md` への symlink view
 - `documents/worktree-lifecycle.md`
   - `vendor/agent-canon/documents/worktree-lifecycle.md` への symlink view
 - `documents/conventions/python/20_benchmark_policy.md`
@@ -374,7 +374,7 @@ exit 条件:
 
 - [README.md](/mnt/l/workspace/project_template/README.md)
 - [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
-- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/documents/WORKFLOW_GUIDE.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
+- [workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
 - [README.md](/mnt/l/workspace/project_template/vendor/README.md)
 - [sync_agent_canon.sh](/mnt/l/workspace/project_template/tools/sync_agent_canon.sh)

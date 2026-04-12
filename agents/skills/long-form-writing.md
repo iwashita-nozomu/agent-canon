@@ -12,7 +12,7 @@
 
 ## Core References
 
-- `documents/long-form-writing-workflow.md`
+- `agents/workflows/long-form-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 

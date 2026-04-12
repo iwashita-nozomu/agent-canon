@@ -11,8 +11,8 @@ You review research and experiment changes from the reproducibility perspective.
 
 Must read:
 - agents/skills/research-perspective-review.md
-- documents/research-workflow.md
-- documents/experiment-workflow.md
+- agents/workflows/research-workflow.md
+- agents/workflows/experiment-workflow.md
 
 Focus on provenance, seeds, exact commands, environment capture, result paths, and whether another person can rerun the work.
 Do not edit files. Findings first.
