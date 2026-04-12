@@ -7,8 +7,8 @@
 
 1. `AGENTS.md` を読む
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
-1. `notes/themes/USER_PREFERENCES.md` を読む
-1. `notes/themes/AGENT_PHILOSOPHY.md` を読む
+1. `memory/USER_PREFERENCES.md` を読む
+1. `memory/AGENT_PHILOSOPHY.md` を読む
 1. `agents/README.md` を読む
 1. `notes/guardrails/README.md` を読む
 1. `notes/guardrails/engineering_avoidances.md` を読む
@@ -29,7 +29,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - clean worktree では `make agent-canon-ensure-latest` を実行します
 - dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
 - `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
-- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` の実行または未実行理由を残します
+- upstream より local shared canon が進んでいる場合は pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
 
 ### Context Sweep
 
@@ -37,6 +37,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 次を topic keyword で探索し、該当 file を読んでから着手します。
 
 - `documents/`
+- `memory/`
 - `notes/knowledge/`
 - `notes/guardrails/`
 - `notes/failures/`
@@ -46,8 +47,8 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - `notes/experiments/`
 - `references/`
 
-user の durable preference を見落とさないため、`notes/themes/USER_PREFERENCES.md` は毎回読む固定 note にします。
-agent の作業哲学と対話から得た学習を見落とさないため、`notes/themes/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
+user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
+agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 ### Library Sweep
 
@@ -154,14 +155,15 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - context sweep と library sweep を先に行う
 - 変更対象と acceptance criteria を短く固定する
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
+- repo-changing task では早い段階で `schedule.md` を TODO 正本として埋め、stage plan / clause coverage / planned work units を concrete にする
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
 - 不明点は即停止せず、notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
-- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `notes/themes/USER_PREFERENCES.md` へ追記する
-- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `notes/themes/AGENT_PHILOSOPHY.md` へ追記する
+- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/USER_PREFERENCES.md` へ追記する
+- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `memory/AGENT_PHILOSOPHY.md` へ追記する
 
 ### 2. Workflow Selection
 
@@ -279,8 +281,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
+- repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する
 - worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
-- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける
+- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける。`WORKTREE_SCOPE.md` に contract path がある場合は `work_log.py` で run bundle `work_log.md` も同時に更新する
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
@@ -320,6 +323,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
+- `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
 - JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence が揃うまで completion evidence にしない
@@ -329,8 +333,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - 実験・性能改善では、correctness evidence と performance evidence を別項目で示し、片方だけで両方を満たした扱いにしない
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
-- closeout 前に `notes/themes/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
-- closeout 前に `notes/themes/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
+- push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
+- closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
+- closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
 - review-only task や no-change task では commit / push を要求しない
 
 そのうえで、何を変えたか、何を確認したか、何を確認していないかを短く残して完了する
@@ -347,6 +352,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 複数 writer を要する場合は、同一 worktree ではなく複数 worktree に分ける
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
+- tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。止めるのは user が明示的に止めた場合か external block がある場合だけとする
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` が close 条件を満たすまで user-facing completion を返さない
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈にだけ依存する運用は repo 正本にしない

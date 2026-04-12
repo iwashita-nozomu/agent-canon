@@ -15,7 +15,7 @@
 
 ## Planned Work Completion Review
 
-<!-- Confirm that all planned work units and active clauses are complete. Return required_change if only a chunk, slice, checkpoint, or subpass is complete. -->
+<!-- Confirm that all planned work units and active clauses are complete, that schedule.md still reflects the full TODO surface, and that work_log.md shows the meaningful execution trail. Return required_change if only a chunk, slice, checkpoint, or subpass is complete. -->
 
 ## Spec-To-Product Coverage Review
 
@@ -28,3 +28,7 @@
 ## Residual Risks
 
 <!-- Record remaining risk, approval notes, or escalation points. -->
+
+## Decision
+
+<!-- Record approve, revise, or escalate. -->

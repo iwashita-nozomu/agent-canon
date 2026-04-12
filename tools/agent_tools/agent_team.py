@@ -15,7 +15,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
-DEFAULT_REPORT_ROOT = ROOT / "reports" / "agents"
+DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
 PYTHON_SUFFIXES = {".py", ".pyi"}
 CPP_SUFFIXES = {
@@ -39,6 +39,20 @@ CPP_PATH_MARKERS = (
     "include/",
     "lib/",
 )
+
+
+def resolve_report_root(
+    report_root: str | None,
+    workspace_root: Path | None = None,
+) -> Path:
+    """Resolve the report root relative to the active workspace by default."""
+    base_root = workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    if report_root is None:
+        return (base_root / DEFAULT_REPORT_ROOT).resolve()
+    candidate = Path(report_root)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (base_root / candidate).resolve()
 
 
 @dataclass(frozen=True)

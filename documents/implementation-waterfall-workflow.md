@@ -145,6 +145,8 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - `team_manifest.yaml`
 - `intent_brief.md`
 - `user_request_contract.md`
+- `schedule.md`
+- `work_log.md`
 - `decision_log.md`
 
 条件付き追加 subagent:
@@ -154,6 +156,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 必須ルール:
 - Gate 0 の前に `documents/`、`notes/`、`references/` と local library の sweep を済ませます
 - Gate 0 の前に `user_request_contract.md` へ must-do、must-not-do、completion-evidence clause を書きます
+- Gate 0 の直後から `schedule.md` を task TODO の正本として更新し、repo-changing task では `work_log.md` を kickoff から closeout まで残します
 - repo-changing task では explicit subagent activation を省略しません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
@@ -198,7 +201,7 @@ source bucket:
 - `current_request`
   - 今回の user request に明示された requirement
 - `durable_user_preference`
-  - `notes/themes/USER_PREFERENCES.md` や過去ログから抽出された user tendency
+  - `memory/USER_PREFERENCES.md` や過去ログから抽出された user tendency
 - `repo_or_code_precedent`
   - 既存 code、test、docs、workflow から分かる制約
 - `domain_or_external_constraint`
@@ -207,7 +210,7 @@ source bucket:
   - まだ決められない項目。silent assumption にせず deferred / escalated にする
 
 ルール:
-- 不明点はすぐユーザーへ戻さず、まず `documents/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
+- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
 - 蓄積情報で user intent、scope、acceptance criteria を変えずに解決できる場合は、evidence path とともに `Resolved From Accumulated Context` へ記録します
 - durable user preference は、今回の request や repo evidence と結び付いたときだけ task requirement に昇格します
 - unknown は requirement として採用せず、resolution sweep 後に open question、deferred clause、または escalation として残します
@@ -278,6 +281,7 @@ exit 条件:
 exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
 - `schedule.md` に clause coverage が書かれている
+- `schedule.md` の `Planned Work Units` が TODO として具体化されている
 - 実装へ進む前に必要な review agent がすべて割り当てられている
 
 ### Gate 4. 計画レビュー
@@ -567,6 +571,8 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
+- `schedule.md` の TODO 行が空ではない
+- `work_log.md` に meaningful step が記録されている
 
 必須レビュー:
 - `auditor`

@@ -11,8 +11,8 @@ Almost all workflows need to use /subagent.
 - `agents/README.md`
 - `agents/TASK_WORKFLOWS.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
-- `notes/themes/USER_PREFERENCES.md`
-- `notes/themes/AGENT_PHILOSOPHY.md`
+- `memory/USER_PREFERENCES.md`
+- `memory/AGENT_PHILOSOPHY.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `documents/AGENTS_COORDINATION.md`
@@ -30,13 +30,15 @@ Almost all workflows need to use /subagent.
 
 - task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` snapshot を upstream `agent-canon` の最新にします。
 - task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。
-- 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
+- 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補を確認します。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
-- durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `notes/themes/USER_PREFERENCES.md` へ追記します。
-- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `notes/themes/AGENT_PHILOSOPHY.md` へ追記します。
+- durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `memory/USER_PREFERENCES.md` へ追記します。
+- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `memory/AGENT_PHILOSOPHY.md` へ追記します。
 - repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
+- repo-changing task では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
+- repo-changing task では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
 
 ## Shared Canon
 
@@ -60,8 +62,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 - `--task-id` を使うと、task catalog の default specialist と default review pack を自動で有効化します。
-- `notes/themes/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
-- `notes/themes/AGENT_PHILOSOPHY.md` は毎回読む runtime note とし、stable な作業哲学だけを periodic sweep で workflow / guardrail / `AGENTS.md` へ昇格します。
+- `memory/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
+- `memory/AGENT_PHILOSOPHY.md` は毎回読む runtime note とし、stable な作業哲学だけを periodic sweep で workflow / guardrail / `AGENTS.md` へ昇格します。
+- 自己学習と対話記録の追記は shared canon `memory/` の責務として扱い、template-local note だけ更新して closeout しません。
 - repo-local virtual environment は作りません。`python3-venv`、`python -m venv`、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を使いません。
 - user request clause を持たない planning、design、implementation、review は無効です。active work は必ず clause ID に結び付けます。
 
@@ -69,13 +72,13 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
-- worktree で作業する場合は `bash tools/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。
+- worktree で作業する場合は `bash tools/worktree_start.sh <branch> [worktree-path]` で kickoff し、継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"` で残します。`WORKTREE_SCOPE.md` に `user_request_contract.md` が入っていれば、同じコマンドで action log と run bundle の `work_log.md` を両方更新できます。
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current state と一致しない場合は編集を始めず、`python3 tools/agent_tools/worktree_scope_lint.py --current` で直します。
 - worktree では `Editable Directories` 外と `Read-Only Or Avoid Directories` 内を編集してはいけません。scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に残します。
 - Python 差分では `python-review`、C / C++ 差分では `cpp-review` を既定候補にし、bootstrap は changed path から reviewer を自動で足します。
 - file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` に従い、integration worktree 上で `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
-- closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/` への昇格先を決めます。
-- closeout 前に `documents/agent-learning-workflow.md` を見て、今回の task から `AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
+- closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。
+- closeout 前に `documents/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes` かつ `review_findings_integrated=yes` になるまで出してはいけません。
@@ -102,6 +105,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - required review、validation、tracked change の commit / push を省略して完了扱いにしてはいけません。
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を根拠に closeout してはいけません。
 - worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
+- `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - `verification.txt` が `status=pass` でない、または `closeout_gate.md` が `user_completion_report=unlocked` でない状態で user-facing 完了報告を出してはいけません。
 
 ## Validation

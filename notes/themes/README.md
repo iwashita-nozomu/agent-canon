@@ -2,7 +2,7 @@
 
 `notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。
 
-`notes/experiments/` が個別実験の report と解釈を扱い、`notes/knowledge/` が短い実務メモを扱うのに対し、このディレクトリでは「その話題について今何が言えるか」を topic 単位で整理します。
+`notes/experiments/` が個別実験の report と解釈を扱い、`notes/knowledge/` が短い実務メモを扱うのに対し、このディレクトリでは「その話題について今何が言えるか」を topic 単位で整理します。self-learning と対話由来の durable memory は `memory/` を正本にし、この directory は topic synthesis を主に扱います。
 
 ## 役割
 
@@ -24,7 +24,7 @@
 ## Template
 
 - [THEME_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/themes/THEME_NOTE_TEMPLATE.md)
-- [USER_PREFERENCES.md](/mnt/l/workspace/project_template/notes/themes/USER_PREFERENCES.md)
-  - 会話から抽出した user preference の固定入口です。まずここへ追記し、十分に安定した項目だけを `AGENTS.md` へ昇格します。
-- [AGENT_PHILOSOPHY.md](/mnt/l/workspace/project_template/notes/themes/AGENT_PHILOSOPHY.md)
-  - agent の作業哲学、対話から得た学習、task retrospective の固定入口です。まずここへ追記し、十分に安定した項目だけを workflow、guardrail、`AGENTS.md` へ昇格します。
+- [USER_PREFERENCES.md](/mnt/l/workspace/project_template/memory/USER_PREFERENCES.md)
+  - 会話から抽出した user preference の固定入口です。shared canon `memory/` を正本にし、十分に安定した項目だけを `AGENTS.md` へ昇格します。`notes/themes/USER_PREFERENCES.md` は互換 view です。
+- [AGENT_PHILOSOPHY.md](/mnt/l/workspace/project_template/memory/AGENT_PHILOSOPHY.md)
+  - agent の作業哲学、対話から得た学習、task retrospective の固定入口です。shared canon `memory/` を正本にし、十分に安定した項目だけを workflow、guardrail、`AGENTS.md` へ昇格します。`notes/themes/AGENT_PHILOSOPHY.md` は互換 view です。

@@ -169,12 +169,12 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md` への symlink view
 - `documents/conventions/python/30_experiment_directory_structure.md`
   - `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md` への symlink view
-- `experiments/README.md`
-  - `vendor/agent-canon/experiments/README.md` への symlink view
-- `experiments/_template/`
-  - `vendor/agent-canon/experiments/_template/` への symlink view
-- `experiments/report/README.md`
-  - `vendor/agent-canon/experiments/report/README.md` への symlink view
+- `memory/README.md`
+  - `vendor/agent-canon/memory/README.md` への symlink view
+- `memory/USER_PREFERENCES.md`
+  - `vendor/agent-canon/memory/USER_PREFERENCES.md` への symlink view
+- `memory/AGENT_PHILOSOPHY.md`
+  - `vendor/agent-canon/memory/AGENT_PHILOSOPHY.md` への symlink view
 - `notes/experiments/README.md`
   - `vendor/agent-canon/notes/experiments/README.md` への symlink view
 - `notes/experiments/REPORT_TEMPLATE.md`
@@ -255,9 +255,18 @@ bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
 ### 7.4 upstream から更新取得
 
 ```bash
+bash tools/update_agent_canon.sh plan
+bash tools/update_agent_canon.sh apply
+bash tools/update_agent_canon.sh proposal-branch
+bash tools/update_agent_canon.sh push-proposal
 bash tools/sync_agent_canon.sh ensure-latest
 bash tools/sync_agent_canon.sh pull
 ```
+
+derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
+`plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。
+`apply` は最終的に `ensure-latest` を呼びます。
+shared canon の差分を maintainer に渡すときは `proposal-branch` で既定 branch を確認し、`push-proposal` でその branch へ push します。
 
 `ensure-latest` は task 開始時の入口です。
 clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ更新します。
@@ -279,6 +288,17 @@ bash tools/sync_agent_canon.sh push
 ```bash
 bash tools/sync_agent_canon.sh status
 ```
+
+### 7.7 project-local bare repo を登録
+
+```bash
+bash tools/update_agent_canon.sh register-local-bare \
+  --bare-repo /mnt/git/<project>-agent-canon.git
+```
+
+この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
+既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
+同時に `canon-proposal/<project-slug>` を既定 proposal branch として用意し、clone の git config に保存します。
 
 ## 8. 移行フェーズ
 

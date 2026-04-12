@@ -18,7 +18,7 @@
 
 ## Accumulated Context Resolution Review
 
-<!-- Check whether open questions were first resolved against notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. Return revise if the agent asked the user or left unknowns without this sweep. -->
+<!-- Check whether open questions were first resolved against memory, notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. Return revise if the agent asked the user or left unknowns without this sweep. -->
 
 ## Unknown Handling Review
 

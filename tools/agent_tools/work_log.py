@@ -7,13 +7,27 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from worktree_start import append_action_log_entry, resolve_action_log_path
+from agent_team import resolve_report_root
+from worktree_start import (
+    append_action_log_entry,
+    resolve_action_log_path,
+    resolve_user_request_contract_path,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description="Append one action-log entry.")
     parser.add_argument("--workspace-root", default=".", help="Workspace root that owns WORKTREE_SCOPE.md.")
+    parser.add_argument("--report-dir", help="Explicit run bundle directory to update.")
+    parser.add_argument("--run-id", help="Run id under reports/agents/.")
+    parser.add_argument(
+        "--report-root",
+        help=(
+            "Optional directory that contains per-run report folders. Defaults to "
+            "<workspace-root>/reports/agents."
+        ),
+    )
     parser.add_argument("--kind", default="work", help="Short event kind, for example kickoff/test/edit/review.")
     parser.add_argument("--message", required=True, help="What happened in this step.")
     parser.add_argument("--next", default="", help="Explicit next step.")
@@ -32,19 +46,67 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def append_run_work_log_entry(report_dir: Path, entry: str) -> Path:
+    """Append one entry to the run-bundle work log."""
+    report_dir.mkdir(parents=True, exist_ok=True)
+    work_log_path = report_dir / "work_log.md"
+    if not work_log_path.exists():
+        work_log_path.write_text(
+            "\n".join(
+                [
+                    "# Work Log",
+                    "",
+                    f"- Run ID: {report_dir.name}",
+                    "- Task:",
+                    "- Owner:",
+                    "",
+                    "## Purpose",
+                    "",
+                    "- Chronological run-local work log.",
+                    "",
+                    "## Entries",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    with work_log_path.open("a", encoding="utf-8") as handle:
+        if work_log_path.stat().st_size > 0:
+            handle.write("\n")
+        handle.write(f"- {entry}\n")
+    return work_log_path
+
+
 def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     workspace_root = Path(args.workspace_root).resolve()
     scope_path = workspace_root / "WORKTREE_SCOPE.md"
-    if not scope_path.is_file():
-        raise SystemExit(f"WORKTREE_SCOPE.md not found: {scope_path}")
-
-    action_log_path = resolve_action_log_path(workspace_root, scope_path)
-    if action_log_path is None:
-        raise SystemExit("Action log path is unresolved in WORKTREE_SCOPE.md")
     if not args.request_clause_id:
         raise SystemExit("At least one --request-clause-id is required.")
+
+    action_log_path: Path | None = None
+    inferred_report_dir: Path | None = None
+    if scope_path.is_file():
+        action_log_path = resolve_action_log_path(workspace_root, scope_path)
+        request_contract_path = resolve_user_request_contract_path(workspace_root, scope_path)
+        if request_contract_path is not None:
+            inferred_report_dir = request_contract_path.parent
+
+    if args.report_dir and args.run_id:
+        raise SystemExit("Provide at most one of --report-dir or --run-id.")
+    if args.report_dir:
+        report_dir = Path(args.report_dir).resolve()
+    elif args.run_id:
+        report_dir = resolve_report_root(args.report_root, workspace_root) / str(args.run_id)
+    else:
+        report_dir = inferred_report_dir
+
+    if action_log_path is None and report_dir is None:
+        raise SystemExit(
+            "No action log or run bundle resolved. Provide WORKTREE_SCOPE.md with concrete paths, "
+            "or pass --report-dir / --run-id."
+        )
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
     clause_suffix = " | request_clause_ids: " + ",".join(args.request_clause_id)
@@ -55,8 +117,13 @@ def main() -> int:
     if args.next:
         next_suffix = f" | next: {args.next}"
     entry = f"`{timestamp} | {args.kind} | {args.message}{clause_suffix}{ref_suffix}{next_suffix}`"
-    append_action_log_entry(action_log_path, entry)
-    print(f"ACTION_LOG={action_log_path}")
+    if action_log_path is not None:
+        append_action_log_entry(action_log_path, entry)
+    work_log_path: Path | None = None
+    if report_dir is not None:
+        work_log_path = append_run_work_log_entry(report_dir, entry)
+    print(f"ACTION_LOG={action_log_path if action_log_path is not None else '(not-written)'}")
+    print(f"WORK_LOG={work_log_path if work_log_path is not None else '(not-written)'}")
     print(entry)
     return 0
 
