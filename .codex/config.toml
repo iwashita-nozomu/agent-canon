@@ -6,5 +6,5 @@ approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 [agents]
-max_threads = 6
+max_threads = 12
 job_max_runtime_seconds = 1800

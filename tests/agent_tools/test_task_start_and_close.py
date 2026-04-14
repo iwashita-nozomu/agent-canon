@@ -96,7 +96,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
@@ -148,6 +151,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$behavior-preserving-refactor",
                 result.stdout,
@@ -179,6 +185,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertTrue(report_dir.is_dir())
@@ -199,6 +206,41 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertIn("/docker/README.md", manifest_text)
             self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
+
+    def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
+        """bootstrap_agent_run should emit runtime and workflow spawn limits for machine use."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "mechanical spawn budget",
+                    "--task-id",
+                    "T8",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-bootstrap-spawn-budget",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
