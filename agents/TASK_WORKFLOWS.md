@@ -174,6 +174,21 @@ single-writer ルール:
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます
 - parent は worktree ごとの結果を順番に統合します
 
+spawn budget ルール:
+- depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
+- `Scoped Change` / `Large Delivery` / `Platform And Environment` は同時 3 体までを既定にします
+- `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 5 体までを既定にします
+- budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
+- budget を増やしても write-capable subagent は同時 1 体までです
+
+concurrent spawn budget:
+- global runtime cap は `.codex/config.toml` の `max_threads = 6`
+- `Scoped Change`: parent を除いて同時 2-3 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 1-2 まで
+- `Research-Driven Change` と `Platform And Environment`: parent を除いて同時 4 agent を上限目安にします。perspective reviewer は batch で回します
+- `Large Delivery`: parent を除いて同時 4 agent を上限目安にします。planning / design / review を wave に分けます
+- `Comprehensive Development` と `Adaptive Improvement Loop`: parent を除いて同時 5 agent を上限目安にします。review pack はまとめて起こさず、intake・implementation・wrap-up の波に分けます
+- depth は固定しませんが、cap を超える fan-out は許可しません。必要な role が多いときは stage を細かく切って順次起動します
+
 ## Workflow Families
 
 ### 1. Scoped Change
@@ -190,6 +205,7 @@ single-writer ルール:
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
+1. active な subagent は同時 3 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
 
 ### 2. Research-Driven Change
 
@@ -218,6 +234,7 @@ single-writer ルール:
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
 - agent が code change と run を継続反復する場合は `adaptive-improvement-loop` を追加する
 - methodology、artifact、reporting policy を大きく変える場合は perspective reviewers を default にします
+- active な subagent は同時 5 体までを既定にし、追加枠は read-only reviewer / researcher に使います
 - repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
 
 ### 3. Large Delivery

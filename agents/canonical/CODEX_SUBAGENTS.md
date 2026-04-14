@@ -13,6 +13,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 調査、レビュー、文書整備は分ける
 - 再帰的 fan-out は避ける
 - 探索、レビュー、仕様確認の並列化は使うが、parallel write-heavy implementation は避ける
+- runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent の depth や fan-out は固定値で規定せず、task の複雑さ、review の独立性、write scope 分離で決める
 - 追加の subagent 層を立てるときは、parent が owner、input packet、expected output、write scope を明示する
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
@@ -25,6 +26,19 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - `gpt-5.3-codex-spark` は `spark_worker` で使い、approved design packet で完全に切れる低リスク slice の first implementation candidate とする
 - 設計・レビュー・scope 判断は `gpt-5.4` / `gpt-5.3-codex` 側に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
+
+## Activation Budget
+
+- runtime hard ceiling は [.codex/config.toml](/mnt/l/workspace/project_template/.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `6` です
+- cap は depth 制限ではなく同時実行数の上限として扱います
+- depth は固定しませんが、active な subagent 数は spawn budget で縛ります
+- 既定 budget は `Scoped Change` / `Large Delivery` / `Platform And Environment` で同時 3 体までです
+- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 5 体までです
+- budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
+- write-capable subagent は同時 1 体までとし、budget を増やしても追加分は read-only role に限ります
+- parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
+- role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
+- parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
 
 ## Codex Command Surface
 

@@ -14,9 +14,20 @@
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
+- runtime cap は `.codex/config.toml` の `[agents].max_threads = 6` を使い、spawn は depth ではなく bounded concurrency で制御します
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
+
+## Runtime Spawn Limits
+
+- `max_threads = 6`
+  - runtime hard ceiling として使います
+- depth は repo config で固定しません
+- 同時 spawn の既定 budget は workflow family 側で決めます
+  - `Scoped Change` / `Large Delivery` / `Platform And Environment`: 3
+  - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 5
+- 同時 write-capable subagent は常に 1 体までです
 
 ## Model Policy
 

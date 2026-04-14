@@ -1,9 +1,10 @@
 # Project-scoped Codex settings.
-# Keep review fan-out explicit, but do not fix agent depth in repo config.
+# Keep review fan-out explicit, keep one writer per worktree, do not fix agent depth in repo config,
+# and use spawned agents in bounded waves instead of starting every available role at once.
 
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 [agents]
-max_threads = 8
+max_threads = 6
 job_max_runtime_seconds = 1800
