@@ -29,11 +29,12 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](/mnt/l/workspace/project_template/.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `6` です
+- runtime hard ceiling は [.codex/config.toml](/mnt/l/workspace/project_template/.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `12` です
 - cap は depth 制限ではなく同時実行数の上限として扱います
 - depth は固定しませんが、active な subagent 数は spawn budget で縛ります
-- 既定 budget は `Scoped Change` / `Large Delivery` / `Platform And Environment` で同時 3 体までです
-- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 5 体までです
+- 既定 budget は `Scoped Change` で同時 5 体までです
+- 既定 budget は `Large Delivery` / `Platform And Environment` で同時 6 体までです
+- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent は同時 1 体までとし、budget を増やしても追加分は read-only role に限ります
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます

@@ -11,6 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -356,6 +360,34 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
         if family.get("id") == family_id:
             return family
     raise KeyError(f"unknown workflow family: {family_id}")
+
+
+def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
+    """Return the active and write-capable spawn budget for one workflow family."""
+    family = resolve_workflow_family(catalog, family_id)
+    raw_budget = family.get("spawn_budget")
+    if not isinstance(raw_budget, dict):
+        raise RuntimeError(f"workflow family spawn_budget must be a mapping for {family_id}")
+    active = raw_budget.get("active_subagents")
+    max_write = raw_budget.get("max_write_subagents")
+    if not isinstance(active, int) or active < 1:
+        raise RuntimeError(f"workflow family active_subagents must be >= 1 for {family_id}")
+    if not isinstance(max_write, int) or max_write < 1:
+        raise RuntimeError(f"workflow family max_write_subagents must be >= 1 for {family_id}")
+    return active, max_write
+
+
+def codex_runtime_max_threads() -> int:
+    """Return the configured runtime max_threads from .codex/config.toml."""
+    config_path = ROOT / ".codex" / "config.toml"
+    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    agents = data.get("agents")
+    if not isinstance(agents, dict):
+        raise RuntimeError("missing [agents] section in .codex/config.toml")
+    max_threads = agents.get("max_threads")
+    if not isinstance(max_threads, int) or max_threads < 1:
+        raise RuntimeError("agents.max_threads must be an integer >= 1")
+    return max_threads
 
 
 def default_specialists_for_task(

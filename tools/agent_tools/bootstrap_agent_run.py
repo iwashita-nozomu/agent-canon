@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agent_team import (
     auto_language_specialists,
+    codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     load_team_config,
@@ -20,6 +21,7 @@ from agent_team import (
     specialist_role_ids,
     task_ids,
     TeamConfig,
+    workflow_spawn_budget,
     resolve_report_root,
 )
 
@@ -130,7 +132,14 @@ def main() -> int:
     enabled_specialists = list(args.enable)
     task_default_specialists: tuple[str, ...] = ()
     auto_specialists: tuple[str, ...] = ()
+    workflow_active_spawn_budget: int | None = None
+    workflow_max_write_subagents: int | None = None
     if args.task_id is not None:
+        task_spec = next(task for task in catalog.tasks if task["id"] == args.task_id)
+        workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
+            catalog,
+            str(task_spec["family"]),
+        )
         task_default_specialists = default_specialists_for_task(
             config=config,
             catalog=catalog,
@@ -166,8 +175,11 @@ def main() -> int:
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
+        print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
+        print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")

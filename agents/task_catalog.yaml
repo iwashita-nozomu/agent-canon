@@ -3,6 +3,9 @@ version: 2
 workflow_families:
   - id: scoped_change
     name: Scoped Change
+    spawn_budget:
+      active_subagents: 5
+      max_write_subagents: 1
     roles:
       always_on:
         - manager
@@ -29,6 +32,9 @@ workflow_families:
 
   - id: research_driven_change
     name: Research-Driven Change
+    spawn_budget:
+      active_subagents: 8
+      max_write_subagents: 1
     roles:
       always_on:
         - manager
@@ -69,6 +75,9 @@ workflow_families:
 
   - id: large_delivery
     name: Large Delivery
+    spawn_budget:
+      active_subagents: 6
+      max_write_subagents: 1
     roles:
       always_on:
         - manager
@@ -95,6 +104,9 @@ workflow_families:
 
   - id: platform_and_environment
     name: Platform And Environment
+    spawn_budget:
+      active_subagents: 6
+      max_write_subagents: 1
     roles:
       always_on:
         - manager
@@ -121,6 +133,9 @@ workflow_families:
 
   - id: comprehensive_development
     name: Comprehensive Development
+    spawn_budget:
+      active_subagents: 8
+      max_write_subagents: 1
     roles:
       always_on:
         - manager
@@ -153,6 +168,9 @@ workflow_families:
 
   - id: adaptive_improvement_loop
     name: Adaptive Improvement Loop
+    spawn_budget:
+      active_subagents: 8
+      max_write_subagents: 1
     roles:
       always_on:
         - manager

@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
 
 from agent_team import (
     ROOT,
+    codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     load_task_catalog,
@@ -25,6 +26,7 @@ from agent_team import (
     resolve_role_document_packet,
     resolve_role,
     task_ids,
+    workflow_spawn_budget,
 )
 
 
@@ -210,6 +212,7 @@ def validate_task_catalog_references() -> None:
     """Check task catalog roles and task-family relationships."""
     config = load_team_config()
     catalog = load_task_catalog(config)
+    runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     family_ids = {family["id"] for family in catalog.workflow_families}
 
@@ -221,6 +224,15 @@ def validate_task_catalog_references() -> None:
             ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
             for role_id in members:
                 ensure(role_id in role_ids, f"family {family['id']} references unknown role {role_id}")
+        active_budget, max_write_budget = workflow_spawn_budget(catalog, str(family["id"]))
+        ensure(
+            active_budget <= runtime_max_threads,
+            f"family {family['id']} active_subagents exceeds runtime max_threads",
+        )
+        ensure(
+            max_write_budget == 1,
+            f"family {family['id']} max_write_subagents must remain 1",
+        )
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)

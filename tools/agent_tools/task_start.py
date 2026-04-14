@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agent_team import (
     auto_language_specialists,
+    codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     load_team_config,
@@ -18,6 +19,7 @@ from agent_team import (
     resolve_cross_cutting_document_packet,
     resolve_task_spec,
     resolve_workflow_family,
+    workflow_spawn_budget,
     select_roles,
     specialist_role_ids,
     task_ids,
@@ -151,11 +153,17 @@ def main() -> int:
     task_default_specialists: tuple[str, ...] = ()
     workflow_family_id: str | None = None
     workflow_family_name: str | None = None
+    workflow_active_spawn_budget: int | None = None
+    workflow_max_write_subagents: int | None = None
     if args.task_id is not None:
         task_spec = resolve_task_spec(catalog, args.task_id)
         workflow_family_id = str(task_spec["family"])
         workflow_family = resolve_workflow_family(catalog, workflow_family_id)
         workflow_family_name = str(workflow_family["name"])
+        workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
+            catalog,
+            workflow_family_id,
+        )
         task_default_specialists = default_specialists_for_task(
             config=config,
             catalog=catalog,
@@ -211,10 +219,13 @@ def main() -> int:
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"REQUEST_CONTRACT={request_contract_path}")
     print("REQUEST_CONTRACT_REQUIRED=yes")
+    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"WORKFLOW_FAMILY={workflow_family_id}")
         print(f"WORKFLOW_FAMILY_NAME={workflow_family_name}")
+        print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
+        print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
