@@ -142,6 +142,20 @@ def resolve_report_root(
     return (base_root / candidate).resolve()
 
 
+def resolve_report_root(
+    report_root: str | None,
+    workspace_root: Path | None = None,
+) -> Path:
+    """Resolve the report root relative to the active workspace by default."""
+    base_root = workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    if report_root is None:
+        return (base_root / DEFAULT_REPORT_ROOT).resolve()
+    candidate = Path(report_root)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (base_root / candidate).resolve()
+
+
 @dataclass(frozen=True)
 class WritePolicy:
     """Describe how one role may write to the filesystem."""
