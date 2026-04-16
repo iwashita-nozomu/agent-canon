@@ -6,22 +6,27 @@ PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 DEFAULT_PROPOSAL_PREFIX="${AGENT_CANON_PROPOSAL_PREFIX:-canon-proposal}"
+DEFAULT_SHARED_SOURCE_REPO="${AGENT_CANON_SOURCE_REPO:-/mnt/l/workspace/agent-canon}"
 
 usage() {
   cat <<EOF
 Usage:
   bash tools/update_agent_canon.sh plan [branch]
   bash tools/update_agent_canon.sh apply [branch]
+  bash tools/update_agent_canon.sh refresh-remote [branch]
   bash tools/update_agent_canon.sh register-remote <remote-url>
   bash tools/update_agent_canon.sh proposal-branch [--proposal-branch <name>]
   bash tools/update_agent_canon.sh push-proposal [proposal-branch]
-  bash tools/update_agent_canon.sh register-local-bare --bare-repo <path>.git [--branch <branch>] [--proposal-branch <name>]
+  bash tools/update_agent_canon.sh register-local-bare --bare-repo <path>.git [--branch <branch>] [--proposal-branch <name>] [--source-repo <path>]
 
 Commands:
   plan
       Print the derived-repo update route for agent-canon only.
   apply
-      Update vendor/agent-canon only by delegating to sync_agent_canon.sh ensure-latest.
+      Refresh the remote snapshot from the source repo when configured, then update
+      vendor/agent-canon via sync_agent_canon.sh ensure-latest.
+  refresh-remote
+      Push the configured source repo branch to the agent-canon remote before a local import.
   register-remote
       Configure or replace the '${REMOTE_NAME}' remote.
   proposal-branch
@@ -78,13 +83,111 @@ default_proposal_branch_name() {
   printf '%s/%s\n' "$DEFAULT_PROPOSAL_PREFIX" "$slug"
 }
 
+configured_source_repo() {
+  if [[ -n "${AGENT_CANON_SOURCE_REPO:-}" ]]; then
+    printf '%s\n' "${AGENT_CANON_SOURCE_REPO}"
+    return
+  fi
+  if git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.sourceRepo" >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.sourceRepo"
+    return
+  fi
+}
+
+configured_remote_url() {
+  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME"
+    return
+  fi
+  default_remote_url || true
+}
+
+cmd_refresh_remote() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local remote_url=""
+  local source_repo=""
+  local source_sha=""
+  local remote_sha=""
+
+  remote_url="$(configured_remote_url)"
+  [ -n "$remote_url" ] || die "remote '$REMOTE_NAME' is not configured"
+
+  source_repo="$(configured_source_repo || true)"
+  [ -n "$source_repo" ] || die "source repo for '$REMOTE_NAME' is not configured"
+  [ -d "$source_repo/.git" ] || die "source repo does not exist: $source_repo"
+
+  if [[ -n "$(git -C "$source_repo" status --short)" ]]; then
+    die "source repo is dirty: $source_repo"
+  fi
+
+  source_sha="$(git -C "$source_repo" rev-parse "refs/heads/${branch}")"
+  remote_sha="$(git ls-remote "$remote_url" "refs/heads/${branch}" | awk '{print $1}')"
+
+  echo "agent_canon_refresh_source_repo=$source_repo"
+  echo "agent_canon_refresh_remote_url=$remote_url"
+  echo "agent_canon_refresh_branch=$branch"
+  echo "agent_canon_refresh_source_sha=$source_sha"
+  if [[ -n "$remote_sha" ]]; then
+    echo "agent_canon_refresh_remote_sha=$remote_sha"
+  else
+    echo "agent_canon_refresh_remote_sha=<unset>"
+  fi
+
+  if [[ "$remote_sha" = "$source_sha" ]]; then
+    echo "agent_canon_refresh_status=already_current"
+    return
+  fi
+
+  git -C "$source_repo" push "$remote_url" "refs/heads/${branch}:refs/heads/${branch}" >/dev/null
+  echo "agent_canon_refresh_status=updated_remote_snapshot"
+}
+
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  local source_repo=""
+  local remote_url=""
+  local source_sha=""
+  local remote_sha=""
+  source_repo="$(configured_source_repo || true)"
+  if [[ -n "$source_repo" ]]; then
+    echo "agent_canon_plan_source_repo=$source_repo"
+    echo "agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync"
+    [ -d "$source_repo/.git" ] || die "configured source repo does not exist: $source_repo"
+    if [[ -n "$(git -C "$source_repo" status --short)" ]]; then
+      die "source repo is dirty: $source_repo"
+    fi
+    remote_url="$(configured_remote_url)"
+    [ -n "$remote_url" ] || die "remote '$REMOTE_NAME' is not configured"
+    source_sha="$(git -C "$source_repo" rev-parse "refs/heads/${branch}")"
+    remote_sha="$(git ls-remote "$remote_url" "refs/heads/${branch}" | awk '{print $1}')"
+    echo "agent_canon_plan_refresh_remote_url=$remote_url"
+    echo "agent_canon_plan_effective_remote_url=$source_repo"
+    echo "agent_canon_plan_source_sha=$source_sha"
+    if [[ -n "$remote_sha" ]]; then
+      echo "agent_canon_plan_refresh_remote_sha=$remote_sha"
+    else
+      echo "agent_canon_plan_refresh_remote_sha=<unset>"
+    fi
+    if [[ "$remote_sha" = "$source_sha" ]]; then
+      echo "agent_canon_plan_refresh_status=already_current"
+    else
+      echo "agent_canon_plan_refresh_status=will_update_remote_snapshot"
+    fi
+    AGENT_CANON_PLAN_REMOTE_URL="$source_repo" \
+      bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
+    return
+  else
+    echo "agent_canon_plan_source_repo=<unset>"
+    echo "agent_canon_plan_apply_order=local_sync_only"
+  fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
 }
 
 cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  if [[ -n "$(configured_source_repo || true)" ]]; then
+    cmd_refresh_remote "$branch"
+  fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch"
 }
 
@@ -187,6 +290,7 @@ cmd_register_local_bare() {
   local bare_repo_path=""
   local branch="$DEFAULT_BRANCH"
   local proposal_branch=""
+  local source_repo=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -200,6 +304,10 @@ cmd_register_local_bare() {
         ;;
       --proposal-branch)
         proposal_branch="${2:-}"
+        shift 2
+        ;;
+      --source-repo)
+        source_repo="${2:-}"
         shift 2
         ;;
       -h|--help)
@@ -227,6 +335,17 @@ cmd_register_local_bare() {
   fi
   ensure_bare_branch_exists "$bare_repo_path" "$branch" "$proposal_branch"
   cmd_register_remote "$bare_repo_path"
+  if [[ -z "$source_repo" ]]; then
+    if [[ -d "${DEFAULT_SHARED_SOURCE_REPO}/.git" ]]; then
+      source_repo="${DEFAULT_SHARED_SOURCE_REPO}"
+    else
+      source_repo="$(configured_source_repo || true)"
+    fi
+  fi
+  if [[ -n "$source_repo" ]]; then
+    git -C "$ROOT_DIR" config "${REMOTE_NAME}.sourceRepo" "$source_repo"
+    echo "agent_canon_source_repo=$source_repo"
+  fi
   git -C "$ROOT_DIR" config "${REMOTE_NAME}.proposalBranch" "$proposal_branch"
   echo "agent_canon_proposal_branch=$proposal_branch"
   echo "agent_canon_register_next=bash tools/update_agent_canon.sh plan $branch"
@@ -253,6 +372,10 @@ main() {
     apply)
       shift
       cmd_apply "${1:-$DEFAULT_BRANCH}"
+      ;;
+    refresh-remote)
+      shift
+      cmd_refresh_remote "${1:-$DEFAULT_BRANCH}"
       ;;
     register-remote)
       shift

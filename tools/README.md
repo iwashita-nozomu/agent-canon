@@ -25,10 +25,12 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
     - fresh clone で subtree metadata が無い場合は、fast-forward 更新に限って snapshot import へ切り替えます。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
-    - `apply` は `ensure-latest` を thin wrapper として呼びます。
+    - source repo が設定されている場合、`plan` は `refresh -> local sync` 後の実効 route を出します。source repo が missing / dirty なら fail-closed で止まります。
+    - `refresh-remote` は configured source repo の branch を `agent-canon` remote へ push し、remote snapshot を先に最新化します。
+    - `apply` は `refresh-remote` を先に実行できる場合は remote snapshot を最新化し、そのあと `ensure-latest` を呼びます。
     - `proposal-branch` は shared canon 差分の既定 push 先 branch を表示します。
     - `push-proposal` は shared canon 差分を repo 専用 proposal branch へ push します。
-    - `register-local-bare` は project-local bare repo を seed し、proposal branch を用意し、`agent-canon` remote を設定します。
+    - source repo の優先順位は `AGENT_CANON_SOURCE_REPO`、`git config agent-canon.sourceRepo` です。`register-local-bare` は project-local bare repo を seed し、proposal branch を用意し、`agent-canon` remote と optional source repo path を設定します。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`

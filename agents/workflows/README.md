@@ -43,6 +43,7 @@ template 利用者向けの導線は root 側の `agents/workflows/README.md` �
 make agent-canon-ensure-latest
 bash tools/update_agent_canon.sh plan
 bash tools/update_agent_canon.sh apply
+bash tools/update_agent_canon.sh refresh-remote
 bash tools/update_agent_canon.sh proposal-branch
 bash tools/update_agent_canon.sh push-proposal
 bash tools/sync_agent_canon.sh link-root

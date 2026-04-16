@@ -6,6 +6,7 @@ PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
+PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 
 usage() {
   cat <<EOF
@@ -526,7 +527,10 @@ cmd_plan() {
     dirty="yes"
   fi
 
-  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+  if [ -n "$PLAN_REMOTE_OVERRIDE_URL" ]; then
+    remote_url="$PLAN_REMOTE_OVERRIDE_URL"
+    remote_source="plan_override"
+  elif git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
     remote_url="$(git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME")"
     remote_source="configured"
   else
