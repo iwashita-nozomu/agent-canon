@@ -13,7 +13,10 @@
 
 ## Stable Preferences
 
-- まだなし
+
+- 2026-04-16 | Keep only canonical design and implementation paths in the tracked tree; reject non-canonical copies, snapshots, and backup files.
+  - source: chat
+  - rationale: User explicitly required current tree-head state as the only durable repo state.
 
 ## Provisional Preferences
 

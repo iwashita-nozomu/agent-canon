@@ -15,6 +15,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 計画が固まる前に詳細設計へ進まない
 - 詳細設計が固まる前に実装を広げない
 - 実装は承認済みの設計文書 packet を読んでから始める
+- 設計文書と実装の正本を 1 本に固定し、tracked tree に parallel truth を残さない
 - 実装、review、verification を段階ゲートで区切る
 - 各 pass で複数回の独立レビューを必須にする
 - `設計 -> レビュー`、`詳細設計 -> レビュー`、`実装 -> レビュー` を完了条件充足まで反復する
@@ -113,9 +114,10 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `revise` は Gate 5 へ戻します
   - `escalate` は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
-  - 実装者が文書だけ読んで着手できる
-  - `Implementation Source Packet` と `Design-To-Implementation Trace` が揃っている
-  - reuse-first、style-following、reader path が blocker なしで揃っている
+- 実装者が文書だけ読んで着手できる
+- `Implementation Source Packet` と `Design-To-Implementation Trace` が揃っている
+- `Canonical Tree-Head Plan` が、正本として残す設計文書 path / 実装 path と削除対象の non-canonical path を明示している
+- reuse-first、style-following、reader path が blocker なしで揃っている
 
 ### Cycle C. 実装 -> 実装 checkpoint review
 
@@ -131,9 +133,10 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `revise` は Gate 9 へ戻します
   - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
 - 完了条件:
-  - diff が approved design と test plan に一致する
-  - 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
-  - regression、style drift、stale path、missing test が blocker なしになる
+- diff が approved design と test plan に一致する
+- 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
+- tracked tree に non-canonical design doc、implementation copy、snapshot、backup path を増やしていない
+- regression、style drift、stale path、missing test が blocker なしになる
 
 ### Gate 0. Subagent Bootstrap
 
@@ -335,6 +338,7 @@ exit 条件:
 - `Existing Code And Docs To Reuse:`
 - `Upstream Requirement Packet:`
 - `Implementation Source Packet:`
+- `Canonical Tree-Head Plan:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
 - `Design-To-Implementation Trace:`
@@ -347,6 +351,7 @@ exit 条件:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、code path、test path、外部 reference を列挙します
+- `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、mirror directory を作らないことを明示します
 - `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
@@ -387,6 +392,7 @@ exit 条件:
 - `design_reviewer`
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
   - `Implementation Source Packet` が編集前に読む artifact、repo docs、code path、test plan を列挙しているか確認する
+  - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
   - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
   - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
   - identifier naming plan が既存 precedent または明示 rationale に結び付いているか確認する
@@ -408,6 +414,7 @@ exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
 - implementation source packet と design-to-implementation trace の懸念が解消している
+- canonical tree-head plan の懸念が解消している
 - naming plan の懸念が解消している
 - decision が `approve` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している
@@ -502,6 +509,7 @@ exit 条件:
 - `change_reviewer`
   - 各 changed slice が design artifact、design section、source packet entry、test plan item、request clause ID を引用しているか確認する
   - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
+  - non-canonical design doc、implementation copy、snapshot、backup path が tracked tree に残っていないか確認する
   - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
   - remaining planned work units と next required gate が実装 handoff に残っているか確認する
   - implementation checkpoint review として、構造、境界、明白な回帰、設計逸脱を早期に確認する
@@ -511,6 +519,7 @@ exit 条件:
 exit 条件:
 - 差分が requirements / plan / design に一致している
 - 各 changed slice が design artifact、design section、test plan item、request clause ID を引用している
+- canonical path 以外の design / implementation truth surface が残っていない
 - remaining planned work units がない、または次の work unit と gate が明記されている
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
@@ -537,6 +546,7 @@ exit 条件:
 - `final_reviewer`
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
   - final diff が approved design section、Implementation Source Packet、request clause ID、test plan item に trace できるか確認する
+  - current tree head 以外の design / implementation truth surface が残っていないか確認する
 - 必要に応じて `python-review`
   - Python API、型境界、test coverage の不足を確認する
 - 必要に応じて `cpp-review`
@@ -578,6 +588,7 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
 - `closeout_gate.md` の `post_fix_full_review_complete=yes`
+- `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 - `schedule.md` の TODO 行が空ではない
 - `work_log.md` に meaningful step が記録されている
@@ -594,6 +605,7 @@ exit 条件:
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
 - required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
+- canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない
 
 ## 5. 差し戻しルール

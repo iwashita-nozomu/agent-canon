@@ -21,6 +21,10 @@
 
 <!-- Check whether each changed slice cites an approved design artifact path and section, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise for missing citations. Return escalate for design drift or design gaps. -->
 
+## Canonical Tree-Head Review
+
+<!-- Confirm that the diff updates only the canonical implementation paths declared by the design and that no non-canonical design doc, copied implementation, backup file, snapshot tree, or alternate truth surface remains in the tracked tree. Return revise if any parallel state remains. -->
+
 ## Remaining Work Review
 
 <!-- Check whether this is only a chunk/slice/checkpoint and whether remaining planned work units or active clauses still exist. Return revise if the implementer treats internal progress as task completion. -->

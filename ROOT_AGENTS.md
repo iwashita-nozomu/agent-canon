@@ -63,6 +63,8 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
 - repo-changing task では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
 - repo-changing task では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
+- 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree に parallel design doc、backup implementation、snapshot copy、`*_old`、`*_copy`、dated mirror を残しません。
+- repo に残す durable state は current tree head 上の canonical path だけです。履歴、review、作業メモは `git` と `reports/agents/<run-id>/` に残し、repo tree に別の truth surface を増やしません。
 
 ## Shared Canon
 
@@ -112,6 +114,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
 - shared canon PR では `agents/workflows/agent-canon-pr-workflow.md` を使い、`make agent-canon-pr-check` を merge 前の固定 gate にします。
 - `.codex/config.toml` is the default shared Codex config; replace the symlink only when a repo-local override is intentional.
+- closeout 前に、正本でない設計文書、実装 copy、dated snapshot、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
 
 ## Close-Out Prohibitions
 
@@ -132,6 +135,8 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を根拠に closeout してはいけません。
 - worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
 - `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
+- 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
+- current tree head 以外を durable な product state として扱ってはいけません。履歴保持は `git` と run bundle artifact に限ります。
 - `verification.txt` が `status=pass` でない、または `closeout_gate.md` が `user_completion_report=unlocked` でない状態で user-facing 完了報告を出してはいけません。
 
 ## Validation
