@@ -416,6 +416,29 @@ import_fast_forward_snapshot() {
   commit_sync_paths_if_needed "$remote_sha" "$method"
 }
 
+import_snapshot_preferring_tree_match() {
+  local local_split="$1"
+  local local_tree="$2"
+  local remote_sha="$3"
+  local method="$4"
+  local matched_commit=""
+
+  if git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    import_fast_forward_snapshot "$local_split" "$remote_sha" "$method"
+    return
+  fi
+
+  matched_commit="$(find_commit_by_tree "$local_tree" "$remote_sha" || true)"
+  if [ -n "$matched_commit" ]; then
+    echo "agent_canon_snapshot_import=tree_match_in_remote_history"
+    import_fast_forward_snapshot "$matched_commit" "$remote_sha" "$method"
+    return
+  fi
+
+  echo "agent_canon_snapshot_import=diverged_history"
+  die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH' and the current prefix tree is not present in remote history; update the proposal branch or merge the shared canon changes before running ensure-latest"
+}
+
 import_snapshot_from_prefix_tree() {
   local local_tree="$1"
   local remote_sha="$2"
@@ -530,6 +553,9 @@ cmd_plan() {
     route="already_current_split"
   elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
     route="local_contains_remote"
+  elif find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
+    route="snapshot_import_tree_match"
+    requires_clean="yes"
   elif [ -n "$local_split" ] && ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
     route="diverged_local_history"
     requires_clean="yes"
@@ -556,11 +582,12 @@ pull_or_import_snapshot() {
   local branch="$1"
   local local_split="$2"
   local remote_sha="$3"
+  local local_tree="$4"
   local pull_log=""
 
   if ! has_subtree_metadata; then
     echo "agent_canon_subtree_pull=skipped_no_subtree_metadata"
-    import_fast_forward_snapshot "$local_split" "$remote_sha"
+    import_snapshot_preferring_tree_match "$local_split" "$local_tree" "$remote_sha" "snapshot_import_no_subtree_metadata"
     return
   fi
 
@@ -577,7 +604,7 @@ pull_or_import_snapshot() {
   cat "$pull_log" >&2
   rm -f "$pull_log"
   echo "agent_canon_subtree_pull=failed"
-  import_fast_forward_snapshot "$local_split" "$remote_sha"
+  import_snapshot_preferring_tree_match "$local_split" "$local_tree" "$remote_sha" "snapshot_import_after_subtree_pull_failure"
 }
 
 cmd_add() {
@@ -593,15 +620,17 @@ cmd_add() {
 cmd_pull() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local local_split=""
+  local local_tree=""
   local remote_sha=""
 
   require_clean_worktree
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
   local_split="$(split_prefix_or_empty)"
   if [ -n "$local_split" ]; then
-    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha" "$local_tree"
     return
   fi
 
@@ -661,15 +690,10 @@ cmd_ensure_latest() {
     return
   fi
 
-  if [ -n "$local_split" ] && ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
-    echo "agent_canon_snapshot_import=diverged_history"
-    die "local shared-canon history diverged from '$REMOTE_NAME/$branch'; merge shared canon changes into upstream or push the proposal branch before ensure-latest"
-  fi
-
   require_clean_worktree
   echo "agent_canon_latest=pulling_remote"
   if [ -n "$local_split" ]; then
-    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha" "$local_tree"
   else
     import_snapshot_from_prefix_tree "$local_tree" "$remote_sha" "snapshot_import_no_subtree"
   fi

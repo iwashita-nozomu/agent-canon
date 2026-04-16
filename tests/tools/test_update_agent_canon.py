@@ -280,7 +280,167 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
-            self.assertIn("agent_canon_plan_route=snapshot_import_no_subtree", plan.stdout)
+            self.assertRegex(
+                plan.stdout,
+                r"agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree)",
+            )
+
+    def test_apply_succeeds_when_local_history_diverged_but_tree_matches_remote_history(self) -> None:
+        """apply should recover when local split diverged but the current tree exists upstream."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            work_dir = root / "agent-canon-work"
+            self.clone_repo(clone_dir)
+
+            split_sha = subprocess.run(
+                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "--git-dir", str(bare_repo), "symbolic-ref", "HEAD", "refs/heads/main"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "remote", "remove", "agent-canon"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+
+            remote_marker_a = work_dir / ".remote-tree-match-marker"
+            remote_marker_a.write_text("remote-a\n", encoding="utf-8")
+            subprocess.run(["git", "add", remote_marker_a.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: remote tree match base",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+
+            local_diverged_marker = clone_dir / "vendor" / "agent-canon" / ".diverged-local-marker"
+            local_diverged_marker.write_text("diverged\n", encoding="utf-8")
+            subprocess.run(["git", "add", str(local_diverged_marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: diverge local shared canon",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            subprocess.run(
+                ["rsync", "-a", "--delete", "--exclude", ".git", f"{work_dir}/", str(clone_dir / "vendor" / "agent-canon")],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: realign local tree to remote history",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            remote_marker_b = work_dir / ".remote-after-tree-match-marker"
+            remote_marker_b.write_text("remote-b\n", encoding="utf-8")
+            subprocess.run(["git", "add", remote_marker_b.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: remote advance after tree match",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=snapshot_import_tree_match", plan.stdout)
+
+            apply = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "apply"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(apply.returncode, 0, apply.stderr)
+            combined_output = f"{apply.stdout}\n{apply.stderr}"
+            self.assertIn("agent_canon_snapshot_import=tree_match_in_remote_history", combined_output)
+            self.assertIn(
+                "agent_canon_update_method=snapshot_import_after_subtree_pull_failure",
+                combined_output,
+            )
 
     def test_apply_fails_closed_when_local_shared_canon_history_diverges(self) -> None:
         """Apply should stop before mutating the worktree when local vendor history diverges."""
