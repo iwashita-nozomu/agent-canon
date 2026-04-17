@@ -78,6 +78,12 @@
 - 2026-04-12 | Avoid staged wording such as 'first'; detailed design should be framed as a closed complete scope rather than an incremental starting subset.
   - source: chat
 
+- 2026-04-17 | Kokkos CPU backend は Serial を正本にせず OpenMP のみを canonical にしたい。
+  - source: chat
+
+- 2026-04-17 | Kokkos CPU backend では fallback を持たず、OpenMP が無ければ fail-closed error にしたい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
