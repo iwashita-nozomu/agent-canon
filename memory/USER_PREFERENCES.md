@@ -129,6 +129,9 @@ upstream design README.md memory surface index
 - 2026-05-01 | ファイル横断実装では自前実装を最後の手段にし、既存 helper/tool/workflow/fixture の再利用・拡張を優先する。新規追加時は Reuse Survey と既存では足りない理由を残す。
   - source: chat
 
+- 2026-04-18 | 外部から受領した Excel などの source artifact は tracked datafiles ではなく rootdata に置き、final 成果物は code で再生成する前提にする。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
