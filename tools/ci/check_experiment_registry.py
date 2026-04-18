@@ -14,6 +14,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
+MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -94,6 +96,56 @@ def maybe_string(entry: dict[str, object], key: str) -> str | None:
         return None
     stripped = raw_value.strip()
     return stripped or None
+
+
+def maybe_string_list(
+    findings: list[Finding],
+    scope_name: str,
+    entry: dict[str, object],
+    key: str,
+) -> list[str]:
+    """Return one optional string list, recording validation findings."""
+    raw_value = entry.get(key)
+    if raw_value is None:
+        return []
+    if not isinstance(raw_value, list):
+        findings.append(Finding("error", f"{scope_name}: {key} must be an array of strings"))
+        return []
+    values: list[str] = []
+    for index, item in enumerate(raw_value):
+        if not isinstance(item, str) or not item.strip():
+            findings.append(
+                Finding("error", f"{scope_name}: {key}[{index}] must be a non-empty string")
+            )
+            continue
+        values.append(item.strip())
+    return values
+
+
+def validate_eval_patterns(
+    findings: list[Finding],
+    scope_name: str,
+    key: str,
+    patterns: list[str],
+) -> None:
+    """Validate one eval artifact pattern list."""
+    for pattern in patterns:
+        pattern_path = Path(pattern)
+        if pattern_path.is_absolute():
+            findings.append(
+                Finding("error", f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}")
+            )
+        if ".." in pattern_path.parts:
+            findings.append(
+                Finding("error", f"{scope_name}: {key} must not escape result/<run_name>: {pattern}")
+            )
+        if pattern in MANAGED_RUN_ARTIFACTS:
+            findings.append(
+                Finding(
+                    "error",
+                    f"{scope_name}: {key} must not target reserved top-level managed artifacts: {pattern}",
+                )
+            )
 
 
 def validate_topic(
@@ -211,6 +263,31 @@ def validate_topic(
                 Finding("warning", f"{topic_name}: {optional_path_key} is set but missing: {resolved}")
             )
 
+    required_eval_artifacts = maybe_string_list(
+        findings,
+        topic_name,
+        topic,
+        "required_eval_artifacts",
+    )
+    optional_eval_artifacts = maybe_string_list(
+        findings,
+        topic_name,
+        topic,
+        "optional_eval_artifacts",
+    )
+    validate_eval_patterns(
+        findings,
+        topic_name,
+        "required_eval_artifacts",
+        required_eval_artifacts,
+    )
+    validate_eval_patterns(
+        findings,
+        topic_name,
+        "optional_eval_artifacts",
+        optional_eval_artifacts,
+    )
+
 
 def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     """Validate one registry file."""
@@ -243,6 +320,31 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
             findings.append(
                 Finding("error", f"defaults.topic_template_dir is missing: {resolved_template_dir}")
             )
+
+    required_eval_artifacts = maybe_string_list(
+        findings,
+        "defaults",
+        defaults,
+        "required_eval_artifacts",
+    )
+    optional_eval_artifacts = maybe_string_list(
+        findings,
+        "defaults",
+        defaults,
+        "optional_eval_artifacts",
+    )
+    validate_eval_patterns(
+        findings,
+        "defaults",
+        "required_eval_artifacts",
+        required_eval_artifacts,
+    )
+    validate_eval_patterns(
+        findings,
+        "defaults",
+        "optional_eval_artifacts",
+        optional_eval_artifacts,
+    )
 
     topics = normalize_topics(registry.get("topics", []))
     seen_names: set[str] = set()

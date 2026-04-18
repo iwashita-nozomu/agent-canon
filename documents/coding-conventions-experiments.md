@@ -18,7 +18,7 @@
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
-- server 上の formal run では `result/<run_name>/run_manifest.json` と `run.log` を残します。
+- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`run.log` を残します。
 
 ## 3. 実行原則
 
