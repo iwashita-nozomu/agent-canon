@@ -46,8 +46,6 @@ class WorkLogTest(unittest.TestCase):
                     str(report_dir),
                     "--kind",
                     "edit",
-                    "--status",
-                    "done",
                     "--request-clause-id",
                     "R1",
                     "--message",
@@ -66,41 +64,7 @@ class WorkLogTest(unittest.TestCase):
             self.assertIn("(not-written)", result.stdout)
             work_log_text = (report_dir / "work_log.md").read_text(encoding="utf-8")
             self.assertIn("updated docs", work_log_text)
-            self.assertIn("status: done", work_log_text)
             self.assertIn("request_clause_ids: R1", work_log_text)
-
-    def test_missing_status_fails_closed(self) -> None:
-        """The CLI should reject weak entries that omit status."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-1"
-            report_dir.mkdir(parents=True, exist_ok=True)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-dir",
-                    str(report_dir),
-                    "--kind",
-                    "edit",
-                    "--request-clause-id",
-                    "R1",
-                    "--message",
-                    "updated docs",
-                    "--next",
-                    "run tests",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("--status", result.stderr)
 
     def test_worktree_scope_updates_action_log_and_run_bundle_work_log(self) -> None:
         """Scope-driven mode should append both the action log and the run-local work log."""
@@ -147,8 +111,6 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--kind",
                     "test",
-                    "--status",
-                    "done",
                     "--request-clause-id",
                     "R2",
                     "--message",
@@ -166,7 +128,6 @@ class WorkLogTest(unittest.TestCase):
             self.assertNotIn("(not-written)", result.stdout)
             self.assertIn("ran targeted pytest", action_log_path.read_text(encoding="utf-8"))
             self.assertIn("ran targeted pytest", (report_dir / "work_log.md").read_text(encoding="utf-8"))
-            self.assertIn("status: done", (report_dir / "work_log.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

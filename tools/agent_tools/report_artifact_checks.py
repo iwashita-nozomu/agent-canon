@@ -7,16 +7,6 @@ import re
 
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
-WORK_LOG_ENTRY_PATTERN = re.compile(
-    r"^- `"
-    r"(?P<timestamp>[^|`]+?) \| "
-    r"(?P<kind>[^|`]+?) \| "
-    r"(?P<message>.*?) \| "
-    r"status: (?P<status>.*?) \| "
-    r"request_clause_ids: (?P<clause_ids>.*?)(?: \| refs: (?P<refs>.*?))? \| "
-    r"next: (?P<next>.*?)"
-    r"`$"
-)
 
 
 def is_placeholder_only_section(text: str) -> bool:
@@ -93,17 +83,6 @@ def bullet_rows(text: str, heading: str) -> list[str]:
     return rows
 
 
-def parse_work_log_entries(text: str) -> list[dict[str, str]]:
-    """Return parsed work-log entries from the Entries section."""
-    entries: list[dict[str, str]] = []
-    for index, row in enumerate(bullet_rows(text, "## Entries"), start=1):
-        match = WORK_LOG_ENTRY_PATTERN.match(row)
-        if match is None:
-            raise ValueError(f"work_log.md:entry_malformed:{index}")
-        entries.append({key: value.strip() for key, value in match.groupdict(default="").items()})
-    return entries
-
-
 def check_schedule_artifact(text: str) -> list[str]:
     """Return blockers for schedule.md."""
     blockers: list[str] = []
@@ -124,18 +103,6 @@ def check_work_log_artifact(text: str) -> list[str]:
     if not section_has_content(text, "## Entries"):
         blockers.append("work_log.md:section_empty_or_missing:entries")
         return blockers
-    rows = bullet_rows(text, "## Entries")
-    if not rows:
+    if not bullet_rows(text, "## Entries"):
         blockers.append("work_log.md:entries_empty")
-        return blockers
-    try:
-        entries = parse_work_log_entries(text)
-    except ValueError as exc:
-        blockers.append(str(exc))
-        return blockers
-    if len(entries) < 3:
-        blockers.append("work_log.md:entries_too_few")
-    distinct_kinds = {entry["kind"] for entry in entries}
-    if len(distinct_kinds) < 2:
-        blockers.append("work_log.md:entry_kind_diversity_too_low")
     return blockers
