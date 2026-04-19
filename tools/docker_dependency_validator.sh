@@ -58,21 +58,32 @@ check_dockerfile_coherence() {
     || report_warning "Dockerfile does not install docker/requirements.txt through pip -r"
 }
 
-check_venv_prohibition() {
+is_container_runtime() {
+  [ -f "/.dockerenv" ] || [ -f "/run/.containerenv" ] || [ -n "${container:-}" ] || [ -n "${DEVCONTAINER_RUNTIME_MODE:-}" ]
+}
+
+check_repo_local_venv_policy() {
   local gitignore=".gitignore"
   local path=""
   local match_file=""
   local roots=()
   local root=""
   local pattern='python3?[[:space:]]+-m[[:space:]]+venv|virtualenv|conda[[:space:]]+create|uv[[:space:]]+venv|pipenv|poetry[[:space:]]+env'
+  local canonical_tool="tools/ci/python_env_policy.py"
 
-  printf '\n3. Checking virtual-environment prohibition...\n'
+  printf '\n3. Checking repo-local virtual-environment policy...\n'
 
-  for path in .venv venv env .conda conda-env .venv-*; do
+  for path in venv env .conda conda-env .venv-*; do
     if [ -e "$path" ]; then
-      report_issue "virtual-environment directory exists: $path"
+      report_issue "non-canonical virtual-environment directory exists: $path"
     fi
   done
+
+  if is_container_runtime; then
+    :
+  elif [ -e ".venv" ]; then
+    report_issue "host runtime must not keep repo-local .venv; use the canonical container runtime instead"
+  fi
 
   if [ -f "$gitignore" ]; then
     grep -Eq '(^|/)\.venv/|^\.venv/' "$gitignore" \
@@ -83,8 +94,12 @@ check_venv_prohibition() {
     report_issue ".gitignore not found"
   fi
 
-  if [ -f docker/Dockerfile ] && grep -q 'python3-venv' docker/Dockerfile; then
-    report_issue "docker/Dockerfile installs python3-venv; canonical image must not support venv creation"
+  if [ ! -f "$canonical_tool" ]; then
+    report_issue "canonical env-policy tool missing: $canonical_tool"
+  fi
+
+  if [ -f docker/Dockerfile ] && ! grep -q 'python3-venv' docker/Dockerfile; then
+    report_issue "docker/Dockerfile must install python3-venv so the canonical container can create .venv"
   fi
 
   for root in scripts tools Makefile .github; do
@@ -94,11 +109,11 @@ check_venv_prohibition() {
 
   while IFS= read -r match_file; do
     case "$match_file" in
-      */__pycache__/*|*.pyc|*/docker_dependency_validator.sh)
+      */__pycache__/*|*.pyc|*/docker_dependency_validator.sh|*/python_env_policy.py)
         continue
         ;;
     esac
-    report_issue "virtual-environment creation command found in ${match_file}"
+    report_issue "non-canonical virtual-environment creation command found in ${match_file}"
   done < <(
     grep -RIlE "$pattern" "${roots[@]}" 2>/dev/null \
       | sort -u
@@ -130,7 +145,7 @@ check_pythonpath_documentation() {
 printf 'Checking Docker environment consistency without Python-dependent tooling...\n\n'
 check_requirements_format
 check_dockerfile_coherence
-check_venv_prohibition
+check_repo_local_venv_policy
 check_pythonpath_documentation
 
 printf '\nSummary: %s issues found\n' "$issues"

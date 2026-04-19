@@ -92,7 +92,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `memory/USER_PREFERENCES.md` は毎回読む runtime note とし、stable になった項目だけを periodic sweep で `AGENTS.md` へ昇格します。
 - `memory/AGENT_PHILOSOPHY.md` は毎回読む runtime note とし、stable な作業哲学だけを periodic sweep で workflow / guardrail / `AGENTS.md` へ昇格します。
 - 自己学習と対話記録の追記は shared canon `memory/` の責務として扱い、template-local note だけ更新して closeout しません。
-- repo-local virtual environment は作りません。`python3-venv`、`python -m venv`、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を使いません。
+- host runtime では repo-local virtual environment を作りません。container runtime では canonical tool `python3 tools/ci/python_env_policy.py --create` から `.venv` だけを許可し、`venv/`、`env/`、`.conda/`、`conda-env/` や ad hoc env manager は使いません。
 - user request clause を持たない planning、design、implementation、review は無効です。active work は必ず clause ID に結び付けます。
 
 - Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。

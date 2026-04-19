@@ -25,7 +25,7 @@
 - review feedback を反映せずに次段へ handoff する
 - 正本を更新せずに runtime entrypoint だけ直す
 - host-global install を repo の正本手順にする
-- repo-local virtual environment を作る。`python3-venv`、`python -m venv`、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を使う
+- host runtime で repo-local virtual environment を作る。container runtime でも canonical tool を通さずに `venv/`、`env/`、`.conda/`、`conda-env/` や ad hoc env manager を増やす
 - agent helper、CI、review、validation、container runner、experiment helper を root `scripts/` に置く
 - partial run を正式結果として扱う
 - spot run、debug run、smoke run を比較表、method 採否、正式 report、review evidence に使う
