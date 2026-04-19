@@ -126,6 +126,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - export worker に live Python object reference を渡してはいけません。cross-process 境界は serializable manifest と reconstruction recipe で渡します。
 - spot run、debug run、smoke run、partial run を正式 evidence や比較表の根拠にしてはいけません。
 - 最小実装、仕様の一部だけの実装、または未反映の required review findings が残る状態で完了扱いにしてはいけません。
+- エラーを消すためだけの場当たり的な追加実装、別経路追加、例外処理の積み増しで切り抜けてはいけません。request clause、既存仕様、design packet、reuse precedent に基づいて、本当に必要な変更だけを選びます。
 - review を受けて修正したあと、tiny fix だからといって full required review set を省略して closeout してはいけません。
 - correctness evidence と performance evidence を混同してはいけません。
 - code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜてはいけません。

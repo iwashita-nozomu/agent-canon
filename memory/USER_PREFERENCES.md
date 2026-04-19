@@ -81,6 +81,9 @@
 - 2026-04-19 | 作業ログの書き込み強度は運用ではなく workflow と gate で担保したい
   - source: chat
 
+- 2026-04-19 | エラーに当たったときの場当たり的な追加実装を禁止し、AGENTS.md に明文化したい
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
