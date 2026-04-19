@@ -301,7 +301,7 @@ def main() -> int:
     print("  1. Confirm action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
     print(
-        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step."
+        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --status done --request-clause-id R1 --message '<what changed>' --next '<next>' after each meaningful step."
     )
     print("  4. Start editing only after the kickoff record is updated.")
     return 0

@@ -51,8 +51,18 @@ def write_ready_work_log(report_dir: Path) -> None:
                 "- Record meaningful execution steps.",
                 "",
                 "## Entries",
-                "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | request_clause_ids: T1-C1 | next: implement`",
-                "- `2026-04-08 09:30 JST | test | passed closeout checks | request_clause_ids: T1-C1 | next: close`",
+                (
+                    "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | "
+                    "status: done | request_clause_ids: T1-C1 | next: implement`"
+                ),
+                (
+                    "- `2026-04-08 09:20 JST | edit | updated the work-log helpers | "
+                    "status: done | request_clause_ids: T1-C1 | next: run closeout checks`"
+                ),
+                (
+                    "- `2026-04-08 09:30 JST | test | passed closeout checks | "
+                    "status: done | request_clause_ids: T1-C1 | next: close`"
+                ),
                 "",
             ]
         ),

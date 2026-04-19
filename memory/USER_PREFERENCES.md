@@ -78,6 +78,9 @@
 - 2026-04-11 | サブエージェントを実際に起動し、handoff では tree 順の文書探索ではなく packet path を明示してほしい
   - source: chat
 
+- 2026-04-19 | 作業ログの書き込み強度は運用ではなく workflow と gate で担保したい
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

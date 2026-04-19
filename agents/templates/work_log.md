@@ -11,4 +11,5 @@
 
 ## Entries
 
-<!-- Append one line per meaningful step with time, kind, request clause IDs, refs, and next action. -->
+<!-- Canonical entry shape: `YYYY-MM-DD HH:MM JST | <kind> | <message> | status: <status> | request_clause_ids: <ids> | refs: <optional refs> | next: <next step>`. -->
+<!-- Minimum chronology: keep at least kickoff/resume, one substantive work record, and validation/review/closeout. -->

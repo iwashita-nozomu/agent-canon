@@ -389,6 +389,76 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("work_log.md:section_empty_or_missing:entries", result.stdout)
 
+    def test_final_gate_rejects_too_thin_work_log(self) -> None:
+        """Final gate should fail when the log is present but too thin to be useful."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "final-thin-work-log"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "final_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Final Review",
+                        "",
+                        "## Ship Blockers",
+                        "| Finding | Severity | Status |",
+                        "| ------- | -------- | ------ |",
+                        "| none | info | resolved |",
+                        "## Design Trace Acceptance",
+                        "Trace is complete.",
+                        "## Planned Work Completion Review",
+                        "All planned work units are complete.",
+                        "## Spec-To-Product Coverage Review",
+                        "Every clause has a product surface.",
+                        "## Review Finding Incorporation Review",
+                        "All fix-now findings were integrated.",
+                        "## Post-Fix Full Review Rerun Review",
+                        "No post-review fixes occurred after the last full review pass.",
+                        "## Canonical Tree-Head Acceptance",
+                        "Only canonical tracked paths remain in the tree head.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "work_log.md").write_text(
+                "\n".join(
+                    [
+                        "# Work Log",
+                        "",
+                        "## Purpose",
+                        "- Required run log.",
+                        "",
+                        "## Entries",
+                        (
+                            "- `2026-04-12 14:10 JST | review | final pass recorded | "
+                            "status: done | request_clause_ids: T1-C1 | next: closeout`"
+                        ),
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "final",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("work_log.md:entries_too_few", result.stdout)
+
     def test_final_gate_rejects_missing_post_fix_full_review_section(self) -> None:
         """Final gate should fail when the post-fix full review evidence is missing."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -429,7 +499,18 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "- Required run log.",
                         "",
                         "## Entries",
-                        "- `2026-04-12 14:10 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        (
+                            "- `2026-04-12 13:50 JST | kickoff | fixed the closeout clause set | "
+                            "status: done | request_clause_ids: T1-C1 | next: rerun final review`"
+                        ),
+                        (
+                            "- `2026-04-12 14:00 JST | edit | refreshed the final review artifact | "
+                            "status: done | request_clause_ids: T1-C1 | next: check closeout sections`"
+                        ),
+                        (
+                            "- `2026-04-12 14:10 JST | review | final pass recorded | "
+                            "status: done | request_clause_ids: T1-C1 | next: closeout`"
+                        ),
                         "",
                     ]
                 ),
@@ -497,7 +578,18 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "- Required run log.",
                         "",
                         "## Entries",
-                        "- `2026-04-16 11:50 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        (
+                            "- `2026-04-16 11:20 JST | kickoff | fixed the canonical tree acceptance scope | "
+                            "status: done | request_clause_ids: T1-C1 | next: rerun final review`"
+                        ),
+                        (
+                            "- `2026-04-16 11:35 JST | edit | updated final review content | "
+                            "status: done | request_clause_ids: T1-C1 | next: capture final review decision`"
+                        ),
+                        (
+                            "- `2026-04-16 11:50 JST | review | final pass recorded | "
+                            "status: done | request_clause_ids: T1-C1 | next: closeout`"
+                        ),
                         "",
                     ]
                 ),

@@ -98,6 +98,12 @@
   - confidence: tentative
   - evidence: 2026-04-11 user feedback on document intake and subagent startup
 
+- 2026-04-19 | interaction-observation | 作業ログの質が落ちやすい運用は、単なる追記義務ではなく CLI 入力項目と closeout gate の両側で fail-closed に寄せる
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: 2026-04-19 user feedback: 作業ログの書き込みが甘い / ワークフローの整備を
+
 ## Task Retrospectives
 
 - まだなし

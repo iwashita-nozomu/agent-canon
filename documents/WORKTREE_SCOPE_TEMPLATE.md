@@ -71,8 +71,9 @@
 - Branch summary path: `notes/branches/<branch_topic>.md`
 - User request contract path: `reports/agents/<run-id>/user_request_contract.md`
 - Note template: `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- Append command: `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
+- Append command: `python3 tools/agent_tools/work_log.py --kind <kind> --status done --request-clause-id R1 --message "<what changed>" --next "<next>"`
 - When contract path is concrete, the same append command also updates `reports/agents/<run-id>/work_log.md`.
+- Keep at least kickoff/resume, one substantive work record, and validation/review/closeout in the resulting log.
 - worktree 内でも、最終配置と同じ相対パスで下書きする
 
 ## Required Checks Before Commit

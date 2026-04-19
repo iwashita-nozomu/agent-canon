@@ -14,6 +14,23 @@ from worktree_start import (
     resolve_user_request_contract_path,
 )
 
+WORK_LOG_KIND_CHOICES = (
+    "kickoff",
+    "resume",
+    "scope",
+    "requirements",
+    "plan",
+    "design",
+    "edit",
+    "test",
+    "review",
+    "validation",
+    "decision",
+    "carry-over",
+    "closeout",
+    "blocked",
+)
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
@@ -28,9 +45,19 @@ def build_parser() -> argparse.ArgumentParser:
             "<workspace-root>/reports/agents."
         ),
     )
-    parser.add_argument("--kind", default="work", help="Short event kind, for example kickoff/test/edit/review.")
+    parser.add_argument(
+        "--kind",
+        required=True,
+        choices=WORK_LOG_KIND_CHOICES,
+        help="Short event kind for the step being recorded.",
+    )
+    parser.add_argument(
+        "--status",
+        required=True,
+        help="Short outcome label such as done or blocked.",
+    )
     parser.add_argument("--message", required=True, help="What happened in this step.")
-    parser.add_argument("--next", default="", help="Explicit next step.")
+    parser.add_argument("--next", required=True, help="Explicit next step.")
     parser.add_argument(
         "--request-clause-id",
         action="append",
@@ -66,6 +93,11 @@ def append_run_work_log_entry(report_dir: Path, entry: str) -> Path:
                     "",
                     "## Entries",
                     "",
+                    (
+                        "<!-- Minimum bar: keep at least kickoff/resume, one substantive work "
+                        "record, and validation/review/closeout. Every entry must include kind, "
+                        "status, request_clause_ids, and next. -->"
+                    ),
                 ]
             ),
             encoding="utf-8",
@@ -109,14 +141,24 @@ def main() -> int:
         )
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
+    status = args.status.strip()
+    if not status:
+        raise SystemExit("--status must not be empty.")
+    if "|" in status:
+        raise SystemExit("--status must not contain '|'.")
+    if "|" in args.message:
+        raise SystemExit("--message must not contain '|'.")
+    if "|" in args.next:
+        raise SystemExit("--next must not contain '|'.")
     clause_suffix = " | request_clause_ids: " + ",".join(args.request_clause_id)
     ref_suffix = ""
     if args.ref:
         ref_suffix = " | refs: " + ", ".join(args.ref)
-    next_suffix = ""
-    if args.next:
-        next_suffix = f" | next: {args.next}"
-    entry = f"`{timestamp} | {args.kind} | {args.message}{clause_suffix}{ref_suffix}{next_suffix}`"
+    next_suffix = f" | next: {args.next}"
+    entry = (
+        f"`{timestamp} | {args.kind} | {args.message} | status: {status}"
+        f"{clause_suffix}{ref_suffix}{next_suffix}`"
+    )
     if action_log_path is not None:
         append_action_log_entry(action_log_path, entry)
     work_log_path: Path | None = None

@@ -160,6 +160,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - Gate 0 の前に `documents/`、`notes/`、`references/` と local library の sweep を済ませます
 - Gate 0 の前に `user_request_contract.md` へ must-do、must-not-do、completion-evidence clause を書きます
 - Gate 0 の直後から `schedule.md` を task TODO の正本として更新し、repo-changing task では `work_log.md` を kickoff から closeout まで残します
+- `work_log.md` は canonical entry shape（kind / status / request_clause_ids / next）を守り、kickoff/resume・substantive work・validation/review/closeout の最低 3 本を残します
 - repo-changing task では explicit subagent activation を省略しません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
