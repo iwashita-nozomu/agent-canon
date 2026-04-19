@@ -33,7 +33,7 @@ bash scripts/start_repository.sh \
   --dry-run
 ```
 
-1. 初期化します。既定では `/mnt/git/<project-slug>-agent-canon.git` を作成し、`vendor/agent-canon/` snapshot を `main` として seed します。
+1. 初期化します。wrapper は clean clone なら実 init の前に `make agent-canon-ensure-latest` を実行し、そのあと `/mnt/git/<project-slug>-agent-canon.git` を作成して `vendor/agent-canon/` snapshot を `main` として seed します。dirty state なら preflight の未実行理由を出して init を続行します。
 
 ```bash
 bash scripts/start_repository.sh \

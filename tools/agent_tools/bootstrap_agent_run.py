@@ -7,6 +7,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
+from agent_canon_preflight import project_root_from_script, run_agent_canon_preflight
 from agent_team import (
     auto_language_specialists,
     codex_runtime_max_threads,
@@ -115,6 +116,11 @@ def build_parser(
         action="store_true",
         help="Preview the run id and paths without writing files.",
     )
+    parser.add_argument(
+        "--skip-agent-canon-preflight",
+        action="store_true",
+        help="Skip the automatic make agent-canon-ensure-latest preflight.",
+    )
     return parser
 
 
@@ -123,6 +129,12 @@ def main() -> int:
     config = load_team_config()
     catalog = load_task_catalog(config)
     args = build_parser(specialist_role_ids(config), task_ids(catalog)).parse_args()
+    project_root = project_root_from_script(Path(__file__))
+    try:
+        preflight = run_agent_canon_preflight(project_root, skip=args.skip_agent_canon_preflight)
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 1
     created_at = datetime.now(timezone.utc).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     workspace_root = Path(args.workspace_root).resolve()
@@ -172,6 +184,10 @@ def main() -> int:
             workspace_root=workspace_root,
         )
 
+    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
+    print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
+    print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
+    print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")

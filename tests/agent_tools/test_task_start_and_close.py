@@ -88,6 +88,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "src/example.cpp",
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -96,6 +97,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
@@ -143,6 +146,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "python/example.py",
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -177,6 +181,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -185,6 +190,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
@@ -230,6 +236,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -260,6 +267,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -303,6 +311,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -399,6 +408,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -667,6 +677,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -846,6 +857,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
