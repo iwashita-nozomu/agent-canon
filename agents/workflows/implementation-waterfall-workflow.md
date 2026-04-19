@@ -338,6 +338,7 @@ exit 条件:
 - `Existing Code And Docs To Reuse:`
 - `Upstream Requirement Packet:`
 - `Implementation Source Packet:`
+- `Installed Libraries And Existing Implementation Survey:`
 - `Canonical Tree-Head Plan:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
@@ -350,10 +351,12 @@ exit 条件:
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
-- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、code path、test path、外部 reference を列挙します
+- `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、mirror directory を作らないことを明示します
 - `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
+- 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - 新規または rename する variable、function、class、file、CLI flag、config key、public API identifier は、既存 precedent、採用名、却下した代替案、review 観点を明記します
 - 既存 precedent がある場合はそれを採用し、ない場合は理由を文書化して Gate 6 で確認します
@@ -391,7 +394,8 @@ exit 条件:
 必須レビュー:
 - `design_reviewer`
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
-  - `Implementation Source Packet` が編集前に読む artifact、repo docs、code path、test plan を列挙しているか確認する
+  - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
+  - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path、test plan を列挙しているか確認する
   - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
   - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
   - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
@@ -406,7 +410,7 @@ exit 条件:
 - `詳細設計レビュー` は計画レビューより重い gate とします
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
-- `Implementation Source Packet` または `Design-To-Implementation Trace` の不足は `revise` blocker とします
+- `Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
 - `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 
@@ -487,6 +491,7 @@ exit 条件:
 ルール:
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Implementation Source Packet` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、実装 summary に読んだ design artifact と section を残します
+- 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
 - design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
 - 実装は 1 つの change request に閉じます
@@ -679,8 +684,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 ## 8. reuse-first の必須ルール
 
 - まず既存 module、既存 helper、既存 abstraction を探します
+- まず導入済みライブラリ、既存 module、既存 helper、既存 abstraction を探します
 - 既存 API shape、命名、error handling、test style、docs style を優先します
-- 新しい pattern を導入するときは、詳細設計文書に既存 pattern では足りない理由を書きます
+- 新しい pattern を導入するときは、詳細設計文書に既存 pattern や導入済みライブラリでは足りない理由を書きます
 - 新しい identifier や path は worker の自由裁量にせず、詳細設計の naming plan または明白な局所 precedent に結び付けます
 - 既存コードを踏襲できるなら、完全新規実装を選びません
 

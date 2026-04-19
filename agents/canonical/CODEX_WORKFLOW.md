@@ -69,10 +69,19 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
-### Library Sweep
+### Library And Reuse Sweep
 
-新しい code path、module、helper、test、script を足す前に、既存の再利用候補を探索します。
-対象は task に応じて次です。
+新しい code path、module、helper、test、script を足す前に、導入済みライブラリと既存の再利用候補を探索します。
+dependency surface は task に応じて次を見ます。
+
+- `docker/requirements.txt`
+- `pyproject.toml`
+- lockfile
+- build file
+- package manager file
+- 必要なら `pipdeptree` / `deptry`
+
+既存実装の探索対象は task に応じて次です。
 
 - `python/`
 - `tests/`
@@ -82,6 +91,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`m
 - `scripts/`
 
 既存実装があるのに別名の重複 module を新設しません。
+既存ライブラリや既存実装で足りない理由を言えない限り、新規追加を選びません。
 
 ## Task Classification
 
@@ -307,11 +317,11 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
-- 実装前に `design_brief.md` の `Implementation Source Packet` と `Design-To-Implementation Trace` を読み、そこにある artifact、repo docs、code path、test plan を読了する
+- 実装前に `design_brief.md` の `Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design-To-Implementation Trace` を読み、そこにある artifact、repo docs、dependency surface、code path、test plan を読了する
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker は会話文脈を実装入力にせず、各 implementation slice の前に design artifact path、design section、test plan item、request clause ID を明示する
-- `Implementation Source Packet` がない、または design と現行 repo docs / code が矛盾する場合は実装せず Gate 5-6 へ戻る
+- `Installed Libraries And Existing Implementation Survey` または `Implementation Source Packet` がない、または design と現行 repo docs / code / dependency surface が矛盾する場合は実装せず Gate 5-6 へ戻る
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、mirror directory のような別 truth surface を作らない
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
@@ -331,7 +341,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - JAX export / native runtime の task では、最初の implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
 - cross-process export worker には live Python object reference を渡さず、serializable manifest と reconstruction recipe を渡す
 - `LoadedProgram` のような runtime materialization は compile DAG node にせず、runtime vertex / lifetime scope として扱う
-- まず既存 code path、既存 helper、既存 style を調べ、再利用を優先する
+- まず導入済みライブラリ、既存 code path、既存 helper、既存 style を調べ、再利用と拡張を優先する
+- 新規 helper や新規 module を足すときは、既存実装では足りない理由と、導入済みライブラリの設定変更や薄い wrapper で済まない理由を design packet に結び付ける
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う

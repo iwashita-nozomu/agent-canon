@@ -160,8 +160,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
 - 実行環境固有の都合がある場合だけ、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` に最小限の差分を持たせます。
-- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/` と local library を先に探索します。
+- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/`、dependency surface、local implementation を先に探索します。
 - reuse sweep をせずに新しい file や module を増やしません。
+- 既存実装を使えるか、導入済みライブラリを拡張できるか、既存では足りない理由が何かを artifact に残さずに新規実装へ進めません。
 - stage reviewer の feedback を反映せずに次段へ handoff しません。
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行します。止めるのは user が明示的に止めた場合か external block がある場合だけです。

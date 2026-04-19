@@ -78,6 +78,9 @@
 - 2026-04-11 | サブエージェントを実際に起動し、handoff では tree 順の文書探索ではなく packet path を明示してほしい
   - source: chat
 
+- 2026-04-19 | 既存実装の再利用を強く優先し、新規実装の前に既存実装で足りない理由を明示してほしい
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

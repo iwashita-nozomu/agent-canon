@@ -10,7 +10,9 @@
 - design artifact path、design section、test plan item、request clause ID を引用できない実装 slice を進める
 - design packet と repo docs / code の矛盾を worker がその場で解釈して実装する
 - `documents/`、`notes/`、`references/` の context sweep をせずに着手する
+- dependency surface、導入済みライブラリ、既存実装候補を見ずに、新規 helper や新規 module を足す
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
+- 既存実装や導入済みライブラリでは足りない理由を書かずに、完全新規実装を選ぶ
 - 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
 - notes、guardrails、documents、prior logs、local code / tests で解決できる曖昧さを調べずにユーザーへ戻す
 - unknown や open question を silent assumption に変換して要件を埋める

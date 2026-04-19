@@ -50,10 +50,11 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
-- 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、code path、test plan、request clause ID を固定します
+- 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
-- 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
+- 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
+- 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
 - rate-limit pressure が強い場合は、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
