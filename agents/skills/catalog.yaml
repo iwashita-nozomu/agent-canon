@@ -1,0 +1,99 @@
+version: 1
+
+skill_families:
+  - id: repo-onboarding
+    purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
+    canonical_doc: agents/skills/repo-onboarding.md
+    shim: .agents/skills/repo-onboarding/SKILL.md
+  - id: start-repository
+    purpose: Start a new repository from the template clone, including bare remotes and project-local agent-canon seeding.
+    canonical_doc: agents/skills/start-repository.md
+    shim: .agents/skills/start-repository/SKILL.md
+  - id: codex-task-workflow
+    purpose: Execute repository tasks with a context-independent Codex flow.
+    canonical_doc: agents/skills/codex-task-workflow.md
+    shim: .agents/skills/codex-task-workflow/SKILL.md
+  - id: agent-orchestration
+    purpose: Select workflow family, skills, review roles, and runtime entrypoints before execution.
+    canonical_doc: agents/skills/agent-orchestration.md
+    shim: .agents/skills/agent-orchestration/SKILL.md
+  - id: subagent-bootstrap
+    purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
+    canonical_doc: agents/skills/subagent-bootstrap.md
+    shim: .agents/skills/subagent-bootstrap/SKILL.md
+  - id: change-review
+    purpose: Review diffs for regressions, missing validation, and stale docs.
+    canonical_doc: agents/skills/change-review.md
+    shim: .agents/skills/change-review/SKILL.md
+  - id: python-review
+    purpose: Review Python diffs with pyright, pytest, ruff, and type-boundary awareness.
+    canonical_doc: agents/skills/python-review.md
+    shim: .agents/skills/python-review/SKILL.md
+  - id: cpp-review
+    purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
+    canonical_doc: agents/skills/cpp-review.md
+    shim: .agents/skills/cpp-review/SKILL.md
+  - id: test-design
+    purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
+    canonical_doc: agents/skills/test-design.md
+    shim: .agents/skills/test-design/SKILL.md
+  - id: behavior-preserving-refactor
+    purpose: Run large refactors as behavior-preserving structural change with explicit safety contracts.
+    canonical_doc: agents/skills/behavior-preserving-refactor.md
+    shim: .agents/skills/behavior-preserving-refactor/SKILL.md
+  - id: long-form-writing
+    purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
+    canonical_doc: agents/skills/long-form-writing.md
+    shim: .agents/skills/long-form-writing/SKILL.md
+  - id: academic-writing
+    purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
+    canonical_doc: agents/skills/academic-writing.md
+    shim: .agents/skills/academic-writing/SKILL.md
+  - id: paper-writing
+    purpose: Draft papers and thesis chapters with section contracts and mandatory citation/evidence review.
+    canonical_doc: agents/skills/paper-writing.md
+    shim: .agents/skills/paper-writing/SKILL.md
+  - id: md-style-check
+    purpose: Check Markdown formatting, heading structure, and link hygiene.
+    canonical_doc: agents/skills/md-style-check.md
+    shim: .agents/skills/md-style-check/SKILL.md
+  - id: worktree-start
+    purpose: Initialize or refresh worktree scope, action-log targets, and kickoff checks before editing.
+    canonical_doc: agents/skills/worktree-start.md
+    shim: .agents/skills/worktree-start/SKILL.md
+  - id: worktree-health
+    purpose: Review worktree scope, drift, and cleanup readiness.
+    canonical_doc: agents/skills/worktree-health.md
+    shim: .agents/skills/worktree-health/SKILL.md
+  - id: experiment-lifecycle
+    purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
+    canonical_doc: agents/skills/experiment-lifecycle.md
+    shim: .agents/skills/experiment-lifecycle/SKILL.md
+  - id: adaptive-improvement-loop
+    purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
+    canonical_doc: agents/skills/adaptive-improvement-loop.md
+    shim: .agents/skills/adaptive-improvement-loop/SKILL.md
+  - id: literature-survey
+    purpose: Search for primary sources, prior art, contradictory evidence, and reusable bibliography structure.
+    canonical_doc: agents/skills/literature-survey.md
+    shim: .agents/skills/literature-survey/SKILL.md
+  - id: research-workflow
+    purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
+    canonical_doc: agents/skills/research-workflow.md
+    shim: .agents/skills/research-workflow/SKILL.md
+  - id: comprehensive-development
+    purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
+    canonical_doc: agents/skills/comprehensive-development.md
+    shim: .agents/skills/comprehensive-development/SKILL.md
+  - id: environment-maintenance
+    purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
+    canonical_doc: agents/skills/environment-maintenance.md
+    shim: .agents/skills/environment-maintenance/SKILL.md
+  - id: user-preference-sync
+    purpose: Distill durable user preferences from notes into stable AGENTS.md guidance.
+    canonical_doc: agents/skills/user-preference-sync.md
+    shim: .agents/skills/user-preference-sync/SKILL.md
+  - id: agent-learning
+    purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
+    canonical_doc: agents/skills/agent-learning.md
+    shim: .agents/skills/agent-learning/SKILL.md

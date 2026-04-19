@@ -1,0 +1,35 @@
+# agent-orchestration
+
+## Purpose
+
+task を workflow family に分類し、handoff、review、runtime entrypoint を一貫した形にそろえます。
+
+## Use When
+
+- どの workflow family を使うか決めたい
+- run bundle や review artifact の要否を決めたい
+- Codex / Claude / Copilot 間で共通ルールを保ちたい
+
+## Core References
+
+- `agents/TASK_WORKFLOWS.md`
+- `agents/COMMUNICATION_PROTOCOL.md`
+- `agents/canonical/ARTIFACT_PLACEMENT.md`
+- `agents/canonical/CLI_ENTRYPOINTS.md`
+
+## Outputs
+
+- chosen workflow family
+- 必要な role / specialist
+- review と handoff の最小構成
+- repo-editing task なら、requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation の順序
+- 最初の作業 update 用の `workflow=<family>`, `skills=<...>`, `review=<...>` 宣言
+- 必要な run bundle command と specialist activation
+- `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
+- parallel write が要るなら file 単位の write-scope 方針
+
+## Codex Implementation Routing
+
+- design trace、identifier naming、test plan、write scope が固定済みの低リスク slice は `spark_worker` を先に使います。
+- 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
+- `spark_worker` は詳細設計、review、final judgment には使いません。

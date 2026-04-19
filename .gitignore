@@ -1,0 +1,6 @@
+# Agent run artifacts
+reports/agents/
+reports/*.json
+reports/*.txt
+reports/*.patch
+
