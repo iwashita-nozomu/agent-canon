@@ -15,7 +15,7 @@
 
 ## Template
 
-- [KNOWLEDGE_NOTE_TEMPLATE.md](/workspace/vendor/agent-canon/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
+- [KNOWLEDGE_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
 
 ## 典型トピック
 

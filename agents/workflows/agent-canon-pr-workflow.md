@@ -92,7 +92,7 @@ bash tools/sync_agent_canon.sh push
 9. local working clone がある場合は fast-forward する
 
 ```bash
-git -C <agent-canon-source-repo> pull --ff-only
+git -C /mnt/l/workspace/agent-canon pull --ff-only
 ```
 
 ## 派生 repo 側の shared canon 提案

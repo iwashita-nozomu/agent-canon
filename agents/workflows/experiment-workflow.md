@@ -28,7 +28,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - 批判的レビューの観点と手順
   - [experiment-critical-review.md](../../documents/experiment-critical-review.md)
 - エージェントごとの task workflow
-  - [TASK_WORKFLOWS.md](/workspace/vendor/agent-canon/agents/TASK_WORKFLOWS.md)
+  - [TASK_WORKFLOWS.md](../../../../agents/TASK_WORKFLOWS.md)
 
 ## 2. 段階別手順
 
@@ -421,8 +421,8 @@ carry-over のルールは次です。
 
 ローカルの入口は次です。
 
-- [references/README.md](/workspace/references/README.md)
-- [workflow-references.md](/workspace/vendor/agent-canon/agents/workflows/workflow-references.md)
+- [references/README.md](../../../../references/README.md)
+- [workflow-references.md](../../../../agents/workflows/workflow-references.md)
 
 ### 実験手順・再現性
 

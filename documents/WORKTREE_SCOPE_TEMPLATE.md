@@ -46,11 +46,11 @@
 
 ## Required References Before Editing
 
-- [documents/worktree-lifecycle.md](/workspace/vendor/agent-canon/documents/worktree-lifecycle.md)
-- [documents/notes-lifecycle.md](/workspace/vendor/agent-canon/documents/notes-lifecycle.md)
-- [documents/repo-agent-runtime.md](/workspace/documents/repo-agent-runtime.md)
-- [notes/guardrails/README.md](/workspace/vendor/agent-canon/notes/guardrails/README.md)
-- [notes/failures/README.md](/workspace/vendor/agent-canon/notes/failures/README.md)
+- [documents/worktree-lifecycle.md](worktree-lifecycle.md)
+- [documents/notes-lifecycle.md](notes-lifecycle.md)
+- [documents/coding-conventions-project.md](coding-conventions-project.md)
+- [notes/guardrails/README.md](../notes/guardrails/README.md)
+- [notes/failures/README.md](../notes/failures/README.md)
 - `documents/<relevant_rule>.md`
 - `agents/skills/<relevant_skill>.md`
 - `notes/<existing_context>.md`

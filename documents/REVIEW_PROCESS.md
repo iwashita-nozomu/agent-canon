@@ -84,6 +84,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。
 1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
 1. 大規模 refactor では project review で stale path、delete 漏れ、cross-module drift、semantic delta 混入を確認します。
+1. 大規模改修、統合、rename、構成変更では review 中に、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書 path への参照 sweep を行い、reader が削除済み・置換済み surface へ誘導されないことを確認します。残っていれば `fix now` です。
 1. 長文文書では、別 reviewer による docs completeness review で reader が不足なく作業できるか確認します。
 1. document flow review で、上から順に読んだときの section order、用語導入、reader path を確認し、decision が `approve` でなければ designer に戻します。
 1. 学術文章では notation review で、記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認します。
@@ -91,6 +92,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. 実装中に checkpoint review を入れ、decision が `approve` でない限り implementer に戻します。
 1. checkpoint review と final acceptance review では、旧実装、移行用の別経路、temporary fallback、implementation copy、dated snapshot、backup file が tracked tree に残っていないことを確認します。残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書が最新実装と一致し、削除済み・置換済みの挙動や手順を reader に案内していないことを確認します。文書が現行実装を説明できていなければ `fix now` です。
+1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
 1. review artifact が `revise`、`required_change`、または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、修正の大小に関係なく required review family 全体を最新 diff に対してやり直します。直前の approve を流用して closeout してはいけません。
 1. 各 review では artifact に `request_clause_ids` があるか確認し、無い場合は差し戻します。
 1. final acceptance review では、全 must-do / completion-evidence clause が product surface、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応しているか確認します。
@@ -149,7 +151,7 @@ findings は少なくとも次に分けます。
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](/workspace/agents/TASK_WORKFLOWS.md)
-- [agents/canonical/ARTIFACT_PLACEMENT.md](/workspace/agents/canonical/ARTIFACT_PLACEMENT.md)
-- [agents/skills/README.md](/workspace/agents/skills/README.md)
-- [agents/workflows/workflow-references.md](/workspace/agents/workflows/workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../agents/TASK_WORKFLOWS.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../agents/canonical/ARTIFACT_PLACEMENT.md)
+- [agents/skills/README.md](../agents/skills/README.md)
+- [agents/workflows/workflow-references.md](../agents/workflows/workflow-references.md)

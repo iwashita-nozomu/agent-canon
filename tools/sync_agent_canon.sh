@@ -557,17 +557,18 @@ cmd_plan() {
     route="already_current_split"
   elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
     route="local_contains_remote"
-  elif find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
+  elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    if [ "$subtree_metadata" = "yes" ]; then
+      route="subtree_pull"
+    else
+      route="snapshot_import_no_subtree_metadata"
+    fi
+    requires_clean="yes"
+  elif [ -n "$local_split" ] && find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
     route="snapshot_import_tree_match"
     requires_clean="yes"
-  elif [ -n "$local_split" ] && ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
-    route="diverged_local_history"
-    requires_clean="yes"
-  elif [ -n "$local_split" ] && [ "$subtree_metadata" = "yes" ]; then
-    route="subtree_pull"
-    requires_clean="yes"
   elif [ -n "$local_split" ]; then
-    route="snapshot_import_no_subtree_metadata"
+    route="diverged_local_history"
     requires_clean="yes"
   elif find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
     route="snapshot_import_no_subtree"

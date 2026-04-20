@@ -20,26 +20,13 @@ Markdown Lint チェッカー（.markdownlint.json 規格準拠）
     python3 check_markdown_lint.py --fix documents/ scripts/
 """
 
-import argparse
-import glob
 import json
 import re
 import sys
+import glob
 from pathlib import Path
-from typing import Dict, List, Tuple
-
-
-def disabled_rules_for_file(filepath: str) -> set[str]:
-    """Return markdownlint rules disabled for the whole file."""
-    disabled: set[str] = set()
-    pattern = re.compile(r"<!--\s*markdownlint-disable-file\s+([A-Z0-9 ]+)\s*-->")
-    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            match = pattern.search(line)
-            if match is None:
-                continue
-            disabled.update(rule for rule in match.group(1).split() if rule)
-    return disabled
+from typing import List, Tuple, Dict
+import argparse
 
 
 class MarkdownLinter:
@@ -202,7 +189,6 @@ class MarkdownLinter:
 
     def scan_file(self, filepath: str) -> List[Tuple[int, str, str]]:
         """ファイルをスキャン"""
-        disabled_rules = disabled_rules_for_file(filepath)
         check_methods = [
             ("MD001", self.check_md001),
             ("MD003", self.check_md003),
@@ -215,8 +201,6 @@ class MarkdownLinter:
 
         all_issues = []
         for code, method in check_methods:
-            if code in disabled_rules:
-                continue
             if self.config.get(code) is not False:  # 有効な場合
                 try:
                     issues = method(filepath)

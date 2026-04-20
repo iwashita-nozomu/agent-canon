@@ -33,4 +33,4 @@
 
 ## Template
 
-- [BRANCH_NOTE_TEMPLATE.md](/workspace/vendor/agent-canon/notes/branches/BRANCH_NOTE_TEMPLATE.md)
+- [BRANCH_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/branches/BRANCH_NOTE_TEMPLATE.md)

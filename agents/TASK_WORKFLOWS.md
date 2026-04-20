@@ -4,7 +4,7 @@
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[agents/workflows/implementation-waterfall-workflow.md](/workspace/vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](../../../agents/workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
@@ -40,7 +40,6 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
    - `verifier`
 
 ルール:
-
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
@@ -151,12 +150,10 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 補足:
-
 - `--task-id` を使うと、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します
 - cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で足します
 
 包括的開発の固定 Codex stack:
-
 - `requirements_organizer`
 - `literature_researcher`
 - `execution_planner`
@@ -172,7 +169,6 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `worker`
 
 single-writer ルール:
-
 - 同一 worktree では `worker` だけが repo file を編集します
 - 同一 worktree で複数の write-capable subagent を走らせません
 - 同一ディレクトリの並列 write も許可しません
@@ -180,7 +176,6 @@ single-writer ルール:
 - parent は worktree ごとの結果を順番に統合します
 
 spawn budget ルール:
-
 - depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
 - 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
 - `Scoped Change` は同時 5 体までを既定にします
@@ -190,7 +185,6 @@ spawn budget ルール:
 - budget を増やしても write-capable subagent は同時 1 体までです
 
 concurrent spawn budget:
-
 - global runtime cap は `.codex/config.toml` の `max_threads = 12`
 - `Scoped Change`: parent を除いて同時 4-5 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 3-4 まで
 - `Research-Driven Change`: parent を除いて同時 6-8 agent を目安にします。perspective reviewer は batch で回します
@@ -203,13 +197,11 @@ concurrent spawn budget:
 ### 1. Scoped Change
 
 対象:
-
 - 局所バグ修正
 - 小規模な docs/test 同期
 - CI failure の切り分け
 
 標準フロー:
-
 1. 共通実装フローをそのまま 1 pass で通す
 1. 小さい変更でも `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を省略しない
 1. code や test を触る task では `test_designer` を省略しない
@@ -221,12 +213,10 @@ concurrent spawn budget:
 ### 2. Research-Driven Change
 
 対象:
-
 - 外部調査を伴う実装
 - benchmark や比較実験を根拠にした改善
 
 追加ロール:
-
 - `researcher`
 - `research_reviewer`
 - `experimenter`
@@ -239,7 +229,6 @@ concurrent spawn budget:
 - 必要に応じて `ml_science_reviewer`
 
 特徴:
-
 - research と experiment を evidence として回す
 - overclaim review を明示的に挟む
 - cost を気にしない default では、`report_reviewer` と research perspective reviewers を常時有効化します
@@ -254,18 +243,15 @@ concurrent spawn budget:
 ### 3. Large Delivery
 
 対象:
-
 - 新機能追加
 - 大規模 refactor
 - 複数 chunk に分ける delivery
 
 追加ロール:
-
 - `scheduler`
 - `schedule_reviewer`
 
 特徴:
-
 - milestone と chunk 境界を先に固定する
 - milestone ごとに実行計画と詳細設計を分ける
 - 各 chunk は checkpoint review までの subpass として閉じる
@@ -280,20 +266,17 @@ concurrent spawn budget:
 ### 4. Platform And Environment
 
 対象:
-
 - Docker
 - CI
 - automation
 - dependency / runtime upgrade
 
 追加ロール:
-
 - `infra_steward`
 - `infra_reviewer`
 - 必要に応じて `researcher`, `scheduler`, `experimenter`
 
 特徴:
-
 - `scheduler` と `schedule_reviewer` を省略せず、環境変更でも順序と handoff を固定する
 - rollout と rollback を先に考える
 - repo ルール、環境、automation を同時に更新する
@@ -307,13 +290,11 @@ concurrent spawn budget:
 ### 5. Comprehensive Development
 
 対象:
-
 - code、docs、tests、workflow、tools、Docker、CI をまたぐ repo-wide な整理
 - agent canon、tooling、implementation convention を同時に触る rearchitecture
 - 単一 chunk に閉じないが、1 つの umbrella plan で切りたい integrated delivery
 
 追加ロール:
-
 - `scheduler`
 - `schedule_reviewer`
 - `critical_guardian`
@@ -323,14 +304,12 @@ concurrent spawn budget:
 - `infra_reviewer`
 
 固定 Codex stack:
-
 - `project_reviewer`
 - `docs_workflow_steward`
 - `python_reviewer`
 - `cpp_reviewer`
 
 特徴:
-
 - 背骨は共通実装フローと `agents/workflows/implementation-waterfall-workflow.md` の gate をそのまま使う
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
@@ -343,13 +322,11 @@ concurrent spawn budget:
 ### 6. Adaptive Improvement Loop
 
 対象:
-
 - benchmark を見ながらの性能改善
 - tuning と比較実験を回しながらの段階的改造
 - 調査、実験、protocol refinement、code change をまとめた改善 loop
 
 追加ロール:
-
 - `researcher`
 - `research_reviewer`
 - `experimenter`
@@ -363,7 +340,6 @@ concurrent spawn budget:
 - 必要に応じて `ml_science_reviewer`
 
 特徴:
-
 - outer loop は agile、iteration backlog を持ちます
 - repo に持ち帰る各 extension は 1 回の waterfall pass として閉じます
 - `Question`、`Comparison Target`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を先に固定します

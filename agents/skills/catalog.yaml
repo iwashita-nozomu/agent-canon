@@ -57,30 +57,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
-  - id: framework-inventory
-    purpose: Inventory reusable APIs, runtimes, tests, and design docs before math-heavy changes.
-    canonical_doc: agents/skills/framework-inventory.md
-    shim: .agents/skills/framework-inventory/SKILL.md
-  - id: mathematical-formulation
-    purpose: Fix the canonical formulation, notation, objective, constraints, and comparison boundary before implementation.
-    canonical_doc: agents/skills/mathematical-formulation.md
-    shim: .agents/skills/mathematical-formulation/SKILL.md
-  - id: mathematical-validity-review
-    purpose: Review derivations, exactness claims, hidden assumptions, and formulation boundaries independently.
-    canonical_doc: agents/skills/mathematical-validity-review.md
-    shim: .agents/skills/mathematical-validity-review/SKILL.md
   - id: worktree-start
     purpose: Initialize or refresh worktree scope, action-log targets, and kickoff checks before editing.
     canonical_doc: agents/skills/worktree-start.md
     shim: .agents/skills/worktree-start/SKILL.md
-  - id: workscope-review
-    purpose: Review worktree or branch scope contracts for boundary sharpness and carry-over clarity.
-    canonical_doc: agents/skills/workscope-review.md
-    shim: .agents/skills/workscope-review/SKILL.md
-  - id: worktree-create
-    purpose: Create or recreate a worktree and produce a concrete lint-clean WORKTREE_SCOPE.md before editing.
-    canonical_doc: agents/skills/worktree-create.md
-    shim: .agents/skills/worktree-create/SKILL.md
   - id: worktree-health
     purpose: Review worktree scope, drift, and cleanup readiness.
     canonical_doc: agents/skills/worktree-health.md
