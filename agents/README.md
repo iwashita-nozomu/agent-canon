@@ -14,7 +14,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - [TASK_WORKFLOWS.md](../../../agents/TASK_WORKFLOWS.md)
   - workflow family と task 選択
 - [workflows/README.md](../../../agents/workflows/README.md)
-  - workflow canon の入口
+  - workflow catalog と routing guide の入口
 - [COMMUNICATION_PROTOCOL.md](../../../agents/COMMUNICATION_PROTOCOL.md)
   - handoff / review / escalation の正本
 - [task_catalog.yaml](../../../agents/task_catalog.yaml)
