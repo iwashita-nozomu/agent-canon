@@ -48,7 +48,7 @@
 
 - [documents/worktree-lifecycle.md](/workspace/vendor/agent-canon/documents/worktree-lifecycle.md)
 - [documents/notes-lifecycle.md](/workspace/vendor/agent-canon/documents/notes-lifecycle.md)
-- [documents/coding-conventions-project.md](/workspace/vendor/agent-canon/documents/coding-conventions-project.md)
+- [documents/repo-agent-runtime.md](/workspace/documents/repo-agent-runtime.md)
 - [notes/guardrails/README.md](/workspace/vendor/agent-canon/notes/guardrails/README.md)
 - [notes/failures/README.md](/workspace/vendor/agent-canon/notes/failures/README.md)
 - `documents/<relevant_rule>.md`

@@ -59,6 +59,13 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - [.github/AGENTS.md](/workspace/.github/AGENTS.md)
   - GitHub 側の薄い入口
 
+## Repo-Local Supplements
+
+- [documents/repo-agent-runtime.md](/workspace/documents/repo-agent-runtime.md)
+  - この repo 固有の context sweep、library sweep、integration rule
+- [documents/repo-workflow-references.md](/workspace/documents/repo-workflow-references.md)
+  - shared workflow references に対する repo 固有の reference collection 補助
+
 ## Skills And Subagents
 
 - Canonical project skills: `.agents/skills/`

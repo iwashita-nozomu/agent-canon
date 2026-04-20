@@ -21,6 +21,8 @@
 - [AGENTS.md](/workspace/AGENTS.md)
 - [CLAUDE.md](/workspace/CLAUDE.md)
 - [.github/copilot-instructions.md](/workspace/.github/copilot-instructions.md)
+- [documents/repo-agent-runtime.md](/workspace/documents/repo-agent-runtime.md)
+  - repo 固有の context/library sweep と local rule の補助 packet
 
 ## Skills
 
@@ -31,7 +33,7 @@
 
 標準の run bundle を作るときは次を使います。
 
-```
+```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
   --task-id T1 \
@@ -41,7 +43,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 研究・実験つき変更:
 
-```
+```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
@@ -51,7 +53,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 環境変更:
 
-```
+```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
@@ -61,7 +63,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 学術文章:
 
-```
+```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
@@ -71,7 +73,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 包括的開発:
 
-```
+```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
@@ -92,7 +94,7 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 
 artifact-only role や review role の write scope を確認するときは、`validate_role_write_scope.py` を使います。
 
-```
+```bash
 python3 tools/agent_tools/validate_role_write_scope.py \
   --report-dir reports/agents/<run-id> \
   --workspace-root "$PWD" \

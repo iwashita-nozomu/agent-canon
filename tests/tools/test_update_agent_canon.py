@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import shlex
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -23,26 +25,79 @@ REPO_ROOT = resolve_repo_root()
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
 
+    def overlay_tree(self, source_root: Path, target: Path, *, exclude_git: bool = True) -> None:
+        """Overlay one source tree onto one target directory."""
+        preserve_git_dir = exclude_git and (target / ".git").exists()
+        if shutil.which("rsync") is not None:
+            exclude_args = ["--exclude", ".git"] if exclude_git else []
+            subprocess.run(
+                ["rsync", "-a", "--delete", *exclude_args, f"{source_root}/", str(target)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return
+
+        for child in target.iterdir():
+            if exclude_git and child.name == ".git":
+                continue
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+        exclude_clause = 'if [ "$name" = ".git" ]; then continue; fi; ' if exclude_git else ""
+        overlay_command = (
+            "shopt -s dotglob nullglob && "
+            f"for entry in {shlex.quote(str(source_root))}/*; do "
+            'name="$(basename "$entry")"; '
+            f"{exclude_clause}"
+            f'cp -a "$entry" {shlex.quote(str(target))}/; '
+            "done"
+        )
+        subprocess.run(
+            [
+                "bash",
+                "-lc",
+                overlay_command,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        git_dir = target / ".git"
+        if preserve_git_dir and not git_dir.exists():
+            raise RuntimeError("clone overlay must preserve target .git directory")
+
+    def overlay_working_tree(self, target: Path) -> None:
+        """Overlay the current working tree onto one cloned repository."""
+        self.overlay_tree(REPO_ROOT, target, exclude_git=True)
+
     def clone_repo(self, target: Path) -> None:
         """Clone the current repository into one temporary target."""
+        clone_env = dict(os.environ)
+        gitconfig_path = target.parent / "clone-safe-directory.gitconfig"
+        gitconfig_path.write_text(
+            "[safe]\n\tdirectory = *\n",
+            encoding="utf-8",
+        )
+        clone_env["GIT_CONFIG_GLOBAL"] = str(gitconfig_path)
+        os.environ["GIT_CONFIG_GLOBAL"] = str(gitconfig_path)
         subprocess.run(
             ["git", "clone", "--no-local", str(REPO_ROOT), str(target)],
             check=True,
             capture_output=True,
             text=True,
+            env=clone_env,
         )
-        subprocess.run(
-            ["rsync", "-a", "--delete", "--exclude", ".git", f"{REPO_ROOT}/", str(target)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        self.overlay_working_tree(target)
         status = subprocess.run(
             ["git", "status", "--short"],
             cwd=target,
             check=True,
             capture_output=True,
             text=True,
+            env=clone_env,
         ).stdout.strip()
         if status:
             subprocess.run(
@@ -51,6 +106,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env=clone_env,
             )
             subprocess.run(
                 ["git", "config", "user.email", "update-agent-canon@example.invalid"],
@@ -58,6 +114,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env=clone_env,
             )
             subprocess.run(
                 ["git", "add", "-A"],
@@ -65,6 +122,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env=clone_env,
             )
             subprocess.run(
                 ["git", "commit", "-m", "test: overlay current working tree"],
@@ -72,6 +130,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env=clone_env,
             )
 
     def test_register_local_bare_seeds_remote_and_plan_uses_configured_remote(self) -> None:
@@ -392,12 +451,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
-            subprocess.run(
-                ["rsync", "-a", "--delete", "--exclude", ".git", f"{work_dir}/", str(clone_dir / "vendor" / "agent-canon")],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            self.overlay_tree(work_dir, clone_dir / "vendor" / "agent-canon", exclude_git=True)
             subprocess.run(["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True)
             subprocess.run(
                 [

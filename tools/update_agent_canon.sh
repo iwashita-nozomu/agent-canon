@@ -6,7 +6,7 @@ PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 DEFAULT_PROPOSAL_PREFIX="${AGENT_CANON_PROPOSAL_PREFIX:-canon-proposal}"
-DEFAULT_SHARED_SOURCE_REPO="${AGENT_CANON_SOURCE_REPO:-/mnt/l/workspace/agent-canon}"
+DEFAULT_SHARED_SOURCE_REPO="${AGENT_CANON_SOURCE_REPO:-}"
 
 usage() {
   cat <<EOF
@@ -336,7 +336,7 @@ cmd_register_local_bare() {
   ensure_bare_branch_exists "$bare_repo_path" "$branch" "$proposal_branch"
   cmd_register_remote "$bare_repo_path"
   if [[ -z "$source_repo" ]]; then
-    if [[ -d "${DEFAULT_SHARED_SOURCE_REPO}/.git" ]]; then
+    if [[ -n "$DEFAULT_SHARED_SOURCE_REPO" && -d "${DEFAULT_SHARED_SOURCE_REPO}/.git" ]]; then
       source_repo="${DEFAULT_SHARED_SOURCE_REPO}"
     else
       source_repo="$(configured_source_repo || true)"

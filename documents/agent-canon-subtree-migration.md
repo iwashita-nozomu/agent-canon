@@ -215,6 +215,7 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/.github/workflows/agent-coordination.yml` から root へ同期する copy surface
 
 重要:
+
 - subtree 配下にも `AGENTS.md` は置けますが、通常は canon 開発 subtree 用 override としてのみ使います
 - root runtime の正面入口は root に固定します
 - shared canon の source of truth は root 側ではなく `vendor/agent-canon/` です
@@ -226,6 +227,7 @@ root 側は次のような薄い wrapper と symlink view にします。
 - shared canon の更新は、明示的に subtree pull した branch にだけ反映されます
 
 つまり:
+
 - worktree は snapshot を使う仕組み
 - shared canon 更新は subtree sync で行う仕組み
 
@@ -297,7 +299,7 @@ bash tools/sync_agent_canon.sh status
 ```bash
 bash tools/update_agent_canon.sh register-local-bare \
   --bare-repo /mnt/git/<project>-agent-canon.git \
-  --source-repo /mnt/l/workspace/agent-canon
+  --source-repo <agent-canon-source-repo>
 ```
 
 この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
@@ -309,6 +311,7 @@ bash tools/update_agent_canon.sh register-local-bare \
 ### Phase 0. template 側の基盤整備
 
 この template で完了していること:
+
 - migration 正本を作る
 - `vendor/agent-canon/` の committed snapshot を置く
 - subtree sync script を追加する
@@ -319,21 +322,25 @@ bash tools/update_agent_canon.sh register-local-bare \
 ### Phase 1. upstream `agent-canon` repo を作る
 
 残タスク:
+
 - `vendor/agent-canon/` の履歴を upstream repo として切り出す
 - template 側に subtree remote を設定する
 - `subtree add / pull / push` の正規運用へ移る
 
 exit 条件:
+
 - upstream repo 単体で shared canon を保持できる
 - template / 派生 repo 側に subtree add / split できる snapshot history を持てる
 
 ### Phase 2. template bootstrap command を追加する
 
 候補:
+
 - `scripts/bootstrap_derived_repo.py`
 - `scripts/new_product.sh`
 
 役割:
+
 - template clone 後の repo 名差し替え
 - subtree remote 設定
 - optional pack 選択
@@ -343,18 +350,21 @@ exit 条件:
 ### root entrypoint が壊れる
 
 抑止:
+
 - root `AGENTS.md` と root `.codex/` の discovery path は最後まで消さない
 - wrapper は instance-local 情報だけに絞る
 
 ### shared canon と instance-local 文書が混ざる
 
 抑止:
+
 - `agent-canon` へ移す範囲を phase で分ける
 - Docker、server、experiment の文書は root 側に残す
 
 ### template / 派生 repo 側で直した canon を upstream へ戻せない
 
 抑止:
+
 - `vendor/agent-canon/` の変更は専用 commit に分ける
 - `git subtree push --prefix=vendor/agent-canon` を標準運用にする
 - 外部 repo をまだ作っていない段階では `snapshot` で vendor tree を更新し、repo 作成時に `git subtree split --prefix=vendor/agent-canon` から初期 history を切り出す
@@ -362,6 +372,7 @@ exit 条件:
 ### worktree ごとに shared canon がばらつく
 
 抑止:
+
 - それは意図した snapshot 運用とみなす
 - どの branch がどの subtree commit を含むかを commit history で追えるようにする
 
