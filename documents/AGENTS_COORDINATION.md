@@ -6,15 +6,15 @@
 
 - [agents/README.md](../agents/README.md)
 - [agents/canonical/README.md](../agents/canonical/README.md)
-- [agents/agents_config.json](../vendor/agent-canon/agents/agents_config.json)
-- [agents/TASK_WORKFLOWS.md](../vendor/agent-canon/agents/TASK_WORKFLOWS.md)
-- [agents/COMMUNICATION_PROTOCOL.md](../vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md)
-- [agents/canonical/ARTIFACT_PLACEMENT.md](../vendor/agent-canon/agents/canonical/ARTIFACT_PLACEMENT.md)
-- [agents/canonical/CLI_ENTRYPOINTS.md](../vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](../vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md)
-- [agents/canonical/CODEX_SUBAGENTS.md](../vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md)
+- [agents/agents_config.json](../agents/agents_config.json)
+- [agents/TASK_WORKFLOWS.md](../agents/TASK_WORKFLOWS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../agents/COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../agents/canonical/ARTIFACT_PLACEMENT.md)
+- [agents/canonical/CLI_ENTRYPOINTS.md](../agents/canonical/CLI_ENTRYPOINTS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../agents/canonical/CODEX_WORKFLOW.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md)
 - [agents/skills/README.md](../agents/skills/README.md)
-- [agents/skills/catalog.yaml](../vendor/agent-canon/agents/skills/catalog.yaml)
+- [agents/skills/catalog.yaml](../agents/skills/catalog.yaml)
 
 ## Runtime Entry Points
 

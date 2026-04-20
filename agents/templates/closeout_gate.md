@@ -15,6 +15,8 @@
 - overall_delivery_complete: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
+- post_fix_full_review_complete: no
+- canonical_tree_head_complete: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -32,6 +34,8 @@
 - overall_delivery_complete: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
+- post_fix_full_review_complete: yes
+- canonical_tree_head_complete: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -46,6 +50,14 @@
 ## Review Finding Integration Evidence
 
 <!-- Record every required review artifact and whether findings were fixed, escalated, or explicitly accepted as follow-up. Do not unlock completion while fix-now findings remain unapplied or unreviewed. -->
+
+## Post-Fix Full Review Evidence
+
+<!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
+
+## Canonical Tree-Head Evidence
+
+<!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
 
 ## Evidence
 

@@ -13,9 +13,9 @@
 
 ## Core References
 
-- `documents/paper-writing-workflow.md`
-- `documents/academic-writing-workflow.md`
-- `documents/long-form-writing-workflow.md`
+- `agents/workflows/paper-writing-workflow.md`
+- `agents/workflows/academic-writing-workflow.md`
+- `agents/workflows/long-form-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/academic-writing.md`

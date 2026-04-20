@@ -22,7 +22,7 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
   - `README.md`
   - `QUICK_START.md`
   - `documents/README.md`
-  - `documents/WORKFLOW_GUIDE.md`
+  - `agents/workflows/README.md`
   - `scripts/README.md`
   - `notes/README.md`
 
@@ -89,9 +89,9 @@ bash tools/sync_agent_canon.sh push
 ## 参照先
 
 - `README.md`
-- `documents/WORKFLOW_GUIDE.md`
+- `agents/workflows/README.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon-pr-workflow.md`
+- `agents/workflows/agent-canon-pr-workflow.md`
 - `tools/shared/error_handler.py`
 - `tools/validation/triplet_validator.py`
 - `tools/docs/audit_and_fix_links.py`
@@ -131,14 +131,14 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/agent-canon-subtree-migration.md` への symlink view
 - `documents/AGENTS_COORDINATION.md`
   - `vendor/agent-canon/documents/AGENTS_COORDINATION.md` への symlink view
-- `documents/academic-writing-workflow.md`
-  - `vendor/agent-canon/documents/academic-writing-workflow.md` への symlink view
+- `agents/workflows/academic-writing-workflow.md`
+  - `vendor/agent-canon/agents/workflows/academic-writing-workflow.md` への symlink view
 - `documents/REVIEW_PROCESS.md`
   - `vendor/agent-canon/documents/REVIEW_PROCESS.md` への symlink view
 - `documents/SHARED_RUNTIME_SURFACES.md`
   - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` への symlink view
-- `documents/WORKFLOW_GUIDE.md`
-  - `vendor/agent-canon/documents/WORKFLOW_GUIDE.md` への symlink view
+- `agents/workflows/README.md`
+  - `vendor/agent-canon/agents/workflows/README.md` への symlink view
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
   - `vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md` への symlink view
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
@@ -151,18 +151,18 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/experiment-registry.md` への symlink view
 - `documents/experiment-report-style.md`
   - `vendor/agent-canon/documents/experiment-report-style.md` への symlink view
-- `documents/experiment-workflow.md`
-  - `vendor/agent-canon/documents/experiment-workflow.md` への symlink view
+- `agents/workflows/experiment-workflow.md`
+  - `vendor/agent-canon/agents/workflows/experiment-workflow.md` への symlink view
 - `documents/experiment_runner.md`
   - `vendor/agent-canon/documents/experiment_runner.md` への symlink view
-- `documents/implementation-waterfall-workflow.md`
-  - `vendor/agent-canon/documents/implementation-waterfall-workflow.md` への symlink view
-- `documents/long-form-writing-workflow.md`
-  - `vendor/agent-canon/documents/long-form-writing-workflow.md` への symlink view
-- `documents/research-workflow.md`
-  - `vendor/agent-canon/documents/research-workflow.md` への symlink view
-- `documents/workflow-references.md`
-  - `vendor/agent-canon/documents/workflow-references.md` への symlink view
+- `agents/workflows/implementation-waterfall-workflow.md`
+  - `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md` への symlink view
+- `agents/workflows/long-form-writing-workflow.md`
+  - `vendor/agent-canon/agents/workflows/long-form-writing-workflow.md` への symlink view
+- `agents/workflows/research-workflow.md`
+  - `vendor/agent-canon/agents/workflows/research-workflow.md` への symlink view
+- `agents/workflows/workflow-references.md`
+  - `vendor/agent-canon/agents/workflows/workflow-references.md` への symlink view
 - `documents/worktree-lifecycle.md`
   - `vendor/agent-canon/documents/worktree-lifecycle.md` への symlink view
 - `documents/conventions/python/20_benchmark_policy.md`
@@ -264,8 +264,10 @@ bash tools/sync_agent_canon.sh pull
 ```
 
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
-`plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。
-`apply` は最終的に `ensure-latest` を呼びます。
+`plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。source repo が設定されていれば、`refresh -> local sync` 後の実効 route を表示します。
+`refresh-remote` は configured source repo の branch を `agent-canon` remote へ push し、remote snapshot を先に最新化します。
+`apply` は source repo が設定されていれば `refresh-remote` を先に実行し、そのあと `ensure-latest` を呼びます。
+source repo の優先順位は `AGENT_CANON_SOURCE_REPO`、`git config agent-canon.sourceRepo` です。source repo が missing / dirty の場合は refresh も local sync も行わず fail-closed で停止します。
 shared canon の差分を maintainer に渡すときは `proposal-branch` で既定 branch を確認し、`push-proposal` でその branch へ push します。
 
 `ensure-latest` は task 開始時の入口です。
@@ -274,7 +276,8 @@ clean worktree では upstream `agent-canon` と local subtree split を比較�
 別の upstream を使う場合は `AGENT_CANON_REMOTE_URL` を指定します。
 通常は `git subtree pull --squash` を使います。
 fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
-local と remote が diverge している場合は、shared canon の上書きを避けるため停止します。
+local subtree split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
+local split も current prefix tree も remote history に無い場合は、shared canon の上書きを避けるため fail-closed で停止します。proposal branch を maintainer が merge するか、shared canon change を upstream へ戻したあとで再実行します。
 dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
 
 ### 7.5 template / 派生 repo 側の shared canon 変更を upstream へ戻す
@@ -293,12 +296,13 @@ bash tools/sync_agent_canon.sh status
 
 ```bash
 bash tools/update_agent_canon.sh register-local-bare \
-  --bare-repo /mnt/git/<project>-agent-canon.git
+  --bare-repo /mnt/git/<project>-agent-canon.git \
+  --source-repo /mnt/l/workspace/agent-canon
 ```
 
 この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
 既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
-同時に `canon-proposal/<project-slug>` を既定 proposal branch として用意し、clone の git config に保存します。
+同時に `canon-proposal/<project-slug>` を既定 proposal branch として用意し、clone の git config に保存します。`--source-repo` を渡すと、その path も git config に保存され、以後の `apply` は `remote snapshot refresh -> local sync` の順で動きます。
 
 ## 8. 移行フェーズ
 
@@ -374,7 +378,7 @@ exit 条件:
 
 - [README.md](/mnt/l/workspace/project_template/README.md)
 - [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
-- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/documents/WORKFLOW_GUIDE.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/documents/workflow-references.md)
+- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
+- [workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
 - [README.md](/mnt/l/workspace/project_template/vendor/README.md)
 - [sync_agent_canon.sh](/mnt/l/workspace/project_template/tools/sync_agent_canon.sh)

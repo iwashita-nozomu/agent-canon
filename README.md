@@ -17,8 +17,9 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `.agents/skills/`
 - `.codex/agents/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/WORKFLOW_GUIDE.md`
-- `documents/agent-canon-pr-workflow.md`
+- `agents/workflows/README.md`
+  - workflow catalog と routing guide の入口
+- `agents/workflows/agent-canon-pr-workflow.md`
 - `documents/agent-canon-subtree-migration.md`
 
 ## 保守ルール
@@ -40,4 +41,4 @@ template 側で shared canon を直した変更を upstream `agent-canon` repo �
 bash tools/sync_agent_canon.sh push
 ```
 
-pull / push / PR の詳細は `documents/agent-canon-pr-workflow.md` を見ます。
+pull / push / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。

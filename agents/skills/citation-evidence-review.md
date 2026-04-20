@@ -13,8 +13,8 @@
 
 ## Core References
 
-- `documents/paper-writing-workflow.md`
-- `documents/academic-writing-workflow.md`
+- `agents/workflows/paper-writing-workflow.md`
+- `agents/workflows/academic-writing-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/templates/citation_evidence_review.md`
 

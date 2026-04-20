@@ -13,7 +13,10 @@
 
 ## Stable Preferences
 
-- まだなし
+
+- 2026-04-16 | Keep only canonical design and implementation paths in the tracked tree; reject non-canonical copies, snapshots, and backup files.
+  - source: chat
+  - rationale: User explicitly required current tree-head state as the only durable repo state.
 
 ## Provisional Preferences
 
@@ -72,16 +75,10 @@
 - 2026-04-11 | Do not stop to ask for push permission when push is a natural completion step; push directly unless I explicitly stop it or an external block exists.
   - source: chat
 
-- 2026-04-11 | Keep the native autodiff core narrow and readable; avoid redundant APIs/protocols and unnecessary extensibility.
+- 2026-04-11 | サブエージェントを実際に起動し、handoff では tree 順の文書探索ではなく packet path を明示してほしい
   - source: chat
 
-- 2026-04-12 | Avoid staged wording such as 'first'; detailed design should be framed as a closed complete scope rather than an incremental starting subset.
-  - source: chat
-
-- 2026-04-17 | Kokkos CPU backend は Serial を正本にせず OpenMP のみを canonical にしたい。
-  - source: chat
-
-- 2026-04-17 | Kokkos CPU backend では fallback を持たず、OpenMP が無ければ fail-closed error にしたい。
+- 2026-04-19 | 既存実装の再利用を強く優先し、新規実装の前に既存実装で足りない理由を明示してほしい
   - source: chat
 
 ## Promotion Candidates

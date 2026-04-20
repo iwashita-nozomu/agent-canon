@@ -16,13 +16,17 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
 
 from agent_team import (
     ROOT,
+    codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
     required_output_templates_missing,
+    resolve_cross_cutting_document_packet,
+    resolve_role_document_packet,
     resolve_role,
     task_ids,
+    workflow_spawn_budget,
 )
 
 
@@ -62,6 +66,17 @@ CODING_ROLE_IDS = {
 SPARK_CODING_ROLE_IDS = {
     "spark_worker",
 }
+
+
+def resolve_packet_probe_workspace() -> Path:
+    """Return the workspace root that should be used for packet path existence checks."""
+    candidate = ROOT.parent.parent.resolve()
+    try:
+        if (candidate / "vendor" / "agent-canon").resolve() == ROOT.resolve():
+            return candidate
+    except FileNotFoundError:
+        pass
+    return ROOT.resolve()
 
 
 def ensure(condition: bool, message: str) -> None:
@@ -176,11 +191,28 @@ def validate_team_config_references() -> None:
     for rule in config.activation_rules:
         ensure(rule["role"] in role_ids, f"activation rule references unknown role: {rule['role']}")
 
+    packet_probe_workspace = resolve_packet_probe_workspace()
+    packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
+    for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
+        ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
+    for role in config.always_on_roles + config.specialist_roles:
+        packet = resolve_role_document_packet(
+            config=config,
+            role=role,
+            report_dir=packet_probe_report_dir,
+            workspace_root=packet_probe_workspace,
+        )
+        for entry in packet.read_before_work:
+            if "/reports/agents/_packet_probe/" in str(entry.path):
+                continue
+            ensure(entry.path.exists(), f"{role.id} document packet path missing: {entry.path}")
+
 
 def validate_task_catalog_references() -> None:
     """Check task catalog roles and task-family relationships."""
     config = load_team_config()
     catalog = load_task_catalog(config)
+    runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     family_ids = {family["id"] for family in catalog.workflow_families}
 
@@ -192,6 +224,15 @@ def validate_task_catalog_references() -> None:
             ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
             for role_id in members:
                 ensure(role_id in role_ids, f"family {family['id']} references unknown role {role_id}")
+        active_budget, max_write_budget = workflow_spawn_budget(catalog, str(family["id"]))
+        ensure(
+            active_budget <= runtime_max_threads,
+            f"family {family['id']} active_subagents exceeds runtime max_threads",
+        )
+        ensure(
+            max_write_budget == 1,
+            f"family {family['id']} max_write_subagents must remain 1",
+        )
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)

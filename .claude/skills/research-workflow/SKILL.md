@@ -6,7 +6,7 @@ description: Use when a task needs external research, comparison design, iterati
 # Research Workflow
 
 1. Read `agents/skills/research-workflow.md`.
-1. Read `documents/research-workflow.md`.
+1. Read `agents/workflows/research-workflow.md`.
 1. If the task includes paper search or prior-art mapping, also read `agents/skills/literature-survey.md`.
 1. Fix the question, comparison targets, and exit criteria before implementing.
 1. Keep one change per loop iteration.

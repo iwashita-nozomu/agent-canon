@@ -13,8 +13,8 @@
 
 ## Must Read Before Reviewing
 
-- `documents/research-workflow.md`
-- `documents/experiment-workflow.md`
+- `agents/workflows/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
 - `documents/experiment-critical-review.md`
 - `documents/REVIEW_PROCESS.md`
 

@@ -37,7 +37,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 
 - experiment report の Markdown 正本は `experiments/report/<run_name>.md` を既定にします。
 - 対応する機械生成物は `experiments/<topic>/result/<run_name>/` に置きます。
-- report 本文からは、少なくとも `summary.json`、`cases.jsonl`、主要な図やログを辿れるようにします。
+- report 本文からは、少なくとも `eval_manifest.json`、`summary.json`、`cases.jsonl`、主要な図やログを辿れるようにします。
 - 複数 run をまたぐ考察は `notes/experiments/` や `notes/themes/` に分けます。
 
 ## 2.1 Title
@@ -347,7 +347,7 @@ repo では、次のラベルで observation と interpretation を分けると�
 ローカルの入口は次です。
 
 - [references/README.md](../references/README.md)
-- [workflow-references.md](workflow-references.md)
+- [workflow-references.md](../agents/workflows/workflow-references.md)
 
 - George Mason University Writing Center, [Writing an IMRaD Report](https://www.stat.cmu.edu/~brian/valerie/617-2022/week01/imrad%20advice/Writing_an_IMRAD_report.pdf)
 - George Mason University Writing Center, [Scientific (IMRaD) Research Reports — Results and Discussion Section](https://writingcenter.gmu.edu/writing-resources/imrad/imrad-results-discussion)

@@ -6,7 +6,7 @@ description: Use when agent-side working philosophy, interaction lessons, or tas
 # Agent Learning
 
 1. Read `agents/skills/agent-learning.md`.
-1. Read `documents/agent-learning-workflow.md`.
+1. Read `agents/workflows/agent-learning-workflow.md`.
 1. Separate user preference from agent-side learning.
 1. Log concise evidence-backed observations with `tools/agent_tools/log_agent_learning.py`.
 1. Keep raw chat out of notes; record source, evidence, scope, and confidence.

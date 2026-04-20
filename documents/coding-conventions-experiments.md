@@ -1,8 +1,8 @@
 # 実験運用規約
 
 この文書は、`experiments/` 配下の実験コード、benchmark、実験結果、実行環境の運用を扱います。
-研究の問い、数式、比較対象、逐次改造の記録方法は `documents/research-workflow.md` を正本とします。
-準備、実装、静的チェック、実行、結果レポートの標準手順は `documents/experiment-workflow.md` を参照してください。
+研究の問い、数式、比較対象、逐次改造の記録方法は `agents/workflows/research-workflow.md` を正本とします。
+準備、実装、静的チェック、実行、結果レポートの標準手順は `agents/workflows/experiment-workflow.md` を参照してください。
 
 ## 1. 対象
 
@@ -18,7 +18,7 @@
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
-- server 上の formal run では `result/<run_name>/run_manifest.json` と `run.log` を残します。
+- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`run.log` を残します。
 
 ## 3. 実行原則
 

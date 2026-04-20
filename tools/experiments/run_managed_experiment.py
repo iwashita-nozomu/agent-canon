@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -16,6 +17,9 @@ import time
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
+
+DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl")
+MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
 
 try:
     import tomllib
@@ -88,7 +92,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
-        help="Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, {manifest_path}.",
+        help=(
+            "Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, "
+            "{manifest_path}, {eval_manifest_path}."
+        ),
     )
     return parser.parse_args()
 
@@ -100,6 +107,20 @@ def load_registry(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError("experiment registry TOML root must be a table")
     return data
+
+
+def string_list(raw_value: object, key: str) -> list[str]:
+    """Return one normalized non-empty string list."""
+    if raw_value is None:
+        return []
+    if not isinstance(raw_value, list):
+        raise ValueError(f"{key} must be an array of strings")
+    values: list[str] = []
+    for index, item in enumerate(raw_value):
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{key}[{index}] must be a non-empty string")
+        values.append(item.strip())
+    return values
 
 
 def find_registry_topic(registry: dict[str, object], topic_name: str) -> dict[str, object] | None:
@@ -173,6 +194,7 @@ def render_report_stub(
     report_path: Path,
     result_dir: Path,
     manifest_path: Path,
+    eval_manifest_path: Path,
     command: list[str],
     created_at: str,
     branch: str | None,
@@ -190,6 +212,7 @@ def render_report_stub(
 - Created At (UTC): {created_at}
 - Result Dir: {result_dir}
 - Run Manifest: {manifest_path}
+- Eval Manifest: {eval_manifest_path}
 - Registry: {registry_text}
 - Branch: {branch_text}
 - Commit: {commit_text}
@@ -214,6 +237,7 @@ def render_report_stub(
 ## Reproducibility Record
 
 - `run_manifest.json`
+- `eval_manifest.json`
 - `run.log`
 - `summary.json`
 - `cases.jsonl`
@@ -283,9 +307,178 @@ def build_manifest(
     return manifest
 
 
+def write_json(path: Path, payload: dict[str, object]) -> None:
+    """Write one JSON object with canonical formatting."""
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
 def write_manifest(path: Path, manifest: dict[str, object]) -> None:
     """Write one manifest JSON file."""
-    path.write_text(json.dumps(manifest, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    write_json(path, manifest)
+
+
+def merge_unique_strings(*groups: list[str]) -> list[str]:
+    """Return one deduplicated list preserving first appearance order."""
+    merged: list[str] = []
+    for group in groups:
+        for value in group:
+            if value not in merged:
+                merged.append(value)
+    return merged
+
+
+def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
+    """Validate one eval artifact pattern list."""
+    for pattern in patterns:
+        pattern_path = Path(pattern)
+        if pattern_path.is_absolute():
+            raise ValueError(f"{key} must stay relative to result/<run_name>: {pattern}")
+        if ".." in pattern_path.parts:
+            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
+    return patterns
+
+
+def resolve_eval_artifact_patterns(
+    registry_defaults: dict[str, object],
+    registry_entry: dict[str, object] | None,
+) -> tuple[list[str], list[str]]:
+    """Return required and optional eval artifact patterns for one run."""
+    default_required = string_list(
+        registry_defaults.get("required_eval_artifacts"),
+        "defaults.required_eval_artifacts",
+    )
+    default_optional = string_list(
+        registry_defaults.get("optional_eval_artifacts"),
+        "defaults.optional_eval_artifacts",
+    )
+    entry_required = string_list(
+        registry_entry.get("required_eval_artifacts") if registry_entry is not None else None,
+        "topics.required_eval_artifacts",
+    )
+    entry_optional = string_list(
+        registry_entry.get("optional_eval_artifacts") if registry_entry is not None else None,
+        "topics.optional_eval_artifacts",
+    )
+    required = merge_unique_strings(
+        list(DEFAULT_REQUIRED_EVAL_ARTIFACTS),
+        default_required,
+        entry_required,
+    )
+    optional = merge_unique_strings(default_optional, entry_optional)
+    optional = [pattern for pattern in optional if pattern not in required]
+    return (
+        validate_eval_artifact_patterns(required, "required_eval_artifacts"),
+        validate_eval_artifact_patterns(optional, "optional_eval_artifacts"),
+    )
+
+
+def file_sha256(path: Path) -> str:
+    """Return the sha256 digest for one file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def artifact_kind(path: Path) -> str:
+    """Infer one artifact kind from the file suffix."""
+    suffix = path.suffix.lower()
+    if suffix == ".jsonl":
+        return "jsonl"
+    if suffix == ".json":
+        return "json"
+    if suffix == ".csv":
+        return "csv"
+    if suffix in {".txt", ".log", ".md"}:
+        return "text"
+    if suffix in {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".html"}:
+        return "rendered"
+    return "file"
+
+
+def line_count(path: Path) -> int:
+    """Return the number of lines in one file without assuming UTF-8 text."""
+    count = 0
+    saw_bytes = False
+    last_byte = b""
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            saw_bytes = True
+            last_byte = chunk[-1:]
+            count += chunk.count(b"\n")
+    if saw_bytes and last_byte != b"\n":
+        count += 1
+    return count
+
+
+def is_managed_run_artifact(path: Path, result_dir: Path) -> bool:
+    """Return whether one path is a reserved top-level managed artifact."""
+    return str(path.relative_to(result_dir)) in MANAGED_RUN_ARTIFACTS
+
+
+def collect_eval_artifacts(
+    result_dir: Path,
+    *,
+    topic: str,
+    run_name: str,
+    required_patterns: list[str],
+    optional_patterns: list[str],
+) -> dict[str, object]:
+    """Collect eval artifact metadata from one result directory."""
+    matched_patterns_by_path: dict[Path, list[str]] = {}
+    missing_required_patterns: list[str] = []
+
+    for pattern in required_patterns:
+        matches = sorted(
+            path
+            for path in result_dir.glob(pattern)
+            if path.is_file() and not is_managed_run_artifact(path, result_dir)
+        )
+        if not matches:
+            missing_required_patterns.append(pattern)
+            continue
+        for match in matches:
+            matched_patterns_by_path.setdefault(match, []).append(pattern)
+
+    for pattern in optional_patterns:
+        for match in sorted(
+            path
+            for path in result_dir.glob(pattern)
+            if path.is_file() and not is_managed_run_artifact(path, result_dir)
+        ):
+            matched_patterns_by_path.setdefault(match, []).append(pattern)
+
+    artifacts: list[dict[str, object]] = []
+    for path in sorted(matched_patterns_by_path, key=lambda item: str(item.relative_to(result_dir))):
+        artifact: dict[str, object] = {
+            "relative_path": str(path.relative_to(result_dir)),
+            "kind": artifact_kind(path),
+            "bytes": path.stat().st_size,
+            "sha256": file_sha256(path),
+            "matched_patterns": matched_patterns_by_path[path],
+        }
+        if artifact["kind"] in {"jsonl", "text", "csv"}:
+            artifact["line_count"] = line_count(path)
+        artifacts.append(artifact)
+
+    return {
+        "topic": topic,
+        "run_name": run_name,
+        "result_dir": str(result_dir),
+        "collected_at_utc": utc_now(),
+        "required_patterns": required_patterns,
+        "optional_patterns": optional_patterns,
+        "missing_required_patterns": missing_required_patterns,
+        "artifact_count": len(artifacts),
+        "artifacts": artifacts,
+    }
 
 
 def format_command(command: list[str], placeholders: dict[str, str]) -> list[str]:
@@ -394,7 +587,16 @@ def main() -> int:
     else:
         report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
     manifest_path = result_dir / "run_manifest.json"
+    eval_manifest_path = result_dir / "eval_manifest.json"
     log_path = result_dir / "run.log"
+    try:
+        required_eval_patterns, optional_eval_patterns = resolve_eval_artifact_patterns(
+            registry_defaults,
+            registry_entry,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     created_at = utc_now()
     placeholders = {
@@ -404,6 +606,7 @@ def main() -> int:
         "run_dir": str(result_dir),
         "report_path": str(report_path),
         "manifest_path": str(manifest_path),
+        "eval_manifest_path": str(eval_manifest_path),
         "log_path": str(log_path),
     }
 
@@ -447,7 +650,10 @@ def main() -> int:
         print(f"result_dir={result_dir}")
         print(f"report_path={report_path}")
         print(f"manifest_path={manifest_path}")
+        print(f"eval_manifest_path={eval_manifest_path}")
         print(f"command_source={command_source}")
+        print("required_eval_patterns=" + ",".join(required_eval_patterns))
+        print("optional_eval_patterns=" + ",".join(optional_eval_patterns))
         if command:
             print("command=" + shlex.join(command))
         return 0
@@ -471,6 +677,7 @@ def main() -> int:
                 report_path=report_path,
                 result_dir=result_dir,
                 manifest_path=manifest_path,
+                eval_manifest_path=eval_manifest_path,
                 command=command,
                 created_at=created_at,
                 branch=git_info.get("branch") if isinstance(git_info.get("branch"), str) else None,
@@ -495,10 +702,25 @@ def main() -> int:
     start_monotonic = time.monotonic()
     exit_code = stream_command(command, cwd=repo_root, env=env, log_path=log_path)
     finished_at = utc_now()
+    eval_collection = collect_eval_artifacts(
+        result_dir,
+        topic=args.topic,
+        run_name=run_name,
+        required_patterns=required_eval_patterns,
+        optional_patterns=optional_eval_patterns,
+    )
+    write_json(eval_manifest_path, eval_collection)
     manifest["finished_at_utc"] = finished_at
     manifest["duration_seconds"] = round(time.monotonic() - start_monotonic, 3)
     manifest["exit_code"] = exit_code
     manifest["status"] = "completed" if exit_code == 0 else "failed"
+    manifest["eval_artifacts"] = {
+        "eval_manifest_path": str(eval_manifest_path),
+        "required_patterns": required_eval_patterns,
+        "optional_patterns": optional_eval_patterns,
+        "collected_artifact_count": eval_collection["artifact_count"],
+        "missing_required_patterns": eval_collection["missing_required_patterns"],
+    }
     write_manifest(manifest_path, manifest)
     return exit_code
 

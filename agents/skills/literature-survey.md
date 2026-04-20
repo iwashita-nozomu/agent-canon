@@ -14,8 +14,8 @@
 
 ## Core References
 
-- `documents/research-workflow.md`
-- `documents/workflow-references.md`
+- `agents/workflows/research-workflow.md`
+- `agents/workflows/workflow-references.md`
 - `references/README.md`
 - 必要なら対象 topic の既存 `notes/themes/*.md`
 - 必要なら対象 topic の既存 `notes/experiments/*.md`
@@ -59,4 +59,4 @@
 - 研究全体の outer loop は `research-workflow` を使います
 - 実験結果の批判的評価は critical review を使います
 - reader-facing な report の確認は report review を使います
-- repo-wide な workflow や review policy の外部根拠索引は `documents/workflow-references.md` に残します
+- repo-wide な workflow や review policy の外部根拠索引は `agents/workflows/workflow-references.md` に残します

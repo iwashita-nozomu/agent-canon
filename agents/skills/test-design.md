@@ -13,7 +13,7 @@ approved design と既存 code path を静的解析し、最も意地の悪い e
 
 ## Core References
 
-- `documents/implementation-waterfall-workflow.md`
+- `agents/workflows/implementation-waterfall-workflow.md`
 - `documents/coding-conventions-python.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/templates/test_plan.md`

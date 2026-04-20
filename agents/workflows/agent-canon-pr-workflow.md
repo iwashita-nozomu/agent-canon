@@ -20,7 +20,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
-- file 構成変更を含む branch を `main` に戻すときは `documents/main-integration-workflow.md` を省略しません。
+- file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash tools/sync_agent_canon.sh push` を実行します。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
 
@@ -127,7 +127,7 @@ bash tools/update_agent_canon.sh push-proposal
 
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
-- `documents/main-integration-workflow.md`
+- `agents/workflows/main-integration-workflow.md`
 - `tools/sync_agent_canon.sh`
 - `tools/ci/check_agent_canon_pr.sh`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`

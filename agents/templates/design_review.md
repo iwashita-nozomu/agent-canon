@@ -17,9 +17,21 @@
 
 <!-- Check whether existing code, naming, APIs, tests, and docs style are being followed. -->
 
+## Cross-Doc Coverage Review
+
+<!-- Check whether the design looked beyond the parent document chain and covered relevant cross-cutting docs such as review policy, guardrails, notes lifecycle, learning workflow, and migration/integration docs. Return revise if the design stayed inside one document branch and missed adjacent governing docs. -->
+
+## Upstream Requirement Packet Review
+
+<!-- Check whether the design explicitly cites the upstream documented requirement packet: request contract, schedule, intent brief, waterfall docs, and other governing documents. Return revise if the design appears to rely on chat-only memory. -->
+
 ## Implementation Source Packet Review
 
 <!-- Check whether the design names every required read-before-edit artifact: request contract, schedule, design, design review, document flow review, test plan, repo docs, code paths, tests, and external references. Return revise if the worker would need chat context or unstated assumptions. -->
+
+## Canonical Tree-Head Review
+
+<!-- Check whether the design fixes the canonical design-document paths and implementation paths that may remain in the tracked tree, and whether it explicitly deletes or forbids non-canonical drafts, snapshots, mirrored directories, backup files, or copied implementations. Return revise if the task would preserve multiple truths beyond the current tree head. -->
 
 ## Identifier And Naming Review
 

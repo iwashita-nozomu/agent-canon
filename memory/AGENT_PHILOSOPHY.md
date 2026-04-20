@@ -92,11 +92,11 @@
   - confidence: tentative
   - evidence: 2026-04-11 user: '毎回Pushの運用はやりすぎかもしれません... Pushするのが自然なら許可を取らずにpushです'
 
-- 2026-04-11 | interaction-observation | When the user is pruning core API surface, prefer converging to one canonical protocol before adding sugar or extension points.
+- 2026-04-11 | interaction-observation | 文書導線を tree-first にすると sibling docs への注意が落ちやすいので、subagent handoff は cross-cutting packet を先に固定してから task packet に入れる
   - source: chat
   - scope: repo-wide
   - confidence: tentative
-  - evidence: The user repeatedly asked to remove redundant routes, keep code readable, and make one protocol canonical before adding sugar.
+  - evidence: 2026-04-11 user feedback on document intake and subagent startup
 
 ## Task Retrospectives
 

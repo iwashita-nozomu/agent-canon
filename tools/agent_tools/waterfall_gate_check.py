@@ -68,7 +68,9 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             "design_brief.md",
             require_filled=True,
             required_sections=(
+                "## Upstream Requirement Packet",
                 "## Implementation Source Packet",
+                "## Canonical Tree-Head Plan",
                 "## Design-To-Implementation Trace",
             ),
         ),
@@ -77,7 +79,9 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             require_filled=True,
             require_approve=True,
             required_sections=(
+                "## Upstream Requirement Packet Review",
                 "## Implementation Source Packet Review",
+                "## Canonical Tree-Head Review",
                 "## Design-To-Implementation Trace Review",
             ),
         ),
@@ -91,7 +95,10 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             "change_review.md",
             require_filled=True,
             require_approve=True,
-            required_sections=("## Design-Base Implementation Review",),
+            required_sections=(
+                "## Design-Base Implementation Review",
+                "## Canonical Tree-Head Review",
+            ),
         ),
     ),
     "final": (
@@ -104,6 +111,8 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
                 "## Planned Work Completion Review",
                 "## Spec-To-Product Coverage Review",
                 "## Review Finding Incorporation Review",
+                "## Post-Fix Full Review Rerun Review",
+                "## Canonical Tree-Head Acceptance",
             ),
         ),
         ArtifactCheck(

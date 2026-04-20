@@ -13,9 +13,17 @@
 
 <!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
 
+## Cross-Doc Coverage Review
+
+<!-- Check whether the implementer and parent used the cross-cutting packet rather than relying only on one workflow branch. Return revise if relevant review, guardrail, migration, or lifecycle docs were omitted from the implementation basis. -->
+
 ## Design-Base Implementation Review
 
 <!-- Check whether each changed slice cites an approved design artifact path and section, user-request clause ID, source/reuse document or code path, and test-plan item. Return revise for missing citations. Return escalate for design drift or design gaps. -->
+
+## Canonical Tree-Head Review
+
+<!-- Confirm that the diff updates only the canonical implementation paths declared by the design and that no non-canonical design doc, copied implementation, backup file, snapshot tree, or alternate truth surface remains in the tracked tree. Return revise if any parallel state remains. -->
 
 ## Remaining Work Review
 
@@ -27,7 +35,11 @@
 
 ## Revision Loop
 
-<!-- Record what the implementer must revise before the next checkpoint review. -->
+<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the full required review set on the refreshed diff. -->
+
+## Post-Review Fix Rerun Requirement
+
+<!-- If this review requires any fix, state that every required review family must rerun on the updated diff before closeout, even when the implementer believes the fix is tiny. List the review artifacts that must be refreshed. -->
 
 ## Follow-Up
 

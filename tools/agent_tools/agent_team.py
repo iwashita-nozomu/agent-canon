@@ -11,6 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +43,103 @@ CPP_PATH_MARKERS = (
     "include/",
     "lib/",
 )
+ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
+    "manager": {
+        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "notes": "Requirements and planning start from explicit documented clauses and stage plan.",
+    },
+    "designer": {
+        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "workspace_paths": [
+            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/canonical/CODEX_WORKFLOW.md",
+        ],
+        "notes": "Detailed design must read upstream documented requirements and waterfall rules before design begins.",
+    },
+    "design_reviewer": {
+        "artifact_keys": ["user_request_contract", "schedule", "design_brief"],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Design review checks the same upstream packet and the resulting design brief.",
+    },
+    "test_designer": {
+        "artifact_keys": ["user_request_contract", "schedule", "design_brief", "design_review"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "notes": "Test design derives cases from the approved design packet.",
+    },
+    "implementer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "document_flow_review",
+            "test_plan",
+        ],
+        "workspace_paths": [
+            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/canonical/CODEX_WORKFLOW.md",
+        ],
+        "must_cite_before_edit": True,
+        "notes": "Implementation must read and cite the approved design packet before editing.",
+    },
+    "change_reviewer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "test_plan",
+            "change_review",
+        ],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Checkpoint review verifies that implementation cited the approved packet.",
+    },
+    "final_reviewer": {
+        "artifact_keys": [
+            "user_request_contract",
+            "schedule",
+            "design_brief",
+            "design_review",
+            "test_plan",
+            "final_review",
+        ],
+        "workspace_paths": ["documents/REVIEW_PROCESS.md"],
+        "notes": "Final review verifies whole-request traceability back to the approved packet.",
+    },
+    "scheduler": {
+        "artifact_keys": ["user_request_contract", "schedule"],
+        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "notes": "Scheduling reads explicit requirement and plan surfaces.",
+    },
+}
+COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
+    "documents/REVIEW_PROCESS.md",
+    "documents/AGENTS_COORDINATION.md",
+    "documents/coding-conventions-python.md",
+    "documents/notes-lifecycle.md",
+    "agents/workflows/agent-learning-workflow.md",
+    "documents/agent-canon-subtree-migration.md",
+    "notes/guardrails/README.md",
+    "notes/guardrails/engineering_avoidances.md",
+    "docker/README.md",
+    "memory/USER_PREFERENCES.md",
+    "memory/AGENT_PHILOSOPHY.md",
+)
+
+
+def resolve_report_root(
+    report_root: str | None,
+    workspace_root: Path | None = None,
+) -> Path:
+    """Resolve the report root relative to the active workspace by default."""
+    base_root = workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    if report_root is None:
+        return (base_root / DEFAULT_REPORT_ROOT).resolve()
+    candidate = Path(report_root)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (base_root / candidate).resolve()
 
 
 def resolve_report_root(
@@ -89,6 +190,35 @@ class RoleWriteScope:
     worktree_scope_file: Path | None
     unresolved_reason: str | None
     notes: str
+
+
+@dataclass(frozen=True)
+class DocumentPacketEntry:
+    """One explicit path a role must read before work."""
+
+    path: Path
+    rationale: str
+
+
+@dataclass(frozen=True)
+class RoleDocumentPacket:
+    """Resolved explicit document packet for one role."""
+
+    role_id: str
+    read_before_work: tuple[DocumentPacketEntry, ...]
+    must_cite_before_edit: bool
+    notes: str
+
+
+def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[DocumentPacketEntry, ...]:
+    """Resolve the common cross-cutting document packet for one workspace."""
+    return tuple(
+        DocumentPacketEntry(
+            path=(workspace_root / relative_path).resolve(),
+            rationale=f"cross_cutting_doc:{relative_path}",
+        )
+        for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
+    )
 
 
 @dataclass(frozen=True)
@@ -246,6 +376,34 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
     raise KeyError(f"unknown workflow family: {family_id}")
 
 
+def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
+    """Return the active and write-capable spawn budget for one workflow family."""
+    family = resolve_workflow_family(catalog, family_id)
+    raw_budget = family.get("spawn_budget")
+    if not isinstance(raw_budget, dict):
+        raise RuntimeError(f"workflow family spawn_budget must be a mapping for {family_id}")
+    active = raw_budget.get("active_subagents")
+    max_write = raw_budget.get("max_write_subagents")
+    if not isinstance(active, int) or active < 1:
+        raise RuntimeError(f"workflow family active_subagents must be >= 1 for {family_id}")
+    if not isinstance(max_write, int) or max_write < 1:
+        raise RuntimeError(f"workflow family max_write_subagents must be >= 1 for {family_id}")
+    return active, max_write
+
+
+def codex_runtime_max_threads() -> int:
+    """Return the configured runtime max_threads from .codex/config.toml."""
+    config_path = ROOT / ".codex" / "config.toml"
+    data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    agents = data.get("agents")
+    if not isinstance(agents, dict):
+        raise RuntimeError("missing [agents] section in .codex/config.toml")
+    max_threads = agents.get("max_threads")
+    if not isinstance(max_threads, int) or max_threads < 1:
+        raise RuntimeError("agents.max_threads must be an integer >= 1")
+    return max_threads
+
+
 def default_specialists_for_task(
     config: TeamConfig,
     catalog: TaskCatalog,
@@ -331,6 +489,63 @@ def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ..
         if artifact not in unique_artifacts:
             unique_artifacts.append(artifact)
     return tuple(unique_artifacts)
+
+
+def resolve_role_document_packet(
+    config: TeamConfig,
+    role: Role,
+    report_dir: Path,
+    workspace_root: Path,
+) -> RoleDocumentPacket:
+    """Resolve explicit read-before-work packet for one role."""
+    spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
+    artifact_keys = _as_string_tuple(
+        spec.get("artifact_keys"),
+        f"document_packet[{role.id}].artifact_keys",
+    )
+    workspace_paths = _as_string_tuple(
+        spec.get("workspace_paths"),
+        f"document_packet[{role.id}].workspace_paths",
+    )
+    entries: list[DocumentPacketEntry] = []
+    seen_paths: set[Path] = set()
+
+    def add_entry(entry: DocumentPacketEntry) -> None:
+        resolved_path = entry.path.resolve()
+        if resolved_path in seen_paths:
+            return
+        seen_paths.add(resolved_path)
+        entries.append(
+            DocumentPacketEntry(
+                path=resolved_path,
+                rationale=entry.rationale,
+            )
+        )
+
+    for artifact_key in artifact_keys:
+        if artifact_key not in config.artifacts:
+            raise RuntimeError(f"document packet artifact key missing for role {role.id}: {artifact_key}")
+        add_entry(
+            DocumentPacketEntry(
+                path=(report_dir / config.artifacts[artifact_key]).resolve(),
+                rationale=f"run artifact:{artifact_key}",
+            )
+        )
+    for relative_path in workspace_paths:
+        add_entry(
+            DocumentPacketEntry(
+                path=(workspace_root / relative_path).resolve(),
+                rationale=f"workspace doc:{relative_path}",
+            )
+        )
+    for entry in resolve_cross_cutting_document_packet(workspace_root):
+        add_entry(entry)
+    return RoleDocumentPacket(
+        role_id=role.id,
+        read_before_work=tuple(entries),
+        must_cite_before_edit=bool(spec.get("must_cite_before_edit", False)),
+        notes=str(spec.get("notes", "")),
+    )
 
 
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
@@ -444,14 +659,16 @@ def build_manifest(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
-        "roles:",
     ]
     communication_protocol = config.team.get("communication_protocol")
     if communication_protocol is not None:
-        lines.insert(
-            9,
-            f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}",
-        )
+        lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
+    lines.append("  cross_cutting_document_packet:")
+    cross_cutting_packet = resolve_cross_cutting_document_packet(workspace_root)
+    for entry in cross_cutting_packet:
+        lines.append(f"    - path: {str(entry.path)!r}")
+        lines.append(f"      rationale: {entry.rationale!r}")
+    lines.append("roles:")
     for role in roles:
         lines.append(f"  - id: {role.id}")
         lines.append(f"    activation: {role.activation}")
@@ -487,6 +704,17 @@ def build_manifest(
         lines.append("      allowed_directories:")
         for path in scope.allowed_directories:
             lines.append(f"        - {str(path)!r}")
+        document_packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+        lines.append("    document_packet:")
+        lines.append(
+            f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
+        )
+        if document_packet.notes:
+            lines.append(f"      notes: {document_packet.notes!r}")
+        lines.append("      read_before_work:")
+        for entry in document_packet.read_before_work:
+            lines.append(f"        - path: {str(entry.path)!r}")
+            lines.append(f"          rationale: {entry.rationale!r}")
     lines.append("context_policies:")
     for policy in config.context_policies:
         lines.append("  - roles:")

@@ -7,17 +7,22 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
+from agent_canon_preflight import project_root_from_script, run_agent_canon_preflight
 from agent_team import (
     auto_language_specialists,
+    codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
     load_team_config,
     load_task_catalog,
     make_run_id,
+    resolve_role_document_packet,
+    resolve_cross_cutting_document_packet,
     select_roles,
     specialist_role_ids,
     task_ids,
     TeamConfig,
+    workflow_spawn_budget,
     resolve_report_root,
 )
 
@@ -28,6 +33,23 @@ def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
         if role.id == role_id:
             return role.codex_agents
     return ()
+
+
+def document_packet_output(
+    config: TeamConfig,
+    role_id: str,
+    report_dir: Path,
+    workspace_root: Path,
+) -> str:
+    """Render one role's explicit document packet as a CSV-like path list."""
+    role = next(role for role in config.always_on_roles + config.specialist_roles if role.id == role_id)
+    packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
+    return ",".join(str(entry.path) for entry in packet.read_before_work)
+
+
+def cross_cutting_document_packet_output(workspace_root: Path) -> str:
+    """Render the common cross-cutting document packet."""
+    return ",".join(str(entry.path) for entry in resolve_cross_cutting_document_packet(workspace_root))
 
 
 def build_parser(
@@ -94,6 +116,11 @@ def build_parser(
         action="store_true",
         help="Preview the run id and paths without writing files.",
     )
+    parser.add_argument(
+        "--skip-agent-canon-preflight",
+        action="store_true",
+        help="Skip the automatic make agent-canon-ensure-latest preflight.",
+    )
     return parser
 
 
@@ -102,6 +129,12 @@ def main() -> int:
     config = load_team_config()
     catalog = load_task_catalog(config)
     args = build_parser(specialist_role_ids(config), task_ids(catalog)).parse_args()
+    project_root = project_root_from_script(Path(__file__))
+    try:
+        preflight = run_agent_canon_preflight(project_root, skip=args.skip_agent_canon_preflight)
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 1
     created_at = datetime.now(timezone.utc).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     workspace_root = Path(args.workspace_root).resolve()
@@ -111,7 +144,14 @@ def main() -> int:
     enabled_specialists = list(args.enable)
     task_default_specialists: tuple[str, ...] = ()
     auto_specialists: tuple[str, ...] = ()
+    workflow_active_spawn_budget: int | None = None
+    workflow_max_write_subagents: int | None = None
     if args.task_id is not None:
+        task_spec = next(task for task in catalog.tasks if task["id"] == args.task_id)
+        workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
+            catalog,
+            str(task_spec["family"]),
+        )
         task_default_specialists = default_specialists_for_task(
             config=config,
             catalog=catalog,
@@ -144,15 +184,28 @@ def main() -> int:
             workspace_root=workspace_root,
         )
 
+    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
+    print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
+    print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
+    print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
+    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
+        print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
+        print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
     if not args.no_auto_language_reviewers:
         print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
     print(f"IMPLEMENTATION_CODEX_AGENTS={','.join(codex_agents_for_role(config, 'implementer'))}")
+    print(f"CROSS_CUTTING_DOCUMENT_PACKET={cross_cutting_document_packet_output(workspace_root)}")
+    print(f"DESIGN_DOCUMENT_PACKET={document_packet_output(config, 'designer', report_dir, workspace_root)}")
+    print(
+        "IMPLEMENTATION_DOCUMENT_PACKET="
+        f"{document_packet_output(config, 'implementer', report_dir, workspace_root)}"
+    )
     if args.dry_run:
         print("DRY_RUN=1")
     else:

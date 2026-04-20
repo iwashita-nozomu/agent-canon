@@ -29,6 +29,8 @@ durable な正本は常に topic 名です。
 - `default_variant`
 - `smoke_inner_command`
 - `formal_inner_command`
+- 必要なら `required_eval_artifacts`
+- 必要なら `optional_eval_artifacts`
 
 ## branch / worktree metadata
 
@@ -61,6 +63,7 @@ python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
 - formal run は `tools/experiments/run_managed_experiment.py` を使います。
 - 可能なら `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
+- `required_eval_artifacts` と `optional_eval_artifacts` は `result/<run_name>/` から自動収集したい eval artifact pattern を表します。`summary.json` と `cases.jsonl` は managed runner の既定 required eval とし、topic 固有の追加 artifact だけを registry に書き足します。top-level managed file (`run_manifest.json`、`eval_manifest.json`、`run.log`) は reserved で、pattern に指定してはいけません。
 
 ## validation
 

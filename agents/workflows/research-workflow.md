@@ -4,7 +4,7 @@
 対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`notes/` への知見整理を含みます。
 準備、実装、静的チェック、実行、結果レポートを通した実務上の統合入口は [experiment-workflow.md](experiment-workflow.md) を参照してください。
 この文書は、とくに問い、定式化、比較設計、段階的改造、claim 更新の正本を担います。
-批判的レビューの具体的な観点は [experiment-critical-review.md](experiment-critical-review.md) を参照してください。
+批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を参照してください。
 
 ## 1. 目的
 
@@ -347,7 +347,7 @@ spot run は次の用途での使用を禁止します。
 ## 8.5 考察に対する批判的レビュー
 
 `experiment_reviewer` は、数字そのものだけでなく、数字の読み方を批判的に見ます。
-最低限の review 観点は [experiment-critical-review.md](experiment-critical-review.md) に従います。
+最低限の review 観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) に従います。
 
 最低でも次を確認します。
 
@@ -399,7 +399,7 @@ review artifact では、次のラベルで切り分けます。
 
 ## 12. 推奨ファイル配置
 
-- workflow の正本: `documents/research-workflow.md`
+- workflow の正本: `agents/workflows/research-workflow.md`
 - report 体裁の正本: `documents/experiment-report-style.md`
 - 実験運用規約: `documents/coding-conventions-experiments.md`
 - worktree 規約: `documents/worktree-lifecycle.md`

@@ -4,7 +4,7 @@
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[documents/implementation-waterfall-workflow.md](../documents/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](../../../agents/workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
@@ -50,10 +50,11 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
-- 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、code path、test plan、request clause ID を固定します
+- 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
 - design packet から trace できない変更は実装せず、Gate 5-6 へ戻します
-- 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary を徹底的に踏襲します
+- 実装では既存コード、既存の命名、既存の文書スタイル、既存の module boundary、導入済みライブラリを徹底的に踏襲します
+- 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
 - rate-limit pressure が強い場合は、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
@@ -65,7 +66,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
 - user-facing completion は、全 active clause、全 planned work unit、final review、validation、closeout gate、commit / push が揃ったときだけ返します
-- branch 側で file 構成変更をした pass は、closeout 前に `documents/main-integration-workflow.md` の integration step まで設計します
+- branch 側で file 構成変更をした pass は、closeout 前に `agents/workflows/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 - `/mnt/git` 配下の log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
@@ -174,6 +175,23 @@ single-writer ルール:
 - 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます
 - parent は worktree ごとの結果を順番に統合します
 
+spawn budget ルール:
+- depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
+- 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
+- `Scoped Change` は同時 5 体までを既定にします
+- `Large Delivery` / `Platform And Environment` は同時 6 体までを既定にします
+- `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 8 体までを既定にします
+- budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
+- budget を増やしても write-capable subagent は同時 1 体までです
+
+concurrent spawn budget:
+- global runtime cap は `.codex/config.toml` の `max_threads = 12`
+- `Scoped Change`: parent を除いて同時 4-5 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 3-4 まで
+- `Research-Driven Change`: parent を除いて同時 6-8 agent を目安にします。perspective reviewer は batch で回します
+- `Platform And Environment` と `Large Delivery`: parent を除いて同時 5-6 agent を目安にします。planning / design / review を wave に分けます
+- `Comprehensive Development` と `Adaptive Improvement Loop`: parent を除いて同時 6-8 agent を目安にします。review pack はまとめて起こさず、intake・implementation・wrap-up の波に分けます
+- depth は固定しませんが、cap を超える fan-out は許可しません。必要な role が多いときは stage を細かく切って順次起動します
+
 ## Workflow Families
 
 ### 1. Scoped Change
@@ -190,6 +208,7 @@ single-writer ルール:
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
+1. active な subagent は同時 5 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
 
 ### 2. Research-Driven Change
 
@@ -218,6 +237,7 @@ single-writer ルール:
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
 - agent が code change と run を継続反復する場合は `adaptive-improvement-loop` を追加する
 - methodology、artifact、reporting policy を大きく変える場合は perspective reviewers を default にします
+- active な subagent は同時 8 体までを既定にし、追加枠は read-only reviewer / researcher に使います
 - repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
 
 ### 3. Large Delivery
@@ -290,7 +310,7 @@ single-writer ルール:
 - `cpp_reviewer`
 
 特徴:
-- 背骨は共通実装フローと `documents/implementation-waterfall-workflow.md` の gate をそのまま使う
+- 背骨は共通実装フローと `agents/workflows/implementation-waterfall-workflow.md` の gate をそのまま使う
 - task を docs / tools / runtime / implementation に分解しても、requirements、plan、design は 1 つの umbrella pass で閉じる
 - `project_reviewer` を intake と closeout の両方で使い、repo-wide completeness と integration risk を確認する
 - `docs_workflow_steward` は canon docs、workflow docs、entrypoint wrapper の整理に限定して使う
@@ -347,5 +367,5 @@ single-writer ルール:
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
 - `agents/canonical/CLI_ENTRYPOINTS.md`
-- `documents/experiment-workflow.md`
-- `documents/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
+- `agents/workflows/research-workflow.md`

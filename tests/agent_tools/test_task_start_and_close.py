@@ -88,6 +88,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "src/example.cpp",
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -96,13 +97,25 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
+            self.assertIn("/notes/guardrails/README.md", result.stdout)
+            self.assertIn("/docker/README.md", result.stdout)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
+            self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT=", result.stdout)
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
@@ -133,6 +146,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "python/example.py",
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -141,6 +155,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$behavior-preserving-refactor",
                 result.stdout,
@@ -164,6 +181,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -172,10 +190,64 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
+            self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
+            self.assertIn("/notes/guardrails/README.md", result.stdout)
+            self.assertIn("/docker/README.md", result.stdout)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
+            self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
+            self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            self.assertIn("cross_cutting_document_packet:", manifest_text)
+            self.assertIn("document_packet:", manifest_text)
+            self.assertIn("must_cite_before_edit: true", manifest_text)
+            self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
+            self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
+            self.assertIn("/notes/guardrails/README.md", manifest_text)
+            self.assertIn("/docker/README.md", manifest_text)
+            self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
+
+    def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
+        """bootstrap_agent_run should emit runtime and workflow spawn limits for machine use."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "mechanical spawn budget",
+                    "--task-id",
+                    "T8",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-bootstrap-spawn-budget",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
@@ -195,6 +267,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -238,6 +311,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -287,6 +361,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: yes",
+                        "- canonical_tree_head_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -332,6 +408,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -382,6 +459,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: yes",
+                        "- canonical_tree_head_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -412,6 +491,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
             self.assertIn("SPEC_PRODUCT_COVERAGE_COMPLETE=yes", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
+            self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
+            self.assertIn("CANONICAL_TREE_HEAD_COMPLETE=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:
@@ -464,6 +545,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: no",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: yes",
+                        "- canonical_tree_head_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -543,6 +626,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
+                        "- post_fix_full_review_complete: no",
+                        "- canonical_tree_head_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -572,6 +657,186 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("spec_product_coverage_complete", result.stdout)
             self.assertIn("review_findings_integrated", result.stdout)
 
+    def test_task_close_rejects_missing_post_fix_full_review_completion(self) -> None:
+        """task_close should fail when review-driven fixes skipped the final full rerun."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-post-fix-review"
+            report_dir = report_root / run_id
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "closeout missing post-fix full review",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (report_dir / "verification.txt").write_text(
+                "\n".join(
+                    [
+                        f"run_id={run_id}",
+                        "task=closeout missing post-fix full review",
+                        "owner=codex",
+                        "created_at_utc=2026-04-08T00:00:00Z",
+                        "status=pass",
+                        "user_completion_report=unlocked",
+                        "closeout_gate_status=resolved",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "closeout_gate.md").write_text(
+                "\n".join(
+                    [
+                        "# Closeout Gate",
+                        "",
+                        "- verifier_status: pass",
+                        "- auditor_status: resolved",
+                        "- required_reviews_complete: yes",
+                        "- validation_complete: yes",
+                        "- request_contract_complete: yes",
+                        "- all_planned_chunks_complete: yes",
+                        "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: no",
+                        "- canonical_tree_head_complete: yes",
+                        "- commit_created: yes",
+                        "- push_completed: yes",
+                        "- user_completion_report: unlocked",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("post_fix_full_review_complete", result.stdout)
+
+    def test_task_close_rejects_missing_canonical_tree_head_completion(self) -> None:
+        """task_close should fail when canonical tree-head cleanup is incomplete."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-canonical-tree-head"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "verification.txt").write_text(
+                "\n".join(
+                    [
+                        f"run_id={run_id}",
+                        "task=closeout missing canonical tree head completion",
+                        "owner=codex",
+                        "created_at_utc=2026-04-08T00:00:00Z",
+                        "status=pass",
+                        "user_completion_report=unlocked",
+                        "closeout_gate_status=resolved",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "user_request_contract.md").write_text(
+                "\n".join(
+                    [
+                        "# User Request Contract",
+                        "",
+                        "- all_clauses_resolved: yes",
+                        "- forbidden_drift_detected: no",
+                        "- deferred_clause_ids:",
+                        "- unresolved_clause_ids:",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "closeout_gate.md").write_text(
+                "\n".join(
+                    [
+                        "# Closeout Gate",
+                        "",
+                        "- verifier_status: pass",
+                        "- auditor_status: resolved",
+                        "- required_reviews_complete: yes",
+                        "- validation_complete: yes",
+                        "- request_contract_complete: yes",
+                        "- all_planned_chunks_complete: yes",
+                        "- overall_delivery_complete: yes",
+                        "- spec_product_coverage_complete: yes",
+                        "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: yes",
+                        "- canonical_tree_head_complete: no",
+                        "- commit_created: yes",
+                        "- push_completed: yes",
+                        "- user_completion_report: unlocked",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_ready_schedule(report_dir)
+            write_ready_work_log(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("canonical_tree_head_complete", result.stdout)
+
     def test_task_close_rejects_empty_work_log(self) -> None:
         """task_close should fail when the run-local work log is still empty."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -592,6 +857,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
+                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -641,6 +907,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
+                        "- post_fix_full_review_complete: yes",
+                        "- canonical_tree_head_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",

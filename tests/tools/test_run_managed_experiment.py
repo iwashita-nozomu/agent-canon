@@ -82,6 +82,7 @@ def build_repo(tmp_path: Path) -> Path:
                 "from __future__ import annotations",
                 "",
                 "import argparse",
+                "import json",
                 "from pathlib import Path",
                 "",
                 'parser = argparse.ArgumentParser()',
@@ -91,6 +92,14 @@ def build_repo(tmp_path: Path) -> Path:
                 "run_dir = Path(args.run_dir)",
                 "run_dir.mkdir(parents=True, exist_ok=True)",
                 "(run_dir / 'marker.txt').write_text(args.mode, encoding='utf-8')",
+                "(run_dir / 'summary.json').write_text(",
+                "    json.dumps({'status': 'completed', 'mode': args.mode}, ensure_ascii=True) + '\\n',",
+                "    encoding='utf-8',",
+                ")",
+                "(run_dir / 'cases.jsonl').write_text(",
+                "    json.dumps({'case_id': 'demo-1', 'status': 'ok', 'mode': args.mode}, ensure_ascii=True) + '\\n',",
+                "    encoding='utf-8',",
+                ")",
             ]
         )
         + "\n",
@@ -106,6 +115,7 @@ def build_repo(tmp_path: Path) -> Path:
                 'report_root = "experiments/report"',
                 'integration_branch = "main"',
                 'topic_template_dir = "experiments/_template"',
+                'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
                 "",
                 "[[topics]]",
                 'name = "demo_topic"',
@@ -153,13 +163,19 @@ def test_run_managed_experiment_uses_registered_command_and_writes_manifest(tmp_
     assert result.returncode == 0
     result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
     manifest = json.loads((result_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "completed"
     assert manifest["exit_code"] == 0
     assert manifest["command_source"] == "registered:smoke"
     assert manifest["registered_command_match"] == "smoke"
     assert manifest["registry"]["canonical_entrypoint"] == CANONICAL_ENTRYPOINT
+    assert manifest["eval_artifacts"]["collected_artifact_count"] == 2
+    assert manifest["eval_artifacts"]["missing_required_patterns"] == []
     assert (result_dir / "run.log").is_file()
     assert (result_dir / "marker.txt").read_text(encoding="utf-8") == "smoke"
+    assert eval_manifest["missing_required_patterns"] == []
+    collected_paths = {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
+    assert collected_paths == {"summary.json", "cases.jsonl"}
     report_path = repo_root / "experiments" / "report" / f"{run_name}.md"
     assert report_path.is_file()
     assert run_name in report_path.read_text(encoding="utf-8")
@@ -195,9 +211,190 @@ def test_run_managed_experiment_propagates_failure(tmp_path: Path) -> None:
         repo_root / "experiments" / "demo_topic" / "result" / run_name / "run_manifest.json"
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    eval_manifest = json.loads(
+        (repo_root / "experiments" / "demo_topic" / "result" / run_name / "eval_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert manifest["status"] == "failed"
     assert manifest["exit_code"] == 7
     assert manifest["command_source"] == "manual"
+    assert manifest["eval_artifacts"]["missing_required_patterns"] == ["summary.json", "cases.jsonl"]
+    assert eval_manifest["artifact_count"] == 0
+
+
+def test_run_managed_experiment_collects_topic_specific_optional_eval_artifacts(
+    tmp_path: Path,
+) -> None:
+    """The helper should collect topic-specific optional eval artifacts from the registry."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\noptional_eval_artifacts = ["marker.txt"]',
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+    run_name = "demo_topic_formal_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--use-registered-command",
+            "formal",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
+    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    artifacts = {artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]}
+    assert "marker.txt" in artifacts
+    assert artifacts["marker.txt"]["matched_patterns"] == ["marker.txt"]
+    assert artifacts["marker.txt"]["line_count"] == 1
+
+
+def test_run_managed_experiment_collects_binary_named_optional_artifact_without_crashing(
+    tmp_path: Path,
+) -> None:
+    """The helper should not crash when one matched artifact contains non-UTF8 bytes."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
+        (
+            f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\n'
+            'optional_eval_artifacts = ["binary.txt"]'
+        ),
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+    experiment_path = repo_root / "experiments" / "demo_topic" / "experimentcode.py"
+    experiment_path.write_text(
+        experiment_path.read_text(encoding="utf-8")
+        + "\n(run_dir / 'binary.txt').write_bytes(b'\\xff\\xfe\\n')\n",
+        encoding="utf-8",
+    )
+    run_name = "demo_topic_formal_binary_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--use-registered-command",
+            "formal",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
+    manifest = json.loads((result_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "completed"
+    artifacts = {artifact["relative_path"]: artifact for artifact in eval_manifest["artifacts"]}
+    assert "binary.txt" in artifacts
+    assert artifacts["binary.txt"]["line_count"] == 1
+
+
+def test_run_managed_experiment_excludes_managed_files_from_optional_wildcards(
+    tmp_path: Path,
+) -> None:
+    """The helper should not inventory its own managed files via wildcard patterns."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\noptional_eval_artifacts = ["*.json"]',
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+    run_name = "demo_topic_formal_jsonwild_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--use-registered-command",
+            "formal",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
+    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    collected_paths = {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
+    assert "summary.json" in collected_paths
+    assert "run_manifest.json" not in collected_paths
+    assert "eval_manifest.json" not in collected_paths
+
+
+def test_run_managed_experiment_keeps_nested_run_log_artifacts_collectable(
+    tmp_path: Path,
+) -> None:
+    """The helper should exclude only top-level managed files, not nested logs with the same name."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
+        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\noptional_eval_artifacts = ["logs/run.log"]',
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+    experiment_path = repo_root / "experiments" / "demo_topic" / "experimentcode.py"
+    experiment_path.write_text(
+        experiment_path.read_text(encoding="utf-8")
+        + "\n(run_dir / 'logs').mkdir(parents=True, exist_ok=True)\n"
+        + "(run_dir / 'logs' / 'run.log').write_text('nested\\nlog', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    run_name = "demo_topic_formal_nestedlog_20260406T000000Z"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(repo_root),
+            "--topic",
+            "demo_topic",
+            "--run-name",
+            run_name,
+            "--use-registered-command",
+            "formal",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    result_dir = repo_root / "experiments" / "demo_topic" / "result" / run_name
+    eval_manifest = json.loads((result_dir / "eval_manifest.json").read_text(encoding="utf-8"))
+    assert "logs/run.log" in {artifact["relative_path"] for artifact in eval_manifest["artifacts"]}
 
 
 def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> None:
@@ -269,6 +466,32 @@ def test_check_experiment_registry_rejects_recursive_runner_command(tmp_path: Pa
 
     assert result.returncode == 1
     assert "must not call the managed runner recursively" in result.stdout
+
+
+def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(tmp_path: Path) -> None:
+    """The registry checker should reject reserved top-level managed artifact patterns."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_text = registry_path.read_text(encoding="utf-8").replace(
+        'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+        'required_eval_artifacts = ["summary.json", "cases.jsonl", "run.log"]',
+    )
+    registry_path.write_text(registry_text, encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "reserved top-level managed artifacts" in result.stdout
 
 
 def test_create_experiment_topic_scaffolds_directory_and_registry(tmp_path: Path) -> None:

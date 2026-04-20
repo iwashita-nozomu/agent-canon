@@ -6,6 +6,7 @@ PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
+PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 
 usage() {
   cat <<EOF
@@ -99,11 +100,7 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
-documents/agent-learning-workflow.md:../${PREFIX}/documents/agent-learning-workflow.md
-documents/academic-writing-workflow.md:../${PREFIX}/documents/academic-writing-workflow.md
-documents/adaptive-improvement-workflow.md:../${PREFIX}/documents/adaptive-improvement-workflow.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
-documents/paper-writing-workflow.md:../${PREFIX}/documents/paper-writing-workflow.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
 documents/SKILL_IMPLEMENTATION_GUIDE.md:../${PREFIX}/documents/SKILL_IMPLEMENTATION_GUIDE.md
 documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPLATE.md
@@ -111,19 +108,17 @@ documents/coding-conventions-experiments.md:../${PREFIX}/documents/coding-conven
 documents/experiment-critical-review.md:../${PREFIX}/documents/experiment-critical-review.md
 documents/experiment-registry.md:../${PREFIX}/documents/experiment-registry.md
 documents/experiment-report-style.md:../${PREFIX}/documents/experiment-report-style.md
-documents/experiment-workflow.md:../${PREFIX}/documents/experiment-workflow.md
 documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
-documents/implementation-waterfall-workflow.md:../${PREFIX}/documents/implementation-waterfall-workflow.md
-documents/long-form-writing-workflow.md:../${PREFIX}/documents/long-form-writing-workflow.md
-documents/main-integration-workflow.md:../${PREFIX}/documents/main-integration-workflow.md
-documents/research-workflow.md:../${PREFIX}/documents/research-workflow.md
-documents/workflow-references.md:../${PREFIX}/documents/workflow-references.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
 memory/README.md:../${PREFIX}/memory/README.md
-memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
+memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
+memory/global:../${PREFIX}/memory/global
+memory/methods:../${PREFIX}/memory/methods
+memory/candidates:../${PREFIX}/memory/candidates
+memory/subagent_loadouts.yaml:../${PREFIX}/memory/subagent_loadouts.yaml
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
@@ -148,8 +143,6 @@ notes/knowledge/path_resolution.md:../../${PREFIX}/notes/knowledge/path_resoluti
 notes/knowledge/pyright_operations.md:../../${PREFIX}/notes/knowledge/pyright_operations.md
 notes/themes/README.md:../../${PREFIX}/notes/themes/README.md
 notes/themes/THEME_NOTE_TEMPLATE.md:../../${PREFIX}/notes/themes/THEME_NOTE_TEMPLATE.md
-notes/themes/AGENT_PHILOSOPHY.md:../../${PREFIX}/notes/themes/AGENT_PHILOSOPHY.md
-notes/themes/USER_PREFERENCES.md:../../${PREFIX}/notes/themes/USER_PREFERENCES.md
 notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
 notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
@@ -168,6 +161,25 @@ tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
 tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
 tools:${PREFIX}/tools
+EOF
+}
+
+build_removed_legacy_paths() {
+  cat <<EOF
+documents/WORKFLOW_GUIDE.md
+documents/academic-writing-workflow.md
+documents/adaptive-improvement-workflow.md
+documents/agent-canon-pr-workflow.md
+documents/agent-learning-workflow.md
+documents/experiment-workflow.md
+documents/implementation-waterfall-workflow.md
+documents/long-form-writing-workflow.md
+documents/main-integration-workflow.md
+documents/paper-writing-workflow.md
+documents/research-workflow.md
+documents/workflow-references.md
+notes/themes/AGENT_PHILOSOPHY.md
+notes/themes/USER_PREFERENCES.md
 EOF
 }
 
@@ -217,6 +229,10 @@ ensure_surface_sync_safe() {
       build_copy_specs
     }
   )
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    paths+=("$path")
+  done < <(build_removed_legacy_paths)
 
   [ "${#paths[@]}" -gt 0 ] || return
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
@@ -243,6 +259,11 @@ cmd_link_root() {
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rm -rf "$ROOT_DIR/$path"
+  done < <(build_removed_legacy_paths)
 }
 
 cmd_snapshot() {
@@ -285,6 +306,15 @@ cmd_check() {
     fi
     failed=1
   done < <(build_copy_specs)
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+      echo "legacy[$path]=present" >&2
+      failed=1
+    fi
+  done < <(build_removed_legacy_paths)
 
   if [ "$failed" -ne 0 ]; then
     die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"
@@ -371,8 +401,8 @@ import_fast_forward_snapshot() {
   local method="${3:-fast_forward_snapshot_import}"
 
   if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
-    method="diverged_snapshot_import"
     echo "agent_canon_snapshot_import=diverged_history"
+    die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH'; update the proposal branch or merge the shared canon changes before running ensure-latest"
   fi
 
   if git -C "$ROOT_DIR" diff --quiet "$local_split" "$remote_sha" --; then
@@ -385,6 +415,29 @@ import_fast_forward_snapshot() {
   apply_snapshot_diff "$local_split" "$remote_sha"
   cmd_link_root 1
   commit_sync_paths_if_needed "$remote_sha" "$method"
+}
+
+import_snapshot_preferring_tree_match() {
+  local local_split="$1"
+  local local_tree="$2"
+  local remote_sha="$3"
+  local method="$4"
+  local matched_commit=""
+
+  if git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    import_fast_forward_snapshot "$local_split" "$remote_sha" "$method"
+    return
+  fi
+
+  matched_commit="$(find_commit_by_tree "$local_tree" "$remote_sha" || true)"
+  if [ -n "$matched_commit" ]; then
+    echo "agent_canon_snapshot_import=tree_match_in_remote_history"
+    import_fast_forward_snapshot "$matched_commit" "$remote_sha" "$method"
+    return
+  fi
+
+  echo "agent_canon_snapshot_import=diverged_history"
+  die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH' and the current prefix tree is not present in remote history; update the proposal branch or merge the shared canon changes before running ensure-latest"
 }
 
 import_snapshot_from_prefix_tree() {
@@ -474,7 +527,10 @@ cmd_plan() {
     dirty="yes"
   fi
 
-  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
+  if [ -n "$PLAN_REMOTE_OVERRIDE_URL" ]; then
+    remote_url="$PLAN_REMOTE_OVERRIDE_URL"
+    remote_source="plan_override"
+  elif git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
     remote_url="$(git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME")"
     remote_source="configured"
   else
@@ -501,11 +557,18 @@ cmd_plan() {
     route="already_current_split"
   elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_split"; then
     route="local_contains_remote"
-  elif [ -n "$local_split" ] && [ "$subtree_metadata" = "yes" ]; then
-    route="subtree_pull"
+  elif [ -n "$local_split" ] && git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
+    if [ "$subtree_metadata" = "yes" ]; then
+      route="subtree_pull"
+    else
+      route="snapshot_import_no_subtree_metadata"
+    fi
+    requires_clean="yes"
+  elif [ -n "$local_split" ] && find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
+    route="snapshot_import_tree_match"
     requires_clean="yes"
   elif [ -n "$local_split" ]; then
-    route="snapshot_import_no_subtree_metadata"
+    route="diverged_local_history"
     requires_clean="yes"
   elif find_commit_by_tree "$local_tree" "$remote_sha" >/dev/null 2>&1; then
     route="snapshot_import_no_subtree"
@@ -524,11 +587,12 @@ pull_or_import_snapshot() {
   local branch="$1"
   local local_split="$2"
   local remote_sha="$3"
+  local local_tree="$4"
   local pull_log=""
 
   if ! has_subtree_metadata; then
     echo "agent_canon_subtree_pull=skipped_no_subtree_metadata"
-    import_fast_forward_snapshot "$local_split" "$remote_sha"
+    import_snapshot_preferring_tree_match "$local_split" "$local_tree" "$remote_sha" "snapshot_import_no_subtree_metadata"
     return
   fi
 
@@ -545,7 +609,7 @@ pull_or_import_snapshot() {
   cat "$pull_log" >&2
   rm -f "$pull_log"
   echo "agent_canon_subtree_pull=failed"
-  import_fast_forward_snapshot "$local_split" "$remote_sha"
+  import_snapshot_preferring_tree_match "$local_split" "$local_tree" "$remote_sha" "snapshot_import_after_subtree_pull_failure"
 }
 
 cmd_add() {
@@ -561,15 +625,17 @@ cmd_add() {
 cmd_pull() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local local_split=""
+  local local_tree=""
   local remote_sha=""
 
   require_clean_worktree
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+  local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
   local_split="$(split_prefix_or_empty)"
   if [ -n "$local_split" ]; then
-    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha" "$local_tree"
     return
   fi
 
@@ -632,7 +698,7 @@ cmd_ensure_latest() {
   require_clean_worktree
   echo "agent_canon_latest=pulling_remote"
   if [ -n "$local_split" ]; then
-    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha"
+    pull_or_import_snapshot "$branch" "$local_split" "$remote_sha" "$local_tree"
   else
     import_snapshot_from_prefix_tree "$local_tree" "$remote_sha" "snapshot_import_no_subtree"
   fi
@@ -640,24 +706,17 @@ cmd_ensure_latest() {
 
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
-  local local_split=""
-  local push_sha=""
+  local snapshot_sha=""
   require_clean_worktree
   require_existing_remote
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
-  local_split="$(split_prefix_or_empty)"
-  if [ -n "$local_split" ]; then
-    echo "agent_canon_push_method=subtree_split"
-    if git subtree --help >/dev/null 2>&1; then
-      git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch"
-      return
-    fi
-    push_sha="$local_split"
-  else
-    push_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: push agent-canon snapshot")"
-    echo "agent_canon_push_method=commit_tree_snapshot"
+  if git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch" >/dev/null 2>&1; then
+    echo "agent_canon_push_method=subtree_push"
+    return
   fi
-  git -C "$ROOT_DIR" push --force "$REMOTE_NAME" "${push_sha}:refs/heads/${branch}"
+  snapshot_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: push agent-canon snapshot")"
+  git -C "$ROOT_DIR" push --force "$REMOTE_NAME" "${snapshot_sha}:refs/heads/${branch}" >/dev/null
+  echo "agent_canon_push_method=commit_tree_snapshot_after_subtree_push_failure"
 }
 
 cmd_status() {

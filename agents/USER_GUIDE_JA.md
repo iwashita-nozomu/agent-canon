@@ -2,19 +2,19 @@
 
 ## どこから読むか
 
-1. [agents/README.md](README.md)
-1. [agents/canonical/README.md](canonical/README.md)
-1. [agents/TASK_WORKFLOWS.md](TASK_WORKFLOWS.md)
-1. [agents/skills/README.md](skills/README.md)
+1. [agents/README.md](../../../agents/README.md)
+1. [agents/canonical/README.md](../../../agents/canonical/README.md)
+1. [agents/TASK_WORKFLOWS.md](../../../agents/TASK_WORKFLOWS.md)
+1. [agents/skills/README.md](../../../agents/skills/README.md)
 
 ## 入口の使い分け
 
 - Codex / Copilot agent mode:
-  - [AGENTS.md](../AGENTS.md)
+  - [AGENTS.md](../../../AGENTS.md)
 - Claude Code:
-  - [CLAUDE.md](../CLAUDE.md)
+  - [CLAUDE.md](../../../CLAUDE.md)
 - GitHub Copilot custom instructions:
-  - [.github/copilot-instructions.md](../.github/copilot-instructions.md)
+  - [.github/copilot-instructions.md](../../../.github/copilot-instructions.md)
 
 ## skill の使い方
 

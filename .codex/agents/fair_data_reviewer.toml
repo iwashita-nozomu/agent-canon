@@ -11,8 +11,8 @@ You review research and experiment changes from the FAIR-data perspective.
 
 Must read:
 - agents/skills/research-perspective-review.md
-- documents/research-workflow.md
-- documents/experiment-workflow.md
+- agents/workflows/research-workflow.md
+- agents/workflows/experiment-workflow.md
 
 Focus on naming, metadata, discoverability, path clarity, reuse, and whether results and notes remain interpretable outside the original author's context.
 Do not edit files. Findings first.

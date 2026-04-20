@@ -12,9 +12,21 @@
 
 <!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->
 
+## Upstream Requirement Packet
+
+<!-- List the exact document paths the designer read before writing this design: user_request_contract.md, schedule.md, intent_brief.md, waterfall workflow docs, and other governing docs. Do not rely on chat-only context. -->
+
+## Installed Libraries And Existing Implementation Survey
+
+<!-- List the dependency surfaces, installed libraries, existing helpers/modules/tests/docs you inspected before deciding the implementation shape. Record whether each candidate is reused, extended, replaced, or rejected, and why existing libraries or existing implementation are insufficient when you add something new. -->
+
 ## Implementation Source Packet
 
-<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, code paths, tests, and external references if any. Mark each item required or not used. -->
+<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md, document_flow_review.md, test_plan.md, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+
+## Canonical Tree-Head Plan
+
+<!-- Name the only canonical design-document paths and implementation paths that may remain tracked after this task. List every non-canonical draft, snapshot, backup file, copied implementation, mirrored directory, or parallel design doc that must be deleted or must not be created. State that the durable product state is the current tree head only. -->
 
 ## Patterns And Writing Style To Mirror
 

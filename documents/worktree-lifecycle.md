@@ -31,7 +31,7 @@
 - `python3 tools/agent_tools/worktree_scope_lint.py --current` か `bash tools/worktree_start.sh --current` で scope の placeholder と kickoff 欄を確認します。
 - `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
-- `main` へ戻すための integration worktree を切る場合は、`documents/main-integration-workflow.md` の手順を先に見ます。
+- `main` へ戻すための integration worktree を切る場合は、`agents/workflows/main-integration-workflow.md` の手順を先に見ます。
 
 ## ルール
 

@@ -1,7 +1,7 @@
 # 実験ディレクトリ構成
 
 この章は、このリポジトリで experiment をどこへ置くかを定めます。
-研究の問い、数式、比較設計、段階的改造の手順は `documents/research-workflow.md` を正本とします。
+研究の問い、数式、比較設計、段階的改造の手順は `agents/workflows/research-workflow.md` を正本とします。
 
 ## 要約
 
@@ -62,6 +62,7 @@ experiments/report/
 - run_name は `<topic>_<variant>_<YYYYMMDDTHHMMSSZ>` に固定します。
 - `result/` の主要生成物は次でそろえます。
   - `result/<run_name>/run_manifest.json`
+  - `result/<run_name>/eval_manifest.json`
   - `result/<run_name>/summary.json`
   - `result/<run_name>/cases.jsonl`
   - `result/<run_name>/run.log`

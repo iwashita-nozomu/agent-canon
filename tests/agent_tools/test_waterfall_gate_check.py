@@ -237,11 +237,21 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "Implement the approved small change.",
                         "## Existing Code And Docs To Reuse",
                         "Mirror `tools/agent_tools/task_close.py`.",
+                        "## Upstream Requirement Packet",
+                        (
+                            "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
+                            "and `agents/workflows/implementation-waterfall-workflow.md`."
+                        ),
                         "## Implementation Source Packet",
                         (
                             "Read `user_request_contract.md`, `design_review.md`, "
                             "`document_flow_review.md`, `test_plan.md`, and "
                             "`tools/agent_tools/task_close.py`."
+                        ),
+                        "## Canonical Tree-Head Plan",
+                        (
+                            "Keep `tools/agent_tools/waterfall_gate_check.py` as the only "
+                            "canonical implementation path and do not leave backup or copy files."
                         ),
                         "## File-By-File Design",
                         "Update `tools/agent_tools/waterfall_gate_check.py` only.",
@@ -264,8 +274,12 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "",
                         "## Findings",
                         "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design cites the governing requirement and workflow documents.",
                         "## Implementation Source Packet Review",
                         "The packet names every required read-before-edit artifact.",
+                        "## Canonical Tree-Head Review",
+                        "The design leaves only canonical tracked paths in the tree.",
                         "## Design-To-Implementation Trace Review",
                         "Each planned edit maps to the request clause and test plan.",
                         "## Decision",
@@ -331,6 +345,10 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "Every clause has a product surface.",
                         "## Review Finding Incorporation Review",
                         "All fix-now findings were integrated.",
+                        "## Post-Fix Full Review Rerun Review",
+                        "No post-review fixes occurred after the last full review pass.",
+                        "## Canonical Tree-Head Acceptance",
+                        "Only canonical tracked paths remain in the tree head.",
                         "## Decision",
                         "approve",
                         "",
@@ -371,6 +389,142 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("work_log.md:section_empty_or_missing:entries", result.stdout)
 
+    def test_final_gate_rejects_missing_post_fix_full_review_section(self) -> None:
+        """Final gate should fail when the post-fix full review evidence is missing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "final-missing-post-fix-review"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "final_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Final Review",
+                        "",
+                        "## Ship Blockers",
+                        "| Finding | Severity | Status |",
+                        "| ------- | -------- | ------ |",
+                        "| none | info | resolved |",
+                        "## Design Trace Acceptance",
+                        "Trace is complete.",
+                        "## Planned Work Completion Review",
+                        "All planned work units are complete.",
+                        "## Spec-To-Product Coverage Review",
+                        "Every clause has a product surface.",
+                        "## Review Finding Incorporation Review",
+                        "All fix-now findings were integrated.",
+                        "## Canonical Tree-Head Acceptance",
+                        "Only canonical tracked paths remain in the tree head.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "work_log.md").write_text(
+                "\n".join(
+                    [
+                        "# Work Log",
+                        "",
+                        "## Purpose",
+                        "- Required run log.",
+                        "",
+                        "## Entries",
+                        "- `2026-04-12 14:10 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "final",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "final_review.md:section_empty_or_missing:post-fix_full_review_rerun_review",
+                result.stdout,
+            )
+
+    def test_final_gate_rejects_missing_canonical_tree_head_section(self) -> None:
+        """Final gate should fail when canonical tree-head acceptance is missing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "final-missing-canonical-tree-head"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "final_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Final Review",
+                        "",
+                        "## Ship Blockers",
+                        "| Finding | Severity | Status |",
+                        "| ------- | -------- | ------ |",
+                        "| none | info | resolved |",
+                        "## Design Trace Acceptance",
+                        "Trace is complete.",
+                        "## Planned Work Completion Review",
+                        "All planned work units are complete.",
+                        "## Spec-To-Product Coverage Review",
+                        "Every clause has a product surface.",
+                        "## Review Finding Incorporation Review",
+                        "All fix-now findings were integrated.",
+                        "## Post-Fix Full Review Rerun Review",
+                        "No post-review fixes occurred after the last full review pass.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "work_log.md").write_text(
+                "\n".join(
+                    [
+                        "# Work Log",
+                        "",
+                        "## Purpose",
+                        "- Required run log.",
+                        "",
+                        "## Entries",
+                        "- `2026-04-16 11:50 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "final",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "final_review.md:section_empty_or_missing:canonical_tree-head_acceptance",
+                result.stdout,
+            )
+
     def test_design_gate_rejects_missing_source_packet(self) -> None:
         """A design review should not pass when the design lacks source packet trace."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -399,6 +553,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "",
                         "## Findings",
                         "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design cites the governing requirement and workflow documents.",
                         "## Implementation Source Packet Review",
                         "The packet names every required read-before-edit artifact.",
                         "## Design-To-Implementation Trace Review",
@@ -445,6 +601,85 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 "design_brief.md:section_empty_or_missing:implementation_source_packet"
             )
             self.assertIn(expected_blocker, result.stdout)
+
+    def test_design_gate_rejects_missing_upstream_requirement_packet(self) -> None:
+        """Design gate should fail when the design omits upstream document references."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "missing-upstream-packet"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "design_brief.md").write_text(
+                "\n".join(
+                    [
+                        "# Detailed Design Brief",
+                        "",
+                        "## Goals",
+                        "Implement the approved small change.",
+                        "## Existing Code And Docs To Reuse",
+                        "Mirror `tools/agent_tools/task_close.py`.",
+                        "## Implementation Source Packet",
+                        "Read `user_request_contract.md` and `design_review.md`.",
+                        "## Design-To-Implementation Trace",
+                        "Slice A maps T1-C1 to `tools/agent_tools/task_close.py`.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "design_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Detailed Design Review",
+                        "",
+                        "## Findings",
+                        "No blockers.",
+                        "## Upstream Requirement Packet Review",
+                        "The design should cite the governing requirement docs.",
+                        "## Implementation Source Packet Review",
+                        "The packet names every required read-before-edit artifact.",
+                        "## Design-To-Implementation Trace Review",
+                        "Each planned edit maps to the request clause and test plan.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (report_dir / "document_flow_review.md").write_text(
+                "\n".join(
+                    [
+                        "# Document Flow Review",
+                        "",
+                        "## Findings",
+                        "No blockers.",
+                        "## Decision",
+                        "approve",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(GATE_CHECK_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--gate",
+                    "design",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "design_brief.md:section_empty_or_missing:upstream_requirement_packet",
+                result.stdout,
+            )
 
 
 if __name__ == "__main__":

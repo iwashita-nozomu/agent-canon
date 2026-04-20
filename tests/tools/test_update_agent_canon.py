@@ -24,30 +24,31 @@ REPO_ROOT = resolve_repo_root()
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
 
-    def prefix_snapshot_sha(self, repo: Path) -> str:
-        """Return a stable snapshot SHA for vendor/agent-canon in the clone."""
-        split = subprocess.run(
-            ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-            cwd=repo,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if split.returncode == 0:
-            return split.stdout.strip()
-        return subprocess.run(
-            [
-                "git",
-                "commit-tree",
-                "HEAD:vendor/agent-canon",
-                "-m",
-                "test: seed agent-canon snapshot",
-            ],
-            cwd=repo,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
+    def copy_tree_contents(self, source: Path, target: Path, *, exclude: tuple[str, ...] = ()) -> None:
+        """Replace ``target`` contents with ``source`` contents while preserving symlinks."""
+        for child in target.iterdir():
+            if child.name in exclude:
+                continue
+            if child.is_symlink() or child.is_file():
+                child.unlink()
+                continue
+            shutil.rmtree(child)
+
+        for child in source.iterdir():
+            if child.name in exclude:
+                continue
+            destination = target / child.name
+            if child.is_symlink():
+                destination.symlink_to(os.readlink(child), target_is_directory=child.is_dir())
+                continue
+            if child.is_dir():
+                shutil.copytree(child, destination, symlinks=True)
+                continue
+            shutil.copy2(child, destination, follow_symlinks=False)
+
+    def overlay_working_tree(self, source: Path, target: Path) -> None:
+        """Overlay the current working tree onto one clone without rsync."""
+        self.copy_tree_contents(source, target, exclude=(".git",))
 
     def clone_repo(self, target: Path) -> None:
         """Clone the current repository into one temporary target."""
@@ -57,22 +58,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        if shutil.which("rsync") is not None:
-            subprocess.run(
-                ["rsync", "-a", "--delete", "--exclude", ".git", f"{REPO_ROOT}/", str(target)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        else:
-            for source in REPO_ROOT.iterdir():
-                if source.name == ".git":
-                    continue
-                destination = target / source.name
-                if source.is_dir():
-                    shutil.copytree(source, destination, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(source, destination)
+        self.overlay_working_tree(REPO_ROOT, target)
         status = subprocess.run(
             ["git", "status", "--short"],
             cwd=target,
@@ -110,12 +96,56 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
+    def seed_shared_canon_remote(self, clone_dir: Path, bare_repo: Path) -> None:
+        """Seed one bare remote from the current vendored shared canon tree."""
+        subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            shared_dir = Path(tmp_dir) / "shared-agent-canon"
+            subprocess.run(["git", "init", str(shared_dir)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Update Agent Canon Test"],
+                cwd=shared_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "update-agent-canon@example.invalid"],
+                cwd=shared_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.copy_tree_contents(clone_dir / "vendor" / "agent-canon", shared_dir, exclude=(".git",))
+            subprocess.run(["git", "add", "-A"], cwd=shared_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "commit", "-m", "test: seed shared canon snapshot"],
+                cwd=shared_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "push", str(bare_repo), "HEAD:refs/heads/main"],
+                cwd=shared_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        subprocess.run(
+            ["git", "--git-dir", str(bare_repo), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
     def test_register_local_bare_seeds_remote_and_plan_uses_configured_remote(self) -> None:
-        """register-local-bare should seed the bare repo and wire the remote."""
+        """Register-local-bare should seed the bare repo and wire the remote."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             clone_dir = root / "clone"
             bare_repo = root / "derived-agent-canon.git"
+            source_repo = root / "shared-agent-canon"
             proposal_branch = "canon-proposal/derived-agent-canon"
             self.clone_repo(clone_dir)
 
@@ -128,6 +158,8 @@ class UpdateAgentCanonTest(unittest.TestCase):
                     str(bare_repo),
                     "--proposal-branch",
                     proposal_branch,
+                    "--source-repo",
+                    str(source_repo),
                 ],
                 cwd=clone_dir,
                 check=False,
@@ -154,6 +186,14 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             self.assertEqual(remote_url, str(bare_repo))
+            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "checkout", "-B", "main", "origin/main"],
+                cwd=source_repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             stored_branch = subprocess.run(
                 ["git", "config", "--get", "agent-canon.proposalBranch"],
                 cwd=clone_dir,
@@ -162,6 +202,14 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             self.assertEqual(stored_branch, proposal_branch)
+            stored_source = subprocess.run(
+                ["git", "config", "--get", "agent-canon.sourceRepo"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(stored_source, str(source_repo))
             self.assertEqual(
                 subprocess.run(
                     [
@@ -187,10 +235,60 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
-            self.assertIn("agent_canon_plan_remote_source=configured", plan.stdout)
+            self.assertIn("agent_canon_plan_remote_source=plan_override", plan.stdout)
+            self.assertIn("agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout)
+
+    def test_register_local_bare_clears_implicit_source_repo_for_daily_validation(self) -> None:
+        """Register-local-bare should default derived repos back to local-sync-only."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "derived-agent-canon.git"
+            self.clone_repo(clone_dir)
+
+            env = os.environ.copy()
+            env["AGENT_CANON_SOURCE_REPO"] = str(root / "shared-agent-canon")
+
+            register = subprocess.run(
+                [
+                    "bash",
+                    str(clone_dir / "tools" / "update_agent_canon.sh"),
+                    "register-local-bare",
+                    "--bare-repo",
+                    str(bare_repo),
+                ],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(register.returncode, 0, register.stderr)
+            self.assertIn("agent_canon_source_repo=<unset>", register.stdout)
+
+            stored_source = subprocess.run(
+                ["git", "config", "--get", "agent-canon.sourceRepo"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stored_source.returncode, 0)
+            self.assertEqual(stored_source.stdout.strip(), "")
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_source_repo=<unset>", plan.stdout)
+            self.assertIn("agent_canon_plan_apply_order=local_sync_only", plan.stdout)
 
     def test_push_proposal_uses_configured_proposal_branch(self) -> None:
-        """push-proposal should update the configured remote branch."""
+        """Push-proposal should update the configured remote branch."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             clone_dir = root / "clone"
@@ -260,21 +358,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             missing_exec = root / "missing-git-exec"
             self.clone_repo(clone_dir)
 
-            split_sha = self.prefix_snapshot_sha(clone_dir)
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
-            subprocess.run(
-                ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ["git", "--git-dir", str(bare_repo), "symbolic-ref", "HEAD", "refs/heads/main"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
             subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
             marker = work_dir / ".plan-no-subtree-marker"
             marker.write_text("marker\n", encoding="utf-8")
@@ -310,7 +394,410 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
-            self.assertIn("agent_canon_plan_route=snapshot_import_no_subtree", plan.stdout)
+            self.assertRegex(
+                plan.stdout,
+                r"agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|snapshot_import_unsafe_tree_not_in_remote)",
+            )
+
+    def test_plan_fails_closed_when_subtree_pull_cannot_be_proven(self) -> None:
+        """Plan should fail closed when local split metadata is unavailable after snapshot seeding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            work_dir = root / "agent-canon-work"
+            self.clone_repo(clone_dir)
+
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
+            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            marker = work_dir / ".subtree-pull-marker"
+            marker.write_text("marker\n", encoding="utf-8")
+            subprocess.run(["git", "add", marker.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: advance agent canon with subtree metadata available",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(["git", "remote", "add", "agent-canon", str(bare_repo)], cwd=clone_dir, check=True, capture_output=True, text=True)
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=snapshot_import_unsafe_tree_not_in_remote", plan.stdout)
+
+    def test_apply_fails_closed_when_local_history_diverged_and_tree_match_cannot_be_proven(self) -> None:
+        """Apply should fail closed when tree-match recovery is unavailable without subtree metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            work_dir = root / "agent-canon-work"
+            self.clone_repo(clone_dir)
+
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
+            subprocess.run(
+                ["git", "remote", "remove", "agent-canon"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+
+            remote_marker_a = work_dir / ".remote-tree-match-marker"
+            remote_marker_a.write_text("remote-a\n", encoding="utf-8")
+            subprocess.run(["git", "add", remote_marker_a.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: remote tree match base",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+
+            local_diverged_marker = clone_dir / "vendor" / "agent-canon" / ".diverged-local-marker"
+            local_diverged_marker.write_text("diverged\n", encoding="utf-8")
+            subprocess.run(["git", "add", str(local_diverged_marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: diverge local shared canon",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.copy_tree_contents(work_dir, clone_dir / "vendor" / "agent-canon", exclude=(".git",))
+            subprocess.run(["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: realign local tree to remote history",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            remote_marker_b = work_dir / ".remote-after-tree-match-marker"
+            remote_marker_b.write_text("remote-b\n", encoding="utf-8")
+            subprocess.run(["git", "add", remote_marker_b.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: remote advance after tree match",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=snapshot_import_unsafe_tree_not_in_remote", plan.stdout)
+
+            apply = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "apply"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(apply.returncode, 0)
+            combined_output = f"{apply.stdout}\n{apply.stderr}"
+            self.assertIn("snapshot import is unsafe", combined_output)
+
+    def test_apply_fails_closed_when_local_shared_canon_history_diverges(self) -> None:
+        """Apply should stop before mutating the worktree when local vendor history diverges."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            work_dir = root / "agent-canon-work"
+            self.clone_repo(clone_dir)
+
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            remote_marker = work_dir / ".remote-diverged-marker"
+            remote_marker.write_text("remote-diverged\n", encoding="utf-8")
+            subprocess.run(["git", "add", remote_marker.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: diverge remote shared canon",
+                ],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+
+            diverged_marker = clone_dir / "vendor" / "agent-canon" / ".diverged-local-marker"
+            diverged_marker.write_text("diverged\n", encoding="utf-8")
+            subprocess.run(["git", "add", str(diverged_marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Update Agent Canon Test",
+                    "-c",
+                    "user.email=update-agent-canon@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: diverge local shared canon",
+                ],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertRegex(
+                plan.stdout,
+                r"agent_canon_plan_route=(diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)",
+            )
+
+            apply = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "apply"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(apply.returncode, 0)
+            combined_output = f"{apply.stdout}\n{apply.stderr}"
+            self.assertRegex(
+                combined_output,
+                r"(agent_canon_snapshot_import=diverged_history|snapshot import is unsafe because the local prefix tree is not present in remote agent-canon history)",
+            )
+            self.assertRegex(combined_output, r"(diverged|unsafe)")
+
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(status, "")
+
+    def test_apply_refreshes_remote_snapshot_before_local_sync(self) -> None:
+        """Apply should refresh the configured remote from source repo before local sync."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            source_repo = root / "agent-canon-source"
+            self.clone_repo(clone_dir)
+
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Update Agent Canon Test"],
+                cwd=source_repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "update-agent-canon@example.invalid"],
+                cwd=source_repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            source_marker = source_repo / ".refresh-first-marker"
+            source_marker.write_text("source-refresh\n", encoding="utf-8")
+            subprocess.run(["git", "add", source_marker.name], cwd=source_repo, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "commit", "-m", "test: advance source snapshot"],
+                cwd=source_repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            subprocess.run(
+                ["git", "config", "agent-canon.sourceRepo", str(source_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            plan = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout)
+            self.assertIn(f"agent_canon_plan_source_repo={source_repo}", plan.stdout)
+
+            apply = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "apply"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(apply.returncode, 0)
+            combined_output = f"{apply.stdout}\n{apply.stderr}"
+            self.assertIn("agent_canon_refresh_status=updated_remote_snapshot", combined_output)
+            self.assertIn("snapshot import is unsafe", combined_output)
+
+            self.assertFalse((clone_dir / "vendor" / "agent-canon" / ".refresh-first-marker").exists())
+            remote_tree = subprocess.run(
+                ["git", "--git-dir", str(bare_repo), "ls-tree", "-r", "--name-only", "main"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertIn(".refresh-first-marker", remote_tree)
+
+    def test_apply_fails_closed_when_source_repo_is_dirty(self) -> None:
+        """Apply should stop before local mutation when the configured source repo is dirty."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            clone_dir = root / "clone"
+            bare_repo = root / "agent-canon-upstream.git"
+            source_repo = root / "agent-canon-source"
+            self.clone_repo(clone_dir)
+
+            self.seed_shared_canon_remote(clone_dir, bare_repo)
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            dirty_marker = source_repo / ".dirty-source-marker"
+            dirty_marker.write_text("dirty\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "config", "agent-canon.sourceRepo", str(source_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            apply = subprocess.run(
+                ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "apply"],
+                cwd=clone_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(apply.returncode, 0)
+            combined_output = f"{apply.stdout}\n{apply.stderr}"
+            self.assertIn("source repo is dirty", combined_output)
+            self.assertFalse((clone_dir / "vendor" / "agent-canon" / ".dirty-source-marker").exists())
+
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(status, "")
 
 
 if __name__ == "__main__":

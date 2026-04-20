@@ -4,8 +4,8 @@
 対象は `python/`、`documents/`、`agents/`、`docker/`、`scripts/` など、repo に持ち帰る変更全般です。
 
 この repo では workflow family の選択は `agents/TASK_WORKFLOWS.md` を使いますが、実装そのものの進め方はこの文書を共通ルールにします。
-README、workflow、guide、migration 文書のような長文では、加えて `documents/long-form-writing-workflow.md` を overlay として使います。
-論文、thesis chapter、scholarly note のような学術文章では、`documents/academic-writing-workflow.md` を優先 overlay として使います。
+README、workflow、guide、migration 文書のような長文では、加えて `agents/workflows/long-form-writing-workflow.md` を overlay として使います。
+論文、thesis chapter、scholarly note のような学術文章では、`agents/workflows/academic-writing-workflow.md` を優先 overlay として使います。
 
 ## 1. 目的
 
@@ -15,6 +15,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 計画が固まる前に詳細設計へ進まない
 - 詳細設計が固まる前に実装を広げない
 - 実装は承認済みの設計文書 packet を読んでから始める
+- 設計文書と実装の正本を 1 本に固定し、tracked tree に parallel truth を残さない
 - 実装、review、verification を段階ゲートで区切る
 - 各 pass で複数回の独立レビューを必須にする
 - `設計 -> レビュー`、`詳細設計 -> レビュー`、`実装 -> レビュー` を完了条件充足まで反復する
@@ -113,9 +114,10 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `revise` は Gate 5 へ戻します
   - `escalate` は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
-  - 実装者が文書だけ読んで着手できる
-  - `Implementation Source Packet` と `Design-To-Implementation Trace` が揃っている
-  - reuse-first、style-following、reader path が blocker なしで揃っている
+- 実装者が文書だけ読んで着手できる
+- `Implementation Source Packet` と `Design-To-Implementation Trace` が揃っている
+- `Canonical Tree-Head Plan` が、正本として残す設計文書 path / 実装 path と削除対象の non-canonical path を明示している
+- reuse-first、style-following、reader path が blocker なしで揃っている
 
 ### Cycle C. 実装 -> 実装 checkpoint review
 
@@ -131,9 +133,10 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `revise` は Gate 9 へ戻します
   - `escalate` は Gate 5 へ戻して詳細設計か test plan を修正します
 - 完了条件:
-  - diff が approved design と test plan に一致する
-  - 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
-  - regression、style drift、stale path、missing test が blocker なしになる
+- diff が approved design と test plan に一致する
+- 各実装 slice が design artifact、design section、test plan item、request clause ID を引用している
+- tracked tree に non-canonical design doc、implementation copy、snapshot、backup path を増やしていない
+- regression、style drift、stale path、missing test が blocker なしになる
 
 ### Gate 0. Subagent Bootstrap
 
@@ -333,7 +336,10 @@ exit 条件:
 
 最低限の記録:
 - `Existing Code And Docs To Reuse:`
+- `Upstream Requirement Packet:`
 - `Implementation Source Packet:`
+- `Installed Libraries And Existing Implementation Survey:`
+- `Canonical Tree-Head Plan:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
 - `Design-To-Implementation Trace:`
@@ -344,19 +350,26 @@ exit 条件:
 
 ルール:
 - 詳細設計の目標は、実装前に読むべき文書を完成させることです
-- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、code path、test path、外部 reference を列挙します
+- `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
+- `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
+- `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
+- `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、mirror directory を作らないことを明示します
+- `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
+- 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
 - 新規または rename する variable、function、class、file、CLI flag、config key、public API identifier は、既存 precedent、採用名、却下した代替案、review 観点を明記します
 - 既存 precedent がある場合はそれを採用し、ない場合は理由を文書化して Gate 6 で確認します
 - worker が naming、API shape、path layout、boundary choice を発明しなくてよい状態まで詳細設計を詰めます
 - worker が会話文脈や記憶を実装入力にしなくてよい状態まで、必要な判断を設計文書内に再掲します
+- worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 
 exit 条件:
 - 実装者が文書だけ読んで着手できる
+- designer が upstream 文書だけ読んで詳細設計に着手できる
 - worker が編集前に読む文書と code path が `Implementation Source Packet` だけで分かる
 - 各予定差分が `Design-To-Implementation Trace` で clause、source、test、validation へ結び付いている
 - 新規 abstraction より reuse-first の方針が説明できる
@@ -381,7 +394,9 @@ exit 条件:
 必須レビュー:
 - `design_reviewer`
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
-  - `Implementation Source Packet` が編集前に読む artifact、repo docs、code path、test plan を列挙しているか確認する
+  - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
+  - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path、test plan を列挙しているか確認する
+  - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
   - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
   - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
   - identifier naming plan が既存 precedent または明示 rationale に結び付いているか確認する
@@ -395,7 +410,7 @@ exit 条件:
 - `詳細設計レビュー` は計画レビューより重い gate とします
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
-- `Implementation Source Packet` または `Design-To-Implementation Trace` の不足は `revise` blocker とします
+- `Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
 - `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 
@@ -403,6 +418,7 @@ exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
 - implementation source packet と design-to-implementation trace の懸念が解消している
+- canonical tree-head plan の懸念が解消している
 - naming plan の懸念が解消している
 - decision が `approve` になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している
@@ -475,6 +491,7 @@ exit 条件:
 ルール:
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Implementation Source Packet` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、実装 summary に読んだ design artifact と section を残します
+- 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
 - design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
 - 実装は 1 つの change request に閉じます
@@ -491,11 +508,13 @@ exit 条件:
 - naming gap を見つけたら、実装で埋めずに Gate 5-6 へ戻します
 - 実装 slice が終わったら、changed files、clause coverage、remaining planned work units、next required gate を記録して次段へ進みます
 - 予定 work unit や active clause が残っている場合は、実装完了ではなく次の work unit へ進みます
+- review artifact の指摘を受けて修正したら、その修正が tiny fix でも Gate 8 から required review family を最新 diff でやり直します。前の approve は失効します
 
 必須レビュー:
 - `change_reviewer`
   - 各 changed slice が design artifact、design section、source packet entry、test plan item、request clause ID を引用しているか確認する
   - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
+  - non-canonical design doc、implementation copy、snapshot、backup path が tracked tree に残っていないか確認する
   - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
   - remaining planned work units と next required gate が実装 handoff に残っているか確認する
   - implementation checkpoint review として、構造、境界、明白な回帰、設計逸脱を早期に確認する
@@ -505,6 +524,7 @@ exit 条件:
 exit 条件:
 - 差分が requirements / plan / design に一致している
 - 各 changed slice が design artifact、design section、test plan item、request clause ID を引用している
+- canonical path 以外の design / implementation truth surface が残っていない
 - remaining planned work units がない、または次の work unit と gate が明記されている
 - planned checks を実行できる状態になっている
 - implementation checkpoint review が `resolved` になっている
@@ -531,6 +551,7 @@ exit 条件:
 - `final_reviewer`
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
   - final diff が approved design section、Implementation Source Packet、request clause ID、test plan item に trace できるか確認する
+  - current tree head 以外の design / implementation truth surface が残っていないか確認する
 - 必要に応じて `python-review`
   - Python API、型境界、test coverage の不足を確認する
 - 必要に応じて `cpp-review`
@@ -541,7 +562,7 @@ exit 条件:
   - claim、evidence、overclaim を確認する
 
 ルール:
-- 設計を変えない軽微修正だけは、この gate 内で戻して構いません
+- review で戻されたあとに入れる修正は、設計を変えない tiny fix でもこの gate 内だけで閉じません。Gate 8 に戻して差分を更新し、Gate 8 と Gate 9 の required review を最新 diff に対してやり直します
 - 新しい requirement が必要なら Gate 1 に戻します
 - 計画変更が必要なら Gate 3 に戻します
 - 設計変更が必要なら Gate 5 に戻します
@@ -550,6 +571,7 @@ exit 条件:
 - `required_change` が解消している
 - 実行した checks と未実行理由が説明できる
 - final acceptance review が `resolved` になっている
+- `final_review.md` に post-fix full review rerun review が記録され、review-driven fix の後に full required review set を rerun したことが追える
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate final"` が pass している
 
 ### Gate 10. Audit And Gate Closure
@@ -570,6 +592,8 @@ exit 条件:
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
+- `closeout_gate.md` の `post_fix_full_review_complete=yes`
+- `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 - `schedule.md` の TODO 行が空ではない
 - `work_log.md` に meaningful step が記録されている
@@ -585,6 +609,8 @@ exit 条件:
 - chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
 - required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
+- review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
+- canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない
 
 ## 5. 差し戻しルール
@@ -658,8 +684,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 ## 8. reuse-first の必須ルール
 
 - まず既存 module、既存 helper、既存 abstraction を探します
+- まず導入済みライブラリ、既存 module、既存 helper、既存 abstraction を探します
 - 既存 API shape、命名、error handling、test style、docs style を優先します
-- 新しい pattern を導入するときは、詳細設計文書に既存 pattern では足りない理由を書きます
+- 新しい pattern を導入するときは、詳細設計文書に既存 pattern や導入済みライブラリでは足りない理由を書きます
 - 新しい identifier や path は worker の自由裁量にせず、詳細設計の naming plan または明白な局所 precedent に結び付けます
 - 既存コードを踏襲できるなら、完全新規実装を選びません
 
@@ -673,9 +700,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](../vendor/agent-canon/agents/TASK_WORKFLOWS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](../vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md)
-- [documents/WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md)
-- [documents/research-workflow.md](research-workflow.md)
-- [documents/experiment-workflow.md](experiment-workflow.md)
-- [documents/workflow-references.md](workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../../../../agents/TASK_WORKFLOWS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../../../../agents/canonical/CODEX_WORKFLOW.md)
+- [agents/workflows/README.md](../../../../agents/workflows/README.md)
+- [agents/workflows/research-workflow.md](../../../../agents/workflows/research-workflow.md)
+- [agents/workflows/experiment-workflow.md](../../../../agents/workflows/experiment-workflow.md)
+- [agents/workflows/workflow-references.md](../../../../agents/workflows/workflow-references.md)

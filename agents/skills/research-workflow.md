@@ -13,8 +13,8 @@
 ## Core References
 
 - `agents/skills/literature-survey.md`
-- `documents/research-workflow.md`
-- `documents/experiment-workflow.md`
+- `agents/workflows/research-workflow.md`
+- `agents/workflows/experiment-workflow.md`
 - `documents/experiment-critical-review.md`
 
 ## Canonical Loop
