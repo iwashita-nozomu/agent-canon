@@ -5,9 +5,9 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 
 ## 含めるもの
 
-  - `agent_tools/`
-    - task/doc start、waterfall gate、close gate、work log、runtime smoke
-    - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。この make target は `bash tools/sync_agent_canon.sh ensure-latest` の thin wrapper です。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
+- `agent_tools/`
+  - task/doc start、waterfall gate、close gate、work log、runtime smoke
+  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。この make target は `bash tools/sync_agent_canon.sh ensure-latest` の thin wrapper です。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
