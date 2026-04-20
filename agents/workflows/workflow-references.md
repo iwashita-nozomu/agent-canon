@@ -31,7 +31,7 @@
   - `/plan`、`/model`、`/permissions` が session-level command であり、per-agent TOML に mode を持たせない根拠です。
 - [Introducing GPT-5.4 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/5/introducing-gpt54/)
   - practitioner 視点で、`gpt-5.4` が coding capability を mainline へ寄せたと読む補助資料です。
-- [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for $52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
+- [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for \$52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
   - mini / nano の速度、価格、reasoning tier の実地感を補う資料です。
 - [I Tested GPT 5.4 Against Every Rival — Here's My Honest Review | Thomas Wiegold Blog](https://thomas-wiegold.com/blog/i-tested-gpt-5-4-against-every-rival/)
   - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex` override を残す判断の補助資料です。
@@ -151,7 +151,7 @@
   - 実装パスのウォーターフォール正本です。
 - [documents/experiment-critical-review.md](/workspace/vendor/agent-canon/documents/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
-- [references/workflow/implementation-waterfall.md](/workspace/references/workflow/implementation-waterfall.md)
-  - 実装ウォーターフォール化の文献メモです。
+- [agents/workflows/implementation-waterfall-workflow.md](/workspace/vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md)
+  - 実装ウォーターフォール化の local workflow 正本です。
 - [agents/README.md](/workspace/vendor/agent-canon/agents/README.md)
   - agent canon の入口です。

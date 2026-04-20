@@ -38,9 +38,28 @@ class LinkIssue:
     candidates: tuple[Path, ...]
 
 
+def iter_nonliteral_lines(text: str) -> list[str]:
+    """Return markdown lines outside fenced code and display-math blocks."""
+    lines: list[str] = []
+    in_fence = False
+    in_display_math = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if not in_fence and stripped == "$$":
+            in_display_math = not in_display_math
+            continue
+        if in_fence or in_display_math:
+            continue
+        lines.append(line)
+    return lines
+
+
 def find_markdown_links(text: str) -> list[tuple[str, str]]:
-    """Return markdown links found in ``text``."""
-    return LINK_PATTERN.findall(text)
+    """Return markdown links found outside literal blocks in ``text``."""
+    return [match for line in iter_nonliteral_lines(text) for match in LINK_PATTERN.findall(line)]
 
 
 def replace_link_targets(text: str, replacements: dict[str, str]) -> str:
@@ -53,7 +72,24 @@ def replace_link_targets(text: str, replacements: dict[str, str]) -> str:
             return match.group(0)
         return f"[{label}]({replacement})"
 
-    return LINK_PATTERN.sub(repl, text)
+    updated_lines: list[str] = []
+    in_fence = False
+    in_display_math = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            updated_lines.append(line)
+            continue
+        if not in_fence and stripped == "$$":
+            in_display_math = not in_display_math
+            updated_lines.append(line)
+            continue
+        if in_fence or in_display_math:
+            updated_lines.append(line)
+            continue
+        updated_lines.append(LINK_PATTERN.sub(repl, line))
+    return "".join(updated_lines)
 
 
 def iter_markdown_files(paths: list[str]) -> list[Path]:
