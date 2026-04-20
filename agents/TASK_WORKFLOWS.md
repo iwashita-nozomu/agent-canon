@@ -4,7 +4,7 @@
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[agents/workflows/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/agents/workflows/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](../../../agents/workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。

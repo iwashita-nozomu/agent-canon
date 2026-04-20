@@ -4,23 +4,23 @@
 
 ## 正本
 
-- [agents/README.md](/mnt/l/workspace/project_template/agents/README.md)
-- [agents/canonical/README.md](/mnt/l/workspace/project_template/agents/canonical/README.md)
-- [agents/agents_config.json](/mnt/l/workspace/project_template/agents/agents_config.json)
-- [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
-- [agents/COMMUNICATION_PROTOCOL.md](/mnt/l/workspace/project_template/agents/COMMUNICATION_PROTOCOL.md)
-- [agents/canonical/ARTIFACT_PLACEMENT.md](/mnt/l/workspace/project_template/agents/canonical/ARTIFACT_PLACEMENT.md)
-- [agents/canonical/CLI_ENTRYPOINTS.md](/mnt/l/workspace/project_template/agents/canonical/CLI_ENTRYPOINTS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_WORKFLOW.md)
-- [agents/canonical/CODEX_SUBAGENTS.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_SUBAGENTS.md)
-- [agents/skills/README.md](/mnt/l/workspace/project_template/agents/skills/README.md)
-- [agents/skills/catalog.yaml](/mnt/l/workspace/project_template/agents/skills/catalog.yaml)
+- [agents/README.md](../agents/README.md)
+- [agents/canonical/README.md](../agents/canonical/README.md)
+- [agents/agents_config.json](../agents/agents_config.json)
+- [agents/TASK_WORKFLOWS.md](../agents/TASK_WORKFLOWS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../agents/COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../agents/canonical/ARTIFACT_PLACEMENT.md)
+- [agents/canonical/CLI_ENTRYPOINTS.md](../agents/canonical/CLI_ENTRYPOINTS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../agents/canonical/CODEX_WORKFLOW.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../agents/canonical/CODEX_SUBAGENTS.md)
+- [agents/skills/README.md](../agents/skills/README.md)
+- [agents/skills/catalog.yaml](../agents/skills/catalog.yaml)
 
 ## Runtime Entry Points
 
-- [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
-- [CLAUDE.md](/mnt/l/workspace/project_template/CLAUDE.md)
-- [.github/copilot-instructions.md](/mnt/l/workspace/project_template/.github/copilot-instructions.md)
+- [AGENTS.md](../AGENTS.md)
+- [CLAUDE.md](../CLAUDE.md)
+- [.github/copilot-instructions.md](../.github/copilot-instructions.md)
 
 ## Skills
 

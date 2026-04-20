@@ -700,9 +700,9 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_WORKFLOW.md)
-- [agents/workflows/README.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
-- [agents/workflows/research-workflow.md](/mnt/l/workspace/project_template/agents/workflows/research-workflow.md)
-- [agents/workflows/experiment-workflow.md](/mnt/l/workspace/project_template/agents/workflows/experiment-workflow.md)
-- [agents/workflows/workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../../../../agents/TASK_WORKFLOWS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../../../../agents/canonical/CODEX_WORKFLOW.md)
+- [agents/workflows/README.md](../../../../agents/workflows/README.md)
+- [agents/workflows/research-workflow.md](../../../../agents/workflows/research-workflow.md)
+- [agents/workflows/experiment-workflow.md](../../../../agents/workflows/experiment-workflow.md)
+- [agents/workflows/workflow-references.md](../../../../agents/workflows/workflow-references.md)

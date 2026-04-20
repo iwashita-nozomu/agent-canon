@@ -143,15 +143,15 @@
 
 ## Related Local Canon
 
-- [references/README.md](/mnt/l/workspace/project_template/references/README.md)
+- [references/README.md](../../../../references/README.md)
   - reference 置き場の入口です。
-- [agents/workflows/research-workflow.md](/mnt/l/workspace/project_template/agents/workflows/research-workflow.md)
+- [agents/workflows/research-workflow.md](../../../../agents/workflows/research-workflow.md)
   - 研究・実験改造の正本です。
-- [agents/workflows/implementation-waterfall-workflow.md](/mnt/l/workspace/project_template/agents/workflows/implementation-waterfall-workflow.md)
+- [agents/workflows/implementation-waterfall-workflow.md](../../../../agents/workflows/implementation-waterfall-workflow.md)
   - 実装パスのウォーターフォール正本です。
-- [documents/experiment-critical-review.md](/mnt/l/workspace/project_template/documents/experiment-critical-review.md)
+- [documents/experiment-critical-review.md](../../../../documents/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
-- [references/workflow/implementation-waterfall.md](/mnt/l/workspace/project_template/references/workflow/implementation-waterfall.md)
+- [references/workflow/implementation-waterfall.md](../../../../references/workflow/implementation-waterfall.md)
   - 実装ウォーターフォール化の文献メモです。
-- [agents/README.md](/mnt/l/workspace/project_template/agents/README.md)
+- [agents/README.md](../../../../agents/README.md)
   - agent canon の入口です。

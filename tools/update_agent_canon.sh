@@ -335,16 +335,12 @@ cmd_register_local_bare() {
   fi
   ensure_bare_branch_exists "$bare_repo_path" "$branch" "$proposal_branch"
   cmd_register_remote "$bare_repo_path"
-  if [[ -z "$source_repo" ]]; then
-    if [[ -d "${DEFAULT_SHARED_SOURCE_REPO}/.git" ]]; then
-      source_repo="${DEFAULT_SHARED_SOURCE_REPO}"
-    else
-      source_repo="$(configured_source_repo || true)"
-    fi
-  fi
   if [[ -n "$source_repo" ]]; then
     git -C "$ROOT_DIR" config "${REMOTE_NAME}.sourceRepo" "$source_repo"
     echo "agent_canon_source_repo=$source_repo"
+  else
+    git -C "$ROOT_DIR" config --unset-all "${REMOTE_NAME}.sourceRepo" >/dev/null 2>&1 || true
+    echo "agent_canon_source_repo=<unset>"
   fi
   git -C "$ROOT_DIR" config "${REMOTE_NAME}.proposalBranch" "$proposal_branch"
   echo "agent_canon_proposal_branch=$proposal_branch"

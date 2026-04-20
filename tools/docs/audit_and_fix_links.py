@@ -140,6 +140,20 @@ def resolve_local_target(source_path: Path, target_path: str) -> Path | None:
     return None
 
 
+def should_rewrite_to_relative(target_path: str, resolved: Path | None) -> bool:
+    """Return whether one resolved local target should still be rewritten."""
+    if resolved is None:
+        return False
+    raw_path = Path(target_path)
+    if not raw_path.is_absolute():
+        return False
+    try:
+        resolved.relative_to(ROOT)
+    except ValueError:
+        return False
+    return True
+
+
 def relative_target(source_path: Path, target_path: Path) -> str:
     """Return a portable relative path from ``source_path`` to ``target_path``."""
     return os.path.relpath(target_path, start=source_path.parent).replace(os.sep, "/")
@@ -178,6 +192,11 @@ def main() -> int:
             target_path, anchor = split_anchor(target)
             resolved = resolve_local_target(md_file, target_path)
             if resolved is not None:
+                if should_rewrite_to_relative(target_path, resolved):
+                    new_target = relative_target(md_file, resolved)
+                    if anchor:
+                        new_target = f"{new_target}#{anchor}"
+                    replacements[target] = new_target
                 continue
 
             basename = Path(target_path).name

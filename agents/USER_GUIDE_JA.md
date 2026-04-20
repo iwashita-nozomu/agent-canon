@@ -2,19 +2,19 @@
 
 ## どこから読むか
 
-1. [agents/README.md](/mnt/l/workspace/project_template/agents/README.md)
-1. [agents/canonical/README.md](/mnt/l/workspace/project_template/agents/canonical/README.md)
-1. [agents/TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
-1. [agents/skills/README.md](/mnt/l/workspace/project_template/agents/skills/README.md)
+1. [agents/README.md](../../../agents/README.md)
+1. [agents/canonical/README.md](../../../agents/canonical/README.md)
+1. [agents/TASK_WORKFLOWS.md](../../../agents/TASK_WORKFLOWS.md)
+1. [agents/skills/README.md](../../../agents/skills/README.md)
 
 ## 入口の使い分け
 
 - Codex / Copilot agent mode:
-  - [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
+  - [AGENTS.md](../../../AGENTS.md)
 - Claude Code:
-  - [CLAUDE.md](/mnt/l/workspace/project_template/CLAUDE.md)
+  - [CLAUDE.md](../../../CLAUDE.md)
 - GitHub Copilot custom instructions:
-  - [.github/copilot-instructions.md](/mnt/l/workspace/project_template/.github/copilot-instructions.md)
+  - [.github/copilot-instructions.md](../../../.github/copilot-instructions.md)
 
 ## skill の使い方
 

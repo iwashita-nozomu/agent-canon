@@ -7,56 +7,56 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 ## 正本
 
-- [canonical/README.md](/mnt/l/workspace/project_template/agents/canonical/README.md)
+- [canonical/README.md](../../../agents/canonical/README.md)
   - 共通レイアウトと正本の置き場
-- [agents_config.json](/mnt/l/workspace/project_template/agents/agents_config.json)
+- [agents_config.json](../../../agents/agents_config.json)
   - チーム定義と write policy
-- [TASK_WORKFLOWS.md](/mnt/l/workspace/project_template/agents/TASK_WORKFLOWS.md)
+- [TASK_WORKFLOWS.md](../../../agents/TASK_WORKFLOWS.md)
   - workflow family と task 選択
-- [workflows/README.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
+- [workflows/README.md](../../../agents/workflows/README.md)
   - workflow canon の入口
-- [COMMUNICATION_PROTOCOL.md](/mnt/l/workspace/project_template/agents/COMMUNICATION_PROTOCOL.md)
+- [COMMUNICATION_PROTOCOL.md](../../../agents/COMMUNICATION_PROTOCOL.md)
   - handoff / review / escalation の正本
-- [task_catalog.yaml](/mnt/l/workspace/project_template/agents/task_catalog.yaml)
+- [task_catalog.yaml](../../../agents/task_catalog.yaml)
   - machine-readable catalog
-- [canonical/ARTIFACT_PLACEMENT.md](/mnt/l/workspace/project_template/agents/canonical/ARTIFACT_PLACEMENT.md)
+- [canonical/ARTIFACT_PLACEMENT.md](../../../agents/canonical/ARTIFACT_PLACEMENT.md)
   - task 文書と run artifact の置き分け
-- [canonical/CLI_ENTRYPOINTS.md](/mnt/l/workspace/project_template/agents/canonical/CLI_ENTRYPOINTS.md)
+- [canonical/CLI_ENTRYPOINTS.md](../../../agents/canonical/CLI_ENTRYPOINTS.md)
   - agent ごとの入口差分と bootstrap 入口
-- [canonical/CODEX_WORKFLOW.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_WORKFLOW.md)
+- [canonical/CODEX_WORKFLOW.md](../../../agents/canonical/CODEX_WORKFLOW.md)
   - Codex の標準 task 実行フロー
-- [canonical/CODEX_SUBAGENTS.md](/mnt/l/workspace/project_template/agents/canonical/CODEX_SUBAGENTS.md)
+- [canonical/CODEX_SUBAGENTS.md](../../../agents/canonical/CODEX_SUBAGENTS.md)
   - Codex の subagent routing
-- [skills/README.md](/mnt/l/workspace/project_template/agents/skills/README.md)
+- [skills/README.md](../../../agents/skills/README.md)
   - 人間向け skill 正本
-- [skills/catalog.yaml](/mnt/l/workspace/project_template/agents/skills/catalog.yaml)
+- [skills/catalog.yaml](../../../agents/skills/catalog.yaml)
   - skill family の機械可読カタログ
-- [skills/literature-survey.md](/mnt/l/workspace/project_template/agents/skills/literature-survey.md)
+- [skills/literature-survey.md](../../../agents/skills/literature-survey.md)
   - 文献調査と先行研究整理の入口
-- [skills/research-workflow.md](/mnt/l/workspace/project_template/agents/skills/research-workflow.md)
+- [skills/research-workflow.md](../../../agents/skills/research-workflow.md)
   - 研究系変更の outer loop
-- [skills/adaptive-improvement-loop.md](/mnt/l/workspace/project_template/agents/skills/adaptive-improvement-loop.md)
+- [skills/adaptive-improvement-loop.md](../../../agents/skills/adaptive-improvement-loop.md)
   - 実験、調査、チューニング、比較改良の outer loop
-- [skills/worktree-start.md](/mnt/l/workspace/project_template/agents/skills/worktree-start.md)
+- [skills/worktree-start.md](../../../agents/skills/worktree-start.md)
   - worktree kickoff、scope 初期化、action log 起点の固定
-- [skills/long-form-writing.md](/mnt/l/workspace/project_template/agents/skills/long-form-writing.md)
+- [skills/long-form-writing.md](../../../agents/skills/long-form-writing.md)
   - README、workflow、guide などの長文作成フロー
-- [skills/academic-writing.md](/mnt/l/workspace/project_template/agents/skills/academic-writing.md)
+- [skills/academic-writing.md](../../../agents/skills/academic-writing.md)
   - 論文、thesis chapter、scholarly note の作成フロー
-- [skills/comprehensive-development.md](/mnt/l/workspace/project_template/agents/skills/comprehensive-development.md)
+- [skills/comprehensive-development.md](../../../agents/skills/comprehensive-development.md)
   - 包括的 repo-wide delivery の umbrella workflow
-- [skills/environment-maintenance.md](/mnt/l/workspace/project_template/agents/skills/environment-maintenance.md)
+- [skills/environment-maintenance.md](../../../agents/skills/environment-maintenance.md)
   - Docker、CI、tool 導入方針の正本
 
 ## Runtime Entry Points
 
-- [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
+- [AGENTS.md](../../../AGENTS.md)
   - Codex / Copilot agent mode の入口
-- [CLAUDE.md](/mnt/l/workspace/project_template/CLAUDE.md)
+- [CLAUDE.md](../../../CLAUDE.md)
   - Claude Code の入口
-- [.github/copilot-instructions.md](/mnt/l/workspace/project_template/.github/copilot-instructions.md)
+- [.github/copilot-instructions.md](../../../.github/copilot-instructions.md)
   - GitHub Copilot repository instructions
-- [.github/AGENTS.md](/mnt/l/workspace/project_template/.github/AGENTS.md)
+- [.github/AGENTS.md](../../../.github/AGENTS.md)
   - GitHub 側の薄い入口
 
 ## Skills And Subagents

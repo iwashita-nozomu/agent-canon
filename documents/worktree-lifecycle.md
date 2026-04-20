@@ -20,9 +20,9 @@
 
 新しい worktree を切った直後、または stale な worktree を再開した直後は、`worktree-start` を使って次を閉じます。
 
-- [WORKTREE_SCOPE_TEMPLATE.md](/mnt/l/workspace/project_template/documents/WORKTREE_SCOPE_TEMPLATE.md) を基に、worktree root の `WORKTREE_SCOPE.md` を current state へ合わせます。
+- [WORKTREE_SCOPE_TEMPLATE.md](WORKTREE_SCOPE_TEMPLATE.md) を基に、worktree root の `WORKTREE_SCOPE.md` を current state へ合わせます。
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` を current branch と current filesystem path に一致させます。不一致のまま編集を始めません。
-- [WORKTREE_LOG_TEMPLATE.md](/mnt/l/workspace/project_template/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
+- [WORKTREE_LOG_TEMPLATE.md](../notes/worktrees/WORKTREE_LOG_TEMPLATE.md) を基に action log を作るか更新し、branch、path、purpose、次の一手を最初に残します。
 - 継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
 - kickoff 時に run bundle の `user_request_contract.md` を current worktree から辿れるように固定します。これにより `work_log.py` 1 回で action log と run bundle `work_log.md` を両方更新できます。
 - この worktree が experiment topic を持つ場合は、`experiments/registry.toml` の `active_branch`、必要なら `active_worktree` と `scope_file` を合わせます。
@@ -39,9 +39,9 @@
 - 統合先は常に `main` です。
 - 長期に残す知見は branch 名ではなく `documents/` または `notes/` に移します。
 - 1 回の実験結果を branch 固有の台帳に依存させません。
-- worktree root には必要に応じて `WORKTREE_SCOPE.md` を置き、テンプレートは [WORKTREE_SCOPE_TEMPLATE.md](/mnt/l/workspace/project_template/documents/WORKTREE_SCOPE_TEMPLATE.md) を使います。
+- worktree root には必要に応じて `WORKTREE_SCOPE.md` を置き、テンプレートは [WORKTREE_SCOPE_TEMPLATE.md](WORKTREE_SCOPE_TEMPLATE.md) を使います。
 - `WORKTREE_SCOPE.md` は worktree ごとに current state へ更新します。別 branch / 別 path の scope file を流用しません。
-- branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](/mnt/l/workspace/project_template/documents/BRANCH_SCOPE.md) と `notes/branches/` を使います。
+- branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](BRANCH_SCOPE.md) と `notes/branches/` を使います。
 - 例外運用中の action log は kickoff から `notes/worktrees/` に残します。
 - action log の各 entry には、いま処理している `request_clause_ids=` を残します。
 - scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次残します。repo-changing task では同じ step を run bundle `work_log.md` にも残します。
