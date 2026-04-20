@@ -223,7 +223,7 @@ root 側は次のような薄い wrapper と symlink view にします。
 
 - template / 派生 repo で worktree を切ると、その branch / commit に入っている `vendor/agent-canon/` snapshot がそのまま見えます
 - upstream `agent-canon` の最新が自動で流入するわけではありません
-- shared canon の更新は、明示的に subtree pull した branch にだけ反映されます
+- shared canon の更新は、明示的に `ensure-latest` / `pull` / `apply` を実行した branch にだけ反映されます
 
 つまり:
 - worktree は snapshot を使う仕組み
@@ -271,12 +271,12 @@ source repo の優先順位は `AGENT_CANON_SOURCE_REPO`、`git config agent-can
 shared canon の差分を maintainer に渡すときは `proposal-branch` で既定 branch を確認し、`push-proposal` でその branch へ push します。
 
 `ensure-latest` は task 開始時の入口です。
-clean worktree では upstream `agent-canon` と local subtree split を比較し、古い場合だけ更新します。
+clean worktree では upstream `agent-canon` と local shared-canon prefix tree を比較し、古い場合だけ更新します。
 `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は、`agent-canon` remote を自動追加します。
 別の upstream を使う場合は `AGENT_CANON_REMOTE_URL` を指定します。
-通常は `git subtree pull --squash` を使います。
-fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
-local subtree split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
+subtree metadata がある branch では通常 `git subtree pull --squash` を使います。
+fresh clone や subtree metadata 不在で `git subtree pull --squash` が使えない場合は、safe な snapshot import fallback に切り替えます。
+local split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
 local split も current prefix tree も remote history に無い場合は、shared canon の上書きを避けるため fail-closed で停止します。proposal branch を maintainer が merge するか、shared canon change を upstream へ戻したあとで再実行します。
 dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
 
@@ -296,8 +296,8 @@ bash tools/sync_agent_canon.sh status
 
 ```bash
 bash tools/update_agent_canon.sh register-local-bare \
-  --bare-repo /mnt/git/<project>-agent-canon.git \
-  --source-repo /mnt/l/workspace/agent-canon
+  --bare-repo <path>/<project>-agent-canon.git \
+  --source-repo <path>/agent-canon
 ```
 
 この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
@@ -357,7 +357,7 @@ exit 条件:
 抑止:
 - `vendor/agent-canon/` の変更は専用 commit に分ける
 - `git subtree push --prefix=vendor/agent-canon` を標準運用にする
-- 外部 repo をまだ作っていない段階では `snapshot` で vendor tree を更新し、repo 作成時に `git subtree split --prefix=vendor/agent-canon` から初期 history を切り出す
+- 外部 repo をまだ作っていない段階では `snapshot` で vendor tree を更新し、repo 作成時は subtree split または commit-tree snapshot seed のどちらか利用可能な方で初期 history を切り出す
 
 ### worktree ごとに shared canon がばらつく
 
@@ -376,9 +376,9 @@ exit 条件:
 
 ## 11. 関連
 
-- [README.md](/mnt/l/workspace/project_template/README.md)
-- [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
-- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
-- [README.md](/mnt/l/workspace/project_template/vendor/README.md)
-- [sync_agent_canon.sh](/mnt/l/workspace/project_template/tools/sync_agent_canon.sh)
+- [README.md](/workspace/README.md)
+- [AGENTS.md](/workspace/AGENTS.md)
+- [WORKFLOW_GUIDE.md](/workspace/agents/workflows/README.md)
+- [workflow-references.md](/workspace/agents/workflows/workflow-references.md)
+- [README.md](/workspace/vendor/README.md)
+- [sync_agent_canon.sh](/workspace/tools/sync_agent_canon.sh)

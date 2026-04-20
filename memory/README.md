@@ -5,9 +5,9 @@
 
 ## Canonical Files
 
-- [USER_PREFERENCES.md](/mnt/l/workspace/project_template/memory/USER_PREFERENCES.md)
+- [USER_PREFERENCES.md](/workspace/memory/USER_PREFERENCES.md)
   - 会話から得た durable user preference の正本
-- [AGENT_PHILOSOPHY.md](/mnt/l/workspace/project_template/memory/AGENT_PHILOSOPHY.md)
+- [AGENT_PHILOSOPHY.md](/workspace/memory/AGENT_PHILOSOPHY.md)
   - agent の作業哲学、対話学習、task retrospective の正本
 
 ## Rules

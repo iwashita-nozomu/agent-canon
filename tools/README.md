@@ -5,9 +5,9 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 
 ## 含めるもの
 
-- `agent_tools/`
-  - task/doc start、waterfall gate、close gate、work log、runtime smoke
-  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
+  - `agent_tools/`
+    - task/doc start、waterfall gate、close gate、work log、runtime smoke
+    - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。この make target は `bash tools/sync_agent_canon.sh ensure-latest` の thin wrapper です。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
@@ -22,9 +22,9 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
-    - `ensure-latest` は task 開始時に upstream `agent-canon` と local subtree snapshot を揃えます。
+    - `ensure-latest` は task 開始時に upstream `agent-canon` と local shared-canon prefix tree を揃えます。
     - `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は自動追加します。
-    - fresh clone で subtree metadata が無い場合は、fast-forward 更新に限って snapshot import へ切り替えます。
+    - fresh clone や subtree metadata 不在の branch では、safe な場合だけ snapshot import fallback へ切り替えます。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - source repo が設定されている場合、`plan` は `refresh -> local sync` 後の実効 route を出します。source repo が missing / dirty なら fail-closed で止まります。

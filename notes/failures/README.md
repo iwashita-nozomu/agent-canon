@@ -27,4 +27,4 @@
 
 ## Template
 
-- [FAILURE_NOTE_TEMPLATE.md](/mnt/l/workspace/project_template/notes/failures/FAILURE_NOTE_TEMPLATE.md)
+- [FAILURE_NOTE_TEMPLATE.md](/workspace/notes/failures/FAILURE_NOTE_TEMPLATE.md)
