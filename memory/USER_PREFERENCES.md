@@ -99,6 +99,12 @@
 - 2026-04-22 | 退避 branch や backup branch を残さず、履歴は git にありつつも、運用上は最新の canonical state だけを見せてほしい。同期や置換のあとに extra branch を保険として残さないでほしい。
   - source: chat
 
+- 2026-04-22 | コードが実行できるだけでは不十分で、本体実装が数式・仕様記述と一致していることを重視してほしい。runtime success よりも mathematical/spec alignment を主要な受け入れ基準として扱ってほしい。
+  - source: chat
+
+- 2026-04-22 | 読みやすさや reader flow の評価はツールだけでは不十分なので、文書や prompt の readability はエージェント review で確認してほしい。tool check は補助にとどめ、可読性判断は agent-side review を必須にしてほしい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
