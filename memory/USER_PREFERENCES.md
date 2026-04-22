@@ -96,6 +96,9 @@
 - 2026-04-22 | repo に搭載されている test は単一の canonical file に文書化してほしい。追加・削除・rename 時はその file も同じ pass で更新してほしい。
   - source: chat
 
+- 2026-04-22 | 退避 branch や backup branch を残さず、履歴は git にありつつも、運用上は最新の canonical state だけを見せてほしい。同期や置換のあとに extra branch を保険として残さないでほしい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
