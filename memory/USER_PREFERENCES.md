@@ -81,6 +81,21 @@
 - 2026-04-19 | 既存実装の再利用を強く優先し、新規実装の前に既存実装で足りない理由を明示してほしい
   - source: chat
 
+- 2026-04-20 | レビューでは差分だけでなく関連ファイル全体と削除影響まで確認してほしい。作成したファイルを後で消すことが多いため、削除済み・移動済み・参照切れも含めて見る。
+  - source: chat
+
+- 2026-04-22 | 最小変更に拘らず、再発源が構造にあるなら workflow・packet・参照構造まで含めて十分な大きさで直してほしい。
+  - source: chat
+
+- 2026-04-22 | 必要な subagent や MCP surface がある task では、起動確認を先に行い、未起動のまま parent 単独へ静かに downgrade しないでほしい。
+  - source: chat
+
+- 2026-04-22 | temporary fallback や旧経路を温存せず、canonical path を 1 本に寄せてほしい。フォールバック温存は実装の二重化の温床になる。
+  - source: chat
+
+- 2026-04-22 | repo に搭載されている test は単一の canonical file に文書化してほしい。追加・削除・rename 時はその file も同じ pass で更新してほしい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
