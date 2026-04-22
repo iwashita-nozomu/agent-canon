@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -23,6 +24,27 @@ REPO_ROOT = resolve_repo_root()
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
 
+    def overlay_working_tree(self, target: Path) -> None:
+        """Mirror the current working tree into one clone without external tools."""
+        for child in target.iterdir():
+            if child.name == ".git":
+                continue
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+        for child in REPO_ROOT.iterdir():
+            if child.name == ".git":
+                continue
+            destination = target / child.name
+            subprocess.run(
+                ["cp", "-a", str(child), str(destination)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
     def clone_repo(self, target: Path) -> None:
         """Clone the current repository into one temporary target."""
         subprocess.run(
@@ -31,12 +53,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        subprocess.run(
-            ["rsync", "-a", "--delete", "--exclude", ".git", f"{REPO_ROOT}/", str(target)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        self.overlay_working_tree(target)
         status = subprocess.run(
             ["git", "status", "--short"],
             cwd=target,

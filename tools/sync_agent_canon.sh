@@ -115,10 +115,6 @@ documents/conventions/python/30_experiment_directory_structure.md:../../../${PRE
 memory/README.md:../${PREFIX}/memory/README.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
-memory/global:../${PREFIX}/memory/global
-memory/methods:../${PREFIX}/memory/methods
-memory/candidates:../${PREFIX}/memory/candidates
-memory/subagent_loadouts.yaml:../${PREFIX}/memory/subagent_loadouts.yaml
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
@@ -180,6 +176,10 @@ documents/research-workflow.md
 documents/workflow-references.md
 notes/themes/AGENT_PHILOSOPHY.md
 notes/themes/USER_PREFERENCES.md
+memory/global
+memory/methods
+memory/candidates
+memory/subagent_loadouts.yaml
 EOF
 }
 
@@ -280,10 +280,12 @@ cmd_check() {
     local path="${spec%%:*}"
     local target="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
-    if [ -L "$abs_path" ] && [ "$(readlink "$abs_path")" = "$target" ]; then
+    if [ -L "$abs_path" ] && [ "$(readlink "$abs_path")" = "$target" ] && [ -e "$abs_path" ]; then
       continue
     fi
-    if [ -e "$abs_path" ]; then
+    if [ -L "$abs_path" ] && ! [ -e "$abs_path" ]; then
+      echo "link[$path]=broken" >&2
+    elif [ -e "$abs_path" ]; then
       echo "link[$path]=drift" >&2
     else
       echo "link[$path]=missing" >&2
