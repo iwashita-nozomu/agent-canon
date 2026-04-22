@@ -23,6 +23,7 @@
 - 長文では、scan できる構造と linear に読んだときの意味の両方を満たす
 - line edit より先に、focus、purpose、order、gap を直す
 - 長文作成では subagent review を必須にする
+- readability や reader flow の accept / reject は tool check ではなく agent review で決める
 
 ## Standard Flow
 
@@ -101,6 +102,8 @@ python3 tools/agent_tools/doc_start.py \
 - 別 instance の `reviewer`
   - docs completeness review を使い、読者に必要な情報の欠落を探す
 
+`make docs-check`、lint、link check は体裁や壊れた参照の検出には使えますが、読みやすさや reader flow の accept evidence にはしません。可読性は `document_flow_reviewer` と completeness reviewer の judgement を正本にします。
+
 追加条件:
 
 - 複数文書、entrypoint、canonical doc をまたぐなら docs consistency review を追加する
@@ -125,6 +128,8 @@ python3 tools/docs/check_markdown_lint.py documents notes
 python3 tools/docs/audit_and_fix_links.py --check documents notes
 ```
 
+validation command が通っても readability は自動では pass しません。closeout では agent review artifact に可読性 judgement が残っていることを確認します。
+
 ## Review Outcomes
 
 - `rewrite_required`
@@ -133,6 +138,7 @@ python3 tools/docs/audit_and_fix_links.py --check documents notes
   - 他文書との食い違いが残っている
 - `approved`
   - top-down readability、information completeness、canon alignment が揃っている
+  - tool check pass は補助条件であり、これだけでは `approved` にしない
 
 ## Repo Interpretation
 
