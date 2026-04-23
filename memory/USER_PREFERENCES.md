@@ -18,6 +18,9 @@
   - source: chat
   - rationale: User explicitly required current tree-head state as the only durable repo state.
 
+- 2026-04-23 | Review must always check full consistency with existing code, docs, workflows, and canonical surfaces, not only the diff.
+  - source: chat
+
 ## Provisional Preferences
 
 - 2026-04-10 | agent の作業哲学、知識、対話から得た学習を task / dialogue ごとに更新可能な仕組みにしたい
