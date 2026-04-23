@@ -25,6 +25,7 @@
 - run は fresh 実行で完走させます。途中停止 run を resume の正本にせず、停止理由を記録して 0 からやり直します。
 - claim は evidence に合わせます。実験範囲を越えた一般化を避け、仮定と限界を本文で明示します。
 - correctness evidence と performance evidence を混同しません。正しさの parity test は性能の証拠ではなく、速度比較は数式上の正しさの証拠ではありません。
+- runtime success や smoke pass は acceptance の十分条件ではありません。本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と一致しているかを別に確認します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで close しません。
 
@@ -110,6 +111,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Equation:` に、対象の式、目的関数、制約、離散化、近似、前処理、停止条件を書きます。
 - `Assumptions:` に、成り立ちを支える前提を書きます。
 - `Numerical Risks:` に、不安定化、オーバーフロー、近似誤差、conditioning、dtype 依存性を書きます。
+- `Equation-to-Code Mapping:` に、どの式、項、constraint、assumption がどの実装 path / function / helper に対応するかを書きます。
 
 ### Step 3. 比較設計を固定する
 
@@ -137,6 +139,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 - まず小さい prototype または最小ケースで式と実装の対応を確かめます。
 - 可能なら analytical solution、trusted prototype、corner case、旧実装と比較します。
+- run が通っても `Equation-to-Code Mapping:` とズレるなら prototype 段階で fail とし、大規模 sweep に進みません。
 - prototype 段階で落ちるなら、大規模 sweep に進みません。
 
 ### Step 6. 小さく改造する
@@ -153,6 +156,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 - unit test、small smoke run、reference comparison を段階ごとに実施します。
 - bug を直したら、その bug を test に変えます。
+- 各段で、runtime 結果とは別に `Equation:`、`Assumptions:`、仕様記述との整合を見直します。式と code のどちらを変えたのか曖昧なまま先へ進みません。
 - 主要な比較は次を分けて記録します。
   - correctness
   - numerical stability
@@ -239,6 +243,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Question:`
 - `Formulation:`
 - `Equation:`
+- `Equation-to-Code Mapping:`
 - `Assumptions:`
 - `Comparison Target:`
 - `Metrics:`
@@ -347,6 +352,7 @@ spot run は次の用途での使用を禁止します。
 ## 8.5 考察に対する批判的レビュー
 
 `experiment_reviewer` は、数字そのものだけでなく、数字の読み方を批判的に見ます。
+`change_reviewer` と `experiment_reviewer` は、run 完走や metric 改善があっても、数式 / 仕様 / method contract と code がずれていれば accept しません。
 最低限の review 観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) に従います。
 
 最低でも次を確認します。
@@ -384,6 +390,8 @@ review artifact では、次のラベルで切り分けます。
 
 - 実装変更ごとに、どの式のどの項をどう変えたかを書きます。
 - 実装上の最適化と定式化上の変更を分けて記録します。
+- `Equation-to-Code Mapping:` は、少なくとも `式または仕様項目 -> 実装 path -> 近似 / 省略 / guard` の形で残します。
+- run が成功しても、mapping が作れない、または mapping 上の意味と code の意味が一致しない場合は、その iteration を accept してはいけません。
 - 次の 3 つを区別します。
   - `Mathematical Change:` 問題設定や近似の変更
   - `Numerical Change:` 解法、安定化、dtype、前処理の変更

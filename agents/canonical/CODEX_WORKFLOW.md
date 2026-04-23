@@ -122,6 +122,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- task が数式、擬似コード、仕様、method contract を持つ場合、runtime success だけでなく implementation alignment evidence が review artifact に残っている
 - required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも full required review set を最新 diff に対して最初からやり直している
 - 反映しない findings は follow-up ではなく、今回の completion を阻害しない理由と escalation が artifact に記録されている
 

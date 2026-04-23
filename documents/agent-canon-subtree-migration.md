@@ -205,6 +205,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/tests/agent_tools/test_check_agent_runtime_alignment.py` への symlink view
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
   - `vendor/agent-canon/tests/agent_tools/test_smoke_test_research_perspective_pack.py` への symlink view
+- `tests/tools/test_check_markdown_math.py`
+  - `vendor/agent-canon/tests/tools/test_check_markdown_math.py` への symlink view
 - `tests/tools/test_mirror_skill_shims.py`
   - `vendor/agent-canon/tests/tools/test_mirror_skill_shims.py` への symlink view
 - `tests/tools/test_run_managed_experiment.py`

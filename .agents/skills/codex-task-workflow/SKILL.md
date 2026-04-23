@@ -15,7 +15,7 @@ description: Use when Codex needs a context-independent execution path for a rep
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.
 1. For repo-editing tasks, bootstrap subagents before implementation with `python3 tools/agent_tools/bootstrap_agent_run.py ... --enable scheduler --enable schedule_reviewer`, and keep the plan reviewer, detailed design reviewer, and document flow reviewer separate.
 1. Use `agents/canonical/ARTIFACT_PLACEMENT.md` before creating task-facing documents.
-1. Load only the minimal extra skills the task needs; long-form docs add `long-form-writing`, and academic papers or thesis chapters add `academic-writing` plus notation/logic review.
+1. Load only the minimal extra skills the task needs; long-form docs add `long-form-writing`, submission papers or thesis-chapter drafts add `paper-writing`, broader academic or scholarly-note writing adds `academic-writing`, and the required notation/logic/citation reviewers follow that writing skill choice.
 1. If the task needs explicit handoff or specialist roles, bootstrap `reports/agents/<run-id>/` first.
 1. Update canonical docs before runtime entrypoints when both are affected.
 1. Before implementation, read the approved `design_brief.md` `Implementation Source Packet` and `Design-To-Implementation Trace`; cite the design artifact path, design section, test-plan item, and user-request clause IDs for each changed slice.
