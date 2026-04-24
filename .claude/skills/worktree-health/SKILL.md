@@ -6,8 +6,9 @@ description: Use this skill to review current worktree scope, drift, and cleanup
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/.agents/skills/worktree-health/SKILL.md
+- vendor/agent-canon/tools/docs/mirror_skill_shims.py
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Worktree Health
 

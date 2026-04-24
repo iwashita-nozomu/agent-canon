@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
-# - vendor/agent-canon/tools/docs/mirror_skill_shims.py
-# - vendor/agent-canon/tools/agent_tools/smoke_test_research_perspective_pack.py
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/tools/README.md
+# - vendor/agent-canon/documents/dependency-headers.md
+
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════

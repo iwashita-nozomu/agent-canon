@@ -1,7 +1,8 @@
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/documents/REVIEW_PROCESS.md
+- vendor/agent-canon/documents/dependency-headers.md
 
 ## Summary
 

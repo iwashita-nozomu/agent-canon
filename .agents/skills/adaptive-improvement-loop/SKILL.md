@@ -6,8 +6,10 @@ description: Use when experiments, research, tuning, and iterative code improvem
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/agents/skills/adaptive-improvement-loop.md
+- vendor/agent-canon/agents/skills/README.md
+- vendor/agent-canon/agents/canonical/skills.md
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Adaptive Improvement Loop
 

@@ -6,8 +6,9 @@ description: Use when C or C++ code changes need strict review for build evidenc
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/.agents/skills/cpp-review/SKILL.md
+- vendor/agent-canon/tools/docs/mirror_skill_shims.py
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # C++ Review
 

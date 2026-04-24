@@ -6,8 +6,9 @@ description: Use when code changes need adversarial static test design before im
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/.agents/skills/test-design/SKILL.md
+- vendor/agent-canon/tools/docs/mirror_skill_shims.py
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Test Design
 

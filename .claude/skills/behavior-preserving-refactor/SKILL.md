@@ -6,8 +6,9 @@ description: Use when a large refactor should be treated as behavior-preserving 
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/.agents/skills/behavior-preserving-refactor/SKILL.md
+- vendor/agent-canon/tools/docs/mirror_skill_shims.py
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Behavior Preserving Refactor
 

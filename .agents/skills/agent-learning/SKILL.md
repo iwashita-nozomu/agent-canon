@@ -6,8 +6,10 @@ description: Use when agent-side working philosophy, interaction lessons, or tas
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/agents/skills/agent-learning.md
+- vendor/agent-canon/agents/skills/README.md
+- vendor/agent-canon/agents/canonical/skills.md
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Agent Learning
 

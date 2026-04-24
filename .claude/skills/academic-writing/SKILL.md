@@ -6,8 +6,9 @@ description: Use when drafting a paper, thesis chapter, scholarly note, or other
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/.agents/skills/academic-writing/SKILL.md
+- vendor/agent-canon/tools/docs/mirror_skill_shims.py
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Academic Writing
 

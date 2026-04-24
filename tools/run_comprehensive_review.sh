@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 # - vendor/agent-canon/tools/README.md
-#
+# - vendor/agent-canon/documents/dependency-headers.md
+
 # 統合コードレビューチェック実行スクリプト（v2.0）
 # スキルファイル section 12 の自動化スクリプトを一括実行
 # 

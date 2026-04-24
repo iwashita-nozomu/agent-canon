@@ -1,6 +1,8 @@
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/.codex/README.md
+
 # Project-scoped Codex settings.
 # Keep review fan-out explicit, keep one writer per worktree, do not fix agent depth in repo config,
 # and use spawned agents in bounded waves instead of starting every available role at once.

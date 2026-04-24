@@ -1,6 +1,9 @@
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/.codex/README.md
+
 name = "requirements_organizer"
 description = "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets."
 nickname_candidates = ["requirements", "intake", "scope"]

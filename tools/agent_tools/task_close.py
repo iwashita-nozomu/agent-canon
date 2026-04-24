@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/agent_team.py
-# - vendor/agent-canon/tools/agent_tools/report_artifact_checks.py
-# - vendor/agent-canon/agents/templates/closeout_gate.md
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/tools/README.md
+# - vendor/agent-canon/documents/dependency-headers.md
+
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
 from __future__ import annotations

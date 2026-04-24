@@ -1,10 +1,10 @@
 # Codex Workflow
 
 Dependency Files:
-- vendor/agent-canon/ROOT_AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-- vendor/agent-canon/agents/templates/closeout_gate.md
-- vendor/agent-canon/tools/agent_tools/task_close.py
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/README.md
+- vendor/agent-canon/documents/dependency-headers.md
 
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
@@ -21,6 +21,7 @@ Dependency Files:
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
 1. 必要なら `.agents/skills/` から該当 skill を読む
+1. text file を編集または作成する場合は `documents/dependency-headers.md` に従って依存ヘッダーを確認する
 
 Base Runtime Packet:
 

@@ -1,6 +1,9 @@
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/.codex/README.md
+
 name = "cpp_reviewer"
 description = "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions."
 nickname_candidates = ["cpp-gate", "native-review", "abi-review"]

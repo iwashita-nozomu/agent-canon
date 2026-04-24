@@ -1,7 +1,8 @@
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+- vendor/agent-canon/.codex/config.toml
 
 # Codex Project Setup
 

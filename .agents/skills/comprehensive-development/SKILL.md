@@ -6,8 +6,10 @@ description: Use when a repo-wide task spans code, docs, tools, workflows, and r
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/agents/skills/comprehensive-development.md
+- vendor/agent-canon/agents/skills/README.md
+- vendor/agent-canon/agents/canonical/skills.md
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Comprehensive Development
 

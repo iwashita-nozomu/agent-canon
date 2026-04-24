@@ -1,7 +1,9 @@
 Dependency Files:
 
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- AGENTS.md
+- documents/README.md
+- documents/coding-conventions.md
+- documents/coding-conventions-house-style.md
 
 # ベンチマーク方針
 

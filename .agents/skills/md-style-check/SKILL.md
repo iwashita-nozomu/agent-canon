@@ -6,8 +6,10 @@ description: Use when Markdown files changed and you need formatting, heading, a
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
+- vendor/agent-canon/agents/skills/md-style-check.md
+- vendor/agent-canon/agents/skills/README.md
+- vendor/agent-canon/agents/canonical/skills.md
+- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
 
 # Markdown Style Check
 

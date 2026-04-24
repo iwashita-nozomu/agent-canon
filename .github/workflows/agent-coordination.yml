@@ -1,6 +1,8 @@
 # Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/tools/sync_agent_canon.sh
+# - vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py
+# - vendor/agent-canon/tools/agent_tools/validate_role_write_scope.py
+
 # Synced to /.github/workflows/agent-coordination.yml by tools/sync_agent_canon.sh link-root.
 # Edit vendor/agent-canon/.github/workflows/agent-coordination.yml, not the root copy.
 name: Agent Coordination

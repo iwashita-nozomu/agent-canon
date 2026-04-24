@@ -1,6 +1,7 @@
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/documents/dependency-headers.md
 - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 
 # レビュー手順とポリシー
@@ -72,6 +73,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - CMake project なら `cmake --build build`
   - test target があれば `ctest --test-dir build`
 - Markdown 差分を含む場合は、少なくとも `make docs-check` を実行します。
+- Human-authored text files must carry useful dependency headers as defined in [dependency-headers.md](dependency-headers.md). Presence-only headers such as `AGENTS.md` alone are acceptable only for truly thin entrypoints.
 - `make docs-check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
 - README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
 - 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。

@@ -1,7 +1,9 @@
 Dependency Files:
 
 - vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/agents/TASK_WORKFLOWS.md
+- vendor/agent-canon/agents/workflows/workflow-references.md
+- vendor/agent-canon/documents/dependency-headers.md
 
 # Workflow Guide
 

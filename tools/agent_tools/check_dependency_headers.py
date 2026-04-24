@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # Dependency Files:
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/documents/dependency-headers.md
+# - vendor/agent-canon/tests/agent_tools/test_check_dependency_headers.py
 # - vendor/agent-canon/agents/templates/closeout_gate.md
+
 """Check that changed human-authored text files declare dependency files."""
 
 from __future__ import annotations
@@ -24,6 +26,13 @@ CHECKABLE_SUFFIXES = {
     ".yaml",
     ".yml",
     ".zsh",
+}
+CHECKABLE_NAMES = {
+    "Dockerfile",
+    "Makefile",
+}
+COMMENTLESS_SUFFIXES = {
+    ".json",
 }
 SKIP_PREFIXES = (
     ".git/",
@@ -106,7 +115,9 @@ def should_check(root: Path, path: Path) -> bool:
         return False
     if relative.startswith("references/") and path.suffix.lower() == ".html":
         return False
-    return path.suffix.lower() in CHECKABLE_SUFFIXES
+    if path.suffix.lower() in COMMENTLESS_SUFFIXES:
+        return False
+    return path.suffix.lower() in CHECKABLE_SUFFIXES or path.name in CHECKABLE_NAMES
 
 
 def has_dependency_header(path: Path) -> bool:
@@ -132,10 +143,25 @@ def dependency_header_search_lines(lines: list[str]) -> list[str]:
     for index, line in enumerate(lines[1:FRONT_MATTER_SCAN_LINES], start=1):
         if line.strip() != "---":
             continue
+        if not looks_like_front_matter(lines[1:index]):
+            return lines[:HEADER_SCAN_LINES]
         after_front_matter = lines[index + 1 : index + 1 + HEADER_SCAN_LINES]
         return [*lines[:HEADER_SCAN_LINES], *after_front_matter]
 
     return lines[:HEADER_SCAN_LINES]
+
+
+def looks_like_front_matter(lines: list[str]) -> bool:
+    """Return whether the opening fence contains metadata rather than a rule."""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith(("- ", "* ")):
+            return True
+        if ":" in stripped:
+            return True
+    return False
 
 
 def stripped_list_item(line: str) -> bool:
@@ -144,7 +170,7 @@ def stripped_list_item(line: str) -> bool:
     for prefix in ("#", "//", ";"):
         if stripped.startswith(prefix):
             stripped = stripped[len(prefix) :].strip()
-    return stripped.startswith("- ") and len(stripped) > 2
+    return stripped.startswith(("- ", "* ", "+ ")) and len(stripped) > 2
 
 
 def main() -> int:

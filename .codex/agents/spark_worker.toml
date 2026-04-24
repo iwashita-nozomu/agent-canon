@@ -1,6 +1,9 @@
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/.codex/README.md
+
 name = "spark_worker"
 description = "Low-latency implementation agent for narrow, design-traced code, docs, tests, or mechanical cleanup slices."
 nickname_candidates = ["spark-impl", "fast-change", "narrow-fix"]

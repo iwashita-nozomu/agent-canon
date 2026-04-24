@@ -2,8 +2,9 @@
 
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 # - vendor/agent-canon/tools/README.md
+# - vendor/agent-canon/documents/dependency-headers.md
+
 # pre_review.sh — PR 前の自動 QA チェック
 #
 # 使用方法:

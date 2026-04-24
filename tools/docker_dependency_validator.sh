@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 # - vendor/agent-canon/tools/README.md
+# - vendor/agent-canon/documents/dependency-headers.md
+
 set -euo pipefail
 
 issues=0

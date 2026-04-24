@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 # - vendor/agent-canon/tools/README.md
+# - vendor/agent-canon/documents/dependency-headers.md
+
 """Audit markdown links and optionally auto-fix resolvable local targets."""
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 ROOT = Path(".").resolve()
 REPORT = ROOT / "reports" / "broken_links.txt"
@@ -44,7 +44,24 @@ class LinkIssue:
 
 def find_markdown_links(text: str) -> list[tuple[str, str]]:
     """Return markdown links found in ``text``."""
-    return LINK_PATTERN.findall(text)
+    links: list[tuple[str, str]] = []
+    in_fence = False
+    in_display_math = False
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        compact = stripped.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        if compact == "$$":
+            in_display_math = not in_display_math
+            continue
+        if in_display_math:
+            continue
+        links.extend(LINK_PATTERN.findall(line))
+    return links
 
 
 def replace_link_targets(text: str, replacements: dict[str, str]) -> str:
@@ -64,7 +81,8 @@ def iter_markdown_files(paths: list[str]) -> list[Path]:
     """Expand paths into markdown files."""
     markdown_files: list[Path] = []
     for raw_path in paths:
-        path = (ROOT / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
+        raw = Path(raw_path)
+        path = raw.resolve() if raw.is_absolute() else (ROOT / raw).resolve()
         if not path.exists():
             continue
         if path.is_dir():

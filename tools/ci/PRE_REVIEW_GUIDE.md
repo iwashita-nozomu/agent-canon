@@ -1,3 +1,10 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/tools/README.md
+- vendor/agent-canon/documents/dependency-headers.md
+
+
 ---
 
 ## 📋 概要
@@ -10,12 +17,6 @@
 4. **Code Quality** — Ruff (E, F, I, D, UP)
 
 ---
-
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-- vendor/agent-canon/tools/README.md
 
 # pre_review.sh スクリプト — 使用ガイド
 

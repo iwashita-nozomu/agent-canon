@@ -1,6 +1,9 @@
 # Dependency Files:
 # - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/.codex/README.md
+
 name = "plan_reviewer"
 description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."
 nickname_candidates = ["plan-review", "schedule-gate", "sequence-review"]
