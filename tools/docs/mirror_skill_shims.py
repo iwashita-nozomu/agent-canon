@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Dependency Files:
+# - vendor/agent-canon/agents/skills/catalog.yaml
+# - vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md
 """
 Mirror skill shim directories from one discovery path to another.
 
@@ -13,8 +16,11 @@ import shutil
 import sys
 from pathlib import Path
 
+FRONTMATTER_SCAN_LINES = 12
+
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Mirror skill shim directories between runtime discovery paths."
     )
@@ -42,23 +48,54 @@ def parse_args() -> argparse.Namespace:
 
 
 def iter_skill_dirs(root: Path) -> list[Path]:
+    """Return skill directories below one root."""
     return sorted(
         path for path in root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file()
     )
 
 
+def validate_skill_frontmatter(root: Path) -> list[str]:
+    """Return findings for skill shims without valid YAML frontmatter."""
+    findings: list[str] = []
+    for skill_dir in iter_skill_dirs(root):
+        skill_path = skill_dir / "SKILL.md"
+        lines = skill_path.read_text(encoding="utf-8").splitlines()
+        if not lines or lines[0].strip() != "---":
+            findings.append(f"{skill_path}: missing YAML frontmatter delimited by ---")
+            continue
+        closing_index = None
+        for index, line in enumerate(lines[1:FRONTMATTER_SCAN_LINES], start=1):
+            if line.strip() == "---":
+                closing_index = index
+                break
+        if closing_index is None:
+            findings.append(f"{skill_path}: missing YAML frontmatter delimited by ---")
+            continue
+        frontmatter = "\n".join(lines[1:closing_index])
+        if "name:" not in frontmatter or "description:" not in frontmatter:
+            findings.append(f"{skill_path}: frontmatter must include name and description")
+    return findings
+
+
 def iter_files(root: Path) -> list[Path]:
+    """Return all files below one root."""
     return sorted(path for path in root.rglob("*") if path.is_file())
 
 
 def files_match(source: Path, target: Path) -> bool:
+    """Return whether source and target file contents match."""
     return target.is_file() and source.read_bytes() == target.read_bytes()
 
 
 def plan_sync(source_root: Path, target_root: Path, prune: bool) -> list[str]:
+    """Return sync actions needed to make target match source."""
     actions: list[str] = []
     source_skills = {path.name: path for path in iter_skill_dirs(source_root)}
-    target_skills = {path.name: path for path in iter_skill_dirs(target_root)} if target_root.exists() else {}
+    target_skills = (
+        {path.name: path for path in iter_skill_dirs(target_root)}
+        if target_root.exists()
+        else {}
+    )
 
     for skill_name, source_skill in source_skills.items():
         target_skill = target_root / skill_name
@@ -89,6 +126,7 @@ def plan_sync(source_root: Path, target_root: Path, prune: bool) -> list[str]:
 
 
 def sync_skill(source_skill: Path, target_skill: Path, prune: bool) -> None:
+    """Copy one source skill into one target directory."""
     source_files = iter_files(source_skill)
     source_relatives = set()
 
@@ -122,6 +160,7 @@ def sync_skill(source_skill: Path, target_skill: Path, prune: bool) -> None:
 
 
 def apply_sync(source_root: Path, target_root: Path, prune: bool) -> None:
+    """Apply the planned skill mirror synchronization."""
     target_root.mkdir(parents=True, exist_ok=True)
     source_skills = {path.name: path for path in iter_skill_dirs(source_root)}
     target_skills = {path.name: path for path in iter_skill_dirs(target_root)}
@@ -138,6 +177,7 @@ def apply_sync(source_root: Path, target_root: Path, prune: bool) -> None:
 
 
 def main() -> int:
+    """Run the skill mirror command."""
     args = parse_args()
     source_root = Path(args.source)
     target_root = Path(args.target)
@@ -149,9 +189,16 @@ def main() -> int:
         print("source and target must be different directories", file=sys.stderr)
         return 2
 
+    frontmatter_findings = validate_skill_frontmatter(source_root)
+    if target_root.exists():
+        frontmatter_findings.extend(validate_skill_frontmatter(target_root))
     actions = plan_sync(source_root, target_root, prune=args.prune)
 
     if args.check:
+        if frontmatter_findings:
+            for finding in frontmatter_findings:
+                print(finding)
+            return 1
         if actions:
             for action in actions:
                 print(action)
