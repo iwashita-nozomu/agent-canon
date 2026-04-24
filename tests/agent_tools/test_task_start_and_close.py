@@ -51,8 +51,14 @@ def write_ready_work_log(report_dir: Path) -> None:
                 "- Record meaningful execution steps.",
                 "",
                 "## Entries",
-                "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | request_clause_ids: T1-C1 | next: implement`",
-                "- `2026-04-08 09:30 JST | test | passed closeout checks | request_clause_ids: T1-C1 | next: close`",
+                (
+                    "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | "
+                    "request_clause_ids: T1-C1 | next: implement`"
+                ),
+                (
+                    "- `2026-04-08 09:30 JST | test | passed closeout checks | "
+                    "request_clause_ids: T1-C1 | next: close`"
+                ),
                 "",
             ]
         ),
@@ -97,7 +103,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout
+            )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)

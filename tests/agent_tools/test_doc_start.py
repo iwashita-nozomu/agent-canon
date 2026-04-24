@@ -57,7 +57,9 @@ class DocStartTest(unittest.TestCase):
             )
             self.assertIn("START_DECLARATION=workflow=Scoped Change", result.stdout)
             self.assertIn("document_flow_reviewer", result.stdout)
-            manifest_text = (report_root / "test-doc-start-long-form" / "team_manifest.yaml").read_text(
+            manifest_text = (
+                report_root / "test-doc-start-long-form" / "team_manifest.yaml"
+            ).read_text(
                 encoding="utf-8",
             )
             self.assertIn("subagent_prompt_packet:", manifest_text)

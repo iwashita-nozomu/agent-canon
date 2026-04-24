@@ -8,7 +8,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "check_markdown_math.py"
 
@@ -107,7 +106,9 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("Display math must use `$$...$$`, not `$...$` on its own line", result.stdout)
+            self.assertIn(
+                "Display math must use `$$...$$`, not `$...$` on its own line", result.stdout
+            )
 
     def test_fails_on_single_dollar_block_delimiters(self) -> None:
         """Display blocks should not use single-dollar delimiter lines."""
@@ -121,7 +122,9 @@ class CheckMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("Display math must use `$$...$$`, not `$` block delimiters", result.stdout)
+            self.assertIn(
+                "Display math must use `$$...$$`, not `$` block delimiters", result.stdout
+            )
 
 
 if __name__ == "__main__":
