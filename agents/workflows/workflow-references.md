@@ -15,14 +15,18 @@
   - shared canon を subtree として template / 派生 repo へ取り込む運用整理の参考です。
 - [Models | OpenAI API](https://developers.openai.com/api/docs/models)
   - current model lineup と mainline chooser の根拠です。
+- [Introducing GPT-5.5 | OpenAI](https://openai.com/index/introducing-gpt-5-5/)
+  - `gpt-5.5` を Codex の frontier planning、review、broad implementation、agentic tool-use role に置く根拠です。
+- [GPT-5.5 System Card | OpenAI](https://openai.com/index/gpt-5-5-system-card/)
+  - complex real-world work、coding、research、tool use を担う model としての safety / capability 境界確認に使います。
 - [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)
-  - `gpt-5.4` を planning、design、review の default 判断役に置く根拠です。
+  - `gpt-5.4` を previous frontier baseline として比較するときの根拠です。
 - [GPT-5.3-Codex Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.3-codex)
   - `gpt-5.3-codex` を coding-specialist の default に置く根拠です。
 - [All models | OpenAI API](https://developers.openai.com/api/docs/models/all)
-  - GPT-5.4 系を frontier default、Codex 系を coding-specialist family として分ける根拠です。
+  - GPT-5.5 / GPT-5.4 系を frontier family、Codex 系を coding-specialist family として分ける根拠です。
 - [Introducing GPT-5.4 | OpenAI](https://openai.com/index/introducing-gpt-5-4/)
-  - `gpt-5.4` を broad professional / judgment role に置く補助根拠です。
+  - `gpt-5.4` を previous broad professional / judgment baseline として扱う補助根拠です。
 - [Introducing GPT-5.4 mini and nano | OpenAI](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/)
   - GPT-5.4 mini の得意領域が fast coding/subagents であること、対してこの repo では coding を Codex 系へ寄せるときの比較根拠です。
 - [Introducing GPT-5.3-Codex-Spark | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)

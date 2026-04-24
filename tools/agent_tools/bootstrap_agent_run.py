@@ -18,6 +18,8 @@ from agent_team import (
     make_run_id,
     resolve_role_document_packet,
     resolve_cross_cutting_document_packet,
+    resolve_task_spec,
+    resolve_workflow_family,
     select_roles,
     specialist_role_ids,
     task_ids,
@@ -25,6 +27,24 @@ from agent_team import (
     workflow_spawn_budget,
     resolve_report_root,
 )
+
+
+def suggested_skills(task_id: str | None, workflow_family_id: str | None) -> tuple[str, ...]:
+    """Return the public skills that should be read before work starts."""
+    selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
+    if workflow_family_id == "research_driven_change":
+        selected.append("$research-workflow")
+    elif workflow_family_id == "platform_and_environment":
+        selected.append("$environment-maintenance")
+    elif workflow_family_id == "comprehensive_development":
+        selected.append("$comprehensive-development")
+    elif workflow_family_id == "adaptive_improvement_loop":
+        selected.append("$adaptive-improvement-loop")
+    if task_id == "T6":
+        selected.append("$behavior-preserving-refactor")
+    if task_id == "T10":
+        selected.append("$paper-writing")
+    return tuple(dict.fromkeys(selected))
 
 
 def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
@@ -144,13 +164,18 @@ def main() -> int:
     enabled_specialists = list(args.enable)
     task_default_specialists: tuple[str, ...] = ()
     auto_specialists: tuple[str, ...] = ()
+    workflow_family_id: str | None = None
+    workflow_family_name: str | None = None
     workflow_active_spawn_budget: int | None = None
     workflow_max_write_subagents: int | None = None
     if args.task_id is not None:
-        task_spec = next(task for task in catalog.tasks if task["id"] == args.task_id)
+        task_spec = resolve_task_spec(catalog, args.task_id)
+        workflow_family_id = str(task_spec["family"])
+        workflow_family = resolve_workflow_family(catalog, workflow_family_id)
+        workflow_family_name = str(workflow_family["name"])
         workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
             catalog,
-            str(task_spec["family"]),
+            workflow_family_id,
         )
         task_default_specialists = default_specialists_for_task(
             config=config,
@@ -192,6 +217,20 @@ def main() -> int:
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
+    selected_skills = suggested_skills(args.task_id, workflow_family_id)
+    review_roles = tuple(
+        role.id
+        for role in roles
+        if role.id.endswith("_reviewer")
+        or role.id in {"reviewer", "verifier", "auditor", "docs_workflow_steward", "critical_guardian"}
+    )
+    print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(
+        "START_DECLARATION="
+        f"workflow={workflow_family_name or 'Unspecified'}, "
+        f"skills={','.join(selected_skills)}, "
+        f"review={','.join(review_roles) or '-'}"
+    )
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")

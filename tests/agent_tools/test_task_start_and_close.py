@@ -104,7 +104,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
@@ -159,7 +159,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$behavior-preserving-refactor",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$behavior-preserving-refactor",
                 result.stdout,
             )
 

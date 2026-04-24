@@ -6,10 +6,11 @@ description: Use when Codex needs a context-independent execution path for a rep
 # Codex Task Workflow
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
+1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is fixed.
 1. On a clean worktree, run `make agent-canon-ensure-latest` before planning or implementation; if dirty, record why it is blocked and rerun after commit or stash.
 1. Sweep `documents/`, `notes/`, `references/`, and local implementation directories before planning or implementation.
 1. Classify the task with `agents/TASK_WORKFLOWS.md` before touching files.
-1. In the first work update, declare `workflow=<family>`, `skills=<...>`, `review=<...>`.
+1. In the first work update, declare `workflow=<family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list.
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.

@@ -128,7 +128,7 @@ def build_parser(
 
 def suggested_skills(task_id: str | None, workflow_family_id: str | None) -> tuple[str, ...]:
     """Return a minimal suggested public skill set."""
-    selected = ["$codex-task-workflow", "$agent-orchestration", "$subagent-bootstrap"]
+    selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
     if workflow_family_id == "research_driven_change":
         selected.append("$research-workflow")
     elif workflow_family_id == "platform_and_environment":

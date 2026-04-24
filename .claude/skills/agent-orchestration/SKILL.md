@@ -1,6 +1,6 @@
 ---
 name: agent-orchestration
-description: Use when selecting workflow family, skills, review roles, runtime entrypoints, and Codex/Claude/Copilot routing before execution.
+description: Mandatory first skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, run bundles, or Codex/Claude/Copilot routing.
 ---
 
 # Agent Orchestration
@@ -12,6 +12,7 @@ description: Use when selecting workflow family, skills, review roles, runtime e
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
 1. Build the public skill set in this order:
+   - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`
    - for `repo-changing execution`, add `$codex-task-workflow` and `$subagent-bootstrap`
    - add the minimal task-shape skill that matches the work:
@@ -30,7 +31,7 @@ description: Use when selecting workflow family, skills, review roles, runtime e
    - use `python3 tools/agent_tools/task_start.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"` only for routing-only starter guidance when no run bundle is being created yet
 1. Emit a family-appropriate output set:
    - one chosen `workflow=<family>`
-   - `skills=<...>` with preserved explicit skills and only the needed additions
+   - `skills=<...>` with `$agent-orchestration` first, preserved explicit skills, and only the needed additions
    - `review=<...>` plus the minimal specialist / reviewer stack that matches that family
    - the starter command when the scenario asks for kickoff guidance
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`

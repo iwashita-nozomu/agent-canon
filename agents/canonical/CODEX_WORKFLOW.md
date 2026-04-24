@@ -9,7 +9,7 @@
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
 1. Base Runtime Packet を読む
 1. Cross-Cutting Packet を読む
-1. `agents/skills/README.md` を読む
+1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
@@ -130,15 +130,15 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 ## Minimal Skill Set
 
-Codex では、まず `agents/skills/README.md` から必要最小限の skill だけ選びます。
+Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から必要最小限の skill だけ選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `$codex-task-workflow` に加えます。
 
-- repo 入口確認:
-  - `repo-onboarding`
 - workflow / runtime routing:
   - `agent-orchestration`
+- repo 入口確認:
+  - `repo-onboarding`
 - subagent 起動:
   - `subagent-bootstrap`
 - code review:
@@ -223,7 +223,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model split は、`gpt-5.4` が planning、writing、final judgment を担当し、`gpt-5.3-codex` が code survey と broad implementation を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.4` / `gpt-5.3-codex` 側に残します。
+default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex` が code survey、static test design、language-specific code review を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.5` 側に残します。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 5 体、`Large Delivery` / `Platform And Environment` で同時 6 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
@@ -347,7 +347,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
-- broad worker は `gpt-5.3-codex` で、design-traced narrow slice の first candidate は `gpt-5.3-codex-spark` とする
+- broad worker は `gpt-5.5` で、design-traced narrow slice の first candidate は `gpt-5.3-codex-spark` とする
 - same-worktree single-writer rule は `worker.toml` と planning/reviewer TOML を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ

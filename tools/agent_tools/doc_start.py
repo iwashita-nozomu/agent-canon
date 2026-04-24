@@ -21,8 +21,8 @@ DOC_KIND_MAP = {
     "long-form": {
         "workflow_family": "Scoped Change",
         "skills": (
-            "$codex-task-workflow",
             "$agent-orchestration",
+            "$codex-task-workflow",
             "$subagent-bootstrap",
             "$long-form-writing",
         ),
@@ -31,8 +31,8 @@ DOC_KIND_MAP = {
     "academic": {
         "workflow_family": "Research-Driven Change",
         "skills": (
-            "$codex-task-workflow",
             "$agent-orchestration",
+            "$codex-task-workflow",
             "$subagent-bootstrap",
             "$academic-writing",
         ),
@@ -44,8 +44,8 @@ DOC_KIND_MAP = {
     "paper": {
         "workflow_family": "Research-Driven Change",
         "skills": (
-            "$codex-task-workflow",
             "$agent-orchestration",
+            "$codex-task-workflow",
             "$subagent-bootstrap",
             "$paper-writing",
         ),

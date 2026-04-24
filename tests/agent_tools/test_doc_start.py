@@ -48,7 +48,7 @@ class DocStartTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("DOC_KIND=long-form", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$long-form-writing",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$long-form-writing",
                 result.stdout,
             )
             self.assertIn("START_DECLARATION=workflow=Scoped Change", result.stdout)
@@ -88,7 +88,7 @@ class DocStartTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("DOC_KIND=paper", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$paper-writing",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$paper-writing",
                 result.stdout,
             )
             self.assertIn("citation_evidence_reviewer", result.stdout)

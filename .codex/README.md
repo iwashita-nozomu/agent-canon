@@ -32,7 +32,7 @@
 
 ## Model Policy
 
-- `gpt-5.4` + `high`
+- `gpt-5.5` + `high`
   - `requirements_organizer`
   - `manager_reviewer`
   - `execution_planner`
@@ -42,6 +42,7 @@
   - `logic_gap_reviewer`
   - `literature_researcher`
   - `docs_workflow_steward`
+  - `worker`
   - `reviewer`
   - `plan_reviewer`
   - `detailed_design_reviewer`
@@ -51,14 +52,14 @@
   - perspective reviewer 全般
 - `gpt-5.3-codex` + `high`
   - `explorer`
-  - `worker`
+  - `test_designer`
   - `python_reviewer`
   - `cpp_reviewer`
 - design-traced narrow implementation default
   - `gpt-5.3-codex-spark`
     - `spark_worker`
 - broad or ambiguous implementation fallback
-  - `gpt-5.3-codex`
+  - `gpt-5.5`
     - `worker`
     - 設計解釈、conflict resolution、architecture-sensitive edit
 - repo default は `high`

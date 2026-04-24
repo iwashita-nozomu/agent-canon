@@ -2,12 +2,14 @@
 
 ## Public Skills
 
+- `agent-orchestration`
+  - task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint の選択
 - `repo-onboarding`
   - unfamiliar repo の入口確認
+- `start-repository`
+  - template clone から新 repository を開始する
 - `codex-task-workflow`
   - Codex の context-independent task 実行フロー
-- `agent-orchestration`
-  - workflow family、skill、review、runtime entrypoint の選択
 - `subagent-bootstrap`
   - specialist run bundle と stage subagent の明示
 - `change-review`
@@ -58,7 +60,8 @@
 - static validation commands
 
 これらは workflow や subagent routing が要求する internal routine として扱い、public skill surface には出しません。
-`agent-orchestration` と `subagent-bootstrap` は task 開始時の使い忘れが実害になるため public skill surface に出します。
+`agent-orchestration` は task 開始時の使い忘れが実害になるため public skill surface の先頭に出します。
+`subagent-bootstrap` も repo-changing task の stage 分離に必要なため public skill surface に出します。
 
 ## Discovery Paths
 
