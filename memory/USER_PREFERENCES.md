@@ -108,6 +108,9 @@
 - 2026-04-22 | 読みやすさや reader flow の評価はツールだけでは不十分なので、文書や prompt の readability はエージェント review で確認してほしい。tool check は補助にとどめ、可読性判断は agent-side review を必須にしてほしい。
   - source: chat
 
+- 2026-04-24 | Implementation work should start from this template repository by default; avoid treating other repositories as the primary starting point unless the user explicitly redirects.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

@@ -51,8 +51,17 @@ class DocStartTest(unittest.TestCase):
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$long-form-writing",
                 result.stdout,
             )
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("START_DECLARATION=workflow=Scoped Change", result.stdout)
             self.assertIn("document_flow_reviewer", result.stdout)
+            manifest_text = (report_root / "test-doc-start-long-form" / "team_manifest.yaml").read_text(
+                encoding="utf-8",
+            )
+            self.assertIn("subagent_prompt_packet:", manifest_text)
+            self.assertIn("prompt_contract:", manifest_text)
 
     def test_doc_start_paper(self) -> None:
         """Paper doc start should enable citation, notation, and logic reviewers."""
@@ -91,12 +100,19 @@ class DocStartTest(unittest.TestCase):
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$paper-writing",
                 result.stdout,
             )
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("citation_evidence_reviewer", result.stdout)
             self.assertIn("notation_definition_reviewer", result.stdout)
             self.assertIn("logic_gap_reviewer", result.stdout)
             self.assertTrue((report_dir / "citation_evidence_review.md").is_file())
             self.assertTrue((report_dir / "notation_definition_review.md").is_file())
             self.assertTrue((report_dir / "logic_gap_review.md").is_file())
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            self.assertIn("subagent_prompt_packet:", manifest_text)
+            self.assertIn("prompt_contract:", manifest_text)
 
 
 if __name__ == "__main__":

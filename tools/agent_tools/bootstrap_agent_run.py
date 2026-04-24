@@ -207,6 +207,7 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            workflow_family_id=workflow_family_id,
         )
 
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
@@ -233,6 +234,7 @@ def main() -> int:
     )
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
+        print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")

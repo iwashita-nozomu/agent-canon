@@ -19,6 +19,7 @@ from agent_team import (
 
 DOC_KIND_MAP = {
     "long-form": {
+        "workflow_family_id": "scoped_change",
         "workflow_family": "Scoped Change",
         "skills": (
             "$agent-orchestration",
@@ -29,6 +30,7 @@ DOC_KIND_MAP = {
         "enable": (),
     },
     "academic": {
+        "workflow_family_id": "research_driven_change",
         "workflow_family": "Research-Driven Change",
         "skills": (
             "$agent-orchestration",
@@ -42,6 +44,7 @@ DOC_KIND_MAP = {
         ),
     },
     "paper": {
+        "workflow_family_id": "research_driven_change",
         "workflow_family": "Research-Driven Change",
         "skills": (
             "$agent-orchestration",
@@ -132,6 +135,7 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            workflow_family_id=str(kind_spec["workflow_family_id"]),
         )
 
     review_roles = tuple(
@@ -151,6 +155,7 @@ def main() -> int:
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"DOC_KIND={args.kind}")
     print(f"WORKFLOW_FAMILY_NAME={kind_spec['workflow_family']}")
+    print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
     print(f"RECOMMENDED_SPECIALISTS={','.join(kind_spec['enable'])}")
     print(f"SUGGESTED_SKILLS={','.join(kind_spec['skills'])}")
     print(f"START_DECLARATION={start_declaration}")

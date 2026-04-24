@@ -241,6 +241,17 @@ def validate_task_catalog_references() -> None:
     for family in catalog.workflow_families:
         roles = family.get("roles", {})
         ensure(isinstance(roles, dict), f"family {family['id']} roles must be a mapping")
+        prompt = family.get("subagent_prompt")
+        ensure(isinstance(prompt, dict), f"family {family['id']} subagent_prompt must be a mapping")
+        for key in ("purpose", "prompt_preamble", "workflow_focus", "reviewer_prompt"):
+            ensure(key in prompt, f"family {family['id']} subagent_prompt missing {key}")
+        ensure(str(prompt["purpose"]).strip(), f"family {family['id']} subagent_prompt purpose empty")
+        for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
+            values = prompt[key]
+            ensure(
+                isinstance(values, list) and all(str(value).strip() for value in values),
+                f"family {family['id']} subagent_prompt {key} must be a non-empty list",
+            )
         for bucket in ("always_on", "specialists"):
             members = roles.get(bucket, [])
             ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
@@ -336,6 +347,7 @@ def validate_bundle_outputs() -> None:
         )
 
         for task_id in task_ids(catalog):
+            task = next(task for task in catalog.tasks if task["id"] == task_id)
             enabled = list(
                 default_specialists_for_task(
                     config=config,
@@ -355,6 +367,7 @@ def validate_bundle_outputs() -> None:
                 created_at_iso=created_at_iso,
                 roles=roles,
                 workspace_root=workspace_root,
+                workflow_family_id=str(task["family"]),
             )
             missing_outputs = [
                 output
@@ -365,6 +378,17 @@ def validate_bundle_outputs() -> None:
             ensure(
                 not missing_outputs,
                 f"task {task_id} did not generate required outputs: {', '.join(sorted(set(missing_outputs)))}",
+            )
+            manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
+                encoding="utf-8",
+            )
+            ensure(
+                "subagent_prompt_packet:" in manifest_text,
+                f"task {task_id} manifest missing subagent_prompt_packet",
+            )
+            ensure(
+                "prompt_contract:" in manifest_text,
+                f"task {task_id} manifest missing role prompt_contract",
             )
 
         full_team_roles = config.always_on_roles + config.specialist_roles
@@ -378,6 +402,7 @@ def validate_bundle_outputs() -> None:
             created_at_iso=created_at_iso,
             roles=full_team_roles,
             workspace_root=workspace_root,
+            workflow_family_id="comprehensive_development",
         )
         missing_outputs = [
             output

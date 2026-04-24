@@ -205,7 +205,7 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - run 固有のメモは `reports/agents/<run-id>/`
 - repo-wide の恒久文書は `agents/` か `documents/`
 - 知見の蓄積は `notes/`
-- packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET` の順で handoff に使う
+- packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET`、`WORKFLOW_SUBAGENT_PROMPT_PACKET` の順で handoff に使う
 
 ### 4. Run Bootstrap
 
@@ -226,6 +226,7 @@ interactive Codex で要件整理と実行計画立案を行う場合は、paren
 default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex` が code survey、static test design、language-specific code review を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.5` 側に残します。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 5 体、`Large Delivery` / `Platform And Environment` で同時 6 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです。
+- workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
 - write-capable subagent は同時 1 体までに固定し、追加分は read-only review / research / survey role だけにします。
 
@@ -244,8 +245,9 @@ bundle 出力には少なくとも次が含まれます。
 - `CROSS_CUTTING_DOCUMENT_PACKET`
 - `DESIGN_DOCUMENT_PACKET`
 - `IMPLEMENTATION_DOCUMENT_PACKET`
+- `WORKFLOW_SUBAGENT_PROMPT_PACKET`
 
-parent は subagent handoff でこの packet path 群を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
+parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
 
 研究・実験つき変更:
 
@@ -326,6 +328,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、mirror directory のような別 truth surface を作らない
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
+- すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
 - repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する

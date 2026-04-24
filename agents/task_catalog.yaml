@@ -3,6 +3,19 @@ version: 2
 workflow_families:
   - id: scoped_change
     name: Scoped Change
+    subagent_prompt:
+      purpose: Prompt packet for small repo changes that still need the full staged gate sequence.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; do not route work to another repository unless the parent explicitly says so.
+        - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
+        - Include request_clause_ids, expected artifact path, write scope, validation command, and next review gate in every handoff.
+      workflow_focus:
+        - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates.
+        - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
+        - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
+      reviewer_prompt:
+        - Verify behavior, tests, docs, and request-clause coverage rather than only checking style.
+        - Block completion if validation is only partial or if review findings were recorded but not integrated.
     spawn_budget:
       active_subagents: 5
       max_write_subagents: 1
@@ -32,6 +45,19 @@ workflow_families:
 
   - id: research_driven_change
     name: Research-Driven Change
+    subagent_prompt:
+      purpose: Prompt packet for research-backed implementation, experiment, benchmark, report, and academic-writing tasks.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; external sources inform the work but do not replace repo-local artifacts.
+        - Start from the run bundle, user_request_contract.md, schedule.md, research_notes.md or cited sources, and team_manifest.yaml.
+        - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
+      workflow_focus:
+        - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
+        - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
+        - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
+      reviewer_prompt:
+        - Block overclaims, spot/debug/partial evidence used as formal evidence, missing baselines, and missing reproducibility artifacts.
+        - For paper-like work, keep citation/evidence, notation, logic, and document-flow review as separate passes.
     spawn_budget:
       active_subagents: 8
       max_write_subagents: 1
@@ -75,6 +101,19 @@ workflow_families:
 
   - id: large_delivery
     name: Large Delivery
+    subagent_prompt:
+      purpose: Prompt packet for multi-surface delivery, new feature work, and large refactors.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point and keep durable product state in canonical current-tree paths only.
+        - Start from the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml.
+        - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
+      workflow_focus:
+        - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
+        - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
+        - Sweep stale references after renames or structure changes before closeout.
+      reviewer_prompt:
+        - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
+        - Verify every chunk maps back to the umbrella completion boundary.
     spawn_budget:
       active_subagents: 6
       max_write_subagents: 1
@@ -104,6 +143,19 @@ workflow_families:
 
   - id: platform_and_environment
     name: Platform And Environment
+    subagent_prompt:
+      purpose: Prompt packet for Docker, CI, dependency, runtime, and development-environment changes.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; environment changes must support the template workflow first.
+        - Start from the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml.
+        - State the triggering code requirement, blocked command, source-of-truth surface, rollback path, and validation command in every handoff.
+      workflow_focus:
+        - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
+        - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
+        - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
+      reviewer_prompt:
+        - Block environment changes without a code requirement, rollback path, or validation evidence.
+        - Verify docs, CI, Docker packs, and local developer commands remain aligned.
     spawn_budget:
       active_subagents: 6
       max_write_subagents: 1
@@ -133,6 +185,19 @@ workflow_families:
 
   - id: comprehensive_development
     name: Comprehensive Development
+    subagent_prompt:
+      purpose: Prompt packet for repo-wide workflow, tooling, runtime, docs, and canon rearchitecture.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point and the integration reference for derived repos.
+        - Start from the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml.
+        - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
+      workflow_focus:
+        - Review the whole repository, not only the local diff; keep root adapters thin and shared canon authoritative.
+        - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
+        - Preserve single-writer discipline; additional agents are read-only unless a separate worktree is explicitly planned.
+      reviewer_prompt:
+        - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
+        - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
     spawn_budget:
       active_subagents: 8
       max_write_subagents: 1
@@ -168,6 +233,19 @@ workflow_families:
 
   - id: adaptive_improvement_loop
     name: Adaptive Improvement Loop
+    subagent_prompt:
+      purpose: Prompt packet for backlog-driven tuning, exploration, and repeated experiment-backed improvement.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; each improvement pass must still be a traceable waterfall slice.
+        - Start from the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml.
+        - State backlog item, hypothesis, run protocol, success metric, stopping rule, and next decision gate in every handoff.
+      workflow_focus:
+        - Keep the adaptive outer loop separate from one implementation slice; one iteration is not whole-loop completion.
+        - Do not mix code change, experiment protocol change, runtime flag change, and claim/report rewrite in one iteration without an explicit clause.
+        - Promote only validated lessons into notes or memory; keep failed attempts traceable.
+      reviewer_prompt:
+        - Block progress claims from spot runs, partial runs, raw failure counts, or unreviewed protocol changes.
+        - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
     spawn_budget:
       active_subagents: 8
       max_write_subagents: 1

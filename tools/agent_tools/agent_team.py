@@ -586,6 +586,7 @@ def create_run_bundle(
     created_at_iso: str,
     roles: tuple[Role, ...],
     workspace_root: Path,
+    workflow_family_id: str | None = None,
 ) -> tuple[str, ...]:
     """Create the standard files for a run."""
     replacements = {
@@ -612,6 +613,7 @@ def create_run_bundle(
             report_dir=report_dir,
             roles=roles,
             workspace_root=workspace_root,
+            workflow_family_id=workflow_family_id,
         ),
         encoding="utf-8",
     )
@@ -646,8 +648,12 @@ def build_manifest(
     report_dir: Path,
     roles: tuple[Role, ...],
     workspace_root: Path,
+    workflow_family_id: str | None = None,
 ) -> str:
     """Build the team manifest yaml."""
+    workflow_family = None
+    if workflow_family_id is not None:
+        workflow_family = resolve_workflow_family(load_task_catalog(config), workflow_family_id)
     lines = [
         "run:",
         f"  id: {run_id}",
@@ -663,6 +669,11 @@ def build_manifest(
     communication_protocol = config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
+    if workflow_family is not None:
+        lines.append("  workflow_family:")
+        lines.append(f"    id: {workflow_family_id}")
+        lines.append(f"    name: {str(workflow_family['name'])!r}")
+        lines.extend(render_subagent_prompt_packet(workflow_family, indent="  "))
     lines.append("  cross_cutting_document_packet:")
     cross_cutting_packet = resolve_cross_cutting_document_packet(workspace_root)
     for entry in cross_cutting_packet:
@@ -677,6 +688,14 @@ def build_manifest(
             lines.append("    codex_agents:")
             for codex_agent in role.codex_agents:
                 lines.append(f"      - {codex_agent}")
+        lines.append("    prompt_contract:")
+        lines.append(
+            "      assignment_prompt: "
+            f"{role_prompt_contract(role, workflow_family).replace(chr(10), ' ')!r}"
+        )
+        lines.append("      prompt_must_include:")
+        for item in role_prompt_must_include(role):
+            lines.append(f"        - {item!r}")
         lines.append("    owns:")
         for responsibility in role.owns:
             lines.append(f"      - {responsibility}")
@@ -734,6 +753,71 @@ def build_manifest(
     for artifact in iter_artifacts(config, roles):
         lines.append(f"  - {artifact}")
     return "\n".join(lines) + "\n"
+
+
+def render_subagent_prompt_packet(
+    workflow_family: dict[str, object],
+    indent: str,
+) -> list[str]:
+    """Render workflow-specific subagent prompt instructions for the manifest."""
+    prompt = workflow_family.get("subagent_prompt")
+    if not isinstance(prompt, dict):
+        return []
+    lines = [f"{indent}subagent_prompt_packet:"]
+    purpose = str(prompt.get("purpose", ""))
+    if purpose:
+        lines.append(f"{indent}  purpose: {purpose!r}")
+    for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
+        values = prompt.get(key, [])
+        if not isinstance(values, list):
+            values = []
+        lines.append(f"{indent}  {key}:")
+        for value in values:
+            lines.append(f"{indent}    - {str(value)!r}")
+    return lines
+
+
+def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) -> str:
+    """Return the reusable prompt contract for one manifest role entry."""
+    family_name = str(workflow_family["name"]) if workflow_family is not None else "the selected workflow"
+    write_scope = (
+        "write only in the manifest write_policy scope"
+        if role.write_policy.mode != "read_only"
+        else "do not edit repository files"
+    )
+    return (
+        f"You are the {role.id} role for {family_name}. Read the run-level "
+        "subagent_prompt_packet, cross_cutting_document_packet, and your document_packet before "
+        f"work. {write_scope}. Return findings or outputs tied to request_clause_ids, artifact "
+        "paths, remaining planned work, and the next required gate."
+    )
+
+
+def role_prompt_must_include(role: Role) -> tuple[str, ...]:
+    """Return handoff fields every invocation prompt should include for one role."""
+    common = [
+        "request_clause_ids",
+        "run_report_dir",
+        "team_manifest_path",
+        "cross_cutting_document_packet",
+        "role_document_packet",
+        "expected_output_artifacts",
+        "next_review_gate",
+    ]
+    if role.write_policy.mode != "read_only":
+        common.extend(("write_policy", "allowed_files_or_directories"))
+    if role.id == "implementer":
+        common.extend(
+            (
+                "implementation_source_packet",
+                "design_to_implementation_trace",
+                "test_plan_item",
+                "remaining_planned_work_units",
+            )
+        )
+    if role.id.endswith("_reviewer") or role.id in {"change_reviewer", "final_reviewer"}:
+        common.extend(("findings_first_output", "approve_revise_or_escalate_decision"))
+    return tuple(common)
 
 
 def resolve_role_write_scope(

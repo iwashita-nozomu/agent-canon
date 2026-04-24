@@ -210,6 +210,7 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            workflow_family_id=workflow_family_id,
         )
 
     review_roles = tuple(
@@ -240,6 +241,7 @@ def main() -> int:
         print(f"TASK_ID={args.task_id}")
         print(f"WORKFLOW_FAMILY={workflow_family_id}")
         print(f"WORKFLOW_FAMILY_NAME={workflow_family_name}")
+        print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")

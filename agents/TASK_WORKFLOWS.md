@@ -42,6 +42,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
+- repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
@@ -178,6 +179,7 @@ single-writer ルール:
 spawn budget ルール:
 - depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
 - 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
+- workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - `Scoped Change` は同時 5 体までを既定にします
 - `Large Delivery` / `Platform And Environment` は同時 6 体までを既定にします
 - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 8 体までを既定にします

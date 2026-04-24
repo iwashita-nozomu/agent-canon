@@ -101,6 +101,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
@@ -156,6 +160,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
@@ -206,6 +214,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
             self.assertIn("cross_cutting_document_packet:", manifest_text)
             self.assertIn("document_packet:", manifest_text)
+            self.assertNotIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("must_cite_before_edit: true", manifest_text)
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
             self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
@@ -246,8 +255,66 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            manifest_text = (
+                report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
+            self.assertIn("workflow_family:", manifest_text)
+            self.assertIn("subagent_prompt_packet:", manifest_text)
+            self.assertIn("prompt_contract:", manifest_text)
+
+    def test_all_task_ids_bootstrap_with_prompt_packet(self) -> None:
+        """Every catalog task should create a workflow-specific subagent prompt packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            for task_id in [f"T{index}" for index in range(1, 14)]:
+                run_id = f"test-prompt-{task_id.lower()}"
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(BOOTSTRAP_SCRIPT),
+                        "--task",
+                        f"prompt packet {task_id}",
+                        "--task-id",
+                        task_id,
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        run_id,
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-root",
+                        str(report_root),
+                        "--skip-agent-canon-preflight",
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(
+                    "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                    result.stdout,
+                )
+                manifest_text = (report_root / run_id / "team_manifest.yaml").read_text(
+                    encoding="utf-8",
+                )
+                self.assertIn("subagent_prompt_packet:", manifest_text)
+                self.assertIn("prompt_preamble:", manifest_text)
+                self.assertIn("workflow_focus:", manifest_text)
+                self.assertIn("reviewer_prompt:", manifest_text)
+                self.assertIn("prompt_contract:", manifest_text)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
