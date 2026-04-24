@@ -1,5 +1,9 @@
 # User Preferences
 
+Dependency Files:
+- vendor/agent-canon/ROOT_AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 この file は、会話から抽出した user の coding philosophy、review expectation、document preference を逐次追記する append-first note です。
 `AGENTS.md` へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
@@ -17,6 +21,9 @@
 - 2026-04-16 | Keep only canonical design and implementation paths in the tracked tree; reject non-canonical copies, snapshots, and backup files.
   - source: chat
   - rationale: User explicitly required current tree-head state as the only durable repo state.
+
+- 2026-04-23 | Review must always check full consistency with existing code, docs, workflows, and canonical surfaces, not only the diff.
+  - source: chat
 
 ## Provisional Preferences
 
@@ -81,7 +88,34 @@
 - 2026-04-19 | 既存実装の再利用を強く優先し、新規実装の前に既存実装で足りない理由を明示してほしい
   - source: chat
 
-- 2026-04-23 | 数理文書では不要な補助記号を避け、主線の導出と最終的に使う行列を明示する
+- 2026-04-20 | レビューでは差分だけでなく関連ファイル全体と削除影響まで確認してほしい。作成したファイルを後で消すことが多いため、削除済み・移動済み・参照切れも含めて見る。
+  - source: chat
+
+- 2026-04-22 | 最小変更に拘らず、再発源が構造にあるなら workflow・packet・参照構造まで含めて十分な大きさで直してほしい。
+  - source: chat
+
+- 2026-04-22 | 必要な subagent や MCP surface がある task では、起動確認を先に行い、未起動のまま parent 単独へ静かに downgrade しないでほしい。
+  - source: chat
+
+- 2026-04-22 | temporary fallback や旧経路を温存せず、canonical path を 1 本に寄せてほしい。フォールバック温存は実装の二重化の温床になる。
+  - source: chat
+
+- 2026-04-22 | repo に搭載されている test は単一の canonical file に文書化してほしい。追加・削除・rename 時はその file も同じ pass で更新してほしい。
+  - source: chat
+
+- 2026-04-22 | 退避 branch や backup branch を残さず、履歴は git にありつつも、運用上は最新の canonical state だけを見せてほしい。同期や置換のあとに extra branch を保険として残さないでほしい。
+  - source: chat
+
+- 2026-04-22 | コードが実行できるだけでは不十分で、本体実装が数式・仕様記述と一致していることを重視してほしい。runtime success よりも mathematical/spec alignment を主要な受け入れ基準として扱ってほしい。
+  - source: chat
+
+- 2026-04-22 | 読みやすさや reader flow の評価はツールだけでは不十分なので、文書や prompt の readability はエージェント review で確認してほしい。tool check は補助にとどめ、可読性判断は agent-side review を必須にしてほしい。
+  - source: chat
+
+- 2026-04-24 | Implementation work should start from this template repository by default; avoid treating other repositories as the primary starting point unless the user explicitly redirects.
+  - source: chat
+
+- 2026-04-24 | Do not return a user-facing completion report while any task, planned work unit, required validation, commit/push, canon sync, or closeout gate remains unfinished; return only after everything in scope is complete.
   - source: chat
 
 ## Promotion Candidates

@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import glob
 import re
-import sys
 from pathlib import Path
 
 
 Issue = tuple[int, str]
+
+LEGACY_INLINE_PATTERN = re.compile(r"(?<!\\)\\\(|(?<!\\)\\\)")
+LEGACY_DISPLAY_PATTERN = re.compile(r"(?<!\\)\\\[|(?<!\\)\\\]")
+DISPLAY_SINGLE_LINE_PATTERN = re.compile(r"^\$\$.+\$\$$")
+STANDALONE_INLINE_PATTERN = re.compile(r"^\$(?!\$).+(?<!\$)\$$")
+INLINE_DOUBLE_DOLLAR_PATTERN = re.compile(r"\$\$.+?\$\$")
 
 
 def collect_markdown_files(patterns: list[str]) -> list[str]:
@@ -38,8 +43,7 @@ def scan_markdown_math(filepath: str) -> list[Issue]:
     """Return math-style issues for one markdown file."""
     issues: list[Issue] = []
     in_fence = False
-    inline_pattern = re.compile(r"(?<!\\)\\\(|(?<!\\)\\\)")
-    display_pattern = re.compile(r"(?<!\\)\\\[|(?<!\\)\\\]")
+    in_display_block = False
     with open(filepath, "r", encoding="utf-8", errors="ignore") as handle:
         for line_no, line in enumerate(handle, 1):
             stripped = line.lstrip()
@@ -48,10 +52,26 @@ def scan_markdown_math(filepath: str) -> list[Issue]:
                 continue
             if in_fence:
                 continue
-            if inline_pattern.search(line):
+            if LEGACY_INLINE_PATTERN.search(line):
                 issues.append((line_no, "Inline math must use `$...$`, not `\\(...\\)`"))
-            if display_pattern.search(line):
+            if LEGACY_DISPLAY_PATTERN.search(line):
                 issues.append((line_no, "Display math must use `$$...$$`, not `\\[...\\]`"))
+            compact = line.strip()
+            if compact == "$$":
+                in_display_block = not in_display_block
+                continue
+            if compact == "$":
+                issues.append((line_no, "Display math must use `$$...$$`, not `$` block delimiters"))
+                continue
+            if in_display_block:
+                continue
+            if STANDALONE_INLINE_PATTERN.fullmatch(compact):
+                issues.append((line_no, "Display math must use `$$...$$`, not `$...$` on its own line"))
+                continue
+            if DISPLAY_SINGLE_LINE_PATTERN.fullmatch(compact):
+                continue
+            if INLINE_DOUBLE_DOLLAR_PATTERN.search(line):
+                issues.append((line_no, "Inline math must use `$...$`, not `$$...$$`"))
     return issues
 
 

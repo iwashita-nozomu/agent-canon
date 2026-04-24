@@ -3,7 +3,7 @@ description = "Read-only reviewer for paper claims, citations, figures, tables, 
 nickname_candidates = ["citation-trace", "evidence-gate", "source-check"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 developer_instructions = """

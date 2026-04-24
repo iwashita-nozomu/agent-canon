@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Dependency Files:
+# - vendor/agent-canon/tools/agent_tools/agent_team.py
+# - vendor/agent-canon/tools/agent_tools/report_artifact_checks.py
+# - vendor/agent-canon/agents/templates/closeout_gate.md
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
 from __future__ import annotations
@@ -68,7 +72,9 @@ def main() -> int:
     if args.report_dir:
         report_dir = Path(args.report_dir).resolve()
     else:
-        report_dir = (resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)).resolve()
+        report_dir = (
+            resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
+        ).resolve()
 
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"
@@ -102,6 +108,8 @@ def main() -> int:
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "all_planned_chunks_complete": closeout.get("all_planned_chunks_complete") == "yes",
         "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
+        "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
+        "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
@@ -127,6 +135,8 @@ def main() -> int:
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
     print(f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}")
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
+    print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
+    print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
     print(
         "SPEC_PRODUCT_COVERAGE_COMPLETE="
         f"{closeout.get('spec_product_coverage_complete', '')}"

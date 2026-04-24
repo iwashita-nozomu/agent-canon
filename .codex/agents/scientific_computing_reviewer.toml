@@ -3,7 +3,7 @@ description = "Read-only reviewer for incremental change, testing, automation, a
 nickname_candidates = ["sci-comp", "prototype-check", "research-eng"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 developer_instructions = """

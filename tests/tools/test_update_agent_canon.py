@@ -19,6 +19,7 @@ def resolve_repo_root() -> Path:
 
 
 REPO_ROOT = resolve_repo_root()
+OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 
 
 class UpdateAgentCanonTest(unittest.TestCase):
@@ -27,7 +28,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
     def overlay_working_tree(self, target: Path) -> None:
         """Mirror the current working tree into one clone without external tools."""
         for child in target.iterdir():
-            if child.name == ".git":
+            if child.name in OVERLAY_EXCLUDED_NAMES:
                 continue
             if child.is_dir() and not child.is_symlink():
                 shutil.rmtree(child)
@@ -35,7 +36,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 child.unlink()
 
         for child in REPO_ROOT.iterdir():
-            if child.name == ".git":
+            if child.name in OVERLAY_EXCLUDED_NAMES:
                 continue
             destination = target / child.name
             subprocess.run(
@@ -123,7 +124,14 @@ class UpdateAgentCanonTest(unittest.TestCase):
             self.assertTrue(bare_repo.is_dir())
             self.assertEqual(
                 subprocess.run(
-                    ["git", "--git-dir", str(bare_repo), "rev-parse", "--verify", "refs/heads/main"],
+                    [
+                        "git",
+                        "--git-dir",
+                        str(bare_repo),
+                        "rev-parse",
+                        "--verify",
+                        "refs/heads/main",
+                    ],
                     check=True,
                     capture_output=True,
                     text=True,
@@ -138,7 +146,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             self.assertEqual(remote_url, str(bare_repo))
-            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(source_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "checkout", "-B", "main", "origin/main"],
                 cwd=source_repo,
@@ -188,7 +201,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("agent_canon_plan_remote_source=plan_override", plan.stdout)
-            self.assertIn("agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout
+            )
 
     def test_register_local_bare_clears_implicit_source_repo_for_daily_validation(self) -> None:
         """Register-local-bare should default derived repos back to local-sync-only."""
@@ -266,7 +281,13 @@ class UpdateAgentCanonTest(unittest.TestCase):
 
             marker = clone_dir / "vendor" / "agent-canon" / ".proposal-branch-marker"
             marker.write_text("proposal\n", encoding="utf-8")
-            subprocess.run(["git", "add", str(marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", str(marker.relative_to(clone_dir))],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -293,7 +314,15 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(push.returncode, 0, push.stderr)
             proposal_tree = subprocess.run(
-                ["git", "--git-dir", str(bare_repo), "ls-tree", "-r", "--name-only", proposal_branch],
+                [
+                    "git",
+                    "--git-dir",
+                    str(bare_repo),
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    proposal_branch,
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -317,7 +346,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -331,10 +365,21 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(work_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             marker = work_dir / ".plan-no-subtree-marker"
             marker.write_text("marker\n", encoding="utf-8")
-            subprocess.run(["git", "add", marker.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", marker.name],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -351,8 +396,20 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
-            subprocess.run(["git", "remote", "add", "agent-canon", str(bare_repo)], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             missing_exec.mkdir(parents=True, exist_ok=True)
             env = os.environ.copy()
             env["GIT_EXEC_PATH"] = str(missing_exec)
@@ -387,7 +444,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -401,10 +463,21 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(work_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             marker = work_dir / ".subtree-pull-marker"
             marker.write_text("marker\n", encoding="utf-8")
-            subprocess.run(["git", "add", marker.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", marker.name],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -421,8 +494,20 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
-            subprocess.run(["git", "remote", "add", "agent-canon", str(bare_repo)], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "agent-canon", str(bare_repo)],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             plan = subprocess.run(
                 ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
@@ -434,7 +519,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("agent_canon_plan_route=subtree_pull", plan.stdout)
 
-    def test_apply_succeeds_when_local_history_diverged_but_tree_matches_remote_history(self) -> None:
+    def test_apply_succeeds_when_local_history_diverged_but_tree_matches_remote_history(
+        self,
+    ) -> None:
         """Apply should recover when local split diverged but the current tree exists upstream."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -450,7 +537,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -478,11 +570,22 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(work_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             remote_marker_a = work_dir / ".remote-tree-match-marker"
             remote_marker_a.write_text("remote-a\n", encoding="utf-8")
-            subprocess.run(["git", "add", remote_marker_a.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", remote_marker_a.name],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -499,11 +602,23 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             local_diverged_marker = clone_dir / "vendor" / "agent-canon" / ".diverged-local-marker"
             local_diverged_marker.write_text("diverged\n", encoding="utf-8")
-            subprocess.run(["git", "add", str(local_diverged_marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", str(local_diverged_marker.relative_to(clone_dir))],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -522,12 +637,22 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
 
             subprocess.run(
-                ["rsync", "-a", "--delete", "--exclude", ".git", f"{work_dir}/", str(clone_dir / "vendor" / "agent-canon")],
+                [
+                    "rsync",
+                    "-a",
+                    "--delete",
+                    "--exclude",
+                    ".git",
+                    f"{work_dir}/",
+                    str(clone_dir / "vendor" / "agent-canon"),
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True
+            )
             subprocess.run(
                 [
                     "git",
@@ -547,7 +672,13 @@ class UpdateAgentCanonTest(unittest.TestCase):
 
             remote_marker_b = work_dir / ".remote-after-tree-match-marker"
             remote_marker_b.write_text("remote-b\n", encoding="utf-8")
-            subprocess.run(["git", "add", remote_marker_b.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", remote_marker_b.name],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -564,7 +695,13 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             plan = subprocess.run(
                 ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
@@ -585,7 +722,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(apply.returncode, 0, apply.stderr)
             combined_output = f"{apply.stdout}\n{apply.stderr}"
-            self.assertIn("agent_canon_snapshot_import=tree_match_in_remote_history", combined_output)
+            self.assertIn(
+                "agent_canon_snapshot_import=tree_match_in_remote_history", combined_output
+            )
             self.assertIn(
                 "agent_canon_update_method=snapshot_import_after_subtree_pull_failure",
                 combined_output,
@@ -607,7 +746,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -628,10 +772,21 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(work_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             remote_marker = work_dir / ".remote-diverged-marker"
             remote_marker.write_text("remote-diverged\n", encoding="utf-8")
-            subprocess.run(["git", "add", remote_marker.name], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", remote_marker.name],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -648,11 +803,23 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "push", "origin", "main"],
+                cwd=work_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             diverged_marker = clone_dir / "vendor" / "agent-canon" / ".diverged-local-marker"
             diverged_marker.write_text("diverged\n", encoding="utf-8")
-            subprocess.run(["git", "add", str(diverged_marker.relative_to(clone_dir))], cwd=clone_dir, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", str(diverged_marker.relative_to(clone_dir))],
+                cwd=clone_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 [
                     "git",
@@ -717,7 +884,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -738,7 +910,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(source_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "config", "user.name", "Update Agent Canon Test"],
                 cwd=source_repo,
@@ -756,7 +933,13 @@ class UpdateAgentCanonTest(unittest.TestCase):
 
             source_marker = source_repo / ".refresh-first-marker"
             source_marker.write_text("source-refresh\n", encoding="utf-8")
-            subprocess.run(["git", "add", source_marker.name], cwd=source_repo, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "add", source_marker.name],
+                cwd=source_repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "commit", "-m", "test: advance source snapshot"],
                 cwd=source_repo,
@@ -781,7 +964,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(plan.returncode, 0, plan.stderr)
-            self.assertIn("agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync", plan.stdout
+            )
             self.assertIn(f"agent_canon_plan_source_repo={source_repo}", plan.stdout)
 
             apply = subprocess.run(
@@ -795,7 +980,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
             combined_output = f"{apply.stdout}\n{apply.stderr}"
             self.assertIn("agent_canon_refresh_status=updated_remote_snapshot", combined_output)
 
-            self.assertTrue((clone_dir / "vendor" / "agent-canon" / ".refresh-first-marker").is_file())
+            self.assertTrue(
+                (clone_dir / "vendor" / "agent-canon" / ".refresh-first-marker").is_file()
+            )
             remote_tree = subprocess.run(
                 ["git", "--git-dir", str(bare_repo), "ls-tree", "-r", "--name-only", "main"],
                 check=True,
@@ -820,7 +1007,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(bare_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ["git", "push", str(bare_repo), f"{split_sha}:refs/heads/main"],
                 cwd=clone_dir,
@@ -841,7 +1033,12 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            subprocess.run(["git", "clone", str(bare_repo), str(source_repo)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "clone", str(bare_repo), str(source_repo)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             dirty_marker = source_repo / ".dirty-source-marker"
             dirty_marker.write_text("dirty\n", encoding="utf-8")
             subprocess.run(
@@ -862,7 +1059,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
             self.assertNotEqual(apply.returncode, 0)
             combined_output = f"{apply.stdout}\n{apply.stderr}"
             self.assertIn("source repo is dirty", combined_output)
-            self.assertFalse((clone_dir / "vendor" / "agent-canon" / ".dirty-source-marker").exists())
+            self.assertFalse(
+                (clone_dir / "vendor" / "agent-canon" / ".dirty-source-marker").exists()
+            )
 
             status = subprocess.run(
                 ["git", "status", "--short"],

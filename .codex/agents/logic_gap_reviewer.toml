@@ -3,7 +3,7 @@ description = "Read-only reviewer for academic-argument continuity, claim-to-evi
 nickname_candidates = ["logic-gap", "argument-check", "claim-audit"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 developer_instructions = """

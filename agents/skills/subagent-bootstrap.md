@@ -70,6 +70,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
+command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。

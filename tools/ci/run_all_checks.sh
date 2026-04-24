@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Dependency Files:
+# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
+# - vendor/agent-canon/tools/docs/mirror_skill_shims.py
+# - vendor/agent-canon/tools/agent_tools/smoke_test_research_perspective_pack.py
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -104,6 +108,12 @@ if "$PYTHON_BIN" tools/agent_tools/smoke_test_research_perspective_pack.py 2>&1;
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/check_dependency_headers.py --changed 2>&1; then
+  echo "✅ dependency header checks 成功"
+else
+  echo "❌ dependency header checks 失敗"
   EXIT_CODE=1
 fi
 echo ""

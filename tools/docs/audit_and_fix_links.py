@@ -10,6 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+
 ROOT = Path(".").resolve()
 REPORT = ROOT / "reports" / "broken_links.txt"
 DEFAULT_PATHS = [
@@ -39,27 +40,7 @@ class LinkIssue:
 
 def find_markdown_links(text: str) -> list[tuple[str, str]]:
     """Return markdown links found in ``text``."""
-    scrubbed = scrub_non_link_regions(text)
-    return LINK_PATTERN.findall(scrubbed)
-
-
-def scrub_non_link_regions(text: str) -> str:
-    """Mask regions where ``[...](...)`` is not a markdown link."""
-
-    def mask(match: re.Match[str]) -> str:
-        return " " * len(match.group(0))
-
-    patterns = [
-        re.compile(r"```.*?```", re.DOTALL),
-        re.compile(r"~~~.*?~~~", re.DOTALL),
-        re.compile(r"\$\$.*?\$\$", re.DOTALL),
-        re.compile(r"`[^`]*`"),
-        re.compile(r"\$[^$\n]*\$"),
-    ]
-    scrubbed = text
-    for pattern in patterns:
-        scrubbed = pattern.sub(mask, scrubbed)
-    return scrubbed
+    return LINK_PATTERN.findall(text)
 
 
 def replace_link_targets(text: str, replacements: dict[str, str]) -> str:
@@ -79,8 +60,7 @@ def iter_markdown_files(paths: list[str]) -> list[Path]:
     """Expand paths into markdown files."""
     markdown_files: list[Path] = []
     for raw_path in paths:
-        raw = Path(raw_path)
-        path = raw.resolve() if raw.is_absolute() else (ROOT / raw).resolve()
+        path = (ROOT / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
         if not path.exists():
             continue
         if path.is_dir():

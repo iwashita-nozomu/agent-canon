@@ -39,7 +39,10 @@ def test_print_only_shell_script_uses_bash() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert "/bin/bash /workspace/tools/ci/check_docker_build.sh --pack docker/packs/default.toml" in result.stdout
+    assert (
+        "/bin/bash /workspace/tools/ci/check_docker_build.sh --pack docker/packs/default.toml"
+        in result.stdout
+    )
 
 
 def test_print_only_command_without_workspace_file_runs_directly() -> None:

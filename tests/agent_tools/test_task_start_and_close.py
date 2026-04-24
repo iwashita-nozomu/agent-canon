@@ -1,5 +1,10 @@
 """Tests for machine-driven task start and close commands."""
 
+# Dependency Files:
+# - vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py
+# - vendor/agent-canon/tools/agent_tools/task_close.py
+# - vendor/agent-canon/agents/templates/closeout_gate.md
+
 from __future__ import annotations
 
 import subprocess
@@ -51,8 +56,14 @@ def write_ready_work_log(report_dir: Path) -> None:
                 "- Record meaningful execution steps.",
                 "",
                 "## Entries",
-                "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | request_clause_ids: T1-C1 | next: implement`",
-                "- `2026-04-08 09:30 JST | test | passed closeout checks | request_clause_ids: T1-C1 | next: close`",
+                (
+                    "- `2026-04-08 09:00 JST | kickoff | fixed request clauses | "
+                    "request_clause_ids: T1-C1 | next: implement`"
+                ),
+                (
+                    "- `2026-04-08 09:30 JST | test | passed closeout checks | "
+                    "request_clause_ids: T1-C1 | next: close`"
+                ),
                 "",
             ]
         ),
@@ -97,14 +108,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout
+            )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
@@ -156,10 +173,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$codex-task-workflow,$agent-orchestration,$subagent-bootstrap,$behavior-preserving-refactor",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$behavior-preserving-refactor",
                 result.stdout,
             )
 
@@ -206,6 +227,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
             self.assertIn("cross_cutting_document_packet:", manifest_text)
             self.assertIn("document_packet:", manifest_text)
+            self.assertNotIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("must_cite_before_edit: true", manifest_text)
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
             self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
@@ -246,8 +268,66 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn(
+                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                result.stdout,
+            )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            manifest_text = (
+                report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
+            self.assertIn("workflow_family:", manifest_text)
+            self.assertIn("subagent_prompt_packet:", manifest_text)
+            self.assertIn("prompt_contract:", manifest_text)
+
+    def test_all_task_ids_bootstrap_with_prompt_packet(self) -> None:
+        """Every catalog task should create a workflow-specific subagent prompt packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+
+            for task_id in [f"T{index}" for index in range(1, 14)]:
+                run_id = f"test-prompt-{task_id.lower()}"
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(BOOTSTRAP_SCRIPT),
+                        "--task",
+                        f"prompt packet {task_id}",
+                        "--task-id",
+                        task_id,
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        run_id,
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-root",
+                        str(report_root),
+                        "--skip-agent-canon-preflight",
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(
+                    "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
+                    result.stdout,
+                )
+                manifest_text = (report_root / run_id / "team_manifest.yaml").read_text(
+                    encoding="utf-8",
+                )
+                self.assertIn("subagent_prompt_packet:", manifest_text)
+                self.assertIn("prompt_preamble:", manifest_text)
+                self.assertIn("workflow_focus:", manifest_text)
+                self.assertIn("reviewer_prompt:", manifest_text)
+                self.assertIn("prompt_contract:", manifest_text)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
@@ -359,6 +439,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -457,6 +539,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -543,6 +627,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: no",
                         "- overall_delivery_complete: no",
+                        "- unfinished_tasks_absent: no",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -575,6 +661,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("all_planned_chunks_complete", result.stdout)
             self.assertIn("overall_delivery_complete", result.stdout)
+            self.assertIn("unfinished_tasks_absent", result.stdout)
 
     def test_task_close_rejects_partial_spec_or_ignored_review_findings(self) -> None:
         """task_close should fail when spec coverage or review integration is incomplete."""
@@ -624,6 +711,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
@@ -725,6 +814,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
@@ -805,6 +896,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -905,6 +998,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",

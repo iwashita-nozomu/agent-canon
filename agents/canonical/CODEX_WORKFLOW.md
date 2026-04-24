@@ -1,5 +1,11 @@
 # Codex Workflow
 
+Dependency Files:
+- vendor/agent-canon/ROOT_AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+- vendor/agent-canon/agents/templates/closeout_gate.md
+- vendor/agent-canon/tools/agent_tools/task_close.py
+
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
 
@@ -9,7 +15,7 @@
 1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty なら未実行理由を最初の作業 update に書く
 1. Base Runtime Packet を読む
 1. Cross-Cutting Packet を読む
-1. `agents/skills/README.md` を読む
+1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
@@ -93,6 +99,17 @@ dependency surface は task に応じて次を見ます。
 既存実装があるのに別名の重複 module を新設しません。
 既存ライブラリや既存実装で足りない理由を言えない限り、新規追加を選びません。
 
+### File Dependency Headers
+
+新規作成・編集する human-authored text file では、ファイル冒頭にそのファイルが依存する repo 内ファイルを明記します。
+
+- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後に `Dependency Files:` block を置きます
+- 依存が無い場合も `Dependency Files: None` または comment 形式の `Dependency Files: None` を置き、未記載と区別します
+- 依存として書くのは、その file を理解・実行・検証するために読むべき repo 内の正本 file です。単なる同一 directory の全列挙や推測 dependency を水増ししません
+- JSON など comment を持たず schema 上 top-level field も置けない file では、同じ変更の design / manifest / README に依存 file を明記し、その理由を review artifact に残します
+- subagent への handoff には `dependency_files_header_plan` を含め、編集対象ごとに冒頭へ書く依存 file を先に固定します
+- closeout 前に `python3 tools/agent_tools/check_dependency_headers.py --changed` を実行し、対象ファイルの依存ヘッダーが抜けていないことを確認します
+
 ## Task Classification
 
 次の 6 つから 1 つ選びます。
@@ -122,6 +139,8 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
+- task が数式、擬似コード、仕様、method contract を持つ場合、runtime success だけでなく implementation alignment evidence が review artifact に残っている
 - required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも full required review set を最新 diff に対して最初からやり直している
 - 反映しない findings は follow-up ではなく、今回の completion を阻害しない理由と escalation が artifact に記録されている
 
@@ -129,15 +148,15 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 ## Minimal Skill Set
 
-Codex では、まず `agents/skills/README.md` から必要最小限の skill だけ選びます。
+Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から必要最小限の skill だけ選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `$codex-task-workflow` に加えます。
 
-- repo 入口確認:
-  - `repo-onboarding`
 - workflow / runtime routing:
   - `agent-orchestration`
+- repo 入口確認:
+  - `repo-onboarding`
 - subagent 起動:
   - `subagent-bootstrap`
 - code review:
@@ -204,7 +223,7 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 - run 固有のメモは `reports/agents/<run-id>/`
 - repo-wide の恒久文書は `agents/` か `documents/`
 - 知見の蓄積は `notes/`
-- packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET` の順で handoff に使う
+- packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET`、`WORKFLOW_SUBAGENT_PROMPT_PACKET` の順で handoff に使う
 
 ### 4. Run Bootstrap
 
@@ -222,9 +241,10 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model split は、`gpt-5.4` が planning、writing、final judgment を担当し、`gpt-5.3-codex` が code survey と broad implementation を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.4` / `gpt-5.3-codex` 側に残します。
+default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex` が code survey、static test design、language-specific code review を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.5` 側に残します。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 5 体、`Large Delivery` / `Platform And Environment` で同時 6 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです。
+- workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
 - write-capable subagent は同時 1 体までに固定し、追加分は read-only review / research / survey role だけにします。
 
@@ -243,8 +263,9 @@ bundle 出力には少なくとも次が含まれます。
 - `CROSS_CUTTING_DOCUMENT_PACKET`
 - `DESIGN_DOCUMENT_PACKET`
 - `IMPLEMENTATION_DOCUMENT_PACKET`
+- `WORKFLOW_SUBAGENT_PROMPT_PACKET`
 
-parent は subagent handoff でこの packet path 群を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
+parent は subagent handoff でこの packet path 群と `team_manifest.yaml` の `run.subagent_prompt_packet` / role 別 `prompt_contract` を明示入力し、文書 tree を逐次辿らせるだけの運用に戻しません。
 
 研究・実験つき変更:
 
@@ -325,6 +346,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、mirror directory のような別 truth surface を作らない
 - `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
+- すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
 - repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する
@@ -346,7 +368,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
-- broad worker は `gpt-5.3-codex` で、design-traced narrow slice の first candidate は `gpt-5.3-codex-spark` とする
+- broad worker は `gpt-5.5` で、design-traced narrow slice の first candidate は `gpt-5.3-codex-spark` とする
 - same-worktree single-writer rule は `worker.toml` と planning/reviewer TOML を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ
@@ -369,6 +391,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - user が明示的に止めていなければ、final report の前に branch を push する
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
+- `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
+- `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
 - `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める
@@ -401,6 +425,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。止めるのは user が明示的に止めた場合か external block がある場合だけとする
+- 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残っている間は user-facing completion を返さない
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` が close 条件を満たすまで user-facing completion を返さない
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈にだけ依存する運用は repo 正本にしない

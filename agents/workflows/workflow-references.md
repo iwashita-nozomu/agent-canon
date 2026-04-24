@@ -15,14 +15,18 @@
   - shared canon を subtree として template / 派生 repo へ取り込む運用整理の参考です。
 - [Models | OpenAI API](https://developers.openai.com/api/docs/models)
   - current model lineup と mainline chooser の根拠です。
+- [Introducing GPT-5.5 | OpenAI](https://openai.com/index/introducing-gpt-5-5/)
+  - `gpt-5.5` を Codex の frontier planning、review、broad implementation、agentic tool-use role に置く根拠です。
+- [GPT-5.5 System Card | OpenAI](https://openai.com/index/gpt-5-5-system-card/)
+  - complex real-world work、coding、research、tool use を担う model としての safety / capability 境界確認に使います。
 - [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)
-  - `gpt-5.4` を planning、design、review の default 判断役に置く根拠です。
+  - `gpt-5.4` を previous frontier baseline として比較するときの根拠です。
 - [GPT-5.3-Codex Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.3-codex)
   - `gpt-5.3-codex` を coding-specialist の default に置く根拠です。
 - [All models | OpenAI API](https://developers.openai.com/api/docs/models/all)
-  - GPT-5.4 系を frontier default、Codex 系を coding-specialist family として分ける根拠です。
+  - GPT-5.5 / GPT-5.4 系を frontier family、Codex 系を coding-specialist family として分ける根拠です。
 - [Introducing GPT-5.4 | OpenAI](https://openai.com/index/introducing-gpt-5-4/)
-  - `gpt-5.4` を broad professional / judgment role に置く補助根拠です。
+  - `gpt-5.4` を previous broad professional / judgment baseline として扱う補助根拠です。
 - [Introducing GPT-5.4 mini and nano | OpenAI](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/)
   - GPT-5.4 mini の得意領域が fast coding/subagents であること、対してこの repo では coding を Codex 系へ寄せるときの比較根拠です。
 - [Introducing GPT-5.3-Codex-Spark | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
@@ -31,7 +35,7 @@
   - `/plan`、`/model`、`/permissions` が session-level command であり、per-agent TOML に mode を持たせない根拠です。
 - [Introducing GPT-5.4 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/5/introducing-gpt54/)
   - practitioner 視点で、`gpt-5.4` が coding capability を mainline へ寄せたと読む補助資料です。
-- [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for \$52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
+- [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for $52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
   - mini / nano の速度、価格、reasoning tier の実地感を補う資料です。
 - [I Tested GPT 5.4 Against Every Rival — Here's My Honest Review | Thomas Wiegold Blog](https://thomas-wiegold.com/blog/i-tested-gpt-5-4-against-every-rival/)
   - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex` override を残す判断の補助資料です。
@@ -151,5 +155,7 @@
   - 実装パスのウォーターフォール正本です。
 - [documents/experiment-critical-review.md](../../../../documents/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
+- [references/workflow/implementation-waterfall.md](../../../../references/workflow/implementation-waterfall.md)
+  - 実装ウォーターフォール化の文献メモです。
 - [agents/README.md](../../../../agents/README.md)
   - agent canon の入口です。

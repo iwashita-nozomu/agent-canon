@@ -3,7 +3,7 @@ description = "Requirements-organizing agent for turning user intent and local p
 nickname_candidates = ["requirements", "intake", "scope"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 developer_instructions = """
