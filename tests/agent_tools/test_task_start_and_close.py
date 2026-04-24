@@ -112,13 +112,13 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest", result.stdout
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=8", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=12", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
@@ -172,12 +172,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$behavior-preserving-refactor",
@@ -212,7 +212,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertTrue(report_dir.is_dir())
@@ -267,12 +267,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=12", result.stdout)
+            self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=6", result.stdout)
+            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             manifest_text = (
                 report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"

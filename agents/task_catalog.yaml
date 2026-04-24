@@ -1,3 +1,8 @@
+# Dependency Files:
+# - vendor/agent-canon/.codex/config.toml
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 version: 2
 
 workflow_families:
@@ -17,7 +22,7 @@ workflow_families:
         - Verify behavior, tests, docs, and request-clause coverage rather than only checking style.
         - Block completion if validation is only partial or if review findings were recorded but not integrated.
     spawn_budget:
-      active_subagents: 5
+      active_subagents: 8
       max_write_subagents: 1
     roles:
       always_on:
@@ -59,7 +64,7 @@ workflow_families:
         - Block overclaims, spot/debug/partial evidence used as formal evidence, missing baselines, and missing reproducibility artifacts.
         - For paper-like work, keep citation/evidence, notation, logic, and document-flow review as separate passes.
     spawn_budget:
-      active_subagents: 8
+      active_subagents: 12
       max_write_subagents: 1
     roles:
       always_on:
@@ -115,7 +120,7 @@ workflow_families:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
         - Verify every chunk maps back to the umbrella completion boundary.
     spawn_budget:
-      active_subagents: 6
+      active_subagents: 10
       max_write_subagents: 1
     roles:
       always_on:
@@ -157,7 +162,7 @@ workflow_families:
         - Block environment changes without a code requirement, rollback path, or validation evidence.
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
     spawn_budget:
-      active_subagents: 6
+      active_subagents: 10
       max_write_subagents: 1
     roles:
       always_on:
@@ -199,7 +204,7 @@ workflow_families:
         - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
         - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
     spawn_budget:
-      active_subagents: 8
+      active_subagents: 12
       max_write_subagents: 1
     roles:
       always_on:
@@ -247,7 +252,7 @@ workflow_families:
         - Block progress claims from spot runs, partial runs, raw failure counts, or unreviewed protocol changes.
         - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
     spawn_budget:
-      active_subagents: 8
+      active_subagents: 12
       max_write_subagents: 1
     roles:
       always_on:

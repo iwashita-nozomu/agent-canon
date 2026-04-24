@@ -1,10 +1,13 @@
 # Project-scoped Codex settings.
 # Keep review fan-out explicit, keep one writer per worktree, do not fix agent depth in repo config,
 # and use spawned agents in bounded waves instead of starting every available role at once.
+# Dependency Files:
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
 
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 [agents]
-max_threads = 12
+max_threads = 24
 job_max_runtime_seconds = 1800

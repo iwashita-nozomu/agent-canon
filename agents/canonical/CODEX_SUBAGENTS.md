@@ -1,5 +1,10 @@
 # Codex Subagents
 
+Dependency Files:
+- vendor/agent-canon/.codex/config.toml
+- vendor/agent-canon/agents/task_catalog.yaml
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 role ごとの具体的な禁止事項、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
@@ -29,12 +34,12 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `12` です
+- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - cap は depth 制限ではなく同時実行数の上限として扱います
 - depth は固定しませんが、active な subagent 数は spawn budget で縛ります
-- 既定 budget は `Scoped Change` で同時 5 体までです
-- 既定 budget は `Large Delivery` / `Platform And Environment` で同時 6 体までです
-- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです
+- 既定 budget は `Scoped Change` で同時 8 体までです
+- 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
+- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent は同時 1 体までとし、budget を増やしても追加分は read-only role に限ります
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
