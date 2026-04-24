@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 実験レポートの書き方
 
 この文書は、`experiments/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。

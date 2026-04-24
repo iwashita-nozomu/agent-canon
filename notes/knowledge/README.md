@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Knowledge Notes
 
 `notes/knowledge/` は、実務で何度も見返す横断知識の置き場です。

@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Experiment Registry
 
 この文書は、`experiments/registry.toml` を使って experiment topic を集中管理する契約を定めます。

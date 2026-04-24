@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Guardrail Notes
 
 このディレクトリは、repo-wide に何度も読み返す禁止事項と anti-pattern の補助 note を置く場所です。

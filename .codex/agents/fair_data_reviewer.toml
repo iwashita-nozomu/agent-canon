@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "fair_data_reviewer"
 description = "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization."
 nickname_candidates = ["fair-data", "metadata", "reuse-check"]

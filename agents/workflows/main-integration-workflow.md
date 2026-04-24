@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # main 統合ワークフロー
 
 この文書は、`main` へ戻すときの統合手順の正本です。

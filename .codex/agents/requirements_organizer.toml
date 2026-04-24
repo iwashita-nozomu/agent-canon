@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "requirements_organizer"
 description = "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets."
 nickname_candidates = ["requirements", "intake", "scope"]

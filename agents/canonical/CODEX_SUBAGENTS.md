@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Codex Subagents
 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。

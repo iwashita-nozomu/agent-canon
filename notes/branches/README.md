@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Branch Notes
 
 `notes/branches/` は、branch ごとの要約と関連 note への入口をまとめるディレクトリです。

@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Artifact Placement
 
 この文書は、task 実行中に増える文書や補助出力の置き場の正本です。

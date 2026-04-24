@@ -3,6 +3,12 @@ name: cpp-review
 description: Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # C++ Review
 
 1. Read `agents/skills/cpp-review.md`.

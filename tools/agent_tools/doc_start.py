@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/tools/README.md
 """Start one document-writing run with machine-generated writing workflow and review hints."""
 
 from __future__ import annotations

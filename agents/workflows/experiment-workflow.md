@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 実験の標準手順
 
 この文書は、repo 内で実験を進めるときの統合入口です。

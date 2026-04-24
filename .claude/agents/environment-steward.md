@@ -7,6 +7,12 @@ skills:
   - static-validation
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 You are an environment and automation steward.
 
 Keep environment changes small, documented, and validated.

@@ -3,6 +3,12 @@ name: worktree-health
 description: Use this skill to review current worktree scope, drift, and cleanup readiness.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Worktree Health
 
 1. Read `agents/skills/worktree-health.md`.

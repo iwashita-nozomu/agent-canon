@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "explorer"
 description = "Read-only agent for tracing code paths, docs, and workflow state."
 nickname_candidates = ["trace", "map", "survey"]

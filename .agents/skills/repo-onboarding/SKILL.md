@@ -3,6 +3,12 @@ name: repo-onboarding
 description: Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Repo Onboarding
 
 1. Read `README.md`, `QUICK_START.md`, and `documents/README.md`.

@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "execution_planner"
 description = "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans."
 nickname_candidates = ["planner", "stage-plan", "execution-plan"]

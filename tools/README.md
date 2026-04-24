@@ -1,3 +1,9 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/tools/README.md
+
 # tools
 
 `tools/` は shared automation の正本です。

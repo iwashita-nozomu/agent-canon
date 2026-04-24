@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Benchmark vs Experiment
 
 性能計測を始める前に benchmark と experiment のどちらを選ぶかを素早く判断するためのメモです。

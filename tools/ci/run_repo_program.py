@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+# - vendor/agent-canon/tools/README.md
 """Run one repo program inside the repo-defined container runtime."""
 
 from __future__ import annotations

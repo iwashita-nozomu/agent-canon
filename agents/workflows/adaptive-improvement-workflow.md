@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 反復改善ワークフロー
 
 この文書は、実験、外部調査、性能計測、チューニング、比較検証を回しながらコードを改善するための正本です。

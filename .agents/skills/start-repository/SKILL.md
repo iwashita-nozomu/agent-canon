@@ -3,6 +3,12 @@ name: start-repository
 description: Use when starting a new repository from this template after clone, including project slug/display-name setup, new bare remote registration, and project-local agent-canon bare repo seeding.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Start Repository
 
 1. Use this skill after `git clone <template> <new-project>` when the user is turning the clone into a new repository.

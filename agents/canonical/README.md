@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Agent Canonical Layout
 
 このディレクトリは、cross-agent で共有する人間向け正本の説明置き場です。

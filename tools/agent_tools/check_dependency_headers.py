@@ -29,9 +29,12 @@ SKIP_PREFIXES = (
     ".git/",
     ".pytest_cache/",
     ".ruff_cache/",
+    "experiments/functional/smolyak_scaling/results/",
     "reports/agents/",
+    "reports/static-analysis/",
 )
 HEADER_SCAN_LINES = 40
+FRONT_MATTER_SCAN_LINES = 240
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,12 +104,14 @@ def should_check(root: Path, path: Path) -> bool:
     relative = repo_relative(root, path)
     if any(relative.startswith(prefix) for prefix in SKIP_PREFIXES):
         return False
+    if relative.startswith("references/") and path.suffix.lower() == ".html":
+        return False
     return path.suffix.lower() in CHECKABLE_SUFFIXES
 
 
 def has_dependency_header(path: Path) -> bool:
     """Return whether a file declares dependency files near the top."""
-    lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
+    lines = dependency_header_search_lines(path.read_text(encoding="utf-8").splitlines())
     for index, line in enumerate(lines):
         normalized = line.lower()
         if "dependency files:" not in normalized and "依存ファイル:" not in line:
@@ -117,6 +122,20 @@ def has_dependency_header(path: Path) -> bool:
         following = lines[index + 1 : index + 7]
         return any(stripped_list_item(candidate) for candidate in following)
     return False
+
+
+def dependency_header_search_lines(lines: list[str]) -> list[str]:
+    """Return the logical top of file, preserving front matter as metadata."""
+    if not lines or lines[0].strip() != "---":
+        return lines[:HEADER_SCAN_LINES]
+
+    for index, line in enumerate(lines[1:FRONT_MATTER_SCAN_LINES], start=1):
+        if line.strip() != "---":
+            continue
+        after_front_matter = lines[index + 1 : index + 1 + HEADER_SCAN_LINES]
+        return [*lines[:HEADER_SCAN_LINES], *after_front_matter]
+
+    return lines[:HEADER_SCAN_LINES]
 
 
 def stripped_list_item(line: str) -> bool:

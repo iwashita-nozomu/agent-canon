@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 実験ディレクトリ構成
 
 この章は、このリポジトリで experiment をどこへ置くかを定めます。

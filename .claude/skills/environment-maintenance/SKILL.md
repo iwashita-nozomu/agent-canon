@@ -3,6 +3,12 @@ name: environment-maintenance
 description: Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Environment Maintenance
 
 1. Treat `docker/` as the shared environment canon.

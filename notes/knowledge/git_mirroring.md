@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Git Mirroring
 
 この note は、template repo で Git mirror を組むときの確認観点をまとめたものです。

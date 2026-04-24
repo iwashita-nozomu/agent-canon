@@ -3,6 +3,12 @@ name: md-style-check
 description: Use when Markdown files changed and you need formatting, heading, and link checks aligned with the repository's documentation rules.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Markdown Style Check
 
 1. Read `agents/skills/md-style-check.md`.

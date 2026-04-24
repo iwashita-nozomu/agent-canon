@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 長文作成 workflow
 
 この文書は、README、workflow 文書、移行文書、設計補助文書、reader-facing guide のような長めの文章を作るときの正本です。

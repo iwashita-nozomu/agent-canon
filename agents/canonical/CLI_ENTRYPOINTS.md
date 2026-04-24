@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # CLI Entrypoints
 
 この文書は、agent ごとの入口差分をまとめた正本です。

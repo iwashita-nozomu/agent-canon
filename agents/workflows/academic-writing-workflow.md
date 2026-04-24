@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 学術文章 workflow
 
 この文書は、論文、thesis chapter、scholarly note、method note、claim-heavy な technical memo のような学術文章を作るときの正本です。

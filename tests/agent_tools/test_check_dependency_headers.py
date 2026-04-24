@@ -47,6 +47,37 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
+    def test_accepts_markdown_dependency_block_after_front_matter(self) -> None:
+        """Markdown files may keep dependency headers after front matter metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            doc = Path(tmp_dir) / "doc.md"
+            doc.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        *[f"description_line_{index}: value" for index in range(60)],
+                        "---",
+                        "",
+                        "Dependency Files:",
+                        "- README.md",
+                        "",
+                        "# Doc",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(doc)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
     def test_rejects_missing_dependency_block(self) -> None:
         """Checkable text files must declare dependency files near the top."""
         with tempfile.TemporaryDirectory() as tmp_dir:

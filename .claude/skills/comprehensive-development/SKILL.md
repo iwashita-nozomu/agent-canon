@@ -3,6 +3,12 @@ name: comprehensive-development
 description: Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Comprehensive Development
 
 1. Read `agents/skills/comprehensive-development.md`.

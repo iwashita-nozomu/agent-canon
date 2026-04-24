@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Benchmark Levels Analysis
 
 benchmark は、重さの異なる層を明示しておくと運用しやすくなります。

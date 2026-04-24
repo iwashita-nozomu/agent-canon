@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Theme Notes
 
 `notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。

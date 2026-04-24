@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Workflow Guide
 
 この文書は、`agents/workflows/` 配下の workflow catalog と routing guide の入口です。

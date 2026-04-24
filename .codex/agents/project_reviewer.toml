@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "project_reviewer"
 description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."
 nickname_candidates = ["project-review", "repo-audit", "inventory"]

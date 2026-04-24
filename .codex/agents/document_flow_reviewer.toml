@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "document_flow_reviewer"
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."
 nickname_candidates = ["doc-flow", "readthrough-gate", "top-down-review"]

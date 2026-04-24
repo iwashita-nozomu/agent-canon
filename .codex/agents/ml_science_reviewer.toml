@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "ml_science_reviewer"
 description = "Read-only reviewer for assumptions, limitations, uncertainty, and reader-facing scientific reporting."
 nickname_candidates = ["ml-science", "checklist", "limitations"]

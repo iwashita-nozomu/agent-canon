@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # agent-canon subtree 構成
 
 この文書は、`agent-canon` maintainer が subtree 構成を保守するときの正本です。

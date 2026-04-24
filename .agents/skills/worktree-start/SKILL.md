@@ -3,6 +3,12 @@ name: worktree-start
 description: Use this skill when creating, recreating, or resuming a worktree and you need to lock scope, action-log paths, carry-over targets, and kickoff checks before editing.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Worktree Start
 
 1. Read `agents/skills/worktree-start.md`.

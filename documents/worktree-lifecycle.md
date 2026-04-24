@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # branch・worktree の例外運用
 
 この文書は、`main` 以外で短期的に作業を切り分ける必要がある場合だけ参照します。

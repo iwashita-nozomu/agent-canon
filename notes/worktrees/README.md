@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Worktree Notes
 
 このディレクトリには、active な worktree の kickoff から closeout までを追う action log と carry-over note を置きます。

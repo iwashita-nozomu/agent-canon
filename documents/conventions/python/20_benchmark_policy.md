@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # ベンチマーク方針
 
 この章は、このリポジトリで行う短時間の性能計測を対象にします。

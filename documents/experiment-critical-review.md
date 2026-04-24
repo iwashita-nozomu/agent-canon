@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # 実験の批判的レビュー手順
 
 この文書は、実験コード、結果レポート、図表、結論の妥当性を批判的にレビューするための正本です。

@@ -3,6 +3,12 @@ name: behavior-preserving-refactor
 description: Use when a large refactor should be treated as behavior-preserving structural change with explicit path mapping, semantic-delta controls, and strong review gates.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Behavior Preserving Refactor
 
 1. Read `agents/skills/behavior-preserving-refactor.md`.

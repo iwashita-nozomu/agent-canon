@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Workflow References
 
 この文書は、workflow、review、agent system、report policy を設計するときに参照した外部資料の索引です。

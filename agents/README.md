@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Agent Hub
 
 このディレクトリは、repo におけるエージェント運用の人間向け正本ハブです。

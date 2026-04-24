@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "python_reviewer"
 description = "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes."
 nickname_candidates = ["py-review", "type-review", "python-gate"]

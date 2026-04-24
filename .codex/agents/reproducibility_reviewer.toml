@@ -1,3 +1,6 @@
+# Dependency Files:
+# - vendor/agent-canon/AGENTS.md
+# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 name = "reproducibility_reviewer"
 description = "Read-only reviewer for provenance, seeds, commands, environments, and rerunability."
 nickname_candidates = ["repro", "provenance", "rerun-check"]

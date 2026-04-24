@@ -3,6 +3,12 @@ name: codex-task-workflow
 description: Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Codex Task Workflow
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.

@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Codex Project Setup
 
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。

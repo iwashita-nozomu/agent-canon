@@ -1,9 +1,3 @@
-# pre_review.sh スクリプト — 使用ガイド
-
-**ファイル**: `/workspace/tools/ci/pre_review.sh`
-**作成日**: 2026-03-21
-**用途**: PR 前の自動 QA チェック
-
 ---
 
 ## 📋 概要
@@ -16,6 +10,19 @@
 4. **Code Quality** — Ruff (E, F, I, D, UP)
 
 ---
+
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/tools/README.md
+
+# pre_review.sh スクリプト — 使用ガイド
+
+**ファイル**: `/workspace/tools/ci/pre_review.sh`
+**作成日**: 2026-03-21
+**用途**: PR 前の自動 QA チェック
+
 
 ## 🚀 使用方法
 

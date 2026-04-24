@@ -3,6 +3,12 @@ name: experiment-lifecycle
 description: Use this skill when preparing, running, or validating experiments.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Experiment Lifecycle
 
 1. Read `agents/skills/experiment-lifecycle.md`.

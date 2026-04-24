@@ -3,6 +3,12 @@ name: test-design
 description: Use when code changes need adversarial static test design before implementation.
 ---
 
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
+
 # Test Design
 
 1. Read `agents/skills/test-design.md`.

@@ -1,3 +1,8 @@
+Dependency Files:
+
+- vendor/agent-canon/AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 # Engineering Avoidances
 
 この note は、repo-wide に何度も読み返す avoid list を短く固定します。
