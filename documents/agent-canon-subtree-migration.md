@@ -1,5 +1,12 @@
 # agent-canon subtree 構成
 
+Dependency Files:
+- vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md
+- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
+- vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md
+- vendor/agent-canon/tools/sync_agent_canon.sh
+- vendor/agent-canon/tools/update_agent_canon.sh
+
 この文書は、`agent-canon` maintainer が subtree 構成を保守するときの正本です。
 template 利用者向けの短い説明は root 側の `documents/agent-canon-subtree-migration.md` を見ます。
 
@@ -92,6 +99,7 @@ bash tools/sync_agent_canon.sh push
 - `agents/workflows/README.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
+- `agents/workflows/derived-agent-canon-diff-workflow.md`
 - `tools/shared/error_handler.py`
 - `tools/validation/triplet_validator.py`
 - `tools/docs/audit_and_fix_links.py`
@@ -266,6 +274,7 @@ bash tools/sync_agent_canon.sh pull
 ```
 
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
+derived repo の `vendor/agent-canon/` に local 差分があり、proposal branch、shared canon main、derived snapshot の順で閉じる必要がある場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` を使います。
 `plan` は read-only で route を示し、subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。source repo が設定されていれば、`refresh -> local sync` 後の実効 route を表示します。
 `refresh-remote` は configured source repo の branch を `agent-canon` remote へ push し、remote snapshot を先に最新化します。
 `apply` は source repo が設定されていれば `refresh-remote` を先に実行し、そのあと `ensure-latest` を呼びます。

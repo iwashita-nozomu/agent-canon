@@ -1,5 +1,11 @@
 # agent-canon PR ワークフロー
 
+Dependency Files:
+- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
+- vendor/agent-canon/documents/agent-canon-subtree-migration.md
+- vendor/agent-canon/tools/sync_agent_canon.sh
+- vendor/agent-canon/tools/ci/check_agent_canon_pr.sh
+
 この文書は、`vendor/agent-canon/` を source of truth とする shared canon 変更を PR に乗せるときの正本です。
 template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本の手順で扱います。
 
@@ -18,6 +24,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
 - 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
+- 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo snapshot を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
@@ -99,6 +106,7 @@ git -C /mnt/l/workspace/agent-canon pull --ff-only
 
 派生 repo では、shared canon の差分を直接 `main` へ push しません。
 repo ごとの proposal branch に積み、maintainer が整理用 branch へ merge します。
+local history divergence や unsafe snapshot import で `ensure-latest` が止まった場合も、この proposal branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
 
 ```bash
 bash tools/update_agent_canon.sh proposal-branch

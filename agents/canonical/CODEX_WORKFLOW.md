@@ -3,6 +3,7 @@
 Dependency Files:
 - vendor/agent-canon/ROOT_AGENTS.md
 - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
 - vendor/agent-canon/agents/templates/closeout_gate.md
 - vendor/agent-canon/tools/agent_tools/task_close.py
 
@@ -54,7 +55,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
 - `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
 - upstream より local shared canon が進んでいて remote history が local split の祖先なら pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
-- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、proposal branch の push または maintainer merge を先に解消します
+- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、maintainer merge、派生 repo snapshot 再同期を完了してから実装へ戻ります
 
 ### Context Sweep
 

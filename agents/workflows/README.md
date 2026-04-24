@@ -1,5 +1,10 @@
 # Workflow Guide
 
+Dependency Files:
+- vendor/agent-canon/agents/TASK_WORKFLOWS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/documents/agent-canon-subtree-migration.md
+
 この文書は、`agents/workflows/` 配下の workflow catalog と routing guide の入口です。
 repo 利用者も `agent-canon` maintainer も、まずここで「今回どの workflow を primary にし、どの overlay を重ねるか」を決めます。
 
@@ -38,6 +43,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - `agents/workflows/main-integration-workflow.md`
 - shared canon 自体を更新して PR / upstream sync する
   - `agents/workflows/agent-canon-pr-workflow.md`
+- 派生 repo の `vendor/agent-canon/` 差分を proposal / shared canon main / 派生 repo snapshot の順で閉じる
+  - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - task から agent philosophy や durable observation を昇格する
   - `agents/workflows/agent-learning-workflow.md`
 
@@ -81,6 +88,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 
 - `agent-canon-pr-workflow.md`
   - shared canon change の branch、PR、upstream sync
+- `derived-agent-canon-diff-workflow.md`
+  - 派生 repo の agent-canon 差分を proposal branch、shared canon main、派生 repo snapshot へ順に反映する手順
 - `agent-learning-workflow.md`
   - `memory/` と guardrail への learning promotion
 - `workflow-references.md`
@@ -94,6 +103,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
+- `agents/workflows/derived-agent-canon-diff-workflow.md`
 
 基本手順:
 
