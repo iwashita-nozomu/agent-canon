@@ -434,6 +434,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -532,6 +533,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -618,6 +620,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: no",
                         "- overall_delivery_complete: no",
+                        "- unfinished_tasks_absent: no",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -650,6 +653,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("all_planned_chunks_complete", result.stdout)
             self.assertIn("overall_delivery_complete", result.stdout)
+            self.assertIn("unfinished_tasks_absent", result.stdout)
 
     def test_task_close_rejects_partial_spec_or_ignored_review_findings(self) -> None:
         """task_close should fail when spec coverage or review integration is incomplete."""
@@ -699,6 +703,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
@@ -800,6 +805,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
@@ -880,6 +886,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -980,6 +987,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- request_contract_complete: yes",
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
+                        "- unfinished_tasks_absent: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",

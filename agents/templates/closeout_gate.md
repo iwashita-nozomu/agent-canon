@@ -13,6 +13,7 @@
 - request_contract_complete: no
 - all_planned_chunks_complete: no
 - overall_delivery_complete: no
+- unfinished_tasks_absent: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
@@ -32,6 +33,7 @@
 - request_contract_complete: yes
 - all_planned_chunks_complete: yes
 - overall_delivery_complete: yes
+- unfinished_tasks_absent: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -41,7 +43,7 @@
 
 ## Completion Boundary Evidence
 
-<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
+<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
 
 ## Spec-To-Product Coverage Evidence
 

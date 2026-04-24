@@ -111,6 +111,9 @@
 - 2026-04-24 | Implementation work should start from this template repository by default; avoid treating other repositories as the primary starting point unless the user explicitly redirects.
   - source: chat
 
+- 2026-04-24 | Do not return a user-facing completion report while any task, planned work unit, required validation, commit/push, canon sync, or closeout gate remains unfinished; return only after everything in scope is complete.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
