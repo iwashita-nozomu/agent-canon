@@ -1,5 +1,11 @@
 # Codex Workflow
 
+Dependency Files:
+- vendor/agent-canon/ROOT_AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+- vendor/agent-canon/agents/templates/closeout_gate.md
+- vendor/agent-canon/tools/agent_tools/task_close.py
+
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
 
@@ -92,6 +98,17 @@ dependency surface は task に応じて次を見ます。
 
 既存実装があるのに別名の重複 module を新設しません。
 既存ライブラリや既存実装で足りない理由を言えない限り、新規追加を選びません。
+
+### File Dependency Headers
+
+新規作成・編集する human-authored text file では、ファイル冒頭にそのファイルが依存する repo 内ファイルを明記します。
+
+- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後に `Dependency Files:` block を置きます
+- 依存が無い場合も `Dependency Files: None` または comment 形式の `Dependency Files: None` を置き、未記載と区別します
+- 依存として書くのは、その file を理解・実行・検証するために読むべき repo 内の正本 file です。単なる同一 directory の全列挙や推測 dependency を水増ししません
+- JSON など comment を持たず schema 上 top-level field も置けない file では、同じ変更の design / manifest / README に依存 file を明記し、その理由を review artifact に残します
+- subagent への handoff には `dependency_files_header_plan` を含め、編集対象ごとに冒頭へ書く依存 file を先に固定します
+- closeout 前に `python3 tools/agent_tools/check_dependency_headers.py --changed` を実行し、対象ファイルの依存ヘッダーが抜けていないことを確認します
 
 ## Task Classification
 
@@ -375,6 +392,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
+- `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
 - `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める

@@ -1,5 +1,9 @@
 # Closeout Gate
 
+Dependency Files:
+- vendor/agent-canon/tools/agent_tools/task_close.py
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 - Run ID: {\{RUN_ID}}
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
@@ -14,6 +18,7 @@
 - all_planned_chunks_complete: no
 - overall_delivery_complete: no
 - unfinished_tasks_absent: no
+- dependency_headers_complete: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
@@ -34,6 +39,7 @@
 - all_planned_chunks_complete: yes
 - overall_delivery_complete: yes
 - unfinished_tasks_absent: yes
+- dependency_headers_complete: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -44,6 +50,10 @@
 ## Completion Boundary Evidence
 
 <!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
+
+## Dependency Header Evidence
+
+<!-- Confirm that every created or edited human-authored text file has a top-of-file Dependency Files block, or record the syntax/schema reason and alternate manifest/design artifact for files that cannot carry such a header. Include the command output from tools/agent_tools/check_dependency_headers.py when applicable. -->
 
 ## Spec-To-Product Coverage Evidence
 

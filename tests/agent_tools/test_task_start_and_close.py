@@ -1,5 +1,10 @@
 """Tests for machine-driven task start and close commands."""
 
+# Dependency Files:
+# - vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py
+# - vendor/agent-canon/tools/agent_tools/task_close.py
+# - vendor/agent-canon/agents/templates/closeout_gate.md
+
 from __future__ import annotations
 
 import subprocess
@@ -435,6 +440,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -534,6 +540,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -621,6 +628,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: no",
                         "- overall_delivery_complete: no",
                         "- unfinished_tasks_absent: no",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -704,6 +712,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
@@ -806,6 +815,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
@@ -887,6 +897,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -988,6 +999,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
+                        "- dependency_headers_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",

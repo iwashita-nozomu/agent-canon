@@ -1,5 +1,10 @@
 # Agent Instructions
 
+Dependency Files:
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+- vendor/agent-canon/agents/templates/closeout_gate.md
+- vendor/agent-canon/tools/agent_tools/task_close.py
+
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
 The shared agent canon lives in `vendor/agent-canon/`, and the root discovery paths are runtime views into that snapshot.
 
@@ -112,6 +117,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が今回 scope に残っていないことを示すまで出してはいけません。
+- user-facing completion report は、作成・編集した human-authored text file の冒頭に `Dependency Files` block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
 - If a shared surface drifts, repair it with `bash tools/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -140,6 +146,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
 - `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残る状態で user-facing completion を返してはいけません。
+- 作成・編集した text file の冒頭に依存 file header が無い状態で user-facing completion を返してはいけません。
 - 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
 - 大規模改修や構成変更のあとに、削除済み・置換済みの implementation / document surface への参照を README、guide、workflow、規約文書、script help、validation 出力へ残したまま closeout してはいけません。
 - current tree head 以外を durable な product state として扱ってはいけません。履歴保持は `git` と run bundle artifact に限ります。

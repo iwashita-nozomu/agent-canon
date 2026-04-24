@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Dependency Files:
+# - vendor/agent-canon/agents/agents_config.json
+# - vendor/agent-canon/agents/task_catalog.yaml
+# - vendor/agent-canon/agents/templates/closeout_gate.md
 """Shared runtime helpers for the permanent agent team."""
 
 from __future__ import annotations
@@ -779,7 +783,11 @@ def render_subagent_prompt_packet(
 
 def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) -> str:
     """Return the reusable prompt contract for one manifest role entry."""
-    family_name = str(workflow_family["name"]) if workflow_family is not None else "the selected workflow"
+    family_name = (
+        str(workflow_family["name"])
+        if workflow_family is not None
+        else "the selected workflow"
+    )
     write_scope = (
         "write only in the manifest write_policy scope"
         if role.write_policy.mode != "read_only"
@@ -789,7 +797,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         f"You are the {role.id} role for {family_name}. Read the run-level "
         "subagent_prompt_packet, cross_cutting_document_packet, and your document_packet before "
         f"work. {write_scope}. Return findings or outputs tied to request_clause_ids, artifact "
-        "paths, remaining planned work, and the next required gate."
+        "paths, dependency-file headers for every edited or created text file, remaining planned "
+        "work, and the next required gate."
     )
 
 
@@ -802,6 +811,7 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
         "cross_cutting_document_packet",
         "role_document_packet",
         "expected_output_artifacts",
+        "dependency_files_header_plan",
         "next_review_gate",
     ]
     if role.write_policy.mode != "read_only":
