@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/documents/dependency-headers.md
-
 """Run one experiment while recording canonical server-side run metadata."""
 
 from __future__ import annotations

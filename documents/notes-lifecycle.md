@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # Notes Lifecycle
 
 この文書は、`notes/` を使うほど充実する形に保つための正本です。

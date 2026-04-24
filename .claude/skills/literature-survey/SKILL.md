@@ -3,13 +3,6 @@ name: literature-survey
 description: Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/literature-survey/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Literature Survey
 
 1. Read `agents/skills/literature-survey.md`.

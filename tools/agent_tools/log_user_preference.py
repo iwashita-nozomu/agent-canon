@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/documents/dependency-headers.md
-
 """Append one observed user preference to the canonical note."""
 
 from __future__ import annotations

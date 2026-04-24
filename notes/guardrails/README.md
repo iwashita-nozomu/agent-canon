@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Guardrail Notes
 
 このディレクトリは、repo-wide に何度も読み返す禁止事項と anti-pattern の補助 note を置く場所です。

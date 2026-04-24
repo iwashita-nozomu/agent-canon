@@ -3,13 +3,6 @@ name: subagent-bootstrap
 description: Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/subagent-bootstrap/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Subagent Bootstrap
 
 1. Read `agents/skills/subagent-bootstrap.md`.

@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # From Another Agent
 
 この note は、前の agent session から次の agent へ持ち越す TODO と、

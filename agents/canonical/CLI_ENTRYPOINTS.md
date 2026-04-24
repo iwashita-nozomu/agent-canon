@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/README.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # CLI Entrypoints
 
 この文書は、agent ごとの入口差分をまとめた正本です。

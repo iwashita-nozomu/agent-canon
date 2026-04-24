@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/documents/dependency-headers.md
-
 """Report the repo-local Python environment policy and optionally create `.venv`."""
 
 from __future__ import annotations

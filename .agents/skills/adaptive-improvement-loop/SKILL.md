@@ -3,14 +3,6 @@ name: adaptive-improvement-loop
 description: Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/skills/adaptive-improvement-loop.md
-- vendor/agent-canon/agents/skills/README.md
-- vendor/agent-canon/agents/canonical/skills.md
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Adaptive Improvement Loop
 
 1. Read `agents/skills/adaptive-improvement-loop.md`.

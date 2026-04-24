@@ -1,10 +1,3 @@
-Dependency Files:
-
-- AGENTS.md
-- documents/README.md
-- documents/coding-conventions.md
-- documents/coding-conventions-house-style.md
-
 # ベンチマーク方針
 
 この章は、このリポジトリで行う短時間の性能計測を対象にします。

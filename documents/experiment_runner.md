@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # `experiment_runner` 設計方針
 
 この文書は、`python/experiment_runner/` を採用するプロジェクトでの推奨設計を定義します。

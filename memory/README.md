@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Memory
 
 `memory/` は、shared canon が責務を持つ durable memory の置き場です。

@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Notes Hub
 
 `notes/` は、正本ではないが長く残したい知見、比較、要約、補助メモを置く場所です。

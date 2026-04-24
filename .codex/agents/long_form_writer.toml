@@ -1,9 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-# - vendor/agent-canon/agents/task_catalog.yaml
-# - vendor/agent-canon/.codex/README.md
-
 name = "long_form_writer"
 description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."
 nickname_candidates = ["doc-writer", "long-doc", "guide-writer"]

@@ -1,11 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/workflows/README.md
-- vendor/agent-canon/agents/workflows/workflow-references.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # 論文執筆 workflow
 
 この文書は、投稿論文、thesis chapter、scholarly paper section のような paper-like 文書を書くときの正本です。

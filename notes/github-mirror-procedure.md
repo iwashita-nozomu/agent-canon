@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Git Mirror Procedure
 
 この note は、`origin` 以外の mirror remote を使う host 固有運用を記録するためのテンプレです。

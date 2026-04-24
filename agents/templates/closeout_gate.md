@@ -1,10 +1,12 @@
 # Closeout Gate
 
 Dependency Files:
+- vendor/agent-canon/tools/agent_tools/task_close.py
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
 
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
+- Run ID: {\{RUN_ID}}
+- Task: {\{TASK}}
+- Owner: {\{OWNER}}
 
 ## Gate Status
 

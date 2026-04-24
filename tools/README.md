@@ -1,8 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # tools
 
 `tools/` は shared automation の正本です。

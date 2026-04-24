@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Worktree Notes
 
 このディレクトリには、active な worktree の kickoff から closeout までを追う action log と carry-over note を置きます。

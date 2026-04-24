@@ -3,13 +3,6 @@ name: start-repository
 description: Use when starting a new repository from this template after clone, including project slug/display-name setup, new bare remote registration, and project-local agent-canon bare repo seeding.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/start-repository/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Start Repository
 
 1. Use this skill after `git clone <template> <new-project>` when the user is turning the clone into a new repository.

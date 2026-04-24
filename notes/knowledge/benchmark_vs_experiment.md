@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Benchmark vs Experiment
 
 性能計測を始める前に benchmark と experiment のどちらを選ぶかを素早く判断するためのメモです。

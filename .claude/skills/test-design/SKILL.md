@@ -3,13 +3,6 @@ name: test-design
 description: Use when code changes need adversarial static test design before implementation.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/test-design/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Test Design
 
 1. Read `agents/skills/test-design.md`.

@@ -1,9 +1,7 @@
 """Tests for dependency header validation."""
 
 # Dependency Files:
-# - vendor/agent-canon/documents/dependency-headers.md
 # - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
-# - vendor/agent-canon/agents/templates/closeout_gate.md
 
 from __future__ import annotations
 
@@ -49,95 +47,6 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
-    def test_accepts_non_dash_markdown_dependency_items(self) -> None:
-        """Markdown dependency blocks may match the file's existing list marker."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "Dependency Files:",
-                        "+ README.md",
-                        "",
-                        "# Doc",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
-
-    def test_accepts_markdown_dependency_block_after_front_matter(self) -> None:
-        """Markdown files may keep dependency headers after front matter metadata."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "---",
-                        *[f"description_line_{index}: value" for index in range(60)],
-                        "---",
-                        "",
-                        "Dependency Files:",
-                        "- README.md",
-                        "",
-                        "# Doc",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
-
-    def test_accepts_markdown_dependency_block_after_list_front_matter(self) -> None:
-        """List-only YAML front matter is still real metadata."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "---",
-                        *[f"- tag-{index}" for index in range(60)],
-                        "---",
-                        "",
-                        "Dependency Files:",
-                        "- README.md",
-                        "",
-                        "# Doc",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
-
     def test_rejects_missing_dependency_block(self) -> None:
         """Checkable text files must declare dependency files near the top."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -164,80 +73,6 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
             self.assertIn("missing top Dependency Files block", result.stdout)
-
-    def test_does_not_treat_markdown_rule_as_front_matter(self) -> None:
-        """A top horizontal rule does not let late dependency headers pass."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "---",
-                        "",
-                        "# Body",
-                        "",
-                        *["body" for _ in range(50)],
-                        "",
-                        "Dependency Files:",
-                        "- README.md",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing top Dependency Files block", result.stdout)
-
-    def test_checks_commentable_suffixless_files(self) -> None:
-        """Makefile and Dockerfile are checkable even without suffixes."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            makefile = Path(tmp_dir) / "Makefile"
-            dockerfile = Path(tmp_dir) / "Dockerfile"
-            makefile.write_text("all:\n\ttrue\n", encoding="utf-8")
-            dockerfile.write_text("FROM scratch\n", encoding="utf-8")
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(makefile), str(dockerfile)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing top Dependency Files block", result.stdout)
-            self.assertIn("Dockerfile", result.stdout)
-
-    def test_accepts_commentable_suffixless_files_with_header(self) -> None:
-        """Commentable suffixless files pass when they declare dependencies."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            makefile = Path(tmp_dir) / "Makefile"
-            dockerfile = Path(tmp_dir) / "Dockerfile"
-            makefile.write_text(
-                "# Dependency Files:\n# - README.md\n\nall:\n\ttrue\n",
-                encoding="utf-8",
-            )
-            dockerfile.write_text(
-                "# Dependency Files:\n# - docker/README.md\n\nFROM scratch\n",
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(makefile), str(dockerfile)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_skips_commentless_json(self) -> None:
         """JSON files are skipped because adding a comment header would break syntax."""

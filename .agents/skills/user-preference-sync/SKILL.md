@@ -3,14 +3,6 @@ name: user-preference-sync
 description: Use when notes/themes/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/skills/user-preference-sync.md
-- vendor/agent-canon/agents/skills/README.md
-- vendor/agent-canon/agents/canonical/skills.md
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # User Preference Sync
 
 1. Read `agents/skills/user-preference-sync.md`.

@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Theme Notes
 
 `notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。

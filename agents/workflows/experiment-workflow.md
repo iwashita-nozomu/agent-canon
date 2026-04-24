@@ -1,11 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/workflows/README.md
-- vendor/agent-canon/agents/workflows/workflow-references.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # 実験の標準手順
 
 この文書は、repo 内で実験を進めるときの統合入口です。

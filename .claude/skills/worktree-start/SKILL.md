@@ -3,13 +3,6 @@ name: worktree-start
 description: Use this skill when creating, recreating, or resuming a worktree and you need to lock scope, action-log paths, carry-over targets, and kickoff checks before editing.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/worktree-start/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Worktree Start
 
 1. Read `agents/skills/worktree-start.md`.

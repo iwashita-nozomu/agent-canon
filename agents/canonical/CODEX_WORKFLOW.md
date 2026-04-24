@@ -1,10 +1,11 @@
 # Codex Workflow
 
 Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/README.md
-- vendor/agent-canon/documents/dependency-headers.md
+- vendor/agent-canon/ROOT_AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
+- vendor/agent-canon/agents/templates/closeout_gate.md
+- vendor/agent-canon/tools/agent_tools/task_close.py
 
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
@@ -21,7 +22,6 @@ Dependency Files:
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
 1. 必要なら `.agents/skills/` から該当 skill を読む
-1. text file を編集または作成する場合は `documents/dependency-headers.md` に従って依存ヘッダーを確認する
 
 Base Runtime Packet:
 
@@ -55,7 +55,7 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 - dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
 - `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
 - upstream より local shared canon が進んでいて remote history が local split の祖先なら pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
-- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、proposal branch の push または maintainer merge を先に解消します
+- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、maintainer merge、派生 repo snapshot 再同期を完了してから実装へ戻ります
 
 ### Context Sweep
 
@@ -244,7 +244,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
 default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex` が code survey、static test design、language-specific code review を担当する形です。設計packetで完全に切れる狭い実装sliceは `spark_worker` の `gpt-5.3-codex-spark` を first implementation candidate にし、設計判断、scope判断、review判断は `gpt-5.5` 側に残します。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
-- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 5 体、`Large Delivery` / `Platform And Environment` で同時 6 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです。
+- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
 - write-capable subagent は同時 1 体までに固定し、追加分は read-only review / research / survey role だけにします。

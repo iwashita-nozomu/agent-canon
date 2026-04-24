@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/documents/dependency-headers.md
-
+# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
+# - vendor/agent-canon/tests/agent_tools/test_check_dependency_headers.py
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"

@@ -3,13 +3,6 @@ name: long-form-writing
 description: Use when drafting a long README, workflow, guide, migration doc, or other reader-facing long-form document that needs explicit structure and mandatory subagent review.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/long-form-writing/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Long-Form Writing
 
 1. Read `agents/skills/long-form-writing.md`.

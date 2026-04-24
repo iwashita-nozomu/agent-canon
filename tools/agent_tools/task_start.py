@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/documents/dependency-headers.md
-
 """Start one agent-task run with machine-generated workflow and review hints."""
 
 from __future__ import annotations

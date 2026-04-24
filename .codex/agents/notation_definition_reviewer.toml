@@ -1,9 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-# - vendor/agent-canon/agents/task_catalog.yaml
-# - vendor/agent-canon/.codex/README.md
-
 name = "notation_definition_reviewer"
 description = "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents."
 nickname_candidates = ["notation-check", "definition-gate", "symbol-review"]

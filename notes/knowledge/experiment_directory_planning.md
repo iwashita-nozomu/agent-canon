@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Experiment Directory Planning
 
 実験コードの配置は、再現に必要な入口を 1 か所で辿れるかを基準に決めます。

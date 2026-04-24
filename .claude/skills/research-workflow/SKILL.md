@@ -3,13 +3,6 @@ name: research-workflow
 description: Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/research-workflow/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Research Workflow
 
 1. Read `agents/skills/research-workflow.md`.

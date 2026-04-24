@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Experiment Result JSON Archive
 
 このディレクトリには、`main` に持ち帰る最小限の final JSON を置きます。

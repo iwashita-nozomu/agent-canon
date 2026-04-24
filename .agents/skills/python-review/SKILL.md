@@ -3,14 +3,6 @@ name: python-review
 description: Use when Python code changes need strict review for pyright, pytest, ruff, type boundaries, and API behavior.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/skills/python-review.md
-- vendor/agent-canon/agents/skills/README.md
-- vendor/agent-canon/agents/canonical/skills.md
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Python Review
 
 1. Read `agents/skills/python-review.md`.

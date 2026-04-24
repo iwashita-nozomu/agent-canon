@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Branch Notes
 
 `notes/branches/` は、branch ごとの要約と関連 note への入口をまとめるディレクトリです。

@@ -1,9 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-# - vendor/agent-canon/agents/task_catalog.yaml
-# - vendor/agent-canon/.codex/README.md
-
 name = "report_reviewer"
 description = "Read-only reviewer for experiment reports and evidence traceability."
 nickname_candidates = ["report-review", "reader-check", "report-gate"]

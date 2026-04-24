@@ -1,11 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/workflows/README.md
-- vendor/agent-canon/agents/workflows/workflow-references.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Agent Learning Workflow
 
 この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。

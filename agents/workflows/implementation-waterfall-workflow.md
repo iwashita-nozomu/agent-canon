@@ -1,11 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/workflows/README.md
-- vendor/agent-canon/agents/workflows/workflow-references.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # 実装ウォーターフォールワークフロー
 
 この文書は、repo に変更を入れる実装プロセスを、段階ゲート付きのウォーターフォールとして進めるための正本です。

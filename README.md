@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md
-- vendor/agent-canon/tools/sync_agent_canon.sh
-
 # agent-canon
 
 このディレクトリは `agent-canon` 自体の committed snapshot です。

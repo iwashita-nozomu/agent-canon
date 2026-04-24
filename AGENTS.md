@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/ROOT_AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # agent-canon Snapshot Instructions
 
 この subtree は shared agent canon の snapshot です。

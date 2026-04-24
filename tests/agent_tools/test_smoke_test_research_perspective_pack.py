@@ -1,7 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
 """Smoke-test coverage for the research perspective pack helper."""
 
 from __future__ import annotations

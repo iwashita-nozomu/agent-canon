@@ -1,9 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/skills/README.md
-# - vendor/agent-canon/agents/canonical/skills.md
-# - vendor/agent-canon/tools/docs/mirror_skill_shims.py
-
 version: 1
 
 skill_families:

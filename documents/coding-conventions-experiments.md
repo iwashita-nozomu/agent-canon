@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # 実験運用規約
 
 この文書は、`experiments/` 配下の実験コード、benchmark、実験結果、実行環境の運用を扱います。

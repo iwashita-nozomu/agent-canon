@@ -15,7 +15,7 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
-- active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change` で同時 5 体まで、`Large Delivery` / `Platform And Environment` で同時 6 体まで、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
+- active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change` で同時 8 体まで、`Large Delivery` / `Platform And Environment` で同時 10 体まで、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
 - 同時に write-capable な subagent は常に 1 体までです。追加分は read-only review / research / survey に限ります。
 
 ## Read Packets

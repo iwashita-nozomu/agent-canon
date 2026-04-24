@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # WORKTREE_SCOPE Template
 
 このファイルは、他環境へ渡す worktree や、変更範囲を限定して使う worktree のためのテンプレートです。

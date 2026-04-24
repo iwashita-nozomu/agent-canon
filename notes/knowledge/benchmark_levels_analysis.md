@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/notes-lifecycle.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Benchmark Levels Analysis
 
 benchmark は、重さの異なる層を明示しておくと運用しやすくなります。

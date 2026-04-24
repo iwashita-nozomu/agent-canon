@@ -3,13 +3,6 @@ name: agent-learning
 description: Use when agent-side working philosophy, interaction lessons, or task retrospectives should be logged without mixing them into user preferences.
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/.agents/skills/agent-learning/SKILL.md
-- vendor/agent-canon/tools/docs/mirror_skill_shims.py
-- vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md
-
 # Agent Learning
 
 1. Read `agents/skills/agent-learning.md`.

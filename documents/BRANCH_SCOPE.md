@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # Branch Scope と Git ワークフロー
 
 この文書は、branch 名、branch の責務、commit / push、merge / rebase の判断をまとめた正本です。

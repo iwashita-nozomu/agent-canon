@@ -1,8 +1,3 @@
-# Dependency Files:
-# - vendor/agent-canon/AGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-# - vendor/agent-canon/tools/README.md
-# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
 """Tests for the generic repo-program container runner."""
 
 from __future__ import annotations

@@ -1,9 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 # Shared Runtime Surfaces
 
 この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。

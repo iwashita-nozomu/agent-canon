@@ -1,9 +1,8 @@
-Dependency Files:
+# pre_review.sh スクリプト — 使用ガイド
 
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/tools/README.md
-- vendor/agent-canon/documents/dependency-headers.md
-
+**ファイル**: `/workspace/tools/ci/pre_review.sh`
+**作成日**: 2026-03-21
+**用途**: PR 前の自動 QA チェック
 
 ---
 
@@ -17,13 +16,6 @@ Dependency Files:
 4. **Code Quality** — Ruff (E, F, I, D, UP)
 
 ---
-
-# pre_review.sh スクリプト — 使用ガイド
-
-**ファイル**: `/workspace/tools/ci/pre_review.sh`
-**作成日**: 2026-03-21
-**用途**: PR 前の自動 QA チェック
-
 
 ## 🚀 使用方法
 

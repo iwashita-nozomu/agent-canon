@@ -1,11 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/workflows/README.md
-- vendor/agent-canon/agents/workflows/workflow-references.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # main 統合ワークフロー
 
 この文書は、`main` へ戻すときの統合手順の正本です。

@@ -1,8 +1,3 @@
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 # Agent Canonical Layout
 
 このディレクトリは、cross-agent で共有する人間向け正本の説明置き場です。

@@ -7,12 +7,6 @@ skills:
   - agent-orchestration
 ---
 
-Dependency Files:
-
-- vendor/agent-canon/AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-- vendor/agent-canon/documents/dependency-headers.md
-
 You are a repository exploration specialist.
 
 Focus on orientation, relevant files, and risks from stale assumptions.

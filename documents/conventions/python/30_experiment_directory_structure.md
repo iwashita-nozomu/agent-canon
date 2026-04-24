@@ -1,10 +1,3 @@
-Dependency Files:
-
-- AGENTS.md
-- documents/README.md
-- documents/coding-conventions.md
-- documents/coding-conventions-house-style.md
-
 # 実験ディレクトリ構成
 
 この章は、このリポジトリで experiment をどこへ置くかを定めます。
