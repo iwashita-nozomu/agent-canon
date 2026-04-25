@@ -1,11 +1,15 @@
 # agent-canon subtree 構成
 
-Dependency Files:
-- vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md
-- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
-- vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md
-- vendor/agent-canon/tools/sync_agent_canon.sh
-- vendor/agent-canon/tools/update_agent_canon.sh
+<!--
+@dependency-start
+upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
+upstream design ../agents/workflows/derived-agent-canon-diff-workflow.md derived repo diff workflow
+upstream design ./SHARED_RUNTIME_SURFACES.md shared root surface list
+upstream implementation ../tools/sync_agent_canon.sh subtree sync tool
+upstream implementation ../tools/update_agent_canon.sh derived repo update helper
+downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root
+@dependency-end
+-->
 
 この文書は、`agent-canon` maintainer が subtree 構成を保守するときの正本です。
 template 利用者向けの短い説明は root 側の `documents/agent-canon-subtree-migration.md` を見ます。
@@ -98,6 +102,7 @@ bash tools/sync_agent_canon.sh push
 - `README.md`
 - `agents/workflows/README.md`
 - `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/dependency-manifest-design.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
 - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - `tools/shared/error_handler.py`
@@ -139,6 +144,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/documents/agent-canon-subtree-migration.md` への symlink view
 - `documents/AGENTS_COORDINATION.md`
   - `vendor/agent-canon/documents/AGENTS_COORDINATION.md` への symlink view
+- `documents/dependency-manifest-design.md`
+  - `vendor/agent-canon/documents/dependency-manifest-design.md` への symlink view
 - `agents/workflows/academic-writing-workflow.md`
   - `vendor/agent-canon/agents/workflows/academic-writing-workflow.md` への symlink view
 - `documents/REVIEW_PROCESS.md`

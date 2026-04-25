@@ -1,11 +1,15 @@
 # Codex Workflow
 
-Dependency Files:
-- vendor/agent-canon/ROOT_AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
-- vendor/agent-canon/agents/templates/closeout_gate.md
-- vendor/agent-canon/tools/agent_tools/task_close.py
+<!--
+@dependency-start
+upstream design ../../ROOT_AGENTS.md root runtime entrypoint
+upstream design ./CODEX_SUBAGENTS.md subagent routing contract
+upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
+upstream design ../templates/closeout_gate.md closeout gate contract
+upstream design ../../documents/dependency-manifest-design.md dependency manifest design
+downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+@dependency-end
+-->
 
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
@@ -103,6 +107,8 @@ dependency surface は task に応じて次を見ます。
 ### File Dependency Headers
 
 新規作成・編集する human-authored text file では、ファイル冒頭にそのファイルが依存する repo 内ファイルを明記します。
+次期形式の設計正本は `documents/dependency-manifest-design.md` です。
+移行が完了するまでは既存の `Dependency Files:` block を受け入れますが、新しい tool 設計は `@dependency-start` / `@dependency-end` marker と upstream / downstream の別 graph を前提にします。
 
 - Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後に `Dependency Files:` block を置きます
 - 依存が無い場合も `Dependency Files: None` または comment 形式の `Dependency Files: None` を置き、未記載と区別します

@@ -1,5 +1,13 @@
 # Shared Runtime Surfaces
 
+<!--
+@dependency-start
+upstream design ../tools/sync_agent_canon.sh shared surface link specification
+upstream design ./agent-canon-subtree-migration.md subtree ownership model
+downstream implementation ../tools/sync_agent_canon.sh enforces this surface list
+@dependency-end
+-->
+
 この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
 template root と派生 repo root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
 
@@ -21,6 +29,7 @@ root では次を symlink view として扱います。
 - `.codex/agents`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
+- `documents/dependency-manifest-design.md`
 - `documents/notes-lifecycle.md`
 - `documents/REVIEW_PROCESS.md`
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
