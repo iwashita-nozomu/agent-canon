@@ -138,6 +138,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/.github/copilot-instructions.md` への symlink view
 - `.codex/README.md`
   - `vendor/agent-canon/.codex/README.md` への symlink view
+- `documents/` 配下の shared document surface
+  - `documents/SHARED_RUNTIME_SURFACES.md` に載っている各 file は `vendor/agent-canon/documents/` への symlink view
 - `documents/BRANCH_SCOPE.md`
   - `vendor/agent-canon/documents/BRANCH_SCOPE.md` への symlink view
 - `documents/agent-canon-subtree-migration.md`
@@ -398,9 +400,9 @@ exit 条件:
 
 ## 11. 関連
 
-- [README.md](/mnt/l/workspace/project_template/README.md)
-- [AGENTS.md](/mnt/l/workspace/project_template/AGENTS.md)
-- [WORKFLOW_GUIDE.md](/mnt/l/workspace/project_template/agents/workflows/README.md)
-- [workflow-references.md](/mnt/l/workspace/project_template/agents/workflows/workflow-references.md)
-- [README.md](/mnt/l/workspace/project_template/vendor/README.md)
-- [sync_agent_canon.sh](/mnt/l/workspace/project_template/tools/sync_agent_canon.sh)
+- [README.md](../README.md)
+- [AGENTS.md](../AGENTS.md)
+- [WORKFLOW_GUIDE.md](../agents/workflows/README.md)
+- [workflow-references.md](../agents/workflows/workflow-references.md)
+- [README.md](../vendor/README.md)
+- [sync_agent_canon.sh](../tools/sync_agent_canon.sh)

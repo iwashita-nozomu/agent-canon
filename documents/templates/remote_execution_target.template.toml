@@ -1,0 +1,16 @@
+# @dependency-start
+# upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+# @dependency-end
+
+[target]
+id = "lab-cpu-1"
+label = "Lab CPU 1"
+transport = "ssh"
+host = "192.0.2.10"
+user = "runner"
+port = 22
+base_workdir = "/srv/remote-runner"
+config_mount_dir = "/srv/remote-execution-config"
+docker_available = true
+gpu_available = false
+enabled = true
