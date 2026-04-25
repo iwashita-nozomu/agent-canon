@@ -1,0 +1,34 @@
+# @dependency-start
+# upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+# @dependency-end
+
+[server]
+id = "main-server"
+label = "Main Server"
+host_kind = "wsl2"
+container_builder = "docker"
+codex_cli_required = true
+python_bin = "python3"
+
+[paths]
+bare_repo_root = "/mnt/git"
+workspace_root = "/mnt/l/workspace"
+local_state_root = "/var/lib/project-template"
+docker_state_root = "/var/lib/docker"
+artifact_root = "/mnt/l/workspace/project_template/reports"
+
+[mounts.bare_repo_root]
+type = "cifs"
+required = true
+
+[mounts.workspace_root]
+type = "cifs"
+required = true
+
+[mounts.local_state_root]
+type = "ext4"
+required = false
+
+[mounts.docker_state_root]
+type = "ext4"
+required = true

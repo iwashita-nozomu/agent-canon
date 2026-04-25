@@ -1,0 +1,20 @@
+# @dependency-start
+# upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+# @dependency-end
+
+[repository]
+id = "project-template"
+label = "project-template"
+clone_url = "git@github.com:example/project-template.git"
+default_branch = "main"
+default_runtime_profile = "default"
+artifact_root = "reports/remote-execution"
+commit_resolution = "server_side_branch_to_commit_sha"
+
+[runtime_profiles.default]
+docker_pack = "docker/packs/default.toml"
+requires_gpu = false
+
+[runtime_profiles.host-docker]
+docker_pack = "docker/packs/default-host-docker.toml"
+requires_gpu = false
