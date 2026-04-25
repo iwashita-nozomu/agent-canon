@@ -1,8 +1,12 @@
 # Closeout Gate
 
-Dependency Files:
-- vendor/agent-canon/tools/agent_tools/task_close.py
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+<!--
+@dependency-start
+upstream design ../canonical/CODEX_WORKFLOW.md closeout workflow contract
+upstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
+@dependency-end
+-->
 
 - Run ID: {\{RUN_ID}}
 - Task: {\{TASK}}
@@ -51,9 +55,9 @@ Dependency Files:
 
 <!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
 
-## Dependency Header Evidence
+## Dependency Manifest Evidence
 
-<!-- Confirm that every created or edited human-authored text file has a top-of-file Dependency Files block, or record the syntax/schema reason and alternate manifest/design artifact for files that cannot carry such a header. Include the command output from tools/agent_tools/check_dependency_headers.py when applicable. -->
+<!-- Confirm that every created or edited human-authored text file has a top-of-file @dependency-start / @dependency-end manifest block, or record the scan-tool classification reason and alternate manifest/design artifact for files that cannot carry such a block. Include output from check_dependency_headers.py, scan_dependency_headers.sh, check_dependency_header_format.sh, and check_dependency_graph.sh when dependency edges changed. During migration, record any pre-existing full-repo graph baseline separately and confirm this change introduced no new old-format header, self reference, reverse-edge gap, kind mismatch, or cycle. -->
 
 ## Spec-To-Product Coverage Evidence
 

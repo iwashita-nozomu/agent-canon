@@ -1,5 +1,13 @@
 # 実装ウォーターフォールワークフロー
 
+<!--
+@dependency-start
+upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
+upstream design ../../documents/dependency-manifest-design.md defines dependency manifest gates
+downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
+@dependency-end
+-->
+
 この文書は、repo に変更を入れる実装プロセスを、段階ゲート付きのウォーターフォールとして進めるための正本です。
 対象は `python/`、`documents/`、`agents/`、`docker/`、`scripts/` など、repo に持ち帰る変更全般です。
 
@@ -339,6 +347,7 @@ exit 条件:
 - `Upstream Requirement Packet:`
 - `Implementation Source Packet:`
 - `Installed Libraries And Existing Implementation Survey:`
+- `Dependency Manifest Plan:`
 - `Canonical Tree-Head Plan:`
 - `Patterns And Writing Style To Mirror:`
 - `File-By-File Design:`
@@ -353,6 +362,9 @@ exit 条件:
 - `Upstream Requirement Packet` には、designer が詳細設計前に読んだ `user_request_contract.md`、`schedule.md`、`intent_brief.md`、waterfall 正本、governing doc の path を列挙します
 - `Installed Libraries And Existing Implementation Survey` には、designer が見た dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙します
 - `Implementation Source Packet` には、worker が編集前に読む `user_request_contract.md`、`schedule.md`、`design_brief.md`、`design_review.md`、`document_flow_review.md`、`test_plan.md`、repo docs、dependency surface、code path、test path、外部 reference を列挙します
+- `Dependency Manifest Plan` には、編集対象 file ごとに追加・維持する `upstream` / `downstream` edge、kind、相対 path、reason、編集前に読む upstream context、編集後に確認する downstream context を列挙します
+- 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
+- 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、mirror directory を作らないことを明示します
 - `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、test plan item、validation evidence を対応付けます
@@ -371,6 +383,7 @@ exit 条件:
 - 実装者が文書だけ読んで着手できる
 - designer が upstream 文書だけ読んで詳細設計に着手できる
 - worker が編集前に読む文書と code path が `Implementation Source Packet` だけで分かる
+- worker が編集前に読む upstream dependency context と、編集後に確認する downstream dependency context を `Dependency Manifest Plan` だけで分かる
 - 各予定差分が `Design-To-Implementation Trace` で clause、source、test、validation へ結び付いている
 - 新規 abstraction より reuse-first の方針が説明できる
 - 新規または rename する identifier と path の naming plan が文書だけで追える
@@ -396,6 +409,8 @@ exit 条件:
   - 文書 completeness、実装可能性、既存コード再利用、既存の書き方踏襲、不要な新規性を確認する
   - `Installed Libraries And Existing Implementation Survey` が dependency surface、既存実装候補、reuse 判断、既存では足りない理由を列挙しているか確認する
   - `Implementation Source Packet` が編集前に読む artifact、repo docs、dependency surface、code path、test plan を列挙しているか確認する
+  - `Dependency Manifest Plan` が各 touched file の `@dependency-start` block、upstream / downstream edge、reverse edge、読む順序、検証 command に落ちているか確認する
+  - 旧 `Dependency Files:` block を新規・変更 file に残す設計を blocker として扱う
   - `Canonical Tree-Head Plan` が current tree head だけを durable state にし、non-canonical design / implementation path を排除しているか確認する
   - 各予定差分が design section、request clause ID、reuse/source 文書または code path、test plan item、validation evidence へ trace できるか確認する
   - worker が会話文脈や記憶を使わないと実装できない箇所を blocker として確認する
@@ -411,6 +426,7 @@ exit 条件:
 - design reviewer が未解消の懸念を残したまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
 - `Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
+- `Dependency Manifest Plan` の不足、reverse edge 欠落、旧形式温存は `revise` blocker とします
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
 - `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
 
@@ -418,6 +434,7 @@ exit 条件:
 - `design_review.md` が `resolved` になっている
 - reuse-first と style-following の懸念が解消している
 - implementation source packet と design-to-implementation trace の懸念が解消している
+- dependency manifest plan と graph validation plan の懸念が解消している
 - canonical tree-head plan の懸念が解消している
 - naming plan の懸念が解消している
 - decision が `approve` になっている
@@ -491,6 +508,7 @@ exit 条件:
 ルール:
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Implementation Source Packet` の全項目、`design_review.md`、`document_flow_review.md`、`test_plan.md` を読み、実装 summary に読んだ design artifact と section を残します
+- 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
 - 実装前に `Installed Libraries And Existing Implementation Survey` を読み、既存ライブラリ拡張か既存実装拡張か新規追加かの判断を実装 summary に残します
 - 会話、記憶、直感を、承認済み設計文書より優先しません
 - design artifact と現在の repo docs / code が矛盾する場合は、実装で解釈せず Gate 5-6 へ戻します
@@ -500,6 +518,7 @@ exit 条件:
 - 途中で scope を広げません
 - 設計を変えたくなったら Gate 5-6 を開き直します
 - design section、request clause ID、test plan item に trace できない変更は実装しません
+- dependency manifest edge、reverse edge、または comment wrapping を設計と違う形で実装しません。必要なら Gate 5-6 へ戻します
 - 非自明な変更では、final polish 前に checkpoint review を必ず 1 回挟みます
 - 既存コード、既存 helper、既存 naming、既存 test style、既存 docs style を優先します
 - 完全な新規実装より、既存実装の拡張、既存 pattern の模倣、既存 file layout の踏襲を優先します
@@ -513,6 +532,8 @@ exit 条件:
 必須レビュー:
 - `change_reviewer`
   - 各 changed slice が design artifact、design section、source packet entry、test plan item、request clause ID を引用しているか確認する
+  - changed human-authored text file が `@dependency-start` / `@dependency-end` 形式を持ち、旧 `Dependency Files:` block を残していないか確認する
+  - 追加・変更された dependency edge に reverse edge、kind match、自己参照なし、cycle risk なしの evidence があるか確認する
   - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
   - non-canonical design doc、implementation copy、snapshot、backup path が tracked tree に残っていないか確認する
   - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
@@ -524,6 +545,7 @@ exit 条件:
 exit 条件:
 - 差分が requirements / plan / design に一致している
 - 各 changed slice が design artifact、design section、test plan item、request clause ID を引用している
+- changed-file dependency manifest checks が pass している
 - canonical path 以外の design / implementation truth surface が残っていない
 - remaining planned work units がない、または次の work unit と gate が明記されている
 - planned checks を実行できる状態になっている
@@ -551,6 +573,7 @@ exit 条件:
 - `final_reviewer`
   - 変更全体、docs 同期、受け入れ条件達成、不要な新規 pattern の混入有無を確認する
   - final diff が approved design section、Implementation Source Packet、request clause ID、test plan item に trace できるか確認する
+  - final diff が Dependency Manifest Plan に trace でき、changed-file manifest scan / format / graph evidence が closeout に残っているか確認する
   - current tree head 以外の design / implementation truth surface が残っていないか確認する
 - 必要に応じて `python-review`
   - Python API、型境界、test coverage の不足を確認する
@@ -570,6 +593,7 @@ exit 条件:
 exit 条件:
 - `required_change` が解消している
 - 実行した checks と未実行理由が説明できる
+- dependency manifest checks と graph validation の実行結果または移行中 baseline 理由が説明できる
 - final acceptance review が `resolved` になっている
 - `final_review.md` に post-fix full review rerun review が記録され、review-driven fix の後に full required review set を rerun したことが追える
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate final"` が pass している
@@ -587,6 +611,7 @@ exit 条件:
 - acceptance criteria の達成
 - repo 正本の同期
 - closeout command の実行
+- dependency manifest checks の実行
 - commit / push の成否確認
 - `verification.txt` の `status=pass`
 - `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
@@ -694,6 +719,10 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - 実行した validation
 - 未実行 validation と理由
+- `python3 tools/agent_tools/check_dependency_headers.py --changed`
+- `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`
+- `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header`
+- dependency edge を追加・変更した場合は `bash tools/agent_tools/check_dependency_graph.sh --print-edges` の結果、または移行中 baseline failure と今回差分で新規 graph error を増やしていない evidence
 - 更新した repo 正本
 - commit hash
 - push の成否
