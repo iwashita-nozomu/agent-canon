@@ -117,18 +117,47 @@ dependency surface は task に応じて次を見ます。
 既存実装があるのに別名の重複 module を新設しません。
 既存ライブラリや既存実装で足りない理由を言えない限り、新規追加を選びません。
 
-### File Dependency Headers
+### File Dependency Manifest
 
-新規作成・編集する human-authored text file では、ファイル冒頭にそのファイルが依存する repo 内ファイルを明記します。
-次期形式の設計正本は `documents/dependency-manifest-design.md` です。
-移行が完了するまでは既存の `Dependency Files:` block を受け入れますが、新しい tool 設計は `@dependency-start` / `@dependency-end` marker と upstream / downstream の別 graph を前提にします。
+新規作成・編集する human-authored text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。
+設計正本は `documents/dependency-manifest-design.md` です。
+旧 `Dependency Files:` block は新規・変更 file では使いません。
 
-- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後に `Dependency Files:` block を置きます
-- 依存が無い場合も `Dependency Files: None` または comment 形式の `Dependency Files: None` を置き、未記載と区別します
+- manifest の内部 DSL は `<direction> <kind> <relative-path> <reason...>` です
+- `direction` は `upstream` または `downstream` です
+- `kind` は `design`、`implementation`、`environment` です
+- path は manifest を持つ file から見た相対 path です
 - 依存として書くのは、その file を理解・実行・検証するために読むべき repo 内の正本 file です。単なる同一 directory の全列挙や推測 dependency を水増ししません
-- JSON など comment を持たず schema 上 top-level field も置けない file では、同じ変更の design / manifest / README に依存 file を明記し、その理由を review artifact に残します
-- subagent への handoff には `dependency_files_header_plan` を含め、編集対象ごとに冒頭へ書く依存 file を先に固定します
-- closeout 前に `python3 tools/agent_tools/check_dependency_headers.py --changed` を実行し、対象ファイルの依存ヘッダーが抜けていないことを確認します
+- upstream は「編集前に読む file」、downstream は「編集後に影響確認する file」として分けます
+- 依存が無い direction は行を置きません。`none` placeholder は置きません
+- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後、C-like file は先頭 comment block に置きます
+- line comment しかない format では `# @dependency-start` のように line comment wrapping を使います
+- commentless format や generated / binary / vendored external file は scan tool の分類に従い、必要なら同じ変更の design / manifest / README に理由を残します
+
+編集 workflow:
+
+1. 変更対象 file の manifest を先に読み、upstream edge の target を編集前 context として読む
+1. manifest が無い checkable file を編集する場合は、同じ差分の最初に `@dependency-start` block を追加する
+1. downstream edge を持つ file を編集した場合は、差分後に downstream target を確認する
+1. 新しい dependency edge を足す場合は、同じ変更で reverse edge も足すか、migration 中で足せない理由を review artifact に記録する
+1. subagent handoff には `dependency_manifest_plan` を含め、編集対象ごとの upstream / downstream edge と読む順序を固定する
+
+closeout 前に、少なくとも次を実行します。
+
+```bash
+python3 tools/agent_tools/check_dependency_headers.py --changed
+bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+```
+
+dependency edge を追加・変更した場合は次も実行します。
+
+```bash
+bash tools/agent_tools/check_dependency_graph.sh --print-edges
+```
+
+`check_dependency_graph.sh` は upstream graph と downstream graph を別々に扱い、自己参照、reverse edge、kind mismatch、cycle を検証します。
+移行期間中に repo 全体の既存 graph failure が残る場合でも、新規・変更 file が旧形式や新規 reverse-edge 欠落を増やした状態で closeout しません。
 
 ## Task Classification
 
