@@ -1,5 +1,12 @@
 # Shared Skill Canon
 
+<!--
+@dependency-start
+upstream design ./catalog.yaml enumerates public skill families
+upstream design ../canonical/CODEX_WORKFLOW.md defines skill selection workflow
+@dependency-end
+-->
+
 このディレクトリは、Codex を主 runtime としつつ、Claude や Copilot でも共有する skill 文書の人間向け正本です。
 機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にし、`.claude/skills/` などの互換 path へ mirror します。
 
@@ -36,6 +43,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
+| `dependency-analysis` | 依存 manifest の header / scan / format / graph tool 起動 | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
 | `worktree-start` | worktree 開始時の scope、action log、kickoff を整える | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
@@ -70,6 +78,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
+- dependency manifest、reverse edge、cycle、full-repo manifest inventory を確認するときは `dependency-analysis` を使います。
 - 大規模 refactor では `behavior-preserving-refactor` を追加し、semantic delta を別管理にします。
 - C / C++ 差分では `cpp-review` を既定候補にします。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
