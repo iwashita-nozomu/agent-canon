@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for the skill shim mirror helper."""
 
 # Dependency Files:

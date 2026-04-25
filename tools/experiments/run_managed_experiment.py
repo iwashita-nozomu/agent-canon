@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Run one experiment while recording canonical server-side run metadata."""
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
 # Experiment Result JSON Archive
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このディレクトリには、`main` に持ち帰る最小限の final JSON を置きます。
 

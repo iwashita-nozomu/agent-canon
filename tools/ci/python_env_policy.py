@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Report the repo-local Python environment policy and optionally create `.venv`."""
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
 # Agent Instructions
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 Dependency Files:
 - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md

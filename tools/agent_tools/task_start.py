@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Start one agent-task run with machine-generated workflow and review hints."""
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
 # academic-writing
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

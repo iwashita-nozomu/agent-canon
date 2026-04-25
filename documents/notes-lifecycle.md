@@ -1,4 +1,9 @@
 # Notes Lifecycle
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、`notes/` を使うほど充実する形に保つための正本です。
 action log、実験メモ、知識メモ、theme note、failure note を別々に持ちつつ、closeout ごとに昇格先を決めます。

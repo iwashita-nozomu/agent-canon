@@ -1,4 +1,9 @@
 # Experiment Notes
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このディレクトリには、`main` から辿れる形で残しておきたい実験メモを置きます。
 1 回の run に対応する一次 report は `experiments/report/` に置き、このディレクトリは複数 run をまたぐ要約、比較、知見整理に使います。

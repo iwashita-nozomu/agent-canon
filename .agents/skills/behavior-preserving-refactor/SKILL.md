@@ -2,6 +2,11 @@
 name: behavior-preserving-refactor
 description: Use when a large refactor should be treated as behavior-preserving structural change with explicit path mapping, semantic-delta controls, and strong review gates.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Behavior Preserving Refactor
 

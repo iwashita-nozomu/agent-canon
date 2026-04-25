@@ -1,4 +1,9 @@
 # 実験レポートの書き方
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、`experiments/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。
 対象は、`experiments/` 配下の比較実験、benchmark、アルゴリズム改造後の検証レポートです。

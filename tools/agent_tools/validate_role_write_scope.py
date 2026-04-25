@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Validate changed files against one agent role's write scope."""
 
 from __future__ import annotations

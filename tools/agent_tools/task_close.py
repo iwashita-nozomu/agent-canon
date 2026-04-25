@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 # Dependency Files:
 # - vendor/agent-canon/tools/agent_tools/agent_team.py
 # - vendor/agent-canon/tools/agent_tools/report_artifact_checks.py

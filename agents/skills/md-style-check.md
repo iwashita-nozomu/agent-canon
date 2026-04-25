@@ -1,4 +1,9 @@
 # md-style-check
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

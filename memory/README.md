@@ -1,4 +1,9 @@
 # Memory
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 `memory/` は、shared canon が責務を持つ durable memory の置き場です。
 自己学習、対話から抽出した preference、agent-side philosophy のように、次回 task でも毎回読むべき runtime memory をここへ置きます。

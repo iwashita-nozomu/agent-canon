@@ -1,4 +1,9 @@
 # Guardrail Notes
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このディレクトリは、repo-wide に何度も読み返す禁止事項と anti-pattern の補助 note を置く場所です。
 

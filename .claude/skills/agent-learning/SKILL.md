@@ -2,6 +2,11 @@
 name: agent-learning
 description: Use when agent-side working philosophy, interaction lessons, or task retrospectives should be logged without mixing them into user preferences.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Agent Learning
 

@@ -1,4 +1,9 @@
 # Benchmark Levels Analysis
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 benchmark は、重さの異なる層を明示しておくと運用しやすくなります。
 

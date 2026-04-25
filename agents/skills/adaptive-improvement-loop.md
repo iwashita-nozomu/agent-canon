@@ -1,4 +1,9 @@
 # adaptive-improvement-loop
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

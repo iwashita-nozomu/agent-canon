@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Audit markdown links and optionally auto-fix resolvable local targets."""
 
 from __future__ import annotations

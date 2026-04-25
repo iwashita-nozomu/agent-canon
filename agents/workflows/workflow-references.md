@@ -1,4 +1,9 @@
 # Workflow References
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、workflow、review、agent system、report policy を設計するときに参照した外部資料の索引です。
 外部根拠で repo-wide な手順を更新した場合は、この文書へ出典を追記します。

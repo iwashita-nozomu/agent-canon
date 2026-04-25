@@ -1,4 +1,9 @@
 # 実験の批判的レビュー手順
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、実験コード、結果レポート、図表、結論の妥当性を批判的にレビューするための正本です。
 個別の実験 topic に依存しない review 観点をまとめ、`experiment_reviewer`、`report_reviewer`、`change_reviewer` が共通に参照できる形にします。

@@ -2,6 +2,11 @@
 name: subagent-bootstrap
 description: Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Subagent Bootstrap
 

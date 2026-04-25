@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for branch integration structure checks."""
 
 from __future__ import annotations

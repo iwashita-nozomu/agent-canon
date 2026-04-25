@@ -2,6 +2,11 @@
 name: python-review
 description: Use when Python code changes need strict review for pyright, pytest, ruff, type boundaries, and API behavior.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Python Review
 

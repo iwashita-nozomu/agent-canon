@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Sync branch/worktree metadata into the experiment registry."""
 
 from __future__ import annotations

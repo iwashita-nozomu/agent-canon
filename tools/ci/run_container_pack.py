@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Build and smoke-test a container runtime pack."""
 
 from __future__ import annotations

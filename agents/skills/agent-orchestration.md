@@ -1,4 +1,9 @@
 # agent-orchestration
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

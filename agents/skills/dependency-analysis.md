@@ -35,6 +35,12 @@ Graph check when edges changed:
 bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
 ```
 
+Strict reverse-edge check when that is the migration target:
+
+```bash
+bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges --check-bidirectional
+```
+
 Full migration inventory:
 
 ```bash
@@ -45,7 +51,8 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ## Interpretation
 
 - changed-file header / scan / format failure は fix-now blocker です。
-- full-repo graph failure は、移行期間中は baseline として扱えます。ただし pass とは呼びません。
+- default graph failure は自己参照または cycle を示すため fix-now blocker です。
+- `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
 
 ## Core References

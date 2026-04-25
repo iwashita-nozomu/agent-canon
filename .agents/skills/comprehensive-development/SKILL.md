@@ -2,6 +2,11 @@
 name: comprehensive-development
 description: Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Comprehensive Development
 

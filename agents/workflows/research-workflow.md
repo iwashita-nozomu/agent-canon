@@ -1,4 +1,9 @@
 # 研究・実験改造ワークフロー
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、数式を伴うアルゴリズム研究、比較実験、段階的なコード改造を 1 つの workflow にまとめた正本です。
 対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`notes/` への知見整理を含みます。

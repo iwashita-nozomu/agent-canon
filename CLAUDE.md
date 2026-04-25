@@ -1,3 +1,8 @@
+<!--
+@dependency-start
+@dependency-end
+-->
+
 @AGENTS.md
 
 # Claude Code

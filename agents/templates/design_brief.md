@@ -1,4 +1,9 @@
 # Detailed Design Brief
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 - Run ID: {\{RUN_ID}}
 - Task: {\{TASK}}

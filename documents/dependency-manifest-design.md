@@ -200,12 +200,14 @@ Responsibilities:
 - extract normalized edges from all manifest blocks
 - build separate upstream and downstream edge sets
 - validate self reference
-- validate bidirectional consistency
-- validate kind match on reverse edges
 - detect cycles separately in upstream and downstream graphs
 - print upstream closure for changed files
 - print downstream closure for changed files
 - emit machine-readable TSV for future visualization
+- with `--check-bidirectional`, validate bidirectional consistency and kind match on reverse edges
+
+Default graph validation is the fail gate for self reference and cycles.
+Bidirectional consistency is a stricter migration gate because a partially migrated repository can have useful upstream/downstream context before every reverse edge is written.
 
 The graph checker can be implemented with Bash, `awk`, `sort`, `comm`, and a small DFS in `awk`.
 If later graph requirements outgrow shell tooling, a Python implementation can replace only this layer while preserving the DSL and CLI contract.
@@ -222,6 +224,8 @@ Phase 2: implement Bash tools first:
 
 `scan_dependency_headers.sh` starts as full-repo report-only so it can list missing manifests without blocking unrelated work.
 `check_dependency_headers.py --changed` and `check_dependency_header_format.sh --changed` reject changed files that do not have valid `@dependency-start` blocks.
+`check_dependency_graph.sh` default mode rejects self references and cycles.
+`check_dependency_graph.sh --check-bidirectional` is used as a stricter migration report until reverse edges are complete.
 
 Phase 3: migrate files one by one from checker findings.
 Each touched file must be converted from `Dependency Files:` to `@dependency-start` in the same change that touches it.

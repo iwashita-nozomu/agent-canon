@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """
 Doc-Test-Implementation 三点セット検証スクリプト。
 

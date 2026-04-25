@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Integration test for the agent runtime alignment checker."""
 
 from __future__ import annotations

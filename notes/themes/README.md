@@ -1,4 +1,9 @@
 # Theme Notes
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 `notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。
 

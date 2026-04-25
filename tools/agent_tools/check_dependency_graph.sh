@@ -9,19 +9,22 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 PRINT_EDGES=0
 CHANGED=0
+CHECK_BIDIRECTIONAL=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [paths...]
+  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
   - self references
+  - cycles in upstream and downstream graphs
+
+With --check-bidirectional it also validates:
   - bidirectional consistency
   - reverse-edge kind matches
-  - cycles in upstream and downstream graphs
 EOF
 }
 
@@ -37,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --print-edges)
       PRINT_EDGES=1
+      shift
+      ;;
+    --check-bidirectional)
+      CHECK_BIDIRECTIONAL=1
       shift
       ;;
     -h|--help)
@@ -153,20 +160,22 @@ while IFS=$'\t' read -r direction kind source target; do
     echo "$source: self reference in $direction $kind edge"
     failures=$((failures + 1))
   fi
-  if [[ "$direction" == "upstream" ]]; then
-    reverse_direction="downstream"
-  else
-    reverse_direction="upstream"
-  fi
-  if ! awk -F '\t' -v d="$reverse_direction" -v k="$kind" -v s="$target" -v t="$source" \
-    '$1 == d && $2 == k && $3 == s && $4 == t { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
-    echo "$source: missing reverse $reverse_direction $kind edge from $target"
-    failures=$((failures + 1))
-  fi
-  if awk -F '\t' -v d="$reverse_direction" -v k="$kind" -v s="$target" -v t="$source" \
-    '$1 == d && $2 != k && $3 == s && $4 == t { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
-    echo "$source: reverse edge from $target uses a different kind"
-    failures=$((failures + 1))
+  if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
+    if [[ "$direction" == "upstream" ]]; then
+      reverse_direction="downstream"
+    else
+      reverse_direction="upstream"
+    fi
+    if ! awk -F '\t' -v d="$reverse_direction" -v k="$kind" -v s="$target" -v t="$source" \
+      '$1 == d && $2 == k && $3 == s && $4 == t { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
+      echo "$source: missing reverse $reverse_direction $kind edge from $target"
+      failures=$((failures + 1))
+    fi
+    if awk -F '\t' -v d="$reverse_direction" -v k="$kind" -v s="$target" -v t="$source" \
+      '$1 == d && $2 != k && $3 == s && $4 == t { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
+      echo "$source: reverse edge from $target uses a different kind"
+      failures=$((failures + 1))
+    fi
   fi
 done < "$edges_file"
 

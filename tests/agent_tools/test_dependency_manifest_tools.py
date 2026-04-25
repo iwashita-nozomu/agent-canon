@@ -138,7 +138,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_GRAPH=pass", result.stdout)
 
     def test_graph_rejects_missing_reverse_edge(self) -> None:
-        """A downstream edge requires the matching upstream reverse edge."""
+        """Strict bidirectional mode requires the matching reverse edge."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             a = root / "a.py"
@@ -156,7 +156,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             b.write_text("# no manifest\n", encoding="utf-8")
 
-            result = run_tool(str(GRAPH), "--root", str(root), str(a), str(b), root=root)
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--check-bidirectional",
+                str(a),
+                str(b),
+                root=root,
+            )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing reverse upstream implementation edge", result.stdout)

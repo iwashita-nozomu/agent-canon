@@ -1,4 +1,9 @@
 # agent-canon PR ワークフロー
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 Dependency Files:
 - vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md

@@ -1,4 +1,9 @@
 # From Another Agent
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この note は、前の agent session から次の agent へ持ち越す TODO と、
 optional follow-up 候補を短く残すための cross-run 申し送りです。

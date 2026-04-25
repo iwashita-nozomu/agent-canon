@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """
 Markdown Lint チェッカー（.markdownlint.json 規格準拠）
 

@@ -1,4 +1,9 @@
 # static-validation
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

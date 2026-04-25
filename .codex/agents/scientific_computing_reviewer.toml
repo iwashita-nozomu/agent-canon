@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "scientific_computing_reviewer"
 description = "Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code."
 nickname_candidates = ["sci-comp", "prototype-check", "research-eng"]

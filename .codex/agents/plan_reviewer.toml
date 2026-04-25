@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "plan_reviewer"
 description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."
 nickname_candidates = ["plan-review", "schedule-gate", "sequence-review"]

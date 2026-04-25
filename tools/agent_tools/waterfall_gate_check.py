@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Check intermediate waterfall gate readiness for one agent run bundle."""
 
 from __future__ import annotations

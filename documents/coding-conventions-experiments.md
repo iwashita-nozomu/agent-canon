@@ -1,4 +1,9 @@
 # 実験運用規約
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、`experiments/` 配下の実験コード、benchmark、実験結果、実行環境の運用を扱います。
 研究の問い、数式、比較対象、逐次改造の記録方法は `agents/workflows/research-workflow.md` を正本とします。

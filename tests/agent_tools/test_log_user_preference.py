@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for the user preference logging tool."""
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
 # Workflow Guide
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 Dependency Files:
 - vendor/agent-canon/agents/TASK_WORKFLOWS.md

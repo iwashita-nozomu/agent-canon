@@ -1,4 +1,9 @@
 # agent-canon
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このディレクトリは `agent-canon` 自体の committed snapshot です。
 template や派生 repo に配布する shared agent canon の正本をここに置きます。

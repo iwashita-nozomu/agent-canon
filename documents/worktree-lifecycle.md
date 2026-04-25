@@ -1,4 +1,9 @@
 # branch・worktree の例外運用
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、`main` 以外で短期的に作業を切り分ける必要がある場合だけ参照します。
 既定運用は `main` です。恒常的な branch 分割や worktree 常用は前提にしません。

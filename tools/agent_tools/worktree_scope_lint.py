@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Lint WORKTREE_SCOPE.md for concrete, reusable kickoff quality."""
 
 from __future__ import annotations

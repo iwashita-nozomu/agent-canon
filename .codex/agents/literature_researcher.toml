@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "literature_researcher"
 description = "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting."
 nickname_candidates = ["literature", "prior-art", "paper-survey"]

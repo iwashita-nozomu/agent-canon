@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "docs_workflow_steward"
 description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."
 nickname_candidates = ["canon", "docs", "workflow-docs"]

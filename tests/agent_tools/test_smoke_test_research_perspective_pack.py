@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Smoke-test coverage for the research perspective pack helper."""
 
 from __future__ import annotations

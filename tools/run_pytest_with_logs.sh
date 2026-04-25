@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# @dependency-start
+# @dependency-end
+
 set -euo pipefail
 
 # このスクリプトは pytest のログを実行ごとのディレクトリに保存します。

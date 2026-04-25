@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for machine-driven document start bootstrap."""
 
 from __future__ import annotations

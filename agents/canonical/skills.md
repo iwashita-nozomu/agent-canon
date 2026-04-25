@@ -1,4 +1,9 @@
 # Canonical Skill Registry
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Public Skills
 

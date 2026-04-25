@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# @dependency-start
+# @dependency-end
+
 set -euo pipefail
 
 issues=0

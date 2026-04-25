@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Validate bootstrap-facing docs stay portable after template initialization."""
 
 from __future__ import annotations

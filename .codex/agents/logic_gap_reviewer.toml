@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "logic_gap_reviewer"
 description = "Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps."
 nickname_candidates = ["logic-gap", "argument-check", "claim-audit"]

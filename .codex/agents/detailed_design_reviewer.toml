@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "detailed_design_reviewer"
 description = "Read-only reviewer for detailed design docs, implementation readiness, reuse-first discipline, and style continuity."
 nickname_candidates = ["design-gate", "design-review", "reuse-review"]

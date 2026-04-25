@@ -1,4 +1,9 @@
 # エージェント利用ガイド
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## どこから読むか
 

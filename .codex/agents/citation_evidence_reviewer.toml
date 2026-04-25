@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "citation_evidence_reviewer"
 description = "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability."
 nickname_candidates = ["citation-trace", "evidence-gate", "source-check"]

@@ -1,4 +1,9 @@
 # GitHub Agent Entry Point
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 GitHub 側の薄い入口です。
 

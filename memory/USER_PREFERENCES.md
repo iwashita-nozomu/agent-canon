@@ -1,4 +1,9 @@
 # User Preferences
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 Dependency Files:
 - vendor/agent-canon/ROOT_AGENTS.md

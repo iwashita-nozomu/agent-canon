@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "document_flow_reviewer"
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."
 nickname_candidates = ["doc-flow", "readthrough-gate", "top-down-review"]

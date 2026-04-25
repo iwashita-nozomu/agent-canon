@@ -1,4 +1,9 @@
 # Knowledge Notes
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 `notes/knowledge/` は、実務で何度も見返す横断知識の置き場です。
 個別プロジェクトの結果ではなく、再利用しやすい短いメモだけを置きます。

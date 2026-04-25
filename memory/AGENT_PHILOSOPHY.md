@@ -1,4 +1,9 @@
 # Agent Philosophy
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この file は、agent の作業哲学、対話から得た学習、repo-wide な判断原則を逐次追記する append-first note です。
 `AGENTS.md` や workflow 正本へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。

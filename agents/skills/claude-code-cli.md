@@ -1,4 +1,9 @@
 # claude-code-cli
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

@@ -1,4 +1,9 @@
 # 長文作成 workflow
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、README、workflow 文書、移行文書、設計補助文書、reader-facing guide のような長めの文章を作るときの正本です。
 単なる Markdown 編集ではなく、読者、構成、段落順、review を先に固定する workflow として扱います。

@@ -1,4 +1,9 @@
 # Git Mirror Procedure
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この note は、`origin` 以外の mirror remote を使う host 固有運用を記録するためのテンプレです。
 SSH key、remote URL、hook path は環境依存なので、repo の正本ではなく `notes/` に置きます。

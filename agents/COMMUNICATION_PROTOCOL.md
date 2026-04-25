@@ -1,4 +1,9 @@
 # Agent Communication Protocol
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、agent-to-agent handoff と review の正本です。
 

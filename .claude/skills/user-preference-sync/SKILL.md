@@ -2,6 +2,11 @@
 name: user-preference-sync
 description: Use when notes/themes/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # User Preference Sync
 

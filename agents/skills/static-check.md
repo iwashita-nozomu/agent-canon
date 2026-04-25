@@ -1,4 +1,9 @@
 # static-check
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 
