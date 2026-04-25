@@ -1,9 +1,11 @@
 # Codex Project Setup
 
-Dependency Files:
-- vendor/agent-canon/.codex/config.toml
-- vendor/agent-canon/agents/task_catalog.yaml
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+<!-- @dependency-start
+upstream implementation ./config.toml project-scoped Codex settings
+upstream design ../agents/task_catalog.yaml workflow family runtime budgets
+upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
+downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
+@dependency-end -->
 
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。
 
@@ -34,6 +36,13 @@ Dependency Files:
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
 - 同時 write-capable subagent は常に 1 体までです
+
+## MCP Inventory
+
+- `repo_mcp_server` は [config.toml](config.toml) の `[mcp_servers.repo_mcp_server]` を正本にします。
+- MCP 前提の task では、local process を手で起動する前に `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
+- `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
+- host 側に `repo_mcp_server` command が無い場合は、inventory entry は見えても runtime startup は失敗し得ます。その場合は host setup issue として記録します。
 
 ## Model Policy
 
