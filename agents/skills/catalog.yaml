@@ -1,4 +1,7 @@
 version: 1
+# @dependency-start
+# upstream design ../canonical/CODEX_WORKFLOW.md defines skill selection workflow
+# @dependency-end
 
 skill_families:
   - id: agent-orchestration
@@ -57,6 +60,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+  - id: dependency-analysis
+    purpose: Run dependency manifest header, scan, format, and graph tools for changed-file gates or migration inventory.
+    canonical_doc: agents/skills/dependency-analysis.md
+    shim: .agents/skills/dependency-analysis/SKILL.md
   - id: worktree-start
     purpose: Initialize or refresh worktree scope, action-log targets, and kickoff checks before editing.
     canonical_doc: agents/skills/worktree-start.md
