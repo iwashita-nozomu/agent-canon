@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "test_designer"
 description = "Read-only agent for static analysis and adversarial test-case design before implementation."
 nickname_candidates = ["test-plan", "nasty-tests", "edge-cases"]

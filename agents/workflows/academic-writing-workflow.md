@@ -1,4 +1,9 @@
 # 学術文章 workflow
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、論文、thesis chapter、scholarly note、method note、claim-heavy な technical memo のような学術文章を作るときの正本です。
 一般の長文作成とは分けて扱い、論理、記号定義、根拠の接続を段階ごとに複数 reviewer で精査します。

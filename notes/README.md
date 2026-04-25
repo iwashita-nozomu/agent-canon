@@ -1,4 +1,9 @@
 # Notes Hub
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 `notes/` は、正本ではないが長く残したい知見、比較、要約、補助メモを置く場所です。
 規約や設計の一次情報は `documents/` に残し、ここではそれに昇格させる前の知見や、run をまたいで残したい判断を扱います。

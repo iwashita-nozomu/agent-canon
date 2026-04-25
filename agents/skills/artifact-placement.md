@@ -1,4 +1,9 @@
 # artifact-placement
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

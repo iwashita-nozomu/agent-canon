@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Build one repo-defined container pack and run a command inside it."""
 
 from __future__ import annotations

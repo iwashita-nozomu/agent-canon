@@ -1,4 +1,9 @@
 # 論文執筆 workflow
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、投稿論文、thesis chapter、scholarly paper section のような paper-like 文書を書くときの正本です。
 学術文章一般より paper structure の拘束を強くし、section ごとの役割、citation/evidence trace、figure/table/appendix の参照順を複数 reviewer で精査します。

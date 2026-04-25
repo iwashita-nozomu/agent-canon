@@ -1,4 +1,9 @@
 # subagent-bootstrap
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

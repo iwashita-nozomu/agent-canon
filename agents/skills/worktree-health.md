@@ -1,4 +1,9 @@
 # worktree-health
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

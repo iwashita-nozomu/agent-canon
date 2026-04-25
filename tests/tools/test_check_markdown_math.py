@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for the markdown math notation checker."""
 
 from __future__ import annotations

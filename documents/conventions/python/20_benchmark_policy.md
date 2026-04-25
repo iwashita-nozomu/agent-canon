@@ -1,4 +1,9 @@
 # ベンチマーク方針
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この章は、このリポジトリで行う短時間の性能計測を対象にします。
 研究目的、定式化、比較対象、記録方法の正本は `agents/workflows/research-workflow.md` を参照します。

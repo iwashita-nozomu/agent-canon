@@ -2,6 +2,11 @@
 name: academic-writing
 description: Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Academic Writing
 

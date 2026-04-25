@@ -1,4 +1,9 @@
 # long-form-writing
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

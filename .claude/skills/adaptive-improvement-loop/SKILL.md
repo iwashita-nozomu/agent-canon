@@ -2,6 +2,11 @@
 name: adaptive-improvement-loop
 description: Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Adaptive Improvement Loop
 

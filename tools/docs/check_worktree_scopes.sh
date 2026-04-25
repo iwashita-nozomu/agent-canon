@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# @dependency-start
+# @dependency-end
+
 set -euo pipefail
 # Check each git worktree for WORKTREE_SCOPE.md and report
 OUT=reports/worktree_scope_report.txt

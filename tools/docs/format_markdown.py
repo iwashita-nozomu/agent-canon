@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """
 Simple Markdown formatter:
 - normalize line endings to LF

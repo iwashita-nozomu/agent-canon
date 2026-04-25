@@ -1,4 +1,7 @@
 #!/bin/bash
+# @dependency-start
+# @dependency-end
+
 
 # pre_review.sh — PR 前の自動 QA チェック
 #

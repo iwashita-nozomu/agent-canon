@@ -2,6 +2,11 @@
 name: start-repository
 description: Use when starting a new repository from this template after clone, including project slug/display-name setup, new bare remote registration, and project-local agent-canon bare repo seeding.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Start Repository
 

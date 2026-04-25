@@ -1,4 +1,9 @@
 # start-repository
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

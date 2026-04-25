@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """
 find_similar_documents.py
 

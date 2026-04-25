@@ -1,4 +1,9 @@
 # from_another_agent
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

@@ -2,6 +2,11 @@
 name: change-review
 description: Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Change Review
 

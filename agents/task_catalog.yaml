@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 # Dependency Files:
 # - vendor/agent-canon/.codex/config.toml
 # - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md

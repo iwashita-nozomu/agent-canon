@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "manager_reviewer"
 description = "Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline."
 nickname_candidates = ["requirements-review", "intake-review", "scope-gate"]

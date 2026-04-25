@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Validate the canonical experiment registry."""
 
 from __future__ import annotations

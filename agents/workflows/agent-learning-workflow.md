@@ -1,4 +1,9 @@
 # Agent Learning Workflow
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、agent の作業哲学と対話から得た学習を、会話文脈ではなく shared canon の `memory/` と tool へ固定する手順です。
 

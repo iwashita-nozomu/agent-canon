@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Preflight helpers for agent-canon freshness at task entrypoints."""
 
 from __future__ import annotations

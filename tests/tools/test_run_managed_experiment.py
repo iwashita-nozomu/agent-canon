@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for the managed experiment run helper."""
 
 from __future__ import annotations

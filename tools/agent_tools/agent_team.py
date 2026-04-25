@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 # Dependency Files:
 # - vendor/agent-canon/agents/agents_config.json
 # - vendor/agent-canon/agents/task_catalog.yaml

@@ -33,6 +33,12 @@ bash tools/agent_tools/check_dependency_header_format.sh --changed --require-hea
 bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
 ```
 
+1. When reverse-edge migration is the task, add strict bidirectional validation:
+
+```bash
+bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges --check-bidirectional
+```
+
 1. For full-repo migration inventory, run report-only scan first:
 
 ```bash
@@ -46,5 +52,6 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ```
 
 1. Treat changed-file header / scan / format failures as fix-now blockers.
-1. During migration, full graph failures may be a baseline, but do not call them pass. Record the baseline and confirm the current diff introduced no new old-format header, self reference, missing reverse edge, kind mismatch, or cycle.
+1. Treat default graph failures as fix-now blockers because they indicate self references or cycles.
+1. During reverse-edge migration, `--check-bidirectional` failures may be a baseline, but do not call them pass. Record the baseline and confirm the current diff introduced no new old-format header, self reference, missing reverse edge, kind mismatch, or cycle.
 1. Put command outputs and any baseline decision in `verification.txt` and `closeout_gate.md`.

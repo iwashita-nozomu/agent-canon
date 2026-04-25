@@ -1,4 +1,9 @@
 # 反復改善ワークフロー
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、実験、外部調査、性能計測、チューニング、比較検証を回しながらコードを改善するための正本です。
 通常の feature 開発や repo-wide な恒久改修は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) を使います。

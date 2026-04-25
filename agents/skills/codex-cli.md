@@ -1,4 +1,9 @@
 # codex-cli
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

@@ -1,4 +1,9 @@
 # GitHub Copilot Repository Instructions
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Read First
 

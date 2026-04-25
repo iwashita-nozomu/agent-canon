@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "reviewer"
 description = "Read-only review agent for diffs, regressions, and documentation alignment."
 nickname_candidates = ["review", "findings", "gate"]

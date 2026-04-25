@@ -1,4 +1,9 @@
 # Path Resolution
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Markdown の画像パス
 

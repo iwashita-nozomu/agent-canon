@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Bootstrap a persistent agent-team run directory."""
 
 from __future__ import annotations

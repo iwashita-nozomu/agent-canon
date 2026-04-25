@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Run one repo program inside the repo-defined container runtime."""
 
 from __future__ import annotations

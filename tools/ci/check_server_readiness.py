@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Inspect host-side readiness for using this machine as the main server."""
 
 from __future__ import annotations

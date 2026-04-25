@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Smoke-check the local jax.export + IREE stack and jaxlib C++ headers."""
 
 from __future__ import annotations

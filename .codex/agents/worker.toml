@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "worker"
 description = "Implementation agent for bounded code, docs, or test changes."
 nickname_candidates = ["impl", "change", "fix"]

@@ -6,6 +6,11 @@ skills:
   - repo-onboarding
   - agent-orchestration
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 You are a repository exploration specialist.
 

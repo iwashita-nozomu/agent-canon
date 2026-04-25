@@ -1,4 +1,9 @@
 # WORKTREE_SCOPE Template
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このファイルは、他環境へ渡す worktree や、変更範囲を限定して使う worktree のためのテンプレートです。
 実際に使うときは、このファイルを worktree root に `WORKTREE_SCOPE.md` として置きます。

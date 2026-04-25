@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Check Markdown math notation policy."""
 
 from __future__ import annotations

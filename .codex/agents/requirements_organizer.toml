@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "requirements_organizer"
 description = "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets."
 nickname_candidates = ["requirements", "intake", "scope"]

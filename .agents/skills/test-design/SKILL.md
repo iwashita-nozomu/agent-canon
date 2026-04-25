@@ -2,6 +2,11 @@
 name: test-design
 description: Use when code changes need adversarial static test design before implementation.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Test Design
 

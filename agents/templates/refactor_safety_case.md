@@ -1,4 +1,9 @@
 # Refactor Safety Case
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Summary
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 # Dependency Files:
 # - vendor/agent-canon/agents/skills/catalog.yaml
 # - vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md

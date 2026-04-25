@@ -1,4 +1,9 @@
 # Skill 実装ガイド
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、repo で使う project skill の実装指針です。
 現在の正本は `agents/` と discovery path の skill directory です。

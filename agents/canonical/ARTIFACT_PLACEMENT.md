@@ -1,4 +1,9 @@
 # Artifact Placement
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、task 実行中に増える文書や補助出力の置き場の正本です。
 run ごとの一時 artifact と、repo に長く残す文書を分けて扱います。

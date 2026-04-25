@@ -2,6 +2,11 @@
 name: environment-maintenance
 description: Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Environment Maintenance
 

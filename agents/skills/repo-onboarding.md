@@ -1,4 +1,9 @@
 # repo-onboarding
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

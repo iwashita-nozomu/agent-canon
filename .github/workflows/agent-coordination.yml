@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 # Synced to /.github/workflows/agent-coordination.yml by tools/sync_agent_canon.sh link-root.
 # Edit vendor/agent-canon/.github/workflows/agent-coordination.yml, not the root copy.
 name: Agent Coordination

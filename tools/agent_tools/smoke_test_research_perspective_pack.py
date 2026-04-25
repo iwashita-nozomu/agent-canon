@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Smoke test the research perspective review pack runtime surfaces."""
 
 from __future__ import annotations

@@ -1,4 +1,9 @@
 # user-preference-sync
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

@@ -1,4 +1,9 @@
 # <Knowledge Topic>
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Scope
 

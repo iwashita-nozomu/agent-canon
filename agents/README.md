@@ -1,4 +1,9 @@
 # Agent Hub
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 このディレクトリは、repo におけるエージェント運用の人間向け正本ハブです。
 個別エージェント向けの runtime entrypoint は薄く保ち、詳細はここへ集約します。

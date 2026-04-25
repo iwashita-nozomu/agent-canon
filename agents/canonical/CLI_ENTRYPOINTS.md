@@ -1,4 +1,9 @@
 # CLI Entrypoints
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、agent ごとの入口差分をまとめた正本です。
 共有ルールは `agents/` に寄せ、各 CLI では薄い入口だけを使います。

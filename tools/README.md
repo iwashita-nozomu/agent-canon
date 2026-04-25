@@ -1,4 +1,9 @@
 # tools
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 `tools/` は shared automation の正本です。
 agent helper、CI/check、container runner、experiment helper、Markdown 整備、validation はここに置きます。

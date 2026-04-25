@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Bootstrap or resume a worktree and summarize the next action surface."""
 
 from __future__ import annotations

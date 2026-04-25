@@ -1,4 +1,9 @@
 # behavior-preserving-refactor
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

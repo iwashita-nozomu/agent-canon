@@ -1,4 +1,9 @@
 # Agent Task Workflows
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 Dependency Files:
 - vendor/agent-canon/.codex/config.toml

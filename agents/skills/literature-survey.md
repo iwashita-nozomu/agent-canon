@@ -1,4 +1,9 @@
 # literature-survey
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

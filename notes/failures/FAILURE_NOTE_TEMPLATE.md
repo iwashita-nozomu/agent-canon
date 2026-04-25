@@ -1,4 +1,9 @@
 # <Failure Topic>
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Scope
 

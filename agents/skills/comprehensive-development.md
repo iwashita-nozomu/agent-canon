@@ -1,4 +1,9 @@
 # comprehensive-development
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

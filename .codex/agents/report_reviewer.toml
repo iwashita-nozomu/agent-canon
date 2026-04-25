@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "report_reviewer"
 description = "Read-only reviewer for experiment reports and evidence traceability."
 nickname_candidates = ["report-review", "reader-check", "report-gate"]

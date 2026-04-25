@@ -1,4 +1,9 @@
 # pre_review.sh スクリプト — 使用ガイド
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 **ファイル**: `/workspace/tools/ci/pre_review.sh`
 **作成日**: 2026-03-21

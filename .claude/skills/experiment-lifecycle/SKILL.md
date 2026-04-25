@@ -2,6 +2,11 @@
 name: experiment-lifecycle
 description: Use this skill when preparing, running, or validating experiments.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Experiment Lifecycle
 

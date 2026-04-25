@@ -1,4 +1,9 @@
 # paper-writing
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

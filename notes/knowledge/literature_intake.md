@@ -1,4 +1,9 @@
 # Literature Intake
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## 目的
 

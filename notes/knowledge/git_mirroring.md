@@ -1,4 +1,9 @@
 # Git Mirroring
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この note は、template repo で Git mirror を組むときの確認観点をまとめたものです。
 特定 repo の URL や bare path を正本にせず、再利用できる運用パターンだけを残します。

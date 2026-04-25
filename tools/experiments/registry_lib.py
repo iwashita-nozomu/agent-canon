@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Shared helpers for experiment registry tooling."""
 
 from __future__ import annotations

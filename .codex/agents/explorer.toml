@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "explorer"
 description = "Read-only agent for tracing code paths, docs, and workflow state."
 nickname_candidates = ["trace", "map", "survey"]

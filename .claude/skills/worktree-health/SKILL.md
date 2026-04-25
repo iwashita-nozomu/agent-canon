@@ -2,6 +2,11 @@
 name: worktree-health
 description: Use this skill to review current worktree scope, drift, and cleanup readiness.
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 # Worktree Health
 

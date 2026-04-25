@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Start one document-writing run with machine-generated writing workflow and review hints."""
 
 from __future__ import annotations

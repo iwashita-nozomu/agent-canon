@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 name = "benchmark_reviewer"
 description = "Read-only reviewer for fairness, confounders, and benchmark anti-patterns."
 nickname_candidates = ["benchmark", "fairness", "confounders"]

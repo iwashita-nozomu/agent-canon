@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Run Codex inside the repo-defined Docker runtime."""
 
 from __future__ import annotations

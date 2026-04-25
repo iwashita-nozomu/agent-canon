@@ -1,4 +1,9 @@
 # main 統合ワークフロー
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 この文書は、`main` へ戻すときの統合手順の正本です。
 特に branch 側で file 構成を変えたときに、その変更を落とさず `main` へ持ち帰ることを目的にします。

@@ -1,3 +1,6 @@
+# @dependency-start
+# @dependency-end
+
 """Tests for machine-driven task start and close commands."""
 
 # Dependency Files:

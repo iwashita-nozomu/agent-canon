@@ -1,4 +1,9 @@
 # test-design
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 ## Purpose
 

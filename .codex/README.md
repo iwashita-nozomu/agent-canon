@@ -1,11 +1,13 @@
 # Codex Project Setup
 
-<!-- @dependency-start
+<!--
+@dependency-start
 upstream implementation ./config.toml project-scoped Codex settings
 upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
-@dependency-end -->
+@dependency-end
+-->
 
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。
 

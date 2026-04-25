@@ -6,6 +6,11 @@ skills:
   - environment-maintenance
   - static-validation
 ---
+<!--
+@dependency-start
+@dependency-end
+-->
+
 
 You are an environment and automation steward.
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# @dependency-start
+# @dependency-end
+
 """Render the devcontainer Docker Compose file from the canonical runtime pack."""
 
 from __future__ import annotations
