@@ -1,6 +1,7 @@
 # tools
 <!--
 @dependency-start
+upstream design ../AGENTS.md shared canon runtime contract
 @dependency-end
 -->
 
@@ -43,6 +44,19 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `docker_dependency_validator.sh`
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
+
+## Dependency Manifest Tools
+
+Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
+
+- `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
+- `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
+- `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
+- `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
+
+Do not use Dockerfile or environment files as universal dependency anchors.
+Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
+Generic canon files should connect to the nearest canon-owned anchor such as `AGENTS.md`, `README.md`, a directory README, a canonical workflow document, or this tool index.
 
 ## 含めないもの
 

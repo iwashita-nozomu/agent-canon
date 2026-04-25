@@ -1,6 +1,7 @@
 # Agent Hub
 <!--
 @dependency-start
+upstream design ../README.md shared canon overview
 @dependency-end
 -->
 

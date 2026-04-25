@@ -4,6 +4,7 @@ description: Use when a task needs specialist delegation, run-bundle bootstrap, 
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

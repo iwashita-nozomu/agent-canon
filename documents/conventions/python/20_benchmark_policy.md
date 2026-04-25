@@ -1,6 +1,7 @@
 # ベンチマーク方針
 <!--
 @dependency-start
+upstream design ../README.md convention index
 @dependency-end
 -->
 

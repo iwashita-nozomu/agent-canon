@@ -1,6 +1,7 @@
 # 実験の標準手順
 <!--
 @dependency-start
+upstream design README.md workflow catalog
 @dependency-end
 -->
 

@@ -1,6 +1,7 @@
 # agent-canon
 <!--
 @dependency-start
+upstream design AGENTS.md shared canon runtime contract
 @dependency-end
 -->
 

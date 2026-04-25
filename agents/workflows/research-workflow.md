@@ -1,6 +1,7 @@
 # 研究・実験改造ワークフロー
 <!--
 @dependency-start
+upstream design README.md workflow catalog
 @dependency-end
 -->
 

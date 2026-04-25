@@ -1,6 +1,7 @@
 # Branch Scope と Git ワークフロー
 <!--
 @dependency-start
+upstream design README.md durable document index
 @dependency-end
 -->
 

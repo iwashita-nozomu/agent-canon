@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 @dependency-end
 -->
 

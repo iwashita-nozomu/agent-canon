@@ -1,4 +1,5 @@
 # @dependency-start
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 # @dependency-end
 
 # Synced to /.github/workflows/agent-coordination.yml by tools/sync_agent_canon.sh link-root.

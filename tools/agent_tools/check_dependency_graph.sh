@@ -19,6 +19,7 @@ Usage:
   check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
+  - isolated manifest files with no graph edge
   - self references
   - cycles in upstream and downstream graphs
 
@@ -120,6 +121,7 @@ extract_edges() {
   [[ "$start_line" -gt 0 && "$end_line" -gt "$start_line" ]] || return 0
 
   source="$(realpath -m --relative-to="$ROOT_DIR" "$file")"
+  printf '%s\n' "$source" >> "$manifest_files"
   line_no=0
   while IFS= read -r line; do
     line_no=$((line_no + 1))
@@ -137,7 +139,8 @@ extract_edges() {
 }
 
 edges_file="$(mktemp)"
-trap 'rm -f "$edges_file" "$edges_file.sorted"' EXIT
+manifest_files="$(mktemp)"
+trap 'rm -f "$edges_file" "$edges_file.sorted" "$manifest_files" "$manifest_files.sorted"' EXIT
 
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
@@ -147,12 +150,23 @@ done < <(collect_paths)
 
 sort -u "$edges_file" > "$edges_file.sorted"
 mv "$edges_file.sorted" "$edges_file"
+sort -u "$manifest_files" > "$manifest_files.sorted"
+mv "$manifest_files.sorted" "$manifest_files"
 
 if [[ "$PRINT_EDGES" -eq 1 ]]; then
   cat "$edges_file"
 fi
 
 failures=0
+
+while IFS= read -r manifest_file; do
+  [[ -n "$manifest_file" ]] || continue
+  if ! awk -F '\t' -v file="$manifest_file" \
+    '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
+    echo "$manifest_file: isolated dependency manifest has no graph edges"
+    failures=$((failures + 1))
+  fi
+done < "$manifest_files"
 
 while IFS=$'\t' read -r direction kind source target; do
   [[ -n "${direction:-}" ]] || continue

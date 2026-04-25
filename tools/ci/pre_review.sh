@@ -1,5 +1,6 @@
 #!/bin/bash
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 

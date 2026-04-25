@@ -4,6 +4,7 @@ description: Use when agent-side working philosophy, interaction lessons, or tas
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

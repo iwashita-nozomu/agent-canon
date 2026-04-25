@@ -4,6 +4,7 @@ description: Use when Python code changes need strict review for pyright, pytest
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

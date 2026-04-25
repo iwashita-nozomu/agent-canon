@@ -1,6 +1,7 @@
 # 実験運用規約
 <!--
 @dependency-start
+upstream design README.md durable document index
 @dependency-end
 -->
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 """Build one repo-defined container pack and run a command inside it."""

@@ -1,6 +1,7 @@
 # agent-canon Snapshot Instructions
 <!--
 @dependency-start
+downstream design README.md shared canon overview must reflect runtime contract
 @dependency-end
 -->
 

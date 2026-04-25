@@ -1,6 +1,7 @@
 # Canonical Skill Registry
 <!--
 @dependency-start
+upstream design README.md canonical workflow index
 @dependency-end
 -->
 

@@ -1,6 +1,7 @@
 # Skill 実装ガイド
 <!--
 @dependency-start
+upstream design README.md durable document index
 @dependency-end
 -->
 

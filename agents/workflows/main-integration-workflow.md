@@ -1,6 +1,7 @@
 # main 統合ワークフロー
 <!--
 @dependency-start
+upstream design README.md workflow catalog
 @dependency-end
 -->
 

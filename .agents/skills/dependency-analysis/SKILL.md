@@ -52,6 +52,7 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ```
 
 1. Treat changed-file header / scan / format failures as fix-now blockers.
-1. Treat default graph failures as fix-now blockers because they indicate self references or cycles.
+1. Treat default graph failures as fix-now blockers because they indicate isolated manifests, self references, or cycles.
+1. Do not make Dockerfile or environment files universal anchors. Use the nearest true canon anchor (`AGENTS.md`, `README.md`, directory README, workflow/design doc, tool index, skill guide) unless the file actually depends on Docker, CI, requirements, or runtime configuration.
 1. During reverse-edge migration, `--check-bidirectional` failures may be a baseline, but do not call them pass. Record the baseline and confirm the current diff introduced no new old-format header, self reference, missing reverse edge, kind mismatch, or cycle.
 1. Put command outputs and any baseline decision in `verification.txt` and `closeout_gate.md`.

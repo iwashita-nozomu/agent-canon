@@ -51,7 +51,8 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ## Interpretation
 
 - changed-file header / scan / format failure は fix-now blocker です。
-- default graph failure は自己参照または cycle を示すため fix-now blocker です。
+- default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
+- Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
 

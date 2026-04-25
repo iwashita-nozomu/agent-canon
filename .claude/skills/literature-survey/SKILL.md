@@ -4,6 +4,7 @@ description: Use when a task needs paper search, prior-art mapping, contradictor
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

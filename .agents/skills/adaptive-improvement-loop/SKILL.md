@@ -4,6 +4,7 @@ description: Use when experiments, research, tuning, and iterative code improvem
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

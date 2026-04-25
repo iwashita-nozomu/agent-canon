@@ -1,6 +1,7 @@
 # Infrastructure Notes
 <!--
 @dependency-start
+upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->
 

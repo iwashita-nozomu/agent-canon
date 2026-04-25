@@ -1,4 +1,5 @@
 # @dependency-start
+# upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 
 """Smoke-test coverage for the research perspective pack helper."""
