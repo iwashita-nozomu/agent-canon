@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
+# upstream design ../../agents/skills/worktree-start.md worktree action log usage
+# upstream design ../../documents/WORKTREE_SCOPE_TEMPLATE.md worktree log contract
+# downstream implementation ../../tests/agent_tools/test_work_log.py verifies work log behavior
+# @dependency-end
 """Append one timestamped action-log entry for the current worktree."""
 
 from __future__ import annotations
@@ -36,6 +42,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="User request clause id covered by this log entry. Repeat to add multiple ids.",
+    )
+    parser.add_argument(
+        "--allow-missing-request-clause-id",
+        action="store_true",
+        help=(
+            "Allow a run-bundle-only pre-contract/runtime note without a clause id. "
+            "Use only before a clause can reasonably exist."
+        ),
+    )
+    parser.add_argument(
+        "--missing-request-clause-reason",
+        default="",
+        help="Required reason when --allow-missing-request-clause-id is used.",
     )
     parser.add_argument(
         "--ref",
@@ -82,9 +101,6 @@ def main() -> int:
     args = build_parser().parse_args()
     workspace_root = Path(args.workspace_root).resolve()
     scope_path = workspace_root / "WORKTREE_SCOPE.md"
-    if not args.request_clause_id:
-        raise SystemExit("At least one --request-clause-id is required.")
-
     action_log_path: Path | None = None
     inferred_report_dir: Path | None = None
     if scope_path.is_file():
@@ -102,6 +118,26 @@ def main() -> int:
     else:
         report_dir = inferred_report_dir
 
+    if not args.request_clause_id:
+        if not args.allow_missing_request_clause_id:
+            raise SystemExit(
+                "At least one --request-clause-id is required unless "
+                "--allow-missing-request-clause-id is set."
+            )
+        if not args.missing_request_clause_reason.strip():
+            raise SystemExit(
+                "--missing-request-clause-reason is required when clause ids are omitted."
+            )
+        if action_log_path is not None:
+            raise SystemExit(
+                "Missing clause ids are only allowed for run-bundle-only logging; "
+                "provide --request-clause-id when WORKTREE_SCOPE.md resolves an action log."
+            )
+        if report_dir is None:
+            raise SystemExit(
+                "Missing clause ids are only allowed when --report-dir or --run-id resolves a run bundle."
+            )
+
     if action_log_path is None and report_dir is None:
         raise SystemExit(
             "No action log or run bundle resolved. Provide WORKTREE_SCOPE.md with concrete paths, "
@@ -109,7 +145,13 @@ def main() -> int:
         )
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
-    clause_suffix = " | request_clause_ids: " + ",".join(args.request_clause_id)
+    if args.request_clause_id:
+        clause_suffix = " | request_clause_ids: " + ",".join(args.request_clause_id)
+    else:
+        clause_suffix = (
+            " | request_clause_ids: unassigned"
+            f" | missing_request_clause_reason: {args.missing_request_clause_reason.strip()}"
+        )
     ref_suffix = ""
     if args.ref:
         ref_suffix = " | refs: " + ", ".join(args.ref)

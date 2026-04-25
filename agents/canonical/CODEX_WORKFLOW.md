@@ -80,6 +80,19 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
+### MCP Surface Preflight
+
+MCP tool や `repo_mcp_server` が必要な task では、configured MCP inventory を先に確認します。
+
+```bash
+python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
+```
+
+- `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
+- configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
+- inventory にあるが startup に失敗する場合は、host setup / command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
+- contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
+
 ### Library And Reuse Sweep
 
 新しい code path、module、helper、test、script を足す前に、導入済みライブラリと既存の再利用候補を探索します。

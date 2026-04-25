@@ -1,5 +1,9 @@
 """Tests for the shared work-log appender."""
 
+# @dependency-start
+# upstream implementation ../../tools/agent_tools/work_log.py appends run and action logs
+# @dependency-end
+
 from __future__ import annotations
 
 import subprocess
@@ -128,6 +132,69 @@ class WorkLogTest(unittest.TestCase):
             self.assertNotIn("(not-written)", result.stdout)
             self.assertIn("ran targeted pytest", action_log_path.read_text(encoding="utf-8"))
             self.assertIn("ran targeted pytest", (report_dir / "work_log.md").read_text(encoding="utf-8"))
+
+    def test_report_dir_allows_explicit_pre_contract_entry_without_clause_id(self) -> None:
+        """Run-bundle preflight notes can be recorded before clauses exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_dir = workspace_root / "reports" / "agents" / "run-3"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(WORK_LOG_SCRIPT),
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--kind",
+                    "preflight",
+                    "--allow-missing-request-clause-id",
+                    "--missing-request-clause-reason",
+                    "contract not created yet",
+                    "--message",
+                    "checked MCP inventory",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            work_log_text = (report_dir / "work_log.md").read_text(encoding="utf-8")
+            self.assertIn("checked MCP inventory", work_log_text)
+            self.assertIn("request_clause_ids: unassigned", work_log_text)
+            self.assertIn("missing_request_clause_reason: contract not created yet", work_log_text)
+
+    def test_missing_clause_id_still_requires_explicit_reason(self) -> None:
+        """Clause-free logging must be an explicit exception."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_dir = workspace_root / "reports" / "agents" / "run-4"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(WORK_LOG_SCRIPT),
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--kind",
+                    "preflight",
+                    "--allow-missing-request-clause-id",
+                    "--message",
+                    "checked MCP inventory",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--missing-request-clause-reason is required", result.stderr)
 
 
 if __name__ == "__main__":

@@ -73,6 +73,8 @@ root では次を symlink view として扱います。
 - `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_check_agent_runtime_alignment.py`
+- `tests/agent_tools/test_check_mcp_inventory.py`
+- `tests/agent_tools/test_work_log.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_check_markdown_math.py`
