@@ -4,6 +4,7 @@ description: Use when touching Docker, CI, dependencies, runtime compatibility, 
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

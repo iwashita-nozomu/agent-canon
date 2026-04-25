@@ -4,6 +4,7 @@ description: Use when Markdown files changed and you need formatting, heading, a
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

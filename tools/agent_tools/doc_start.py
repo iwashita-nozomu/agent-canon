@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 """Start one document-writing run with machine-generated writing workflow and review hints."""

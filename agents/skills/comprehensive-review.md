@@ -1,6 +1,7 @@
 # comprehensive-review
 <!--
 @dependency-start
+upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->
 

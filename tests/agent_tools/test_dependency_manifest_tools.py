@@ -137,6 +137,28 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_GRAPH=pass", result.stdout)
 
+    def test_graph_rejects_isolated_manifest(self) -> None:
+        """The graph checker rejects manifests that do not connect to any edge."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(GRAPH), "--root", str(root), str(source), root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("isolated dependency manifest", result.stdout)
+            self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
+
     def test_graph_rejects_missing_reverse_edge(self) -> None:
         """Strict bidirectional mode requires the matching reverse edge."""
         with tempfile.TemporaryDirectory() as tmp_dir:

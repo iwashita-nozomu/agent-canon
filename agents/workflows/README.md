@@ -1,6 +1,7 @@
 # Workflow Guide
 <!--
 @dependency-start
+upstream design ../TASK_WORKFLOWS.md workflow routing contract
 @dependency-end
 -->
 

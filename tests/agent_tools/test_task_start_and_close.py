@@ -1,4 +1,5 @@
 # @dependency-start
+# upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""

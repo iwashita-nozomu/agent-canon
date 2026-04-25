@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 """Create concrete worktree log paths and fill WORKTREE_SCOPE.md placeholders."""

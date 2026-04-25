@@ -4,6 +4,7 @@ description: Use when drafting a submission paper, thesis chapter, or other pape
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

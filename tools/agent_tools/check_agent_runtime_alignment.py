@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""

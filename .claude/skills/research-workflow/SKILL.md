@@ -4,6 +4,7 @@ description: Use when a task needs external research, comparison design, iterati
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

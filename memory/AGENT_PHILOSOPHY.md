@@ -1,6 +1,7 @@
 # Agent Philosophy
 <!--
 @dependency-start
+upstream design README.md memory surface index
 @dependency-end
 -->
 

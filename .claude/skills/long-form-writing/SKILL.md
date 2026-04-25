@@ -4,6 +4,7 @@ description: Use when drafting a long README, workflow, guide, migration doc, or
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

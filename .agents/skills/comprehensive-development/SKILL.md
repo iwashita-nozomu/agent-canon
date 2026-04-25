@@ -4,6 +4,7 @@ description: Use when a repo-wide task spans code, docs, tools, workflows, and r
 ---
 <!--
 @dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 

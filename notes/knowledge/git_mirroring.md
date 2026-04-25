@@ -1,6 +1,7 @@
 # Git Mirroring
 <!--
 @dependency-start
+upstream design README.md notes lifecycle index
 @dependency-end
 -->
 

@@ -25,6 +25,7 @@ downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py
 - human reviewer、agent、CI tool が同じ manifest を読む
 - Bash / awk で高速に scan と format check ができる
 - graph-level の双方向整合、自己参照、循環、closure を tool で検証できる
+- graph-level の孤立 manifest を tool で検証できる
 - code、docs、workflow、test、environment file を同じ内部 DSL で扱う
 
 ## Non-Goals
@@ -63,6 +64,12 @@ downstream implementation ../tests/agent_tools/test_task_start_and_close.py veri
 複数 file に依存する場合は、依存ごとに行を増やします。
 依存がない direction は行を置きません。
 空の placeholder 行や `none` 行は不要です。
+
+ただし、manifest block 全体が空の file は graph 上の孤立 node になりやすいため、default graph gate では fail とします。
+少なくとも、編集前に読むべき nearest canonical context を `upstream` に置くか、変更後に確認すべき consumer / index / generated mirror を `downstream` に置きます。
+shared canon の file は、実依存がない場合でも `AGENTS.md`、`README.md`、directory-level README、canonical workflow doc、tool index、skill implementation guide のような canon 内 anchor に接続します。
+Dockerfile や repo-local environment file は universal anchor にしません。
+shared canon は派生 repo に配布されるため、environment edge はその file が本当に Docker / CI / requirements / runtime assumption に依存する場合だけ使います。
 
 ## Dependency Kinds
 
@@ -149,6 +156,21 @@ Kind must match unless a later design explicitly allows cross-kind reverse edges
 The graph checker compares the downstream edge set with the inverse upstream edge set.
 It should report missing reverse edges and kind mismatches with file-relative diagnostics.
 
+## Isolated Manifests
+
+A file with a dependency manifest must appear in the graph as either a source or a target.
+If it appears in neither position, the manifest does not help an agent choose context and should fail the default graph gate.
+
+Valid ways to avoid isolation:
+
+- add an `upstream design` edge to the nearest canonical contract
+- add an `upstream implementation` edge to the helper, generator, or runtime it uses
+- add a `downstream implementation` edge to tests, mirrors, generated views, or consumers that must be checked after edits
+- add an `environment` edge only when the file truly depends on Docker, CI, requirements, or runtime configuration
+
+Do not add synthetic Dockerfile dependencies just to make a node non-isolated.
+For `agent-canon`, generic files should connect to canon-owned anchors such as `AGENTS.md`, `README.md`, `agents/canonical/*.md`, `documents/*.md`, or `tools/README.md`.
+
 ## Self Reference And Cycles
 
 Self reference is a graph-level error.
@@ -199,6 +221,7 @@ Responsibilities:
 
 - extract normalized edges from all manifest blocks
 - build separate upstream and downstream edge sets
+- fail manifest files that are isolated from the edge graph
 - validate self reference
 - detect cycles separately in upstream and downstream graphs
 - print upstream closure for changed files
@@ -206,7 +229,7 @@ Responsibilities:
 - emit machine-readable TSV for future visualization
 - with `--check-bidirectional`, validate bidirectional consistency and kind match on reverse edges
 
-Default graph validation is the fail gate for self reference and cycles.
+Default graph validation is the fail gate for isolated manifests, self reference, and cycles.
 Bidirectional consistency is a stricter migration gate because a partially migrated repository can have useful upstream/downstream context before every reverse edge is written.
 
 The graph checker can be implemented with Bash, `awk`, `sort`, `comm`, and a small DFS in `awk`.

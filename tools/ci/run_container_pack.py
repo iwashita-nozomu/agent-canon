@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../README.md shared automation index
 # @dependency-end
 
 """Build and smoke-test a container runtime pack."""
