@@ -84,6 +84,7 @@ def write_ready_run(report_dir: Path) -> None:
                 "# Closeout Gate",
                 "- validation_complete: yes",
                 "- dependency_headers_complete: yes",
+                "- repo_wide_dependency_tools_complete: yes",
                 "- canonical_tree_head_complete: yes",
                 "- commit_created: yes",
                 "- push_completed: yes",

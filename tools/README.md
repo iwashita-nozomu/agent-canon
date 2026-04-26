@@ -68,6 +68,7 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
+- `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
 
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.

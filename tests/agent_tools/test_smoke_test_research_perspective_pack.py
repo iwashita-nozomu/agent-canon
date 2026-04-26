@@ -105,6 +105,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("closeout_gate_status=pending", verification_text)
             self.assertIn("- user_completion_report: locked", closeout_text)
             self.assertIn("- spec_product_coverage_complete: no", closeout_text)
+            self.assertIn("- repo_wide_dependency_tools_complete: no", closeout_text)
             self.assertIn("- review_findings_integrated: no", closeout_text)
             self.assertIn("- post_fix_full_review_complete: no", closeout_text)
             self.assertIn("- canonical_tree_head_complete: no", closeout_text)

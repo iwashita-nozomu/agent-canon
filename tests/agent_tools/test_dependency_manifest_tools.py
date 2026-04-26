@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
 FORMAT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_header_format.sh"
 GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
+REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -257,6 +258,60 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cycle includes", result.stdout)
             self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
+
+    def test_repo_review_runs_all_dependency_tools(self) -> None:
+        """The review wrapper applies dependency tools to all tracked checkable files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            target = root / "target.md"
+            source = root / "source.md"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "downstream design source.md source reads target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "target.md", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(str(REPO_REVIEW), "--root", str(root), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
 
 if __name__ == "__main__":
