@@ -23,6 +23,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - overall_delivery_complete: no
 - unfinished_tasks_absent: no
 - dependency_headers_complete: no
+- repo_wide_dependency_tools_complete: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
@@ -45,6 +46,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - overall_delivery_complete: yes
 - unfinished_tasks_absent: yes
 - dependency_headers_complete: yes
+- repo_wide_dependency_tools_complete: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -60,6 +62,10 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Dependency Manifest Evidence
 
 <!-- Confirm that every created or edited human-authored text file has a top-of-file @dependency-start / @dependency-end manifest block, or record the scan-tool classification reason and alternate manifest/design artifact for files that cannot carry such a block. Include output from check_dependency_headers.py, scan_dependency_headers.sh, check_dependency_header_format.sh, and check_dependency_graph.sh when dependency edges changed. During migration, record any pre-existing full-repo graph baseline separately and confirm this change introduced no new old-format header, self reference, reverse-edge gap, kind mismatch, or cycle. -->
+
+## Repo-Wide Dependency Tool Evidence
+
+<!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. -->
 
 ## Spec-To-Product Coverage Evidence
 

@@ -117,6 +117,8 @@ def main() -> int:
         "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
         "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
+        "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
+        == "yes",
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
@@ -149,6 +151,10 @@ def main() -> int:
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
     print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
     print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
+    print(
+        "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE="
+        f"{closeout.get('repo_wide_dependency_tools_complete', '')}"
+    )
     print(
         "SPEC_PRODUCT_COVERAGE_COMPLETE="
         f"{closeout.get('spec_product_coverage_complete', '')}"

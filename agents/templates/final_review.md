@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../../documents/dependency-manifest-design.md dependency review policy
 @dependency-end
 -->
 
@@ -38,6 +39,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 ## Post-Fix Full Review Rerun Review
 
 <!-- Confirm that if any review-driven fix landed after an earlier review artifact, the full required review set was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last full review pass. Return revise if any tiny fix skipped the rerun. -->
+
+## Repo-Wide Dependency Review
+
+<!-- Confirm `bash tools/agent_tools/run_repo_dependency_review.sh` was run against the full repository after the latest fix. Return revise if only --changed checks were run or if any dependency manifest issue remains. -->
 
 ## Canonical Tree-Head Acceptance
 

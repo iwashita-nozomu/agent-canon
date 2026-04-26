@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
+upstream design ../../documents/dependency-manifest-design.md dependency review policy
 @dependency-end
 -->
 
@@ -38,6 +39,10 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 ## User Request Trace Review
 
 <!-- Record whether the diff satisfies the declared clause IDs and whether it drifted into work the user did not request. -->
+
+## Repo-Wide Dependency Review
+
+<!-- Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository, not only changed files. Record REPO_DEPENDENCY_REVIEW=pass or list fix-now findings for missing headers, invalid manifests, self references, isolated manifests, or graph cycles. -->
 
 ## Revision Loop
 
