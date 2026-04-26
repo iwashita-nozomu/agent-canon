@@ -78,6 +78,35 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
+    def test_format_accepts_json_string_manifest(self) -> None:
+        """JSON files can keep valid syntax by storing manifest lines as strings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "target.py"
+            source = root / "source.json"
+            target.write_text("# target\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "{",
+                        '  "_dependency_manifest": [',
+                        '    "@dependency-start",',
+                        '    "upstream implementation target.py target contract",',
+                        '    "@dependency-end"',
+                        "  ],",
+                        '  "ok": true',
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
     def test_format_rejects_invalid_direction(self) -> None:
         """The format checker rejects unknown directions."""
         with tempfile.TemporaryDirectory() as tmp_dir:

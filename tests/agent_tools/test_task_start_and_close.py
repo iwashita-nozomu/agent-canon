@@ -75,6 +75,26 @@ def write_ready_work_log(report_dir: Path) -> None:
     )
 
 
+def write_ready_agent_evaluation(report_dir: Path) -> None:
+    """Write a passing agent-evaluation artifact."""
+    (report_dir / "agent_evaluation.md").write_text(
+        "\n".join(
+            [
+                "# Agent Evaluation",
+                "",
+                "- evaluation_status: pass",
+                "- score: 100",
+                "- max_score: 100",
+                "- threshold: 85",
+                "- feedback_actions_resolved: yes",
+                "- learning_capture_complete: yes",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
@@ -449,6 +469,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -459,6 +480,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -549,6 +571,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -559,6 +582,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -637,6 +661,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -647,6 +672,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -721,6 +747,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -731,6 +758,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -824,6 +852,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -834,6 +863,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -906,6 +936,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: no",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -916,6 +947,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -1008,6 +1040,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -1017,6 +1050,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
