@@ -248,7 +248,6 @@ seed_snapshot_into_bare() {
   local bare_repo_path="$1"
   local branch="$2"
   local seed_sha=""
-  local split_output=""
 
   if git --git-dir="$bare_repo_path" rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
     echo "agent_canon_bare_repo=already_has_${branch}:${bare_repo_path}"
@@ -256,13 +255,8 @@ seed_snapshot_into_bare() {
   fi
 
   if git subtree --help >/dev/null 2>&1; then
-    if split_output="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null)"; then
-      seed_sha="$split_output"
-      echo "agent_canon_seed_method=subtree_split"
-    else
-      seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
-      echo "agent_canon_seed_method=commit_tree_snapshot_after_subtree_split_failure"
-    fi
+    seed_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD)"
+    echo "agent_canon_seed_method=subtree_split"
   else
     seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
     echo "agent_canon_seed_method=commit_tree_snapshot"

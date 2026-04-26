@@ -4,7 +4,7 @@
 
 ## Must Read
 
-- [engineering_avoidances.md](/workspace/notes/guardrails/engineering_avoidances.md)
+- [engineering_avoidances.md](/mnt/l/workspace/project_template/notes/guardrails/engineering_avoidances.md)
 
 ## 使う場面
 

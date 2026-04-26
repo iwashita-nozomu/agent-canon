@@ -1,5 +1,10 @@
 # Codex Subagents
 
+Dependency Files:
+- vendor/agent-canon/.codex/config.toml
+- vendor/agent-canon/agents/task_catalog.yaml
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 role ごとの具体的な禁止事項、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
@@ -22,19 +27,19 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の default は、文書・計画・review を `gpt-5.4` `high`、code survey と broad implementation を `gpt-5.3-codex` `high`、design-traced narrow implementation slice を `gpt-5.3-codex-spark` `high` に分ける
+- Codex の default は、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5` `high`、code survey / static test design / language-specific code review を `gpt-5.3-codex` `high`、design-traced narrow implementation slice を `gpt-5.3-codex-spark` `high` に分ける
 - `gpt-5.3-codex-spark` は `spark_worker` で使い、approved design packet で完全に切れる低リスク slice の first implementation candidate とする
-- 設計・レビュー・scope 判断は `gpt-5.4` / `gpt-5.3-codex` 側に残す
+- 設計・レビュー・scope 判断、曖昧な実装判断、multi-surface conflict resolution は `gpt-5.5` 側に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `12` です
+- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - cap は depth 制限ではなく同時実行数の上限として扱います
 - depth は固定しませんが、active な subagent 数は spawn budget で縛ります
-- 既定 budget は `Scoped Change` で同時 5 体までです
-- 既定 budget は `Large Delivery` / `Platform And Environment` で同時 6 体までです
-- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 8 体までです
+- 既定 budget は `Scoped Change` で同時 8 体までです
+- 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
+- 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent は同時 1 体までとし、budget を増やしても追加分は read-only role に限ります
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
@@ -163,7 +168,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の禁止事項を重複記述しません
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- designer / implementer を起動するときは、`team_manifest.yaml` の `document_packet.read_before_work` か `task_start.py` / `bootstrap_agent_run.py` の packet 出力をそのまま渡します
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力をそのまま渡します
+- workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 長文文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
 - 論文 draft では `citation_evidence_reviewer` も追加します
@@ -180,15 +186,16 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 | Role Bucket | Roles | Model | Reasoning |
 | ----------- | ----- | ----- | --------- |
-| Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.4` | `high` |
-| Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.4` | `high` |
-| Codebase Survey / Test Design / Broad Implementation / Language-Specific Code Review | `explorer`, `test_designer`, `worker`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex` | `high` |
+| Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.5` | `high` |
+| Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.5` | `high` |
+| Broad Or Ambiguous Implementation | `worker` | `gpt-5.5` | `high` |
+| Codebase Survey / Test Design / Language-Specific Code Review | `explorer`, `test_designer`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex` | `high` |
 | Low-Latency Narrow Implementation | `spark_worker` | `gpt-5.3-codex-spark` | `high` |
-| Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.4` | `high` |
+| Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.5` | `high` |
 
 運用メモ:
-- OpenAI の current docs では `gpt-5.4` は professional workflows 向けの default / highest-intelligence 枠、`gpt-5.3-codex` は agentic coding 専用最適化枠です
-- この repo ではそれに合わせて、文書・計画・review を `gpt-5.4`、coding-specialist role を `gpt-5.3-codex` に寄せます
+- OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
+- この repo ではそれに合わせて、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5`、狭い code survey / static test design / language review を `gpt-5.3-codex`、設計済み低リスク実装 slice を `gpt-5.3-codex-spark` に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします
@@ -227,7 +234,7 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 
 - `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
 - `agents/agents_config.json` の required output が実テンプレートに結び付いている
-- `.codex/agents/*.toml` の model split が文書系 `gpt-5.4` / coding 系 `gpt-5.3-codex` に揃っている
+- `.codex/agents/*.toml` の model split が frontier 判断系 `gpt-5.5` / coding-specialist 系 `gpt-5.3-codex` / narrow implementation 系 `gpt-5.3-codex-spark` に揃っている
 - temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_review` pack と `T9` がある

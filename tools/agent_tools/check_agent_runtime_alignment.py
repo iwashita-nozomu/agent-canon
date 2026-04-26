@@ -32,6 +32,9 @@ from agent_team import (
 
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+FRONTIER_MODEL = "gpt-5.5"
+CODEX_CODING_MODEL = "gpt-5.3-codex"
+SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
     "manager_reviewer",
@@ -59,9 +62,11 @@ WRITING_AND_REVIEW_ROLE_IDS = {
 CODING_ROLE_IDS = {
     "explorer",
     "test_designer",
-    "worker",
     "python_reviewer",
     "cpp_reviewer",
+}
+FRONTIER_IMPLEMENTATION_ROLE_IDS = {
+    "worker",
 }
 SPARK_CODING_ROLE_IDS = {
     "spark_worker",
@@ -96,7 +101,12 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
 def validate_codex_agent_settings() -> None:
     """Check that Codex agent settings use the expected model split."""
     configs = parse_codex_agents()
-    required_role_ids = WRITING_AND_REVIEW_ROLE_IDS | CODING_ROLE_IDS | SPARK_CODING_ROLE_IDS
+    required_role_ids = (
+        WRITING_AND_REVIEW_ROLE_IDS
+        | CODING_ROLE_IDS
+        | FRONTIER_IMPLEMENTATION_ROLE_IDS
+        | SPARK_CODING_ROLE_IDS
+    )
     missing = sorted(required_role_ids - set(configs))
     ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
 
@@ -107,7 +117,7 @@ def validate_codex_agent_settings() -> None:
             config.get("model_reasoning_effort") == "high",
             f"{role_id} model_reasoning_effort must be high",
         )
-        ensure(config.get("model") == "gpt-5.4", f"{role_id} model must be gpt-5.4")
+        ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
 
     for role_id in sorted(CODING_ROLE_IDS):
         config = configs[role_id]
@@ -116,7 +126,19 @@ def validate_codex_agent_settings() -> None:
             config.get("model_reasoning_effort") == "high",
             f"{role_id} model_reasoning_effort must be high",
         )
-        ensure(config.get("model") == "gpt-5.3-codex", f"{role_id} model must be gpt-5.3-codex")
+        ensure(
+            config.get("model") == CODEX_CODING_MODEL,
+            f"{role_id} model must be {CODEX_CODING_MODEL}",
+        )
+
+    for role_id in sorted(FRONTIER_IMPLEMENTATION_ROLE_IDS):
+        config = configs[role_id]
+        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
+        ensure(
+            config.get("model_reasoning_effort") == "high",
+            f"{role_id} model_reasoning_effort must be high",
+        )
+        ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
 
     for role_id in sorted(SPARK_CODING_ROLE_IDS):
         config = configs[role_id]
@@ -126,8 +148,8 @@ def validate_codex_agent_settings() -> None:
             f"{role_id} model_reasoning_effort must be high",
         )
         ensure(
-            config.get("model") == "gpt-5.3-codex-spark",
-            f"{role_id} model must be gpt-5.3-codex-spark",
+            config.get("model") == SPARK_CODING_MODEL,
+            f"{role_id} model must be {SPARK_CODING_MODEL}",
         )
 
 
@@ -219,6 +241,17 @@ def validate_task_catalog_references() -> None:
     for family in catalog.workflow_families:
         roles = family.get("roles", {})
         ensure(isinstance(roles, dict), f"family {family['id']} roles must be a mapping")
+        prompt = family.get("subagent_prompt")
+        ensure(isinstance(prompt, dict), f"family {family['id']} subagent_prompt must be a mapping")
+        for key in ("purpose", "prompt_preamble", "workflow_focus", "reviewer_prompt"):
+            ensure(key in prompt, f"family {family['id']} subagent_prompt missing {key}")
+        ensure(str(prompt["purpose"]).strip(), f"family {family['id']} subagent_prompt purpose empty")
+        for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
+            values = prompt[key]
+            ensure(
+                isinstance(values, list) and all(str(value).strip() for value in values),
+                f"family {family['id']} subagent_prompt {key} must be a non-empty list",
+            )
         for bucket in ("always_on", "specialists"):
             members = roles.get(bucket, [])
             ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
@@ -314,6 +347,7 @@ def validate_bundle_outputs() -> None:
         )
 
         for task_id in task_ids(catalog):
+            task = next(task for task in catalog.tasks if task["id"] == task_id)
             enabled = list(
                 default_specialists_for_task(
                     config=config,
@@ -333,6 +367,7 @@ def validate_bundle_outputs() -> None:
                 created_at_iso=created_at_iso,
                 roles=roles,
                 workspace_root=workspace_root,
+                workflow_family_id=str(task["family"]),
             )
             missing_outputs = [
                 output
@@ -343,6 +378,17 @@ def validate_bundle_outputs() -> None:
             ensure(
                 not missing_outputs,
                 f"task {task_id} did not generate required outputs: {', '.join(sorted(set(missing_outputs)))}",
+            )
+            manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
+                encoding="utf-8",
+            )
+            ensure(
+                "subagent_prompt_packet:" in manifest_text,
+                f"task {task_id} manifest missing subagent_prompt_packet",
+            )
+            ensure(
+                "prompt_contract:" in manifest_text,
+                f"task {task_id} manifest missing role prompt_contract",
             )
 
         full_team_roles = config.always_on_roles + config.specialist_roles
@@ -356,6 +402,7 @@ def validate_bundle_outputs() -> None:
             created_at_iso=created_at_iso,
             roles=full_team_roles,
             workspace_root=workspace_root,
+            workflow_family_id="comprehensive_development",
         )
         missing_outputs = [
             output

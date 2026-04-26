@@ -1,5 +1,10 @@
 # Codex Project Setup
 
+Dependency Files:
+- vendor/agent-canon/.codex/config.toml
+- vendor/agent-canon/agents/task_catalog.yaml
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+
 このディレクトリは、Codex を primary runtime として使うための project-scoped 設定置き場です。
 
 ## Layout
@@ -14,25 +19,25 @@
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
-- runtime cap は `.codex/config.toml` の `[agents].max_threads = 12` を使い、spawn は depth ではなく bounded concurrency で制御します
+- runtime cap は `.codex/config.toml` の `[agents].max_threads = 24` を使い、spawn は depth ではなく bounded concurrency で制御します
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
 
 ## Runtime Spawn Limits
 
-- `max_threads = 12`
+- `max_threads = 24`
   - runtime hard ceiling として使います
 - depth は repo config で固定しません
 - 同時 spawn の既定 budget は workflow family 側で決めます
-  - `Scoped Change`: 5
-  - `Large Delivery` / `Platform And Environment`: 6
-  - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 8
+  - `Scoped Change`: 8
+  - `Large Delivery` / `Platform And Environment`: 10
+  - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
 - 同時 write-capable subagent は常に 1 体までです
 
 ## Model Policy
 
-- `gpt-5.4` + `high`
+- `gpt-5.5` + `high`
   - `requirements_organizer`
   - `manager_reviewer`
   - `execution_planner`
@@ -42,6 +47,7 @@
   - `logic_gap_reviewer`
   - `literature_researcher`
   - `docs_workflow_steward`
+  - `worker`
   - `reviewer`
   - `plan_reviewer`
   - `detailed_design_reviewer`
@@ -51,14 +57,14 @@
   - perspective reviewer 全般
 - `gpt-5.3-codex` + `high`
   - `explorer`
-  - `worker`
+  - `test_designer`
   - `python_reviewer`
   - `cpp_reviewer`
 - design-traced narrow implementation default
   - `gpt-5.3-codex-spark`
     - `spark_worker`
 - broad or ambiguous implementation fallback
-  - `gpt-5.3-codex`
+  - `gpt-5.5`
     - `worker`
     - 設計解釈、conflict resolution、architecture-sensitive edit
 - repo default は `high`

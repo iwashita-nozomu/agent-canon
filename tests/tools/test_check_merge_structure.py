@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_merge_structure.py"
@@ -126,4 +125,8 @@ def test_check_merge_structure_fails_when_old_layout_survives(tmp_path: Path) ->
     )
     assert result.returncode != 0
     assert "MERGE_STRUCTURE_CHECK=fail" in result.stdout
-    assert "alpha.txt" in result.stdout or "latest.txt" in result.stdout or "docs/guide.md" in result.stdout
+    assert (
+        "alpha.txt" in result.stdout
+        or "latest.txt" in result.stdout
+        or "docs/guide.md" in result.stdout
+    )

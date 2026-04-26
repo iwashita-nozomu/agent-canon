@@ -1,5 +1,9 @@
 # User Preferences
 
+Dependency Files:
+- vendor/agent-canon/ROOT_AGENTS.md
+- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+
 この file は、会話から抽出した user の coding philosophy、review expectation、document preference を逐次追記する append-first note です。
 `AGENTS.md` へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 
@@ -106,6 +110,12 @@
   - source: chat
 
 - 2026-04-22 | 読みやすさや reader flow の評価はツールだけでは不十分なので、文書や prompt の readability はエージェント review で確認してほしい。tool check は補助にとどめ、可読性判断は agent-side review を必須にしてほしい。
+  - source: chat
+
+- 2026-04-24 | Implementation work should start from this template repository by default; avoid treating other repositories as the primary starting point unless the user explicitly redirects.
+  - source: chat
+
+- 2026-04-24 | Do not return a user-facing completion report while any task, planned work unit, required validation, commit/push, canon sync, or closeout gate remains unfinished; return only after everything in scope is complete.
   - source: chat
 
 ## Promotion Candidates

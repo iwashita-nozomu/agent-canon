@@ -183,8 +183,14 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "| --------- | ---------------- | ----------- | ------ |",
                         "| T1-C1 | requirements | requirements | done |",
                         "## Planned Work Units",
-                        "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
-                        "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
+                        (
+                            "| Unit ID | Clause IDs | Owner | Completion Evidence | "
+                            "Next Gate | Status |"
+                        ),
+                        (
+                            "| ------- | ---------- | ----- | ------------------- | "
+                            "--------- | ------ |"
+                        ),
                         "",
                     ]
                 ),
@@ -429,7 +435,10 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "- Required run log.",
                         "",
                         "## Entries",
-                        "- `2026-04-12 14:10 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        (
+                            "- `2026-04-12 14:10 JST | review | final pass recorded | "
+                            "request_clause_ids: T1-C1 | next: closeout`"
+                        ),
                         "",
                     ]
                 ),
@@ -497,7 +506,10 @@ class WaterfallGateCheckTest(unittest.TestCase):
                         "- Required run log.",
                         "",
                         "## Entries",
-                        "- `2026-04-16 11:50 JST | review | final pass recorded | request_clause_ids: T1-C1 | next: closeout`",
+                        (
+                            "- `2026-04-16 11:50 JST | review | final pass recorded | "
+                            "request_clause_ids: T1-C1 | next: closeout`"
+                        ),
                         "",
                     ]
                 ),

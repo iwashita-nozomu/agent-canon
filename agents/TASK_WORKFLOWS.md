@@ -1,5 +1,10 @@
 # Agent Task Workflows
 
+Dependency Files:
+- vendor/agent-canon/.codex/config.toml
+- vendor/agent-canon/agents/task_catalog.yaml
+- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+
 この文書は、repo で使う workflow family の正本です。
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
@@ -42,6 +47,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
+- repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
@@ -178,18 +184,19 @@ single-writer ルール:
 spawn budget ルール:
 - depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
 - 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
-- `Scoped Change` は同時 5 体までを既定にします
-- `Large Delivery` / `Platform And Environment` は同時 6 体までを既定にします
-- `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 8 体までを既定にします
+- workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
+- `Scoped Change` は同時 8 体までを既定にします
+- `Large Delivery` / `Platform And Environment` は同時 10 体までを既定にします
+- `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 12 体までを既定にします
 - budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
 - budget を増やしても write-capable subagent は同時 1 体までです
 
 concurrent spawn budget:
-- global runtime cap は `.codex/config.toml` の `max_threads = 12`
-- `Scoped Change`: parent を除いて同時 4-5 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 3-4 まで
-- `Research-Driven Change`: parent を除いて同時 6-8 agent を目安にします。perspective reviewer は batch で回します
-- `Platform And Environment` と `Large Delivery`: parent を除いて同時 5-6 agent を目安にします。planning / design / review を wave に分けます
-- `Comprehensive Development` と `Adaptive Improvement Loop`: parent を除いて同時 6-8 agent を目安にします。review pack はまとめて起こさず、intake・implementation・wrap-up の波に分けます
+- global runtime cap は `.codex/config.toml` の `max_threads = 24`
+- `Scoped Change`: parent を除いて同時 6-8 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 5-7 まで
+- `Research-Driven Change`: parent を除いて同時 9-12 agent を目安にします。perspective reviewer は batch で回します
+- `Platform And Environment` と `Large Delivery`: parent を除いて同時 8-10 agent を目安にします。planning / design / review を wave に分けます
+- `Comprehensive Development` と `Adaptive Improvement Loop`: parent を除いて同時 9-12 agent を目安にします。review pack はまとめて起こさず、intake・implementation・wrap-up の波に分けます
 - depth は固定しませんが、cap を超える fan-out は許可しません。必要な role が多いときは stage を細かく切って順次起動します
 
 ## Workflow Families
@@ -208,7 +215,7 @@ concurrent spawn budget:
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
-1. active な subagent は同時 5 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
+1. active な subagent は同時 8 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
 
 ### 2. Research-Driven Change
 
@@ -237,7 +244,7 @@ concurrent spawn budget:
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
 - agent が code change と run を継続反復する場合は `adaptive-improvement-loop` を追加する
 - methodology、artifact、reporting policy を大きく変える場合は perspective reviewers を default にします
-- active な subagent は同時 8 体までを既定にし、追加枠は read-only reviewer / researcher に使います
+- active な subagent は同時 12 体までを既定にし、追加枠は read-only reviewer / researcher に使います
 - repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
 
 ### 3. Large Delivery

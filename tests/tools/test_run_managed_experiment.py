@@ -7,24 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-CHECK_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "ci"
-    / "check_experiment_registry.py"
-)
+CHECK_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "check_experiment_registry.py"
 CREATE_TOPIC_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "create_experiment_topic.py"
+    Path(__file__).resolve().parents[2] / "tools" / "experiments" / "create_experiment_topic.py"
 )
-SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "run_managed_experiment.py"
-)
+SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "run_managed_experiment.py"
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "tools"
@@ -32,15 +19,9 @@ SYNC_CONTEXT_SCRIPT = (
     / "sync_experiment_registry_context.py"
 )
 CANONICAL_ENTRYPOINT = "experiments/demo_topic/experimentcode.py"
-SMOKE_INNER_COMMAND = (
-    f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode smoke"
-)
-FORMAL_INNER_COMMAND = (
-    f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode formal"
-)
-RECURSIVE_RUNNER_COMMAND = (
-    "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
-)
+SMOKE_INNER_COMMAND = f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode smoke"
+FORMAL_INNER_COMMAND = f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} --mode formal"
+RECURSIVE_RUNNER_COMMAND = "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
 
 
 def build_repo(tmp_path: Path) -> Path:
@@ -85,7 +66,7 @@ def build_repo(tmp_path: Path) -> Path:
                 "import json",
                 "from pathlib import Path",
                 "",
-                'parser = argparse.ArgumentParser()',
+                "parser = argparse.ArgumentParser()",
                 'parser.add_argument("--run-dir", required=True)',
                 'parser.add_argument("--mode", required=True)',
                 "args = parser.parse_args()",
@@ -93,11 +74,17 @@ def build_repo(tmp_path: Path) -> Path:
                 "run_dir.mkdir(parents=True, exist_ok=True)",
                 "(run_dir / 'marker.txt').write_text(args.mode, encoding='utf-8')",
                 "(run_dir / 'summary.json').write_text(",
-                "    json.dumps({'status': 'completed', 'mode': args.mode}, ensure_ascii=True) + '\\n',",
+                (
+                    "    json.dumps({'status': 'completed', 'mode': args.mode}, "
+                    "ensure_ascii=True) + '\\n',"
+                ),
                 "    encoding='utf-8',",
                 ")",
                 "(run_dir / 'cases.jsonl').write_text(",
-                "    json.dumps({'case_id': 'demo-1', 'status': 'ok', 'mode': args.mode}, ensure_ascii=True) + '\\n',",
+                (
+                    "    json.dumps({'case_id': 'demo-1', 'status': 'ok', "
+                    "'mode': args.mode}, ensure_ascii=True) + '\\n',"
+                ),
                 "    encoding='utf-8',",
                 ")",
             ]
@@ -212,14 +199,17 @@ def test_run_managed_experiment_propagates_failure(tmp_path: Path) -> None:
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     eval_manifest = json.loads(
-        (repo_root / "experiments" / "demo_topic" / "result" / run_name / "eval_manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            repo_root / "experiments" / "demo_topic" / "result" / run_name / "eval_manifest.json"
+        ).read_text(encoding="utf-8")
     )
     assert manifest["status"] == "failed"
     assert manifest["exit_code"] == 7
     assert manifest["command_source"] == "manual"
-    assert manifest["eval_artifacts"]["missing_required_patterns"] == ["summary.json", "cases.jsonl"]
+    assert manifest["eval_artifacts"]["missing_required_patterns"] == [
+        "summary.json",
+        "cases.jsonl",
+    ]
     assert eval_manifest["artifact_count"] == 0
 
 
@@ -231,7 +221,10 @@ def test_run_managed_experiment_collects_topic_specific_optional_eval_artifacts(
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_text = registry_path.read_text(encoding="utf-8").replace(
         f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
-        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\noptional_eval_artifacts = ["marker.txt"]',
+        (
+            f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\n'
+            'optional_eval_artifacts = ["marker.txt"]'
+        ),
     )
     registry_path.write_text(registry_text, encoding="utf-8")
     run_name = "demo_topic_formal_20260406T000000Z"
@@ -356,12 +349,15 @@ def test_run_managed_experiment_excludes_managed_files_from_optional_wildcards(
 def test_run_managed_experiment_keeps_nested_run_log_artifacts_collectable(
     tmp_path: Path,
 ) -> None:
-    """The helper should exclude only top-level managed files, not nested logs with the same name."""
+    """The helper should keep nested log artifacts collectable."""
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_text = registry_path.read_text(encoding="utf-8").replace(
         f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
-        f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\noptional_eval_artifacts = ["logs/run.log"]',
+        (
+            f'formal_inner_command = "{FORMAL_INNER_COMMAND}"\n'
+            'optional_eval_artifacts = ["logs/run.log"]'
+        ),
     )
     registry_path.write_text(registry_text, encoding="utf-8")
     experiment_path = repo_root / "experiments" / "demo_topic" / "experimentcode.py"

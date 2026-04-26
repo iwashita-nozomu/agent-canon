@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Dependency Files:
+# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
+# - vendor/agent-canon/tests/agent_tools/test_check_dependency_headers.py
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
@@ -147,6 +150,7 @@ tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/ag
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
+tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
@@ -709,17 +713,10 @@ cmd_ensure_latest() {
 
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
-  local snapshot_sha=""
   require_clean_worktree
   require_existing_remote
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
-  if git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch" >/dev/null 2>&1; then
-    echo "agent_canon_push_method=subtree_push"
-    return
-  fi
-  snapshot_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: push agent-canon snapshot")"
-  git -C "$ROOT_DIR" push --force "$REMOTE_NAME" "${snapshot_sha}:refs/heads/${branch}" >/dev/null
-  echo "agent_canon_push_method=commit_tree_snapshot_after_subtree_push_failure"
+  git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch"
 }
 
 cmd_status() {

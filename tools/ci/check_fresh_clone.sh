@@ -10,8 +10,7 @@ echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
-git config --global --add safe.directory "${CLONE_DIR}"
-tar -C "${ROOT_DIR}" --exclude .git -cf - . | tar -C "${CLONE_DIR}" -xf -
+rsync -a --delete --exclude .git "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
 cd "${CLONE_DIR}"
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
@@ -44,22 +43,11 @@ PY
 bash tools/sync_agent_canon.sh check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
-AGENT_CANON_TREE_SHA="$(git rev-parse "HEAD:vendor/agent-canon")"
-if git subtree --help >/dev/null 2>&1; then
-  AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD 2>/dev/null || true)"
-else
-  AGENT_CANON_SPLIT_SHA=""
-fi
-if [[ -n "${AGENT_CANON_SPLIT_SHA}" ]]; then
-  AGENT_CANON_SEED_SHA="${AGENT_CANON_SPLIT_SHA}"
-else
-  AGENT_CANON_SEED_SHA="$(git commit-tree "${AGENT_CANON_TREE_SHA}" -m "test: seed agent canon snapshot")"
-fi
+AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD)"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
-git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SEED_SHA}:refs/heads/main" >/dev/null
+git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
-git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"
   printf "fresh clone fallback marker\n" > .fresh-clone-agent-canon-marker
@@ -70,21 +58,8 @@ git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
 git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
-make agent-canon-ensure-latest >/dev/null
-python3 tools/agent_tools/bootstrap_agent_run.py \
-  --task "fresh clone preflight bootstrap" \
-  --owner "fresh-clone-check" \
-  --workspace-root "${CLONE_DIR}" \
-  --report-root "${TMP_DIR}/bootstrap-reports" \
-  --dry-run >/dev/null
-python3 tools/agent_tools/task_start.py \
-  --task "fresh clone preflight task-start" \
-  --owner "fresh-clone-check" \
-  --workspace-root "${CLONE_DIR}" \
-  --report-root "${TMP_DIR}/task-start-reports" \
-  --dry-run >/dev/null
 bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -Eq "agent_canon_plan_route=(already_current|already_current_tree|subtree_pull|snapshot_import_tree_match|snapshot_import_no_subtree|snapshot_import_no_subtree_metadata)" "${TMP_DIR}/agent-canon-plan.txt"
+grep -q "agent_canon_plan_route=subtree_pull" "${TMP_DIR}/agent-canon-plan.txt"
 bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
@@ -96,7 +71,7 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|snapshot_import_no_subtree_metadata)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks

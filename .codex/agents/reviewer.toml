@@ -3,7 +3,7 @@ description = "Read-only review agent for diffs, regressions, and documentation 
 nickname_candidates = ["review", "findings", "gate"]
 sandbox_mode = "read-only"
 approval_policy = "never"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 developer_instructions = """
