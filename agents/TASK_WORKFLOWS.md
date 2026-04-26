@@ -1,15 +1,13 @@
-# Agent Task Workflows
 <!--
 @dependency-start
 upstream design README.md agent canon overview
+upstream implementation task_catalog.yaml workflow family defaults
+upstream design canonical/CODEX_SUBAGENTS.md subagent role contract
+downstream design workflows/implementation-waterfall-workflow.md stage gate implementation flow
 @dependency-end
 -->
 
-
-Dependency Files:
-- vendor/agent-canon/.codex/config.toml
-- vendor/agent-canon/agents/task_catalog.yaml
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
+# Agent Task Workflows
 
 この文書は、repo で使う workflow family の正本です。
 task を細かく増やしすぎず、少数の family に寄せて運用します。
