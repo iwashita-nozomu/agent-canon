@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # upstream design README.md shared automation index
+# upstream environment ../../../docker/Dockerfile canonical image tool inventory
 # @dependency-end
 
 set -euo pipefail
@@ -60,6 +61,8 @@ check_dockerfile_coherence() {
     || report_warning "Dockerfile does not reference requirements.txt"
   grep -Eiq 'pip[[:space:]]+install.*-r[[:space:]]+[^[:space:]]*requirements\.txt' "$dockerfile" \
     || report_warning "Dockerfile does not install docker/requirements.txt through pip -r"
+  grep -Eq '(^|[[:space:]])rsync([[:space:]]|\\|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must install rsync so fresh-clone overlay works in the canonical container"
 }
 
 is_container_runtime() {

@@ -45,6 +45,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - canonical container の `safe.directory` は Docker image 側で明示設定しなければなりません。run-time entrypoint や ad hoc env だけで後付けすることを禁止します。
 - template の canonical Dockerfile では、`/workspace` と local bare remote 置き場 `/mnt/git/*.git` に必要な `safe.directory` を build 時の `git config --global --add safe.directory ...` で正本化しなければなりません。
 - Docker container 内から Docker を使う手順を正本にする場合は、同梱するのは CLI だけとし、host socket mount または別 daemon が必要であることを文書へ明記しなければなりません。
+- canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は script の fallback で検証を継続できますが、Dockerfile 側の欠落を放置してはいけません。
 
 ## 4.5 環境依存ツール導入提案のルール
 
