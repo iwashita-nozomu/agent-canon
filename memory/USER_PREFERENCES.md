@@ -5,11 +5,6 @@ upstream design README.md memory surface index
 @dependency-end
 -->
 
-
-Dependency Files:
-- vendor/agent-canon/ROOT_AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 この file は、会話から抽出した user の coding philosophy、review expectation、document preference を逐次追記する append-first note です。
 `AGENTS.md` へ入れる前の観測をここへ集め、十分に安定した項目だけを periodic sweep で昇格させます。
 

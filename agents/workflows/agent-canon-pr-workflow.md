@@ -1,15 +1,12 @@
 # agent-canon PR ワークフロー
 <!--
 @dependency-start
+upstream implementation ../../tools/sync_agent_canon.sh sync implementation
+upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
+downstream design ../../documents/agent-canon-subtree-migration.md subtree migration contract consumes PR workflow
+downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 @dependency-end
 -->
-
-
-Dependency Files:
-- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
-- vendor/agent-canon/documents/agent-canon-subtree-migration.md
-- vendor/agent-canon/tools/sync_agent_canon.sh
-- vendor/agent-canon/tools/ci/check_agent_canon_pr.sh
 
 この文書は、`vendor/agent-canon/` を source of truth とする shared canon 変更を PR に乗せるときの正本です。
 template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本の手順で扱います。

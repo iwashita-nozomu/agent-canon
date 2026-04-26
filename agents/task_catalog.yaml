@@ -1,11 +1,8 @@
 # @dependency-start
+# downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
+# downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
+# downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # @dependency-end
-
-# Dependency Files:
-# - vendor/agent-canon/.codex/config.toml
-# - vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-
 version: 2
 
 workflow_families:

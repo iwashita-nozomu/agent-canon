@@ -4,12 +4,6 @@
 @dependency-end
 -->
 
-
-Dependency Files:
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-- vendor/agent-canon/agents/templates/closeout_gate.md
-- vendor/agent-canon/tools/agent_tools/task_close.py
-
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
 The shared agent canon lives in `vendor/agent-canon/`, and the root discovery paths are runtime views into that snapshot.
 

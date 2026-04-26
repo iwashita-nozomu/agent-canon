@@ -5,12 +5,6 @@ upstream design ../TASK_WORKFLOWS.md workflow routing contract
 @dependency-end
 -->
 
-
-Dependency Files:
-- vendor/agent-canon/agents/TASK_WORKFLOWS.md
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-- vendor/agent-canon/documents/agent-canon-subtree-migration.md
-
 この文書は、`agents/workflows/` 配下の workflow catalog と routing guide の入口です。
 repo 利用者も `agent-canon` maintainer も、まずここで「今回どの workflow を primary にし、どの overlay を重ねるか」を決めます。
 
