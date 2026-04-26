@@ -14,6 +14,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 
 - user が agent の人格形成、作業哲学、対話からの継続学習を求めている
 - task closeout で、次回以降の agent 行動を変える観測がある
+- run bundle を評価し、agent feedback action を closeout 前に潰したい
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい
 - raw chat ではなく、evidence 付きの短い observation として残したい
 - self-learning と対話記録の追記を shared canon 側の責務として閉じたい
@@ -27,6 +28,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `documents/notes-lifecycle.md`
 - `agents/workflows/workflow-references.md`
 - `tools/agent_tools/log_agent_learning.py`
+- `tools/agent_tools/evaluate_agent_run.py`
 
 ## Mandatory Checklist
 
@@ -34,11 +36,18 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - raw transcript を貼らず、短い observation に圧縮する
 - source、evidence、scope、confidence を書く
 - task-local な一時指示を stable philosophy にしない
+- `evaluate_agent_run.py --write` で `agent_evaluation.md` を作り、feedback action を closeout 前に解決する
 - `memory/` への追記を template local artifact だけで終わらせず、shared canon update として closeout する
 - promotion candidate は `AGENTS.md` へ直書きせず、periodic sweep で昇格する
 - 確定した禁止事項は `engineering_avoidances.md` への昇格候補にする
 
 ## Default Commands
+
+```bash
+python3 tools/agent_tools/evaluate_agent_run.py \
+  --report-dir reports/agents/<run-id> \
+  --write
+```
 
 ```bash
 python3 tools/agent_tools/log_agent_learning.py \

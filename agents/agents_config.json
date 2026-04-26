@@ -1,4 +1,10 @@
 {
+  "_dependency_manifest": [
+    "@dependency-start",
+    "upstream implementation ../tools/agent_tools/agent_team.py loads this runtime team configuration",
+    "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
+    "@dependency-end"
+  ],
   "version": 16,
   "team": {
     "id": "repo_permanent_team",
@@ -272,15 +278,17 @@
       ],
       "required_outputs": [
         "closeout_gate.md",
+        "agent_evaluation.md",
         "retrospective.md"
       ],
       "write_policy": {
         "mode": "artifacts_only",
         "allowed_artifacts": [
           "closeout_gate",
+          "agent_evaluation",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes and review_findings_integrated=yes are evidenced."
+        "notes": "Audit closeout is recorded in the closeout gate, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, and agent evaluation feedback is resolved."
       }
     }
   ],
@@ -1644,6 +1652,7 @@
     "final_review": "final_review.md",
     "verification": "verification.txt",
     "closeout_gate": "closeout_gate.md",
+    "agent_evaluation": "agent_evaluation.md",
     "retrospective": "retrospective.md",
     "research_notes": "research_notes.md",
     "research_review": "research_review.md",

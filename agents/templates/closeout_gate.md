@@ -3,7 +3,7 @@
 <!--
 @dependency-start
 upstream design ../canonical/CODEX_WORKFLOW.md closeout workflow contract
-upstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
 @dependency-end
 -->
@@ -27,6 +27,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
 - canonical_tree_head_complete: no
+- agent_evaluation_complete: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -48,6 +49,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
 - canonical_tree_head_complete: yes
+- agent_evaluation_complete: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -74,6 +76,10 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Canonical Tree-Head Evidence
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
+
+## Agent Evaluation Evidence
+
+<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. -->
 
 ## Evidence
 

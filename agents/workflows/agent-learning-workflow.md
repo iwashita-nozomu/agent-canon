@@ -13,6 +13,7 @@ upstream design README.md workflow catalog
 - user preference と agent philosophy を混同しない
 - raw chat ではなく、短い observation と evidence に圧縮して残す
 - 毎 task の closeout で、学習すべき項目があるか確認する
+- 毎 task の closeout で、run bundle を評価し、agent feedback action を明示する
 - stable になった項目だけを `AGENTS.md`、workflow、review rule へ昇格する
 - 自己学習と対話記録の追記を template local artifact ではなく shared canon workflow の責務として扱う
 
@@ -24,6 +25,13 @@ upstream design README.md workflow catalog
 - Value Sensitive Design は、価値を設計過程全体で扱う方法論です。この repo では、user preference、agent philosophy、repo rule、review gate を分けて、価値の出所を追跡可能にします。
 - extended mind は、外部 notebook や言語的 scaffold が認知の一部になり得ると見る立場です。この repo では、notes を agent の外部記憶として扱い、入口文書で毎回読む対象にします。
 - human-feedback preference learning は、対話や評価から preference を更新する実装上の比喩を与えます。ただし、この repo では raw feedback を自動学習せず、agent が evidence 付き observation として明示的に記録します。
+
+## External Evaluation Basis
+
+- OpenAI の agent eval guidance は、debug 中は trace grading で tool call、handoff、policy adherence、prompt/routing change の影響を見ることを推奨しています。Source: https://platform.openai.com/docs/guides/agent-evals
+- OpenAI の trace grading guidance は、end-to-end trace に structured score / label を付け、workflow がどこで成功・失敗したかを特定する考え方を説明しています。Source: https://platform.openai.com/docs/guides/trace-grading
+- OpenAI の Codex 運用記事は、agent が失敗したときに「何の tool / guardrail / documentation が足りないか」を repo に戻し、review feedback と validation を loop 化する方針を説明しています。Source: https://openai.com/index/harness-engineering/
+- この repo では外部 API 依存を closeout gate に入れず、同じ原則を `reports/agents/<run-id>/agent_evaluation.md` と `tools/agent_tools/evaluate_agent_run.py` に写像します。
 
 ## Canonical Notes
 
@@ -59,6 +67,28 @@ python3 tools/agent_tools/log_user_preference.py \
   --source chat
 ```
 
+## Agent Run Evaluation
+
+closeout 前に run bundle を評価し、採点結果と feedback action を `agent_evaluation.md` に固定します。
+
+```bash
+python3 tools/agent_tools/evaluate_agent_run.py \
+  --report-dir reports/agents/<run-id> \
+  --write
+```
+
+評価対象:
+
+- request clause traceability
+- schedule / work log の completeness
+- review feedback の resolution
+- validation / commit / push evidence
+- dependency manifest と canonical tree-head evidence
+- retrospective と learning capture
+
+`AGENT_EVALUATION_STATUS=revise` の場合は、出力された feedback action を schedule/work_log/該当 artifact に反映し、再度 evaluation を通します。
+`AGENT_EVALUATION_STATUS=pass` になり、`agent_evaluation.md` の `feedback_actions_resolved: yes` と `learning_capture_complete: yes` が揃うまで、`task_close.py` は user-facing completion を許可しません。
+
 ## Kind Definitions
 
 - `interaction-observation`
@@ -78,6 +108,8 @@ python3 tools/agent_tools/log_user_preference.py \
 
 closeout 前に次を確認します。
 
+1. `tools/agent_tools/evaluate_agent_run.py --report-dir <run> --write` が pass したか
+1. `agent_evaluation.md` の feedback action が解決済みか
 1. user preference は `USER_PREFERENCES.md` に入れるべきか
 1. agent の作業哲学や対話上の再発防止は `AGENT_PHILOSOPHY.md` に入れるべきか
 1. 確定した禁止事項は `engineering_avoidances.md` に昇格すべきか

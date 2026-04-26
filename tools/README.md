@@ -44,6 +44,21 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `docker_dependency_validator.sh`
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
+  - `agent_tools/evaluate_agent_run.py`
+
+## Agent Evaluation Tools
+
+`evaluate_agent_run.py` grades one `reports/agents/<run-id>/` bundle before closeout.
+It turns review / validation / schedule / retrospective evidence into `agent_evaluation.md` with a score and fix-now feedback actions.
+This is the repo-local counterpart to trace / eval feedback loops: use it to identify missing tooling, guardrails, documentation, or run evidence before the user-facing completion report.
+
+```bash
+python3 tools/agent_tools/evaluate_agent_run.py \
+  --report-dir reports/agents/<run-id> \
+  --write
+```
+
+`task_close.py` requires `agent_evaluation.md` to report `evaluation_status: pass`, `feedback_actions_resolved: yes`, and `learning_capture_complete: yes`.
 
 ## Dependency Manifest Tools
 

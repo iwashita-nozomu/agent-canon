@@ -93,6 +93,13 @@ strip_manifest_line() {
   esac
   line="${line#"${line%%[![:space:]]*}"}"
   line="${line%"${line##*[![:space:]]}"}"
+  line="${line%,}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  line="${line%"${line##*[![:space:]]}"}"
+  if [[ "$line" == \"*\" ]]; then
+    line="${line#\"}"
+    line="${line%\"}"
+  fi
   printf '%s\n' "$line"
 }
 
