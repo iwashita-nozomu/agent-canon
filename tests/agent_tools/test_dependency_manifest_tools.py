@@ -5,6 +5,7 @@
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest markers
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
+# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide review
 # @dependency-end
 
 from __future__ import annotations
@@ -312,6 +313,59 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
+
+    def test_repo_review_reports_missing_manifests_without_failing_by_default(self) -> None:
+        """The repo-wide wrapper keeps missing headers report-only during migration."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            source = root / "source.md"
+            source.write_text("# Source\n\nBody.\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(str(REPO_REVIEW), "--root", str(root), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("MISSING_DEPENDENCY_MANIFEST=source.md", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
+
+    def test_repo_review_can_require_missing_manifests(self) -> None:
+        """Strict mode fails when tracked checkable files lack manifests."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            source = root / "source.md"
+            source.write_text("# Source\n\nBody.\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(str(REPO_REVIEW), "--root", str(root), "--fail-missing", root=root)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("MISSING_DEPENDENCY_MANIFEST=source.md", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
 
 
 if __name__ == "__main__":

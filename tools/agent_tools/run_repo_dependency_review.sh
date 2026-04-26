@@ -10,14 +10,16 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 CHECK_BIDIRECTIONAL=0
+FAIL_MISSING=0
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
+Missing manifests are report-only by default until the repository-wide migration is complete.
 EOF
 }
 
@@ -29,6 +31,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --check-bidirectional)
       CHECK_BIDIRECTIONAL=1
+      shift
+      ;;
+    --fail-missing)
+      FAIL_MISSING=1
       shift
       ;;
     -h|--help)
@@ -54,8 +60,15 @@ mapfile -t checkable_paths < <(
 
 echo "REPO_DEPENDENCY_REVIEW_PATHS=${#checkable_paths[@]}"
 
-bash tools/agent_tools/scan_dependency_headers.sh --fail-missing "${checkable_paths[@]}"
-bash tools/agent_tools/check_dependency_header_format.sh --require-header "${checkable_paths[@]}"
+scan_args=(tools/agent_tools/scan_dependency_headers.sh)
+format_args=(tools/agent_tools/check_dependency_header_format.sh)
+if [[ "$FAIL_MISSING" -eq 1 ]]; then
+  scan_args+=(--fail-missing)
+  format_args+=(--require-header)
+fi
+
+bash "${scan_args[@]}" "${checkable_paths[@]}"
+bash "${format_args[@]}" "${checkable_paths[@]}"
 
 graph_args=(tools/agent_tools/check_dependency_graph.sh)
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
