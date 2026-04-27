@@ -91,6 +91,138 @@ Operational interpretation:
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
 - `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
+## Current Template Coverage Matrix
+
+The current repo intentionally configures only a small subset of the official schema.
+The lists below are not recommendations to enable every key.
+They are an explicit inventory of settings that Codex can accept but this template does not currently put in `.codex/config.toml`.
+
+### Currently Configured Top-Level Keys
+
+| Key | Current Role In This Repo |
+| --- | ------------------------- |
+| `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
+| `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
+| `features` | Only `features.codex_hooks=true` is configured. |
+| `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
+| `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
+
+### Top-Level Keys Not Currently In `.codex/config.toml`
+
+| Category | Absent Keys |
+| -------- | ----------- |
+| Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_effort`, `plan_mode_reasoning_effort`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_verbosity`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
+| Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
+| Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
+| Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_output_token_limit`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
+| MCP OAuth and auth storage | `mcp_oauth_callback_port`, `mcp_oauth_callback_url`, `mcp_oauth_credentials_store`, `cli_auth_credentials_store`, `forced_chatgpt_workspace_id`, `forced_login_method` |
+| UI, history, logging, and local state | `tui`, `history`, `log_dir`, `sqlite_home`, `notify`, `file_opener`, `feedback`, `analytics`, `notice`, `check_for_update_on_startup`, `suppress_unstable_features_warning`, `disable_paste_burst`, `commit_attribution`, `compact_prompt`, `hide_agent_reasoning`, `show_raw_agent_reasoning`, `background_terminal_max_timeout` |
+| Memory, observability, and snapshots | `memories`, `otel`, `ghost_snapshot`, `auto_review` |
+| Realtime, audio, JS, and platform-specific settings | `realtime`, `audio`, `js_repl_node_module_dirs`, `js_repl_node_path`, `windows`, `windows_wsl_setup_acknowledged`, `zsh_path` |
+| Experimental thread/realtime/tool overrides | `experimental_compact_prompt_file`, `experimental_realtime_start_instructions`, `experimental_realtime_ws_backend_prompt`, `experimental_realtime_ws_base_url`, `experimental_realtime_ws_model`, `experimental_realtime_ws_startup_context`, `experimental_thread_config_endpoint`, `experimental_thread_store_endpoint`, `experimental_use_freeform_apply_patch`, `experimental_use_unified_exec_tool` |
+| Profile selection | `profile`, `profiles`, `personality` |
+
+Interpretation for this template:
+
+- Absent model/provider keys should usually be placed in user config or profiles unless the repo requires a shared default.
+- Absent UI, history, audio, notice, Windows, credential-store, and OAuth keys are machine-local by default.
+- Absent `hooks` does not mean hooks are unused here; this repo uses the sibling `.codex/hooks.json` surface rather than inline TOML hooks.
+- Absent `skills` does not mean skills are unavailable; this repo provides skills through `.agents/skills/`.
+- Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
+
+### Feature Flags Not Currently Enabled Here
+
+The schema currently exposes many feature flags under `[features]`.
+This template enables only `codex_hooks`.
+All other schema-listed flags are currently absent from the shared repo config:
+
+```text
+apply_patch_freeform
+apply_patch_streaming_events
+apps
+browser_use
+child_agents_md
+chronicle
+code_mode
+code_mode_only
+codex_git_commit
+collab
+collaboration_modes
+computer_use
+connectors
+default_mode_request_user_input
+elevated_windows_sandbox
+enable_experimental_windows_sandbox
+enable_fanout
+enable_request_compression
+exec_permission_approvals
+experimental_use_freeform_apply_patch
+experimental_use_unified_exec_tool
+experimental_windows_sandbox
+external_migration
+fast_mode
+general_analytics
+guardian_approval
+image_detail_original
+image_generation
+in_app_browser
+include_apply_patch_tool
+js_repl
+js_repl_tools_only
+memories
+memory_tool
+multi_agent
+multi_agent_v2
+personality
+plugins
+prevent_idle_sleep
+realtime_conversation
+remote_control
+remote_models
+remote_plugin
+request_permissions
+request_permissions_tool
+request_rule
+responses_websockets
+responses_websockets_v2
+runtime_metrics
+search_tool
+shell_snapshot
+shell_tool
+shell_zsh_fork
+skill_env_var_dependency_prompt
+skill_mcp_dependency_install
+sqlite
+steer
+telepathy
+tool_call_mcp_elicitation
+tool_search
+tool_search_always_defer_mcp_tools
+tool_suggest
+tui_app_server
+unavailable_dummy_tools
+undo
+unified_exec
+use_legacy_landlock
+use_linux_sandbox_bwrap
+web_search
+web_search_cached
+web_search_request
+workspace_dependencies
+workspace_owner_usage_nudge
+```
+
+### Nested Settings Not Currently Used By The Template
+
+| Surface | Configured Here | Schema-Available But Absent Here |
+| ------- | --------------- | -------------------------------- |
+| `[agents]` | `max_threads`, `job_max_runtime_seconds` | `max_depth` and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` |
+| `[mcp_servers.repo_mcp_server]` | `command`, `args`, `enabled`, `required`, `startup_timeout_sec`, `tool_timeout_sec` | `url`, `cwd`, `env`, `env_vars`, `http_headers`, `env_http_headers`, `bearer_token_env_var`, `enabled_tools`, `disabled_tools`, `tools`, `default_tools_approval_mode`, `supports_parallel_tool_calls`, `oauth_resource`, `scopes`, `startup_timeout_ms`, `experimental_environment`, `name` |
+| `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
+| `.agents/skills/` versus `[skills]` | skills are provided as files under `.agents/skills/` | `[skills] include_instructions`, `[skills.bundled]`, and `[[skills.config]]` name/path enablement entries |
+
+Use this matrix during reviews: if a task proposes adding one of these absent keys, require a short reason for why it belongs in shared repo config rather than user config, a profile, CLI override, hook file, skill file, or machine-local state.
+
 ## CLI Commands and Config-Relevant Flags
 
 | Command | Config-relevant behavior |

@@ -97,6 +97,80 @@ tool_timeout_sec = 300
 
 ---
 
+# Template に入っていないもの
+
+現在の `.codex/config.toml` に入っている top-level key は 5 つだけです。
+
+- `approval_policy`
+- `sandbox_mode`
+- `features`
+- `agents`
+- `mcp_servers`
+
+それ以外の official schema key は「Codex が受け付けるが、この template には未設定」です。
+
+---
+
+# 未設定 top-level の代表カテゴリ
+
+- model / provider / reasoning
+- approvals reviewer / permissions / sandbox detail
+- project doc discovery / injected context
+- inline hooks / tools / skills / apps / plugins
+- MCP OAuth / credential stores
+- UI / history / logs / notifications
+- memory / OTEL / ghost snapshots
+- realtime / audio / JS REPL / Windows
+- experimental overrides
+- profiles / personality
+
+---
+
+# 未設定は不足とは限らない
+
+未設定の理由を分類します。
+
+- user config に置くべきもの: model、provider、profile
+- machine-local なもの: TUI、history、audio、notice、Windows onboarding
+- secret を含み得るもの: provider auth、headers、OAuth、credential stores
+- repo では別 surface のもの: hooks は `hooks.json`、skills は `.agents/skills`
+- 危険・不安定なもの: `experimental_*`
+
+---
+
+# Feature flags
+
+この template で有効なのは `codex_hooks` のみです。
+
+schema には他にも多くの flag があります。
+例:
+
+- `multi_agent`, `multi_agent_v2`
+- `web_search`, `web_search_cached`, `search_tool`
+- `image_generation`, `apps`, `plugins`
+- `tool_search`, `tool_suggest`
+- `memories`, `memory_tool`
+- `unified_exec`, `shell_tool`
+- `experimental_use_freeform_apply_patch`
+
+---
+
+# Nested で未設定のもの
+
+`[agents]`:
+
+- 未設定: `max_depth`
+- 未設定: inline role entries
+
+`[mcp_servers.repo_mcp_server]`:
+
+- 未設定: `url`, `cwd`, `env`, `env_vars`
+- 未設定: `enabled_tools`, `disabled_tools`, `tools`
+- 未設定: HTTP headers / bearer token / OAuth
+- 未設定: `supports_parallel_tool_calls`
+
+---
+
 # CLI override
 
 ```bash
