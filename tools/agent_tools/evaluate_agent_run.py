@@ -165,6 +165,8 @@ def has_open_review_findings(*texts: str) -> bool:
     for text in texts:
         cleaned = markdown_without_comments(text).lower()
         for line in cleaned.splitlines():
+            if re.search(r"\b(no|none)\b.*\b(fix-now|required_change|open)\b", line):
+                continue
             if "fix-now" in line and any(token in line for token in ("open", "pending")):
                 return True
             if "required_change" in line and not any(
