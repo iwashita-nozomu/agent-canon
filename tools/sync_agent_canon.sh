@@ -161,6 +161,7 @@ documents/tools/TOOLS_DIRECTORY.md:../../${PREFIX}/documents/tools/TOOLS_DIRECTO
 memory/README.md:../${PREFIX}/memory/README.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
+mcp:${PREFIX}/mcp
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
