@@ -102,6 +102,8 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .codex/config.toml:../${PREFIX}/.codex/config.toml
 .codex/README.md:../${PREFIX}/.codex/README.md
 .codex/agents:../${PREFIX}/.codex/agents
+.codex/hooks.json:../${PREFIX}/.codex/hooks.json
+.codex/hooks:../${PREFIX}/.codex/hooks
 .github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
@@ -196,6 +198,7 @@ tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_s
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
 tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
+tests/agent_tools/test_codex_hooks.py:../../${PREFIX}/tests/agent_tools/test_codex_hooks.py
 tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
 tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
 tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/test_evaluate_agent_run.py
