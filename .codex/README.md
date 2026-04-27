@@ -32,6 +32,8 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 
 - `max_threads = 24`
   - runtime hard ceiling として使います
+- `job_max_runtime_seconds = 3600`
+  - 長めの review / repo scan / validation を含む subagent job を 1 時間まで許容します
 - depth は repo config で固定しません
 - 同時 spawn の既定 budget は workflow family 側で決めます
   - `Scoped Change`: 8
@@ -44,6 +46,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - `repo_mcp_server` は [config.toml](config.toml) の `[mcp_servers.repo_mcp_server]` を正本にします。
 - launcher は host-global `repo_mcp_server` command ではなく、repo-local `bash mcp/repo_mcp_server.sh` を使います。
 - root `mcp/` は `vendor/agent-canon/mcp/` への runtime view で、`tools/sync_agent_canon.sh link-root` が復元します。
+- MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
 - MCP 前提の task では、local process を手で起動する前に `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
 - `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
 - `check_mcp_inventory.py` は inventory だけでなく launcher command と repo-local script の存在も検査します。
