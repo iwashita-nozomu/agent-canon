@@ -348,9 +348,10 @@ def render_markdown(
     max_score = sum(item.max_score for item in criteria)
     status = "pass" if score >= min_score and not blockers else "revise"
     feedback_resolved = "yes" if status == "pass" else "no"
+    learning_criteria = {"learning_and_feedback_capture", "self_improvement_feedback_capture"}
     learning_complete = (
         "yes"
-        if any(item.name == "learning_and_feedback_capture" and item.status == "pass" for item in criteria)
+        if any(item.name in learning_criteria and item.status == "pass" for item in criteria)
         else "no"
     )
     lines = [

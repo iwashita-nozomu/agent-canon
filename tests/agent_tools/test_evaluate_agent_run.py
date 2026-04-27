@@ -170,6 +170,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
             report = (report_dir / "agent_evaluation.md").read_text(encoding="utf-8")
             self.assertIn("- evaluation_status: pass", report)
             self.assertIn("- feedback_actions_resolved: yes", report)
+            self.assertIn("- learning_capture_complete: yes", report)
 
     def test_evaluate_ready_run_ignores_template_comment_revise_text(self) -> None:
         """Template comments containing revise should not be treated as open findings."""

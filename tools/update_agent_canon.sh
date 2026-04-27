@@ -247,28 +247,6 @@ cmd_proposal_branch() {
   echo "agent_canon_proposal_branch_source=derived"
 }
 
-split_prefix_snapshot() {
-  local split_sha=""
-
-  if ! git subtree --help >/dev/null 2>&1; then
-    return 1
-  fi
-
-  split_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null || true)"
-  if [[ -n "$split_sha" ]]; then
-    printf '%s\n' "$split_sha"
-    return 0
-  fi
-
-  split_sha="$(git -C "$ROOT_DIR" subtree split --ignore-joins --prefix="$PREFIX" HEAD 2>/dev/null || true)"
-  if [[ -n "$split_sha" ]]; then
-    printf '%s\n' "$split_sha"
-    return 0
-  fi
-
-  return 1
-}
-
 seed_snapshot_into_bare() {
   local bare_repo_path="$1"
   local branch="$2"
@@ -279,7 +257,8 @@ seed_snapshot_into_bare() {
     return
   fi
 
-  if seed_sha="$(split_prefix_snapshot)"; then
+  if git subtree --help >/dev/null 2>&1; then
+    seed_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD)"
     echo "agent_canon_seed_method=subtree_split"
   else
     seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
