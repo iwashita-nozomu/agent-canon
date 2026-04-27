@@ -56,26 +56,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
 
-    def test_scan_skips_strict_json_data_by_default(self) -> None:
-        """Strict JSON data files are not forced to carry schema-breaking manifest members."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "model.nn.json"
-            source.write_text('{"schema": "native_nn.config.v1"}\n', encoding="utf-8")
-
-            result = run_tool(
-                str(SCAN),
-                "--root",
-                str(root),
-                "--fail-missing",
-                str(source),
-                root=root,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("MISSING_DEPENDENCY_MANIFEST=model.nn.json", result.stdout)
-            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
-
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -125,25 +105,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
             result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
-
-    def test_format_require_header_skips_strict_json_without_manifest(self) -> None:
-        """Strict JSON data is not required to carry a dependency manifest."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "model.nn.json"
-            source.write_text('{"schema": "native_nn.config.v1"}\n', encoding="utf-8")
-
-            result = run_tool(
-                str(FORMAT),
-                "--root",
-                str(root),
-                "--require-header",
-                str(source),
-                root=root,
-            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)

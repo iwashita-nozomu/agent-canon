@@ -25,6 +25,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - unfinished_tasks_absent: no
 - dependency_headers_complete: no
 - repo_wide_dependency_tools_complete: no
+- repo_wide_static_analysis_complete: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
@@ -48,6 +49,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - unfinished_tasks_absent: yes
 - dependency_headers_complete: yes
 - repo_wide_dependency_tools_complete: yes
+- repo_wide_static_analysis_complete: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -66,7 +68,11 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Repo-Wide Dependency Tool Evidence
 
-<!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. -->
+<!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. If any header is missing or invalid, fix it and rerun before unlock. -->
+
+## Repo-Wide Static Analysis Evidence
+
+<!-- Before user-facing completion, run full-repo static analysis. Preferred evidence is `make ci` because it includes pyright and ruff without quick-mode skips. If environment constraints prevent `make ci`, record full-repo `python3 -m pyright` and `python3 -m ruff check python tests --select D,E,F,I,UP` evidence and the toolchain repair performed. Do not unlock closeout with only `make ci-quick`. -->
 
 ## Spec-To-Product Coverage Evidence
 

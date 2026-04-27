@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # upstream design ../README.md shared automation index
-# upstream environment ../../notes/knowledge/environment_setup.md documents required host tooling
+# upstream environment ../../../../docker/Dockerfile installs rsync for canonical container runs
 # @dependency-end
 
 set -euo pipefail

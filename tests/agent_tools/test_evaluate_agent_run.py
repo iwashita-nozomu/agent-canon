@@ -117,6 +117,7 @@ def write_ready_run(report_dir: Path) -> None:
                 "- validation_complete: yes",
                 "- dependency_headers_complete: yes",
                 "- repo_wide_dependency_tools_complete: yes",
+                "- repo_wide_static_analysis_complete: yes",
                 "- canonical_tree_head_complete: yes",
                 "- commit_created: yes",
                 "- push_completed: yes",
