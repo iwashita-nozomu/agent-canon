@@ -99,7 +99,7 @@ def write_ready_run(report_dir: Path) -> None:
                 "",
                 "## Chunk Findings",
                 "",
-                "No blocking findings.",
+                "No fix-now findings are open.",
                 "",
             ]
         ),
