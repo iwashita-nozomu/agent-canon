@@ -3,12 +3,6 @@
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""
-
-# Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py
-# - vendor/agent-canon/tools/agent_tools/task_close.py
-# - vendor/agent-canon/agents/templates/closeout_gate.md
-
 from __future__ import annotations
 
 import subprocess

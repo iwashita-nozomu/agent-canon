@@ -8,6 +8,7 @@ downstream implementation ../tools/agent_tools/check_dependency_headers.py valid
 downstream implementation ../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
 downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax
 downstream implementation ../tools/agent_tools/check_dependency_graph.sh validates manifest graph semantics
+downstream implementation ../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 @dependency-end
@@ -234,6 +235,15 @@ Bidirectional consistency is a stricter migration gate because a partially migra
 
 The graph checker can be implemented with Bash, `awk`, `sort`, `comm`, and a small DFS in `awk`.
 If later graph requirements outgrow shell tooling, a Python implementation can replace only this layer while preserving the DSL and CLI contract.
+
+### `run_repo_dependency_review.sh`
+
+Responsibilities:
+
+- run the scan, format, and graph tools over all tracked checkable files
+- keep missing manifests report-only by default while repository-wide migration is incomplete
+- offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
+- pass `--check-bidirectional` through to graph validation when strict reverse-edge review is requested
 
 ## Migration Plan
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
+# upstream design ../../agents/skills/catalog.yaml shared skill catalog
+# upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill shim source contract
 # @dependency-end
-
-# Dependency Files:
-# - vendor/agent-canon/agents/skills/catalog.yaml
-# - vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md
 """
 Mirror skill shim directories from one discovery path to another.
 
