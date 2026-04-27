@@ -110,6 +110,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: During 20260427-041425, subtree-sync fixes had to be reapplied after agent-canon remote advanced and ci-quick caught the regression.
 
+- 2026-04-27 | interaction-observation | Implementation closeout must use a mechanical completion loop plus independent read-only diff-check agent approval to prevent shortcutting user-request scope.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User requested: 実装をはしょりすぎる癖があります。機械的なループを強制的に入れ，差分チェックエージェントに確認させましょう
+
 ## Task Retrospectives
 
 - まだなし

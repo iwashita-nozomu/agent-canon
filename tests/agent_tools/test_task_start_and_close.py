@@ -5,6 +5,7 @@
 """Tests for machine-driven task start and close commands."""
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,68 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+
+
+def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
+    """Return the current repository commit for closeout fixtures."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def current_diff_ref(workspace: Path = PROJECT_ROOT) -> str:
+    """Return the current tracked diff ref expected by task_close."""
+    head = current_git_head(workspace)
+    unstaged = subprocess.run(
+        ["git", "diff", "--binary"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--binary"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
+    diff_bytes = unstaged.stdout + staged.stdout
+    if not diff_bytes:
+        return head
+    return f"{head}-dirty-{hashlib.sha256(diff_bytes).hexdigest()}"
+
+
+def ready_closeout_evidence_lines(
+    diff_ref: str | None = None, workspace: Path = PROJECT_ROOT
+) -> list[str]:
+    """Return structured closeout evidence lines for a ready bundle."""
+    latest_diff_ref = diff_ref or current_diff_ref(workspace)
+    return [
+        "",
+        "## Mechanical Completion Loop Evidence",
+        "- mechanical_loop_iterations: 1",
+        "- mechanical_loop_open_items: none",
+        "- mechanical_loop_stop_reason: all structured loop fields complete",
+        "- mechanical_loop_planned_work_status: complete",
+        "- mechanical_loop_review_findings_status: none",
+        "- mechanical_loop_validation_status: pass",
+        "- mechanical_loop_dependency_review_status: pass",
+        "- mechanical_loop_static_analysis_status: pass",
+        "- mechanical_loop_commit_push_status: complete",
+        "- mechanical_loop_canon_sync_status: complete",
+        "- mechanical_loop_follow_up_status: none",
+        "",
+        "## Diff-Check Agent Evidence",
+        "- diff_check_agent_role: reviewer",
+        "- diff_check_agent_decision: approve",
+        f"- diff_check_latest_diff_ref: {latest_diff_ref}",
+        "- diff_check_artifact: diff_check_review.md",
+        "",
+    ]
 
 
 def write_ready_schedule(report_dir: Path) -> None:
@@ -87,6 +150,109 @@ def write_ready_agent_evaluation(report_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def write_ready_diff_check_artifact(
+    report_dir: Path,
+    *,
+    workspace: Path = PROJECT_ROOT,
+    role: str = "reviewer",
+    decision: str = "approve",
+    diff_ref: str | None = None,
+    read_only: str = "yes",
+    independent: str = "yes",
+    findings_status: str = "none",
+) -> None:
+    """Write a passing independent diff-check review artifact."""
+    latest_diff_ref = diff_ref or current_diff_ref(workspace)
+    (report_dir / "diff_check_review.md").write_text(
+        "\n".join(
+            [
+                "# Diff Check Review",
+                "",
+                "## Diff-Check Review",
+                f"- diff_check_agent_role: {role}",
+                f"- diff_check_agent_decision: {decision}",
+                f"- diff_check_latest_diff_ref: {latest_diff_ref}",
+                f"- diff_check_read_only: {read_only}",
+                f"- diff_check_independent_agent: {independent}",
+                f"- diff_check_findings_status: {findings_status}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_ready_closeout_bundle(
+    report_dir: Path, run_id: str, workspace: Path = PROJECT_ROOT
+) -> None:
+    """Write ready closeout artifacts except the diff-check artifact."""
+    (report_dir / "verification.txt").write_text(
+        "\n".join(
+            [
+                f"run_id={run_id}",
+                "task=diff artifact field smoke",
+                "owner=codex",
+                "created_at_utc=2026-04-08T00:00:00Z",
+                "status=pass",
+                "user_completion_report=unlocked",
+                "closeout_gate_status=resolved",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (report_dir / "user_request_contract.md").write_text(
+        "\n".join(
+            [
+                "# User Request Contract",
+                "",
+                "- all_clauses_resolved: yes",
+                "- forbidden_drift_detected: no",
+                "- deferred_clause_ids:",
+                "- unresolved_clause_ids:",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (report_dir / "closeout_gate.md").write_text(
+        "\n".join(
+            [
+                "# Closeout Gate",
+                "",
+                "## Gate Status",
+                "",
+                "- verifier_status: pass",
+                "- auditor_status: resolved",
+                "- required_reviews_complete: yes",
+                "- validation_complete: yes",
+                "- request_contract_complete: yes",
+                "- all_planned_chunks_complete: yes",
+                "- overall_delivery_complete: yes",
+                "- unfinished_tasks_absent: yes",
+                "- dependency_headers_complete: yes",
+                "- repo_wide_dependency_tools_complete: yes",
+                "- repo_wide_static_analysis_complete: yes",
+                "- spec_product_coverage_complete: yes",
+                "- review_findings_integrated: yes",
+                "- post_fix_full_review_complete: yes",
+                "- mechanical_completion_loop_complete: yes",
+                "- diff_check_agent_complete: yes",
+                "- canonical_tree_head_complete: yes",
+                "- agent_evaluation_complete: yes",
+                "- commit_created: yes",
+                "- push_completed: yes",
+                "- user_completion_report: unlocked",
+                *ready_closeout_evidence_lines(workspace=workspace),
+            ]
+        ),
+        encoding="utf-8",
+    )
+    write_ready_schedule(report_dir)
+    write_ready_work_log(report_dir)
+    write_ready_agent_evaluation(report_dir)
 
 
 class TaskStartAndCloseTest(unittest.TestCase):
@@ -450,6 +616,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -464,12 +632,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
@@ -477,6 +647,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [
@@ -499,6 +670,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "commit", "--allow-empty", "-m", "init"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             run_id = "test-task-close-workspace-default"
             subprocess.run(
                 [
@@ -554,6 +739,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -568,12 +755,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(workspace=workspace_root),
                     ]
                 ),
                 encoding="utf-8",
@@ -581,6 +770,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
             result = subprocess.run(
                 [
@@ -602,8 +792,225 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("SPEC_PRODUCT_COVERAGE_COMPLETE=yes", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
+            self.assertIn("MECHANICAL_COMPLETION_LOOP_COMPLETE=yes", result.stdout)
+            self.assertIn("DIFF_CHECK_AGENT_COMPLETE=yes", result.stdout)
             self.assertIn("CANONICAL_TREE_HEAD_COMPLETE=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
+
+    def test_task_close_rejects_missing_mechanical_loop_or_diff_check(self) -> None:
+        """task_close should fail when parent-only closeout skips the final diff loop."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-diff-loop"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_text = closeout_path.read_text(encoding="utf-8")
+            closeout_path.write_text(
+                closeout_text.replace(
+                    "- mechanical_completion_loop_complete: yes\n"
+                    "- diff_check_agent_complete: yes",
+                    "- mechanical_completion_loop_complete: no\n"
+                    "- diff_check_agent_complete: no",
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("mechanical_completion_loop_complete", result.stdout)
+            self.assertIn("diff_check_agent_complete", result.stdout)
+
+    def test_task_close_rejects_missing_diff_check_artifact(self) -> None:
+        """task_close should fail when diff-check evidence points to a missing artifact."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-diff-artifact"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("diff_check_artifact_exists", result.stdout)
+
+    def test_task_close_rejects_invalid_diff_check_artifact_fields(self) -> None:
+        """task_close should fail when the diff-check artifact is not an approval."""
+        cases = [
+            ("role-mismatch", {"role": "project_reviewer"}, "diff_check_artifact_role"),
+            ("decision-revise", {"decision": "revise"}, "diff_check_artifact_decision"),
+            (
+                "diff-ref-mismatch",
+                {"diff_ref": "old-head"},
+                "diff_check_artifact_latest_diff_ref",
+            ),
+            ("read-only-no", {"read_only": "no"}, "diff_check_artifact_read_only"),
+            ("independent-no", {"independent": "no"}, "diff_check_artifact_independent"),
+            (
+                "findings-unresolved",
+                {"findings_status": "unresolved"},
+                "diff_check_artifact_findings_status",
+            ),
+        ]
+        for case_id, artifact_kwargs, expected_blocker in cases:
+            with self.subTest(case_id=case_id):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    report_root = Path(tmp_dir) / "reports"
+                    run_id = f"test-task-close-invalid-diff-artifact-{case_id}"
+                    report_dir = report_root / run_id
+                    report_dir.mkdir(parents=True, exist_ok=True)
+                    write_ready_closeout_bundle(report_dir, run_id)
+                    write_ready_diff_check_artifact(
+                        report_dir,
+                        role=artifact_kwargs.get("role", "reviewer"),
+                        decision=artifact_kwargs.get("decision", "approve"),
+                        diff_ref=artifact_kwargs.get("diff_ref"),
+                        read_only=artifact_kwargs.get("read_only", "yes"),
+                        independent=artifact_kwargs.get("independent", "yes"),
+                        findings_status=artifact_kwargs.get("findings_status", "none"),
+                    )
+
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            str(TASK_CLOSE_SCRIPT),
+                            "--report-dir",
+                            str(report_dir),
+                        ],
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("CLOSEOUT_READY=no", result.stdout)
+                    self.assertIn(expected_blocker, result.stdout)
+
+    def test_task_close_rejects_incomplete_mechanical_loop_evidence(self) -> None:
+        """task_close should fail when mechanical loop structured evidence is incomplete."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-incomplete-mechanical-loop"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- mechanical_loop_validation_status: pass",
+                    "- mechanical_loop_validation_status: missing",
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("mechanical_loop_validation_status", result.stdout)
+
+    def test_task_close_rejects_non_git_workspace(self) -> None:
+        """task_close should fail closed when it cannot resolve the current diff ref."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_dir = workspace_root / "reports" / "agents" / "non-git-closeout"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            run_id = "non-git-closeout"
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unable to resolve git HEAD", result.stderr)
+
+    def test_task_close_rejects_stale_closeout_and_artifact_diff_ref(self) -> None:
+        """task_close should compare matching closeout/artifact refs to the current diff ref."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-stale-diff-ref"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            stale_ref = "stale-diff-ref"
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    f"- diff_check_latest_diff_ref: {current_diff_ref()}",
+                    f"- diff_check_latest_diff_ref: {stale_ref}",
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir, diff_ref=stale_ref)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("diff_check_latest_diff_ref", result.stdout)
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:
         """task_close should fail when only a chunk is complete."""
@@ -646,6 +1053,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -660,12 +1069,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- mechanical_completion_loop_complete: no",
+                        "- diff_check_agent_complete: no",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
@@ -673,6 +1084,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [
@@ -734,6 +1146,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -748,12 +1162,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
@@ -761,6 +1177,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [
@@ -841,6 +1258,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -855,12 +1274,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
@@ -868,6 +1289,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [
@@ -927,6 +1349,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -941,12 +1365,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: no",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
@@ -954,6 +1380,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [
@@ -1033,6 +1460,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     [
                         "# Closeout Gate",
                         "",
+                        "## Gate Status",
+                        "",
                         "- verifier_status: pass",
                         "- auditor_status: resolved",
                         "- required_reviews_complete: yes",
@@ -1047,18 +1476,21 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
+                        "- mechanical_completion_loop_complete: yes",
+                        "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
-                        "",
+                        *ready_closeout_evidence_lines(),
                     ]
                 ),
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
                 [

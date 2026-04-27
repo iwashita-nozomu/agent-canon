@@ -1,9 +1,10 @@
-# Schedule
 <!--
 @dependency-start
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->
+
+# Schedule
 
 
 - Run ID: {\{RUN_ID}}
@@ -29,7 +30,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Task Completion Boundary
 
-<!-- Define what must be true before user-facing completion: all active clauses resolved, all planned work units complete, final review approved, validation complete, closeout gate unlocked, commit and push done. A chunk, slice, checkpoint, or subpass is internal progress only. -->
+<!-- Define what must be true before user-facing completion: all active clauses resolved, all planned work units complete, final review approved, mechanical completion loop complete, read-only diff-check agent approval recorded in a run-local artifact, validation complete, closeout gate unlocked, commit and push done. A chunk, slice, checkpoint, or subpass is internal progress only. -->
 
 ## Explicit Subagents
 

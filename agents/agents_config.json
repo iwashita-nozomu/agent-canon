@@ -5,7 +5,7 @@
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"
   ],
-  "version": 16,
+  "version": 17,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -292,7 +292,7 @@
           "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
+        "notes": "Audit closeout is recorded in the closeout gate, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
       }
     }
   ],

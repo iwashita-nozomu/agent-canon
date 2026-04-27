@@ -3,15 +3,17 @@
 # upstream implementation ./agent_team.py resolves report root defaults
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
 # upstream design ../../agents/templates/closeout_gate.md defines closeout status contract
-# upstream design ../../agents/templates/agent_evaluation.md defines agent evaluation status contract
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py verifies closeout behavior
+# upstream design ../../agents/templates/agent_evaluation.md defines evaluation contract
+# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
 # @dependency-end
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
+import subprocess
 from pathlib import Path
 
 from agent_team import resolve_report_root
@@ -61,9 +63,82 @@ def parse_markdown_status(path: Path) -> dict[str, str]:
     return data
 
 
+def parse_markdown_status_section(path: Path, heading: str) -> dict[str, str]:
+    """Parse '- key: value' status lines under one level-2 markdown heading."""
+    data: dict[str, str] = {}
+    pattern = re.compile(r"^- ([a-zA-Z0-9_]+): (.+)$")
+    in_section = False
+    target = f"## {heading}"
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped == target:
+            in_section = True
+            continue
+        if in_section and stripped.startswith("## "):
+            break
+        if not in_section:
+            continue
+        match = pattern.match(stripped)
+        if match:
+            key = match.group(1)
+            if key in data:
+                raise SystemExit(f"Duplicate status key in {heading}: {key}")
+            data[key] = match.group(2).strip()
+    return data
+
+
 def join_blockers(blockers: list[str]) -> str:
     """Render blocker list for terminal output."""
     return ",".join(blockers) if blockers else ""
+
+
+def resolve_run_artifact(report_dir: Path, value: str) -> Path | None:
+    """Resolve one run-local artifact path, rejecting paths outside the run bundle."""
+    if not value:
+        return None
+    raw_path = Path(value)
+    candidate = raw_path.resolve() if raw_path.is_absolute() else (report_dir / raw_path).resolve()
+    try:
+        candidate.relative_to(report_dir)
+    except ValueError:
+        return None
+    return candidate
+
+
+def current_git_head(workspace: Path) -> str:
+    """Return the current git commit for the workspace."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def current_diff_ref(workspace: Path) -> str:
+    """Return a ref for the exact tracked diff state under review."""
+    head = current_git_head(workspace)
+    if not head:
+        raise SystemExit(f"Unable to resolve git HEAD from workspace: {workspace}")
+    unstaged = subprocess.run(
+        ["git", "diff", "--binary"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--binary"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
+    diff_bytes = unstaged.stdout + staged.stdout
+    if not diff_bytes:
+        return head
+    diff_hash = hashlib.sha256(diff_bytes).hexdigest()
+    return f"{head}-dirty-{diff_hash}"
 
 
 def main() -> int:
@@ -78,6 +153,7 @@ def main() -> int:
         report_dir = (
             resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
+    workspace = Path.cwd().resolve()
 
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"
@@ -99,7 +175,20 @@ def main() -> int:
         raise SystemExit(f"agent_evaluation.md not found: {agent_evaluation_path}")
 
     verification = parse_kv_lines(verification_path)
-    closeout = parse_markdown_status(closeout_path)
+    closeout = parse_markdown_status_section(closeout_path, "Gate Status")
+    mechanical_loop = parse_markdown_status_section(
+        closeout_path, "Mechanical Completion Loop Evidence"
+    )
+    diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
+    diff_check_artifact_path = resolve_run_artifact(
+        report_dir, diff_check.get("diff_check_artifact", "")
+    )
+    diff_check_artifact = (
+        parse_markdown_status_section(diff_check_artifact_path, "Diff-Check Review")
+        if diff_check_artifact_path and diff_check_artifact_path.is_file()
+        else {}
+    )
+    active_diff_ref = current_diff_ref(workspace)
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
     request_contract = parse_markdown_status(request_contract_path)
     schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
@@ -125,6 +214,76 @@ def main() -> int:
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
+        "mechanical_completion_loop_complete": closeout.get(
+            "mechanical_completion_loop_complete"
+        )
+        == "yes",
+        "mechanical_loop_iterations": mechanical_loop.get("mechanical_loop_iterations", "")
+        not in {"", "0", "none"},
+        "mechanical_loop_open_items": mechanical_loop.get("mechanical_loop_open_items")
+        == "none",
+        "mechanical_loop_stop_reason": mechanical_loop.get("mechanical_loop_stop_reason", "")
+        != "",
+        "mechanical_loop_planned_work_status": mechanical_loop.get(
+            "mechanical_loop_planned_work_status"
+        )
+        == "complete",
+        "mechanical_loop_review_findings_status": mechanical_loop.get(
+            "mechanical_loop_review_findings_status"
+        )
+        in {"none", "resolved"},
+        "mechanical_loop_validation_status": mechanical_loop.get(
+            "mechanical_loop_validation_status"
+        )
+        == "pass",
+        "mechanical_loop_dependency_review_status": mechanical_loop.get(
+            "mechanical_loop_dependency_review_status"
+        )
+        == "pass",
+        "mechanical_loop_static_analysis_status": mechanical_loop.get(
+            "mechanical_loop_static_analysis_status"
+        )
+        == "pass",
+        "mechanical_loop_commit_push_status": mechanical_loop.get(
+            "mechanical_loop_commit_push_status"
+        )
+        == "complete",
+        "mechanical_loop_canon_sync_status": mechanical_loop.get(
+            "mechanical_loop_canon_sync_status"
+        )
+        in {"complete", "not_applicable"},
+        "mechanical_loop_follow_up_status": mechanical_loop.get(
+            "mechanical_loop_follow_up_status"
+        )
+        in {"none", "resolved"},
+        "diff_check_agent_complete": closeout.get("diff_check_agent_complete") == "yes",
+        "diff_check_agent_role": diff_check.get("diff_check_agent_role", "")
+        not in {"", "parent", "self", "codex"},
+        "diff_check_agent_decision": diff_check.get("diff_check_agent_decision") == "approve",
+        "diff_check_latest_diff_ref": diff_check.get("diff_check_latest_diff_ref")
+        == active_diff_ref,
+        "diff_check_artifact_path": diff_check_artifact_path is not None,
+        "diff_check_artifact_exists": bool(
+            diff_check_artifact_path and diff_check_artifact_path.is_file()
+        ),
+        "diff_check_artifact_role": diff_check_artifact.get("diff_check_agent_role")
+        == diff_check.get("diff_check_agent_role"),
+        "diff_check_artifact_decision": diff_check_artifact.get("diff_check_agent_decision")
+        == "approve",
+        "diff_check_artifact_latest_diff_ref": diff_check_artifact.get(
+            "diff_check_latest_diff_ref"
+        )
+        == diff_check.get("diff_check_latest_diff_ref"),
+        "diff_check_artifact_read_only": diff_check_artifact.get("diff_check_read_only")
+        == "yes",
+        "diff_check_artifact_independent": diff_check_artifact.get(
+            "diff_check_independent_agent"
+        )
+        == "yes",
+        "diff_check_artifact_findings_status": diff_check_artifact.get(
+            "diff_check_findings_status"
+        )
+        in {"none", "resolved"},
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
         "agent_evaluation_status": agent_evaluation.get("evaluation_status") == "pass",
@@ -169,6 +328,34 @@ def main() -> int:
     print(
         "POST_FIX_FULL_REVIEW_COMPLETE="
         f"{closeout.get('post_fix_full_review_complete', '')}"
+    )
+    print(
+        "MECHANICAL_COMPLETION_LOOP_COMPLETE="
+        f"{closeout.get('mechanical_completion_loop_complete', '')}"
+    )
+    print(f"MECHANICAL_LOOP_ITERATIONS={mechanical_loop.get('mechanical_loop_iterations', '')}")
+    print(f"MECHANICAL_LOOP_OPEN_ITEMS={mechanical_loop.get('mechanical_loop_open_items', '')}")
+    print(
+        "MECHANICAL_LOOP_VALIDATION_STATUS="
+        f"{mechanical_loop.get('mechanical_loop_validation_status', '')}"
+    )
+    print(
+        "MECHANICAL_LOOP_DEPENDENCY_REVIEW_STATUS="
+        f"{mechanical_loop.get('mechanical_loop_dependency_review_status', '')}"
+    )
+    print(
+        "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS="
+        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+    )
+    print(f"DIFF_CHECK_AGENT_COMPLETE={closeout.get('diff_check_agent_complete', '')}")
+    print(f"DIFF_CHECK_AGENT_ROLE={diff_check.get('diff_check_agent_role', '')}")
+    print(f"DIFF_CHECK_AGENT_DECISION={diff_check.get('diff_check_agent_decision', '')}")
+    print(f"DIFF_CHECK_LATEST_DIFF_REF={diff_check.get('diff_check_latest_diff_ref', '')}")
+    print(f"DIFF_CHECK_CURRENT_DIFF_REF={active_diff_ref}")
+    print(f"DIFF_CHECK_ARTIFACT={diff_check.get('diff_check_artifact', '')}")
+    print(
+        "DIFF_CHECK_ARTIFACT_EXISTS="
+        f"{'yes' if diff_check_artifact_path and diff_check_artifact_path.is_file() else 'no'}"
     )
     print(
         "CANONICAL_TREE_HEAD_COMPLETE="

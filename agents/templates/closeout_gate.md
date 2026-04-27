@@ -29,6 +29,8 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
+- mechanical_completion_loop_complete: no
+- diff_check_agent_complete: no
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
 - commit_created: no
@@ -53,6 +55,8 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
+- mechanical_completion_loop_complete: yes
+- diff_check_agent_complete: yes
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
 - commit_created: yes
@@ -85,6 +89,33 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Post-Fix Full Review Evidence
 
 <!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
+
+## Mechanical Completion Loop Evidence
+
+<!-- Record each finalization loop iteration: planned work units and active clauses inspected, latest diff inspected, validation / dependency / static-analysis evidence checked, diff-check agent decision, fix-now findings applied, and the reason the loop stopped. Do not mark complete until no planned work, review finding, validation failure, dependency failure, static-analysis failure, commit / push item, canon-sync item, or follow-up decision remains in this task scope. -->
+
+- mechanical_loop_iterations:
+- mechanical_loop_open_items:
+- mechanical_loop_stop_reason:
+- mechanical_loop_planned_work_status:
+- mechanical_loop_review_findings_status:
+- mechanical_loop_validation_status:
+- mechanical_loop_dependency_review_status:
+- mechanical_loop_static_analysis_status:
+- mechanical_loop_commit_push_status:
+- mechanical_loop_canon_sync_status:
+- mechanical_loop_follow_up_status:
+
+## Diff-Check Agent Evidence
+
+<!-- Record the read-only diff-check agent instance, input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any fix. Parent self-review is not sufficient for this field. -->
+
+- diff_check_agent_role:
+- diff_check_agent_decision:
+- diff_check_latest_diff_ref:
+- diff_check_artifact:
+
+`diff_check_latest_diff_ref` は現在の tracked diff state を示す ref にします。clean tree では git `HEAD`、dirty tree では `task_close.py` が計算する `HEAD-dirty-<sha256>` 形式です。`diff_check_artifact` は run bundle 内の artifact path にします。その artifact の `## Diff-Check Review` には、少なくとも `diff_check_agent_role`、`diff_check_agent_decision`、`diff_check_latest_diff_ref`、`diff_check_read_only: yes`、`diff_check_independent_agent: yes`、`diff_check_findings_status` を記録します。
 
 ## Canonical Tree-Head Evidence
 
