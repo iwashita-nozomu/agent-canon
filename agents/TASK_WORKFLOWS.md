@@ -42,6 +42,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
    - `implementer`
 1. 実装 checkpoint review
    - `change_reviewer`
+1. 機械的 completion loop
+   - `reviewer` または task-specific read-only diff-check agent
 1. 最終受け入れ review
    - `final_reviewer`
 1. 監査と gate close
@@ -74,8 +76,10 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
+- 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、read-only diff-check agent が最新 diff を approve するまで completion loop を反復します
+- parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
-- user-facing completion は、全 active clause、全 planned work unit、final review、validation、closeout gate、commit / push が揃ったときだけ返します
+- user-facing completion は、全 active clause、全 planned work unit、mechanical completion loop、diff-check agent approval、final review、validation、closeout gate、commit / push が揃ったときだけ返します
 - branch 側で file 構成変更をした pass は、closeout 前に `agents/workflows/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します

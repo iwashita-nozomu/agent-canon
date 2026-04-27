@@ -1,5 +1,3 @@
-# Codex Workflow
-
 <!--
 @dependency-start
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
@@ -10,6 +8,8 @@ upstream design ../../documents/dependency-manifest-design.md dependency manifes
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
 -->
+
+# Codex Workflow
 
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
@@ -196,6 +196,19 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - 反映しない findings は follow-up ではなく、今回の completion を阻害しない理由と escalation が artifact に記録されている
 
 `closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃うまで、`user_completion_report` を `unlocked` にしてはいけません。
+
+## Mechanical Completion Loop
+
+実装後から user-facing completion までの間は、parent の自己判断だけで閉じず、次の機械的 loop を `closeout_gate.md` に evidence として残します。
+
+1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push、shared canon sync、follow-up 判断を一覧化します。
+1. 最新 diff と tracked / untracked state を確認し、変更対象 file の dependency manifest、downstream edge、旧参照、正本でない copy / snapshot / backup path を見ます。
+1. 必要な repo-wide dependency review、静的解析、docs / tests / agent checks を実行します。差分限定 check だけでは loop を閉じません。
+1. read-only の diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡します。
+1. diff-check agent の decision が `approve` 以外なら、fix-now finding を実装して loop の 1 に戻ります。`escalate` は該当する設計・計画 stage へ戻します。
+1. diff-check agent が `approve` し、未完了 work unit、未解決 finding、未実行 validation、未同期 canon、未 commit / push、未判断 follow-up が無い場合だけ loop を止めます。
+
+`closeout_gate.md` の `mechanical_completion_loop_complete=yes` と `diff_check_agent_complete=yes` が揃うまで、`user_completion_report` を `unlocked` にしてはいけません。
 
 ## Minimal Skill Set
 
@@ -449,6 +462,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、header 修正まで完了していない completion report を出さない
 - `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` の static analysis evidence が無い completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
+- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` が揃い、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断が構造化 loop evidence として残るまで completion report を出さない
+- `closeout_gate.md` の `diff_check_agent_complete=yes` が揃い、run-local diff-check artifact が read-only independent agent、latest diff ref、`approve` decision、findings disposition を示すまで completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
 - `workflow_monitoring.md` の signals / interventions / improvement decisions が埋まり、skill / config / workflow / memory の改善判断が `applied`、`recorded`、`not_applicable` のいずれかになるまで、workflow 監視が未完了の completion report を出さない
 - `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃うまで、agent behavior evaluation と feedback resolution が未完了の completion report を出さない

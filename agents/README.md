@@ -1,9 +1,10 @@
-# Agent Hub
 <!--
 @dependency-start
 upstream design ../README.md shared canon overview
 @dependency-end
 -->
+
+# Agent Hub
 
 
 このディレクトリは、repo におけるエージェント運用の人間向け正本ハブです。
@@ -172,4 +173,4 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - stage reviewer の feedback を反映せずに次段へ handoff しません。
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行します。止めるのは user が明示的に止めた場合か external block がある場合だけです。
-- user-facing completion は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで返しません。
+- user-facing completion は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref（clean なら `HEAD`、dirty なら `HEAD-dirty-<sha256>`）の read-only independent approval を示すまで返しません。

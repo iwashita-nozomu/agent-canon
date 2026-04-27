@@ -1,5 +1,3 @@
-# 実装ウォーターフォールワークフロー
-
 <!--
 @dependency-start
 upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gates
@@ -7,6 +5,8 @@ upstream design ../../documents/dependency-manifest-design.md defines dependency
 downstream design ../templates/closeout_gate.md records closeout evidence required by this workflow
 @dependency-end
 -->
+
+# 実装ウォーターフォールワークフロー
 
 この文書は、repo に変更を入れる実装プロセスを、段階ゲート付きのウォーターフォールとして進めるための正本です。
 対象は `python/`、`documents/`、`agents/`、`docker/`、`scripts/` など、repo に持ち帰る変更全般です。
@@ -618,6 +618,8 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes`
 - `closeout_gate.md` の `post_fix_full_review_complete=yes`
+- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
+- `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local diff-check artifact evidence
 - `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
 - `schedule.md` の TODO 行が空ではない
@@ -635,6 +637,8 @@ exit 条件:
 - 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
 - required review の fix-now findings が反映済み、再レビュー済み、または escalated であることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、latest diff に対する full review rerun artifact が `Post-Fix Full Review Evidence` に記録されている
+- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
+- read-only diff-check agent の decision、latest diff ref、run-local artifact、findings disposition が `Diff-Check Agent Evidence` に記録され、artifact が `approve` を示している
 - canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない
 
