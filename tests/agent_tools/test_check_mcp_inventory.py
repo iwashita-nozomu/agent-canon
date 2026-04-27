@@ -47,11 +47,14 @@ class McpInventoryCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             codex = self.write_fake_codex(
                 Path(tmp_dir),
-                '[{"name":"repo_mcp_server","command":"repo_mcp_server","status":"enabled"}]',
+                '[{"name":"repo_mcp_server","command":"bash","args":["mcp/repo_mcp_server.sh"],"status":"enabled"}]',
             )
+            mcp_dir = Path(tmp_dir) / "mcp"
+            mcp_dir.mkdir()
+            (mcp_dir / "repo_mcp_server.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
-                cwd=PROJECT_ROOT,
+                cwd=Path(tmp_dir),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -60,6 +63,8 @@ class McpInventoryCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("MCP_SERVER=repo_mcp_server", result.stdout)
+        self.assertIn("command=bash", result.stdout)
+        self.assertIn("args=mcp/repo_mcp_server.sh", result.stdout)
         self.assertIn("MCP_INVENTORY=pass", result.stdout)
 
     def test_required_server_fails_when_missing(self) -> None:
@@ -85,12 +90,15 @@ class McpInventoryCheckTest(unittest.TestCase):
                 Path(tmp_dir),
                 (
                     '[{"name":"repo_mcp_server","enabled":true,'
-                    '"transport":{"type":"stdio","command":"repo_mcp_server"}}]'
+                    '"transport":{"type":"stdio","command":"bash","args":["mcp/repo_mcp_server.sh"]}}]'
                 ),
             )
+            mcp_dir = Path(tmp_dir) / "mcp"
+            mcp_dir.mkdir()
+            (mcp_dir / "repo_mcp_server.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
-                cwd=PROJECT_ROOT,
+                cwd=Path(tmp_dir),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -98,7 +106,27 @@ class McpInventoryCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("status=enabled", result.stdout)
-        self.assertIn("command=repo_mcp_server", result.stdout)
+        self.assertIn("command=bash", result.stdout)
+        self.assertIn("args=mcp/repo_mcp_server.sh", result.stdout)
+
+    def test_required_server_fails_when_launcher_path_is_missing(self) -> None:
+        """A configured required server still fails if its repo-local launcher is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            codex = self.write_fake_codex(
+                Path(tmp_dir),
+                '[{"name":"repo_mcp_server","command":"bash","args":["mcp/repo_mcp_server.sh"],"status":"enabled"}]',
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
+                cwd=Path(tmp_dir),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("MCP_LAUNCHER_ERROR=repo_mcp_server: launcher argument path not found: mcp/repo_mcp_server.sh", result.stdout)
+        self.assertIn("NEXT_ACTION=fix_required_mcp_launcher_before_work", result.stdout)
 
     def test_empty_inventory_needs_explicit_allowance_without_requirements(self) -> None:
         """A bare inventory check should not silently accept no configured servers."""

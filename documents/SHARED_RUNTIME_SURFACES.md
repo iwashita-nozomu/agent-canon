@@ -27,6 +27,7 @@ root では次を symlink view として扱います。
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents`
+- `mcp/`
 - `documents/BRANCH_SCOPE.md`
 - `documents/AGENTS_COORDINATION.md`
 - `documents/DOCSTRING_GUIDE.md`

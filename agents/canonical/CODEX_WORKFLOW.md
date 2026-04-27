@@ -89,8 +89,9 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 ```
 
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
+- template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
-- inventory にあるが startup に失敗する場合は、host setup / command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
+- inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
 - contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
 
 ### Library And Reuse Sweep

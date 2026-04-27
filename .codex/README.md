@@ -42,9 +42,11 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 ## MCP Inventory
 
 - `repo_mcp_server` は [config.toml](config.toml) の `[mcp_servers.repo_mcp_server]` を正本にします。
+- launcher は host-global `repo_mcp_server` command ではなく、repo-local `bash mcp/repo_mcp_server.sh` を使います。
+- root `mcp/` は `vendor/agent-canon/mcp/` への runtime view で、`tools/sync_agent_canon.sh link-root` が復元します。
 - MCP 前提の task では、local process を手で起動する前に `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
 - `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
-- host 側に `repo_mcp_server` command が無い場合は、inventory entry は見えても runtime startup は失敗し得ます。その場合は host setup issue として記録します。
+- `check_mcp_inventory.py` は inventory だけでなく launcher command と repo-local script の存在も検査します。
 
 ## Model Policy
 

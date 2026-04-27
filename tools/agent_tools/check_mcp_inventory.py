@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,7 @@ class McpServer:
     name: str
     status: str
     command: str
+    args: tuple[str, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -80,19 +83,46 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
         if not isinstance(status, str):
             status = "enabled" if enabled is True else "disabled" if enabled is False else ""
         command = raw_server.get("command")
+        raw_args = raw_server.get("args")
         transport = raw_server.get("transport")
-        if not isinstance(command, str) and isinstance(transport, dict):
-            transport_command = transport.get("command")
-            if isinstance(transport_command, str):
-                command = transport_command
+        if isinstance(transport, dict):
+            if not isinstance(command, str):
+                transport_command = transport.get("command")
+                if isinstance(transport_command, str):
+                    command = transport_command
+            if not isinstance(raw_args, list):
+                raw_args = transport.get("args")
+        parsed_args = tuple(item for item in raw_args if isinstance(item, str)) if isinstance(raw_args, list) else ()
         servers.append(
             McpServer(
                 name=name,
                 status=status,
                 command=command if isinstance(command, str) else "",
+                args=parsed_args,
             )
         )
     return servers
+
+
+def launcher_errors(server: McpServer, root: Path) -> list[str]:
+    """Return launcher availability errors for one server."""
+    errors: list[str] = []
+    if not server.command:
+        return [f"{server.name}: missing launcher command"]
+    if "/" in server.command:
+        command_path = (root / server.command).resolve() if not Path(server.command).is_absolute() else Path(server.command)
+        if not command_path.exists():
+            errors.append(f"{server.name}: launcher command path not found: {server.command}")
+    elif shutil.which(server.command) is None:
+        errors.append(f"{server.name}: launcher command not found on PATH: {server.command}")
+
+    for arg in server.args:
+        if arg.startswith("-") or "/" not in arg:
+            continue
+        arg_path = (root / arg).resolve() if not Path(arg).is_absolute() else Path(arg)
+        if not arg_path.exists():
+            errors.append(f"{server.name}: launcher argument path not found: {arg}")
+    return errors
 
 
 def render_servers(servers: Sequence[McpServer]) -> None:
@@ -102,6 +132,7 @@ def render_servers(servers: Sequence[McpServer]) -> None:
             "MCP_SERVER="
             f"{server.name}\tstatus={server.status or '(unknown)'}"
             f"\tcommand={server.command or '(unknown)'}"
+            f"\targs={' '.join(server.args) if server.args else '(none)'}"
         )
 
 
@@ -122,6 +153,18 @@ def main() -> int:
         print("MCP_INVENTORY=fail")
         print(f"MISSING_MCP_SERVERS={','.join(missing)}")
         print("NEXT_ACTION=configure_required_mcp_servers_before_work")
+        return 1
+    required_servers = [server for server in servers if server.name in set(args.require)]
+    launcher_issues = [
+        issue
+        for server in required_servers
+        for issue in launcher_errors(server, Path.cwd())
+    ]
+    if launcher_issues:
+        print("MCP_INVENTORY=fail")
+        for issue in launcher_issues:
+            print(f"MCP_LAUNCHER_ERROR={issue}")
+        print("NEXT_ACTION=fix_required_mcp_launcher_before_work")
         return 1
     if not servers and not args.allow_empty and not args.require:
         print("MCP_INVENTORY=fail")

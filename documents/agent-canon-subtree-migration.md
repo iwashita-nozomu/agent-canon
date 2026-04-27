@@ -138,6 +138,8 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/.github/copilot-instructions.md` への symlink view
 - `.codex/README.md`
   - `vendor/agent-canon/.codex/README.md` への symlink view
+- `mcp/`
+  - `vendor/agent-canon/mcp/` への symlink view
 - `documents/` 配下の shared document surface
   - `documents/SHARED_RUNTIME_SURFACES.md` に載っている各 file は `vendor/agent-canon/documents/` への symlink view
 - `documents/BRANCH_SCOPE.md`
