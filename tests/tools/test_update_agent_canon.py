@@ -96,6 +96,48 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
+    def split_agent_canon_snapshot(self, repo: Path) -> str:
+        """Return a split commit for fresh clones that may not have subtree join objects."""
+        plain = subprocess.run(
+            ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if plain.returncode == 0 and plain.stdout.strip():
+            return plain.stdout.strip()
+
+        ignore_joins = subprocess.run(
+            ["git", "subtree", "split", "--ignore-joins", "--prefix=vendor/agent-canon", "HEAD"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return ignore_joins.stdout.strip()
+
+    def replace_tree(self, source: Path, target: Path) -> None:
+        """Replace target contents without depending on rsync in minimal containers."""
+        for child in target.iterdir():
+            if child.name == ".git":
+                continue
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+        for child in source.iterdir():
+            if child.name == ".git":
+                continue
+            destination = target / child.name
+            if child.is_symlink():
+                os.symlink(os.readlink(child), destination)
+            elif child.is_dir():
+                shutil.copytree(child, destination, symlinks=True)
+            else:
+                shutil.copy2(child, destination, follow_symlinks=False)
+
     def test_register_local_bare_seeds_remote_and_plan_uses_configured_remote(self) -> None:
         """Register-local-bare should seed the bare repo and wire the remote."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -343,13 +385,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             missing_exec = root / "missing-git-exec"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
@@ -415,8 +451,23 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
             missing_exec.mkdir(parents=True, exist_ok=True)
+            git_binary = shutil.which("git")
+            self.assertIsNotNone(git_binary)
+            git_wrapper = missing_exec / "git"
+            git_wrapper.write_text(
+                "#!/usr/bin/env bash\n"
+                "for arg in \"$@\"; do\n"
+                "  if [[ \"$arg\" == \"subtree\" ]]; then\n"
+                "    echo 'git: subtree unavailable in test' >&2\n"
+                "    exit 1\n"
+                "  fi\n"
+                "done\n"
+                f"exec {git_binary} \"$@\"\n",
+                encoding="utf-8",
+            )
+            git_wrapper.chmod(0o755)
             env = os.environ.copy()
-            env["GIT_EXEC_PATH"] = str(missing_exec)
+            env["PATH"] = f"{missing_exec}{os.pathsep}{env['PATH']}"
 
             plan = subprocess.run(
                 ["bash", str(clone_dir / "tools" / "update_agent_canon.sh"), "plan"],
@@ -441,13 +492,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             work_dir = root / "agent-canon-work"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
@@ -534,13 +579,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             work_dir = root / "agent-canon-work"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
@@ -640,20 +679,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
-            subprocess.run(
-                [
-                    "rsync",
-                    "-a",
-                    "--delete",
-                    "--exclude",
-                    ".git",
-                    f"{work_dir}/",
-                    str(clone_dir / "vendor" / "agent-canon"),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            self.replace_tree(work_dir, clone_dir / "vendor" / "agent-canon")
             subprocess.run(
                 ["git", "add", "-A"], cwd=clone_dir, check=True, capture_output=True, text=True
             )
@@ -743,13 +769,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             work_dir = root / "agent-canon-work"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
@@ -881,13 +901,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             source_repo = root / "agent-canon-source"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
@@ -1004,13 +1018,7 @@ class UpdateAgentCanonTest(unittest.TestCase):
             source_repo = root / "agent-canon-source"
             self.clone_repo(clone_dir)
 
-            split_sha = subprocess.run(
-                ["git", "subtree", "split", "--prefix=vendor/agent-canon", "HEAD"],
-                cwd=clone_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+            split_sha = self.split_agent_canon_snapshot(clone_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(bare_repo)],
                 check=True,
