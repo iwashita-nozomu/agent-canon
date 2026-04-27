@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # upstream design README.md shared automation index
-# upstream environment ../../../docker/Dockerfile canonical image tool inventory
+# upstream environment ../notes/knowledge/environment_setup.md canonical environment expectations
 # @dependency-end
 
 set -euo pipefail
