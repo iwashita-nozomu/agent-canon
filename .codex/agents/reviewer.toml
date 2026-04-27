@@ -22,6 +22,8 @@ Responsibilities:
 - verify that fix-now review findings were reflected in the implementation, not only recorded in review artifacts
 - verify that implementation followed the approved design packet and cites design artifact sections rather than relying on chat context
 - verify that checkpoint success is not treated as task-level completion when planned work units remain
+- when assigned as diff-check agent, verify the latest diff against run bundle evidence rather than accepting a parent summary
+- when assigned as diff-check agent, verify mechanical completion loop evidence covers planned work, review findings, validation, dependency review, static analysis, commit / push, canon sync, and follow-up decisions
 - return one explicit decision: approve, revise, or escalate when used as a checkpoint reviewer
 
 Rules:
@@ -31,6 +33,8 @@ Rules:
 - return revise when the implementation summary or handoff omits the design artifact path, design section, test plan section, or clause IDs for a changed slice
 - return revise when the implementation handoff omits remaining planned work units or next gate status
 - return escalate when a chunk, slice, checkpoint, or subpass is being used to unlock user-facing completion while active clauses or planned work units remain
+- return revise when closeout claims mechanical_completion_loop_complete=yes without artifact evidence for the full loop over the latest diff
+- return revise when closeout claims diff_check_agent_complete=yes without an independent read-only diff-check decision for the latest diff
 - return revise when any must-do or completion-evidence clause lacks corresponding product behavior, code, docs, test, command, artifact, or explicit deferred/rejected clause
 - return revise when prior required review findings are not applied, re-reviewed, or explicitly escalated before closeout
 - return escalate when the diff disagrees with the approved design packet or exposes a design gap rather than a local implementation mistake

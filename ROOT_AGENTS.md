@@ -1,8 +1,9 @@
-# Agent Instructions
 <!--
 @dependency-start
 @dependency-end
 -->
+
+# Agent Instructions
 
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
 The shared agent canon lives in `vendor/agent-canon/`, and the root discovery paths are runtime views into that snapshot.
@@ -112,9 +113,12 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` に従い、integration worktree 上で `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
+- closeout 前に、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目があれば実装または該当 stage へ戻ります。
+- closeout 前に read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して最新 diff の approve / revise / escalate decision を artifact に残します。
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` になるまで出してはいけません。
+- user-facing completion report は、`closeout_gate.md` が `mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が今回 scope に残っていないことを示すまで出してはいけません。
 - user-facing completion report は、作成・編集した human-authored text file の冒頭に `@dependency-start` / `@dependency-end` manifest block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
 - repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、依存 graph、header 欠落、header format を確認します。失敗した header は修正してから再実行し、`closeout_gate.md` に evidence を残します。
@@ -139,6 +143,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - spot run、debug run、smoke run、partial run を正式 evidence や比較表の根拠にしてはいけません。
 - 最小実装、仕様の一部だけの実装、または未反映の required review findings が残る状態で完了扱いにしてはいけません。
 - review を受けて修正したあと、tiny fix だからといって full required review set を省略して closeout してはいけません。
+- parent 自身の差分確認だけで mechanical completion loop や diff-check agent approval を完了扱いにしてはいけません。
 - correctness evidence と performance evidence を混同してはいけません。
 - code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜてはいけません。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務してはいけません。
@@ -148,6 +153,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - worktree action log に scope、edit、test、experiment、carry-over の必要 entry が無い状態で closeout してはいけません。
 - `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残る状態で user-facing completion を返してはいけません。
+- read-only diff-check agent が最新 diff を approve していない状態で user-facing completion を返してはいけません。
 - 作成・編集した text file の冒頭に依存 file header が無い状態で user-facing completion を返してはいけません。
 - 全 repo 対象の依存解析、header scan / format / graph check、静的解析を通さないまま user-facing completion を返してはいけません。
 - 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
