@@ -3,6 +3,7 @@
 # upstream implementation ./agent_tools/check_dependency_headers.py validates dependency manifests
 # upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
+# downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # @dependency-end
 set -euo pipefail
 
@@ -197,6 +198,7 @@ tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/t
 tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
 tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
 tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
+tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/test_evaluate_agent_run.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
