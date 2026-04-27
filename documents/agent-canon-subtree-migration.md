@@ -4,7 +4,6 @@
 @dependency-start
 upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
 upstream design ../agents/workflows/derived-agent-canon-diff-workflow.md derived repo diff workflow
-upstream design ./SHARED_RUNTIME_SURFACES.md shared root surface list
 upstream implementation ../tools/sync_agent_canon.sh subtree sync tool
 upstream implementation ../tools/update_agent_canon.sh derived repo update helper
 downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root
