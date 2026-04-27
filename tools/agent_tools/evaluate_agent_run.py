@@ -2,6 +2,7 @@
 # @dependency-start
 # upstream design ../../agents/workflows/agent-learning-workflow.md defines feedback capture workflow
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation artifact shape
+# upstream design ../../agents/templates/workflow_monitoring.md defines in-workflow monitoring evidence
 # upstream implementation ./report_artifact_checks.py validates schedule and work log completeness
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies scoring behavior
 # @dependency-end
@@ -27,6 +28,7 @@ REQUIRED_ARTIFACTS = (
     "user_request_contract.md",
     "schedule.md",
     "work_log.md",
+    "workflow_monitoring.md",
     "change_review.md",
     "final_review.md",
     "verification.txt",
@@ -133,6 +135,45 @@ def artifact_text(report_dir: Path, name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def markdown_without_comments(text: str) -> str:
+    """Return markdown text without HTML comments."""
+    return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+
+
+def bundle_text(report_dir: Path) -> str:
+    """Return normalized text from all markdown and text run artifacts."""
+    parts: list[str] = []
+    for path in sorted(report_dir.glob("*")):
+        if path.suffix not in {".md", ".txt", ".yaml", ".yml"}:
+            continue
+        parts.append(markdown_without_comments(path.read_text(encoding="utf-8")))
+    return "\n".join(parts).lower()
+
+
+def has_any(text: str, needles: tuple[str, ...]) -> bool:
+    """Return whether normalized text contains any evidence token."""
+    return any(needle.lower() in text for needle in needles)
+
+
+def status_in(status: dict[str, str], key: str, allowed: set[str]) -> bool:
+    """Return whether one markdown status key has an allowed value."""
+    return status.get(key, "").strip().lower() in allowed
+
+
+def has_open_review_findings(*texts: str) -> bool:
+    """Return whether review artifacts still carry open fix-now findings."""
+    for text in texts:
+        cleaned = markdown_without_comments(text).lower()
+        for line in cleaned.splitlines():
+            if "fix-now" in line and any(token in line for token in ("open", "pending")):
+                return True
+            if "required_change" in line and not any(
+                token in line for token in ("resolved", "applied", "fixed", "closed")
+            ):
+                return True
+    return False
+
+
 def criterion(
     name: str,
     max_score: int,
@@ -155,23 +196,83 @@ def evaluate(report_dir: Path) -> tuple[list[CriterionResult], list[str]]:
     closeout = parse_markdown_status(report_dir / "closeout_gate.md")
     schedule_text = artifact_text(report_dir, "schedule.md")
     work_log_text = artifact_text(report_dir, "work_log.md")
+    monitoring_text = artifact_text(report_dir, "workflow_monitoring.md")
+    monitoring_status = parse_markdown_status(report_dir / "workflow_monitoring.md")
     retrospective_text = artifact_text(report_dir, "retrospective.md")
     final_decision = markdown_decision(report_dir / "final_review.md")
-    change_review_text = artifact_text(report_dir, "change_review.md").lower()
+    change_review_text = artifact_text(report_dir, "change_review.md")
+    final_review_text = artifact_text(report_dir, "final_review.md")
+    normalized_bundle = bundle_text(report_dir)
 
     schedule_blockers = check_schedule_artifact(schedule_text)
     work_log_blockers = check_work_log_artifact(work_log_text)
+    monitoring_sections_complete = all(
+        section_has_content(monitoring_text, heading)
+        for heading in (
+            "## Signals",
+            "## Interventions",
+            "## Improvement Decisions",
+        )
+    )
+    improvement_decisions_complete = all(
+        status_in(
+            monitoring_status,
+            key,
+            {"applied", "recorded", "not_applicable"},
+        )
+        for key in (
+            "skill_improvement_decision",
+            "config_improvement_decision",
+            "workflow_improvement_decision",
+            "memory_learning_decision",
+        )
+    )
+    orchestration_evidence = (
+        has_any(normalized_bundle, ("skills=", "$agent-orchestration"))
+        and has_any(
+            normalized_bundle,
+            ("subagent", "stage owner", "parent_direct_reason", "trivial_direct_edit"),
+        )
+        and has_any(
+            normalized_bundle,
+            (
+                "mcp_inventory=pass",
+                "check_mcp_inventory",
+                "mcp_preflight_not_required",
+                "mcp not required",
+            ),
+        )
+        and has_any(
+            normalized_bundle,
+            (
+                "repo_dependency_review=pass",
+                "run_repo_dependency_review.sh",
+                "repo_dependency_intake_not_required",
+                "dependency review",
+            ),
+        )
+        and has_any(
+            normalized_bundle,
+            (
+                "web_research",
+                "external_research",
+                "internet research",
+                "web_research_not_required",
+                "internet_research_not_required",
+            ),
+        )
+    )
 
     criteria = [
         criterion(
             "artifact_completeness",
-            10,
+            8,
             not missing,
             f"Create missing run artifacts: {', '.join(missing)}.",
         ),
         criterion(
             "request_traceability",
-            15,
+            10,
             request_contract.get("all_clauses_resolved") == "yes"
             and request_contract.get("forbidden_drift_detected") == "no"
             and not request_contract.get("unresolved_clause_ids", "").strip(),
@@ -179,21 +280,32 @@ def evaluate(report_dir: Path) -> tuple[list[CriterionResult], list[str]]:
         ),
         criterion(
             "planned_work_and_chronology",
-            15,
+            10,
             not schedule_blockers and not work_log_blockers,
             "Fill schedule stage/coverage/work-unit tables and add meaningful work-log entries.",
         ),
         criterion(
+            "workflow_monitoring",
+            12,
+            monitoring_sections_complete,
+            "Fill workflow_monitoring.md with signals, interventions, and improvement decisions from the active workflow.",
+        ),
+        criterion(
+            "orchestration_and_pre_design_intake",
+            12,
+            orchestration_evidence,
+            "Record skills, stage/subagent or parent-direct routing, MCP preflight or explicit opt-out, repo dependency intake, and web research decision before design/implementation.",
+        ),
+        criterion(
             "review_feedback_loop",
-            15,
+            10,
             "approve" in final_decision
-            and "required_change" not in change_review_text
-            and "revise" not in change_review_text,
+            and not has_open_review_findings(change_review_text, final_review_text),
             "Resolve or escalate review feedback and record an approving final review decision.",
         ),
         criterion(
             "validation_and_closeout_evidence",
-            20,
+            12,
             verification.get("status") == "pass"
             and closeout.get("validation_complete") == "yes"
             and closeout.get("commit_created") == "yes"
@@ -209,12 +321,14 @@ def evaluate(report_dir: Path) -> tuple[list[CriterionResult], list[str]]:
             "Record changed-file dependency evidence, repo-wide dependency review evidence, and canonical tree-head evidence in closeout_gate.md.",
         ),
         criterion(
-            "learning_and_feedback_capture",
-            15,
+            "self_improvement_feedback_capture",
+            16,
             section_has_content(retrospective_text, "## What Worked")
             and section_has_content(retrospective_text, "## What Hurt")
-            and section_has_content(retrospective_text, "## Follow-ups"),
-            "Fill retrospective sections with concrete feedback, including 'None' when no follow-up remains.",
+            and section_has_content(retrospective_text, "## Follow-ups")
+            and improvement_decisions_complete,
+            "Fill retrospective sections and mark skill/config/workflow/memory improvement decisions as applied, recorded, or not_applicable.",
+            partial_score=8 if improvement_decisions_complete else 0,
         ),
     ]
     blockers = [item.feedback for item in criteria if item.status != "pass"]
@@ -287,7 +401,9 @@ def render_markdown(
             "## Learning Capture",
             "",
             "If this evaluation exposed a durable agent-side lesson, record it with "
-            "`tools/agent_tools/log_agent_learning.py` and cite the evidence. Do not copy raw chat.",
+            "`tools/agent_tools/log_agent_learning.py` and cite the evidence. If the lesson "
+            "requires a durable process change, update the relevant skill, config, or workflow "
+            "before marking the monitoring decision as applied. Do not copy raw chat.",
             "",
         ]
     )

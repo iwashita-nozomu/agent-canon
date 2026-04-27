@@ -274,11 +274,14 @@
       "owns": [
         "evidence_capture",
         "closeout",
+        "workflow_monitoring",
+        "self_improvement_decisions",
         "retrospective"
       ],
       "required_outputs": [
         "closeout_gate.md",
         "agent_evaluation.md",
+        "workflow_monitoring.md",
         "retrospective.md"
       ],
       "write_policy": {
@@ -286,9 +289,10 @@
         "allowed_artifacts": [
           "closeout_gate",
           "agent_evaluation",
+          "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, and agent evaluation feedback is resolved."
+        "notes": "Audit closeout is recorded in the closeout gate, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after spec_product_coverage_complete=yes, review_findings_integrated=yes, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
       }
     }
   ],
@@ -1653,6 +1657,7 @@
     "verification": "verification.txt",
     "closeout_gate": "closeout_gate.md",
     "agent_evaluation": "agent_evaluation.md",
+    "workflow_monitoring": "workflow_monitoring.md",
     "retrospective": "retrospective.md",
     "research_notes": "research_notes.md",
     "research_review": "research_review.md",

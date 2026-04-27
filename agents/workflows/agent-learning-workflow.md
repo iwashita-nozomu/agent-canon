@@ -81,13 +81,30 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 - request clause traceability
 - schedule / work log の completeness
+- workflow monitoring: selected skills、stage / subagent routing、MCP preflight、repo dependency intake、web research decision、intervention history
 - review feedback の resolution
 - validation / commit / push evidence
 - dependency manifest と canonical tree-head evidence
-- retrospective と learning capture
+- retrospective と skill / config / workflow / memory への self-improvement decision
 
 `AGENT_EVALUATION_STATUS=revise` の場合は、出力された feedback action を schedule/work_log/該当 artifact に反映し、再度 evaluation を通します。
 `AGENT_EVALUATION_STATUS=pass` になり、`agent_evaluation.md` の `feedback_actions_resolved: yes` と `learning_capture_complete: yes` が揃うまで、`task_close.py` は user-facing completion を許可しません。
+
+## Workflow Monitoring
+
+repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正本として維持します。
+この artifact は conversation summary ではなく、workflow が実際に観測した signals と介入を記録します。
+
+必須 signals:
+
+- `skills=` または `$agent-orchestration` など、選択した skill surface
+- stage owner、subagent routing、または `parent_direct_reason` / `trivial_direct_edit`
+- MCP preflight 結果、または `mcp_preflight_not_required`
+- repo dependency intake 結果、または `repo_dependency_intake_not_required`
+- web research / external research 結果、または `web_research_not_required`
+
+closeout では `skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` を `applied`、`recorded`、`not_applicable` のいずれかにします。
+`pending` のまま Eval を通してはいけません。
 
 ## Kind Definitions
 
