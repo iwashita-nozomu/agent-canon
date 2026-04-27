@@ -42,7 +42,7 @@ if [[ -n "$(git status --short)" ]]; then
   git commit -m "test: overlay current working tree for fresh clone check" >/dev/null
 fi
 
-for path in AGENTS.md agents .agents .claude .codex/config.toml mcp/repo_mcp_server.sh agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
+for path in AGENTS.md agents .agents .claude .codex/config.toml .codex/hooks.json .codex/hooks/mcp_session_context.sh mcp/repo_mcp_server.sh agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
   if [ ! -e "${path}" ]; then
     echo "missing runtime surface: ${path}" >&2
     exit 1
