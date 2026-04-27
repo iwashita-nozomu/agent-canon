@@ -2,6 +2,8 @@
 # @dependency-start
 # upstream implementation ./agent_tools/check_dependency_headers.py validates dependency manifests
 # upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
+# downstream implementation ../documents/codex-configuration-reference.md root symlink view for Codex config docs
+# downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # @dependency-end
@@ -102,6 +104,8 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .codex/config.toml:../${PREFIX}/.codex/config.toml
 .codex/README.md:../${PREFIX}/.codex/README.md
 .codex/agents:../${PREFIX}/.codex/agents
+.codex/hooks.json:../${PREFIX}/.codex/hooks.json
+.codex/hooks:../${PREFIX}/.codex/hooks
 .github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
@@ -109,6 +113,8 @@ documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/DOCSTRING_GUIDE.md:../${PREFIX}/documents/DOCSTRING_GUIDE.md
 documents/FILE_CHECKLIST_OPERATIONS.md:../${PREFIX}/documents/FILE_CHECKLIST_OPERATIONS.md
 documents/README.md:../${PREFIX}/documents/README.md
+documents/codex-configuration-reference.md:../${PREFIX}/documents/codex-configuration-reference.md
+documents/codex-configuration-slides.md:../${PREFIX}/documents/codex-configuration-slides.md
 documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
@@ -196,6 +202,7 @@ tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_s
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
 tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
+tests/agent_tools/test_codex_hooks.py:../../${PREFIX}/tests/agent_tools/test_codex_hooks.py
 tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
 tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
 tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/test_evaluate_agent_run.py

@@ -1,4 +1,3 @@
-# Codex Subagents
 <!--
 @dependency-start
 upstream design ../task_catalog.yaml task routing catalog
@@ -6,6 +5,8 @@ downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
 downstream implementation ../../.codex/config.toml Codex runtime config consumes subagent routing
 @dependency-end
 -->
+
+# Codex Subagents
 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。

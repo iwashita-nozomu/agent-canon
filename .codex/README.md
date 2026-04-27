@@ -5,6 +5,8 @@
 upstream implementation ./config.toml project-scoped Codex settings
 upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
+downstream implementation ./hooks.json project-local hook declarations
+downstream implementation ./hooks/mcp_session_context.sh injects MCP preflight context
 downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
 @dependency-end
 -->
@@ -17,6 +19,10 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
   - Codex の project 設定
 - `agents/*.toml`
   - Codex 用 subagent 定義
+- `hooks.json`
+  - Codex lifecycle hook 定義
+- `hooks/*.sh`
+  - repo-local hook script
 
 ## Shared Canon
 
@@ -50,6 +56,14 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - MCP 前提の task では、local process を手で起動する前に `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
 - `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
 - `check_mcp_inventory.py` は inventory だけでなく launcher command と repo-local script の存在も検査します。
+
+## MCP Hook Context
+
+- `config.toml` の `[features].codex_hooks = true` で project-local hook を有効にします。
+- `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
+- hook の役割は「MCP を忘れにくくする context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
+- hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
+- `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
 ## Model Policy
 
