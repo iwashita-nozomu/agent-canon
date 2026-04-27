@@ -4,6 +4,7 @@
 @dependency-start
 upstream design ../canonical/CODEX_WORKFLOW.md closeout workflow contract
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
 downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
 @dependency-end
 -->
@@ -85,7 +86,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Agent Evaluation Evidence
 
-<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. -->
+<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, interventions, and skill/config/workflow/memory improvement decisions. -->
 
 ## Evidence
 
