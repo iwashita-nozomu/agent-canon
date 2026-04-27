@@ -104,6 +104,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: 2026-04-11 user feedback on document intake and subagent startup
 
+- 2026-04-27 | interaction-observation | When updating vendored agent-canon from a derived repository, apply fixes to the shared canon head and validate the resulting vendor snapshot before committing; do not rely on subtree history merges when split metadata diverges.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: During 20260427-041425, subtree-sync fixes had to be reapplied after agent-canon remote advanced and ci-quick caught the regression.
+
 ## Task Retrospectives
 
 - まだなし
