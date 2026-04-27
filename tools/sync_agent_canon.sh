@@ -513,7 +513,9 @@ import_snapshot_from_prefix_tree() {
 }
 
 split_prefix_or_empty() {
-  git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null || true
+  git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null \
+    || git -C "$ROOT_DIR" subtree split --ignore-joins --prefix="$PREFIX" HEAD 2>/dev/null \
+    || true
 }
 
 has_subtree_metadata() {
@@ -762,10 +764,13 @@ cmd_ensure_latest() {
 
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
+  local local_split=""
   require_clean_worktree
   require_existing_remote
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
-  git -C "$ROOT_DIR" subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$branch"
+  local_split="$(split_prefix_or_empty)"
+  [ -n "$local_split" ] || die "could not split prefix '$PREFIX'"
+  git -C "$ROOT_DIR" push "$REMOTE_NAME" "${local_split}:refs/heads/${branch}"
 }
 
 cmd_status() {
