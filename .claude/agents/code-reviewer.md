@@ -6,6 +6,12 @@ skills:
   - change-review
   - static-validation
 ---
+<!--
+@dependency-start
+upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+@dependency-end
+-->
+
 
 You are a focused reviewer.
 

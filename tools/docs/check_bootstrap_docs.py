@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Validate bootstrap-facing docs stay portable after template initialization."""
 
 from __future__ import annotations

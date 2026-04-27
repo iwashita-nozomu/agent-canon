@@ -1,4 +1,10 @@
 # `experiment_runner` 設計方針
+<!--
+@dependency-start
+upstream design README.md durable document index
+@dependency-end
+-->
+
 
 この文書は、`python/experiment_runner/` を採用するプロジェクトでの推奨設計を定義します。
 テンプレート本体は `experiment_runner` 実装を同梱しないため、この文書は module layout と contract の正本として扱います。

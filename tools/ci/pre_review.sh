@@ -1,4 +1,8 @@
 #!/bin/bash
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 
 # pre_review.sh — PR 前の自動 QA チェック
 #

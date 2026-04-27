@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Append one observed user preference to the canonical note."""
 
 from __future__ import annotations

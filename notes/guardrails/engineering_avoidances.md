@@ -1,4 +1,10 @@
 # Engineering Avoidances
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 この note は、repo-wide に何度も読み返す avoid list を短く固定します。
 

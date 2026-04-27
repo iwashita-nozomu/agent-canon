@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design README.md shared automation index
+# @dependency-end
+
 """
 規約矛盾検出スクリプト。
 

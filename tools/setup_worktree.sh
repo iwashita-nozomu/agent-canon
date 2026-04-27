@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @dependency-start
+# upstream design README.md shared automation index
+# @dependency-end
+
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════

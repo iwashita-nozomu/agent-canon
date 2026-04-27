@@ -2,6 +2,12 @@
 name: adaptive-improvement-loop
 description: Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Adaptive Improvement Loop
 

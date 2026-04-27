@@ -1,4 +1,10 @@
 # Theme Notes
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 `notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。
 

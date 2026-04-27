@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for the repo-local Python environment policy helper."""
 
 from __future__ import annotations

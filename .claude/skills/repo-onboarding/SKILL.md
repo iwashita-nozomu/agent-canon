@@ -2,6 +2,12 @@
 name: repo-onboarding
 description: Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Repo Onboarding
 

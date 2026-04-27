@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @dependency-start
+# upstream design README.md shared automation index
+# @dependency-end
+
 #
 # 統合コードレビューチェック実行スクリプト（v2.0）
 # スキルファイル section 12 の自動化スクリプトを一括実行

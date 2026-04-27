@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# @dependency-end
+
 name = "citation_evidence_reviewer"
 description = "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability."
 nickname_candidates = ["citation-trace", "evidence-gate", "source-check"]

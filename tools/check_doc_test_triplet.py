@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design README.md shared automation index
+# @dependency-end
+
 """Legacy entrypoint for the doc-test-implementation triplet validator."""
 
 from __future__ import annotations

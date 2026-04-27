@@ -2,6 +2,12 @@
 name: literature-survey
 description: Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Literature Survey
 

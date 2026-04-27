@@ -1,4 +1,10 @@
 # Branch Notes
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 `notes/branches/` は、branch ごとの要約と関連 note への入口をまとめるディレクトリです。
 このカテゴリは例外運用用です。通常運用では branch 名そのものではなく `main` 上の code、document、note を見ます。

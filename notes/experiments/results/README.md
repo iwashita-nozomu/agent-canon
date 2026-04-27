@@ -1,4 +1,10 @@
 # Experiment Result JSON Archive
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 このディレクトリには、`main` に持ち帰る最小限の final JSON を置きます。
 

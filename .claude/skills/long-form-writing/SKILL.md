@@ -2,6 +2,12 @@
 name: long-form-writing
 description: Use when drafting a long README, workflow, guide, migration doc, or other reader-facing long-form document that needs explicit structure and mandatory subagent review.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Long-Form Writing
 

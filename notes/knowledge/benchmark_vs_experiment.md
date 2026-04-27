@@ -1,4 +1,10 @@
 # Benchmark vs Experiment
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 性能計測を始める前に benchmark と experiment のどちらを選ぶかを素早く判断するためのメモです。
 

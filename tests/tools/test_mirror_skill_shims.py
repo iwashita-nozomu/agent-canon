@@ -1,8 +1,8 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for the skill shim mirror helper."""
-
-# Dependency Files:
-# - vendor/agent-canon/tools/docs/mirror_skill_shims.py
-
 from __future__ import annotations
 
 import subprocess

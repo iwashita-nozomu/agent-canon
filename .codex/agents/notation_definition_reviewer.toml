@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# @dependency-end
+
 name = "notation_definition_reviewer"
 description = "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents."
 nickname_candidates = ["notation-check", "definition-gate", "symbol-review"]

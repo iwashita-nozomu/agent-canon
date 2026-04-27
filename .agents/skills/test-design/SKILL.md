@@ -2,6 +2,12 @@
 name: test-design
 description: Use when code changes need adversarial static test design before implementation.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Test Design
 

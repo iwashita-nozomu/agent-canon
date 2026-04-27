@@ -2,6 +2,12 @@
 name: environment-maintenance
 description: Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Environment Maintenance
 

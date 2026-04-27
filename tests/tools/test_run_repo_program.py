@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for the generic repo-program container runner."""
 
 from __future__ import annotations

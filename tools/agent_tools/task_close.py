@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/agent_team.py
-# - vendor/agent-canon/tools/agent_tools/report_artifact_checks.py
-# - vendor/agent-canon/agents/templates/closeout_gate.md
+# @dependency-start
+# upstream implementation ./agent_team.py resolves report root defaults
+# upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
+# upstream design ../../agents/templates/closeout_gate.md defines closeout status contract
+# upstream design ../../agents/templates/agent_evaluation.md defines agent evaluation status contract
+# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py verifies closeout behavior
+# @dependency-end
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
 from __future__ import annotations
@@ -81,6 +84,7 @@ def main() -> int:
     request_contract_path = report_dir / "user_request_contract.md"
     schedule_path = report_dir / "schedule.md"
     work_log_path = report_dir / "work_log.md"
+    agent_evaluation_path = report_dir / "agent_evaluation.md"
     if not verification_path.is_file():
         raise SystemExit(f"verification.txt not found: {verification_path}")
     if not closeout_path.is_file():
@@ -91,9 +95,12 @@ def main() -> int:
         raise SystemExit(f"schedule.md not found: {schedule_path}")
     if not work_log_path.is_file():
         raise SystemExit(f"work_log.md not found: {work_log_path}")
+    if not agent_evaluation_path.is_file():
+        raise SystemExit(f"agent_evaluation.md not found: {agent_evaluation_path}")
 
     verification = parse_kv_lines(verification_path)
     closeout = parse_markdown_status(closeout_path)
+    agent_evaluation = parse_markdown_status(agent_evaluation_path)
     request_contract = parse_markdown_status(request_contract_path)
     schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
@@ -110,11 +117,18 @@ def main() -> int:
         "overall_delivery_complete": closeout.get("overall_delivery_complete") == "yes",
         "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
+        "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
+        == "yes",
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
         "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete") == "yes",
         "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
+        "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
+        "agent_evaluation_status": agent_evaluation.get("evaluation_status") == "pass",
+        "agent_feedback_resolved": agent_evaluation.get("feedback_actions_resolved") == "yes",
+        "agent_learning_capture_complete": agent_evaluation.get("learning_capture_complete")
+        == "yes",
         "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "todo_artifact_complete": not schedule_blockers,
@@ -138,6 +152,10 @@ def main() -> int:
     print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
     print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
     print(
+        "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE="
+        f"{closeout.get('repo_wide_dependency_tools_complete', '')}"
+    )
+    print(
         "SPEC_PRODUCT_COVERAGE_COMPLETE="
         f"{closeout.get('spec_product_coverage_complete', '')}"
     )
@@ -149,6 +167,13 @@ def main() -> int:
     print(
         "CANONICAL_TREE_HEAD_COMPLETE="
         f"{closeout.get('canonical_tree_head_complete', '')}"
+    )
+    print(f"AGENT_EVALUATION_COMPLETE={closeout.get('agent_evaluation_complete', '')}")
+    print(f"AGENT_EVALUATION_STATUS={agent_evaluation.get('evaluation_status', '')}")
+    print(f"AGENT_FEEDBACK_RESOLVED={agent_evaluation.get('feedback_actions_resolved', '')}")
+    print(
+        "AGENT_LEARNING_CAPTURE_COMPLETE="
+        f"{agent_evaluation.get('learning_capture_complete', '')}"
     )
     print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
     print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")

@@ -6,6 +6,12 @@ skills:
   - environment-maintenance
   - static-validation
 ---
+<!--
+@dependency-start
+upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+@dependency-end
+-->
+
 
 You are an environment and automation steward.
 

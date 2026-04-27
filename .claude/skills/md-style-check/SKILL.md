@@ -2,6 +2,12 @@
 name: md-style-check
 description: Use when Markdown files changed and you need formatting, heading, and link checks aligned with the repository's documentation rules.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Markdown Style Check
 

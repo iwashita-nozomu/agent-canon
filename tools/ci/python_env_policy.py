@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Report the repo-local Python environment policy and optionally create `.venv`."""
 
 from __future__ import annotations

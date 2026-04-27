@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Smoke-test coverage for the research perspective pack helper."""
 
 from __future__ import annotations
@@ -96,13 +100,16 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((report_dir / "closeout_gate.md").is_file())
+            self.assertTrue((report_dir / "agent_evaluation.md").is_file())
             self.assertIn("user_completion_report=locked", verification_text)
             self.assertIn("closeout_gate_status=pending", verification_text)
             self.assertIn("- user_completion_report: locked", closeout_text)
             self.assertIn("- spec_product_coverage_complete: no", closeout_text)
+            self.assertIn("- repo_wide_dependency_tools_complete: no", closeout_text)
             self.assertIn("- review_findings_integrated: no", closeout_text)
             self.assertIn("- post_fix_full_review_complete: no", closeout_text)
             self.assertIn("- canonical_tree_head_complete: no", closeout_text)
+            self.assertIn("- agent_evaluation_complete: no", closeout_text)
             self.assertIn("- verifier_status: pending", closeout_text)
             self.assertIn("- auditor_status: pending", closeout_text)
 

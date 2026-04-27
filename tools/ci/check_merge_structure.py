@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Check that branch-side structural path changes survived integration."""
 
 from __future__ import annotations

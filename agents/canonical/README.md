@@ -1,4 +1,10 @@
 # Agent Canonical Layout
+<!--
+@dependency-start
+upstream design ../README.md agent canon overview
+@dependency-end
+-->
+
 
 このディレクトリは、cross-agent で共有する人間向け正本の説明置き場です。
 実行時に読まれる entrypoint は別にあっても、保守対象はここを基準にします。

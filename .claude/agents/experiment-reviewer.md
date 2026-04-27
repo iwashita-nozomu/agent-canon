@@ -6,6 +6,12 @@ skills:
   - experiment-workflow
   - critical-review
 ---
+<!--
+@dependency-start
+upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+@dependency-end
+-->
+
 
 You are a focused experiment reviewer.
 

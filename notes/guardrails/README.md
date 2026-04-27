@@ -1,4 +1,10 @@
 # Guardrail Notes
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 このディレクトリは、repo-wide に何度も読み返す禁止事項と anti-pattern の補助 note を置く場所です。
 

@@ -1,4 +1,10 @@
 # 実験の標準手順
+<!--
+@dependency-start
+upstream design README.md workflow catalog
+@dependency-end
+-->
+
 
 この文書は、repo 内で実験を進めるときの統合入口です。
 個別の `experiments/<topic>/README.md` は、その実験やモジュール固有の使い方として残し、この文書では topic をまたぐ汎用的な実験方法を扱います。

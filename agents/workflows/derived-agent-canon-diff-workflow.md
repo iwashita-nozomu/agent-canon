@@ -1,10 +1,14 @@
 # Derived Agent-Canon Diff Workflow
 
-Dependency Files:
-- vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md
-- vendor/agent-canon/documents/agent-canon-subtree-migration.md
-- vendor/agent-canon/tools/sync_agent_canon.sh
-- vendor/agent-canon/tools/update_agent_canon.sh
+<!--
+@dependency-start
+upstream design ./agent-canon-pr-workflow.md defines shared canon PR gates
+upstream design ../../documents/agent-canon-subtree-migration.md defines subtree migration contract
+upstream implementation ../../tools/sync_agent_canon.sh synchronizes shared canon snapshots
+upstream implementation ../../tools/update_agent_canon.sh pushes canon proposal branches
+downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
+@dependency-end
+-->
 
 この workflow は、template から作った派生 repo の `vendor/agent-canon/` に差分があるときの入口です。
 目的は、派生 repo の local snapshot、repo 専用 proposal branch、shared `agent-canon` main、派生 repo の current tree head を順番に揃え、shared canon 差分を未整理のまま残さないことです。
@@ -142,11 +146,21 @@ fresh clone smoke がある場合は、更新後の bare remote から clone し
 ```bash
 bash tools/sync_agent_canon.sh check
 python3 tools/agent_tools/check_dependency_headers.py --changed
+bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
 python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
 make agent-checks
 make docs-check
 make ci-quick
 ```
+
+dependency edge を追加・変更した shared canon PR では、次を追加して graph semantics を確認します。
+
+```bash
+bash tools/agent_tools/check_dependency_graph.sh --print-edges
+```
+
+移行期間中に既存 full-repo graph failure が残る場合は、failure を `work_log.md` と `closeout_gate.md` に baseline として記録し、今回の差分が新しい旧形式 header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
 
 shared canon PR または template snapshot 更新では、`make agent-canon-pr-check` を追加します。
 repo 全体の runtime 影響がある場合、または template snapshot を更新する場合は `make ci` を closeout gate にします。

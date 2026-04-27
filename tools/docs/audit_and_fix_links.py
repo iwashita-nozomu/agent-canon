@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Audit markdown links and optionally auto-fix resolvable local targets."""
 
 from __future__ import annotations

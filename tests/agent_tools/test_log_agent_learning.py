@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for the agent learning logging tool."""
 
 from __future__ import annotations

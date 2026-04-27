@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Shared helpers for repo-defined container runtime scripts."""
 
 from __future__ import annotations

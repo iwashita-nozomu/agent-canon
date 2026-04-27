@@ -1,4 +1,10 @@
 # Path Resolution
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 ## Markdown の画像パス
 

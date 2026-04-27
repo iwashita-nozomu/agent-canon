@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

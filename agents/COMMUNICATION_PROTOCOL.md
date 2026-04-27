@@ -1,4 +1,10 @@
 # Agent Communication Protocol
+<!--
+@dependency-start
+upstream design README.md agent canon overview
+@dependency-end
+-->
+
 
 この文書は、agent-to-agent handoff と review の正本です。
 

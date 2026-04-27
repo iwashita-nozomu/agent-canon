@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Inspect host-side readiness for using this machine as the main server."""
 
 from __future__ import annotations

@@ -2,6 +2,12 @@
 name: agent-orchestration
 description: Mandatory first skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, run bundles, or Codex/Claude/Copilot routing.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Agent Orchestration
 

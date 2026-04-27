@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Run one repo program inside the repo-defined container runtime."""
 
 from __future__ import annotations

@@ -1,4 +1,10 @@
 # tools
+<!--
+@dependency-start
+upstream design ../AGENTS.md shared canon runtime contract
+@dependency-end
+-->
+
 
 `tools/` は shared automation の正本です。
 agent helper、CI/check、container runner、experiment helper、Markdown 整備、validation はここに置きます。
@@ -38,6 +44,35 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `docker_dependency_validator.sh`
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
+  - `agent_tools/evaluate_agent_run.py`
+
+## Agent Evaluation Tools
+
+`evaluate_agent_run.py` grades one `reports/agents/<run-id>/` bundle before closeout.
+It turns review / validation / schedule / retrospective evidence into `agent_evaluation.md` with a score and fix-now feedback actions.
+This is the repo-local counterpart to trace / eval feedback loops: use it to identify missing tooling, guardrails, documentation, or run evidence before the user-facing completion report.
+
+```bash
+python3 tools/agent_tools/evaluate_agent_run.py \
+  --report-dir reports/agents/<run-id> \
+  --write
+```
+
+`task_close.py` requires `agent_evaluation.md` to report `evaluation_status: pass`, `feedback_actions_resolved: yes`, and `learning_capture_complete: yes`.
+
+## Dependency Manifest Tools
+
+Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
+
+- `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
+- `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
+- `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
+- `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
+- `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
+
+Do not use Dockerfile or environment files as universal dependency anchors.
+Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
+Generic canon files should connect to the nearest canon-owned anchor such as `AGENTS.md`, `README.md`, a directory README, a canonical workflow document, or this tool index.
 
 ## 含めないもの
 

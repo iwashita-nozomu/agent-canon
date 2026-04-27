@@ -1,4 +1,10 @@
 # Knowledge Notes
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 `notes/knowledge/` は、実務で何度も見返す横断知識の置き場です。
 個別プロジェクトの結果ではなく、再利用しやすい短いメモだけを置きます。

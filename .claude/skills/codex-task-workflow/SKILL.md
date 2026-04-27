@@ -3,6 +3,14 @@ name: codex-task-workflow
 description: Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout.
 ---
 
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
+upstream design ../../../documents/dependency-manifest-design.md defines dependency manifest requirements
+upstream design ../../../agents/skills/codex-task-workflow.md documents the human-facing skill
+@dependency-end
+-->
+
 # Codex Task Workflow
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
@@ -20,7 +28,11 @@ description: Use when Codex needs a context-independent execution path for a rep
 1. If the task needs explicit handoff or specialist roles, bootstrap `reports/agents/<run-id>/` first.
 1. Update canonical docs before runtime entrypoints when both are affected.
 1. Before implementation, read the approved `design_brief.md` `Implementation Source Packet` and `Design-To-Implementation Trace`; cite the design artifact path, design section, test-plan item, and user-request clause IDs for each changed slice.
+1. Before implementation, read the approved `Dependency Manifest Plan`; load upstream dependency targets before editing and downstream targets after editing.
+1. For new or edited human-authored text files, use only the `@dependency-start` / `@dependency-end` manifest format, not legacy `Dependency Files:` blocks.
 1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
 1. For fully design-traced, low-risk implementation slices, use `spark_worker` first and `worker` as fallback; keep requirements, design, review, and scope judgment off Spark.
 1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, final review, validation, closeout gate, commit, and push are complete.
+1. Validate dependency manifests with `python3 tools/agent_tools/check_dependency_headers.py --changed`, `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`, and `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header` before closeout.
+1. If dependency edges changed, run `bash tools/agent_tools/check_dependency_graph.sh --print-edges` or record the migration baseline and evidence that the current diff introduced no new graph error.
 1. Validate with `make ci-quick` first and escalate to broader checks only when needed.

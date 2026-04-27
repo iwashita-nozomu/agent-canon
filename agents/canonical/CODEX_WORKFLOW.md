@@ -1,11 +1,15 @@
 # Codex Workflow
 
-Dependency Files:
-- vendor/agent-canon/ROOT_AGENTS.md
-- vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md
-- vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md
-- vendor/agent-canon/agents/templates/closeout_gate.md
-- vendor/agent-canon/tools/agent_tools/task_close.py
+<!--
+@dependency-start
+upstream design ../../ROOT_AGENTS.md root runtime entrypoint
+upstream design ./CODEX_SUBAGENTS.md subagent routing contract
+upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
+downstream design ../templates/closeout_gate.md closeout gate contract
+upstream design ../../documents/dependency-manifest-design.md dependency manifest design
+downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+@dependency-end
+-->
 
 この文書は、Codex でこの repo を扱うときの標準フローです。
 会話の過去文脈に依存せず、毎回同じ順序で進められるようにします。
@@ -76,6 +80,20 @@ task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent
 user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
+### MCP Surface Preflight
+
+MCP tool や `repo_mcp_server` が必要な task では、configured MCP inventory を先に確認します。
+
+```bash
+python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
+```
+
+- `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
+- template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
+- configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
+- inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
+- contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
+
 ### Library And Reuse Sweep
 
 新しい code path、module、helper、test、script を足す前に、導入済みライブラリと既存の再利用候補を探索します。
@@ -100,16 +118,47 @@ dependency surface は task に応じて次を見ます。
 既存実装があるのに別名の重複 module を新設しません。
 既存ライブラリや既存実装で足りない理由を言えない限り、新規追加を選びません。
 
-### File Dependency Headers
+### File Dependency Manifest
 
-新規作成・編集する human-authored text file では、ファイル冒頭にそのファイルが依存する repo 内ファイルを明記します。
+新規作成・編集する human-authored text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。
+設計正本は `documents/dependency-manifest-design.md` です。
+旧 `Dependency Files:` block は新規・変更 file では使いません。
 
-- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後に `Dependency Files:` block を置きます
-- 依存が無い場合も `Dependency Files: None` または comment 形式の `Dependency Files: None` を置き、未記載と区別します
+- manifest の内部 DSL は `<direction> <kind> <relative-path> <reason...>` です
+- `direction` は `upstream` または `downstream` です
+- `kind` は `design`、`implementation`、`environment` です
+- path は manifest を持つ file から見た相対 path です
 - 依存として書くのは、その file を理解・実行・検証するために読むべき repo 内の正本 file です。単なる同一 directory の全列挙や推測 dependency を水増ししません
-- JSON など comment を持たず schema 上 top-level field も置けない file では、同じ変更の design / manifest / README に依存 file を明記し、その理由を review artifact に残します
-- subagent への handoff には `dependency_files_header_plan` を含め、編集対象ごとに冒頭へ書く依存 file を先に固定します
-- closeout 前に `python3 tools/agent_tools/check_dependency_headers.py --changed` を実行し、対象ファイルの依存ヘッダーが抜けていないことを確認します
+- upstream は「編集前に読む file」、downstream は「編集後に影響確認する file」として分けます
+- 依存が無い direction は行を置きません。`none` placeholder は置きません
+- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後、C-like file は先頭 comment block に置きます
+- line comment しかない format では `# @dependency-start` のように line comment wrapping を使います
+- commentless format や generated / binary / vendored external file は scan tool の分類に従い、必要なら同じ変更の design / manifest / README に理由を残します
+
+編集 workflow:
+
+1. 変更対象 file の manifest を先に読み、upstream edge の target を編集前 context として読む
+1. manifest が無い checkable file を編集する場合は、同じ差分の最初に `@dependency-start` block を追加する
+1. downstream edge を持つ file を編集した場合は、差分後に downstream target を確認する
+1. 新しい dependency edge を足す場合は、同じ変更で reverse edge も足すか、migration 中で足せない理由を review artifact に記録する
+1. subagent handoff には `dependency_manifest_plan` を含め、編集対象ごとの upstream / downstream edge と読む順序を固定する
+
+closeout 前に、少なくとも次を実行します。
+
+```bash
+python3 tools/agent_tools/check_dependency_headers.py --changed
+bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+```
+
+dependency edge を追加・変更した場合は次も実行します。
+
+```bash
+bash tools/agent_tools/check_dependency_graph.sh --print-edges
+```
+
+`check_dependency_graph.sh` は upstream graph と downstream graph を別々に扱い、自己参照、reverse edge、kind mismatch、cycle を検証します。
+移行期間中に repo 全体の既存 graph failure が残る場合でも、新規・変更 file が旧形式や新規 reverse-edge 欠落を増やした状態で closeout しません。
 
 ## Task Classification
 
@@ -394,8 +443,10 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
 - `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
+- `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh` を通していない completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
+- `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃うまで、agent behavior evaluation と feedback resolution が未完了の completion report を出さない
 - `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す
 - user request が generic path の usable smoke を求める場合、specialized path の tuning、narrow smoke、header-only compile だけでは completion evidence にしない
@@ -409,6 +460,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
 - closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
 - closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
+- closeout 前に `agent_evaluation.md` の feedback actions を見直し、stable な失敗防止は `agent-learning` で記録し、確定した禁止事項は guardrail 昇格候補にする
 - review-only task や no-change task では commit / push を要求しない
 
 そのうえで、何を変えたか、何を確認したか、何を確認していないかを短く残して完了する

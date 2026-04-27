@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# @dependency-end
+
 name = "docs_workflow_steward"
 description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."
 nickname_candidates = ["canon", "docs", "workflow-docs"]

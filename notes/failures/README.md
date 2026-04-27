@@ -1,4 +1,10 @@
 # Failure Case Hub
+<!--
+@dependency-start
+upstream design ../README.md notes lifecycle index
+@dependency-end
+-->
+
 
 このディレクトリは、再発防止のために残す failure case の置き場です。
 

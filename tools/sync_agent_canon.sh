@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/check_dependency_headers.py
-# - vendor/agent-canon/tests/agent_tools/test_check_dependency_headers.py
+# @dependency-start
+# upstream implementation ./agent_tools/check_dependency_headers.py validates dependency manifests
+# upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
+# downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
+# @dependency-end
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
@@ -103,21 +105,63 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
+documents/DOCSTRING_GUIDE.md:../${PREFIX}/documents/DOCSTRING_GUIDE.md
+documents/FILE_CHECKLIST_OPERATIONS.md:../${PREFIX}/documents/FILE_CHECKLIST_OPERATIONS.md
+documents/README.md:../${PREFIX}/documents/README.md
+documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
+documents/SHARED_RUNTIME_SURFACES.md:../${PREFIX}/documents/SHARED_RUNTIME_SURFACES.md
 documents/SKILL_IMPLEMENTATION_GUIDE.md:../${PREFIX}/documents/SKILL_IMPLEMENTATION_GUIDE.md
+documents/TROUBLESHOOTING.md:../${PREFIX}/documents/TROUBLESHOOTING.md
 documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPLATE.md
+documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-subtree-migration.md
+documents/coding-conventions-cpp.md:../${PREFIX}/documents/coding-conventions-cpp.md
 documents/coding-conventions-experiments.md:../${PREFIX}/documents/coding-conventions-experiments.md
+documents/coding-conventions-house-style.md:../${PREFIX}/documents/coding-conventions-house-style.md
+documents/coding-conventions-logging.md:../${PREFIX}/documents/coding-conventions-logging.md
+documents/coding-conventions-project.md:../${PREFIX}/documents/coding-conventions-project.md
+documents/coding-conventions-python.md:../${PREFIX}/documents/coding-conventions-python.md
+documents/coding-conventions-reviews.md:../${PREFIX}/documents/coding-conventions-reviews.md
+documents/coding-conventions-testing.md:../${PREFIX}/documents/coding-conventions-testing.md
 documents/experiment-critical-review.md:../${PREFIX}/documents/experiment-critical-review.md
 documents/experiment-registry.md:../${PREFIX}/documents/experiment-registry.md
 documents/experiment-report-style.md:../${PREFIX}/documents/experiment-report-style.md
 documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
+documents/cpp-build-layout.md:../${PREFIX}/documents/cpp-build-layout.md
+documents/linux-wsl-host-requirements.md:../${PREFIX}/documents/linux-wsl-host-requirements.md
+documents/remote-execution-repo-contract.md:../${PREFIX}/documents/remote-execution-repo-contract.md
+documents/server-host-contract.md:../${PREFIX}/documents/server-host-contract.md
+documents/template-bootstrap.md:../${PREFIX}/documents/template-bootstrap.md
 documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
+documents/conventions/README.md:../../${PREFIX}/documents/conventions/README.md
+documents/conventions/common/01_principles.md:../../../${PREFIX}/documents/conventions/common/01_principles.md
+documents/conventions/common/02_naming.md:../../../${PREFIX}/documents/conventions/common/02_naming.md
+documents/conventions/common/03_comments.md:../../../${PREFIX}/documents/conventions/common/03_comments.md
+documents/conventions/common/04_operators.md:../../../${PREFIX}/documents/conventions/common/04_operators.md
+documents/conventions/common/05_docs.md:../../../${PREFIX}/documents/conventions/common/05_docs.md
+documents/conventions/python/01_scope.md:../../../${PREFIX}/documents/conventions/python/01_scope.md
+documents/conventions/python/04_type_annotations.md:../../../${PREFIX}/documents/conventions/python/04_type_annotations.md
+documents/conventions/python/06_comments.md:../../../${PREFIX}/documents/conventions/python/06_comments.md
+documents/conventions/python/07_type_checker.md:../../../${PREFIX}/documents/conventions/python/07_type_checker.md
+documents/conventions/python/09_file_roles.md:../../../${PREFIX}/documents/conventions/python/09_file_roles.md
+documents/conventions/python/11_naming.md:../../../${PREFIX}/documents/conventions/python/11_naming.md
+documents/conventions/python/15_jax_rules.md:../../../${PREFIX}/documents/conventions/python/15_jax_rules.md
 documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
 documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
+documents/design/README.md:../../${PREFIX}/documents/design/README.md
+documents/design/protocols.md:../../${PREFIX}/documents/design/protocols.md
+documents/templates/README.md:../../${PREFIX}/documents/templates/README.md
+documents/templates/remote_execution_repo.template.toml:../../${PREFIX}/documents/templates/remote_execution_repo.template.toml
+documents/templates/remote_execution_target.template.toml:../../${PREFIX}/documents/templates/remote_execution_target.template.toml
+documents/templates/server_host_inventory.template.md:../../${PREFIX}/documents/templates/server_host_inventory.template.md
+documents/templates/server_runtime_layout.template.toml:../../${PREFIX}/documents/templates/server_runtime_layout.template.toml
+documents/tools/README.md:../../${PREFIX}/documents/tools/README.md
+documents/tools/TOOLS_DIRECTORY.md:../../${PREFIX}/documents/tools/TOOLS_DIRECTORY.md
 memory/README.md:../${PREFIX}/memory/README.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
+mcp:${PREFIX}/mcp
 notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
 notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
 notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
@@ -150,10 +194,13 @@ tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/ag
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
+tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
 tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
+tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
+tests/agent_tools/test_work_log.py:../../${PREFIX}/tests/agent_tools/test_work_log.py
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_check_markdown_math.py:../../${PREFIX}/tests/tools/test_check_markdown_math.py

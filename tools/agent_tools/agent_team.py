@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/agents/agents_config.json
-# - vendor/agent-canon/agents/task_catalog.yaml
-# - vendor/agent-canon/agents/templates/closeout_gate.md
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
 from __future__ import annotations

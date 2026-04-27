@@ -1,4 +1,10 @@
 # Experiment Registry
+<!--
+@dependency-start
+upstream design README.md durable document index
+@dependency-end
+-->
+
 
 この文書は、`experiments/registry.toml` を使って experiment topic を集中管理する契約を定めます。
 server 上でどの実験コードを正式に実行するかを、topic ごとに 1 か所へ固定するのが目的です。

@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-# Dependency Files:
-# - vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
-# - vendor/agent-canon/agents/templates/closeout_gate.md
-"""Check that changed human-authored text files declare dependency files."""
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md dependency manifest requirement
+# upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
+# upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
+# downstream implementation ./check_dependency_header_format.sh validates manifest syntax
+# downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
+# @dependency-end
+"""Check that changed human-authored text files declare dependency manifests."""
 
 from __future__ import annotations
 
@@ -38,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Require a top-of-file Dependency Files block in changed human-authored text files."
+            "Require a top-of-file @dependency-start block in changed human-authored text files."
         )
     )
     parser.add_argument(
@@ -104,28 +108,17 @@ def should_check(root: Path, path: Path) -> bool:
     return path.suffix.lower() in CHECKABLE_SUFFIXES
 
 
-def has_dependency_header(path: Path) -> bool:
-    """Return whether a file declares dependency files near the top."""
+def has_dependency_manifest(path: Path) -> bool:
+    """Return whether a file declares the new dependency manifest markers."""
     lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
-    for index, line in enumerate(lines):
-        normalized = line.lower()
-        if "dependency files:" not in normalized and "依存ファイル:" not in line:
-            continue
-        after_colon = line.split(":", 1)[1].strip() if ":" in line else ""
-        if after_colon:
-            return True
-        following = lines[index + 1 : index + 7]
-        return any(stripped_list_item(candidate) for candidate in following)
-    return False
+    return any("@dependency-start" in line for line in lines) and any(
+        "@dependency-end" in line for line in lines
+    )
 
 
-def stripped_list_item(line: str) -> bool:
-    """Return whether one line looks like a dependency list item."""
-    stripped = line.strip()
-    for prefix in ("#", "//", ";"):
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix) :].strip()
-    return stripped.startswith("- ") and len(stripped) > 2
+def has_dependency_header(path: Path) -> bool:
+    """Return whether a file declares the dependency manifest format."""
+    return has_dependency_manifest(path)
 
 
 def main() -> int:
@@ -144,7 +137,9 @@ def main() -> int:
         if not should_check(root, resolved):
             continue
         if not has_dependency_header(resolved):
-            findings.append(f"{repo_relative(root, resolved)}: missing top Dependency Files block")
+            findings.append(
+                f"{repo_relative(root, resolved)}: missing top dependency manifest block"
+            )
 
     if findings:
         print("DEPENDENCY_HEADERS=fail")

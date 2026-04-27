@@ -1,4 +1,10 @@
 # Experiment Directory Planning
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 実験コードの配置は、再現に必要な入口を 1 か所で辿れるかを基準に決めます。
 

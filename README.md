@@ -1,4 +1,10 @@
 # agent-canon
+<!--
+@dependency-start
+upstream design AGENTS.md shared canon runtime contract
+@dependency-end
+-->
+
 
 このディレクトリは `agent-canon` 自体の committed snapshot です。
 template や派生 repo に配布する shared agent canon の正本をここに置きます。

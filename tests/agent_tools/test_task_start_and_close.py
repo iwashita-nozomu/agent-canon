@@ -1,10 +1,8 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for machine-driven task start and close commands."""
-
-# Dependency Files:
-# - vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py
-# - vendor/agent-canon/tools/agent_tools/task_close.py
-# - vendor/agent-canon/agents/templates/closeout_gate.md
-
 from __future__ import annotations
 
 import subprocess
@@ -64,6 +62,26 @@ def write_ready_work_log(report_dir: Path) -> None:
                     "- `2026-04-08 09:30 JST | test | passed closeout checks | "
                     "request_clause_ids: T1-C1 | next: close`"
                 ),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_ready_agent_evaluation(report_dir: Path) -> None:
+    """Write a passing agent-evaluation artifact."""
+    (report_dir / "agent_evaluation.md").write_text(
+        "\n".join(
+            [
+                "# Agent Evaluation",
+                "",
+                "- evaluation_status: pass",
+                "- score: 100",
+                "- max_score: 100",
+                "- threshold: 85",
+                "- feedback_actions_resolved: yes",
+                "- learning_capture_complete: yes",
                 "",
             ]
         ),
@@ -441,10 +459,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -455,6 +475,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -541,10 +562,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -555,6 +578,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -629,10 +653,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: no",
                         "- unfinished_tasks_absent: no",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -643,6 +669,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -713,10 +740,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -727,6 +756,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -816,10 +846,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -830,6 +862,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -898,10 +931,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: no",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -912,6 +947,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             write_ready_schedule(report_dir)
             write_ready_work_log(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [
@@ -1000,10 +1036,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- overall_delivery_complete: yes",
                         "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
+                        "- repo_wide_dependency_tools_complete: yes",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- canonical_tree_head_complete: yes",
+                        "- agent_evaluation_complete: yes",
                         "- commit_created: yes",
                         "- push_completed: yes",
                         "- user_completion_report: unlocked",
@@ -1013,6 +1051,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
+            write_ready_agent_evaluation(report_dir)
 
             result = subprocess.run(
                 [

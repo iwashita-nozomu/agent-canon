@@ -1,4 +1,10 @@
 # Branch Scope と Git ワークフロー
+<!--
+@dependency-start
+upstream design README.md durable document index
+@dependency-end
+-->
+
 
 この文書は、branch 名、branch の責務、commit / push、merge / rebase の判断をまとめた正本です。
 worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-lifecycle.md) を参照します。

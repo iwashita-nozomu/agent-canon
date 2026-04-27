@@ -1,8 +1,12 @@
 # Closeout Gate
 
-Dependency Files:
-- vendor/agent-canon/tools/agent_tools/task_close.py
-- vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md
+<!--
+@dependency-start
+upstream design ../canonical/CODEX_WORKFLOW.md closeout workflow contract
+downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
+@dependency-end
+-->
 
 - Run ID: {\{RUN_ID}}
 - Task: {\{TASK}}
@@ -19,10 +23,12 @@ Dependency Files:
 - overall_delivery_complete: no
 - unfinished_tasks_absent: no
 - dependency_headers_complete: no
+- repo_wide_dependency_tools_complete: no
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
 - canonical_tree_head_complete: no
+- agent_evaluation_complete: no
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
@@ -40,10 +46,12 @@ Dependency Files:
 - overall_delivery_complete: yes
 - unfinished_tasks_absent: yes
 - dependency_headers_complete: yes
+- repo_wide_dependency_tools_complete: yes
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
 - canonical_tree_head_complete: yes
+- agent_evaluation_complete: yes
 - commit_created: yes
 - push_completed: yes
 
@@ -51,9 +59,13 @@ Dependency Files:
 
 <!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
 
-## Dependency Header Evidence
+## Dependency Manifest Evidence
 
-<!-- Confirm that every created or edited human-authored text file has a top-of-file Dependency Files block, or record the syntax/schema reason and alternate manifest/design artifact for files that cannot carry such a header. Include the command output from tools/agent_tools/check_dependency_headers.py when applicable. -->
+<!-- Confirm that every created or edited human-authored text file has a top-of-file @dependency-start / @dependency-end manifest block, or record the scan-tool classification reason and alternate manifest/design artifact for files that cannot carry such a block. Include output from check_dependency_headers.py, scan_dependency_headers.sh, check_dependency_header_format.sh, and check_dependency_graph.sh when dependency edges changed. During migration, record any pre-existing full-repo graph baseline separately and confirm this change introduced no new old-format header, self reference, reverse-edge gap, kind mismatch, or cycle. -->
+
+## Repo-Wide Dependency Tool Evidence
+
+<!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. -->
 
 ## Spec-To-Product Coverage Evidence
 
@@ -70,6 +82,10 @@ Dependency Files:
 ## Canonical Tree-Head Evidence
 
 <!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
+
+## Agent Evaluation Evidence
+
+<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. -->
 
 ## Evidence
 

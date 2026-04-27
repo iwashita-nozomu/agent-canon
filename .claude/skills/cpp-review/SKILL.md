@@ -2,6 +2,12 @@
 name: cpp-review
 description: Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # C++ Review
 

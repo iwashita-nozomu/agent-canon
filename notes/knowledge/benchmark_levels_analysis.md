@@ -1,4 +1,10 @@
 # Benchmark Levels Analysis
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 benchmark は、重さの異なる層を明示しておくと運用しやすくなります。
 

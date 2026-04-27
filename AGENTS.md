@@ -1,4 +1,10 @@
 # agent-canon Snapshot Instructions
+<!--
+@dependency-start
+downstream design README.md shared canon overview must reflect runtime contract
+@dependency-end
+-->
+
 
 この subtree は shared agent canon の snapshot です。
 ここを単体で見ているときは、shared canon の整合を優先し、特定の派生 repo に閉じた Docker、implementation、experiment 前提を持ち込みません。

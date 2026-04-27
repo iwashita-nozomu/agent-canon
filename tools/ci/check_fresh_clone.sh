@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# @dependency-start
+# upstream design ../README.md shared automation index
+# upstream environment ../../../../docker/Dockerfile installs rsync for canonical container runs
+# @dependency-end
+
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -9,8 +14,26 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
+overlay_current_tree() {
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete --exclude .git "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+    return
+  fi
+
+  echo "fresh_clone_overlay=tar_fallback_no_rsync"
+  echo "fresh_clone_overlay_note=install rsync via docker/Dockerfile for canonical container runs"
+  find "${CLONE_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+  (
+    cd "${ROOT_DIR}"
+    tar --exclude='./.git' -cf - .
+  ) | (
+    cd "${CLONE_DIR}"
+    tar -xf -
+  )
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
-rsync -a --delete --exclude .git "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+overlay_current_tree
 cd "${CLONE_DIR}"
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
@@ -19,7 +42,7 @@ if [[ -n "$(git status --short)" ]]; then
   git commit -m "test: overlay current working tree for fresh clone check" >/dev/null
 fi
 
-for path in AGENTS.md agents .agents .claude .codex/config.toml agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
+for path in AGENTS.md agents .agents .claude .codex/config.toml mcp/repo_mcp_server.sh agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
   if [ ! -e "${path}" ]; then
     echo "missing runtime surface: ${path}" >&2
     exit 1

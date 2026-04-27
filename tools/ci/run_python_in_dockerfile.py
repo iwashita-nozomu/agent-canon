@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design ../README.md shared automation index
+# @dependency-end
+
 """Run one Python file inside the repo-defined Docker runtime."""
 
 from __future__ import annotations

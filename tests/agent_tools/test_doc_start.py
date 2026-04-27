@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for machine-driven document start bootstrap."""
 
 from __future__ import annotations

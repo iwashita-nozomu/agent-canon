@@ -1,4 +1,10 @@
 # レビュー手順とポリシー
+<!--
+@dependency-start
+upstream design README.md durable document index
+@dependency-end
+-->
+
 
 この文書は、コード、文書、workflow、環境設定の変更を main-first 運用で安全に閉じるための review 手順を定めます。
 現行の agent canon、skill canon、artifact placement に合わせて、必要な review family と evidence の残し方を固定します。
@@ -67,6 +73,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - CMake project なら `cmake --build build`
   - test target があれば `ctest --test-dir build`
 - Markdown 差分を含む場合は、少なくとも `make docs-check` を実行します。
+- checkpoint review と final acceptance review では、変更ファイルだけでなく全 repo に `bash tools/agent_tools/run_repo_dependency_review.sh` を適用し、`change_review.md` または `final_review.md` に `REPO_DEPENDENCY_REVIEW=pass` と checked path count を残します。
 - `make docs-check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
 - README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
 - 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。
@@ -99,6 +106,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、README、guide、workflow、規約文書、script help、validation 出力が旧 implementation / 旧 document surface を参照していないことを確認します。参照が残っていれば `fix now` です。
 1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation がその記述と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
 1. checkpoint review と final acceptance review では、文書や prompt の readability / reader flow を tool 結果だけで accept せず、`document_flow_reviewer` や別 reviewer の judgement が artifact に残っていることを確認します。
+1. checkpoint review と final acceptance review では、`bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
 1. review artifact が `revise`、`required_change`、または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、修正の大小に関係なく required review family 全体を最新 diff に対してやり直します。直前の approve を流用して closeout してはいけません。
 1. 各 review では artifact に `request_clause_ids` があるか確認し、無い場合は差し戻します。
 1. final acceptance review では、全 must-do / completion-evidence clause が product surface、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応しているか確認します。
@@ -123,6 +131,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - 学術文章では、notation review と logic-gap review も揃っていること
 - 対象に応じた validation 結果が確認されていること
 - runtime success だけでなく、task に式、仕様、protocol、method contract がある場合は alignment evidence が review artifact に残っていること
+- checkpoint review と final acceptance review で、全 repo 対象の dependency review が pass していること
 - review-driven fix が入った場合、最新 diff に対する full review rerun evidence が残っていること
 - 変更理由と影響範囲が追えること
 - コンフリクトがないこと

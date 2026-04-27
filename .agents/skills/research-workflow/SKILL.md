@@ -2,6 +2,12 @@
 name: research-workflow
 description: Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted.
 ---
+<!--
+@dependency-start
+upstream design ../../../agents/canonical/skills.md skill canon registry
+@dependency-end
+-->
+
 
 # Research Workflow
 

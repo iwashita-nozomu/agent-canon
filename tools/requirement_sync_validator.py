@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# @dependency-start
+# upstream design README.md shared automation index
+# @dependency-end
+
 """
 要件同期検証スクリプト。
 

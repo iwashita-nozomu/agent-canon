@@ -1,4 +1,10 @@
 # エージェント利用ガイド
+<!--
+@dependency-start
+upstream design README.md agent canon overview
+@dependency-end
+-->
+
 
 ## どこから読むか
 

@@ -1,4 +1,10 @@
 # <Topic-First Worktree Note>
+<!--
+@dependency-start
+upstream design README.md notes lifecycle index
+@dependency-end
+-->
+
 
 ## Summary
 

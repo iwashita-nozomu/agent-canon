@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
+# @dependency-end
+
 name = "long_form_writer"
 description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."
 nickname_candidates = ["doc-writer", "long-doc", "guide-writer"]

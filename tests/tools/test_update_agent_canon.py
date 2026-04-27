@@ -1,3 +1,7 @@
+# @dependency-start
+# upstream design ../../tools/README.md validated automation surface
+# @dependency-end
+
 """Tests for the derived-repo agent-canon update wrapper."""
 
 from __future__ import annotations

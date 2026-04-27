@@ -1,4 +1,10 @@
 # エージェント運用の入口
+<!--
+@dependency-start
+upstream design README.md durable document index
+@dependency-end
+-->
+
 
 この文書は repo 運用から見た agent 運用の薄い入口です。
 
