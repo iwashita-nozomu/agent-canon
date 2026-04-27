@@ -5,7 +5,7 @@
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest markers
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide review
+# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps review
 # @dependency-end
 
 from __future__ import annotations
