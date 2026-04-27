@@ -74,11 +74,19 @@ class WorkLogTest(unittest.TestCase):
         """Scope-driven mode should append both the action log and the run-local work log."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            action_log_path = workspace_root / "notes" / "worktrees" / "worktree_topic_2026-04-11.md"
+            action_log_path = (
+                workspace_root / "notes" / "worktrees" / "worktree_topic_2026-04-11.md"
+            )
             report_dir = workspace_root / "reports" / "agents" / "run-2"
             report_dir.mkdir(parents=True, exist_ok=True)
             action_log_path.parent.mkdir(parents=True, exist_ok=True)
-            (report_dir / "user_request_contract.md").write_text("# User Request Contract\n", encoding="utf-8")
+            request_contract_path = (
+                report_dir / "user_request_contract.md"
+            ).relative_to(workspace_root)
+            (report_dir / "user_request_contract.md").write_text(
+                "# User Request Contract\n",
+                encoding="utf-8",
+            )
             (report_dir / "work_log.md").write_text(
                 "\n".join(
                     [
@@ -100,7 +108,12 @@ class WorkLogTest(unittest.TestCase):
                         "",
                         "## Working Notes During Execution",
                         f"- Action log path: `{action_log_path.relative_to(workspace_root)}`",
-                        f"- User request contract path: `{(report_dir / 'user_request_contract.md').relative_to(workspace_root)}`",
+                        (
+                            "- User request contract path: "
+                            "`"
+                            f"{request_contract_path}"
+                            "`"
+                        ),
                         "",
                     ]
                 ),
@@ -131,7 +144,10 @@ class WorkLogTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotIn("(not-written)", result.stdout)
             self.assertIn("ran targeted pytest", action_log_path.read_text(encoding="utf-8"))
-            self.assertIn("ran targeted pytest", (report_dir / "work_log.md").read_text(encoding="utf-8"))
+            self.assertIn(
+                "ran targeted pytest",
+                (report_dir / "work_log.md").read_text(encoding="utf-8"),
+            )
 
     def test_report_dir_allows_explicit_pre_contract_entry_without_clause_id(self) -> None:
         """Run-bundle preflight notes can be recorded before clauses exist."""

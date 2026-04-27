@@ -14,7 +14,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
 
@@ -62,7 +61,12 @@ def write_ready_run(report_dir: Path) -> None:
                 "## Purpose",
                 "- Record meaningful execution.",
                 "## Entries",
-                "- kickoff: request_clause_ids=C1 skills=$agent-orchestration,$codex-task-workflow stage owner=codex subagent=worker mcp_preflight_not_required web_research_not_required next=implementation",
+                (
+                    "- kickoff: request_clause_ids=C1 "
+                    "skills=$agent-orchestration,$codex-task-workflow "
+                    "stage owner=codex subagent=worker mcp_preflight_not_required "
+                    "web_research_not_required next=implementation"
+                ),
                 "- validation: request_clause_ids=C1 repo_dependency_review=pass next=closeout",
                 "",
             ]
@@ -80,7 +84,10 @@ def write_ready_run(report_dir: Path) -> None:
                 "- repo_dependency_review=pass path_count=12",
                 "- web_research_not_required: local deterministic test",
                 "## Interventions",
-                "- Monitoring kept implementation local and required dependency review evidence before closeout.",
+                (
+                    "- Monitoring kept implementation local and required dependency review "
+                    "evidence before closeout."
+                ),
                 "## Improvement Decisions",
                 "- skill_improvement_decision: not_applicable",
                 "- config_improvement_decision: not_applicable",
