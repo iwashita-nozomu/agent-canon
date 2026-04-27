@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # @dependency-start
+# upstream design ../agents/canonical/CODEX_WORKFLOW.md defines shared canon update gates
+# upstream implementation ./sync_agent_canon.sh performs snapshot synchronization
+# downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior
 # @dependency-end
 
 set -euo pipefail
