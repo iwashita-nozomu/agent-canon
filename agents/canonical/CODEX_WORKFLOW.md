@@ -426,8 +426,10 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 6. Validation
 
+- repo-changing task は差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。失敗した header は修正してから再実行する
+- repo-changing task は user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。`make ci-quick` は途中 checkpoint 用であり、final closeout の静的解析 evidence にはしない
 - agent runtime / skill 変更では `make agent-checks`
-- まず `make ci-quick`
+- checkpoint では `make ci-quick` を使ってよいが、final closeout では `make ci` を優先する
 - 必要に応じて `make ci`
 - Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP` を確認する
 - C / C++ 変更では project-native configure / build / test evidence を確認し、CMake project なら `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build` を既定候補にする
@@ -443,7 +445,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
 - `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
-- `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh` を通していない completion report を出さない
+- `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、header 修正まで完了していない completion report を出さない
+- `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` の static analysis evidence が無い completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
 - `workflow_monitoring.md` の signals / interventions / improvement decisions が埋まり、skill / config / workflow / memory の改善判断が `applied`、`recorded`、`not_applicable` のいずれかになるまで、workflow 監視が未完了の completion report を出さない
