@@ -202,12 +202,6 @@ Responsibilities:
 - run in report-only mode during migration
 - later become a CI fail gate
 
-Strict JSON data/config files are not checkable by default because adding a
-manifest member changes the parsed object and can violate schema-level unknown
-field rejection. JSON files may still be validated explicitly by
-`check_dependency_header_format.sh` when the owning schema permits an embedded
-`_dependency_manifest` member or the consumer accepts JSONC comments.
-
 ### `check_dependency_header_format.sh`
 
 Responsibilities:

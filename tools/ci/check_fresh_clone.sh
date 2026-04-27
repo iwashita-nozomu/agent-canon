@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # upstream design ../README.md shared automation index
-# upstream environment ../../notes/knowledge/environment_setup.md documents required host tooling
+# upstream environment ../../../../docker/Dockerfile installs rsync for canonical container runs
 # @dependency-end
 
 set -euo pipefail
@@ -33,6 +33,7 @@ overlay_current_tree() {
 }
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
+git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
 if [[ -n "$(git status --short)" ]]; then
@@ -42,7 +43,7 @@ if [[ -n "$(git status --short)" ]]; then
   git commit -m "test: overlay current working tree for fresh clone check" >/dev/null
 fi
 
-for path in AGENTS.md agents .agents .claude .codex/config.toml mcp/repo_mcp_server.sh agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
+for path in AGENTS.md agents .agents .claude .codex/config.toml .codex/hooks.json .codex/hooks/mcp_session_context.sh mcp/repo_mcp_server.sh agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
   if [ ! -e "${path}" ]; then
     echo "missing runtime surface: ${path}" >&2
     exit 1
@@ -66,11 +67,13 @@ PY
 bash tools/sync_agent_canon.sh check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
-AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD)"
+AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD 2>/dev/null \
+  || git subtree split --ignore-joins --prefix=vendor/agent-canon HEAD)"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
 git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
+git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"
   printf "fresh clone fallback marker\n" > .fresh-clone-agent-canon-marker

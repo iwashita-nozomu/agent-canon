@@ -1,0 +1,37 @@
+{
+  "_dependency_manifest": [
+    "@dependency-start",
+    "upstream implementation config.toml enables project-local Codex hooks",
+    "upstream design README.md documents MCP inventory preflight",
+    "downstream implementation hooks/mcp_session_context.sh emits MCP hook context",
+    "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
+    "@dependency-end"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/mcp_session_context.sh\" SessionStart",
+            "timeout": 30,
+            "statusMessage": "Loading repo MCP context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/mcp_session_context.sh\" UserPromptSubmit",
+            "timeout": 30,
+            "statusMessage": "Loading repo MCP preflight guidance"
+          }
+        ]
+      }
+    ]
+  }
+}

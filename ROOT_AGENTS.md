@@ -116,7 +116,10 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が今回 scope に残っていないことを示すまで出してはいけません。
-- user-facing completion report は、作成・編集した human-authored text file の冒頭に `Dependency Files` block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
+- user-facing completion report は、作成・編集した human-authored text file の冒頭に `@dependency-start` / `@dependency-end` manifest block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
+- repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、依存 graph、header 欠落、header format を確認します。失敗した header は修正してから再実行し、`closeout_gate.md` に evidence を残します。
+- repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の静的解析を通します。既定は `make ci` です。時間短縮目的の `make ci-quick` だけでは closeout evidence にしてはいけません。
+- `make ci` が環境要因で実行不能な場合は、少なくとも `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` を全 repo 設定で実行し、不足 toolchain は修復します。未実行のまま user-facing completion report を返してはいけません。
 - If a shared surface drifts, repair it with `bash tools/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -146,6 +149,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `schedule.md` の TODO 行が空、または `work_log.md` に意味のある作業 entry が無い状態で closeout してはいけません。
 - 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残る状態で user-facing completion を返してはいけません。
 - 作成・編集した text file の冒頭に依存 file header が無い状態で user-facing completion を返してはいけません。
+- 全 repo 対象の依存解析、header scan / format / graph check、静的解析を通さないまま user-facing completion を返してはいけません。
 - 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
 - 大規模改修や構成変更のあとに、削除済み・置換済みの implementation / document surface への参照を README、guide、workflow、規約文書、script help、validation 出力へ残したまま closeout してはいけません。
 - current tree head 以外を durable な product state として扱ってはいけません。履歴保持は `git` と run bundle artifact に限ります。
@@ -153,8 +157,11 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 ## Validation
 
+- `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - `make agent-checks`
-- `make ci-quick`
+- `make ci`
 - `make docs-check`
 - `python3 -m pytest tests/ -q --tb=short`
+- `python3 -m pyright`
+- `python3 -m ruff check python tests --select D,E,F,I,UP`
 - C / C++ 変更では project-native configure / build / test evidence

@@ -52,8 +52,16 @@ class McpInventoryCheckTest(unittest.TestCase):
             mcp_dir = Path(tmp_dir) / "mcp"
             mcp_dir.mkdir()
             (mcp_dir / "repo_mcp_server.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--codex-bin",
+                str(codex),
+                "--require",
+                "repo_mcp_server",
+            ]
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
+                command,
                 cwd=Path(tmp_dir),
                 check=False,
                 capture_output=True,
@@ -71,8 +79,16 @@ class McpInventoryCheckTest(unittest.TestCase):
         """The checker fails closed instead of implying a local-process fallback."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             codex = self.write_fake_codex(Path(tmp_dir), "[]")
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--codex-bin",
+                str(codex),
+                "--require",
+                "repo_mcp_server",
+            ]
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
+                command,
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -96,8 +112,16 @@ class McpInventoryCheckTest(unittest.TestCase):
             mcp_dir = Path(tmp_dir) / "mcp"
             mcp_dir.mkdir()
             (mcp_dir / "repo_mcp_server.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--codex-bin",
+                str(codex),
+                "--require",
+                "repo_mcp_server",
+            ]
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
+                command,
                 cwd=Path(tmp_dir),
                 check=False,
                 capture_output=True,
@@ -116,8 +140,16 @@ class McpInventoryCheckTest(unittest.TestCase):
                 Path(tmp_dir),
                 '[{"name":"repo_mcp_server","command":"bash","args":["mcp/repo_mcp_server.sh"],"status":"enabled"}]',
             )
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--codex-bin",
+                str(codex),
+                "--require",
+                "repo_mcp_server",
+            ]
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--codex-bin", str(codex), "--require", "repo_mcp_server"],
+                command,
                 cwd=Path(tmp_dir),
                 check=False,
                 capture_output=True,
@@ -125,7 +157,11 @@ class McpInventoryCheckTest(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("MCP_LAUNCHER_ERROR=repo_mcp_server: launcher argument path not found: mcp/repo_mcp_server.sh", result.stdout)
+        self.assertIn(
+            "MCP_LAUNCHER_ERROR=repo_mcp_server: launcher argument path not found: "
+            "mcp/repo_mcp_server.sh",
+            result.stdout,
+        )
         self.assertIn("NEXT_ACTION=fix_required_mcp_launcher_before_work", result.stdout)
 
     def test_empty_inventory_needs_explicit_allowance_without_requirements(self) -> None:

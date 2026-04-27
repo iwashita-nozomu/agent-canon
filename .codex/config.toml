@@ -4,11 +4,15 @@
 # @dependency-start
 # upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
+# downstream implementation ./hooks.json injects MCP startup and prompt context
 # downstream implementation ../tools/agent_tools/check_mcp_inventory.py verifies MCP inventory
 # @dependency-end
 
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+
+[features]
+codex_hooks = true
 
 [agents]
 max_threads = 24

@@ -119,6 +119,8 @@ def main() -> int:
         "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
         "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
         == "yes",
+        "repo_wide_static_analysis_complete": closeout.get("repo_wide_static_analysis_complete")
+        == "yes",
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
@@ -154,6 +156,10 @@ def main() -> int:
     print(
         "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE="
         f"{closeout.get('repo_wide_dependency_tools_complete', '')}"
+    )
+    print(
+        "REPO_WIDE_STATIC_ANALYSIS_COMPLETE="
+        f"{closeout.get('repo_wide_static_analysis_complete', '')}"
     )
     print(
         "SPEC_PRODUCT_COVERAGE_COMPLETE="

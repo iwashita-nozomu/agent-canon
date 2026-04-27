@@ -319,8 +319,9 @@ def evaluate(report_dir: Path) -> tuple[list[CriterionResult], list[str]]:
             10,
             closeout.get("dependency_headers_complete") == "yes"
             and closeout.get("repo_wide_dependency_tools_complete") == "yes"
+            and closeout.get("repo_wide_static_analysis_complete") == "yes"
             and closeout.get("canonical_tree_head_complete") == "yes",
-            "Record changed-file dependency evidence, repo-wide dependency review evidence, and canonical tree-head evidence in closeout_gate.md.",
+            "Record changed-file dependency evidence, repo-wide dependency review evidence, repo-wide static analysis evidence, and canonical tree-head evidence in closeout_gate.md.",
         ),
         criterion(
             "self_improvement_feedback_capture",

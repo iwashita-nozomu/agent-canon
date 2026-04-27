@@ -49,6 +49,17 @@ done
 
 cd "$ROOT_DIR"
 
+is_checkable_suffix() {
+  case "$1" in
+    *.bash|*.cfg|*.css|*.h|*.hpp|*.html|*.c|*.cc|*.cpp|*.md|*.py|*.rst|*.sh|*.toml|*.txt|*.yaml|*.yml|*.zsh)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 collect_paths() {
   if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
     printf '%s\n' "${INPUT_PATHS[@]}"
@@ -100,17 +111,6 @@ normalize_path() {
   realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
 }
 
-is_checkable_suffix() {
-  case "$1" in
-    *.bash|*.cfg|*.css|*.h|*.hpp|*.html|*.c|*.cc|*.cpp|*.md|*.py|*.rst|*.sh|*.toml|*.txt|*.yaml|*.yml|*.zsh)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 check_file() {
   local file="$1"
   local start_count end_count start_line end_line line_no line stripped
@@ -145,10 +145,8 @@ check_file() {
   done < "$file"
 
   if [[ "$start_count" -eq 0 && "$end_count" -eq 0 ]]; then
+    is_checkable_suffix "$file" || return 0
     if [[ "$REQUIRE_HEADER" -eq 1 ]]; then
-      if ! is_checkable_suffix "$file"; then
-        return 0
-      fi
       echo "$file: missing dependency manifest markers"
       return 1
     fi
