@@ -12,12 +12,12 @@ sandbox_mode = "danger-full-access"
 
 [agents]
 max_threads = 24
-job_max_runtime_seconds = 1800
+job_max_runtime_seconds = 3600
 
 [mcp_servers.repo_mcp_server]
 command = "bash"
 args = ["mcp/repo_mcp_server.sh"]
 enabled = true
 required = false
-startup_timeout_sec = 10
-tool_timeout_sec = 60
+startup_timeout_sec = 20
+tool_timeout_sec = 300
