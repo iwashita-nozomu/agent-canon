@@ -4,6 +4,7 @@
 # upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
 # downstream implementation ../documents/codex-configuration-reference.md root symlink view for Codex config docs
 # downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
+# downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # @dependency-end
@@ -115,6 +116,7 @@ documents/FILE_CHECKLIST_OPERATIONS.md:../${PREFIX}/documents/FILE_CHECKLIST_OPE
 documents/README.md:../${PREFIX}/documents/README.md
 documents/codex-configuration-reference.md:../${PREFIX}/documents/codex-configuration-reference.md
 documents/codex-configuration-slides.md:../${PREFIX}/documents/codex-configuration-slides.md
+documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-design.md
 documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md

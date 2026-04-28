@@ -1,6 +1,7 @@
 <!--
 @dependency-start
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+downstream design ./object-oriented-design.md expands OOP policy for class and Protocol decisions
 @dependency-end
 -->
 
@@ -15,6 +16,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - 非自明な関数と重要な処理塊には `# 責務:` コメントを付け、1 関数 1 責務を守ります。
 - 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
+- class、dataclass、`Protocol`、composition、継承の判断は [オブジェクト指向設計方針](./object-oriented-design.md) に従います。
 - JAX を使う場合、trace 対象では `jax.lax.*` と配列演算を使い、Python 制御や暗黙変換を混ぜません。
 - 正本文書は日本語で書き、`## 要約`、`## 規約`、`## 禁止事項`、`## 例外` を使い分けます。
 

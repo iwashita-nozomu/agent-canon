@@ -1,0 +1,118 @@
+<!--
+@dependency-start
+upstream design ./README.md documents index and discovery path
+upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror ownership
+upstream design ./coding-conventions-house-style.md shared implementation style contract
+upstream design ./coding-conventions-python.md Python convention entrypoint
+upstream design ./design/protocols.md Protocol and type-boundary placement contract
+upstream implementation ../tools/sync_agent_canon.sh root symlink view generation
+@dependency-end
+-->
+
+# オブジェクト指向設計方針
+
+この文書は、agent-canon が共有する OOP 的な設計判断の正本です。
+特定言語の syntax ではなく、責務、状態、契約、拡張点をどの単位に置くかを固定します。
+Python 固有の型注釈、命名、`Protocol` 配置は
+[Python コーディング規約](./coding-conventions-python.md) と
+[Protocol 設計](./design/protocols.md) を併読します。
+
+## 要約
+
+- OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
+- まず関数、値オブジェクト、既存 `Protocol`、既存 class を再利用し、新しい class は最後に追加します。
+- 状態を持たない処理は class にせず、関数または小さい module-level helper に保ちます。
+- 不変の設定、結果、通知は `@dataclass(frozen=True)` などの値オブジェクトで表します。
+- 差し替え境界は具象 class ではなく、最小の振る舞い契約で受けます。
+- 継承は契約の特殊化に限定し、実装共有のための深い継承階層を禁止します。
+- composition を既定にし、所有する部品と lifecycle を明示します。
+
+## 規約
+
+### 1. Class を作る条件
+
+新しい class は、次のいずれかを満たす場合だけ追加します。
+
+- 不変データに名前を与え、複数箇所で同じ意味として受け渡す。
+- 変更可能な状態と、その状態を守る操作を 1 つの責務として閉じ込める。
+- 外部リソース、process、session、connection の lifecycle を明示的に管理する。
+- 複数の実装が同じ振る舞い契約を満たす必要がある。
+- 既存 class または `Protocol` の特殊化として、domain の意味を明確にできる。
+
+次の目的だけで class を作ってはなりません。
+
+- 関数を名前空間にまとめたいだけ。
+- 1 回しか使わない短い処理を「将来拡張できそう」という理由で包む。
+- `self` を使わない static method の集合を作る。
+- 既存関数や既存 dataclass で足りる処理を別名で再実装する。
+
+### 2. 責務境界
+
+1 つの class は、1 つの主責務だけを持たなければなりません。
+入力検証、状態更新、永続化、通知、集計、表示を 1 class に詰め込むことを禁止します。
+複数段階が必要な場合は、値オブジェクト、service function、writer、renderer、scheduler などに責務を分けます。
+
+public method は class の責務語彙で命名します。
+内部手順名、環境都合、暫定実装名を public method に出してはなりません。
+
+### 3. Dataclass と値オブジェクト
+
+設定値、結果、完了通知、検証済み入力のような値は、言語が提供する軽量な値オブジェクトで表します。
+Python では `@dataclass(frozen=True)` を既定にします。
+
+mutable object は、進行中の process state、cache、accumulator、resource handle のように更新責務が明確な場合だけ許可します。
+mutable object を使う場合は、どの method が状態を変えるかを docstring または責務コメントで分かるようにします。
+
+### 4. Protocol と抽象境界
+
+呼び出し側が必要とする振る舞いだけを契約にします。
+具象 class の全属性を `Protocol` に写してはなりません。
+`Protocol` を追加する場合は、[Protocol 設計](./design/protocols.md) の条件を満たす必要があります。
+
+実装側は、具象 class へ直接依存する前に、既存の `Protocol`、`TypeAlias`、typed dataclass で受けられないか確認します。
+ただし、具象実装が 1 つしかなく、差し替え境界もない場合に `Protocol` を増やすことは禁止します。
+
+### 5. Composition と継承
+
+既定は composition です。
+ある object が別 object を使う場合は、所有、借用、lifecycle、失敗時の責務を明確にします。
+
+継承は次の場合に限定します。
+
+- 契約または型 family の特殊化を表す。
+- 親 class の public contract を壊さずに置換できる。
+- 既存設計文書で継承関係が正本として固定されている。
+
+実装共有だけを目的にした深い継承、mixin の多用、親 class の内部状態に依存する subclass を禁止します。
+共通処理は helper function、composition された component、または小さい値オブジェクトへ切り出します。
+
+### 6. 境界で検証する
+
+constructor、factory、public method は入口で引数を検証します。
+shape、dtype、path、resource availability、config の正規化は境界で一度だけ行います。
+内部の深い処理で契約違反が偶然失敗する設計は禁止します。
+
+契約違反の例外には、対象の引数名、期待条件、実際の値の分類を含めます。
+ただし巨大 object や秘密値を例外 message に含めてはなりません。
+
+### 7. Public API と公開面
+
+public class、public dataclass、public `Protocol` は module docstring と `__all__` で公開面を固定します。
+公開する class は docstring で責務、主要属性、主要 method、利用例を説明します。
+内部 class は先頭 `_` を付け、外部から import される前提にしてはなりません。
+
+## 禁止事項
+
+- class を単なる namespace として使うことを禁止します。
+- `Manager`、`Helper`、`Util`、`Thing` のように責務が読めない class 名を public API に使うことを禁止します。
+- 継承で実装都合を共有し、置換可能性を説明しないことを禁止します。
+- `Protocol` を具象 class の属性一覧として複製することを禁止します。
+- mutable state を持つ object を、更新責務や lifecycle なしに広く共有することを禁止します。
+- 旧 class 名と新 class 名を互換 alias で併存させることを禁止します。
+- test double のためだけに production `Protocol` を増やすことを禁止します。
+
+## 例外
+
+- CLI entrypoint や短い運用 script では、class 化せず関数で閉じてよいです。
+- 外部 framework が class-based interface を要求する場合は、その adapter class を許可します。ただし domain logic は adapter へ閉じ込めず、既存の関数、値オブジェクト、service layer に委譲します。
+- performance-critical path では、allocation を避けるために tuple や array を使うことを許可します。ただし public 境界では意味のある型名または docstring で契約を説明します。

@@ -5,6 +5,7 @@
 upstream design ../tools/sync_agent_canon.sh shared surface link specification
 upstream design ./agent-canon-subtree-migration.md subtree ownership model
 downstream implementation ../tools/sync_agent_canon.sh enforces this surface list
+downstream design ./object-oriented-design.md listed shared coding policy surface
 @dependency-end
 -->
 
@@ -33,6 +34,7 @@ root では次を symlink view として扱います。
 - `documents/DOCSTRING_GUIDE.md`
 - `documents/FILE_CHECKLIST_OPERATIONS.md`
 - `documents/README.md`
+- `documents/object-oriented-design.md`
 - `documents/dependency-manifest-design.md`
 - `documents/notes-lifecycle.md`
 - `documents/REVIEW_PROCESS.md`
