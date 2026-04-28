@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 upstream design README.md workflow catalog
+downstream design ../../documents/algorithm-implementation-boundary.md equation-to-code boundary policy
 @dependency-end
 -->
 
@@ -11,6 +12,7 @@ upstream design README.md workflow catalog
 準備、実装、静的チェック、実行、結果レポートを通した実務上の統合入口は [experiment-workflow.md](experiment-workflow.md) を参照してください。
 この文書は、とくに問い、定式化、比較設計、段階的改造、claim 更新の正本を担います。
 批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiment-critical-review.md) を参照してください。
+数理境界と実装境界の対応表は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) を正本にします。
 
 ## 1. 目的
 
@@ -117,7 +119,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 - `Equation:` に、対象の式、目的関数、制約、離散化、近似、前処理、停止条件を書きます。
 - `Assumptions:` に、成り立ちを支える前提を書きます。
 - `Numerical Risks:` に、不安定化、オーバーフロー、近似誤差、conditioning、dtype 依存性を書きます。
-- `Equation-to-Code Mapping:` に、どの式、項、constraint、assumption がどの実装 path / function / helper に対応するかを書きます。
+- `Equation-to-Code Mapping:` に、どの式、項、constraint、assumption、state boundary がどの実装 path / function / helper に対応するかを書きます。形式は [algorithm-implementation-boundary.md](../../documents/algorithm-implementation-boundary.md) の Boundary Map に合わせます。
 
 ### Step 3. 比較設計を固定する
 

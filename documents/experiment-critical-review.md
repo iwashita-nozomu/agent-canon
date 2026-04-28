@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 upstream design README.md durable document index
+downstream design ./algorithm-implementation-boundary.md algorithm boundary review reference
 @dependency-end
 -->
 
@@ -12,6 +13,7 @@ upstream design README.md durable document index
 実験全体の標準手順は [experiment-workflow.md](../agents/workflows/experiment-workflow.md) を参照してください。
 レポート本文の構成は [experiment-report-style.md](experiment-report-style.md) を参照してください。
 問い、比較対象、逐次改造の流れは [research-workflow.md](../agents/workflows/research-workflow.md) を参照してください。
+数理境界と実装境界の対応は [algorithm-implementation-boundary.md](algorithm-implementation-boundary.md) の Boundary Map で確認します。
 
 ## 1. 目的
 

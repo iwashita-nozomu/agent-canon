@@ -1,6 +1,7 @@
 <!--
 @dependency-start
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./codex-configuration-slides.md Codex configuration slide deck
 downstream design ./object-oriented-design.md general OOP coding policy
@@ -21,4 +22,5 @@ template の初期状態では、ここを shared workflow のリンク集にし
 
 ## Coding Policy References
 
+- [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md): 数理・仕様境界と implementation boundary の対応表、変更種別、review gate。
 - [Object-Oriented Design Policy](./object-oriented-design.md): class、dataclass、Protocol、composition、継承の判断基準。

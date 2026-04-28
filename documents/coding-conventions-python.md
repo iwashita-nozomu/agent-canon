@@ -1,6 +1,7 @@
 <!--
 @dependency-start
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy for Python implementations
 downstream design ./object-oriented-design.md general OOP policy for Python class decisions
 @dependency-end
 -->
@@ -17,10 +18,11 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 |---|---|---|
 | 1 | 対象範囲を確認 | [01_scope.md](./conventions/python/01_scope.md) |
 | 2 | 公開境界の型注釈を決める | [04_type_annotations.md](./conventions/python/04_type_annotations.md) |
-| 3 | OOP 境界を決める | [object-oriented-design.md](./object-oriented-design.md) |
-| 4 | 配置と責務を決める | [09_file_roles.md](./conventions/python/09_file_roles.md) |
-| 5 | 名前を確定する | [11_naming.md](./conventions/python/11_naming.md) |
-| 6 | `pyright` と `pytest` を通す | [07_type_checker.md](./conventions/python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
+| 3 | アルゴリズム境界を決める | [algorithm-implementation-boundary.md](./algorithm-implementation-boundary.md) |
+| 4 | OOP 境界を決める | [object-oriented-design.md](./object-oriented-design.md) |
+| 5 | 配置と責務を決める | [09_file_roles.md](./conventions/python/09_file_roles.md) |
+| 6 | 名前を確定する | [11_naming.md](./conventions/python/11_naming.md) |
+| 7 | `pyright` と `pytest` を通す | [07_type_checker.md](./conventions/python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
 
 ## よくある間違い
 
@@ -90,12 +92,13 @@ def load_config(path: Path) -> dict[str, str]:
 3. [コメント](./conventions/python/06_comments.md)
 4. [型チェッカの活用](./conventions/python/07_type_checker.md)
 5. [責務分離](./conventions/python/09_file_roles.md)
-6. [OOP 境界](./object-oriented-design.md)
-7. [命名規約](./conventions/python/11_naming.md)
-8. テスト規約（共通）: [coding-conventions-testing.md](./coding-conventions-testing.md)
-9. JAX 補足が必要な場合だけ: [15_jax_rules.md](./conventions/python/15_jax_rules.md)
-10. ベンチマーク方針: [20_benchmark_policy.md](./conventions/python/20_benchmark_policy.md)
-11. 実験ディレクトリ構成: [30_experiment_directory_structure.md](./conventions/python/30_experiment_directory_structure.md)
+6. [アルゴリズム境界](./algorithm-implementation-boundary.md)
+7. [OOP 境界](./object-oriented-design.md)
+8. [命名規約](./conventions/python/11_naming.md)
+9. テスト規約（共通）: [coding-conventions-testing.md](./coding-conventions-testing.md)
+10. JAX 補足が必要な場合だけ: [15_jax_rules.md](./conventions/python/15_jax_rules.md)
+11. ベンチマーク方針: [20_benchmark_policy.md](./conventions/python/20_benchmark_policy.md)
+12. 実験ディレクトリ構成: [30_experiment_directory_structure.md](./conventions/python/30_experiment_directory_structure.md)
 
 ## Python ファイル修正後
 
