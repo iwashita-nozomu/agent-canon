@@ -21,6 +21,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `agents/TASK_WORKFLOWS.md`
 - `agents/workflows/implementation-waterfall-workflow.md`
+- `agents/workflows/comprehensive-refactoring-workflow.md`
 - `documents/REVIEW_PROCESS.md`
 - `agents/workflows/main-integration-workflow.md`
 
@@ -31,6 +32,8 @@ upstream design ../canonical/skills.md skill canon registry
 1. 新機能追加は同じ pass に混ぜません。必要なら先に分離します。
 1. delete、rename、move、module split は `Files To Remove Or Move:` として先に列挙します。
 1. old path と new path の対応を `Path Mapping:` として残します。
+1. 大規模 repo では `Current Responsibility Map:` と `Target Responsibility Map:` を先に作り、OOP 的に責務、状態、契約、adapter を最小境界へ分けます。
+1. 必要に応じて `python3 tools/agent_tools/analyze_refactor_surface.py <paths> --min-score <score>` で baseline と target score を固定します。
 1. implementation 前に `test_designer` で regression case と nasty case を固定します。
 1. 既存 test が薄い場合は baseline capture を追加してから rework します。
 1. closeout 前に `python3 tools/ci/check_merge_structure.py ...` の要否を確認します。
@@ -46,3 +49,5 @@ upstream design ../canonical/skills.md skill canon registry
 - language reviewer
   - Python なら `python-review`
   - C / C++ なら `cpp-review`
+- `docs_workflow_steward`
+  - design 見直し、OOP boundary、解析 score gate が workflow と docs に残っているか

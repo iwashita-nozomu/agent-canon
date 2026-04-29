@@ -13,6 +13,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - まず 1 つの primary workflow を選びます。
 - 長文、学術文書、paper のように文書種別が強い task では overlay workflow を追加します。
 - shared canon maintenance や `main` 統合のような特殊操作だけ、maintenance workflow を追加します。
+- 大規模 refactor では `comprehensive-refactoring-workflow.md` を overlay として追加し、設計見直し、OOP 境界、解析 score gate を固定します。
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
 
 ## Quick Routing
@@ -27,6 +28,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - `agents/workflows/experiment-workflow.md`
 - tuning、比較改善、探索的改造を backlog 付きで反復する
   - `agents/workflows/adaptive-improvement-workflow.md`
+- 大規模 repo の包括 refactor、OOP boundary 再設計、解析 score gate
+  - `agents/workflows/comprehensive-refactoring-workflow.md`
 
 ### Overlay Workflow
 
@@ -65,6 +68,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - repo に持ち帰る change 全般の共通実装パス
 - `main-integration-workflow.md`
   - file 構成変更を含む branch を `main` に戻す手順
+- `comprehensive-refactoring-workflow.md`
+  - 大規模 refactor の設計見直し、OOP 的な最小実装方針、静的解析 score gate
 
 ### Research And Experiment
 

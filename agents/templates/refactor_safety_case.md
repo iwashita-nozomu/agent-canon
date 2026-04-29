@@ -17,6 +17,13 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 - `<path>`
 
+## Responsibility Maps
+
+- Current responsibility map:
+- Target responsibility map:
+- OOP boundary plan:
+- Rejected abstractions:
+
 ## Files To Remove Or Move
 
 - `<path>`
@@ -31,6 +38,9 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Existing tests:
 - Captured behavior:
 - Manual checks:
+- Refactor surface baseline:
+- Target score:
+- Static analyzer limits:
 
 ## Required Regression Cases
 

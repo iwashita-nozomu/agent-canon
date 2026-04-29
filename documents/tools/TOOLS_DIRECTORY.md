@@ -42,6 +42,7 @@ shared review / validation / container helper の source of truth は `vendor/ag
 
 shared agent/worktree surface の ownership は `documents/SHARED_RUNTIME_SURFACES.md` を正本にします。
 - `tools/sync_agent_canon.sh`
+- `tools/agent_tools/analyze_refactor_surface.py`
 
 ## 例外運用
 
