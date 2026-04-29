@@ -23,6 +23,7 @@ upstream design README.md notes lifecycle index
 - notes、guardrails、documents、prior logs、local code / tests で解決できる曖昧さを調べずにユーザーへ戻す
 - unknown や open question を silent assumption に変換して要件を埋める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残す
+- 欠落 file / path を見つけたときに、template root、`vendor/agent-canon/`、standalone `agent-canon` を確認せず、すぐ再作成、削除済み判定、repo-local 例外扱いにする
 - Spark を要件定義、詳細設計、重要レビュー、最終判断に使う
 - chunk、slice、checkpoint、subpass の完了を user request 全体の完了として報告する
 - remaining planned work units や active clause が残っているのに closeout を unlock する

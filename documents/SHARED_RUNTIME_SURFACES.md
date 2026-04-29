@@ -141,6 +141,9 @@ root では次を symlink view として扱います。
 - root 側の symlink view や copy surface を直接編集しません
 - root copy が drift したら `bash tools/sync_agent_canon.sh link-root` で復元します
 - drift を確認したいときは `bash tools/sync_agent_canon.sh check` を使います
+- root 側で shared surface の file / directory 欠落を見つけたときは、再作成前に template root、`vendor/agent-canon/`、standalone `agent-canon`、この surface list、`tools/sync_agent_canon.sh` の順で確認します
+- 欠落が broken symlink、root copy drift、surface list 漏れ、canon 側 rename、意図的削除のどれかを分類してから、`link-root`、vendor update、surface list update、または削除 follow-up に進みます
+- template と canon の両方で欠落している path だけを repo-local 新規 file 候補にします
 
 ## Validation
 

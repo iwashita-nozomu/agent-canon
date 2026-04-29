@@ -122,6 +122,9 @@ upstream design README.md memory surface index
 - 2026-04-28 | 数式文書では『導入しない』『残さない』などの自明な否定説明を避け、式の導出と必要な定義だけで書く。
   - source: chat
 
+- 2026-04-29 | ファイルや path の欠落を見つけたときは、再作成や欠落判定の前に template root と shared agent-canon を確認してほしい。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
