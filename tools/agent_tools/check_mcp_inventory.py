@@ -14,11 +14,15 @@ import argparse
 import json
 import shutil
 import subprocess
-import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 @dataclass(frozen=True)
