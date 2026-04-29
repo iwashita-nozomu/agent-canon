@@ -79,7 +79,8 @@ class McpInventoryCheckTest(unittest.TestCase):
     def test_required_server_fails_when_missing(self) -> None:
         """The checker fails closed instead of implying a local-process fallback."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            codex = self.write_fake_codex(Path(tmp_dir), "[]")
+            root = Path(tmp_dir)
+            codex = self.write_fake_codex(root, "[]")
             command = [
                 sys.executable,
                 str(SCRIPT),
@@ -90,7 +91,7 @@ class McpInventoryCheckTest(unittest.TestCase):
             ]
             result = subprocess.run(
                 command,
-                cwd=PROJECT_ROOT,
+                cwd=root,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -99,6 +100,45 @@ class McpInventoryCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("MISSING_MCP_SERVERS=repo_mcp_server", result.stdout)
         self.assertIn("NEXT_ACTION=configure_required_mcp_servers_before_work", result.stdout)
+
+    def test_missing_inventory_reports_ignored_project_config(self) -> None:
+        """If .codex/config.toml declares the server, an empty inventory means config loading broke."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            codex = self.write_fake_codex(root, "[]")
+            config_dir = root / ".codex"
+            config_dir.mkdir()
+            (config_dir / "config.toml").write_text(
+                textwrap.dedent(
+                    """\
+                    [mcp_servers.repo_mcp_server]
+                    command = "bash"
+                    args = ["mcp/repo_mcp_server.sh"]
+                    enabled = true
+                    """
+                ),
+                encoding="utf-8",
+            )
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "--codex-bin",
+                str(codex),
+                "--require",
+                "repo_mcp_server",
+            ]
+            result = subprocess.run(
+                command,
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("PROJECT_CODEX_CONFIG_DECLARES_MISSING_MCP=yes", result.stdout)
+        self.assertIn("LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted", result.stdout)
+        self.assertIn("NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work", result.stdout)
 
     def test_nested_codex_transport_shape_is_supported(self) -> None:
         """Current Codex JSON nests command and enabled status under transport/root fields."""

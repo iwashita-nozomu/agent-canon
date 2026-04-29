@@ -59,3 +59,5 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(hook_output["hookEventName"], "SessionStart")
         self.assertIn("repo_mcp_server", hook_output["additionalContext"])
         self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
+        self.assertIn("even when the user did not mention MCP", hook_output["additionalContext"])
+        self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])

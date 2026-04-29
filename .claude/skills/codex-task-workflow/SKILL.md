@@ -17,6 +17,7 @@ upstream design ../../../agents/skills/codex-task-workflow.md documents the huma
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is fixed.
 1. On a clean worktree, run `make agent-canon-ensure-latest` before planning or implementation; if dirty, record why it is blocked and rerun after commit or stash.
+1. For repository tasks, run `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` during intake even if the user did not mention MCP. If it passes, prefer repo MCP tools for repo root/status and MCP-covered context checks; if it fails, repair `.codex/`, `mcp/`, or base command availability instead of starting an ad hoc local process.
 1. Sweep `documents/`, `notes/`, `references/`, and local implementation directories before planning or implementation.
 1. Classify the task with `agents/TASK_WORKFLOWS.md` before touching files.
 1. In the first work update, declare `workflow=<family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list.

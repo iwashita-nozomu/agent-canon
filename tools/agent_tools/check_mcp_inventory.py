@@ -15,6 +15,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,6 +106,21 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
     return servers
 
 
+def load_project_config_server_names(root: Path) -> set[str]:
+    """Return MCP server names declared by the repo-local Codex config."""
+    config_path = root / ".codex" / "config.toml"
+    if not config_path.is_file():
+        return set()
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return set()
+    servers = config.get("mcp_servers")
+    if not isinstance(servers, dict):
+        return set()
+    return {name for name in servers if isinstance(name, str) and name}
+
+
 def launcher_errors(server: McpServer, root: Path) -> list[str]:
     """Return launcher availability errors for one server."""
     errors: list[str] = []
@@ -151,8 +167,16 @@ def main() -> int:
     configured_names = {server.name for server in servers}
     missing = sorted(set(args.require) - configured_names)
     if missing:
+        project_config_names = load_project_config_server_names(Path.cwd())
+        ignored_required = sorted(set(missing) & project_config_names)
         print("MCP_INVENTORY=fail")
         print(f"MISSING_MCP_SERVERS={','.join(missing)}")
+        if ignored_required:
+            print("PROJECT_CODEX_CONFIG_DECLARES_MISSING_MCP=yes")
+            print(f"PROJECT_CONFIG_MCP_SERVERS={','.join(sorted(project_config_names))}")
+            print("LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted")
+            print("NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work")
+            return 1
         print("NEXT_ACTION=configure_required_mcp_servers_before_work")
         return 1
     required_servers = [server for server in servers if server.name in set(args.require)]

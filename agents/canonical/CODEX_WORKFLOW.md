@@ -96,7 +96,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 
 ### MCP Surface Preflight
 
-MCP tool や `repo_mcp_server` が必要な task では、configured MCP inventory を先に確認します。
+repository task では、ユーザーが MCP を明示していなくても、repo-local `repo_mcp_server` が configured inventory にあるものとして扱い、task intake の標準 preflight で確認します。
 
 ```bash
 python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
@@ -104,8 +104,10 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
-- `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは注意喚起と routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
+- MCP inventory が pass した場合は、repo state、repo root、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
+- `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは「MCP をユーザーが明示しなくても思い出す」ための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
+- `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
 - inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
 - contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
 
