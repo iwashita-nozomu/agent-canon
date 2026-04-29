@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Agent Task Workflows for this repository.
 upstream design README.md agent canon overview
 upstream implementation task_catalog.yaml workflow family defaults
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract

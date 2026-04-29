@@ -1,6 +1,7 @@
 # project-review
 <!--
 @dependency-start
+responsibility Documents project-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

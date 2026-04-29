@@ -1,6 +1,7 @@
 # Git Mirror Procedure
 <!--
 @dependency-start
+responsibility Documents Git Mirror Procedure for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

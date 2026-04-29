@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Tests test check agent runtime alignment behavior.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 

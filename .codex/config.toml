@@ -2,6 +2,7 @@
 # Keep review fan-out explicit, keep one writer per worktree, do not fix agent depth in repo config,
 # and use spawned agents in bounded waves instead of starting every available role at once.
 # @dependency-start
+# responsibility Documents Project-scoped Codex settings. for this repository.
 # upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
 # downstream implementation ./hooks.json injects MCP startup and prompt context

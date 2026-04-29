@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Checks experiment registry CI readiness.
 # upstream design ../README.md shared automation index
 # upstream design ../../documents/experiment-registry.md defines registry schema
 # downstream implementation ../../tests/tools/test_run_managed_experiment.py tests

@@ -1,6 +1,7 @@
 # Skill 実装ガイド
 <!--
 @dependency-start
+responsibility Documents Skill 実装ガイド for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Implements the repository MCP server.
 # upstream design README.md MCP runtime surface contract
 # upstream implementation ./repo_mcp_server.sh launches this server
 # downstream implementation ../tools/agent_tools/check_mcp_inventory.py validates launcher availability

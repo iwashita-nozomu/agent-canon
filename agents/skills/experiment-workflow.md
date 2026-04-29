@@ -1,6 +1,7 @@
 # experiment-workflow
 <!--
 @dependency-start
+responsibility Documents experiment-workflow for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

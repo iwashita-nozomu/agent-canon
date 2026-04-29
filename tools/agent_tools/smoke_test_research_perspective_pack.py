@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides smoke test research perspective pack agent workflow automation.
 # @dependency-end
 
 """Smoke test the research perspective review pack runtime surfaces."""

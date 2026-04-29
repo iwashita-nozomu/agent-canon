@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+responsibility Documents Codex Project Setup for this repository.
 upstream implementation ./config.toml project-scoped Codex settings
 upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides evaluate agent run agent workflow automation.
 # upstream design ../../agents/workflows/agent-learning-workflow.md defines feedback capture workflow
 # upstream design ../../agents/templates/agent_evaluation.md defines evaluation artifact shape
 # upstream design ../../agents/templates/workflow_monitoring.md defines in-workflow monitoring evidence

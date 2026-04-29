@@ -1,6 +1,7 @@
 # tools
 <!--
 @dependency-start
+responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
 @dependency-end
 -->

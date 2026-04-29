@@ -1,6 +1,7 @@
 # Agent Learning Workflow
 <!--
 @dependency-start
+responsibility Documents Agent Learning Workflow for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->

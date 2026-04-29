@@ -4,6 +4,7 @@ description: Use when entering an unfamiliar repository or subdirectory and you 
 ---
 <!--
 @dependency-start
+responsibility Documents Repo Onboarding for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

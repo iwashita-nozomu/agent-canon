@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents documents/ for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference

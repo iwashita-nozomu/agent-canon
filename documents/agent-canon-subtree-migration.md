@@ -2,8 +2,9 @@
 
 <!--
 @dependency-start
+responsibility Documents agent-canon subtree 構成 for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
-upstream design ../agents/workflows/derived-agent-canon-diff-workflow.md derived repo diff workflow
+downstream design ../agents/workflows/derived-agent-canon-diff-workflow.md consumes the subtree migration contract
 upstream implementation ../tools/sync_agent_canon.sh subtree sync tool
 upstream implementation ../tools/update_agent_canon.sh derived repo update helper
 downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root

@@ -1,6 +1,7 @@
 # 研究・実験改造ワークフロー
 <!--
 @dependency-start
+responsibility Documents 研究・実験改造ワークフロー for this repository.
 upstream design README.md workflow catalog
 downstream design ../../documents/algorithm-implementation-boundary.md equation-to-code boundary policy
 @dependency-end

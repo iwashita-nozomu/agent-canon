@@ -4,6 +4,7 @@ description: Mandatory first skill for repository tasks. Use before selecting wo
 ---
 <!--
 @dependency-start
+responsibility Documents Agent Orchestration for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

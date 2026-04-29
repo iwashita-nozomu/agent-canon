@@ -1,6 +1,7 @@
 # main 統合ワークフロー
 <!--
 @dependency-start
+responsibility Documents main 統合ワークフロー for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->

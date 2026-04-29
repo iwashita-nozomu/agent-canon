@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

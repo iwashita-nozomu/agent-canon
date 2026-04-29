@@ -1,6 +1,7 @@
 # <Knowledge Topic>
 <!--
 @dependency-start
+responsibility Documents <Knowledge Topic> for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

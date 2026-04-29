@@ -1,6 +1,7 @@
 # static-check
 <!--
 @dependency-start
+responsibility Documents static-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

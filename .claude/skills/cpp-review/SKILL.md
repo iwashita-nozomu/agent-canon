@@ -4,6 +4,7 @@ description: Use when C or C++ code changes need strict review for build evidenc
 ---
 <!--
 @dependency-start
+responsibility Documents C++ Review for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

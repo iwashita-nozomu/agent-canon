@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Builds and validates dependency manifest graph semantics.
 # upstream design ../../documents/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ./check_dependency_header_format.sh validates source manifests
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies graph behavior
@@ -138,6 +139,7 @@ extract_edges() {
     case "$stripped" in
       "/*"|"*/"|"<!--"|"-->"|'"""'|"'''" ) continue ;;
     esac
+    [[ "$stripped" == responsibility[[:space:]]* ]] && continue
     read -r direction kind rel_path reason <<< "$stripped"
     [[ "$direction" == "upstream" || "$direction" == "downstream" ]] || continue
     target="$(normalize_path "$file" "$rel_path")"

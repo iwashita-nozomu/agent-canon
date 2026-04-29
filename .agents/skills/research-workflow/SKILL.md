@@ -4,6 +4,7 @@ description: Use when a task needs external research, comparison design, iterati
 ---
 <!--
 @dependency-start
+responsibility Documents Research Workflow for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

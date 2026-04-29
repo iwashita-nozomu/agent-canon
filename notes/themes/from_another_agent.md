@@ -1,6 +1,7 @@
 # From Another Agent
 <!--
 @dependency-start
+responsibility Documents From Another Agent for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

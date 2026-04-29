@@ -1,6 +1,7 @@
 # agent-canon PR ワークフロー
 <!--
 @dependency-start
+responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 downstream design ../../documents/agent-canon-subtree-migration.md subtree migration contract consumes PR workflow

@@ -1,6 +1,7 @@
 # test-design
 <!--
 @dependency-start
+responsibility Documents test-design for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

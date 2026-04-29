@@ -1,6 +1,7 @@
 # Theme Notes
 <!--
 @dependency-start
+responsibility Documents Theme Notes for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end
 -->

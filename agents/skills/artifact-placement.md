@@ -1,6 +1,7 @@
 # artifact-placement
 <!--
 @dependency-start
+responsibility Documents artifact-placement for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

@@ -1,6 +1,7 @@
 # Experiment Report
 <!--
 @dependency-start
+responsibility Documents Experiment Report for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

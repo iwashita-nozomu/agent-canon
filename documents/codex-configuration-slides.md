@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Codex Configuration Slides for this repository.
 upstream design ./codex-configuration-reference.md source reference for the slide deck
 upstream implementation ../.codex/config.toml current shared template Codex config
 @dependency-end

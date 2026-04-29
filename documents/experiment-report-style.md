@@ -1,6 +1,7 @@
 # 実験レポートの書き方
 <!--
 @dependency-start
+responsibility Documents 実験レポートの書き方 for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->

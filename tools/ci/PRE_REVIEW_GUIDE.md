@@ -1,6 +1,7 @@
 # pre_review.sh スクリプト — 使用ガイド
 <!--
 @dependency-start
+responsibility Documents pre_review.sh スクリプト — 使用ガイド for this repository.
 upstream design ../README.md shared automation index
 @dependency-end
 -->

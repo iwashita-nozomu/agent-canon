@@ -1,6 +1,7 @@
 # research-workflow
 <!--
 @dependency-start
+responsibility Documents research-workflow for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

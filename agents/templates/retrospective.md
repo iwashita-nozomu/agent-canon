@@ -1,6 +1,7 @@
 # Retrospective
 <!--
 @dependency-start
+responsibility Documents Retrospective for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 upstream design workflow_monitoring.md records monitoring observations and improvement decisions
 @dependency-end

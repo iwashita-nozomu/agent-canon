@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Agent Hub for this repository.
 upstream design ../README.md shared canon overview
 @dependency-end
 -->

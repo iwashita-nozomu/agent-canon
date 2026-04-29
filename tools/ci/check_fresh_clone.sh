@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Checks that a fresh clone can run the expected repository validations.
 # upstream design ../README.md shared automation index
-# upstream environment ../../../../docker/Dockerfile installs rsync for canonical container runs
+# upstream environment ../../documents/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # @dependency-end
 
 set -euo pipefail

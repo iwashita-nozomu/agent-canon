@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides mirror skill shims documentation tooling.
 # upstream design ../../agents/skills/catalog.yaml shared skill catalog
 # upstream design ../../.agents/skills/agent-orchestration/SKILL.md skill shim source contract
 # @dependency-end

@@ -1,6 +1,7 @@
 # agent-learning
 <!--
 @dependency-start
+responsibility Documents agent-learning for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

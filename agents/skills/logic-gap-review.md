@@ -1,6 +1,7 @@
 # logic-gap-review
 <!--
 @dependency-start
+responsibility Documents logic-gap-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

@@ -1,6 +1,7 @@
 # start-repository
 <!--
 @dependency-start
+responsibility Documents start-repository for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

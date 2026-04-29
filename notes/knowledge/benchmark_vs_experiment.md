@@ -1,6 +1,7 @@
 # Benchmark vs Experiment
 <!--
 @dependency-start
+responsibility Documents Benchmark vs Experiment for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

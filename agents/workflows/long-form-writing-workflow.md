@@ -1,6 +1,7 @@
 # 長文作成 workflow
 <!--
 @dependency-start
+responsibility Documents 長文作成 workflow for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->

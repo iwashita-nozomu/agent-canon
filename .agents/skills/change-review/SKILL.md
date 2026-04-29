@@ -4,6 +4,7 @@ description: Use for code review, doc review, or AI-generated diff review when y
 ---
 <!--
 @dependency-start
+responsibility Documents Change Review for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

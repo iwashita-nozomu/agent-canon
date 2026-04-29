@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Runs docs checks CI automation.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
-# upstream environment ../../../docker/Dockerfile canonical image tool inventory
+# upstream environment ../documents/linux-wsl-host-requirements.md documents canonical host tool inventory
 # @dependency-end
 
 set -euo pipefail

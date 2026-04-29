@@ -1,6 +1,7 @@
 # Experiment Registry
 <!--
 @dependency-start
+responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 downstream implementation ../tools/ci/check_experiment_registry.py validates registry schema
 @dependency-end

@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+responsibility Defines the repository-wide dependency manifest DSL and validation model.
 upstream design ../agents/canonical/CODEX_WORKFLOW.md dependency header workflow requirement
 upstream design ../agents/templates/closeout_gate.md closeout dependency evidence requirement
 downstream implementation ../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
@@ -44,11 +45,24 @@ downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py
 
 ```text
 @dependency-start
+responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../agents/canonical/CODEX_WORKFLOW.md workflow contract
 upstream implementation ../tools/agent_tools/bootstrap_agent_run.py consumes workflow metadata
 downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies emitted output
 @dependency-end
 ```
+
+manifest block には file の責務を 1 line で書きます。
+文法は次です。
+
+```text
+responsibility <role statement...>
+```
+
+- `responsibility` は file が repo 内で担う役割を 1 文で表します
+- dependency edge ではないため graph edge にはなりません
+- すべての manifest block にちょうど 1 行だけ置きます
+- agent は file を読む前に、この行で「なぜこの file が存在するか」を把握します
 
 1 dependency は 1 line で表します。
 文法は次です。
@@ -94,6 +108,7 @@ Markdown:
 <!--
 @dependency-start
 upstream design ../agents/canonical/CODEX_WORKFLOW.md workflow contract
+responsibility Provides a Python helper entrypoint for agent run bootstrap.
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py consumes workflow contract
 @dependency-end
 -->
@@ -103,6 +118,7 @@ Python / shell / TOML:
 
 ```python
 # @dependency-start
+# responsibility Implements one repository tool or runtime helper.
 # upstream implementation ../tools/agent_tools/agent_team.py imports helper contract
 # downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies CLI behavior
 # @dependency-end
@@ -113,6 +129,7 @@ C-like languages:
 ```c
 /*
 @dependency-start
+responsibility Defines a C or C++ source/header surface and its edit context.
 upstream design ../include/public_api.h public API contract
 downstream implementation ../tests/test_public_api.cpp validates API behavior
 @dependency-end
@@ -209,6 +226,7 @@ Responsibilities:
 - validate marker count and marker order
 - validate placement near the top of the file
 - strip common comment prefixes
+- validate each manifest has exactly one non-empty `responsibility` line
 - validate each dependency line has direction, kind, relative path, and reason
 - validate direction and kind enum values
 - validate path is relative

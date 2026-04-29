@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Bootstraps worktree notes artifacts for agent workflows.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

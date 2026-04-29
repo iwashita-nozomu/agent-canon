@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Agent Instructions for this repository.
 @dependency-end
 -->
 

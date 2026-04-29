@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Bootstraps the repository MCP server process.
 # upstream design README.md MCP runtime surface contract
 # upstream implementation ../.codex/config.toml invokes this repo-local launcher
 # downstream implementation ./repo_mcp_server.py implements the stdio MCP server

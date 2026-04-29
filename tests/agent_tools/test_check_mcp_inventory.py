@@ -1,6 +1,7 @@
 """Tests for the Codex MCP inventory checker."""
 
 # @dependency-start
+# responsibility Tests test check mcp inventory behavior.
 # upstream implementation ../../tools/agent_tools/check_mcp_inventory.py checks MCP inventory
 # upstream implementation ../../.codex/config.toml declares repo_mcp_server
 # @dependency-end

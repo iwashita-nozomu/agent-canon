@@ -1,6 +1,7 @@
 # agent-orchestration
 <!--
 @dependency-start
+responsibility Documents agent-orchestration for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

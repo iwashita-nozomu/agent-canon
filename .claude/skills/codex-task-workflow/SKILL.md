@@ -5,6 +5,7 @@ description: Use when Codex needs a context-independent execution path for a rep
 
 <!--
 @dependency-start
+responsibility Documents Codex Task Workflow for this repository.
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../../../documents/dependency-manifest-design.md defines dependency manifest requirements
 upstream design ../../../agents/skills/codex-task-workflow.md documents the human-facing skill

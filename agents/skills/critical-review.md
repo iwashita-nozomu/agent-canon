@@ -1,6 +1,7 @@
 # critical-review
 <!--
 @dependency-start
+responsibility Documents critical-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

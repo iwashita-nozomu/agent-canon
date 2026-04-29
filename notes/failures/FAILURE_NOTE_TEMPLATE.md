@@ -1,6 +1,7 @@
 # <Failure Topic>
 <!--
 @dependency-start
+responsibility Documents <Failure Topic> for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

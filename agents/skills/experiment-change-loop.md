@@ -1,6 +1,7 @@
 # experiment-change-loop
 <!--
 @dependency-start
+responsibility Documents experiment-change-loop for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

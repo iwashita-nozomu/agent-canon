@@ -4,6 +4,7 @@ description: Use when drafting a paper, thesis chapter, scholarly note, or other
 ---
 <!--
 @dependency-start
+responsibility Documents Academic Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

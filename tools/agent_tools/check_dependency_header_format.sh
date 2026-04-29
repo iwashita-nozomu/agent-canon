@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Validates dependency manifest syntax and responsibility metadata.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests
 # downstream implementation ./check_dependency_graph.sh consumes validated manifest lines
@@ -115,6 +116,7 @@ check_file() {
   local file="$1"
   local start_count end_count start_line end_line line_no line stripped
   local direction kind rel_path reason target
+  local responsibility_count responsibility_text
   [[ -f "$file" && ! -L "$file" ]] || return 0
 
   start_count=0
@@ -162,6 +164,7 @@ check_file() {
   fi
 
   line_no=0
+  responsibility_count=0
   while IFS= read -r line; do
     line_no=$((line_no + 1))
     [[ "$line_no" -gt "$start_line" && "$line_no" -lt "$end_line" ]] || continue
@@ -171,6 +174,16 @@ check_file() {
         continue
         ;;
     esac
+    if [[ "$stripped" == responsibility[[:space:]]* ]]; then
+      responsibility_text="${stripped#responsibility}"
+      responsibility_text="${responsibility_text#"${responsibility_text%%[![:space:]]*}"}"
+      if [[ -z "$responsibility_text" ]]; then
+        echo "$file:$line_no: responsibility line must include a role statement"
+        return 1
+      fi
+      responsibility_count=$((responsibility_count + 1))
+      continue
+    fi
     read -r direction kind rel_path reason <<< "$stripped"
     if [[ -z "${direction:-}" || -z "${kind:-}" || -z "${rel_path:-}" || -z "${reason:-}" ]]; then
       echo "$file:$line_no: dependency line must be: direction kind relative-path reason"
@@ -194,6 +207,11 @@ check_file() {
       return 1
     fi
   done < "$file"
+
+  if [[ "$responsibility_count" -ne 1 ]]; then
+    echo "$file: dependency manifest must contain exactly one responsibility line"
+    return 1
+  fi
 }
 
 failures=0

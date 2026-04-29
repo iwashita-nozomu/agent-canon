@@ -1,6 +1,7 @@
 # 実験ディレクトリ構成
 <!--
 @dependency-start
+responsibility Documents 実験ディレクトリ構成 for this repository.
 upstream design ../README.md convention index
 @dependency-end
 -->

@@ -1,6 +1,7 @@
 # experiment-lifecycle
 <!--
 @dependency-start
+responsibility Documents experiment-lifecycle for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

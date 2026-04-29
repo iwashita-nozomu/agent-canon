@@ -1,6 +1,7 @@
 # docs-consistency-review
 <!--
 @dependency-start
+responsibility Documents docs-consistency-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

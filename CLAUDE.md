@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Claude Code for this repository.
 upstream design AGENTS.md shared canon runtime contract
 @dependency-end
 -->

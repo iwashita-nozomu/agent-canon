@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Provides push origin repository automation.
 # upstream design README.md shared automation index
 # @dependency-end
 

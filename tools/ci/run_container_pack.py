@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Runs container pack CI automation.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Checks dependency headers agent workflow state.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md dependency manifest requirement
 # upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design

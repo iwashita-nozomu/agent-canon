@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents Python コーディング規約 for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy for Python implementations
 downstream design ./object-oriented-design.md general OOP policy for Python class decisions

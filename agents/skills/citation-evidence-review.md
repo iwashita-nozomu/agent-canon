@@ -1,6 +1,7 @@
 # citation-evidence-review
 <!--
 @dependency-start
+responsibility Documents citation-evidence-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

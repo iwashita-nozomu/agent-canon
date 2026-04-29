@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Fixes markdown docs documentation formatting.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

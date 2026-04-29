@@ -5,6 +5,7 @@ description: Use when checking, validating, or diagnosing repository dependency 
 
 <!--
 @dependency-start
+responsibility Documents Dependency Analysis for this repository.
 upstream design ../../../documents/dependency-manifest-design.md defines manifest format and graph semantics
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ../../../agents/skills/dependency-analysis.md documents the human-facing skill

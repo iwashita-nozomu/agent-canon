@@ -1,6 +1,7 @@
 # Memory
 <!--
 @dependency-start
+responsibility Documents Memory for this repository.
 upstream design ../README.md shared canon overview
 @dependency-end
 -->

@@ -4,6 +4,7 @@ description: Use this skill to review current worktree scope, drift, and cleanup
 ---
 <!--
 @dependency-start
+responsibility Documents Worktree Health for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

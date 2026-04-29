@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Provides run pytest with logs repository automation.
 # upstream design README.md shared automation index
 # @dependency-end
 

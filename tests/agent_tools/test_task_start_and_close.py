@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Tests test task start and close behavior.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 

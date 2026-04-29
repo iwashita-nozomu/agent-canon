@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Tests test worktree scope lint behavior.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 

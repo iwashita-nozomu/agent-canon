@@ -1,6 +1,7 @@
 # Detailed Design Brief
 <!--
 @dependency-start
+responsibility Documents Detailed Design Brief for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

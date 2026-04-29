@@ -1,6 +1,7 @@
 # Artifact Placement
 <!--
 @dependency-start
+responsibility Documents Artifact Placement for this repository.
 upstream design README.md canonical workflow index
 @dependency-end
 -->

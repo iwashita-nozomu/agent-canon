@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Provides sync agent canon repository automation.
 # upstream implementation ./agent_tools/check_dependency_headers.py validates dependency manifests
 # upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
 # downstream implementation ../documents/codex-configuration-reference.md root symlink view for Codex config docs

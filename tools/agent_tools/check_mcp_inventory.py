@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Checks mcp inventory agent workflow state.
 # upstream implementation ../../.codex/config.toml declares repo_mcp_server launcher
 # upstream design ../../.codex/README.md documents MCP inventory preflight
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md requires MCP preflight

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides task close agent workflow automation.
 # upstream implementation ./agent_team.py resolves report root defaults
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
 # upstream design ../../agents/templates/closeout_gate.md defines closeout status contract

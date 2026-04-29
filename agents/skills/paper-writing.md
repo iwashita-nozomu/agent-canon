@@ -1,6 +1,7 @@
 # paper-writing
 <!--
 @dependency-start
+responsibility Documents paper-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

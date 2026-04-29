@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents ログ/デバッグ出力の規約（共通） for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 @dependency-end
 -->

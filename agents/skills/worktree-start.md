@@ -1,6 +1,7 @@
 # worktree-start
 <!--
 @dependency-start
+responsibility Documents worktree-start for this repository.
 @dependency-end
 -->
 

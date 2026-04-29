@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides analyze refactor surface agent workflow automation.
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md analyzer gate
 # upstream design ../../documents/object-oriented-design.md OOP boundary policy
 # downstream implementation ../../tests/agent_tools/test_analyze_refactor_surface.py analyzer tests

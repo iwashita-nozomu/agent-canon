@@ -1,6 +1,7 @@
 # literature-survey
 <!--
 @dependency-start
+responsibility Documents literature-survey for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

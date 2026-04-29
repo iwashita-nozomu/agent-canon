@@ -1,6 +1,7 @@
 """Tests for dependency manifest shell tools."""
 
 # @dependency-start
+# responsibility Tests dependency manifest shell tool behavior.
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
 # upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest markers
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
@@ -67,6 +68,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Exercises a valid line-comment manifest.",
                         "# upstream implementation target.py target contract",
                         "# @dependency-end",
                         "",
@@ -93,6 +95,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "{",
                         '  "_dependency_manifest": [',
                         '    "@dependency-start",',
+                        '    "responsibility Exercises a JSON string manifest.",',
                         '    "upstream implementation target.py target contract",',
                         '    "@dependency-end"',
                         "  ],",
@@ -160,6 +163,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Exercises invalid direction validation.",
                         "# sideways implementation target.py invalid direction",
                         "# @dependency-end",
                         "",
@@ -184,6 +188,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Defines source a for graph validation.",
                         "# downstream implementation b.py b consumes a",
                         "# @dependency-end",
                         "",
@@ -195,6 +200,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Defines source b for graph validation.",
                         "# upstream implementation a.py a is consumed by b",
                         "# @dependency-end",
                         "",
@@ -217,6 +223,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Exercises isolated manifest validation.",
                         "# @dependency-end",
                         "",
                     ]
@@ -240,6 +247,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
+                        "# responsibility Defines source a for reverse-edge validation.",
                         "# downstream implementation b.py b consumes a",
                         "# @dependency-end",
                         "",
@@ -318,6 +326,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Target",
                         "<!--",
                         "@dependency-start",
+                        "responsibility Defines target test fixture context.",
                         "downstream design source.md source reads target",
                         "@dependency-end",
                         "-->",
@@ -332,6 +341,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# Source",
                         "<!--",
                         "@dependency-start",
+                        "responsibility Defines source test fixture context.",
                         "upstream design target.md target context",
                         "@dependency-end",
                         "-->",

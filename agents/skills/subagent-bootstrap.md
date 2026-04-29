@@ -1,6 +1,7 @@
 # subagent-bootstrap
 <!--
 @dependency-start
+responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

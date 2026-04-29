@@ -1,6 +1,7 @@
 # Agent Canonical Layout
 <!--
 @dependency-start
+responsibility Documents Agent Canonical Layout for this repository.
 upstream design ../README.md agent canon overview
 @dependency-end
 -->

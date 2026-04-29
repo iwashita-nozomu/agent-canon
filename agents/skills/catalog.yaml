@@ -1,5 +1,6 @@
 version: 1
 # @dependency-start
+# responsibility Catalogs canonical agent skills and their descriptions.
 # upstream design ../canonical/CODEX_WORKFLOW.md defines skill selection workflow
 # @dependency-end
 

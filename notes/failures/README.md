@@ -1,6 +1,7 @@
 # Failure Case Hub
 <!--
 @dependency-start
+responsibility Documents Failure Case Hub for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end
 -->

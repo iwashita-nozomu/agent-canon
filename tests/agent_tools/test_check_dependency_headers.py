@@ -1,6 +1,7 @@
 """Tests for dependency header validation."""
 
 # @dependency-start
+# responsibility Tests changed-file dependency header detection.
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
 # @dependency-end
 
@@ -30,6 +31,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                         "",
                         "<!--",
                         "@dependency-start",
+                        "responsibility Documents a markdown file under test.",
                         "upstream design README.md repo overview",
                         "@dependency-end",
                         "-->",

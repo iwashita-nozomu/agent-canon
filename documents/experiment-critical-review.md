@@ -1,6 +1,7 @@
 # 実験の批判的レビュー手順
 <!--
 @dependency-start
+responsibility Documents 実験の批判的レビュー手順 for this repository.
 upstream design README.md durable document index
 downstream design ./algorithm-implementation-boundary.md algorithm boundary review reference
 @dependency-end

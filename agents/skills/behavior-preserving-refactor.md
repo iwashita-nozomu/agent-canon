@@ -1,6 +1,7 @@
 # behavior-preserving-refactor
 <!--
 @dependency-start
+responsibility Documents behavior-preserving-refactor for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

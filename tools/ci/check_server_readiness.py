@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Checks server readiness CI readiness.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

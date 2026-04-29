@@ -1,6 +1,7 @@
 """Tests for the shared work-log appender."""
 
 # @dependency-start
+# responsibility Tests test work log behavior.
 # upstream implementation ../../tools/agent_tools/work_log.py appends run and action logs
 # @dependency-end
 

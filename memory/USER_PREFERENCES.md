@@ -1,6 +1,7 @@
 # User Preferences
 <!--
 @dependency-start
+responsibility Documents User Preferences for this repository.
 upstream design README.md memory surface index
 @dependency-end
 -->

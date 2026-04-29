@@ -1,6 +1,7 @@
 """Tests for the refactor surface analyzer."""
 
 # @dependency-start
+# responsibility Tests test analyze refactor surface behavior.
 # upstream implementation ../../tools/agent_tools/analyze_refactor_surface.py analyzer
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md analyzer gate policy
 # @dependency-end

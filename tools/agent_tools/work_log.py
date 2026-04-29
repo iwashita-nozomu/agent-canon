@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides work log agent workflow automation.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
 # upstream design ../../agents/skills/worktree-start.md worktree action log usage
 # upstream design ../../documents/WORKTREE_SCOPE_TEMPLATE.md worktree log contract

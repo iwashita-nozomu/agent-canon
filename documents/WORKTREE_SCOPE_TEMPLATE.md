@@ -1,6 +1,7 @@
 # WORKTREE_SCOPE Template
 <!--
 @dependency-start
+responsibility Documents WORKTREE_SCOPE Template for this repository.
 @dependency-end
 -->
 

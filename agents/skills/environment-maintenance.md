@@ -1,6 +1,7 @@
 # environment-maintenance
 <!--
 @dependency-start
+responsibility Documents environment-maintenance for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

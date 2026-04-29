@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents エージェント利用ガイド for this repository.
 upstream design README.md agent canon overview
 @dependency-end
 -->

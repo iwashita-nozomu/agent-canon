@@ -1,6 +1,7 @@
 # Pyright Operations
 <!--
 @dependency-start
+responsibility Documents Pyright Operations for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

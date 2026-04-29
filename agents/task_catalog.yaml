@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Maps task identifiers to workflow and review defaults.
 # downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing

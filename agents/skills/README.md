@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ../canonical/CODEX_WORKFLOW.md defines skill selection workflow
 @dependency-end

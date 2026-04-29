@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Tests test evaluate agent run behavior.
 # upstream design ../../agents/workflows/agent-learning-workflow.md agent feedback workflow
 # upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
 # downstream implementation ../../tools/agent_tools/task_close.py consumes agent evaluation status

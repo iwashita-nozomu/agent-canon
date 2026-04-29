@@ -1,6 +1,7 @@
 # Document Flow Review
 <!--
 @dependency-start
+responsibility Documents Document Flow Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

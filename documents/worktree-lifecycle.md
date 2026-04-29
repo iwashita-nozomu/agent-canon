@@ -1,6 +1,7 @@
 # branch・worktree の例外運用
 <!--
 @dependency-start
+responsibility Documents branch・worktree の例外運用 for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->

@@ -1,6 +1,7 @@
 # claude-code-cli
 <!--
 @dependency-start
+responsibility Documents claude-code-cli for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

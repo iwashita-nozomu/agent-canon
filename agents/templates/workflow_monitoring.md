@@ -1,6 +1,7 @@
 # Workflow Monitoring
 <!--
 @dependency-start
+responsibility Documents Workflow Monitoring for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
 upstream design ../workflows/agent-learning-workflow.md defines feedback and self-improvement capture
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates monitoring evidence

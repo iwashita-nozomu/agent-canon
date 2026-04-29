@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Runs mcp session context shell automation.
 # upstream implementation ../hooks.json invokes this hook for SessionStart and UserPromptSubmit
 # upstream implementation ../config.toml enables codex_hooks
 # upstream design ../README.md documents MCP inventory preflight

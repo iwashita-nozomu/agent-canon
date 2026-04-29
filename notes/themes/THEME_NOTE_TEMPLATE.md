@@ -1,6 +1,7 @@
 # <Theme Topic>
 <!--
 @dependency-start
+responsibility Documents <Theme Topic> for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

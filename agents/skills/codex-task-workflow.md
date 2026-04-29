@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+responsibility Documents codex-task-workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines the executable Codex workflow
 upstream design ../../documents/dependency-manifest-design.md defines dependency manifest requirements
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill

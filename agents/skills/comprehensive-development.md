@@ -1,6 +1,7 @@
 # comprehensive-development
 <!--
 @dependency-start
+responsibility Documents comprehensive-development for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

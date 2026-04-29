@@ -1,6 +1,7 @@
 # エージェント運用の入口
 <!--
 @dependency-start
+responsibility Documents エージェント運用の入口 for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->

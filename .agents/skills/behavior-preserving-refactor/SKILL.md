@@ -4,6 +4,7 @@ description: Use when a large refactor should be treated as behavior-preserving 
 ---
 <!--
 @dependency-start
+responsibility Documents Behavior Preserving Refactor for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

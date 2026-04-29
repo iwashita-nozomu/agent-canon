@@ -1,6 +1,7 @@
 # GitHub Agent Entry Point
 <!--
 @dependency-start
+responsibility Documents GitHub Agent Entry Point for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 @dependency-end
 -->

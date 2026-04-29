@@ -1,6 +1,7 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
+    "responsibility Defines the canonical runtime agent team configuration.",
     "upstream implementation ../tools/agent_tools/agent_team.py loads this runtime team configuration",
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"

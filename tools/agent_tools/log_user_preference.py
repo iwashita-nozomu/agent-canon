@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Logs user preference records for agent workflows.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

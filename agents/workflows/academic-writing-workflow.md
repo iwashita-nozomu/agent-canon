@@ -1,6 +1,7 @@
 # 学術文章 workflow
 <!--
 @dependency-start
+responsibility Documents 学術文章 workflow for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->

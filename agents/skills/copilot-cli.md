@@ -1,6 +1,7 @@
 # copilot-cli
 <!--
 @dependency-start
+responsibility Documents copilot-cli for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

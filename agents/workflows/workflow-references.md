@@ -1,6 +1,7 @@
 # Workflow References
 <!--
 @dependency-start
+responsibility Documents Workflow References for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->

@@ -1,4 +1,5 @@
 # @dependency-start
+# responsibility Provides the remote execution repo.template configuration template.
 # upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 # @dependency-end
 

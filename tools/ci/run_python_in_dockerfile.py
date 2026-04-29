@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Runs python in dockerfile CI automation.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

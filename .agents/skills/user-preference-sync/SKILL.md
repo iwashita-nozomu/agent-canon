@@ -4,6 +4,7 @@ description: Use when notes/themes/USER_PREFERENCES.md should be distilled into 
 ---
 <!--
 @dependency-start
+responsibility Documents User Preference Sync for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Provides update agent canon repository automation.
 # upstream design ../agents/canonical/CODEX_WORKFLOW.md defines shared canon update gates
 # upstream implementation ./sync_agent_canon.sh performs snapshot synchronization
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior

@@ -1,6 +1,7 @@
 # User Request Contract
 <!--
 @dependency-start
+responsibility Documents User Request Contract for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

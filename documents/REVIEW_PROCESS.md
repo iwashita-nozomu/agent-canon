@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents レビュー手順とポリシー for this repository.
 upstream design README.md durable document index
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 @dependency-end

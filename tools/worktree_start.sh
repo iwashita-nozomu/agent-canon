@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Provides worktree start repository automation.
 # upstream design README.md shared automation index
 # @dependency-end
 

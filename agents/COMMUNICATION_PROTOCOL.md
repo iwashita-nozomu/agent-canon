@@ -1,6 +1,7 @@
 # Agent Communication Protocol
 <!--
 @dependency-start
+responsibility Documents Agent Communication Protocol for this repository.
 upstream design README.md agent canon overview
 @dependency-end
 -->

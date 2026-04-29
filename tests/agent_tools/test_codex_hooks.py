@@ -1,6 +1,7 @@
 """Tests for Codex project-local hook wiring."""
 
 # @dependency-start
+# responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables codex_hooks
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON

@@ -1,6 +1,7 @@
 # Infra Review
 <!--
 @dependency-start
+responsibility Documents Infra Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

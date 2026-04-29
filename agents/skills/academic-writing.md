@@ -1,6 +1,7 @@
 # academic-writing
 <!--
 @dependency-start
+responsibility Documents academic-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

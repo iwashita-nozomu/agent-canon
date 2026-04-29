@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Checks worktree scopes documentation quality.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

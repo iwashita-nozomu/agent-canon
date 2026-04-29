@@ -4,6 +4,7 @@ description: Use when starting a new repository from this template after clone, 
 ---
 <!--
 @dependency-start
+responsibility Documents Start Repository for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

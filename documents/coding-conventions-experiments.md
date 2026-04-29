@@ -1,6 +1,7 @@
 # 実験運用規約
 <!--
 @dependency-start
+responsibility Documents 実験運用規約 for this repository.
 upstream design README.md durable document index
 @dependency-end
 -->

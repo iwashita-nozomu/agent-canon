@@ -1,6 +1,7 @@
 # Environment Change Proposal
 <!--
 @dependency-start
+responsibility Documents Environment Change Proposal for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

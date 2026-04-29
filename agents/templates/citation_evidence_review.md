@@ -1,6 +1,7 @@
 # Citation Evidence Review
 <!--
 @dependency-start
+responsibility Documents Citation Evidence Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

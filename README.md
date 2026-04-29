@@ -1,6 +1,7 @@
 # agent-canon
 <!--
 @dependency-start
+responsibility Documents agent-canon for this repository.
 upstream design AGENTS.md shared canon runtime contract
 @dependency-end
 -->

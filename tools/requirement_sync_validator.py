@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides requirement sync validator repository automation.
 # upstream design README.md shared automation index
 # @dependency-end
 

@@ -1,6 +1,7 @@
 # Detailed Design Review
 <!--
 @dependency-start
+responsibility Documents Detailed Design Review for this repository.
 upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 @dependency-end
 -->

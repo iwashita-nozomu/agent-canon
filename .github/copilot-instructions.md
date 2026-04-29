@@ -1,6 +1,7 @@
 # GitHub Copilot Repository Instructions
 <!--
 @dependency-start
+responsibility Documents GitHub Copilot Repository Instructions for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 @dependency-end
 -->

@@ -1,6 +1,7 @@
 # Worktree Notes
 <!--
 @dependency-start
+responsibility Documents Worktree Notes for this repository.
 upstream design ../README.md notes lifecycle index
 @dependency-end
 -->

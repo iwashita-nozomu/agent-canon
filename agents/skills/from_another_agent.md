@@ -1,6 +1,7 @@
 # from_another_agent
 <!--
 @dependency-start
+responsibility Documents from_another_agent for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides validate role write scope agent workflow automation.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

@@ -4,6 +4,7 @@ description: Use this skill when creating, recreating, or resuming a worktree an
 ---
 <!--
 @dependency-start
+responsibility Documents Worktree Start for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

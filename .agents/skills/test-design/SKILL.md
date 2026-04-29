@@ -4,6 +4,7 @@ description: Use when code changes need adversarial static test design before im
 ---
 <!--
 @dependency-start
+responsibility Documents Test Design for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->

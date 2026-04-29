@@ -1,5 +1,6 @@
 <!--
 @dependency-start
+responsibility Documents アルゴリズム数理・実装境界方針 for this repository.
 upstream design ./README.md durable document index
 upstream design ./REVIEW_PROCESS.md review gate for equation/spec alignment
 upstream design ./experiment-critical-review.md mathematical validity review

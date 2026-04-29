@@ -1,6 +1,7 @@
 # repo-onboarding
 <!--
 @dependency-start
+responsibility Documents repo-onboarding for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

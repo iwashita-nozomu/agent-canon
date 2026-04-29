@@ -1,6 +1,7 @@
 # Experiment Directory Planning
 <!--
 @dependency-start
+responsibility Documents Experiment Directory Planning for this repository.
 upstream design README.md notes lifecycle index
 @dependency-end
 -->

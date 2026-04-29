@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # @dependency-start
+# responsibility Checks agent canon latest CI readiness.
 # upstream design ../README.md shared automation index
 # @dependency-end
 

@@ -8,6 +8,7 @@ skills:
 ---
 <!--
 @dependency-start
+responsibility You are a repository exploration specialist.
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 @dependency-end
 -->

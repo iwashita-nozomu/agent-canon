@@ -2,6 +2,7 @@
 
 <!--
 @dependency-start
+responsibility Documents Shared Runtime Surfaces for this repository.
 upstream design ../tools/sync_agent_canon.sh shared surface link specification
 upstream design ./agent-canon-subtree-migration.md subtree ownership model
 downstream implementation ../tools/sync_agent_canon.sh enforces this surface list

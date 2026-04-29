@@ -1,6 +1,7 @@
 # user-preference-sync
 <!--
 @dependency-start
+responsibility Documents user-preference-sync for this repository.
 upstream design ../canonical/skills.md skill canon registry
 @dependency-end
 -->

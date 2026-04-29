@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
+# responsibility Provides registry lib experiment workflow tooling.
 # upstream design ../README.md shared automation index
 # @dependency-end
 
