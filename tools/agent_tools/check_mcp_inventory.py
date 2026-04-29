@@ -19,11 +19,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 @dataclass(frozen=True)
 class McpServer:
@@ -123,14 +118,18 @@ def load_project_config_server_names(root: Path) -> set[str]:
     if not config_path.is_file():
         return set()
     try:
-        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
+        lines = config_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
         return set()
-    servers = cast(object, config.get("mcp_servers"))
-    if not isinstance(servers, dict):
-        return set()
-    server_data = cast(dict[str, object], servers)
-    return {name for name in server_data if name}
+    names: set[str] = set()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("[mcp_servers.") or not stripped.endswith("]"):
+            continue
+        server_name = stripped.removeprefix("[mcp_servers.").removesuffix("]").strip()
+        if server_name and not any(char.isspace() for char in server_name):
+            names.add(server_name.strip('"').strip("'"))
+    return names
 
 
 def launcher_errors(server: McpServer, root: Path) -> list[str]:
