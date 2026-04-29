@@ -119,6 +119,9 @@ upstream design README.md memory surface index
 - 2026-04-24 | Do not return a user-facing completion report while any task, planned work unit, required validation, commit/push, canon sync, or closeout gate remains unfinished; return only after everything in scope is complete.
   - source: chat
 
+- 2026-04-28 | 数式文書では『導入しない』『残さない』などの自明な否定説明を避け、式の導出と必要な定義だけで書く。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

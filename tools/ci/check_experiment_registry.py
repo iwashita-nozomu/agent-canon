@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    import tomllib
+    import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
@@ -70,6 +70,34 @@ def git_branch_exists(repo_root: Path, branch_name: str) -> bool:
     return bool(result.stdout.strip())
 
 
+def git_ref_exists(repo_root: Path, ref_name: str) -> bool:
+    """Return whether one local or remote ref exists."""
+    candidates = [
+        ref_name,
+        f"refs/heads/{ref_name}",
+        f"refs/remotes/{ref_name}",
+    ]
+    for candidate in candidates:
+        result = subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", candidate],
+            cwd=repo_root,
+            check=False,
+        )
+        if result.returncode == 0:
+            return True
+    return False
+
+
+def git_commit_exists(repo_root: Path, commit: str) -> bool:
+    """Return whether one commit-ish exists."""
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=repo_root,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def normalize_topics(raw_topics: object) -> list[dict[str, object]]:
     """Return the topic table list."""
     if not isinstance(raw_topics, list):
@@ -78,6 +106,20 @@ def normalize_topics(raw_topics: object) -> list[dict[str, object]]:
     for index, raw_topic in enumerate(raw_topics):
         if not isinstance(raw_topic, dict):
             raise ValueError(f"topics[{index}] must be a table")
+        topics.append(raw_topic)
+    return topics
+
+
+def normalize_optional_topics(raw_topics: object, table_name: str) -> list[dict[str, object]]:
+    """Return an optional topic table list."""
+    if raw_topics is None:
+        return []
+    if not isinstance(raw_topics, list):
+        raise ValueError(f"registry {table_name} must be an array of tables")
+    topics: list[dict[str, object]] = []
+    for index, raw_topic in enumerate(raw_topics):
+        if not isinstance(raw_topic, dict):
+            raise ValueError(f"{table_name}[{index}] must be a table")
         topics.append(raw_topic)
     return topics
 
@@ -137,17 +179,24 @@ def validate_eval_patterns(
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             findings.append(
-                Finding("error", f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}")
+                Finding(
+                    "error",
+                    f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}",
+                )
             )
         if ".." in pattern_path.parts:
             findings.append(
-                Finding("error", f"{scope_name}: {key} must not escape result/<run_name>: {pattern}")
+                Finding(
+                    "error",
+                    f"{scope_name}: {key} must not escape result/<run_name>: {pattern}",
+                )
             )
         if pattern in MANAGED_RUN_ARTIFACTS:
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must not target reserved top-level managed artifacts: {pattern}",
+                    f"{scope_name}: {key} must not target reserved top-level managed "
+                    f"artifacts: {pattern}",
                 )
             )
 
@@ -187,11 +236,24 @@ def validate_topic(
         )
     ):
         return
+    assert status is not None
+    assert topic_dir_raw is not None
+    assert readme_raw is not None
+    assert entrypoint_raw is not None
+    assert result_root_raw is not None
+    assert report_root_raw is not None
+    assert default_variant is not None
+    assert smoke_command is not None
+    assert formal_command is not None
 
     allowed_status = {"template", "draft", "active", "paused", "archived"}
     if status not in allowed_status:
         findings.append(
-            Finding("error", f"{topic_name}: unsupported status {status!r}; expected one of {sorted(allowed_status)}")
+            Finding(
+                "error",
+                f"{topic_name}: unsupported status {status!r}; "
+                f"expected one of {sorted(allowed_status)}",
+            )
         )
 
     topic_dir = repo_root / topic_dir_raw
@@ -205,7 +267,8 @@ def validate_topic(
         findings.append(
             Finding(
                 "warning",
-                f"{topic_name}: topic_dir is {topic_dir_raw}, expected experiments/{topic_name} for the default layout",
+                f"{topic_name}: topic_dir is {topic_dir_raw}, "
+                f"expected experiments/{topic_name} for the default layout",
             )
         )
     if not topic_dir.is_dir():
@@ -213,7 +276,12 @@ def validate_topic(
     if not topic_readme.is_file():
         findings.append(Finding("error", f"{topic_name}: topic_readme is missing: {topic_readme}"))
     if not canonical_entrypoint.is_file():
-        findings.append(Finding("error", f"{topic_name}: canonical_entrypoint is missing: {canonical_entrypoint}"))
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: canonical_entrypoint is missing: {canonical_entrypoint}",
+            )
+        )
     if not result_root.is_dir():
         findings.append(Finding("error", f"{topic_name}: result_root is missing: {result_root}"))
     if not report_root.is_dir():
@@ -223,20 +291,29 @@ def validate_topic(
     for command_kind, command_text in (("smoke", smoke_command), ("formal", formal_command)):
         if "{run_dir}" not in command_text:
             findings.append(
-                Finding("error", f"{topic_name}: {command_kind}_inner_command must contain {{run_dir}}")
+                Finding(
+                    "error",
+                    f"{topic_name}: {command_kind}_inner_command must contain {{run_dir}}",
+                )
             )
         if entrypoint_raw not in command_text:
             findings.append(
                 Finding(
                     "error",
-                    f"{topic_name}: {command_kind}_inner_command must mention canonical_entrypoint {entrypoint_raw}",
+                    f"{topic_name}: {command_kind}_inner_command must mention "
+                    f"canonical_entrypoint {entrypoint_raw}",
                 )
             )
-        if managed_runner is not None and isinstance(managed_runner, str) and managed_runner in command_text:
+        if (
+            managed_runner is not None
+            and isinstance(managed_runner, str)
+            and managed_runner in command_text
+        ):
             findings.append(
                 Finding(
                     "error",
-                    f"{topic_name}: {command_kind}_inner_command must not call the managed runner recursively",
+                    f"{topic_name}: {command_kind}_inner_command must not call the "
+                    "managed runner recursively",
                 )
             )
 
@@ -244,7 +321,8 @@ def validate_topic(
         findings.append(
             Finding(
                 "error",
-                f"{topic_name}: default_variant must be smoke, formal, or manual; got {default_variant!r}",
+                f"{topic_name}: default_variant must be smoke, formal, or manual; "
+                f"got {default_variant!r}",
             )
         )
 
@@ -264,7 +342,10 @@ def validate_topic(
         resolved = repo_root / optional_path
         if not resolved.exists():
             findings.append(
-                Finding("warning", f"{topic_name}: {optional_path_key} is set but missing: {resolved}")
+                Finding(
+                    "warning",
+                    f"{topic_name}: {optional_path_key} is set but missing: {resolved}",
+                )
             )
 
     required_eval_artifacts = maybe_string_list(
@@ -293,6 +374,68 @@ def validate_topic(
     )
 
 
+def validate_branch_topic(
+    repo_root: Path,
+    topic: dict[str, object],
+    findings: list[Finding],
+) -> None:
+    """Validate one branch-only topic entry."""
+    topic_name = require_string(findings, "<unknown>", topic, "name")
+    if topic_name is None:
+        return
+
+    status = require_string(findings, topic_name, topic, "status")
+    remote_branch = require_string(findings, topic_name, topic, "remote_branch")
+    primary_note = require_string(findings, topic_name, topic, "primary_note")
+    if any(value is None for value in (status, remote_branch, primary_note)):
+        return
+    assert status is not None
+    assert remote_branch is not None
+    assert primary_note is not None
+
+    allowed_status = {"active", "paused", "archived"}
+    if status not in allowed_status:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: unsupported branch topic status {status!r}; "
+                f"expected one of {sorted(allowed_status)}",
+            )
+        )
+
+    if not git_ref_exists(repo_root, remote_branch):
+        findings.append(
+            Finding(
+                "warning",
+                f"{topic_name}: remote_branch does not exist in the current repo: {remote_branch}",
+            )
+        )
+
+    primary_note_path = repo_root / primary_note
+    if not primary_note_path.is_file():
+        findings.append(
+            Finding("error", f"{topic_name}: primary_note is missing: {primary_note_path}")
+        )
+
+    branch_note = maybe_string(topic, "branch_note")
+    if branch_note is not None and not (repo_root / branch_note).is_file():
+        findings.append(
+            Finding(
+                "warning",
+                f"{topic_name}: branch_note is set but missing: {repo_root / branch_note}",
+            )
+        )
+
+    source_commit = maybe_string(topic, "source_commit")
+    if source_commit is not None and not git_commit_exists(repo_root, source_commit):
+        findings.append(
+            Finding(
+                "warning",
+                f"{topic_name}: source_commit does not exist in the current repo: {source_commit}",
+            )
+        )
+
+
 def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     """Validate one registry file."""
     findings: list[Finding] = []
@@ -313,7 +456,9 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     if isinstance(managed_runner, str):
         managed_runner_path = repo_root / managed_runner
         if not managed_runner_path.is_file():
-            findings.append(Finding("error", f"defaults.managed_runner is missing: {managed_runner_path}"))
+            findings.append(
+                Finding("error", f"defaults.managed_runner is missing: {managed_runner_path}")
+            )
     else:
         findings.append(Finding("error", "defaults.managed_runner must be a string"))
 
@@ -351,6 +496,7 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     )
 
     topics = normalize_topics(registry.get("topics", []))
+    branch_topics = normalize_optional_topics(registry.get("branch_topics"), "branch_topics")
     seen_names: set[str] = set()
     for topic in topics:
         topic_name = topic.get("name")
@@ -360,6 +506,14 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
             seen_names.add(topic_name)
         validate_topic(repo_root, defaults, topic, findings)
 
+    for topic in branch_topics:
+        topic_name = topic.get("name")
+        if isinstance(topic_name, str):
+            if topic_name in seen_names:
+                findings.append(Finding("error", f"duplicate topic name: {topic_name}"))
+            seen_names.add(topic_name)
+        validate_branch_topic(repo_root, topic, findings)
+
     return findings
 
 
@@ -367,7 +521,11 @@ def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     repo_root = Path(args.repo_root).resolve()
-    registry_path = Path(args.registry).resolve() if args.registry else repo_root / "experiments" / "registry.toml"
+    registry_path = (
+        Path(args.registry).resolve()
+        if args.registry
+        else repo_root / "experiments" / "registry.toml"
+    )
     try:
         findings = collect_findings(repo_root, registry_path)
     except (OSError, ValueError) as exc:

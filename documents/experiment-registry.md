@@ -38,6 +38,28 @@ durable な正本は常に topic 名です。
 - 必要なら `required_eval_artifacts`
 - 必要なら `optional_eval_artifacts`
 
+## branch-only topics
+
+main に実験実装を残さず、隔離 branch だけで保持する実験は
+`[[branch_topics]]` に登録します。
+
+`[[branch_topics]]` は branch 管理用の index であり、main tree 上に
+`topic_dir` や `canonical_entrypoint` を要求しません。main に残すのは、
+実験名、保存 branch、主要 note、必要なら branch 内 entrypoint や result root
+だけです。これにより、main は実験 framework と registry だけを持ち、
+branch 固有の探索コード、notebook、生成結果を持ちません。
+
+少なくとも次を持ちます。
+
+- `name`
+- `status`
+- `remote_branch`
+- `primary_note`
+- 必要なら `source_commit`
+- 必要なら `branch_note`
+- 必要なら `branch_entrypoint`
+- 必要なら `result_root`
+
 ## branch / worktree metadata
 
 必要な場合だけ次を持てます。
@@ -56,6 +78,8 @@ durable な正本は常に topic 名です。
 - formal run のコマンドを変えたら、registry と topic README を同じ変更で更新します。
 - 実験 topic を隔離 branch / worktree で扱う場合だけ、`active_branch` や `scope_file` を更新します。
 - branch を閉じたら、stale な `active_branch` や `active_worktree` を整理します。
+- branch にだけ残す実験は、main から implementation tree を削除し、
+  `[[branch_topics]]` だけで辿れるようにします。
 
 手で編集してもよいですが、通常は次を使います。
 
