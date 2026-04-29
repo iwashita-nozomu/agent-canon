@@ -1,5 +1,6 @@
 # @dependency-start
 # upstream design ../../tools/README.md validated automation surface
+# upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
 # @dependency-end
 
 """Tests for the managed experiment run helper."""
@@ -415,6 +416,112 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
 
     assert result.returncode == 0
     assert "OK: experiment registry is valid" in result.stdout
+
+
+def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) -> None:
+    """The registry checker should accept branch-only topic entries."""
+    repo_root = build_repo(tmp_path)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Registry Test",
+            "-c",
+            "user.email=registry-test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "branch", "experiment/branch-only"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    (repo_root / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "notes" / "branches" / "branch_only.md").write_text(
+        "# Branch Only\n",
+        encoding="utf-8",
+    )
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8")
+        + "\n".join(
+            [
+                "[[branch_topics]]",
+                'name = "branch_only"',
+                'status = "active"',
+                'remote_branch = "experiment/branch-only"',
+                'primary_note = "notes/branches/branch_only.md"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "OK: experiment registry is valid" in result.stdout
+
+
+def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
+    tmp_path: Path,
+) -> None:
+    """The registry checker should reject duplicate names across topic tables."""
+    repo_root = build_repo(tmp_path)
+    (repo_root / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "notes" / "branches" / "demo_topic.md").write_text(
+        "# Demo Topic Branch\n",
+        encoding="utf-8",
+    )
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8")
+        + "\n".join(
+            [
+                "[[branch_topics]]",
+                'name = "demo_topic"',
+                'status = "active"',
+                'remote_branch = "experiment/demo-topic"',
+                'primary_note = "notes/branches/demo_topic.md"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "duplicate topic name: demo_topic" in result.stdout
 
 
 def test_check_experiment_registry_defaults_to_repo_root_via_symlink(

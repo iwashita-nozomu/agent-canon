@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 upstream design README.md durable document index
+downstream implementation ../tools/ci/check_experiment_registry.py validates registry schema
 @dependency-end
 -->
 
