@@ -102,7 +102,7 @@ class McpInventoryCheckTest(unittest.TestCase):
         self.assertIn("NEXT_ACTION=configure_required_mcp_servers_before_work", result.stdout)
 
     def test_missing_inventory_reports_ignored_project_config(self) -> None:
-        """Empty inventory can mean the project-local MCP config was ignored."""
+        """Report likely config loading failure when project config declares the MCP."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             codex = self.write_fake_codex(root, "[]")

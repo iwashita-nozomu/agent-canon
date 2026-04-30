@@ -18,7 +18,7 @@ cat <<JSON
 {
   "hookSpecificOutput": {
     "hookEventName": "${event}",
-    "additionalContext": "Repo MCP requirement: for repository tasks, confirm repo_mcp_server in configured Codex inventory with 'python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server' even when the user did not mention MCP. When it passes, prefer repo MCP tools for repo root/status and MCP-covered context checks. The canonical launcher is '.codex/config.toml' -> 'bash mcp/repo_mcp_server.sh'; do not silently replace it with an ad hoc local process. If it is missing or startup fails, repair '.codex/', 'mcp/', or base command availability before continuing."
+    "additionalContext": "Repo MCP requirement: for repository tasks, confirm repo_mcp_server in configured Codex inventory with 'python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server' even when the user did not mention MCP. When it passes, prefer repo MCP tools for repo root/status and MCP-covered context checks. Current repo_mcp_server is status/context only, not a file-edit tool; do not repeat that limitation in every user update unless MCP failure/mismatch affects the work or the user asks about editing mode. The canonical launcher is '.codex/config.toml' -> 'bash mcp/repo_mcp_server.sh'; do not silently replace it with an ad hoc local process. If it is missing or startup fails, repair '.codex/', 'mcp/', or base command availability before continuing."
   }
 }
 JSON

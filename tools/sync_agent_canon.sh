@@ -215,6 +215,7 @@ tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/t
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
+tests/agent_tools/test_workflow_monitor.py:../../${PREFIX}/tests/agent_tools/test_workflow_monitor.py
 tests/agent_tools/test_work_log.py:../../${PREFIX}/tests/agent_tools/test_work_log.py
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py

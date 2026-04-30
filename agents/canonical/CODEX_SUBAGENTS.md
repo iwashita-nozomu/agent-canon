@@ -49,6 +49,10 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
+- 新規 user request では前 task の subagent instance を使い回さず、新しい run bundle と fresh subagent を起こします
+- 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
+- `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
+- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
 
 ## Codex Command Surface
 

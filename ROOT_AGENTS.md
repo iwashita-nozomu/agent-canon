@@ -18,6 +18,9 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
 - active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change` で同時 8 体まで、`Large Delivery` / `Platform And Environment` で同時 10 体まで、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
 - 同時に write-capable な subagent は常に 1 体までです。追加分は read-only review / research / survey に限ります。
+- 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起動します。
+- `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
+- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません。
 
 ## Read Packets
 

@@ -12,11 +12,12 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 CHECK_BIDIRECTIONAL=0
 FAIL_MISSING=0
+REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--report-dir DIR]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -37,6 +38,10 @@ while [[ $# -gt 0 ]]; do
     --fail-missing)
       FAIL_MISSING=1
       shift
+      ;;
+    --report-dir)
+      REPORT_DIR="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -78,3 +83,10 @@ fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
 
 echo "REPO_DEPENDENCY_REVIEW=pass"
+
+if [[ -n "$REPORT_DIR" ]]; then
+  python3 tools/agent_tools/workflow_monitor.py \
+    --report-dir "$REPORT_DIR" \
+    --signal "repo_dependency_review=pass paths=${#checkable_paths[@]} check_bidirectional=${CHECK_BIDIRECTIONAL} fail_missing=${FAIL_MISSING}" \
+    --intervention "run_repo_dependency_review.sh recorded dependency review pass"
+fi

@@ -126,10 +126,10 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/agent-canon-subtree-migration.md",
     "notes/guardrails/README.md",
     "notes/guardrails/engineering_avoidances.md",
-    "docker/README.md",
     "memory/USER_PREFERENCES.md",
     "memory/AGENT_PHILOSOPHY.md",
 )
+OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
 def resolve_report_root(
@@ -216,13 +216,24 @@ class RoleDocumentPacket:
 
 def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[DocumentPacketEntry, ...]:
     """Resolve the common cross-cutting document packet for one workspace."""
-    return tuple(
-        DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
-            rationale=f"cross_cutting_doc:{relative_path}",
+    entries: list[DocumentPacketEntry] = []
+    for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS:
+        entries.append(
+            DocumentPacketEntry(
+                path=(workspace_root / relative_path).resolve(),
+                rationale=f"cross_cutting_doc:{relative_path}",
+            )
         )
-        for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
-    )
+    for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS:
+        candidate = (workspace_root / relative_path).resolve()
+        if candidate.exists():
+            entries.append(
+                DocumentPacketEntry(
+                    path=candidate,
+                    rationale=f"cross_cutting_doc:{relative_path}",
+                )
+            )
+    return tuple(entries)
 
 
 @dataclass(frozen=True)
@@ -669,6 +680,14 @@ def build_manifest(
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
+        "  subagent_lifecycle_policy:",
+        "    fresh_subagents_required: true",
+        "    reuse_for_new_task: forbidden",
+        "    previous_task_subagent_reuse: forbidden",
+        "    close_before_user_completion: true",
+        "    closeout_gate_key: subagents_closed",
+        "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
+        "    handoff_rule: 'Do not send_input to agents from another user request; spawn a fresh run-local agent for each new task or stage wave.'",
     ]
     communication_protocol = config.team.get("communication_protocol")
     if communication_protocol is not None:
@@ -808,6 +827,7 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
         "request_clause_ids",
         "run_report_dir",
         "team_manifest_path",
+        "subagent_lifecycle_policy",
         "cross_cutting_document_packet",
         "role_document_packet",
         "expected_output_artifacts",

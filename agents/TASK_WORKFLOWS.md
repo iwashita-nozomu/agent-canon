@@ -199,6 +199,9 @@ spawn budget ルール:
 - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 12 体までを既定にします
 - budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
 - budget を増やしても write-capable subagent は同時 1 体までです
+- 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
+- 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
+- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
 concurrent spawn budget:
 - global runtime cap は `.codex/config.toml` の `max_threads = 24`

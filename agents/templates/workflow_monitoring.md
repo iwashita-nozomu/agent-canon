@@ -16,11 +16,11 @@ downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluate
 
 ## Signals
 
-<!-- Record workflow signals observed during execution: selected skills, stage owners, subagent or parent-direct routing, MCP preflight, repo dependency intake, web-research decision, review status, validation status, and any drift risk. Use explicit opt-out markers such as mcp_preflight_not_required only when the workflow made that decision. -->
+<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, MCP preflight, repo dependency intake, web-research decision, review status, validation status, and any drift risk. Use explicit opt-out markers such as mcp_preflight_not_required only when the workflow made that decision. -->
 
 ## Interventions
 
-<!-- Record monitoring-driven interventions: spawned or skipped roles, added review gates, dependency-tool reruns, prompt/tool/config corrections, schedule changes, or explicit no-op decisions. -->
+<!-- Record monitoring-driven interventions. Prefer `workflow_monitor.py --intervention "..."` so Eval evidence is accumulated during the run, not only at closeout. Include spawned or skipped roles, added review gates, dependency-tool reruns, prompt/tool/config corrections, schedule changes, or explicit no-op decisions. -->
 
 ## Improvement Decisions
 
@@ -29,4 +29,4 @@ downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluate
 - workflow_improvement_decision: pending
 - memory_learning_decision: pending
 
-<!-- Use applied, recorded, or not_applicable. Do not leave pending at closeout. If applied or recorded, cite the concrete file, commit, or memory entry. -->
+<!-- Use applied, recorded, or not_applicable. Prefer `workflow_monitor.py --decision key=value`. Do not leave pending at closeout. If applied or recorded, cite the concrete file, commit, or memory entry. -->

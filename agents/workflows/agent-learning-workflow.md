@@ -95,6 +95,9 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正本として維持します。
 この artifact は conversation summary ではなく、workflow が実際に観測した signals と介入を記録します。
+`workflow_monitor.py` を使うと、監視項目を手書きではなく機械的に蓄積できます。
+`bootstrap_agent_run.py` / `task_start.py` は routing と preflight の初期 signals を自動追記します。
+`check_mcp_inventory.py --report-dir <run>` と `run_repo_dependency_review.sh --report-dir <run>` はそれぞれ MCP preflight と dependency review の evidence を追記します。
 
 必須 signals:
 
