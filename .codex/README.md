@@ -59,6 +59,8 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
 - repository task では、ユーザーが MCP を明示していなくても、intake で `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
 - inventory が pass した task では、repo root / status / MCP-covered context checks で repo MCP tools を優先候補にします。
+- current `repo_mcp_server` は repo root / status / context check 専用で、file edit tool は提供しません。
+- MCP が pass している通常作業では、この制限を user update で毎回説明しません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
 - `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに `codex mcp list --json` が空の場合は、project trust または Codex project-config loading を先に修復します。
 - `check_mcp_inventory.py` は inventory だけでなく launcher command と repo-local script の存在も検査します。
@@ -69,6 +71,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
 - hook の役割は「MCP をユーザーが明示しなくても repo task の標準 preflight として扱う context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
+- hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
 ## Model Policy

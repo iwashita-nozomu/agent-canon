@@ -105,11 +105,23 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
 - MCP inventory が pass した場合は、repo state、repo root、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
+- current `repo_mcp_server` は repo root / status / MCP-covered context check 用です。file editing capability は持ちません。
+- MCP が pass したあと、毎回「MCP は編集できないので patch で編集する」と user update に書いてはいけません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
 - `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは「MCP をユーザーが明示しなくても思い出す」ための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
 - inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
 - contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
+
+### Edit Execution Surface
+
+Repo file edits use the narrowest reliable execution surface:
+
+1. 通常の小〜中規模編集は patch-based edit を使います。
+1. 機械生成・一括変換・format は repo 内の script / formatter / generator を使います。
+1. MCP 経由編集は、repo MCP server が explicit edit tool を提供してから使います。status-only MCP を edit tool として扱ってはいけません。
+
+この選択は作業 log / run bundle に必要な粒度で残しますが、user update では冗長に説明しません。説明が必要なのは、既定から外れる編集手段を使う場合、tool availability が作業判断に影響する場合、または user が編集手段を質問した場合です。
 
 ### Library And Reuse Sweep
 

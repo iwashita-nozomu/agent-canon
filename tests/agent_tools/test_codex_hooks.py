@@ -61,3 +61,5 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
         self.assertIn("even when the user did not mention MCP", hook_output["additionalContext"])
         self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])
+        self.assertIn("status/context only", hook_output["additionalContext"])
+        self.assertIn("do not repeat that limitation", hook_output["additionalContext"])
