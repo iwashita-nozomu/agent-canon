@@ -62,6 +62,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で docs completeness review も通します
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
+- 原因考察、修正箇所選定、複数候補比較が必要な task では `agents/workflows/hypothesis-validation-workflow.md` を overlay とし、code dependency scan と header dependency graph を別々に取得してから仮説、反証条件、fix surface 妥当性を固定します
 - `詳細設計` の目標は、実装前提が十分に伝わる文書を起こすことです
 - 詳細設計には `Implementation Source Packet` と `Design-To-Implementation Trace` を必ず含め、worker が読む artifact、repo docs、dependency/library survey、code path、test plan、request clause ID を固定します
 - 実装では会話文脈や記憶より承認済み design packet を優先し、各 implementation slice で design artifact path、section、test plan item、request clause ID を引用します
@@ -84,6 +85,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - branch 側で file 構成変更をした pass は、closeout 前に `agents/workflows/main-integration-workflow.md` の integration step まで設計します
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
+- 考察系 overlay では、仮説なし、反証条件なし、fix surface 妥当性なしで実装へ進みません
 - `/mnt/git` 配下の log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
 - specialized path の tuning だけで generic path の usable smoke を満たした扱いにしません
 - spot run、debug run、smoke run、partial run は正式な comparison evidence や method 採否の根拠にしません

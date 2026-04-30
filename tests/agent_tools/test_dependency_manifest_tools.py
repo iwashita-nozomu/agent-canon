@@ -7,6 +7,7 @@
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
+# upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependencies
 # @dependency-end
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
 FORMAT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_header_format.sh"
 GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
 REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
+CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
 WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 
@@ -58,6 +60,57 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_code_scan_extracts_python_import_edges(self) -> None:
+        """The code dependency scanner resolves local Python imports."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            package = root / "pkg"
+            package.mkdir()
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            (package / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            source = package / "consumer.py"
+            source.write_text("from . import module\n", encoding="utf-8")
+
+            result = run_tool(
+                str(CODE_SCAN),
+                "--root",
+                str(root),
+                str(source),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "CODE_DEPENDENCY\tpython\tfrom-import-symbol\tpkg/consumer.py\tpkg/module.py\t.module",
+                result.stdout,
+            )
+            self.assertIn("CODE_DEPENDENCY_SCAN=pass files=1", result.stdout)
+
+    def test_code_scan_extracts_c_family_local_includes(self) -> None:
+        """The code dependency scanner resolves local C/C++ includes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            include = root / "include"
+            include.mkdir()
+            header = include / "api.hpp"
+            source = root / "main.cpp"
+            header.write_text("#pragma once\n", encoding="utf-8")
+            source.write_text('#include "include/api.hpp"\n', encoding="utf-8")
+
+            result = run_tool(
+                str(CODE_SCAN),
+                "--root",
+                str(root),
+                str(source),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "CODE_DEPENDENCY\tc-family\tinclude\tmain.cpp\tinclude/api.hpp\tinclude/api.hpp",
+                result.stdout,
+            )
 
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""

@@ -11,7 +11,8 @@ upstream design ./catalog.yaml registers this public skill
 
 ## Purpose
 
-依存 manifest の header / scan / format / graph tool を、changed-file gate、個別 file review、full-repo migration inventory の目的に分けて起動します。
+依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
+code dependency と header dependency は別 evidence として扱います。
 
 ## Use When
 
@@ -19,8 +20,15 @@ upstream design ./catalog.yaml registers this public skill
 - `@dependency-start` / `@dependency-end` block を追加・修正した
 - dependency edge、reverse edge、kind、cycle の問題を診断したい
 - closeout 前に dependency manifest evidence を揃えたい
+- 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
 
 ## Required Commands
+
+Code dependency surface:
+
+```bash
+bash tools/agent_tools/scan_code_dependencies.sh --changed
+```
 
 Changed-file gate:
 
@@ -51,6 +59,8 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 
 ## Interpretation
 
+- code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。
+- 修正箇所を選ぶ task では、先に `scan_code_dependencies.sh` で実コード依存を抜き、次に header dependency graph で読むべき design / docs / tests を確認します。
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
@@ -60,5 +70,6 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ## Core References
 
 - `documents/dependency-manifest-design.md`
+- `agents/workflows/hypothesis-validation-workflow.md`
 - `agents/canonical/CODEX_WORKFLOW.md`
 - `agents/templates/closeout_gate.md`

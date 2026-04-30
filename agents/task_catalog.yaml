@@ -17,6 +17,7 @@ workflow_families:
         - Include request_clause_ids, expected artifact path, write scope, validation command, and next review gate in every handoff.
       workflow_focus:
         - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates.
+        - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
         - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
       reviewer_prompt:
@@ -59,6 +60,7 @@ workflow_families:
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
       workflow_focus:
         - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
+        - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
         - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
         - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
       reviewer_prompt:
@@ -115,6 +117,7 @@ workflow_families:
         - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
       workflow_focus:
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
+        - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
         - Sweep stale references after renames or structure changes before closeout.
       reviewer_prompt:
@@ -199,6 +202,7 @@ workflow_families:
         - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
       workflow_focus:
         - Review the whole repository, not only the local diff; keep root adapters thin and shared canon authoritative.
+        - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
         - Preserve single-writer discipline; additional agents are read-only unless a separate worktree is explicitly planned.
       reviewer_prompt:

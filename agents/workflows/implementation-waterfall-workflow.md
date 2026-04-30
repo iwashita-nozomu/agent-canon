@@ -15,6 +15,7 @@ downstream design ../templates/closeout_gate.md records closeout evidence requir
 この repo では workflow family の選択は `agents/TASK_WORKFLOWS.md` を使いますが、実装そのものの進め方はこの文書を共通ルールにします。
 README、workflow、guide、migration 文書のような長文では、加えて `agents/workflows/long-form-writing-workflow.md` を overlay として使います。
 論文、thesis chapter、scholarly note のような学術文章では、`agents/workflows/academic-writing-workflow.md` を優先 overlay として使います。
+原因考察、修正箇所選定、複数候補比較が必要な変更では、`agents/workflows/hypothesis-validation-workflow.md` を overlay として使います。
 
 ## 1. 目的
 
@@ -31,6 +32,7 @@ README、workflow、guide、migration 文書のような長文では、加えて
 - 変更要求 1 件につき 1 回の実装パスを閉じる
 - 差し戻しが必要な場合は、どの段へ戻すかを明示する
 - 新規実装より前に、既存コードと既存の書き方を徹底的に再利用する
+- 考察系 task では、code dependency と header dependency を別 tool で抜き、仮説と修正箇所妥当性を固定してから実装する
 
 ## 2. 文献ベースの判断
 
