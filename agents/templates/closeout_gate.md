@@ -31,6 +31,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
 - mechanical_completion_loop_complete: no
+- subagents_closed: no
 - diff_check_agent_complete: no
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
@@ -57,6 +58,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
 - mechanical_completion_loop_complete: yes
+- subagents_closed: yes
 - diff_check_agent_complete: yes
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
@@ -106,6 +108,17 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - mechanical_loop_commit_push_status:
 - mechanical_loop_canon_sync_status:
 - mechanical_loop_follow_up_status:
+
+## Subagent Lifecycle Evidence
+
+<!-- Record run-local subagent lifecycle evidence before user-facing completion. New user requests must use fresh subagents, not send_input to agents created for prior tasks. Stage-wave agents that are no longer needed must be closed before closeout. This section is intentionally about run-local subagents; if a task is trivial and used no subagents, record close_agent_evidence as parent_direct_no_subagents plus the run-bundle reason. -->
+
+- fresh_subagents_required:
+- reuse_for_new_task:
+- previous_task_subagent_reuse:
+- subagent_closeout_status:
+- open_subagent_instances:
+- close_agent_evidence:
 
 ## Diff-Check Agent Evidence
 

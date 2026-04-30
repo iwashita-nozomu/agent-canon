@@ -47,6 +47,9 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
 - 同時 write-capable subagent は常に 1 体までです
+- 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
+- `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
+- closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
 ## MCP Inventory
 

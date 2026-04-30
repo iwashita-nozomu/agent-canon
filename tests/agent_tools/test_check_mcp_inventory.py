@@ -102,7 +102,7 @@ class McpInventoryCheckTest(unittest.TestCase):
         self.assertIn("NEXT_ACTION=configure_required_mcp_servers_before_work", result.stdout)
 
     def test_missing_inventory_reports_ignored_project_config(self) -> None:
-        """If .codex/config.toml declares the server, an empty inventory means config loading broke."""
+        """Report likely config loading failure when project config declares the MCP."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             codex = self.write_fake_codex(root, "[]")
@@ -137,8 +137,14 @@ class McpInventoryCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("PROJECT_CODEX_CONFIG_DECLARES_MISSING_MCP=yes", result.stdout)
-        self.assertIn("LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted", result.stdout)
-        self.assertIn("NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work", result.stdout)
+        self.assertIn(
+            "LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted",
+            result.stdout,
+        )
+        self.assertIn(
+            "NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work",
+            result.stdout,
+        )
 
     def test_nested_codex_transport_shape_is_supported(self) -> None:
         """Current Codex JSON nests command and enabled status under transport/root fields."""

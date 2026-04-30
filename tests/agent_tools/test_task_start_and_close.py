@@ -72,6 +72,14 @@ def ready_closeout_evidence_lines(
         "- mechanical_loop_canon_sync_status: complete",
         "- mechanical_loop_follow_up_status: none",
         "",
+        "## Subagent Lifecycle Evidence",
+        "- fresh_subagents_required: yes",
+        "- reuse_for_new_task: forbidden",
+        "- previous_task_subagent_reuse: none",
+        "- subagent_closeout_status: closed",
+        "- open_subagent_instances: none",
+        "- close_agent_evidence: parent_direct_no_open_subagents",
+        "",
         "## Diff-Check Agent Evidence",
         "- diff_check_agent_role: reviewer",
         "- diff_check_agent_decision: approve",
@@ -240,6 +248,7 @@ def write_ready_closeout_bundle(
                 "- review_findings_integrated: yes",
                 "- post_fix_full_review_complete: yes",
                 "- mechanical_completion_loop_complete: yes",
+                "- subagents_closed: yes",
                 "- diff_check_agent_complete: yes",
                 "- canonical_tree_head_complete: yes",
                 "- agent_evaluation_complete: yes",
@@ -314,7 +323,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
-            self.assertIn("/docker/README.md", result.stdout)
+            self.assertNotIn("/docker/README.md", result.stdout)
             self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
@@ -405,7 +414,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
-            self.assertIn("/docker/README.md", result.stdout)
+            self.assertNotIn("/docker/README.md", result.stdout)
             self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", result.stdout)
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
@@ -417,7 +426,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn(str(report_dir / "design_brief.md"), manifest_text)
             self.assertIn("/documents/REVIEW_PROCESS.md", manifest_text)
             self.assertIn("/notes/guardrails/README.md", manifest_text)
-            self.assertIn("/docker/README.md", manifest_text)
+            self.assertNotIn("/docker/README.md", manifest_text)
             self.assertIn("/agents/workflows/implementation-waterfall-workflow.md", manifest_text)
 
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
@@ -464,7 +473,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ).read_text(encoding="utf-8")
             self.assertIn("workflow_family:", manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
+            self.assertIn("subagent_lifecycle_policy:", manifest_text)
+            self.assertIn("fresh_subagents_required: true", manifest_text)
+            self.assertIn("reuse_for_new_task: forbidden", manifest_text)
+            self.assertIn("previous_task_subagent_reuse: forbidden", manifest_text)
             self.assertIn("prompt_contract:", manifest_text)
+            self.assertIn("subagent_lifecycle_policy", manifest_text)
 
     def test_all_task_ids_bootstrap_with_prompt_packet(self) -> None:
         """Every catalog task should create a workflow-specific subagent prompt packet."""
@@ -512,6 +526,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 self.assertIn("prompt_preamble:", manifest_text)
                 self.assertIn("workflow_focus:", manifest_text)
                 self.assertIn("reviewer_prompt:", manifest_text)
+                self.assertIn("subagent_lifecycle_policy:", manifest_text)
+                self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
                 self.assertIn("prompt_contract:", manifest_text)
 
     def test_task_close_rejects_locked_bundle(self) -> None:
@@ -634,6 +650,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
@@ -757,6 +774,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
@@ -794,6 +812,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
             self.assertIn("MECHANICAL_COMPLETION_LOOP_COMPLETE=yes", result.stdout)
+            self.assertIn("SUBAGENTS_CLOSED=yes", result.stdout)
             self.assertIn("DIFF_CHECK_AGENT_COMPLETE=yes", result.stdout)
             self.assertIn("CANONICAL_TREE_HEAD_COMPLETE=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
@@ -811,8 +830,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             closeout_path.write_text(
                 closeout_text.replace(
                     "- mechanical_completion_loop_complete: yes\n"
+                    "- subagents_closed: yes\n"
                     "- diff_check_agent_complete: yes",
                     "- mechanical_completion_loop_complete: no\n"
+                    "- subagents_closed: no\n"
                     "- diff_check_agent_complete: no",
                 ),
                 encoding="utf-8",
@@ -836,6 +857,44 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("mechanical_completion_loop_complete", result.stdout)
             self.assertIn("diff_check_agent_complete", result.stdout)
+
+    def test_task_close_rejects_missing_subagent_lifecycle_evidence(self) -> None:
+        """task_close should fail when run-local subagent close evidence is missing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-subagent-lifecycle"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8")
+                .replace("- subagents_closed: yes", "- subagents_closed: no")
+                .replace(
+                    "- close_agent_evidence: parent_direct_no_open_subagents",
+                    "- close_agent_evidence: none",
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("subagents_closed", result.stdout)
+            self.assertIn("close_agent_evidence", result.stdout)
 
     def test_task_close_rejects_missing_diff_check_artifact(self) -> None:
         """task_close should fail when diff-check evidence points to a missing artifact."""
@@ -1164,6 +1223,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
@@ -1276,6 +1336,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
@@ -1367,6 +1428,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: no",
                         "- agent_evaluation_complete: yes",
@@ -1478,6 +1540,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
                         "- mechanical_completion_loop_complete: yes",
+                        "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",

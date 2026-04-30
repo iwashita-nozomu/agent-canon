@@ -21,3 +21,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. If `IMPLEMENTATION_CODEX_AGENTS` starts with `spark_worker,worker`, send approved, design-traced, low-risk implementation slices to `spark_worker` first.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
 1. Use one writer per worktree. If multiple writers are necessary, split worktrees before implementation.
+1. For each new user request, start fresh run-local subagents; do not `send_input` a new task into subagents from a previous request.
+1. Include `team_manifest.yaml` `run.subagent_lifecycle_policy` in every subagent handoff prompt, especially `fresh_subagents_required: true` and `reuse_for_new_task: forbidden`.
+1. Before closeout, close run-local subagents and record `subagents_closed=yes` plus `Subagent Lifecycle Evidence` in `closeout_gate.md`.

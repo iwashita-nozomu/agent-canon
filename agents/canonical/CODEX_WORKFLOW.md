@@ -479,6 +479,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` の static analysis evidence が無い completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` が揃い、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断が構造化 loop evidence として残るまで completion report を出さない
+- `closeout_gate.md` の `subagents_closed=yes` が揃い、run-local subagent が閉じられ、新規 user request で前 task の subagent を使い回していないことが `Subagent Lifecycle Evidence` に残るまで completion report を出さない
 - `closeout_gate.md` の `diff_check_agent_complete=yes` が揃い、run-local diff-check artifact が read-only independent agent、latest diff ref、`approve` decision、findings disposition を示すまで completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
 - `workflow_monitoring.md` の signals / interventions / improvement decisions が埋まり、skill / config / workflow / memory の改善判断が `applied`、`recorded`、`not_applicable` のいずれかになるまで、workflow 監視が未完了の completion report を出さない

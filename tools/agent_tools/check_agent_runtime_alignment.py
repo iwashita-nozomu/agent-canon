@@ -392,6 +392,15 @@ def validate_bundle_outputs() -> None:
                 f"task {task_id} manifest missing subagent_prompt_packet",
             )
             ensure(
+                "subagent_lifecycle_policy:" in manifest_text,
+                f"task {task_id} manifest missing subagent_lifecycle_policy",
+            )
+            ensure(
+                "fresh_subagents_required: true" in manifest_text
+                and "reuse_for_new_task: forbidden" in manifest_text,
+                f"task {task_id} manifest missing fresh subagent lifecycle policy",
+            )
+            ensure(
                 "prompt_contract:" in manifest_text,
                 f"task {task_id} manifest missing role prompt_contract",
             )

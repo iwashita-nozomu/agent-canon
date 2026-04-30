@@ -180,6 +180,9 @@ def main() -> int:
     mechanical_loop = parse_markdown_status_section(
         closeout_path, "Mechanical Completion Loop Evidence"
     )
+    subagent_lifecycle = parse_markdown_status_section(
+        closeout_path, "Subagent Lifecycle Evidence"
+    )
     diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
     diff_check_artifact_path = resolve_run_artifact(
         report_dir, diff_check.get("diff_check_artifact", "")
@@ -219,6 +222,7 @@ def main() -> int:
             "mechanical_completion_loop_complete"
         )
         == "yes",
+        "subagents_closed": closeout.get("subagents_closed") == "yes",
         "mechanical_loop_iterations": mechanical_loop.get("mechanical_loop_iterations", "")
         not in {"", "0", "none"},
         "mechanical_loop_open_items": mechanical_loop.get("mechanical_loop_open_items")
@@ -257,6 +261,20 @@ def main() -> int:
             "mechanical_loop_follow_up_status"
         )
         in {"none", "resolved"},
+        "fresh_subagents_required": subagent_lifecycle.get("fresh_subagents_required")
+        == "yes",
+        "reuse_for_new_task": subagent_lifecycle.get("reuse_for_new_task")
+        == "forbidden",
+        "previous_task_subagent_reuse": subagent_lifecycle.get(
+            "previous_task_subagent_reuse"
+        )
+        in {"none", "forbidden"},
+        "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
+        == "closed",
+        "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")
+        == "none",
+        "close_agent_evidence": subagent_lifecycle.get("close_agent_evidence", "")
+        not in {"", "none", "missing"},
         "diff_check_agent_complete": closeout.get("diff_check_agent_complete") == "yes",
         "diff_check_agent_role": diff_check.get("diff_check_agent_role", "")
         not in {"", "parent", "self", "codex"},
@@ -334,6 +352,7 @@ def main() -> int:
         "MECHANICAL_COMPLETION_LOOP_COMPLETE="
         f"{closeout.get('mechanical_completion_loop_complete', '')}"
     )
+    print(f"SUBAGENTS_CLOSED={closeout.get('subagents_closed', '')}")
     print(f"MECHANICAL_LOOP_ITERATIONS={mechanical_loop.get('mechanical_loop_iterations', '')}")
     print(f"MECHANICAL_LOOP_OPEN_ITEMS={mechanical_loop.get('mechanical_loop_open_items', '')}")
     print(
@@ -347,6 +366,26 @@ def main() -> int:
     print(
         "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS="
         f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+    )
+    print(
+        "SUBAGENT_FRESH_REQUIRED="
+        f"{subagent_lifecycle.get('fresh_subagents_required', '')}"
+    )
+    print(
+        "SUBAGENT_REUSE_FOR_NEW_TASK="
+        f"{subagent_lifecycle.get('reuse_for_new_task', '')}"
+    )
+    print(
+        "SUBAGENT_PREVIOUS_TASK_REUSE="
+        f"{subagent_lifecycle.get('previous_task_subagent_reuse', '')}"
+    )
+    print(
+        "SUBAGENT_CLOSEOUT_STATUS="
+        f"{subagent_lifecycle.get('subagent_closeout_status', '')}"
+    )
+    print(
+        "SUBAGENT_OPEN_INSTANCES="
+        f"{subagent_lifecycle.get('open_subagent_instances', '')}"
     )
     print(f"DIFF_CHECK_AGENT_COMPLETE={closeout.get('diff_check_agent_complete', '')}")
     print(f"DIFF_CHECK_AGENT_ROLE={diff_check.get('diff_check_agent_role', '')}")
