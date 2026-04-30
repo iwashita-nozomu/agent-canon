@@ -154,6 +154,26 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
+    def test_format_require_header_skips_agent_run_artifacts(self) -> None:
+        """Run-bundle artifacts are workflow evidence, not product manifest surface."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report = root / "reports" / "agents" / "run-1" / "verification.txt"
+            report.parent.mkdir(parents=True)
+            report.write_text("status=pass\n", encoding="utf-8")
+
+            result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                "--require-header",
+                str(report),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
     def test_format_rejects_invalid_direction(self) -> None:
         """The format checker rejects unknown directions."""
         with tempfile.TemporaryDirectory() as tmp_dir:

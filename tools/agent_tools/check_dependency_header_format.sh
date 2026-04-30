@@ -61,6 +61,17 @@ is_checkable_suffix() {
   esac
 }
 
+is_skip_path() {
+  case "$1" in
+    .git/*|.pytest_cache/*|.ruff_cache/*|reports/agents/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 collect_paths() {
   if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
     printf '%s\n' "${INPUT_PATHS[@]}"
@@ -218,6 +229,10 @@ failures=0
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
   path="${raw_path#./}"
+  if [[ "$path" = /* ]]; then
+    path="$(realpath -m --relative-to="$ROOT_DIR" "$path")"
+  fi
+  is_skip_path "$path" && continue
   if ! check_file "$path"; then
     failures=$((failures + 1))
   fi

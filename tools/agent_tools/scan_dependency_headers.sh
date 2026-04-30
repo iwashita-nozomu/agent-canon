@@ -108,6 +108,9 @@ skipped=0
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
   path="${raw_path#./}"
+  if [[ "$path" = /* ]]; then
+    path="$(realpath -m --relative-to="$ROOT_DIR" "$path")"
+  fi
   [[ -f "$path" && ! -L "$path" ]] || { skipped=$((skipped + 1)); continue; }
   is_skip_path "$path" && { skipped=$((skipped + 1)); continue; }
   is_checkable_suffix "$path" || { skipped=$((skipped + 1)); continue; }
