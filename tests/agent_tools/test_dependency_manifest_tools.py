@@ -2,11 +2,11 @@
 
 # @dependency-start
 # responsibility Tests dependency manifest shell tool behavior.
-# upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
-# upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest markers
+# upstream design ../../documents/dependency-manifest-design.md manifest design
+# upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps review
+# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
 # @dependency-end
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
 FORMAT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_header_format.sh"
 GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
 REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
+WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
+AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -209,7 +211,14 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(str(GRAPH), "--root", str(root), str(a), str(b), root=root)
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                str(a),
+                str(b),
+                root=root,
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_GRAPH=pass", result.stdout)
@@ -247,7 +256,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "# @dependency-start",
-                        "# responsibility Defines source a for reverse-edge validation.",
+                        "# responsibility Defines source a for reverse validation.",
                         "# downstream implementation b.py b consumes a",
                         "# @dependency-end",
                         "",
@@ -302,17 +311,30 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(str(GRAPH), "--root", str(root), str(a), str(b), root=root)
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                str(a),
+                str(b),
+                root=root,
+            )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cycle includes", result.stdout)
             self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
 
     def test_repo_review_runs_all_dependency_tools(self) -> None:
-        """The review wrapper applies dependency tools to all tracked checkable files."""
+        """The wrapper applies dependency tools to tracked checkable files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             tool_dir = root / "tools" / "agent_tools"
             tool_dir.mkdir(parents=True)
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
@@ -364,11 +386,93 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
-    def test_repo_review_reports_missing_manifests_without_failing_by_default(self) -> None:
+    def test_repo_review_records_monitoring_when_report_dir_is_given(self) -> None:
+        """The review wrapper records monitoring evidence when directed to a run."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
+            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
+            target = root / "target.md"
+            source = root / "source.md"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines target test fixture context.",
+                        "downstream design source.md source reads target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines source test fixture context.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "target.md", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = root / "reports" / "agents" / "run-3"
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--report-dir",
+                str(report_dir),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("repo_dependency_review=pass", text)
+            self.assertIn(
+                "run_repo_dependency_review.sh recorded dependency review pass",
+                text,
+            )
+
+    def test_repo_review_reports_missing_manifests_by_default(self) -> None:
         """The repo-wide wrapper keeps missing headers report-only during migration."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             tool_dir = root / "tools" / "agent_tools"
             tool_dir.mkdir(parents=True)
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
@@ -395,7 +499,13 @@ class DependencyManifestToolTest(unittest.TestCase):
         """Strict mode fails when tracked checkable files lack manifests."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             tool_dir = root / "tools" / "agent_tools"
             tool_dir.mkdir(parents=True)
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
@@ -411,7 +521,13 @@ class DependencyManifestToolTest(unittest.TestCase):
                 text=True,
             )
 
-            result = run_tool(str(REPO_REVIEW), "--root", str(root), "--fail-missing", root=root)
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                root=root,
+            )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=source.md", result.stdout)
