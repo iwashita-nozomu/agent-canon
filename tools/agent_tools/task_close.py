@@ -268,7 +268,7 @@ def main() -> int:
         "previous_task_subagent_reuse": subagent_lifecycle.get(
             "previous_task_subagent_reuse"
         )
-        in {"none", "forbidden"},
+        == "none",
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
         == "closed",
         "open_subagent_instances": subagent_lifecycle.get("open_subagent_instances")

@@ -896,6 +896,41 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("subagents_closed", result.stdout)
             self.assertIn("close_agent_evidence", result.stdout)
 
+    def test_task_close_rejects_policy_value_as_observed_subagent_reuse(self) -> None:
+        """task_close should require observed prior-task subagent reuse to be none."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-policy-value-is-not-observation"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- previous_task_subagent_reuse: none",
+                    "- previous_task_subagent_reuse: forbidden",
+                ),
+                encoding="utf-8",
+            )
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("previous_task_subagent_reuse", result.stdout)
+
     def test_task_close_rejects_missing_diff_check_artifact(self) -> None:
         """task_close should fail when diff-check evidence points to a missing artifact."""
         with tempfile.TemporaryDirectory() as tmp_dir:
