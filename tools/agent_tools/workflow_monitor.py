@@ -78,7 +78,7 @@ def default_monitoring_text(report_dir: Path) -> str:
             "<!--",
             "@dependency-start",
             "responsibility Records workflow monitoring for this run bundle.",
-            "upstream design ../../../../vendor/agent-canon/agents/templates/"
+            "upstream design ../../../agents/templates/"
             "workflow_monitoring.md template",
             "@dependency-end",
             "-->",
