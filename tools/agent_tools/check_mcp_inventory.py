@@ -4,7 +4,7 @@
 # upstream implementation ../../.codex/config.toml declares repo_mcp_server launcher
 # upstream design ../../.codex/README.md documents MCP inventory preflight
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md requires MCP preflight
-# downstream implementation ../../tests/agent_tools/test_check_mcp_inventory.py tests inventory checks
+# downstream implementation ../../tests/agent_tools/test_check_mcp_inventory.py tests it
 # @dependency-end
 """Check that required Codex MCP servers are visible in the configured inventory."""
 
@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+
+from workflow_monitor import append_monitoring
 
 
 @dataclass(frozen=True)
@@ -33,7 +36,9 @@ class McpServer:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
-        description="Fail closed when required Codex MCP servers are absent from inventory."
+        description=(
+            "Fail closed when required Codex MCP servers are absent from inventory."
+        )
     )
     parser.add_argument(
         "--require",
@@ -51,7 +56,42 @@ def build_parser() -> argparse.ArgumentParser:
         default="codex",
         help="Codex CLI binary to execute.",
     )
+    parser.add_argument("--report-dir", help="Run bundle directory to update.")
+    parser.add_argument("--run-id", help="Run id under reports/agents/.")
+    parser.add_argument(
+        "--report-root",
+        help="Optional report root. Defaults to ./reports/agents.",
+    )
     return parser
+
+
+def monitoring_report_dir(args: argparse.Namespace) -> Path | None:
+    """Return the run bundle that should receive monitoring evidence."""
+    report_dir = args.report_dir or os.environ.get("AGENT_RUN_REPORT_DIR")
+    if report_dir:
+        return Path(str(report_dir)).resolve()
+    run_id = args.run_id or os.environ.get("AGENT_RUN_ID")
+    if not run_id:
+        return None
+    report_root = Path(
+        str(
+            args.report_root
+            or os.environ.get("AGENT_RUN_REPORT_ROOT", "reports/agents")
+        )
+    )
+    return (report_root / str(run_id)).resolve()
+
+
+def record_monitoring(args: argparse.Namespace, status: str, detail: str) -> None:
+    """Best-effort append of MCP preflight evidence."""
+    report_dir = monitoring_report_dir(args)
+    if report_dir is None:
+        return
+    append_monitoring(
+        report_dir,
+        signals=[f"mcp_inventory={status}: {detail}"],
+        interventions=[f"check_mcp_inventory.py recorded MCP inventory {status}"],
+    )
 
 
 def load_inventory(codex_bin: str) -> list[McpServer]:
@@ -68,7 +108,9 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
     try:
         inventory_data = cast(object, json.loads(result.stdout))
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"`{codex_bin} mcp list --json` returned invalid JSON") from exc
+        raise RuntimeError(
+            f"`{codex_bin} mcp list --json` returned invalid JSON"
+        ) from exc
     if not isinstance(inventory_data, list):
         raise RuntimeError("Codex MCP inventory JSON must be a list")
     raw_servers = cast(list[object], inventory_data)
@@ -84,7 +126,12 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
         enabled = server_data.get("enabled")
         status = server_data.get("status")
         if not isinstance(status, str):
-            status = "enabled" if enabled is True else "disabled" if enabled is False else ""
+            if enabled is True:
+                status = "enabled"
+            elif enabled is False:
+                status = "disabled"
+            else:
+                status = ""
         command = server_data.get("command")
         raw_args = server_data.get("args")
         transport = server_data.get("transport")
@@ -97,7 +144,11 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
             if not isinstance(raw_args, list):
                 raw_args = transport_data.get("args")
         parsed_args = (
-            tuple(item for item in cast(list[object], raw_args) if isinstance(item, str))
+            tuple(
+                item
+                for item in cast(list[object], raw_args)
+                if isinstance(item, str)
+            )
             if isinstance(raw_args, list)
             else ()
         )
@@ -138,11 +189,19 @@ def launcher_errors(server: McpServer, root: Path) -> list[str]:
     if not server.command:
         return [f"{server.name}: missing launcher command"]
     if "/" in server.command:
-        command_path = (root / server.command).resolve() if not Path(server.command).is_absolute() else Path(server.command)
+        command_path = (
+            (root / server.command).resolve()
+            if not Path(server.command).is_absolute()
+            else Path(server.command)
+        )
         if not command_path.exists():
-            errors.append(f"{server.name}: launcher command path not found: {server.command}")
+            errors.append(
+                f"{server.name}: launcher command path not found: {server.command}"
+            )
     elif shutil.which(server.command) is None:
-        errors.append(f"{server.name}: launcher command not found on PATH: {server.command}")
+        errors.append(
+            f"{server.name}: launcher command not found on PATH: {server.command}"
+        )
 
     for arg in server.args:
         if arg.startswith("-") or "/" not in arg:
@@ -172,6 +231,7 @@ def main() -> int:
     except RuntimeError as exc:
         print("MCP_INVENTORY=fail")
         print(f"MCP_INVENTORY_ERROR={exc}")
+        record_monitoring(args, "fail", str(exc))
         return 1
 
     render_servers(servers)
@@ -187,10 +247,18 @@ def main() -> int:
             print(f"PROJECT_CONFIG_MCP_SERVERS={','.join(sorted(project_config_names))}")
             print("LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted")
             print("NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work")
+            record_monitoring(
+                args,
+                "fail",
+                f"missing={','.join(missing)} likely_cause=project_config_not_loaded",
+            )
             return 1
         print("NEXT_ACTION=configure_required_mcp_servers_before_work")
+        record_monitoring(args, "fail", f"missing={','.join(missing)}")
         return 1
-    required_servers = [server for server in servers if server.name in set(args.require)]
+    required_servers = [
+        server for server in servers if server.name in set(args.require)
+    ]
     launcher_issues = [
         issue
         for server in required_servers
@@ -201,13 +269,24 @@ def main() -> int:
         for issue in launcher_issues:
             print(f"MCP_LAUNCHER_ERROR={issue}")
         print("NEXT_ACTION=fix_required_mcp_launcher_before_work")
+        record_monitoring(
+            args,
+            "fail",
+            "launcher_errors=" + "; ".join(launcher_issues),
+        )
         return 1
     if not servers and not args.allow_empty and not args.require:
         print("MCP_INVENTORY=fail")
         print("MCP_INVENTORY_EMPTY=yes")
         print("NEXT_ACTION=pass_--allow-empty_or_--require_expected_servers")
+        record_monitoring(args, "fail", "empty_inventory_without_allowance")
         return 1
     print("MCP_INVENTORY=pass")
+    record_monitoring(
+        args,
+        "pass",
+        f"servers={','.join(sorted(configured_names)) or 'none'}",
+    )
     return 0
 
 

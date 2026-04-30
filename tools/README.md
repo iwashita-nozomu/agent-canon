@@ -61,6 +61,16 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 `task_close.py` requires `agent_evaluation.md` to report `evaluation_status: pass`, `feedback_actions_resolved: yes`, and `learning_capture_complete: yes`.
 `workflow_monitoring.md` is the in-workflow monitoring artifact consumed by the evaluation. Keep it current during the run, not only at closeout.
+`workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
+`bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
+
+```bash
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --signal "skills=$agent-orchestration,$codex-task-workflow" \
+  --intervention "spawned fresh reviewer" \
+  --decision workflow_improvement_decision=applied
+```
 
 ## Dependency Manifest Tools
 
