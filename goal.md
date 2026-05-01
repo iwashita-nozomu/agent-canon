@@ -12,7 +12,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 - goal_status: active
 - run_safety_cap: 5
-- current_iteration: 7
+- current_iteration: 8
 - active_run_id: 20260501-oop-readability-loop
 - stop_reason:
 
@@ -57,6 +57,9 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B20: Continue with iteration 7 using subagent-supported candidate selection.
 - [x] B21: Rerun the all-code OOP readability evaluation after iteration 7.
 - [x] B22: Record remaining backlog and explicit continue/stop decision.
+- [x] B23: Continue with iteration 8 using subagent-supported candidate selection.
+- [x] B24: Rerun the all-code OOP readability evaluation after iteration 8.
+- [x] B25: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -151,3 +154,20 @@ behavior, public API semantics, or numerical algorithms.
   reviewer approval, and `make ci` passed. The loop remains active because
   `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`, `kokkos_backend.hpp`,
   and remaining info-only C++ surfaces still dominate the hotspot ranking.
+- iteration 8: continue from the pushed iteration 7 baseline. Candidate
+  selection should prefer the highest remaining behavior-preserving hotspot and
+  keep C++ surfaces in scope unless the next best risk reduction is clearly in
+  AgentCanon tooling.
+- iteration 8 result: C++ Smolyak device batch kernels now take one internal
+  `SmolyakBatchKernelViews` value object instead of repeated wide view/count
+  signatures for materialize, reduce, and finalize. Public integrator API,
+  Kokkos backend selection, team policies, reduction order, and numerical
+  scheduling remain unchanged. Source-tree OOP findings decreased from 817 to
+  816, warn findings decreased from 305 to 303, and `smolyak.hpp` decreased
+  from 29 to 28.
+- iteration 8 validation: targeted Smolyak/backend build, Smolyak/backend plus
+  package-consumer ctests, affected-surface code dependency scan, repo
+  dependency review, C++ reviewer approval, and `make ci` passed. The loop
+  remains active because `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`,
+  `kokkos_backend.hpp`, and remaining native info surfaces still dominate the
+  hotspot ranking.
