@@ -126,6 +126,9 @@ upstream design README.md memory surface index
 - 2026-04-29 | ファイルや path の欠落を見つけたときは、再作成や欠落判定の前に template root と shared agent-canon を確認してほしい。
   - source: chat
 
+- 2026-05-01 | ファイル横断実装では自前実装を最後の手段にし、既存 helper/tool/workflow/fixture の再利用・拡張を優先する。新規追加時は Reuse Survey と既存では足りない理由を残す。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
