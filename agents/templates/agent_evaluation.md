@@ -3,7 +3,6 @@
 <!--
 @dependency-start
 responsibility Documents Agent Evaluation for this repository.
-upstream design ../workflows/agent-learning-workflow.md agent feedback workflow
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py generates concrete evaluations
 downstream implementation ../../tools/agent_tools/task_close.py enforces pass status before user completion
 @dependency-end
