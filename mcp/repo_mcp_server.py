@@ -157,10 +157,11 @@ def handle_request(message: Mapping[str, Any]) -> None:
         return
 
     if method == "initialize":
-        params = message.get("params")
+        params_obj: object = message.get("params")
         protocol_version = "2024-11-05"
-        if isinstance(params, Mapping):
-            protocol_version_value = params.get("protocolVersion")
+        if isinstance(params_obj, Mapping):
+            params = cast(Mapping[str, object], params_obj)
+            protocol_version_value: object = params.get("protocolVersion")
             if isinstance(protocol_version_value, str):
                 protocol_version = protocol_version_value
         send(
@@ -185,18 +186,21 @@ def handle_request(message: Mapping[str, Any]) -> None:
         return
 
     if method == "tools/call":
-        params = message.get("params")
-        tool_params = cast(Mapping[str, Any], params) if isinstance(params, Mapping) else {}
-        name = tool_params.get("name")
-        arguments = tool_params.get("arguments", {})
+        params_obj = message.get("params")
+        tool_params: Mapping[str, object] = {}
+        if isinstance(params_obj, Mapping):
+            tool_params = cast(Mapping[str, object], params_obj)
+        name: object = tool_params.get("name")
+        arguments: object = tool_params.get("arguments", {})
         if not isinstance(name, str):
             send_error(request_id, -32602, "tools/call requires params.name")
             return
-        if not isinstance(arguments, dict):
+        if not isinstance(arguments, Mapping):
             send_error(request_id, -32602, "tools/call params.arguments must be an object")
             return
+        tool_arguments = cast(Mapping[str, Any], arguments)
         try:
-            result = call_tool(name, arguments)
+            result = call_tool(name, tool_arguments)
         except KeyError:
             send_error(request_id, -32602, f"unknown tool: {name}")
             return
