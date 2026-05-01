@@ -1,7 +1,6 @@
 # @dependency-start
 # responsibility Defines deterministic run-bundle evals for observable agent behavior.
 # upstream design README.md eval directory contract
-# upstream design ../workflows/agent-learning-workflow.md agent behavior feedback workflow
 # upstream design ../templates/workflow_monitoring.md stores behavior events during a run
 # downstream implementation ../../tools/agent_tools/evaluate_agent_run.py consumes these criteria
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies behavior scoring
