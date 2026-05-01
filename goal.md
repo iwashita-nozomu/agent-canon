@@ -30,8 +30,8 @@ behavior, public API semantics, or numerical algorithms.
 - [x] G2: Code dependency extraction is reviewed with `bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.
 - [x] G3: OOP/readability analysis is run over all code paths before and after the current iteration with the same path set and threshold.
 - [x] G4: The current iteration reduces accepted OOP findings or score-risk concentration without adding behavior changes.
-- [ ] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
-- [ ] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
+- [x] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
+- [x] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
 
 ## Backlog
 
@@ -41,7 +41,7 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B4: Rerun iteration 1 all-code OOP readability evaluation and compare baseline versus final counts.
 - [x] B5: Continue with iteration 2 on the next highest accepted hotspot cluster.
 - [x] B6: Rerun the all-code OOP readability evaluation after iteration 2.
-- [ ] B7: Record remaining backlog and explicit continue/stop decision.
+- [x] B7: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -57,3 +57,9 @@ behavior, public API semantics, or numerical algorithms.
   target file decreased from 52 to 50. Decision state is `backlog_continue`;
   the loop remains open for validation, commit / push, and the next backlog
   item.
+- iteration 2 validation: `cmake --build build --target
+  native_autodiff_bridge_pass_test native_autodiff_pipeline_smoke
+  native_autodiff_clang_normalization_smoke`, matching `ctest` compiler-pass
+  subset, repo dependency review, and `make ci` passed. Next backlog remains
+  open; likely targets are `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`,
+  or `kokkos_backend.hpp`. `goal_status` stays `active`.
