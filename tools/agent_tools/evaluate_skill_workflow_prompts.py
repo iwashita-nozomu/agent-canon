@@ -122,7 +122,7 @@ def expand_eval_entry(
         return (
             PromptEval(
                 eval_id=eval_id,
-                target=root / str(entry["target"]),
+                target=resolve_target(root, str(entry["target"])),
                 kind=kind,
                 description=description,
                 checklist=checklist,
@@ -154,6 +154,17 @@ def expand_eval_entry(
         )
         for path in paths
     )
+
+
+def resolve_target(root: Path, target: str) -> Path:
+    """Resolve a prompt target in source or vendored snapshot layouts."""
+    direct = root / target
+    if direct.exists():
+        return direct
+    vendored = root / "vendor" / "agent-canon" / target
+    if vendored.exists():
+        return vendored
+    return direct
 
 
 def load_checklist_item(entry: object, eval_id: str) -> ChecklistItem:
