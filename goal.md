@@ -30,8 +30,8 @@ behavior, public API semantics, or numerical algorithms.
 - [x] G2: Code dependency extraction is reviewed with `bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.
 - [x] G3: OOP/readability analysis is run over all code paths before and after the current iteration with the same path set and threshold.
 - [x] G4: The current iteration reduces accepted OOP findings or score-risk concentration without adding behavior changes.
-- [ ] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
-- [ ] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
+- [x] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
+- [x] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
 
 ## Backlog
 
@@ -47,7 +47,7 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B10: Record remaining backlog and explicit continue/stop decision.
 - [x] B11: Continue with iteration 4 using subagent-supported candidate selection.
 - [x] B12: Rerun the all-code OOP readability evaluation after iteration 4.
-- [ ] B13: Record remaining backlog and explicit continue/stop decision.
+- [x] B13: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -90,3 +90,8 @@ behavior, public API semantics, or numerical algorithms.
   Targeted Python tests, targeted C++ build/tests, and repo dependency review
   passed. Repo-wide `make ci` is pending until upstream AgentCanon sync can run
   from a clean worktree.
+- iteration 4 validation: upstream AgentCanon was synchronized and pushed to
+  `/mnt/git/agent-canon.git`. `make ci` passed with 171 pytest tests plus 6
+  subtests, pyright, pydocstyle, and ruff. Remaining backlog continues with
+  `PrimitiveDerivativeBridgePass.cpp`, `smolyak.hpp`, `native_autodiff.hpp`,
+  `kokkos_backend.hpp`, and deeper C++/Python readability hotspots.
