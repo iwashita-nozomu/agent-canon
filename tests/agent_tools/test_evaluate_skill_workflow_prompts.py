@@ -13,8 +13,12 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from typing import Any, cast
 
-import tomllib
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python 3.10 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
@@ -45,10 +49,19 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        data = cast(
+            dict[str, Any],
+            tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+                manifest.read_text(encoding="utf-8")
+            ),
+        )
+        evals = cast(list[dict[str, Any]], data["evals"])
 
         globs = {
-            entry.get("target_glob"): entry.get("expected_count") for entry in data["evals"]
+            cast(str | None, entry.get("target_glob")): cast(
+                int | None, entry.get("expected_count")
+            )
+            for entry in evals
         }
 
         self.assertEqual(globs[".agents/skills/*/SKILL.md"], 25)
