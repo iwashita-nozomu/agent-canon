@@ -12,7 +12,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 - goal_status: active
 - run_safety_cap: 5
-- current_iteration: 4
+- current_iteration: 5
 - active_run_id: 20260501-oop-readability-loop
 - stop_reason:
 
@@ -30,8 +30,8 @@ behavior, public API semantics, or numerical algorithms.
 - [x] G2: Code dependency extraction is reviewed with `bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.
 - [x] G3: OOP/readability analysis is run over all code paths before and after the current iteration with the same path set and threshold.
 - [x] G4: The current iteration reduces accepted OOP findings or score-risk concentration without adding behavior changes.
-- [x] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
-- [x] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
+- [ ] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
+- [ ] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
 
 ## Backlog
 
@@ -48,6 +48,9 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B11: Continue with iteration 4 using subagent-supported candidate selection.
 - [x] B12: Rerun the all-code OOP readability evaluation after iteration 4.
 - [x] B13: Record remaining backlog and explicit continue/stop decision.
+- [x] B14: Continue with iteration 5 using subagent-supported candidate selection.
+- [x] B15: Rerun the all-code OOP readability evaluation after iteration 5.
+- [ ] B16: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -95,3 +98,14 @@ behavior, public API semantics, or numerical algorithms.
   subtests, pyright, pydocstyle, and ruff. Remaining backlog continues with
   `PrimitiveDerivativeBridgePass.cpp`, `smolyak.hpp`, `native_autodiff.hpp`,
   `kokkos_backend.hpp`, and deeper C++/Python readability hotspots.
+- iteration 5: loop continues because the objective still has high-risk
+  hotspots. Parent keeps loop state and validation gates; subagents select the
+  next bounded behavior-preserving target before a single write slice starts.
+- iteration 5 update: C++ layout validator refactor in
+  `PrimitiveDerivativeBridgePass.cpp` removed the targeted validator
+  function-length / cognitive-complexity findings. The target file moved from
+  high-risk to moderate-risk; source-tree warn findings dropped from 317 to
+  311 while total info findings rose from 818 to 820. C++ reviewer approved
+  this as risk-concentration reduction. Targeted C++ build/tests and repo
+  dependency review passed. Repo-wide `make ci` is pending until upstream
+  AgentCanon sync can run from a clean worktree.
