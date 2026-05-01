@@ -9,9 +9,23 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "run_repo_program.py"
+
+def resolve_project_root() -> Path:
+    """Return a project root with the repo-program runner and runtime pack files."""
+    for candidate in Path(__file__).resolve().parents:
+        script = candidate / "tools" / "ci" / "run_repo_program.py"
+        default_pack = candidate / "docker" / "packs" / "default.toml"
+        rules = candidate / "docker" / "python-execution-rules.toml"
+        if script.exists() and default_pack.exists() and rules.exists():
+            return candidate
+    raise unittest.SkipTest("repo-program runner tests require template docker runtime files")
+
+
+PROJECT_ROOT = resolve_project_root()
+SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_repo_program.py"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:

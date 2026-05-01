@@ -10,10 +10,20 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_merge_structure.py"
+
+def resolve_script() -> Path:
+    """Return the nearest available check_merge_structure.py script."""
+    for candidate in Path(__file__).resolve().parents:
+        script = candidate / "tools" / "ci" / "check_merge_structure.py"
+        if script.exists():
+            return script
+    raise unittest.SkipTest("check_merge_structure.py is not available in this tree")
+
+
+SCRIPT = resolve_script()
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

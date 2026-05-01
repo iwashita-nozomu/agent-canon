@@ -31,6 +31,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Operating Rules
 
 - 最初に top-level `goal.md` を更新し、今回の `Objective`、`Exit Criteria`、`Backlog`、`Loop Log` を固定します。これを tool 追加や prompt 修正より後回しにせず、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で確認します。
+- repo MCP が利用可能な場合は、各 iteration の開始前と closeout 前に MCP tool `goal.loop_status` を見ます。`NEXT_ACTION=run_next_iteration` の間は次 backlog iteration へ進み、user-facing completion にしません。
 - outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
 - 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
 - iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、明示的な `goal_status: achieved` なしに完了扱いしません。
@@ -43,6 +44,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
+- MCP `goal.loop_status` または `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り loop を閉じません。
 - 改善を採用しないときも、`What We Learned:` を note に残します。
 
 ## Required Records
@@ -66,6 +68,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `Behavior Eval Manifest:`
 - `Behavior Event Log:`
 - `Agent Behavior Eval Result:`
+- `MCP Goal Loop Status:`
 
 ## Boundary
 
