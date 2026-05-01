@@ -90,6 +90,14 @@ Generic canon files should connect to the nearest canon-owned anchor such as `AG
 For analysis-first work, run code dependency extraction and header dependency graph validation separately.
 Use code dependency evidence to understand import/include/source reachability, and header dependency evidence to decide which design, docs, tests, workflow, and environment context must be read before editing.
 
+## Static Design Analysis Tools
+
+- `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
+- `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, and simple cognitive-complexity signals.
+
+These tools are review aids.
+Use them to set baseline / target / actual scores in refactor or design artifacts, then keep human reviewer judgment for behavior, domain correctness, and intentional exceptions.
+
 ## 含めないもの
 
 - clone 直後の repo-local 初期化

@@ -6,6 +6,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror ownership
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./design/protocols.md Protocol and type-boundary placement contract
+downstream implementation ../tools/agent_tools/analyze_oop_readability.py OOP readability score gate
 upstream implementation ../tools/sync_agent_canon.sh root symlink view generation
 @dependency-end
 -->
@@ -23,10 +24,12 @@ Python 固有の型注釈、命名、`Protocol` 配置は
 - OOP は class を増やす技法ではなく、責務と契約の境界を明示するために使います。
 - まず関数、値オブジェクト、既存 `Protocol`、既存 class を再利用し、新しい class は最後に追加します。
 - 状態を持たない処理は class にせず、関数または小さい module-level helper に保ちます。
+- helper は極力、使う関数の内側へ局所内包します。public / module-level helper は domain の射として読める名前と型を持つ場合だけ許可します。
 - 不変の設定、結果、通知は `@dataclass(frozen=True)` などの値オブジェクトで表します。
 - 差し替え境界は具象 class ではなく、最小の振る舞い契約で受けます。
 - 継承は契約の特殊化に限定し、実装共有のための深い継承階層を禁止します。
 - composition を既定にし、所有する部品と lifecycle を明示します。
+- `None` を渡して内部で runtime 分岐する設計より、型、値オブジェクト、`Protocol`、`Optional` を外した別 entrypoint、または variant boundary で静的解析へ委譲します。
 
 ## 規約
 
@@ -63,6 +66,8 @@ Python では `@dataclass(frozen=True)` を既定にします。
 
 mutable object は、進行中の process state、cache、accumulator、resource handle のように更新責務が明確な場合だけ許可します。
 mutable object を使う場合は、どの method が状態を変えるかを docstring または責務コメントで分かるようにします。
+object は必要以上の member を抱えてはいけません。
+member が増える場合は、値オブジェクト、state owner、adapter、service function へ分割できないかを先に確認します。
 
 ### 4. Protocol と抽象境界
 
@@ -102,15 +107,51 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 公開する class は docstring で責務、主要属性、主要 method、利用例を説明します。
 内部 class は先頭 `_` を付け、外部から import される前提にしてはなりません。
 
+### 8. 圏論的な読みやすさ
+
+実装を厳密な圏論で証明する必要はありません。
+ただし、読みやすい OOP 境界は「射」として読める必要があります。
+
+- public function / method は、入力 domain、出力 codomain、失敗境界が型や名前から読める。
+- 純粋な変換 `A -> B` と、IO / mutation / process 起動のような副作用境界を 1 つの関数に混ぜない。
+- 合成可能な小さい変換を作り、巨大な手続きで複数の射を隠さない。
+- `None` による runtime routing を domain の一部として曖昧にせず、別型、別 constructor、別 entrypoint、`Protocol`、variant で表す。
+- helper は外へ増やすより、合成の内側でしか使わない局所関数や内包に閉じる。
+
 ## 禁止事項
 
 - class を単なる namespace として使うことを禁止します。
 - `Manager`、`Helper`、`Util`、`Thing` のように責務が読めない class 名を public API に使うことを禁止します。
+- `helper`、`util`、`misc` のような責務不明名を module-level public function に使うことを禁止します。
 - 継承で実装都合を共有し、置換可能性を説明しないことを禁止します。
 - `Protocol` を具象 class の属性一覧として複製することを禁止します。
 - mutable state を持つ object を、更新責務や lifecycle なしに広く共有することを禁止します。
+- 必要以上の member を object に抱え込み、値オブジェクトや state owner へ分けられる責務を残すことを禁止します。
+- `None` sentinel を渡して内部 runtime 分岐で意味を変える public boundary を禁止します。型で表現できる場合は型で表現します。
 - 旧 class 名と新 class 名を互換 alias で併存させることを禁止します。
 - test double のためだけに production `Protocol` を増やすことを禁止します。
+
+## 機械評価
+
+OOP 的な可読性は reviewer の判断を必要としますが、危険な形は機械的に先に落とします。
+Python / C++ surface では次を baseline として使います。
+
+```bash
+python3 tools/agent_tools/analyze_oop_readability.py python include src tests --min-score 85
+```
+
+この tool は次の risk を検出します。
+
+- `Manager`、`Helper`、`Util`、`Thing` のような責務不明 class 名。
+- 長すぎる function / class、public method 過多、引数過多。
+- Python の instance attribute 過多、static method だけの namespace class、module-level helper bucket、public annotation 欠落。
+- Python の `Optional` / `None` runtime 分岐、純粋変換と副作用の混在。
+- C++ の public field 過多、base class 過多、巨大 function / class、`nullptr` runtime 分岐。
+- control-flow が深く、人間が追う負荷が高い function。
+
+score は設計判断の補助です。
+`OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
+重要な変更では、tool output を `project_reviewer`、`python_reviewer`、`cpp_reviewer` の review input にし、false positive / allowed warning を design artifact に書きます。
 
 ## 例外
 
