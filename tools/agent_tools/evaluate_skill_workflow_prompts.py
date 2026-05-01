@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import re
 import sys
 from dataclasses import dataclass
@@ -128,7 +129,13 @@ def expand_eval_entry(
             ),
         )
     pattern = str(entry["target_glob"])
-    paths = tuple(sorted(path for path in root.glob(pattern) if path.is_file()))
+    paths = tuple(
+        sorted(
+            root / path
+            for path in glob.glob(pattern, root_dir=root)
+            if (root / path).is_file()
+        )
+    )
     if not paths:
         raise ValueError(f"eval {eval_id} target_glob matched no files: {pattern}")
     expected_count = entry.get("expected_count")
