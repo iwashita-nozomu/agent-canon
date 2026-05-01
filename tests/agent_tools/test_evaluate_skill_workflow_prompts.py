@@ -49,9 +49,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data: dict[str, Any] = tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+        data = cast(dict[str, Any], tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
             manifest.read_text(encoding="utf-8")
-        )
+        ))
         evals = cast(list[dict[str, Any]], data["evals"])
 
         globs = {
