@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from report_artifact_checks import (
 )
 
 DEFAULT_MIN_SCORE = 85
+MARKDOWN_COMMENT_PATTERN = re.compile(r"<!--.*?-->", flags=re.DOTALL)
 REQUIRED_ARTIFACTS = (
     "user_request_contract.md",
     "schedule.md",
@@ -140,7 +142,11 @@ def string_tuple(value: object, field: str) -> tuple[str, ...]:
 def markdown_section_text(text: str, heading: str) -> str:
     """Return one level-2 Markdown section without comments."""
     lines = markdown_without_comments(text).splitlines()
-    collected: list[str] = []
+    return "\n".join(markdown_section_lines(lines, heading)).lower()
+
+
+def markdown_section_lines(lines: list[str], heading: str) -> Iterator[str]:
+    """Yield lines from one level-2 Markdown section."""
     in_section = False
     for line in lines:
         stripped = line.strip()
@@ -149,8 +155,7 @@ def markdown_section_text(text: str, heading: str) -> str:
                 break
             in_section = stripped == heading
         if in_section:
-            collected.append(line)
-    return "\n".join(collected).lower()
+            yield line
 
 
 def load_behavior_manifest(path: Path) -> tuple[BehaviorCriterion, ...]:
@@ -159,32 +164,32 @@ def load_behavior_manifest(path: Path) -> tuple[BehaviorCriterion, ...]:
     raw_criteria = data.get("criteria")
     if not isinstance(raw_criteria, list) or not raw_criteria:
         raise ValueError("behavior manifest must define at least one [[criteria]] entry")
-    criteria: list[BehaviorCriterion] = []
-    for index, entry in enumerate(raw_criteria, 1):
-        if not isinstance(entry, dict):
-            raise ValueError(f"behavior criterion {index} must be a table")
-        name = str(entry["name"])
-        source = str(entry.get("source", "behavior_events"))
-        if source not in {"behavior_events", "bundle"}:
-            raise ValueError(f"behavior criterion {name} has invalid source={source}")
-        feedback = str(
-            entry.get("feedback", f"Record behavior evidence for {name}.")
-        )
-        criteria.append(
-            BehaviorCriterion(
-                name=name,
-                max_score=int(str(entry.get("max_score", 5))),
-                feedback=feedback,
-                source=source,
-                required_all=string_tuple(
-                    entry.get("required_all"), f"{name}.required_all"
-                ),
-                required_any=string_tuple(
-                    entry.get("required_any"), f"{name}.required_any"
-                ),
-            )
-        )
-    return tuple(criteria)
+    return tuple(
+        behavior_criterion_from_manifest_entry(index, entry)
+        for index, entry in enumerate(raw_criteria, 1)
+    )
+
+
+def behavior_criterion_from_manifest_entry(
+    index: int,
+    entry: object,
+) -> BehaviorCriterion:
+    """Build one behavior criterion from a manifest entry."""
+    if not isinstance(entry, dict):
+        raise ValueError(f"behavior criterion {index} must be a table")
+    name = str(entry["name"])
+    source = str(entry.get("source", "behavior_events"))
+    if source not in {"behavior_events", "bundle"}:
+        raise ValueError(f"behavior criterion {name} has invalid source={source}")
+    feedback = str(entry.get("feedback", f"Record behavior evidence for {name}."))
+    return BehaviorCriterion(
+        name=name,
+        max_score=int(str(entry.get("max_score", 5))),
+        feedback=feedback,
+        source=source,
+        required_all=string_tuple(entry.get("required_all"), f"{name}.required_all"),
+        required_any=string_tuple(entry.get("required_any"), f"{name}.required_any"),
+    )
 
 
 def parse_kv_lines(path: Path) -> dict[str, str]:
@@ -240,17 +245,17 @@ def artifact_text(report_dir: Path, name: str) -> str:
 
 def markdown_without_comments(text: str) -> str:
     """Return markdown text without HTML comments."""
-    return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    cleaned = MARKDOWN_COMMENT_PATTERN.sub("", text)
+    return cleaned
 
 
 def bundle_text(report_dir: Path) -> str:
     """Return normalized text from all markdown and text run artifacts."""
-    parts: list[str] = []
-    for path in sorted(report_dir.glob("*")):
-        if path.suffix not in {".md", ".txt", ".yaml", ".yml"}:
-            continue
-        parts.append(markdown_without_comments(path.read_text(encoding="utf-8")))
-    return "\n".join(parts).lower()
+    return "\n".join(
+        markdown_without_comments(path.read_text(encoding="utf-8"))
+        for path in sorted(report_dir.glob("*"))
+        if path.suffix in {".md", ".txt", ".yaml", ".yml"}
+    ).lower()
 
 
 def has_any(text: str, needles: tuple[str, ...]) -> bool:
@@ -406,11 +411,20 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
 
 def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
     """Build non-manifest run evaluation criteria."""
-    schedule_blockers = check_schedule_artifact(evidence.schedule_text)
-    work_log_blockers = check_work_log_artifact(evidence.work_log_text)
+    return [
+        *build_artifact_and_traceability_criteria(evidence),
+        *build_workflow_execution_criteria(evidence),
+        *build_review_and_closeout_criteria(evidence),
+        build_self_improvement_feedback_criterion(evidence),
+    ]
+
+
+def build_artifact_and_traceability_criteria(
+    evidence: RunEvidence,
+) -> list[CriterionResult]:
+    """Build artifact completeness and request traceability criteria."""
     request_contract = evidence.request_contract
-    closeout = evidence.closeout
-    criteria = [
+    return [
         criterion(
             "artifact_completeness",
             8,
@@ -426,6 +440,16 @@ def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
             "Resolve all request clauses, clear unresolved ids, and confirm "
             "forbidden drift is absent.",
         ),
+    ]
+
+
+def build_workflow_execution_criteria(
+    evidence: RunEvidence,
+) -> list[CriterionResult]:
+    """Build planned work, monitoring, and intake criteria."""
+    schedule_blockers = check_schedule_artifact(evidence.schedule_text)
+    work_log_blockers = check_work_log_artifact(evidence.work_log_text)
+    return [
         criterion(
             "planned_work_and_chronology",
             10,
@@ -447,6 +471,14 @@ def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
             "or explicit opt-out, repo dependency intake, web research decision, "
             "review status, validation status, and drift risk before implementation.",
         ),
+    ]
+
+
+def build_review_and_closeout_criteria(
+    evidence: RunEvidence,
+) -> list[CriterionResult]:
+    """Build review feedback and closeout criteria."""
+    return [
         criterion(
             "review_feedback_loop",
             10,
@@ -457,6 +489,14 @@ def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
             ),
             "Resolve or escalate review feedback and record an approving final review decision.",
         ),
+        *build_closeout_criteria(evidence),
+    ]
+
+
+def build_closeout_criteria(evidence: RunEvidence) -> list[CriterionResult]:
+    """Build validation, dependency, and canonical closeout criteria."""
+    closeout = evidence.closeout
+    return [
         criterion(
             "validation_and_closeout_evidence",
             12,
@@ -478,19 +518,22 @@ def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
             "evidence, repo-wide static analysis evidence, and canonical tree-head "
             "evidence in closeout_gate.md.",
         ),
-        criterion(
-            "self_improvement_feedback_capture",
-            16,
-            section_has_content(evidence.retrospective_text, "## What Worked")
-            and section_has_content(evidence.retrospective_text, "## What Hurt")
-            and section_has_content(evidence.retrospective_text, "## Follow-ups")
-            and improvement_decisions_complete(evidence),
-            "Fill retrospective sections and mark skill/config/workflow/memory "
-            "improvement decisions as applied, recorded, or not_applicable.",
-            partial_score=8 if improvement_decisions_complete(evidence) else 0,
-        ),
     ]
-    return criteria
+
+
+def build_self_improvement_feedback_criterion(evidence: RunEvidence) -> CriterionResult:
+    """Build the self-improvement feedback capture criterion."""
+    return criterion(
+        "self_improvement_feedback_capture",
+        16,
+        section_has_content(evidence.retrospective_text, "## What Worked")
+        and section_has_content(evidence.retrospective_text, "## What Hurt")
+        and section_has_content(evidence.retrospective_text, "## Follow-ups")
+        and improvement_decisions_complete(evidence),
+        "Fill retrospective sections and mark skill/config/workflow/memory "
+        "improvement decisions as applied, recorded, or not_applicable.",
+        partial_score=8 if improvement_decisions_complete(evidence) else 0,
+    )
 
 
 def evaluate(
@@ -499,16 +542,16 @@ def evaluate(
 ) -> tuple[list[CriterionResult], list[str]]:
     """Evaluate one report directory."""
     evidence = read_run_evidence(report_dir)
-    criteria = build_base_criteria(evidence)
-    criteria.extend(
-        evaluate_behavior_criteria(
+    criteria = [
+        *build_base_criteria(evidence),
+        *evaluate_behavior_criteria(
             {
                 "behavior_events": evidence.behavior_events_text,
                 "bundle": evidence.normalized_bundle,
             },
             behavior_criteria,
-        )
-    )
+        ),
+    ]
     blockers = [item.feedback for item in criteria if item.status != "pass"]
     return criteria, blockers
 
@@ -518,33 +561,56 @@ def evaluate_behavior_criteria(
     behavior_criteria: tuple[BehaviorCriterion, ...],
 ) -> list[CriterionResult]:
     """Evaluate manifest-defined behavior evidence criteria."""
-    results: list[CriterionResult] = []
-    for item in behavior_criteria:
-        text = source_texts[item.source]
-        missing_all = tuple(
-            token for token in item.required_all if token.lower() not in text
+    return [
+        evaluate_behavior_criterion(source_texts[item.source], item)
+        for item in behavior_criteria
+    ]
+
+
+def evaluate_behavior_criterion(
+    text: str,
+    item: BehaviorCriterion,
+) -> CriterionResult:
+    """Evaluate one manifest-defined behavior criterion."""
+    missing_all = tuple(token for token in item.required_all if token.lower() not in text)
+    any_passed = not item.required_any or has_any(text, item.required_any)
+    passed = not missing_all and any_passed
+    return criterion(
+        f"behavior::{item.name}",
+        item.max_score,
+        passed,
+        behavior_feedback(item, missing_all, any_passed),
+    )
+
+
+def behavior_feedback(
+    item: BehaviorCriterion,
+    missing_all: tuple[str, ...],
+    any_passed: bool,
+) -> str:
+    """Render behavior criterion feedback with missing-token details."""
+    details = behavior_feedback_details(item, missing_all, any_passed)
+    return item.feedback if not details else f"{item.feedback} ({'; '.join(details)})"
+
+
+def behavior_feedback_details(
+    item: BehaviorCriterion,
+    missing_all: tuple[str, ...],
+    any_passed: bool,
+) -> tuple[str, ...]:
+    """Return missing-token details for one behavior criterion."""
+    return tuple(
+        detail
+        for detail in (
+            "missing all-required tokens: " + ", ".join(missing_all)
+            if missing_all
+            else "",
+            "missing any-required token: " + " OR ".join(item.required_any)
+            if not any_passed
+            else "",
         )
-        any_passed = not item.required_any or has_any(text, item.required_any)
-        passed = not missing_all and any_passed
-        details: list[str] = []
-        if missing_all:
-            details.append("missing all-required tokens: " + ", ".join(missing_all))
-        if not any_passed:
-            details.append(
-                "missing any-required token: " + " OR ".join(item.required_any)
-            )
-        feedback = (
-            item.feedback if not details else f"{item.feedback} ({'; '.join(details)})"
-        )
-        results.append(
-            criterion(
-                f"behavior::{item.name}",
-                item.max_score,
-                passed,
-                feedback,
-            )
-        )
-    return results
+        if detail
+    )
 
 
 def render_markdown(
@@ -554,23 +620,54 @@ def render_markdown(
     min_score: int,
 ) -> str:
     """Render the evaluation artifact."""
+    return "\n".join(
+        [
+            *render_markdown_header(report_dir, criteria, blockers, min_score),
+            *render_rubric_lines(criteria),
+            *render_feedback_action_lines(blockers),
+            *render_learning_capture_lines(),
+        ]
+    )
+
+
+def render_markdown_header(
+    report_dir: Path,
+    criteria: list[CriterionResult],
+    blockers: list[str],
+    min_score: int,
+) -> list[str]:
+    """Render the evaluation summary and rubric header lines."""
+    summary = markdown_summary(criteria, blockers, min_score)
+    return [
+        *render_markdown_title_lines(),
+        *render_markdown_status_lines(summary),
+        *render_markdown_scope_lines(report_dir),
+        *render_rubric_header_lines(),
+    ]
+
+
+def markdown_summary(
+    criteria: list[CriterionResult],
+    blockers: list[str],
+    min_score: int,
+) -> dict[str, str]:
+    """Build rendered status values for the evaluation header."""
     score = sum(item.score for item in criteria)
     max_score = sum(item.max_score for item in criteria)
     status = "pass" if score >= min_score and not blockers else "revise"
-    feedback_resolved = "yes" if status == "pass" else "no"
-    learning_criteria = {
-        "learning_and_feedback_capture",
-        "self_improvement_feedback_capture",
+    return {
+        "evaluation_status": status,
+        "score": str(score),
+        "max_score": str(max_score),
+        "threshold": str(min_score),
+        "feedback_actions_resolved": "yes" if status == "pass" else "no",
+        "learning_capture_complete": learning_capture_complete(criteria),
     }
-    learning_complete = (
-        "yes"
-        if any(
-            item.name in learning_criteria and item.status == "pass"
-            for item in criteria
-        )
-        else "no"
-    )
-    lines = [
+
+
+def render_markdown_title_lines() -> list[str]:
+    """Render the title and dependency manifest lines."""
+    return [
         "# Agent Evaluation",
         "",
         "<!--",
@@ -582,55 +679,98 @@ def render_markdown(
         "@dependency-end",
         "-->",
         "",
-        f"- evaluation_status: {status}",
-        f"- score: {score}",
-        f"- max_score: {max_score}",
-        f"- threshold: {min_score}",
-        f"- feedback_actions_resolved: {feedback_resolved}",
-        f"- learning_capture_complete: {learning_complete}",
+    ]
+
+
+def render_markdown_status_lines(summary: dict[str, str]) -> list[str]:
+    """Render the status summary lines."""
+    return [
+        f"- evaluation_status: {summary['evaluation_status']}",
+        f"- score: {summary['score']}",
+        f"- max_score: {summary['max_score']}",
+        f"- threshold: {summary['threshold']}",
+        f"- feedback_actions_resolved: {summary['feedback_actions_resolved']}",
+        f"- learning_capture_complete: {summary['learning_capture_complete']}",
         "",
+    ]
+
+
+def render_markdown_scope_lines(report_dir: Path) -> list[str]:
+    """Render the scope section lines."""
+    return [
         "## Scope",
         "",
         f"- report_dir: {report_dir}",
         "",
+    ]
+
+
+def render_rubric_header_lines() -> list[str]:
+    """Render the rubric table header lines."""
+    return [
         "## Rubric",
         "",
         "| Criterion | Score | Max | Status | Feedback |",
         "| --------- | ----- | --- | ------ | -------- |",
     ]
-    for item in criteria:
-        lines.append(
-            f"| {item.name} | {item.score} | {item.max_score} | "
-            f"{item.status} | {item.feedback} |"
-        )
-    lines.extend(
+
+
+def learning_capture_complete(criteria: list[CriterionResult]) -> str:
+    """Return whether any learning capture criterion passed."""
+    learning_criteria = {
+        "learning_and_feedback_capture",
+        "self_improvement_feedback_capture",
+    }
+    if any(
+        item.name in learning_criteria and item.status == "pass"
+        for item in criteria
+    ):
+        return "yes"
+    return "no"
+
+
+def render_rubric_lines(criteria: list[CriterionResult]) -> list[str]:
+    """Render criterion result rows."""
+    return [
+        f"| {item.name} | {item.score} | {item.max_score} | "
+        f"{item.status} | {item.feedback} |"
+        for item in criteria
+    ]
+
+
+def render_feedback_action_lines(blockers: list[str]) -> list[str]:
+    """Render feedback action table lines."""
+    action_lines = (
         [
-            "",
-            "## Feedback Actions",
-            "",
-            "| Action ID | Severity | Action | Status |",
-            "| --------- | -------- | ------ | ------ |",
+            f"| F{index} | fix-now | {blocker} | open |"
+            for index, blocker in enumerate(blockers, start=1)
         ]
+        if blockers
+        else ["| F0 | none | No open feedback actions. | resolved |"]
     )
-    if blockers:
-        for index, blocker in enumerate(blockers, start=1):
-            lines.append(f"| F{index} | fix-now | {blocker} | open |")
-    else:
-        lines.append("| F0 | none | No open feedback actions. | resolved |")
-    lines.extend(
-        [
-            "",
-            "## Learning Capture",
-            "",
-            "If this evaluation exposed a durable agent-side lesson, record it with "
-            "`tools/agent_tools/log_agent_learning.py` and cite the evidence. "
-            "If the lesson requires a durable process change, update the relevant "
-            "skill, config, or workflow "
-            "before marking the monitoring decision as applied. Do not copy raw chat.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
+    return [
+        "",
+        "## Feedback Actions",
+        "",
+        "| Action ID | Severity | Action | Status |",
+        "| --------- | -------- | ------ | ------ |",
+        *action_lines,
+    ]
+
+
+def render_learning_capture_lines() -> list[str]:
+    """Render learning capture guidance lines."""
+    return [
+        "",
+        "## Learning Capture",
+        "",
+        "If this evaluation exposed a durable agent-side lesson, record it with "
+        "`tools/agent_tools/log_agent_learning.py` and cite the evidence. "
+        "If the lesson requires a durable process change, update the relevant "
+        "skill, config, or workflow "
+        "before marking the monitoring decision as applied. Do not copy raw chat.",
+        "",
+    ]
 
 
 def main() -> int:

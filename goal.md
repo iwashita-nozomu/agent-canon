@@ -12,7 +12,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 - goal_status: active
 - run_safety_cap: 5
-- current_iteration: 3
+- current_iteration: 4
 - active_run_id: 20260501-oop-readability-loop
 - stop_reason:
 
@@ -30,8 +30,8 @@ behavior, public API semantics, or numerical algorithms.
 - [x] G2: Code dependency extraction is reviewed with `bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.
 - [x] G3: OOP/readability analysis is run over all code paths before and after the current iteration with the same path set and threshold.
 - [x] G4: The current iteration reduces accepted OOP findings or score-risk concentration without adding behavior changes.
-- [x] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
-- [x] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
+- [ ] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
+- [ ] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
 
 ## Backlog
 
@@ -45,6 +45,9 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B8: Continue with iteration 3 on the next highest accepted hotspot cluster.
 - [x] B9: Rerun the all-code OOP readability evaluation after iteration 3.
 - [x] B10: Record remaining backlog and explicit continue/stop decision.
+- [x] B11: Continue with iteration 4 using subagent-supported candidate selection.
+- [x] B12: Rerun the all-code OOP readability evaluation after iteration 4.
+- [ ] B13: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -77,3 +80,13 @@ behavior, public API semantics, or numerical algorithms.
   review, and `make ci` passed. Next backlog remains open; likely targets are
   `smolyak.hpp`, `native_autodiff.hpp`, `kokkos_backend.hpp`, or deeper
   `agent_team.py` structure. `goal_status` stays `active`.
+- iteration 4: parent manages the loop state and gates; subagents handle
+  read-only candidate selection, validation design, and one bounded writer
+  slice. Starting baseline is all-code OOP findings 828.
+- iteration 4 update: Python report assembly refactor reduced
+  `evaluate_agent_run.py` findings from 10 to 1. C++ registry pass refactor
+  reduced `PrimitiveRegistryPass.cpp` findings from 20 to 18 and lowered that
+  file from severe-risk to low-risk. Source-tree OOP findings are 828 to 818.
+  Targeted Python tests, targeted C++ build/tests, and repo dependency review
+  passed. Repo-wide `make ci` is pending until upstream AgentCanon sync can run
+  from a clean worktree.
