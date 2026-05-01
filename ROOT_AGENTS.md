@@ -66,6 +66,9 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補と、既存実装では足りない理由を確認します。
+- ファイル横断の実装では、修正対象 file だけでなく call site、import/export surface、既存 helper、既存 test fixture、既存 workflow/tool を先に読み、既存の責務境界へ寄せます。
+- 新しい helper、module、script、workflow branch、設定 surface は最後の手段です。既存実装の拡張、既存 API の薄い adapter、既存 tool の option 追加、既存 test fixture の再利用で達成できる場合は、それを優先します。
+- 新規実装を選ぶ場合は、run bundle または作業 artifact に `Reuse Survey` として、見た path、再利用した path、再利用しなかった候補、既存では足りない具体理由を残してから編集します。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を短く宣言します。
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
 - durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `memory/USER_PREFERENCES.md` へ追記します。
@@ -140,6 +143,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 会話だけを根拠に実装へ進めてはいけません。
 - 導入済みライブラリ棚卸しと既存実装棚卸しをせずに、新規実装や新規 helper 追加へ進めてはいけません。
 - reuse sweep をせずに新しい file や module を増やしてはいけません。
+- 既存 helper、既存 tool、既存 workflow、既存 fixture を拡張できるのに、自前の並行実装を追加してはいけません。
+- 変更対象 file だけを読んで、関連する call site、test、script、docs、dependency manifest を読まずに横断的な実装判断をしてはいけません。
+- `Reuse Survey` に既存候補と不採用理由が無い状態で、新しい abstraction、utility、wrapper、script、module を追加してはいけません。
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid を無視してはいけません。
 - user request が generic path の usable smoke を求めているのに、specialized path の tuning だけで完了扱いにしてはいけません。
 - JAX export / native runtime の task では、generic callable path、specialized coeff path、export-based generic path を混同してはいけません。generic path は `jax.export` artifact と consumer/runtime evidence で確認します。

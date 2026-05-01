@@ -117,6 +117,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User requested: 実装をはしょりすぎる癖があります。機械的なループを強制的に入れ，差分チェックエージェントに確認させましょう
 
+- 2026-05-01 | interaction-observation | File-cross coding quality regresses when the agent edits only the local target and invents parallel helpers instead of reading existing call sites, tools, workflows, and fixtures.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User requested AGENTS.md explicitly state reuse because the agent is weak at cross-file coding and tends to self-implement.
+
 ## Task Retrospectives
 
 - まだなし
