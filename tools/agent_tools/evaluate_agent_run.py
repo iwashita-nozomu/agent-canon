@@ -16,7 +16,11 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 from agent_team import resolve_report_root
 from report_artifact_checks import (
     check_schedule_artifact,
