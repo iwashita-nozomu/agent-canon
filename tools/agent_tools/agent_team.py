@@ -7,14 +7,15 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
@@ -59,7 +60,10 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "agents/workflows/implementation-waterfall-workflow.md",
             "agents/canonical/CODEX_WORKFLOW.md",
         ],
-        "notes": "Detailed design must read upstream documented requirements and waterfall rules before design begins.",
+        "notes": (
+            "Detailed design must read upstream documented requirements and waterfall rules before "
+            "design begins."
+        ),
     },
     "design_reviewer": {
         "artifact_keys": ["user_request_contract", "schedule", "design_brief"],
@@ -146,20 +150,6 @@ def resolve_report_root(
     return (base_root / candidate).resolve()
 
 
-def resolve_report_root(
-    report_root: str | None,
-    workspace_root: Path | None = None,
-) -> Path:
-    """Resolve the report root relative to the active workspace by default."""
-    base_root = workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
-    if report_root is None:
-        return (base_root / DEFAULT_REPORT_ROOT).resolve()
-    candidate = Path(report_root)
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (base_root / candidate).resolve()
-
-
 @dataclass(frozen=True)
 class WritePolicy:
     """Describe how one role may write to the filesystem."""
@@ -216,24 +206,22 @@ class RoleDocumentPacket:
 
 def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[DocumentPacketEntry, ...]:
     """Resolve the common cross-cutting document packet for one workspace."""
-    entries: list[DocumentPacketEntry] = []
-    for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS:
-        entries.append(
-            DocumentPacketEntry(
-                path=(workspace_root / relative_path).resolve(),
-                rationale=f"cross_cutting_doc:{relative_path}",
-            )
+    required_entries = tuple(
+        DocumentPacketEntry(
+            path=(workspace_root / relative_path).resolve(),
+            rationale=f"cross_cutting_doc:{relative_path}",
         )
-    for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS:
-        candidate = (workspace_root / relative_path).resolve()
-        if candidate.exists():
-            entries.append(
-                DocumentPacketEntry(
-                    path=candidate,
-                    rationale=f"cross_cutting_doc:{relative_path}",
-                )
-            )
-    return tuple(entries)
+        for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
+    )
+    optional_entries = tuple(
+        DocumentPacketEntry(
+            path=(workspace_root / relative_path).resolve(),
+            rationale=f"cross_cutting_doc:{relative_path}",
+        )
+        for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS
+        if (workspace_root / relative_path).resolve().exists()
+    )
+    return required_entries + optional_entries
 
 
 @dataclass(frozen=True)
@@ -348,31 +336,28 @@ def auto_language_specialists(
 ) -> tuple[str, ...]:
     """Infer language-specific reviewers from changed paths."""
     candidate_paths = changed_paths or discover_changed_paths(workspace_root)
-    selected: list[str] = []
-    for raw_path in candidate_paths:
-        normalized = raw_path.replace("\\", "/").lstrip("./")
-        suffix = Path(normalized).suffix.lower()
-        if (
-            "python_reviewer" not in selected
-            and (
-                normalized.startswith("python/")
-                or normalized.startswith("tests/")
-                or suffix in PYTHON_SUFFIXES
-            )
-        ):
-            selected.append("python_reviewer")
-        if (
-            "cpp_reviewer" not in selected
-            and (
-                suffix in CPP_SUFFIXES
-                or any(
-                    normalized == marker or normalized.startswith(marker)
-                    for marker in CPP_PATH_MARKERS
-                )
-            )
-        ):
-            selected.append("cpp_reviewer")
-    return tuple(selected)
+    normalized_paths = tuple(
+        raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
+    )
+    has_python = any(
+        normalized.startswith("python/")
+        or normalized.startswith("tests/")
+        or Path(normalized).suffix.lower() in PYTHON_SUFFIXES
+        for normalized in normalized_paths
+    )
+    has_cpp = any(
+        Path(normalized).suffix.lower() in CPP_SUFFIXES
+        or any(normalized == marker or normalized.startswith(marker) for marker in CPP_PATH_MARKERS)
+        for normalized in normalized_paths
+    )
+    return tuple(
+        role_id
+        for role_id, enabled in (
+            ("python_reviewer", has_python),
+            ("cpp_reviewer", has_cpp),
+        )
+        if enabled
+    )
 
 
 def resolve_task_spec(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
@@ -488,22 +473,15 @@ def select_roles(
 
 def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ...]:
     """Return unique artifact filenames in deterministic order."""
-    ordered_artifacts: list[str] = []
-    for role in roles:
-        for output in role.required_outputs:
-            if output not in ordered_artifacts:
-                ordered_artifacts.append(output)
-    ordered_artifacts.extend(
-        [
-            config.artifacts["team_manifest"],
-            config.artifacts["verification"],
-        ]
+    return tuple(
+        dict.fromkeys(
+            (
+                *(output for role in roles for output in role.required_outputs),
+                config.artifacts["team_manifest"],
+                config.artifacts["verification"],
+            )
+        )
     )
-    unique_artifacts: list[str] = []
-    for artifact in ordered_artifacts:
-        if artifact not in unique_artifacts:
-            unique_artifacts.append(artifact)
-    return tuple(unique_artifacts)
 
 
 def resolve_role_document_packet(
@@ -539,7 +517,9 @@ def resolve_role_document_packet(
 
     for artifact_key in artifact_keys:
         if artifact_key not in config.artifacts:
-            raise RuntimeError(f"document packet artifact key missing for role {role.id}: {artifact_key}")
+            raise RuntimeError(
+                f"document packet artifact key missing for role {role.id}: {artifact_key}"
+            )
         add_entry(
             DocumentPacketEntry(
                 path=(report_dir / config.artifacts[artifact_key]).resolve(),
@@ -582,14 +562,14 @@ def required_output_templates_missing(
     allowed_missing: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     """Return required output templates that are missing from agents/templates."""
-    missing: list[str] = []
-    for role in roles:
-        for output in role.required_outputs:
-            if output in allowed_missing:
-                continue
-            if output not in missing and not has_template(output):
-                missing.append(output)
-    return tuple(missing)
+    return tuple(
+        dict.fromkeys(
+            output
+            for role in roles
+            for output in role.required_outputs
+            if output not in allowed_missing and not has_template(output)
+        )
+    )
 
 
 def create_run_bundle(
@@ -687,7 +667,8 @@ def build_manifest(
         "    close_before_user_completion: true",
         "    closeout_gate_key: subagents_closed",
         "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
-        "    handoff_rule: 'Do not send_input to agents from another user request; spawn a fresh run-local agent for each new task or stage wave.'",
+        "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
+        "fresh run-local agent for each new task or stage wave.'",
     ]
     communication_protocol = config.team.get("communication_protocol")
     if communication_protocol is not None:
@@ -879,9 +860,13 @@ def resolve_role_write_scope(
         )
         allowed_directories = tuple(sorted(editable_directories, key=str))
         if role.write_policy.requires_worktree_scope and scope_file is None:
-            unresolved_reason = "WORKTREE_SCOPE.md is required but was not found in the workspace root."
+            unresolved_reason = (
+                "WORKTREE_SCOPE.md is required but was not found in the workspace root."
+            )
         elif role.write_policy.requires_worktree_scope and not allowed_directories:
-            unresolved_reason = "WORKTREE_SCOPE.md was found, but no editable directories could be parsed."
+            unresolved_reason = (
+                "WORKTREE_SCOPE.md was found, but no editable directories could be parsed."
+            )
     elif role.write_policy.mode == "runtime_outputs_plus_artifacts":
         runtime_output_directories = tuple(
             _resolve_scope_directories(
@@ -892,7 +877,9 @@ def resolve_role_write_scope(
         )
         allowed_directories = tuple(sorted(runtime_output_directories, key=str))
         if role.write_policy.requires_worktree_scope and scope_file is None:
-            unresolved_reason = "WORKTREE_SCOPE.md is required but was not found in the workspace root."
+            unresolved_reason = (
+                "WORKTREE_SCOPE.md is required but was not found in the workspace root."
+            )
         elif role.write_policy.requires_worktree_scope and not allowed_directories:
             unresolved_reason = (
                 "WORKTREE_SCOPE.md was found, but no runtime output directories could be parsed."

@@ -19,8 +19,7 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl")
@@ -50,7 +49,9 @@ def compact_timestamp() -> str:
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""
     parser = argparse.ArgumentParser(
-        description="Create one managed experiment run directory, manifest, and optional report stub."
+        description=(
+            "Create one managed experiment run directory, manifest, and optional report stub."
+        )
     )
     parser.add_argument(
         "--repo-root",
@@ -73,7 +74,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--registry",
-        help="Optional registry path. Defaults to <repo-root>/experiments/registry.toml when present.",
+        help=(
+            "Optional registry path. Defaults to <repo-root>/experiments/registry.toml "
+            "when present."
+        ),
     )
     parser.add_argument(
         "--use-registered-command",
@@ -92,7 +96,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Resolve run paths and command metadata but do not write files or execute the command.",
+        help=(
+            "Resolve run paths and command metadata but do not write files or execute the command."
+        ),
     )
     parser.add_argument(
         "command",
@@ -120,12 +126,10 @@ def string_list(raw_value: object, key: str) -> list[str]:
         return []
     if not isinstance(raw_value, list):
         raise ValueError(f"{key} must be an array of strings")
-    values: list[str] = []
     for index, item in enumerate(raw_value):
         if not isinstance(item, str) or not item.strip():
             raise ValueError(f"{key}[{index}] must be a non-empty string")
-        values.append(item.strip())
-    return values
+    return [item.strip() for item in raw_value]
 
 
 def find_registry_topic(registry: dict[str, object], topic_name: str) -> dict[str, object] | None:
@@ -324,12 +328,7 @@ def write_manifest(path: Path, manifest: dict[str, object]) -> None:
 
 def merge_unique_strings(*groups: list[str]) -> list[str]:
     """Return one deduplicated list preserving first appearance order."""
-    merged: list[str] = []
-    for group in groups:
-        for value in group:
-            if value not in merged:
-                merged.append(value)
-    return merged
+    return list(dict.fromkeys(value for group in groups for value in group))
 
 
 def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
@@ -461,7 +460,10 @@ def collect_eval_artifacts(
             matched_patterns_by_path.setdefault(match, []).append(pattern)
 
     artifacts: list[dict[str, object]] = []
-    for path in sorted(matched_patterns_by_path, key=lambda item: str(item.relative_to(result_dir))):
+    for path in sorted(
+        matched_patterns_by_path,
+        key=lambda item: str(item.relative_to(result_dir)),
+    ):
         artifact: dict[str, object] = {
             "relative_path": str(path.relative_to(result_dir)),
             "kind": artifact_kind(path),
@@ -584,7 +586,9 @@ def main() -> int:
     if args.report_path:
         report_path = Path(args.report_path).resolve()
     elif registry_entry is not None:
-        registry_report_root = registry_entry.get("report_root") or registry_defaults.get("report_root")
+        registry_report_root = registry_entry.get("report_root") or registry_defaults.get(
+            "report_root"
+        )
         if isinstance(registry_report_root, str):
             report_path = (repo_root / registry_report_root / f"{run_name}.md").resolve()
         else:
@@ -623,7 +627,11 @@ def main() -> int:
             print("--use-registered-command requires experiments/registry.toml", file=sys.stderr)
             return 2
         try:
-            command = command_from_registry(registry_entry, args.use_registered_command, placeholders)
+            command = command_from_registry(
+                registry_entry,
+                args.use_registered_command,
+                placeholders,
+            )
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 2
