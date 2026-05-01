@@ -3,7 +3,6 @@
 @dependency-start
 responsibility Documents Agent Learning Workflow for this repository.
 upstream design README.md workflow catalog
-upstream design ../evals/agent_behavior_eval.toml default behavior eval rubric
 upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
 upstream implementation ../../tools/agent_tools/workflow_monitor.py appends monitoring evidence
 @dependency-end
