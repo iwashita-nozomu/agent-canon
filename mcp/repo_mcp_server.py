@@ -16,10 +16,10 @@ import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 SERVER_INFO = {"name": "repo_mcp_server", "version": "0.1.0"}
-USE_CONTENT_LENGTH = False
+use_content_length = False
 
 
 def repo_root() -> Path:
@@ -41,7 +41,7 @@ def repo_root() -> Path:
 def send(message: Mapping[str, Any]) -> None:
     """Write one JSON-RPC message to stdout."""
     payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
-    if USE_CONTENT_LENGTH:
+    if use_content_length:
         sys.stdout.buffer.write(f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii"))
         sys.stdout.buffer.write(payload)
         sys.stdout.buffer.flush()
@@ -159,8 +159,10 @@ def handle_request(message: Mapping[str, Any]) -> None:
     if method == "initialize":
         params = message.get("params")
         protocol_version = "2024-11-05"
-        if isinstance(params, dict) and isinstance(params.get("protocolVersion"), str):
-            protocol_version = params["protocolVersion"]
+        if isinstance(params, Mapping):
+            protocol_version_value = params.get("protocolVersion")
+            if isinstance(protocol_version_value, str):
+                protocol_version = protocol_version_value
         send(
             {
                 "jsonrpc": "2.0",
@@ -184,8 +186,9 @@ def handle_request(message: Mapping[str, Any]) -> None:
 
     if method == "tools/call":
         params = message.get("params")
-        name = params.get("name") if isinstance(params, dict) else None
-        arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
+        tool_params = cast(Mapping[str, Any], params) if isinstance(params, Mapping) else {}
+        name = tool_params.get("name")
+        arguments = tool_params.get("arguments", {})
         if not isinstance(name, str):
             send_error(request_id, -32602, "tools/call requires params.name")
             return
@@ -218,7 +221,7 @@ def send_error(request_id: Any, code: int, message: str) -> None:
 
 def main() -> int:
     """Run the stdio JSON-RPC loop."""
-    global USE_CONTENT_LENGTH
+    global use_content_length
     reader = sys.stdin.buffer
     while True:
         line = reader.readline()
@@ -228,7 +231,7 @@ def main() -> int:
         if not stripped:
             continue
         if stripped.lower().startswith(b"content-length:"):
-            USE_CONTENT_LENGTH = True
+            use_content_length = True
             try:
                 length = int(stripped.split(b":", 1)[1].strip())
             except ValueError:
@@ -247,8 +250,8 @@ def main() -> int:
             message = json.loads(text)
         except json.JSONDecodeError:
             continue
-        if isinstance(message, dict):
-            handle_request(message)
+        if isinstance(message, Mapping):
+            handle_request(cast(Mapping[str, Any], message))
     return 0
 
 
