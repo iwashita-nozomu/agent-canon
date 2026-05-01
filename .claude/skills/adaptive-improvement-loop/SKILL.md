@@ -16,6 +16,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Read `agents/workflows/adaptive-improvement-workflow.md`.
 1. Read `agents/workflows/research-workflow.md`.
 1. Read `agents/workflows/experiment-workflow.md`.
+1. Confirm MCP loop state with `goal.loop_status` when repo MCP tools are available; if it returns `NEXT_ACTION=run_next_iteration`, continue the next backlog iteration instead of treating the current iteration as completion.
 1. Before any implementation or tool addition, update top-level `goal.md` with the current Objective, Exit Criteria, Backlog, and Loop Log entry, then confirm it with `python3 tools/agent_tools/goal_loop.py status --goal-file goal.md`.
 1. For skill/workflow prompt tuning, freeze one eval per tested skill/workflow in `agents/evals/skill_workflow_prompt_eval.toml` before changing the prompt under test.
 1. Run `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` before and after prompt repair.
@@ -28,5 +29,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Treat the iteration number as progress metadata, not as a completion condition; only explicit achieved criteria close the loop.
 1. Before moving to a second extension, finish the previous extension's waterfall gate checks, final review, `task-close`, commit, and push.
 1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.
+1. Do not close the loop while MCP `goal.loop_status` or `goal_loop.py status` reports `NEXT_ACTION=run_next_iteration`.
 1. Do not close a skill/workflow improvement loop while prompt eval drift remains.
 1. Do not close an agent behavior improvement loop while behavior eval feedback actions remain open.

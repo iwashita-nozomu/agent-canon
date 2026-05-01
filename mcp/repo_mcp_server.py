@@ -3,7 +3,8 @@
 # responsibility Implements the repository MCP server.
 # upstream design README.md MCP runtime surface contract
 # upstream implementation ./repo_mcp_server.sh launches this server
-# downstream implementation ../tools/agent_tools/check_mcp_inventory.py validates launcher availability
+# upstream implementation ../tools/agent_tools/goal_loop.py provides adaptive loop state
+# downstream implementation ../tools/agent_tools/check_mcp_inventory.py validates launcher
 # @dependency-end
 """Small repo-local MCP stdio server for Agent Canon repositories."""
 
@@ -60,8 +61,31 @@ def tool_schema() -> dict[str, Any]:
             },
             {
                 "name": "repo.status",
-                "description": "Return `git status --short --branch --untracked-files=all` for the repository.",
+                "description": (
+                    "Return `git status --short --branch --untracked-files=all` "
+                    "for the repository."
+                ),
                 "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            },
+            {
+                "name": "goal.loop_status",
+                "description": (
+                    "Return machine-readable goal.md loop status and NEXT_ACTION. "
+                    "Use this for adaptive-improvement-loop iteration decisions."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "goal_file": {
+                            "type": "string",
+                            "description": (
+                                "Goal file path relative to repo root. "
+                                "Defaults to goal.md."
+                            ),
+                        }
+                    },
+                    "additionalProperties": False,
+                },
             },
         ]
     }
@@ -72,9 +96,42 @@ def text_result(text: str) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": text}]}
 
 
-def call_tool(name: str) -> dict[str, Any]:
+def resolve_repo_relative_path(root: Path, raw_path: str) -> Path:
+    """Resolve a repo-relative tool path without escaping the repository."""
+    candidate = (root / raw_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"path escapes repository root: {raw_path}") from exc
+    return candidate
+
+
+def goal_loop_status(root: Path, arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Return goal.md loop status through the canonical goal loop tool."""
+    raw_goal_file = arguments.get("goal_file", "goal.md")
+    if not isinstance(raw_goal_file, str) or not raw_goal_file.strip():
+        raise ValueError("goal_file must be a non-empty string")
+    goal_file = resolve_repo_relative_path(root, raw_goal_file)
+    script = root / "tools" / "agent_tools" / "goal_loop.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "status", "--goal-file", str(goal_file)],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout.strip()
+    if result.stderr.strip():
+        output = f"{output}\n{result.stderr.strip()}".strip()
+    prefix = "MCP_GOAL_LOOP_TOOL=goal.loop_status"
+    status_line = f"MCP_GOAL_LOOP_EXIT={result.returncode}"
+    return text_result("\n".join(line for line in (prefix, status_line, output) if line))
+
+
+def call_tool(name: str, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Execute a supported tool."""
     root = repo_root()
+    tool_arguments = arguments or {}
     if name == "repo.root":
         return text_result(str(root))
     if name == "repo.status":
@@ -87,6 +144,8 @@ def call_tool(name: str) -> dict[str, Any]:
         )
         output = result.stdout.strip() or result.stderr.strip() or "(no output)"
         return text_result(output)
+    if name == "goal.loop_status":
+        return goal_loop_status(root, tool_arguments)
     raise KeyError(name)
 
 
@@ -126,13 +185,20 @@ def handle_request(message: Mapping[str, Any]) -> None:
     if method == "tools/call":
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
+        arguments = params.get("arguments", {}) if isinstance(params, dict) else {}
         if not isinstance(name, str):
             send_error(request_id, -32602, "tools/call requires params.name")
             return
+        if not isinstance(arguments, dict):
+            send_error(request_id, -32602, "tools/call params.arguments must be an object")
+            return
         try:
-            result = call_tool(name)
+            result = call_tool(name, arguments)
         except KeyError:
             send_error(request_id, -32602, f"unknown tool: {name}")
+            return
+        except ValueError as exc:
+            send_error(request_id, -32602, str(exc))
             return
         send({"jsonrpc": "2.0", "id": request_id, "result": result})
         return

@@ -36,6 +36,7 @@ outer loop は agile、inner change pass は waterfall です。
 ## 3. 基本ルール
 
 - 最初に top-level `goal.md` を更新し、今回の Objective、Exit Criteria、Backlog、Loop Log を固定します。これを tool 追加、prompt repair、workflow 編集より後回しにしてはいけません。
+- repo MCP が利用可能な場合は、`goal.loop_status` を iteration gate にします。`NEXT_ACTION=run_next_iteration` なら次 backlog item を選び、`NEXT_ACTION=close_goal_loop` になるまで completion report を出しません。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
 - iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
@@ -59,6 +60,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. 改善 backlog を固定する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
 1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
+1. repo MCP が利用可能な場合は MCP `goal.loop_status` でも同じ `GOAL_LOOP_STATUS` と `NEXT_ACTION` を確認し、run bundle に evidence を残す
 1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定する
 1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を baseline として実行する
 1. agent 行動改善の場合は、`agents/evals/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する
@@ -75,6 +77,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. prompt eval report が `EVAL_STATUS=pass` になるまで次 extension または closeout に進まない
 1. behavior eval feedback があれば、run artifact、workflow prompt、または behavior-event recording rule を修正し、`AGENT_EVALUATION_STATUS=pass` になるまで次 extension または closeout に進まない
 1. `goal.md` の exit criteria と backlog を evidence に合わせて更新する
+1. MCP `goal.loop_status` または `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す場合は次 iteration へ進む
 1. waterfall pass の `task-close`、commit、push を終える
 1. backlog を更新し、次 extension へ進むか loop を閉じる
 

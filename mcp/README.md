@@ -19,3 +19,13 @@ bash mcp/repo_mcp_server.sh
 ```
 
 Do not require a host-global `repo_mcp_server` executable.
+
+## Tools
+
+- `repo.root`: returns the repository root.
+- `repo.status`: returns `git status --short --branch --untracked-files=all`.
+- `goal.loop_status`: runs `tools/agent_tools/goal_loop.py status` for `goal.md`
+  and returns `GOAL_LOOP_STATUS` plus `NEXT_ACTION`. The adaptive improvement
+  loop uses this tool as the mechanical iteration gate:
+  `NEXT_ACTION=run_next_iteration`
+  means continue the next backlog item, not completion.

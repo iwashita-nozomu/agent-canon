@@ -17,10 +17,15 @@ from pathlib import Path
 
 def resolve_repo_root() -> Path:
     """Return the repository root for both vendored and mirrored test paths."""
+    git_root = None
     for candidate in Path(__file__).resolve().parents:
-        if (candidate / ".git").exists() and (candidate / "vendor" / "agent-canon").exists():
-            return candidate
-    raise RuntimeError("repository root not found")
+        if (candidate / ".git").exists():
+            git_root = candidate
+            if (candidate / "vendor" / "agent-canon").exists():
+                return candidate
+    if git_root is not None:
+        raise unittest.SkipTest("derived-repo agent-canon wrapper tests require vendor/agent-canon")
+    raise RuntimeError("git repository root not found")
 
 
 REPO_ROOT = resolve_repo_root()

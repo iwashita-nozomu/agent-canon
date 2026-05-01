@@ -211,6 +211,12 @@ critical = true
 description = "Requires behavior-event monitoring and agent behavior eval before closeout."
 required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "evaluate_agent_run\\.py"]
 
+[[evals.checklist]]
+id = "AIL-SHIM-5"
+critical = true
+description = "Uses MCP goal.loop_status as the mechanical iteration gate."
+required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration"]
+
 [[evals]]
 id = "adaptive-improvement-loop-human-skill"
 target = "agents/skills/adaptive-improvement-loop.md"
@@ -241,6 +247,12 @@ critical = true
 description = "Requires behavior-event capture and behavior eval repair for agent behavior tuning."
 required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
 
+[[evals.checklist]]
+id = "AIL-HUMAN-5"
+critical = true
+description = "Requires MCP goal.loop_status to keep iterations mechanical."
+required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "MCP Goal Loop Status"]
+
 [[evals]]
 id = "adaptive-improvement-workflow"
 target = "agents/workflows/adaptive-improvement-workflow.md"
@@ -270,6 +282,36 @@ id = "AIL-WF-4"
 critical = true
 description = "Repairs behavior eval feedback and reruns until agent behavior monitoring passes."
 required_regex = ["agent_behavior_eval\\.toml", "workflow_monitor\\.py --behavior-event", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-WF-5"
+critical = true
+description = "Requires MCP goal.loop_status to decide whether to continue or close."
+required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+
+[[evals]]
+id = "repo-mcp-server-goal-loop-tool"
+target = "mcp/repo_mcp_server.py"
+kind = "mcp"
+description = "The repo MCP server must expose goal loop state for adaptive iterations."
+
+[[evals.checklist]]
+id = "MCP-GOAL-1"
+critical = true
+description = "Declares the goal.loop_status tool and calls goal_loop.py status."
+required_regex = ["goal\\.loop_status", "goal_loop\\.py", "NEXT_ACTION"]
+
+[[evals]]
+id = "mcp-readme-goal-loop-tool"
+target = "mcp/README.md"
+kind = "mcp"
+description = "The MCP README must document goal.loop_status as an iteration gate."
+
+[[evals.checklist]]
+id = "MCP-README-GOAL-1"
+critical = true
+description = "Documents goal.loop_status and run_next_iteration behavior."
+required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "adaptive improvement"]
 
 [[evals]]
 id = "agent-learning-workflow-behavior-eval"
