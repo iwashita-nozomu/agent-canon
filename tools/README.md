@@ -47,6 +47,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `agent_tools/waterfall_gate_check.py`
   - `agent_tools/evaluate_agent_run.py`
   - `agent_tools/goal_loop.py`
+  - `agent_tools/evaluate_skill_workflow_prompts.py`
 
 ## Agent Evaluation Tools
 
@@ -86,6 +87,20 @@ python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 -
 
 Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
+
+## Skill And Workflow Prompt Evals
+
+`evaluate_skill_workflow_prompts.py` runs frozen checklist evals for skill and workflow prompt surfaces.
+Use it before and after prompt repair when changing agent-facing skills or workflows.
+
+```bash
+python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
+  --manifest agents/evals/skill_workflow_prompt_eval.toml \
+  --report-out reports/skill-workflow-prompt-eval.md
+```
+
+Each tested skill/workflow should have its own eval entry in `agents/evals/skill_workflow_prompt_eval.toml`.
+Do not close prompt-improvement work while `EVAL_STATUS=fail`.
 
 ## Dependency Manifest Tools
 

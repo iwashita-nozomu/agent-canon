@@ -35,6 +35,7 @@ outer loop は agile、inner change pass は waterfall です。
 
 ## 3. 基本ルール
 
+- 最初に top-level `goal.md` を更新し、今回の Objective、Exit Criteria、Backlog、Loop Log を固定します。これを tool 追加、prompt repair、workflow 編集より後回しにしてはいけません。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。
@@ -46,12 +47,17 @@ outer loop は agile、inner change pass は waterfall です。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
 - `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
 - `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
+- skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`agents/evals/skill_workflow_prompt_eval.toml` を正本にします。
+- prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass` になるまで loop を閉じません。
 
 ## 4. Canonical Outer Loop
 
+1. top-level `goal.md` に今回の Objective、Exit Criteria、Backlog、Loop Log を書く
 1. 改善 backlog を固定する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
 1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
+1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定する
+1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を baseline として実行する
 1. backlog から今回の 1 extension を選ぶ
 1. extension ごとの waterfall run-id を作る
 1. 必要なら外部調査と precedent 調査を追加する
@@ -61,6 +67,8 @@ outer loop は agile、inner change pass は waterfall です。
 1. fresh run で比較する
 1. `experiment_reviewer` と `report_reviewer` が iteration outcome をレビューする
 1. decision state を確定する
+1. eval drift があれば、対応する prompt repair を行い、同じ eval を rerun する
+1. prompt eval report が `EVAL_STATUS=pass` になるまで次 extension または closeout に進まない
 1. `goal.md` の exit criteria と backlog を evidence に合わせて更新する
 1. waterfall pass の `task-close`、commit、push を終える
 1. backlog を更新し、次 extension へ進むか loop を閉じる

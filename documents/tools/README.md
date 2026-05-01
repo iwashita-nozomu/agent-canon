@@ -72,6 +72,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
 - `tools/agent_tools/goal_loop.py`
   - top-level `goal.md` の exit criteria を正本にし、達成まで iteration command を繰り返します。既定 criteria には依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を含めます。
+- `tools/agent_tools/evaluate_skill_workflow_prompts.py`
+  - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査し、prompt repair 後に `EVAL_STATUS=pass` まで rerun します。
 - `tools/agent_tools/analyze_refactor_surface.py`
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/push_origin.sh`
