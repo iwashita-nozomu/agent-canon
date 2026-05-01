@@ -10,6 +10,7 @@ upstream design README.md workflow catalog
 この文書は、実験、外部調査、性能計測、チューニング、比較検証を回しながらコードを改善するための正本です。
 通常の feature 開発や repo-wide な恒久改修は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) を使います。
 この文書は、それだけでは扱いにくい tuning / exploration / protocol refinement を、明示的な反復 loop として扱います。
+repo-level の長期 loop では top-level `goal.md` を正本にし、`python3 tools/agent_tools/goal_loop.py` で状態確認、iteration 実行、criteria 更新を行います。
 
 ## 1. 位置づけ
 
@@ -43,11 +44,14 @@ outer loop は agile、inner change pass は waterfall です。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。
 - tuning 中でも、既存コード再利用と既存 style の踏襲を優先します。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
+- `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
+- `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
 
 ## 4. Canonical Outer Loop
 
 1. 改善 backlog を固定する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
+1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
 1. backlog から今回の 1 extension を選ぶ
 1. extension ごとの waterfall run-id を作る
 1. 必要なら外部調査と precedent 調査を追加する
@@ -57,6 +61,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. fresh run で比較する
 1. `experiment_reviewer` と `report_reviewer` が iteration outcome をレビューする
 1. decision state を確定する
+1. `goal.md` の exit criteria と backlog を evidence に合わせて更新する
 1. waterfall pass の `task-close`、commit、push を終える
 1. backlog を更新し、次 extension へ進むか loop を閉じる
 

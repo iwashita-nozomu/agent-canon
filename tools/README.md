@@ -46,6 +46,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
   - `agent_tools/evaluate_agent_run.py`
+  - `agent_tools/goal_loop.py`
 
 ## Agent Evaluation Tools
 
@@ -71,6 +72,20 @@ python3 tools/agent_tools/workflow_monitor.py \
   --intervention "spawned fresh reviewer" \
   --decision workflow_improvement_decision=applied
 ```
+
+## Goal Loop Tool
+
+`goal_loop.py` manages a top-level `goal.md` contract and repeats a command until explicit exit criteria are checked and `goal_status: achieved` is set.
+The default `goal.md` and `goal_loop.py init` include mandatory criteria for dependency review, code dependency extraction, OOP/readability analysis, repo-wide static analysis or CI, and objective-specific evidence.
+
+```bash
+python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
+python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
+python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
+```
+
+Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
+Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
 
 ## Dependency Manifest Tools
 

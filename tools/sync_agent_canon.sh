@@ -7,8 +7,10 @@
 # downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
 # downstream implementation ../documents/algorithm-implementation-boundary.md root symlink view for algorithm boundary policy
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
+# downstream implementation ../goal.md root symlink view for goal loop contract
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
+# downstream implementation ../tests/agent_tools/test_goal_loop.py root symlink view for goal loop tests
 # @dependency-end
 set -euo pipefail
 
@@ -100,6 +102,7 @@ ensure_prefix_exists() {
 build_link_specs() {
   cat <<EOF
 AGENTS.md:${PREFIX}/ROOT_AGENTS.md
+goal.md:${PREFIX}/goal.md
 agents:${PREFIX}/agents
 .agents:${PREFIX}/.agents
 .claude:${PREFIX}/.claude
@@ -213,6 +216,7 @@ tests/agent_tools/test_codex_hooks.py:../../${PREFIX}/tests/agent_tools/test_cod
 tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
 tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
 tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/test_evaluate_agent_run.py
+tests/agent_tools/test_goal_loop.py:../../${PREFIX}/tests/agent_tools/test_goal_loop.py
 tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
 tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
 tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
