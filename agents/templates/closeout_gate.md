@@ -137,7 +137,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Agent Evaluation Evidence
 
-<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, interventions, and skill/config/workflow/memory improvement decisions. -->
+<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest agents/evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
 
 ## Evidence
 

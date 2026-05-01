@@ -205,6 +205,12 @@ critical = true
 description = "Blocks loop closeout while eval drift remains."
 required_regex = ["Do not close", "eval"]
 
+[[evals.checklist]]
+id = "AIL-SHIM-4"
+critical = true
+description = "Requires behavior-event monitoring and agent behavior eval before closeout."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "evaluate_agent_run\\.py"]
+
 [[evals]]
 id = "adaptive-improvement-loop-human-skill"
 target = "agents/skills/adaptive-improvement-loop.md"
@@ -229,6 +235,12 @@ critical = true
 description = "Requires prompt repair and rerun until no eval deviation remains."
 required_regex = ["prompt", "rerun", "no eval deviation"]
 
+[[evals.checklist]]
+id = "AIL-HUMAN-4"
+critical = true
+description = "Requires behavior-event capture and behavior eval repair for agent behavior tuning."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
 [[evals]]
 id = "adaptive-improvement-workflow"
 target = "agents/workflows/adaptive-improvement-workflow.md"
@@ -252,3 +264,123 @@ id = "AIL-WF-3"
 critical = true
 description = "Repairs prompts and reruns the same eval until drift is gone."
 required_regex = ["prompt repair", "rerun", "eval drift"]
+
+[[evals.checklist]]
+id = "AIL-WF-4"
+critical = true
+description = "Repairs behavior eval feedback and reruns until agent behavior monitoring passes."
+required_regex = ["agent_behavior_eval\\.toml", "workflow_monitor\\.py --behavior-event", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals]]
+id = "agent-learning-workflow-behavior-eval"
+target = "agents/workflows/agent-learning-workflow.md"
+kind = "workflow"
+description = "The agent learning workflow must grade observable behavior, not only final output."
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-1"
+critical = true
+description = "Defines behavior eval rubric ownership."
+required_regex = ["agent_behavior_eval\\.toml", "behavior eval"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-2"
+critical = true
+description = "Requires behavior events in workflow monitoring."
+required_regex = ["workflow_monitor\\.py --behavior-event", "## Behavior Events"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-3"
+critical = true
+description = "Lists observable agent behavior families."
+required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
+
+[[evals]]
+id = "workflow-monitoring-template-behavior-events"
+target = "agents/templates/workflow_monitoring.md"
+kind = "workflow"
+description = "The monitoring template must expose a behavior-event section for trace-like evals."
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-1"
+critical = true
+description = "Includes a Behavior Events section and mechanical accumulation command."
+required_regex = ["## Behavior Events", "workflow_monitor\\.py --behavior-event"]
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-2"
+critical = true
+description = "Mentions observable event families required by the behavior eval."
+required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
+
+[[evals]]
+id = "agent-behavior-eval-manifest"
+target = "agents/evals/agent_behavior_eval.toml"
+kind = "eval"
+description = "The behavior eval manifest must cover observable run behavior families."
+
+[[evals.checklist]]
+id = "ABEM-1"
+critical = true
+description = "Defines criteria tables for behavior scoring."
+required_regex = ["\\[\\[criteria\\]\\]", "skill_invocation_recorded"]
+
+[[evals.checklist]]
+id = "ABEM-2"
+critical = true
+description = "Covers prompt eval, review feedback, subagent lifecycle, and diff-check behavior."
+required_regex = ["prompt_eval_behavior_recorded", "review_feedback_behavior_recorded", "subagent_lifecycle_behavior_recorded", "diff_check_behavior_recorded"]
+
+[[evals]]
+id = "agent-learning-skill-shim-behavior-eval"
+target = ".agents/skills/agent-learning/SKILL.md"
+kind = "skill"
+description = "The discoverable agent-learning skill must route behavior monitoring and behavior eval."
+
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-1"
+critical = true
+description = "Requires behavior-event recording before closeout."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "skill invocation"]
+
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-2"
+critical = true
+description = "Requires behavior-manifest based run evaluation."
+required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feedback actions"]
+
+[[evals]]
+id = "agent-learning-human-skill-behavior-eval"
+target = "agents/skills/agent-learning.md"
+kind = "skill"
+description = "The human agent-learning skill must document behavior eval management."
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-1"
+critical = true
+description = "Names workflow monitor behavior-event recording."
+required_regex = ["workflow_monitor\\.py --behavior-event", "subagent lifecycle", "diff-check"]
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-2"
+critical = true
+description = "Names behavior manifest and pass status."
+required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals]]
+id = "evals-readme-behavior-eval"
+target = "agents/evals/README.md"
+kind = "eval"
+description = "The eval directory README must document prompt and behavior eval management."
+
+[[evals.checklist]]
+id = "EVALS-README-BEHAVIOR-1"
+critical = true
+description = "Documents behavior eval command and manifest."
+required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml"]
+
+[[evals.checklist]]
+id = "EVALS-README-BEHAVIOR-2"
+critical = true
+description = "Requires behavior events to be recorded during the run."
+required_regex = ["workflow_monitor\\.py --behavior-event", "Record these events during the run"]

@@ -3,6 +3,8 @@
 @dependency-start
 responsibility Documents Agent Learning Workflow for this repository.
 upstream design README.md workflow catalog
+upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
+upstream implementation ../../tools/agent_tools/workflow_monitor.py appends monitoring evidence
 @dependency-end
 -->
 
@@ -82,7 +84,8 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 - request clause traceability
 - schedule / work log の completeness
-- workflow monitoring: selected skills、stage / subagent routing、MCP preflight、repo dependency intake、web research decision、intervention history
+- workflow monitoring: selected skills、stage / subagent routing、MCP preflight、repo dependency intake、web research decision、behavior events、intervention history
+- behavior eval: skill invocation、subagent routing、tool gates、prompt eval baseline/rerun、review feedback resolution、subagent lifecycle closeout、diff-check approval
 - review feedback の resolution
 - validation / commit / push evidence
 - dependency manifest と canonical tree-head evidence
@@ -90,6 +93,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 `AGENT_EVALUATION_STATUS=revise` の場合は、出力された feedback action を schedule/work_log/該当 artifact に反映し、再度 evaluation を通します。
 `AGENT_EVALUATION_STATUS=pass` になり、`agent_evaluation.md` の `feedback_actions_resolved: yes` と `learning_capture_complete: yes` が揃うまで、`task_close.py` は user-facing completion を許可しません。
+behavior eval の rubric は `agents/evals/agent_behavior_eval.toml` を正本にし、skill / workflow を変えたのに agent 行動が変わっていない場合は revise として扱います。
 
 ## Workflow Monitoring
 
@@ -98,6 +102,7 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 `workflow_monitor.py` を使うと、監視項目を手書きではなく機械的に蓄積できます。
 `bootstrap_agent_run.py` / `task_start.py` は routing と preflight の初期 signals を自動追記します。
 `check_mcp_inventory.py --report-dir <run>` と `run_repo_dependency_review.sh --report-dir <run>` はそれぞれ MCP preflight と dependency review の evidence を追記します。
+agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 
 必須 signals:
 
@@ -106,6 +111,7 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 - MCP preflight 結果、または `mcp_preflight_not_required`
 - repo dependency intake 結果、または `repo_dependency_intake_not_required`
 - web research / external research 結果、または `web_research_not_required`
+- behavior event: skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check のいずれか
 
 closeout では `skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` を `applied`、`recorded`、`not_applicable` のいずれかにします。
 `pending` のまま Eval を通してはいけません。

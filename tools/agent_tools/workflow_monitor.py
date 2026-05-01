@@ -53,6 +53,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Intervention to append.",
     )
     parser.add_argument(
+        "--behavior-event",
+        action="append",
+        default=[],
+        help=(
+            "Agent behavior event to append, such as skill invocation, subagent routing, "
+            "tool call, review decision, prompt eval result, or feedback action."
+        ),
+    )
+    parser.add_argument(
         "--decision",
         action="append",
         default=[],
@@ -86,6 +95,8 @@ def default_monitoring_text(report_dir: Path) -> str:
             f"- Run ID: {report_dir.name}",
             "",
             "## Signals",
+            "",
+            "## Behavior Events",
             "",
             "## Interventions",
             "",
@@ -198,6 +209,7 @@ def append_monitoring(
     report_dir: Path,
     *,
     signals: list[str] | None = None,
+    behavior_events: list[str] | None = None,
     interventions: list[str] | None = None,
     decisions: dict[str, str] | None = None,
     timestamp: str = "",
@@ -209,10 +221,14 @@ def append_monitoring(
         path.write_text(default_monitoring_text(report_dir), encoding="utf-8")
     lines = path.read_text(encoding="utf-8").splitlines()
     signal_entries = [normalize_entry(item, timestamp) for item in signals or []]
+    behavior_entries = [
+        normalize_entry(item, timestamp) for item in behavior_events or []
+    ]
     intervention_entries = [
         normalize_entry(item, timestamp) for item in interventions or []
     ]
     insert_entries(lines, "## Signals", signal_entries)
+    insert_entries(lines, "## Behavior Events", behavior_entries)
     insert_entries(lines, "## Interventions", intervention_entries)
     apply_decisions(lines, decisions or {})
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
@@ -226,6 +242,7 @@ def main() -> int:
     path = append_monitoring(
         resolve_report_dir(args),
         signals=list(args.signal),
+        behavior_events=list(args.behavior_event),
         interventions=list(args.intervention),
         decisions=decisions,
         timestamp=str(args.timestamp),

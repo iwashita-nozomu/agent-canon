@@ -178,8 +178,34 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("GOAL_LOOP_STATUS=achieved", result.stdout)
             self.assertIn("- current_iteration: 1", goal.read_text(encoding="utf-8"))
 
-    def test_run_stops_at_budget(self) -> None:
-        """The run command stops when the goal budget is exhausted."""
+    def test_goal_status_continues_at_run_safety_cap_count(self) -> None:
+        """Run safety cap is not a goal status termination condition."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            goal = root / "goal.md"
+            run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Continue past the advisory iteration count.",
+                "--max-iterations",
+                "1",
+            )
+            text = goal.read_text(encoding="utf-8")
+            goal.write_text(
+                text.replace("- current_iteration: 0", "- current_iteration: 1"),
+                encoding="utf-8",
+            )
+
+            result = run_goal_loop("status", "--goal-file", str(goal))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GOAL_LOOP_STATUS=continue", result.stdout)
+            self.assertIn("NEXT_ACTION=run_next_iteration", result.stdout)
+
+    def test_run_stops_at_invocation_safety_cap(self) -> None:
+        """The run command can stop at a caller-supplied safety cap."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             goal = root / "goal.md"
@@ -205,7 +231,7 @@ class GoalLoopTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn("GOAL_LOOP_STATUS=budget_exhausted", result.stdout)
+            self.assertIn("GOAL_LOOP_STATUS=run_limit_reached", result.stdout)
 
 
 if __name__ == "__main__":

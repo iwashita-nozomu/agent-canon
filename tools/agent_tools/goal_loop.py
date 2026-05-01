@@ -80,9 +80,9 @@ class GoalState:
         return int_field(self.fields, "current_iteration", 0)
 
     @property
-    def max_iterations(self) -> int:
-        """Return max_iterations as an integer."""
-        return int_field(self.fields, "max_iterations", 1)
+    def run_safety_cap(self) -> int:
+        """Return the optional per-run safety cap."""
+        return int_field(self.fields, "run_safety_cap", 0)
 
     @property
     def done_exit_criteria(self) -> int:
@@ -105,19 +105,12 @@ class GoalState:
         )
 
     @property
-    def budget_exhausted(self) -> bool:
-        """Return true when the loop cannot start another iteration."""
-        return not self.achieved and self.current_iteration >= self.max_iterations
-
-    @property
     def loop_status(self) -> str:
         """Return machine loop status."""
         if self.parse_errors:
             return "invalid"
         if self.achieved:
             return "achieved"
-        if self.budget_exhausted:
-            return "budget_exhausted"
         return "continue"
 
 
@@ -137,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="Create a goal.md file.")
     init_parser.add_argument("--goal-file", default="goal.md")
     init_parser.add_argument("--objective", required=True)
-    init_parser.add_argument("--max-iterations", type=int, default=5)
+    init_parser.add_argument("--max-iterations", type=int, default=0)
     init_parser.add_argument("--force", action="store_true")
 
     status_parser = subparsers.add_parser("status", help="Print goal loop status.")
@@ -149,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--max-iterations",
         type=int,
-        help="Optional run-local cap. Defaults to remaining budget in goal.md.",
+        help="Optional run-local safety cap for this invocation only.",
     )
     run_parser.add_argument(
         "command_args",
@@ -217,10 +210,10 @@ def parse_goal(path: Path) -> GoalState:
             backlog.append(item)
     if not exit_criteria:
         parse_errors.append("goal.md must include at least one Exit Criteria checkbox")
-    if int_field(fields, "max_iterations", 1) < 1:
-        parse_errors.append("max_iterations must be >= 1")
     if int_field(fields, "current_iteration", 0) < 0:
         parse_errors.append("current_iteration must be >= 0")
+    if int_field(fields, "run_safety_cap", 0) < 0:
+        parse_errors.append("run_safety_cap must be >= 0")
     return GoalState(
         path=path,
         fields=fields,
@@ -242,7 +235,7 @@ def render_machine_status(state: GoalState) -> str:
         f"GOAL_STATUS_FIELD={state.goal_status}",
         f"GOAL_LOOP_STATUS={state.loop_status}",
         f"GOAL_CURRENT_ITERATION={state.current_iteration}",
-        f"GOAL_MAX_ITERATIONS={state.max_iterations}",
+        f"GOAL_RUN_SAFETY_CAP={state.run_safety_cap}",
         f"GOAL_EXIT_CRITERIA_TOTAL={len(state.exit_criteria)}",
         f"GOAL_EXIT_CRITERIA_DONE={state.done_exit_criteria}",
         f"GOAL_BACKLOG_TOTAL={len(state.backlog)}",
@@ -259,8 +252,6 @@ def next_action(state: GoalState) -> str:
     """Return the next loop action."""
     if state.loop_status == "achieved":
         return "close_goal_loop"
-    if state.loop_status == "budget_exhausted":
-        return "increase_budget_or_stop_without_merge"
     if state.loop_status == "invalid":
         return "repair_goal_md"
     return "run_next_iteration"
@@ -283,7 +274,7 @@ def render_markdown_report(state: GoalState) -> str:
         f"- goal_status_field: `{state.goal_status}`",
         f"- goal_loop_status: `{state.loop_status}`",
         f"- current_iteration: `{state.current_iteration}`",
-        f"- max_iterations: `{state.max_iterations}`",
+        f"- run_safety_cap: `{state.run_safety_cap}`",
         f"- next_action: `{next_action(state)}`",
         "",
         "## Exit Criteria",
@@ -311,7 +302,7 @@ def write_report(path: str, state: GoalState) -> None:
     report_path.write_text(render_markdown_report(state), encoding="utf-8")
 
 
-def write_initial_goal(path: Path, objective: str, max_iterations: int, force: bool) -> None:
+def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: bool) -> None:
     """Write a starter goal.md contract."""
     if path.exists() and not force:
         raise RuntimeError(f"goal file already exists: {path}")
@@ -329,7 +320,7 @@ def write_initial_goal(path: Path, objective: str, max_iterations: int, force: b
             "## Loop Contract",
             "",
             "- goal_status: active",
-            f"- max_iterations: {max_iterations}",
+            f"- run_safety_cap: {run_safety_cap}",
             "- current_iteration: 0",
             "- active_run_id:",
             "- stop_reason:",
@@ -411,7 +402,7 @@ def set_goal_status(goal_file: Path, status: str) -> None:
 
 
 def run_goal_command(args: argparse.Namespace) -> int:
-    """Run the configured command until goal.md is achieved or budget is exhausted."""
+    """Run the configured command until goal.md is achieved or a run-local cap is hit."""
     goal_file = Path(str(args.goal_file)).resolve()
     command = list(args.command_args)
     if command and command[0] == "--":
@@ -419,16 +410,19 @@ def run_goal_command(args: argparse.Namespace) -> int:
     if not command:
         print("goal_loop.py: run requires a command after --", file=sys.stderr)
         return 1
-    run_limit = args.max_iterations
+    configured_run_limit = args.max_iterations
     runs = 0
     while True:
         state = parse_goal(goal_file)
+        run_limit = configured_run_limit
+        if run_limit is None and state.run_safety_cap > 0:
+            run_limit = state.run_safety_cap
         if args.report_out:
             write_report(str(args.report_out), state)
         print(render_machine_status(state), end="")
         if state.loop_status == "achieved":
             return 0
-        if state.loop_status in {"invalid", "budget_exhausted"}:
+        if state.loop_status == "invalid":
             return 2
         if run_limit is not None and runs >= run_limit:
             print("GOAL_LOOP_STATUS=run_limit_reached")
