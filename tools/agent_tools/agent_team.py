@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -981,7 +982,7 @@ def slugify(value: str) -> str:
     return slug or "task"
 
 
-def make_run_id(task: str, created_at) -> str:
+def make_run_id(task: str, created_at: datetime) -> str:
     """Build a stable default run id."""
     timestamp = created_at.strftime("%Y%m%d-%H%M%S")
     return f"{timestamp}-{slugify(task)[:40]}"
