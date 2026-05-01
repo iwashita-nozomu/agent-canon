@@ -9,17 +9,27 @@ responsibility Documents Dependency Analysis for this repository.
 upstream design ../../../documents/dependency-manifest-design.md defines manifest format and graph semantics
 upstream design ../../../agents/canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ../../../agents/skills/dependency-analysis.md documents the human-facing skill
+upstream design ../../../agents/workflows/hypothesis-validation-workflow.md separates code and header dependency evidence
 @dependency-end
 -->
 
 # Dependency Analysis
 
 1. Read `documents/dependency-manifest-design.md`.
+1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.
 1. Choose the smallest mode that answers the task:
+   - code dependency surface: run `scan_code_dependencies.sh`
    - changed-file closeout gate: use `--changed`
    - explicit file review: pass file paths explicitly
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
+1. For code dependency evidence, run:
+
+```bash
+bash tools/agent_tools/scan_code_dependencies.sh --changed
+```
+
+1. Keep code dependency evidence separate from header dependency evidence. Do not merge import/include/source edges with manifest upstream/downstream graph edges.
 1. For changed human-authored text files, run:
 
 ```bash

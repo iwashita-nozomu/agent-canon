@@ -4,6 +4,7 @@ responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
 downstream implementation ../../.codex/config.toml Codex runtime config consumes subagent routing
+downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP readability report reviewer role
 @dependency-end
 -->
 
@@ -118,6 +119,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
   - Python diff を型、pytest、ruff 前提で洗う
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
+- `oop_readability_reviewer`
+  - `analyze_oop_readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
 - `spark_worker`
@@ -167,6 +170,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
+| OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report を事実として扱い、OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
 | 低リスク実装slice | design trace、naming、validation が固定済みの slice だけを `spark_worker` first |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
@@ -199,7 +203,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 | Broad Or Ambiguous Implementation | `worker` | `gpt-5.5` | `high` |
 | Codebase Survey / Test Design / Language-Specific Code Review | `explorer`, `test_designer`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex` | `high` |
 | Low-Latency Narrow Implementation | `spark_worker` | `gpt-5.3-codex-spark` | `high` |
-| Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.5` | `high` |
+| Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `oop_readability_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.5` | `high` |
 
 運用メモ:
 - OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。

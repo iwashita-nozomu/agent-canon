@@ -10,6 +10,7 @@ downstream implementation ../tools/agent_tools/scan_dependency_headers.sh scans 
 downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax
 downstream implementation ../tools/agent_tools/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
+downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 @dependency-end
@@ -208,6 +209,21 @@ Example: A `upstream` B plus B `upstream` A is an upstream cycle and should fail
 
 Tools are Bash-first.
 Python is not required for the first implementation because the DSL is line-oriented.
+
+Code dependency extraction is deliberately separate from dependency manifest validation.
+`scan_code_dependencies.sh` reads language syntax such as Python imports, local C/C++ includes, and shell source statements.
+The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
+Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
+
+### `scan_code_dependencies.sh`
+
+Responsibilities:
+
+- extract best-effort code edges from import / include / source statements
+- keep output independent from manifest upstream/downstream edges
+- support explicit path lists and `--changed`
+- provide pre-edit evidence for `agents/workflows/hypothesis-validation-workflow.md`
+- remain Bash-first and lightweight; deeper language-specific precision can be added later without changing the header manifest DSL
 
 ### `scan_dependency_headers.sh`
 

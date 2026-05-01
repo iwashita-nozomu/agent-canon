@@ -6,6 +6,7 @@ description: Mandatory first skill for repository tasks. Use before selecting wo
 @dependency-start
 responsibility Documents Agent Orchestration for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/workflows/hypothesis-validation-workflow.md analysis-first overlay routing
 @dependency-end
 -->
 
@@ -31,6 +32,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
+     - cause analysis, hypothesis validation, fix-surface selection, or multi-candidate comparison -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay
    - do not add unrelated family skills just because they are nearby in the catalog
 1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, or repo-changing-only skills.
 1. Choose the starter command with explicit precedence:

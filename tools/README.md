@@ -46,6 +46,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
   - `agent_tools/evaluate_agent_run.py`
+  - `agent_tools/goal_loop.py`
+  - `agent_tools/evaluate_skill_workflow_prompts.py`
 
 ## Agent Evaluation Tools
 
@@ -72,10 +74,39 @@ python3 tools/agent_tools/workflow_monitor.py \
   --decision workflow_improvement_decision=applied
 ```
 
+## Goal Loop Tool
+
+`goal_loop.py` manages a top-level `goal.md` contract and repeats a command until explicit exit criteria are checked and `goal_status: achieved` is set.
+The default `goal.md` and `goal_loop.py init` include mandatory criteria for dependency review, code dependency extraction, OOP/readability analysis, repo-wide static analysis or CI, and objective-specific evidence.
+
+```bash
+python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
+python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
+python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
+```
+
+Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
+Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
+
+## Skill And Workflow Prompt Evals
+
+`evaluate_skill_workflow_prompts.py` runs frozen checklist evals for skill and workflow prompt surfaces.
+Use it before and after prompt repair when changing agent-facing skills or workflows.
+
+```bash
+python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
+  --manifest agents/evals/skill_workflow_prompt_eval.toml \
+  --report-out reports/skill-workflow-prompt-eval.md
+```
+
+Each tested skill/workflow should have its own eval entry in `agents/evals/skill_workflow_prompt_eval.toml`.
+Do not close prompt-improvement work while `EVAL_STATUS=fail`.
+
 ## Dependency Manifest Tools
 
 Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 
+- `scan_code_dependencies.sh` extracts code dependency edges from imports, local includes, and shell `source` statements. This is not a dependency header tool.
 - `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
 - `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
@@ -85,6 +116,20 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
 Generic canon files should connect to the nearest canon-owned anchor such as `AGENTS.md`, `README.md`, a directory README, a canonical workflow document, or this tool index.
+
+For analysis-first work, run code dependency extraction and header dependency graph validation separately.
+Use code dependency evidence to understand import/include/source reachability, and header dependency evidence to decide which design, docs, tests, workflow, and environment context must be read before editing.
+
+## Static Design Analysis Tools
+
+- `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
+- `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, simple cognitive-complexity signals, mathematically redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
+- `analyze_oop_readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.
+- `analyze_oop_readability.py --review-prompt-out <path>` writes a prompt for `oop_readability_reviewer`. The reviewer documents the mechanical report, but does not change the score, thresholds, counts, paths, line numbers, or pass/fail verdict.
+
+These tools are review aids.
+Use them to set baseline / target / actual scores in refactor or design artifacts.
+For OOP readability, keep the mechanical report as the source of truth and use `oop_readability_reviewer` only to write the reader-facing interpretation and false-positive notes.
 
 ## 含めないもの
 

@@ -1,0 +1,254 @@
+# @dependency-start
+# responsibility Defines deterministic evals for skill and workflow prompt drift.
+# upstream design README.md prompt eval directory contract
+# upstream design ../skills/adaptive-improvement-loop.md adaptive improvement skill contract
+# downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
+# @dependency-end
+
+version = 1
+
+[[evals]]
+id = "all-discoverable-skill-shims"
+target_glob = ".agents/skills/*/SKILL.md"
+expected_count = 25
+kind = "skill"
+description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-1"
+critical = true
+description = "Starts with YAML frontmatter and includes required name/description fields."
+required_regex = ["\\A---\\n", "\\nname:\\s*[-a-z0-9]+", "\\ndescription:\\s*\\S"]
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-2"
+critical = true
+description = "Includes dependency manifest markers near the top of the file."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-3"
+critical = true
+description = "Provides an executable numbered instruction list."
+required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "all-human-skill-docs"
+target_glob = "agents/skills/*.md"
+expected_count = 47
+kind = "skill"
+description = "Every human-facing skill document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "SKILL-DOC-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "SKILL-DOC-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-workflow-docs"
+target_glob = "agents/workflows/*.md"
+expected_count = 15
+kind = "workflow"
+description = "Every workflow document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "WORKFLOW-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "WORKFLOW-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-claude-skill-mirrors"
+target_glob = ".claude/skills/*/SKILL.md"
+expected_count = 25
+kind = "skill"
+description = "Every Claude skill mirror must remain loadable and dependency-linked."
+
+[[evals.checklist]]
+id = "CLAUDE-SKILL-GENERIC-1"
+critical = true
+description = "Starts with YAML frontmatter and includes required name/description fields."
+required_regex = ["\\A---\\n", "\\nname:\\s*[-a-z0-9]+", "\\ndescription:\\s*\\S"]
+
+[[evals.checklist]]
+id = "CLAUDE-SKILL-GENERIC-2"
+critical = true
+description = "Includes dependency manifest markers near the top of the file."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "CLAUDE-SKILL-GENERIC-3"
+critical = true
+description = "Provides an executable numbered instruction list."
+required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "all-canonical-routing-docs"
+target_glob = "agents/canonical/*.md"
+expected_count = 6
+kind = "workflow"
+description = "Every canonical routing document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "CANONICAL-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "CANONICAL-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-codex-subagent-prompts"
+target_glob = ".codex/agents/*.toml"
+expected_count = 29
+kind = "subagent"
+description = "Every Codex subagent prompt must be dependency-linked and declare a model."
+
+[[evals.checklist]]
+id = "CODEX-AGENT-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "CODEX-AGENT-GENERIC-2"
+critical = true
+description = "Declares an agent model."
+required_regex = ["(?m)^model\\s*="]
+
+[[evals]]
+id = "root-agent-entrypoint"
+target = "AGENTS.md"
+kind = "workflow"
+description = "The runtime root agent entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "shared-root-agent-entrypoint"
+target = "ROOT_AGENTS.md"
+kind = "workflow"
+description = "The shared root agent entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "agents-readme-routing-entrypoint"
+target = "agents/README.md"
+kind = "workflow"
+description = "The agents README routing entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "AGENTS-README-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "task-workflows-routing-entrypoint"
+target = "agents/TASK_WORKFLOWS.md"
+kind = "workflow"
+description = "The task workflow routing entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "TASK-WORKFLOWS-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "adaptive-improvement-loop-skill-shim"
+target = ".agents/skills/adaptive-improvement-loop/SKILL.md"
+kind = "skill"
+description = "The discoverable Codex skill must route iterative improvement through goal.md and prompt evals."
+
+[[evals.checklist]]
+id = "AIL-SHIM-1"
+critical = true
+description = "Mentions the top-level goal contract and goal loop tool."
+required_regex = ["goal\\.md", "goal_loop\\.py"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-2"
+critical = true
+description = "Requires frozen eval definitions before prompt or workflow tuning."
+required_regex = ["agents/evals/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-3"
+critical = true
+description = "Blocks loop closeout while eval drift remains."
+required_regex = ["Do not close", "eval"]
+
+[[evals]]
+id = "adaptive-improvement-loop-human-skill"
+target = "agents/skills/adaptive-improvement-loop.md"
+kind = "skill"
+description = "The human skill canon must explain eval-driven prompt repair for iterative loops."
+
+[[evals.checklist]]
+id = "AIL-HUMAN-1"
+critical = true
+description = "Requires goal.md and goal_loop.py for repo-level loops."
+required_regex = ["goal\\.md", "goal_loop\\.py"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-2"
+critical = true
+description = "Requires an eval per tested skill and workflow."
+required_regex = ["skill/workflow", "eval"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-3"
+critical = true
+description = "Requires prompt repair and rerun until no eval deviation remains."
+required_regex = ["prompt", "rerun", "no eval deviation"]
+
+[[evals]]
+id = "adaptive-improvement-workflow"
+target = "agents/workflows/adaptive-improvement-workflow.md"
+kind = "workflow"
+description = "The workflow must make eval definition, measurement, prompt repair, and rerun a first-class loop stage."
+
+[[evals.checklist]]
+id = "AIL-WF-1"
+critical = true
+description = "Defines evals before choosing or changing an iteration."
+required_regex = ["skill/workflow eval", "agents/evals/skill_workflow_prompt_eval\\.toml"]
+
+[[evals.checklist]]
+id = "AIL-WF-2"
+critical = true
+description = "Runs the mechanical eval tool and uses its report as evidence."
+required_regex = ["evaluate_skill_workflow_prompts\\.py", "EVAL_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-WF-3"
+critical = true
+description = "Repairs prompts and reruns the same eval until drift is gone."
+required_regex = ["prompt repair", "rerun", "eval drift"]
