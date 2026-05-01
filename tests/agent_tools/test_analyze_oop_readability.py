@@ -188,7 +188,10 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             result = self.run_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("cpp:info:null_runtime_branch:route:1>typed-reference-or-variant-boundary", result.stdout)
+            self.assertIn(
+                "cpp:info:null_runtime_branch:route:1>typed-reference-or-variant-boundary",
+                result.stdout,
+            )
 
     def test_python_mathematical_redundancy_is_flagged(self) -> None:
         """Identity, pass-through, stateless callables, and formatting wrappers are reported."""

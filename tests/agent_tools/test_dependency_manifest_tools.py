@@ -7,7 +7,7 @@
 # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
-# upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependencies
+# upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh scans code
 # @dependency-end
 
 from __future__ import annotations
