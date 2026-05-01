@@ -12,7 +12,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 - goal_status: active
 - run_safety_cap: 5
-- current_iteration: 5
+- current_iteration: 6
 - active_run_id: 20260501-oop-readability-loop
 - stop_reason:
 
@@ -51,6 +51,9 @@ behavior, public API semantics, or numerical algorithms.
 - [x] B14: Continue with iteration 5 using subagent-supported candidate selection.
 - [x] B15: Rerun the all-code OOP readability evaluation after iteration 5.
 - [x] B16: Record remaining backlog and explicit continue/stop decision.
+- [x] B17: Continue with iteration 6 using subagent-supported candidate selection.
+- [x] B18: Rerun the all-code OOP readability evaluation after iteration 6.
+- [x] B19: Record remaining backlog and explicit continue/stop decision.
 
 ## Loop Log
 
@@ -115,3 +118,18 @@ behavior, public API semantics, or numerical algorithms.
   `PrimitiveDerivativeBridgePass.cpp`, `agent_team.py`, `smolyak.hpp`,
   `native_autodiff.hpp`, and `kokkos_backend.hpp` still dominate the hotspot
   ranking.
+- iteration 6: continue the loop mechanically from a clean pushed baseline.
+  Parent manages loop state and gates; subagents select the next bounded
+  behavior-preserving code hotspot with C++ coverage kept in scope.
+- iteration 6 result: C++ marker dispatch in
+  `PrimitiveDerivativeBridgePass.cpp` was split into classification,
+  primal-resolution, registered-family, and callable rewrite helpers. The
+  `PrimitiveDerivativeBridgePass::run` function/cognitive warnings were
+  removed. Source-tree OOP findings decreased from 820 to 819, warn findings
+  decreased from 311 to 309, and the target file decreased from 52 to 51.
+  C++ reviewer approved the diff as behavior-preserving.
+- iteration 6 validation: targeted C++ build, native autodiff compiler-pass
+  ctests, affected-surface code dependency scan, repo dependency review, and
+  `make ci` passed. The loop remains active because the highest remaining
+  hotspots are `PrimitiveDerivativeBridgePass.cpp`, `agent_team.py`,
+  `smolyak.hpp`, `native_autodiff.hpp`, and `kokkos_backend.hpp`.
