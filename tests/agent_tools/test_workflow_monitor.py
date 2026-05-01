@@ -38,6 +38,8 @@ class WorkflowMonitorTest(unittest.TestCase):
                     str(report_dir),
                     "--signal",
                     "skills=$agent-orchestration",
+                    "--behavior-event",
+                    "skill_invocation=$agent-orchestration status=observed",
                     "--intervention",
                     "spawned reviewer",
                     "--decision",
@@ -60,6 +62,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                 text,
             )
             self.assertIn("skills=$agent-orchestration", text)
+            self.assertIn("skill_invocation=$agent-orchestration status=observed", text)
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- memory_learning_decision: not_applicable", text)

@@ -84,6 +84,17 @@ def write_ready_run(report_dir: Path) -> None:
                 "- mcp_preflight_not_required: no MCP tool needed for this unit test",
                 "- repo_dependency_review=pass path_count=12",
                 "- web_research_not_required: local deterministic test",
+                "- review_status=approve",
+                "- validation_status=pass",
+                "- drift_risk=none",
+                "## Behavior Events",
+                "- skill_invocation=$agent-orchestration status=observed",
+                "- subagent_routing=worker stage=implementation status=observed",
+                "- tool_call=run_repo_dependency_review.sh status=pass",
+                "- prompt_eval_not_required reason=unit-test-run-bundle",
+                "- review_decision=approve feedback_actions_resolved=yes",
+                "- subagent_lifecycle=closed subagents_closed=yes",
+                "- diff_check_not_required reason=unit-test-run-bundle",
                 "## Interventions",
                 (
                     "- Monitoring kept implementation local and required dependency review "
@@ -272,6 +283,64 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+
+    def test_evaluate_missing_required_signal_fails(self) -> None:
+        """Required monitoring signals must cover review, validation, and drift."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace("- review_status=approve\n", ""),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("review status", result.stdout)
+
+    def test_evaluate_missing_behavior_events_fail(self) -> None:
+        """Run behavior events are required, not only final prose summaries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            before, _, after = monitoring.partition("## Behavior Events")
+            _, _, tail = after.partition("## Interventions")
+            (report_dir / "workflow_monitoring.md").write_text(
+                before + "## Behavior Events\n\n## Interventions" + tail,
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("Record the selected skills", result.stdout)
 
     def test_evaluate_incomplete_run_fails_with_feedback(self) -> None:
         """Missing evidence should create fix-now feedback actions."""

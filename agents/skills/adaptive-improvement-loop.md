@@ -37,6 +37,8 @@ upstream design ../canonical/skills.md skill canon registry
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定します。
 - prompt 修正前後で `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を実行し、`EVAL_STATUS=pass` を evidence にします。
 - eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
+- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
+- closeout 前に `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest agents/evals/agent_behavior_eval.toml --write` を実行し、`AGENT_EVALUATION_STATUS=pass` まで workflow artifact または prompt を修正します。
 - 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
@@ -60,6 +62,9 @@ upstream design ../canonical/skills.md skill canon registry
 - `Skill/Workflow Eval Manifest:`
 - `Prompt Eval Command:`
 - `Prompt Eval Result:`
+- `Behavior Eval Manifest:`
+- `Behavior Event Log:`
+- `Agent Behavior Eval Result:`
 
 ## Boundary
 

@@ -30,6 +30,8 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `agents/workflows/workflow-references.md`
 - `tools/agent_tools/log_agent_learning.py`
 - `tools/agent_tools/evaluate_agent_run.py`
+- `tools/agent_tools/workflow_monitor.py`
+- `agents/evals/agent_behavior_eval.toml`
 
 ## Mandatory Checklist
 
@@ -38,6 +40,8 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - source、evidence、scope、confidence を書く
 - task-local な一時指示を stable philosophy にしない
 - `evaluate_agent_run.py --write` で `agent_evaluation.md` を作り、feedback action を closeout 前に解決する
+- `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
+- behavior eval は `agents/evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる
 - `memory/` への追記を template local artifact だけで終わらせず、shared canon update として closeout する
 - promotion candidate は `AGENTS.md` へ直書きせず、periodic sweep で昇格する
 - 確定した禁止事項は `engineering_avoidances.md` への昇格候補にする
@@ -47,7 +51,14 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 ```bash
 python3 tools/agent_tools/evaluate_agent_run.py \
   --report-dir reports/agents/<run-id> \
+  --behavior-manifest agents/evals/agent_behavior_eval.toml \
   --write
+```
+
+```bash
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --behavior-event "skill_invocation=$agent-learning status=observed"
 ```
 
 ```bash

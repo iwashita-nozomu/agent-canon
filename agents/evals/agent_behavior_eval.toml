@@ -1,0 +1,88 @@
+# @dependency-start
+# responsibility Defines deterministic run-bundle evals for observable agent behavior.
+# upstream design README.md eval directory contract
+# upstream design ../workflows/agent-learning-workflow.md agent behavior feedback workflow
+# upstream design ../templates/workflow_monitoring.md stores behavior events during a run
+# downstream implementation ../../tools/agent_tools/evaluate_agent_run.py consumes these criteria
+# downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies behavior scoring
+# @dependency-end
+
+version = 1
+
+[[criteria]]
+name = "skill_invocation_recorded"
+max_score = 5
+feedback = "Record the selected skills and the invoked skill surface in workflow_monitoring.md Behavior Events."
+required_all = ["## Behavior Events"]
+required_any = ["skill_invocation=", "skill_invocation_not_required"]
+
+[[criteria]]
+name = "stage_and_subagent_behavior_recorded"
+max_score = 5
+feedback = "Record stage ownership and subagent routing or explicit parent-direct rationale as behavior evidence."
+required_any = ["subagent_routing=", "stage owner", "parent_direct_reason", "trivial_direct_edit"]
+
+[[criteria]]
+name = "tool_gate_behavior_recorded"
+max_score = 5
+feedback = "Record required tool gates as behavior events before closeout."
+required_any = [
+  "tool_call=run_repo_dependency_review.sh",
+  "repo_dependency_review=pass",
+  "tool_call=make ci",
+  "static_analysis=pass",
+]
+
+[[criteria]]
+name = "prompt_eval_behavior_recorded"
+max_score = 5
+feedback = "Record prompt eval baseline/rerun behavior for skill or workflow prompt changes."
+required_any = [
+  "tool_call=evaluate_skill_workflow_prompts.py",
+  "prompt_eval=pass",
+  "EVAL_STATUS=pass",
+  "prompt_eval_not_required",
+]
+
+[[criteria]]
+name = "review_feedback_behavior_recorded"
+max_score = 5
+feedback = "Record review decisions and feedback resolution as observable behavior."
+required_any = [
+  "review_decision=approve",
+  "review_findings_integrated=yes",
+  "feedback_actions_resolved: yes",
+]
+
+[[criteria]]
+name = "subagent_lifecycle_behavior_recorded"
+max_score = 5
+feedback = "Record fresh subagent lifecycle policy and closeout evidence, or explicit no-subagent justification."
+required_any = [
+  "subagents_closed=yes",
+  "fresh_subagents_required",
+  "subagent_lifecycle=closed",
+  "parent_direct_reason",
+]
+
+[[criteria]]
+name = "diff_check_behavior_recorded"
+max_score = 5
+feedback = "Record independent diff-check behavior, or explicit no-diff rationale for non-changing advisory tasks."
+required_any = [
+  "diff_check_agent_complete=yes",
+  "diff_check_agent_decision=approve",
+  "diff_check_not_required",
+]
+
+[[criteria]]
+name = "self_improvement_decision_recorded"
+max_score = 5
+source = "bundle"
+feedback = "Record skill/config/workflow/memory improvement decisions after behavior evaluation."
+required_all = [
+  "skill_improvement_decision:",
+  "config_improvement_decision:",
+  "workflow_improvement_decision:",
+  "memory_learning_decision:",
+]
