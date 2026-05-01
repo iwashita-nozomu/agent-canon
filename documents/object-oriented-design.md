@@ -117,6 +117,8 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 - 合成可能な小さい変換を作り、巨大な手続きで複数の射を隠さない。
 - `None` による runtime routing を domain の一部として曖昧にせず、別型、別 constructor、別 entrypoint、`Protocol`、variant で表す。
 - helper は外へ増やすより、合成の内側でしか使わない局所関数や内包に閉じる。
+- 数理的に情報を増やさない identity wrapper、pass-through wrapper、stateless callable class、薄い formatting wrapper は不要構造として扱います。
+- 表示用 formatting は domain contract を持つ presentation boundary の場合だけ関数化し、単なる `str(x)` / f-string / `to_string(x)` の包み直しは避けます。
 
 ## 禁止事項
 
@@ -148,10 +150,24 @@ python3 tools/agent_tools/analyze_oop_readability.py python include src tests --
 - Python の `Optional` / `None` runtime 分岐、純粋変換と副作用の混在。
 - C++ の public field 過多、base class 過多、巨大 function / class、`nullptr` runtime 分岐。
 - control-flow が深く、人間が追う負荷が高い function。
+- 数理的に不要な identity function、pass-through function、stateless callable class。
+- domain contract を足さない trivial formatting function。
 
 score は設計判断の補助です。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
-重要な変更では、tool output を `project_reviewer`、`python_reviewer`、`cpp_reviewer` の review input にし、false positive / allowed warning を design artifact に書きます。
+重要な変更では、機械 report を正本にします。
+
+```bash
+python3 tools/agent_tools/analyze_oop_readability.py \
+  --format markdown \
+  --include-snippets \
+  --review-prompt-out reports/agents/<run-id>/oop_readability_reviewer_prompt.md \
+  python include src tests \
+  > reports/agents/<run-id>/oop_readability_report.md
+```
+
+`oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
+false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。
 
 ## 例外
 

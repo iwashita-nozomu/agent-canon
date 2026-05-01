@@ -28,12 +28,11 @@ from agent_team import (
     load_team_config,
     required_output_templates_missing,
     resolve_cross_cutting_document_packet,
-    resolve_role_document_packet,
     resolve_role,
+    resolve_role_document_packet,
     task_ids,
     workflow_spawn_budget,
 )
-
 
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
@@ -52,6 +51,7 @@ WRITING_AND_REVIEW_ROLE_IDS = {
     "citation_evidence_reviewer",
     "notation_definition_reviewer",
     "logic_gap_reviewer",
+    "oop_readability_reviewer",
     "reviewer",
     "project_reviewer",
     "report_reviewer",
