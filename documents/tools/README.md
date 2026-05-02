@@ -94,6 +94,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/analyze_oop_readability.py`
   - Python / C++ の OOP readability を機械判定します。外部 repo や派生 template snapshot を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
+- `tools/agent_tools/check_algorithm_module_public_surface.py`
+  - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
 - `tools/push_origin.sh`
   - commit 後の canonical push 入口です。
 
