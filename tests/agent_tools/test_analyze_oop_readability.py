@@ -134,6 +134,52 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("module_helper_name:calculate_helper", result.stdout)
 
+    def test_python_local_aggregation_is_not_mixed_effect(self) -> None:
+        """Mutating a function-owned accumulator is not an external effect boundary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "rendering.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "def render_lines(values: tuple[int, ...]) -> str:",
+                        "    lines: list[str] = []",
+                        "    for value in values:",
+                        "        lines.append(str(value))",
+                        "    return '\\n'.join(lines)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("mixed_morphism_effect:render_lines", result.stdout)
+
+    def test_python_boundary_mutation_is_mixed_effect(self) -> None:
+        """Mutating caller-owned inputs remains an effect boundary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "mutation.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "def collect(values: list[int], value: int) -> list[int]:",
+                        "    values.append(value)",
+                        "    return values",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("mixed_morphism_effect:collect", result.stdout)
+
     def test_cpp_public_surface_is_flagged(self) -> None:
         """A C++ class with wide public state and vague name is reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:

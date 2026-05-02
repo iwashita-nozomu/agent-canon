@@ -436,9 +436,52 @@ def returns_value(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return False
 
 
+def collect_local_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Collect names owned by the function body, excluding boundary inputs."""
+    parameters = {
+        arg.arg
+        for arg in (
+            list(node.args.posonlyargs)
+            + list(node.args.args)
+            + list(node.args.kwonlyargs)
+        )
+    }
+    if node.args.vararg is not None:
+        parameters.add(node.args.vararg.arg)
+    if node.args.kwarg is not None:
+        parameters.add(node.args.kwarg.arg)
+
+    names: set[str] = set()
+
+    def collect_target(target: ast.AST) -> None:
+        if isinstance(target, ast.Name) and target.id not in parameters:
+            names.add(target.id)
+        if isinstance(target, (ast.Tuple, ast.List)):
+            for element in target.elts:
+                collect_target(element)
+
+    for child in ast.walk(node):
+        if isinstance(child, ast.Assign):
+            for target in child.targets:
+                collect_target(target)
+        elif isinstance(child, ast.AnnAssign):
+            collect_target(child.target)
+        elif isinstance(child, (ast.For, ast.AsyncFor)):
+            collect_target(child.target)
+        elif isinstance(child, ast.With):
+            for item in child.items:
+                if item.optional_vars is not None:
+                    collect_target(item.optional_vars)
+        elif isinstance(child, ast.AsyncWith):
+            for item in child.items:
+                if item.optional_vars is not None:
+                    collect_target(item.optional_vars)
+    return names
+
+
 def has_side_effect_call(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    """Return true when a function appears to cross an IO or mutation boundary."""
-    side_effect_names = {
+    """Return true when a function appears to cross an external effect boundary."""
+    local_mutation_names = {
         "append",
         "extend",
         "insert",
@@ -446,6 +489,10 @@ def has_side_effect_call(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         "remove",
         "clear",
         "update",
+        "add",
+        "discard",
+    }
+    external_effect_names = {
         "write",
         "writelines",
         "write_text",
@@ -461,13 +508,19 @@ def has_side_effect_call(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         "check_call",
         "check_output",
     }
+    local_names = collect_local_names(node)
     for child in ast.walk(node):
         if isinstance(child, ast.Call):
             func = child.func
-            if isinstance(func, ast.Name) and func.id in side_effect_names:
+            if isinstance(func, ast.Name) and func.id in external_effect_names:
                 return True
-            if isinstance(func, ast.Attribute) and func.attr in side_effect_names:
-                return True
+            if isinstance(func, ast.Attribute):
+                if func.attr in external_effect_names:
+                    return True
+                if func.attr in local_mutation_names:
+                    if isinstance(func.value, ast.Name) and func.value.id in local_names:
+                        continue
+                    return True
     return False
 
 
