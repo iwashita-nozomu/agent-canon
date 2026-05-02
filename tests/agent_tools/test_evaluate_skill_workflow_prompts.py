@@ -51,9 +51,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data: dict[str, Any] = tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+        data = cast(dict[str, Any], tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
             manifest.read_text(encoding="utf-8")
-        )
+        ))
         evals = cast(list[dict[str, Any]], data["evals"])
 
         globs = {
@@ -63,10 +63,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 25)
-        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 25)
-        self.assertEqual(globs["agents/skills/*.md"], 47)
-        self.assertEqual(globs["agents/workflows/*.md"], 17)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 26)
+        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 26)
+        self.assertEqual(globs["agents/skills/*.md"], 48)
+        self.assertEqual(globs["agents/workflows/*.md"], 18)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], 29)
 

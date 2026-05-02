@@ -29,9 +29,30 @@ def resolve_repo_root() -> Path:
 
 
 REPO_ROOT = resolve_repo_root()
+AGENT_CANON_IS_SUBMODULE = bool(
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get",
+            "submodule.vendor/agent-canon.path",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+)
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
+SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
 
 
+@unittest.skipIf(
+    AGENT_CANON_IS_SUBMODULE,
+    "subtree snapshot wrapper tests do not apply when vendor/agent-canon is a submodule",
+)
 class UpdateAgentCanonTest(unittest.TestCase):
     """Exercise the wrapper through a cloned repository."""
 
@@ -55,6 +76,9 @@ class UpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+        submodule_gitfile = target / SUBMODULE_GITFILE
+        if submodule_gitfile.is_file():
+            submodule_gitfile.unlink()
 
     def clone_repo(self, target: Path) -> None:
         """Clone the current repository into one temporary target."""
