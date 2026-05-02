@@ -279,6 +279,65 @@ split_prefix_snapshot() {
   return 1
 }
 
+commit_prefix_worktree_snapshot() {
+  local tmp_index=""
+  local path=""
+  local rel_path=""
+  local mode=""
+  local blob_sha=""
+  local tree_sha=""
+
+  tmp_index="$(mktemp)"
+  rm -f "$tmp_index"
+
+  GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" read-tree --empty
+  while IFS= read -r -d '' path; do
+    rel_path="${path#"$ROOT_DIR/$PREFIX/"}"
+    if [[ -L "$path" ]]; then
+      mode="120000"
+      blob_sha="$(readlink "$path" | git -C "$ROOT_DIR" hash-object -w --stdin)"
+    elif [[ -f "$path" ]]; then
+      if [[ -x "$path" ]]; then
+        mode="100755"
+      else
+        mode="100644"
+      fi
+      blob_sha="$(git -C "$ROOT_DIR" hash-object -w --path="$rel_path" "$path")"
+    else
+      continue
+    fi
+    GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" update-index --add --cacheinfo "$mode,$blob_sha,$rel_path"
+  done < <(
+    find "$ROOT_DIR/$PREFIX" \
+      -name .git -prune -o \
+      \( -type f -o -type l \) -print0
+  )
+
+  tree_sha="$(GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" write-tree)"
+  rm -f "$tmp_index"
+  git -C "$ROOT_DIR" commit-tree "$tree_sha" -m "chore: seed agent-canon snapshot"
+}
+
+push_submodule_head_snapshot() {
+  local bare_repo_path="$1"
+  local branch="$2"
+
+  git -C "$ROOT_DIR/$PREFIX" rev-parse --verify HEAD^{commit} >/dev/null 2>&1 || return 1
+  git -C "$ROOT_DIR/$PREFIX" push "$bare_repo_path" "HEAD:refs/heads/${branch}" >/dev/null
+  git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
+  echo "seeded agent_canon_bare_repo=${bare_repo_path}"
+}
+
+push_root_seed_snapshot() {
+  local bare_repo_path="$1"
+  local branch="$2"
+  local seed_sha="$3"
+
+  git -C "$ROOT_DIR" push "$bare_repo_path" "${seed_sha}:refs/heads/${branch}" >/dev/null
+  git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
+  echo "seeded agent_canon_bare_repo=${bare_repo_path}"
+}
+
 seed_snapshot_into_bare() {
   local bare_repo_path="$1"
   local branch="$2"
@@ -291,14 +350,22 @@ seed_snapshot_into_bare() {
 
   if seed_sha="$(split_prefix_snapshot)"; then
     echo "agent_canon_seed_method=subtree_split"
-  else
-    seed_sha="$(git -C "$ROOT_DIR" commit-tree "HEAD:$PREFIX" -m "chore: seed agent-canon snapshot")"
-    echo "agent_canon_seed_method=commit_tree_snapshot"
+    push_root_seed_snapshot "$bare_repo_path" "$branch" "$seed_sha"
+    return
   fi
 
-  git -C "$ROOT_DIR" push "$bare_repo_path" "${seed_sha}:refs/heads/${branch}" >/dev/null
-  git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
-  echo "seeded agent_canon_bare_repo=${bare_repo_path}"
+  if push_submodule_head_snapshot "$bare_repo_path" "$branch"; then
+    echo "agent_canon_seed_method=submodule_head"
+    return
+  fi
+
+  if seed_sha="$(commit_prefix_worktree_snapshot)"; then
+    echo "agent_canon_seed_method=commit_tree_snapshot"
+  else
+    die "failed to seed agent-canon snapshot from '$PREFIX'"
+  fi
+
+  push_root_seed_snapshot "$bare_repo_path" "$branch" "$seed_sha"
 }
 
 ensure_bare_branch_exists() {
