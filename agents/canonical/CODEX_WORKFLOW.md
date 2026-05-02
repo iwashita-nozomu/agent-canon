@@ -125,6 +125,7 @@ python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
 
 - shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
 - `goal.md` は durable source of truth、Codex goals は session view、MCP `goal.loop_status` は機械 gate です。
+- user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含むまで実装へ進みません。
 - goal-driven task では、Codex goals だけを更新して closeout してはいけません。対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を先に更新します。
 - `goal_loop.py status` または MCP `goal.loop_status` が `NEXT_ACTION=run_next_iteration` を返す限り、Codex goals 上で完了に見えても user-facing completion を返しません。
 - Codex goals と `goal.md` が食い違う場合は、repo-owned `goal.md` を正本にして session goal view を修正してから実装へ戻ります。

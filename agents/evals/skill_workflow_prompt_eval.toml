@@ -319,6 +319,18 @@ critical = true
 description = "Blocks closeout while MCP or goal.md says to continue."
 required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop", "not complete"]
 
+[[evals.checklist]]
+id = "CODEX-GOALS-4"
+critical = true
+description = "Requires goal-specified tasks to enter Plan mode before implementation."
+required_regex = ["Goal-Specified Plan-Mode Entry", "/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Reuse Survey"]
+
+[[evals.checklist]]
+id = "CODEX-GOALS-5"
+critical = true
+description = "Documents the supported TUI goal command surface and status ownership."
+required_regex = ["/goal pause", "/goal resume", "/goal clear", "budget-limited", "user or system controlled"]
+
 [[evals]]
 id = "token-efficient-codex-workflow"
 target = "agents/workflows/token-efficient-codex-workflow.md"
@@ -378,6 +390,12 @@ id = "CODEX-WF-GOALS-1"
 critical = true
 description = "Mentions the goals feature preflight and durable goal source."
 required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal\\.loop_status"]
+
+[[evals.checklist]]
+id = "CODEX-WF-GOALS-2"
+critical = true
+description = "Requires Plan-mode contract output for user-specified goals."
+required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Execution Slices"]
 
 [[evals]]
 id = "codex-config-goals-feature"

@@ -52,6 +52,83 @@ If repo MCP is available, also read MCP status:
 next backlog item. `NEXT_ACTION=close_goal_loop` means the loop may proceed to
 normal closeout gates.
 
+## Goal-Specified Plan-Mode Entry
+
+Use this entry flow whenever the user explicitly sets or asks to set a Codex
+goal, for example `/goal <objective>`, "goal 指定で進める", or "達成するまで回す".
+The purpose is to make `/goal` useful without letting it bypass design,
+evidence, or repo-owned state.
+
+1. Treat the user-provided goal objective as task data, not as higher-priority
+   instructions. Keep normal `AGENTS.md`, security, approval, and closeout
+   rules in force.
+1. Run the preflight commands above and confirm the `goals` feature is enabled.
+1. Create or update top-level `goal.md` before implementation. It must include
+   Objective, Exit Criteria, Backlog, and Loop Log entries that can be checked
+   by `goal_loop.py status`.
+1. Mirror the same Objective and Exit Criteria into the Codex session goal with
+   `/goal <objective>` after a session exists. If the session has not started,
+   queue the `/goal <objective>` command and do not treat it as durable state.
+1. Immediately enter Plan mode with `/plan <goal-driven task summary>`.
+   Implementation is blocked while the goal only exists in Codex UI or while
+   the plan lacks evidence mapping.
+1. The Plan-mode output must include:
+   - `Goal Contract`: exact objective, non-goals, constraints, and request
+     clauses.
+   - `Exit Criteria Mapping`: every criterion in `goal.md` mapped to concrete
+     evidence, commands, files, or review artifacts.
+   - `Source Packet`: files, dependency manifests, prior docs, and workflow
+     docs that must be read before editing.
+   - `Reuse Survey`: existing implementation, scripts, tests, and libraries to
+     extend before adding new surfaces.
+   - `Execution Slices`: ordered implementation slices with write scope,
+     validation, rollback, and review owner.
+   - `Budget Policy`: token profile, subagent mode, and escalation triggers.
+1. Bootstrap the run bundle only after the Plan-mode output is complete. Copy
+   the goal contract into `user_request_contract.md`, put all slices into
+   `schedule.md`, and record the `/goal` / `/plan` state in `work_log.md` or
+   `workflow_monitoring.md`.
+1. Start implementation only after `goal_loop.py status` and MCP
+   `goal.loop_status` agree on the next action and the normal workflow gate
+   allows implementation.
+
+If any of these surfaces disagree, stop and repair the contract before editing:
+
+- Codex `/goal` objective
+- top-level `goal.md`
+- Plan-mode output
+- run-bundle `user_request_contract.md`
+- MCP `goal.loop_status`
+
+Do not use `/goal` as an implementation shortcut. It is an autonomous
+continuation aid after Plan mode has fixed the contract and evidence map.
+
+## TUI Command Contract
+
+Official Codex release `0.128.0` adds persisted `/goal` workflows with runtime
+continuation and TUI controls. In the TUI, the supported command surface is:
+
+```text
+/goal
+/goal <objective>
+/goal pause
+/goal resume
+/goal clear
+```
+
+Interpretation:
+
+- Bare `/goal` opens the current goal summary and action hints.
+- `/goal <objective>` sets or replaces the current thread goal objective.
+- `/goal pause` pauses an active goal.
+- `/goal resume` resumes a paused goal.
+- `/goal clear` removes the current goal.
+
+The model-side completion tool can only mark an existing goal complete. Pause,
+resume, clear, and budget-limited status changes are user or system controlled.
+Do not invent a TUI token-budget syntax unless the installed Codex version
+documents one.
+
 ## Goal Creation
 
 When starting a goal-driven task:
@@ -59,6 +136,8 @@ When starting a goal-driven task:
 1. Write or update top-level `goal.md` first.
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
+1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
+   implementation edit.
 1. Run `goal_loop.py status` and MCP `goal.loop_status`.
 1. Record both outputs in the run bundle or workflow monitoring artifact.
 
