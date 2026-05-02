@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests skill and workflow prompt eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py tests target
-# upstream design ../../agents/evals/skill_workflow_prompt_eval.toml default prompt eval manifest
+# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py
+# upstream design ../../agents/evals/skill_workflow_prompt_eval.toml eval manifest
 # @dependency-end
 """Tests for skill and workflow prompt evals."""
 
@@ -51,11 +51,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data = cast(
-            dict[str, Any],
-            tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
-                manifest.read_text(encoding="utf-8")
-            ),
+        data = tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+            manifest.read_text(encoding="utf-8")
         )
         evals = cast(list[dict[str, Any]], data["evals"])
 
@@ -243,7 +240,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             result = run_eval("--root", str(root), "--manifest", "eval.toml")
 
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn("must define exactly one of target or target_glob", result.stderr)
+            self.assertIn(
+                "must define exactly one of target or target_glob",
+                result.stderr,
+            )
 
     def test_duplicate_eval_id_fails_manifest_audit(self) -> None:
         """Duplicate eval IDs are rejected before prompt scoring."""
