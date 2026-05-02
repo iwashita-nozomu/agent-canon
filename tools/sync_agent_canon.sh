@@ -15,7 +15,13 @@
 # @dependency-end
 set -euo pipefail
 
-ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
+if [ -n "$SUPERPROJECT_DIR" ]; then
+  ROOT_DIR="$SUPERPROJECT_DIR"
+else
+  ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
