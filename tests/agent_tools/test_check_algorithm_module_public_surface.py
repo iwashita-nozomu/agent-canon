@@ -136,11 +136,11 @@ class AlgorithmModulePublicSurfaceTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_all:__all__", result.stdout)
 
-    def test_non_algorithm_protocol_import_is_ignored(self) -> None:
-        """Tests or docs helpers that import the base protocol are not algorithm modules."""
+    def test_non_algorithm_protocol_import_fails(self) -> None:
+        """Production protocol imports must expose the standard algorithm surface."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            source = root / "test_protocol.py"
+            source = root / "helper.py"
             source.write_text(
                 "\n".join(
                     [
@@ -155,6 +155,31 @@ class AlgorithmModulePublicSurfaceTest(unittest.TestCase):
             )
 
             result = self.run_checker(root, str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("non_algorithm_protocol_import", result.stdout)
+
+    def test_allowlisted_test_protocol_import_is_ignored(self) -> None:
+        """Test files can import the base protocol without becoming algorithm modules."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            test_dir = root / "python" / "tests" / "base"
+            test_dir.mkdir(parents=True)
+            source = test_dir / "test_protocol.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from jax_util.base import algorithm_module_protocol as amp",
+                        "",
+                        "class _State(amp.State):",
+                        "    pass",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("ALGORITHM_PUBLIC_SURFACE_MODULES=0", result.stdout)

@@ -7,10 +7,10 @@
 # @dependency-end
 """Check algorithm modules that import ``algorithm_module_protocol``.
 
-The checker treats a Python file as an algorithm module when it imports
-``algorithm_module_protocol`` and declares at least one standard public algorithm
-name. Such files must expose exactly the standard public names and must not keep
-additional top-level public definitions.
+Production files that import ``algorithm_module_protocol`` are expected to be
+algorithm modules unless they are package exports, canon registries, or tests.
+Algorithm modules must expose exactly the standard public names and must not
+keep additional top-level public definitions.
 """
 
 from __future__ import annotations
@@ -43,6 +43,12 @@ DEFAULT_EXCLUDES = (
     "reports",
     "vendor",
     "python/jax_util.egg-info",
+)
+NON_ALGORITHM_IMPORT_ALLOWLIST = (
+    "python/jax_util/base",
+    "python/jax_util/canon",
+    "python/tests",
+    "tests",
 )
 
 
@@ -180,11 +186,12 @@ def is_public_assignment(name: str) -> bool:
     return not name.startswith("_") and name != "__all__"
 
 
-def is_algorithm_module(tree: ast.Module) -> bool:
-    """Return true when this imported file declares a standard public algorithm name."""
-    if not imports_algorithm_module_protocol(tree):
-        return False
-    return bool(set(public_definition_names(tree)) & EXPECTED_PUBLIC_NAME_SET)
+def is_allowed_non_algorithm_import(relative: str) -> bool:
+    """Return true for protocol imports that are not algorithm modules."""
+    return any(
+        relative == prefix or relative.startswith(f"{prefix}/")
+        for prefix in NON_ALGORITHM_IMPORT_ALLOWLIST
+    )
 
 
 def parse_all_names(tree: ast.Module) -> tuple[tuple[str, ...] | None, int, bool]:
@@ -240,11 +247,24 @@ def analyze_file(root: Path, path: Path) -> tuple[ModuleReport | None, list[Find
                 detail="parseable",
             )
         ]
-    if not is_algorithm_module(tree):
+    imports_protocol = imports_algorithm_module_protocol(tree)
+    definitions = public_definition_names(tree)
+    if not imports_protocol:
         return None, []
+    if not set(definitions) & EXPECTED_PUBLIC_NAME_SET:
+        if is_allowed_non_algorithm_import(relative):
+            return None, []
+        return None, [
+            Finding(
+                path=relative,
+                line=1,
+                kind="non_algorithm_protocol_import",
+                name="algorithm_module_protocol",
+                detail="define-standard-public-surface-or-remove-import",
+            )
+        ]
 
     findings: list[Finding] = []
-    definitions = public_definition_names(tree)
     all_names, all_line, all_dynamic = parse_all_names(tree)
     if all_names is None:
         findings.append(
