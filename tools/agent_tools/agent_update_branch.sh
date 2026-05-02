@@ -2,11 +2,17 @@
 # @dependency-start
 # responsibility Validates and pushes Template/AgentCanon agent update branches.
 # upstream design ../../agents/workflows/agent-update-branch-workflow.md defines branch lanes
-# downstream skill ../../.agents/skills/agent-update-branch/SKILL.md documents invocation
+# downstream design ../../.agents/skills/agent-update-branch/SKILL.md documents invocation
 # @dependency-end
 set -euo pipefail
 
-ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")/../.." rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
+if [ -n "$SUPERPROJECT_DIR" ]; then
+  ROOT_DIR="$SUPERPROJECT_DIR"
+else
+  ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+fi
 BASE_REF="${AGENT_UPDATE_BASE_REF:-origin/main}"
 
 usage() {

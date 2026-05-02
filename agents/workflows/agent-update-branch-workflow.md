@@ -3,8 +3,8 @@
 @dependency-start
 responsibility Defines branch lanes for Template and AgentCanon runtime updates.
 upstream design ../canonical/CODEX_WORKFLOW.md provides closeout gates
-upstream implementation ../../tools/agent_tools/agent_update_branch.sh validates lane-specific diffs
-downstream skill ../skills/agent-update-branch.md exposes the workflow as a skill
+downstream implementation ../../tools/agent_tools/agent_update_branch.sh validates lane-specific diffs
+downstream design ../skills/agent-update-branch.md exposes the workflow as a skill
 @dependency-end
 -->
 
