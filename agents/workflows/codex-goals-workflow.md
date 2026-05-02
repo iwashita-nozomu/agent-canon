@@ -18,6 +18,9 @@ contract.
 
 - `goal.md` is the durable source of truth for Objective, Exit Criteria,
   Backlog, and Loop Log.
+- `goal.md` is repo-local state. It must not be a symlink to
+  `vendor/agent-canon/goal.md`, and AgentCanon sync must not overwrite one
+  repo's active goal with another repo's goal.
 - Codex `goals` is the interactive session view of the same objective and
   criteria.
 - MCP `goal.loop_status` is the mechanical close/continue gate for repo-level
@@ -32,6 +35,8 @@ Run this at task intake when the task uses a goal or adaptive loop:
 codex features list | grep '^goals'
 python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
+python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
+  --report-out reports/agents/<run-id>/goal_work_breakdown.md
 ```
 
 If `goals` is not enabled, use one of these before relying on the Codex goals
@@ -72,11 +77,17 @@ evidence, or repo-owned state.
 1. Immediately enter Plan mode with `/plan <goal-driven task summary>`.
    Implementation is blocked while the goal only exists in Codex UI or while
    the plan lacks evidence mapping.
+1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
+   TODO draft. The output lists unchecked Exit Criteria and Backlog items as
+   `GW*` work units with evidence hints.
 1. The Plan-mode output must include:
    - `Goal Contract`: exact objective, non-goals, constraints, and request
      clauses.
    - `Exit Criteria Mapping`: every criterion in `goal.md` mapped to concrete
      evidence, commands, files, or review artifacts.
+   - `Goal Work Breakdown`: `goal_loop.py plan` output copied into
+     `schedule.md` with each `GW*` row assigned an owner, validation, and
+     status.
    - `Source Packet`: files, dependency manifests, prior docs, and workflow
      docs that must be read before editing.
    - `Reuse Survey`: existing implementation, scripts, tests, and libraries to
@@ -85,9 +96,9 @@ evidence, or repo-owned state.
      validation, rollback, and review owner.
    - `Budget Policy`: token profile, subagent mode, and escalation triggers.
 1. Bootstrap the run bundle only after the Plan-mode output is complete. Copy
-   the goal contract into `user_request_contract.md`, put all slices into
-   `schedule.md`, and record the `/goal` / `/plan` state in `work_log.md` or
-   `workflow_monitoring.md`.
+   the goal contract into `user_request_contract.md`, put all `GW*` work units
+   into `schedule.md`, and record the `/goal` / `/plan` state in `work_log.md`
+   or `workflow_monitoring.md`.
 1. Start implementation only after `goal_loop.py status` and MCP
    `goal.loop_status` agree on the next action and the normal workflow gate
    allows implementation.
@@ -136,6 +147,7 @@ When starting a goal-driven task:
 1. Write or update top-level `goal.md` first.
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
+1. Run `goal_loop.py plan --goal-file goal.md --report-out <run>/goal_work_breakdown.md`.
 1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
    implementation edit.
 1. Run `goal_loop.py status` and MCP `goal.loop_status`.
@@ -151,12 +163,17 @@ At the start and end of each iteration:
 
 1. Compare Codex goals with `goal.md`.
 1. Run `goal_loop.py status`.
+1. Run `goal_loop.py plan` and refresh the run-bundle `goal_work_breakdown.md`
+   if unchecked items changed.
 1. Run MCP `goal.loop_status` when available.
 1. If any surface says work remains, continue the loop instead of returning a
    completion report.
 
 If Codex goals and `goal.md` disagree, repair `goal.md` or the Codex goal view
 before changing code. The repo-owned `goal.md` wins for durable state.
+If `goal.md` resolves into `vendor/agent-canon/`, run
+`bash tools/sync_agent_canon.sh link-root` or replace it with a repo-local
+contract before trusting `goal.loop_status`.
 
 ## Closeout
 

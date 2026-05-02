@@ -134,6 +134,46 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("# Goal Loop Status", text)
             self.assertIn("goal_loop_status: `continue`", text)
 
+    def test_plan_writes_goal_work_breakdown(self) -> None:
+        """Plan turns unchecked goal items into schedule-ready work units."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            goal = Path(tmp_dir) / "goal.md"
+            report = Path(tmp_dir) / "reports" / "goal-loop" / "work-plan.md"
+            run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Make progress explicit.",
+            )
+            run_goal_loop(
+                "mark",
+                "--goal-file",
+                str(goal),
+                "--criterion",
+                "G1",
+                "--done",
+            )
+
+            result = run_goal_loop(
+                "plan",
+                "--goal-file",
+                str(goal),
+                "--report-out",
+                str(report),
+                "--max-items",
+                "3",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("# Goal Work Breakdown", result.stdout)
+            self.assertIn("GOAL_WORK_UNITS=5", result.stdout)
+            self.assertIn("exit_criteria:G2", result.stdout)
+            self.assertIn("Copy every open `GW*` row", result.stdout)
+            report_text = report.read_text(encoding="utf-8")
+            self.assertIn("NEXT_ACTION=run_next_iteration", result.stdout)
+            self.assertIn("## Work Units", report_text)
+
     def test_run_repeats_until_command_marks_goal_achieved(self) -> None:
         """The run command repeats until goal.md reaches achieved state."""
         with tempfile.TemporaryDirectory() as tmp_dir:

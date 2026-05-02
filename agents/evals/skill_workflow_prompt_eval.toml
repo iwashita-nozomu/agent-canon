@@ -305,7 +305,7 @@ description = "The Codex goals workflow must bind the feature to goal.md and MCP
 id = "CODEX-GOALS-1"
 critical = true
 description = "Defines the role split between goal.md, Codex goals, MCP, and goal_loop.py."
-required_regex = ["goal\\.md", "Codex `goals`", "goal\\.loop_status", "goal_loop\\.py"]
+required_regex = ["goal\\.md", "Codex `goals`", "goal\\.loop_status", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-2"
@@ -323,7 +323,7 @@ required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop
 id = "CODEX-GOALS-4"
 critical = true
 description = "Requires goal-specified tasks to enter Plan mode before implementation."
-required_regex = ["Goal-Specified Plan-Mode Entry", "/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Reuse Survey"]
+required_regex = ["Goal-Specified Plan-Mode Entry", "/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "goal_loop\\.py plan", "Reuse Survey"]
 
 [[evals.checklist]]
 id = "CODEX-GOALS-5"
@@ -395,7 +395,7 @@ required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\
 id = "CODEX-WF-GOALS-2"
 critical = true
 description = "Requires Plan-mode contract output for user-specified goals."
-required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Execution Slices"]
+required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "Execution Slices"]
 
 [[evals]]
 id = "codex-config-goals-feature"

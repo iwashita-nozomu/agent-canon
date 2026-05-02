@@ -137,6 +137,18 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_goal_args(status_parser)
     status_parser.add_argument("--require-achieved", action="store_true")
 
+    plan_parser = subparsers.add_parser(
+        "plan",
+        help="Render unchecked goal items as concrete work units.",
+    )
+    add_common_goal_args(plan_parser)
+    plan_parser.add_argument(
+        "--max-items",
+        type=int,
+        default=12,
+        help="Maximum unchecked exit/backlog items to render.",
+    )
+
     run_parser = subparsers.add_parser("run", help="Run a command until goal.md is achieved.")
     add_common_goal_args(run_parser)
     run_parser.add_argument(
@@ -295,11 +307,90 @@ def render_markdown_report(state: GoalState) -> str:
     return "\n".join(lines)
 
 
+def open_items(items: tuple[CheckboxItem, ...]) -> list[CheckboxItem]:
+    """Return unchecked goal items in file order."""
+    return [item for item in items if not item.checked]
+
+
+def render_work_plan(state: GoalState, max_items: int) -> str:
+    """Render unchecked goal items as an implementation-ready TODO surface."""
+    unchecked_criteria = open_items(state.exit_criteria)
+    unchecked_backlog = open_items(state.backlog)
+    selected = [*unchecked_criteria, *unchecked_backlog][: max(0, max_items)]
+    lines = [
+        "# Goal Work Breakdown",
+        "<!--",
+        "@dependency-start",
+        "responsibility Records executable TODO units derived from goal.md.",
+        "upstream implementation ../../tools/agent_tools/goal_loop.py generates this plan",
+        "@dependency-end",
+        "-->",
+        "",
+        "## Summary",
+        "",
+        f"- goal_file: `{state.path}`",
+        f"- goal_status_field: `{state.goal_status}`",
+        f"- goal_loop_status: `{state.loop_status}`",
+        f"- next_action: `{next_action(state)}`",
+        f"- open_exit_criteria: `{len(unchecked_criteria)}`",
+        f"- open_backlog_items: `{len(unchecked_backlog)}`",
+        "",
+        "## Work Units",
+        "",
+        "| Unit ID | Source | Work To Do | Evidence To Produce | Status |",
+        "| ------- | ------ | ---------- | ------------------- | ------ |",
+    ]
+    if selected:
+        for index, item in enumerate(selected, 1):
+            source = "exit_criteria" if item in unchecked_criteria else "backlog"
+            evidence = evidence_hint(item)
+            lines.append(
+                f"| GW{index} | {source}:{item.item_id} | {item.text} | {evidence} | open |"
+            )
+    else:
+        lines.append("| none | none | No unchecked goal items. | closeout evidence | complete |")
+    lines.extend(
+        [
+            "",
+            "## Schedule Transfer Rule",
+            "",
+            "- Copy every open `GW*` row into the run bundle `schedule.md` before editing.",
+            "- Do not start implementation from a bare objective without this breakdown.",
+            "- If `NEXT_ACTION=run_next_iteration`, create the next iteration slice from the first open work unit.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def evidence_hint(item: CheckboxItem) -> str:
+    """Return a concise evidence hint for one goal item."""
+    text = item.text.lower()
+    if "dependency" in text:
+        return "`run_repo_dependency_review.sh` output"
+    if "code dependency" in text or "scan_code_dependencies" in text:
+        return "`scan_code_dependencies.sh` output"
+    if "oop" in text or "readability" in text:
+        return "`analyze_oop_readability.py` report"
+    if "ci" in text or "static analysis" in text or "pyright" in text or "ruff" in text:
+        return "`make ci` or documented static-analysis fallback"
+    if "evidence" in text:
+        return "run-bundle artifact with clause mapping"
+    return "specific artifact path, command output, or review decision"
+
+
 def write_report(path: str, state: GoalState) -> None:
     """Write a Markdown status report."""
     report_path = Path(path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(render_markdown_report(state), encoding="utf-8")
+
+
+def write_work_plan(path: str, state: GoalState, max_items: int) -> None:
+    """Write a Markdown goal work breakdown."""
+    report_path = Path(path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(render_work_plan(state, max_items), encoding="utf-8")
 
 
 def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: bool) -> None:
@@ -470,6 +561,19 @@ def handle_status(args: argparse.Namespace) -> int:
     return 0 if state.loop_status != "invalid" else 1
 
 
+def handle_plan(args: argparse.Namespace) -> int:
+    """Handle goal work-breakdown rendering."""
+    goal_file = Path(str(args.goal_file)).resolve()
+    state = parse_goal(goal_file)
+    text = render_work_plan(state, int(args.max_items))
+    if args.report_out:
+        write_work_plan(str(args.report_out), state, int(args.max_items))
+    print(text)
+    print(f"GOAL_WORK_UNITS={len(open_items(state.exit_criteria)) + len(open_items(state.backlog))}")
+    print(f"NEXT_ACTION={next_action(state)}")
+    return 0 if state.loop_status != "invalid" else 1
+
+
 def handle_mark(args: argparse.Namespace) -> int:
     """Handle checkbox and status updates."""
     goal_file = Path(str(args.goal_file)).resolve()
@@ -488,6 +592,8 @@ def handle_command(args: argparse.Namespace) -> int:
         return handle_init(args)
     if args.command == "status":
         return handle_status(args)
+    if args.command == "plan":
+        return handle_plan(args)
     if args.command == "mark":
         return handle_mark(args)
     if args.command == "run":

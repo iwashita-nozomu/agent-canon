@@ -72,8 +72,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
 - `tools/agent_tools/goal_loop.py`
   - top-level `goal.md` の exit criteria を正本にし、達成まで iteration command を繰り返します。既定 criteria には依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を含めます。
+  - `goal_loop.py plan` は未完了の exit criteria / backlog を `Goal Work Breakdown` として `GW*` work unit へ展開します。implementation 前にこの行を run bundle `schedule.md` へ移し、bare objective から直接実装へ入らないようにします。
 - Codex `goals` feature
-  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は MCP `goal.loop_status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、直後に `/plan` で Goal Contract と evidence map を固定してから実装します。
+  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は MCP `goal.loop_status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `mcp/repo_mcp_server.py` の `goal.loop_status`
   - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`

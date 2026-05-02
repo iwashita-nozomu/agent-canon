@@ -81,11 +81,14 @@ The default `goal.md` and `goal_loop.py init` include mandatory criteria for dep
 
 ```bash
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
+python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
+  --report-out reports/agents/<run-id>/goal_work_breakdown.md
 python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
 python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
 ```
 
 Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
+Before implementation, run `goal_loop.py plan` and copy every open `GW*` row into the run bundle `schedule.md`; this prevents starting from a bare objective with no explicit work units.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
 
 ## Skill And Workflow Prompt Evals

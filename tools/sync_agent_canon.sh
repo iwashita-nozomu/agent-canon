@@ -7,7 +7,6 @@
 # downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
 # downstream implementation ../documents/algorithm-implementation-boundary.md root symlink view for algorithm boundary policy
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
-# downstream implementation ../goal.md root symlink view for goal loop contract
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # downstream implementation ../tests/agent_tools/test_evaluate_skill_workflow_prompts.py root symlink view for prompt eval tests
@@ -104,7 +103,6 @@ ensure_prefix_exists() {
 build_link_specs() {
   cat <<EOF
 AGENTS.md:${PREFIX}/ROOT_AGENTS.md
-goal.md:${PREFIX}/goal.md
 agents:${PREFIX}/agents
 .agents:${PREFIX}/.agents
 .claude:${PREFIX}/.claude
@@ -237,6 +235,72 @@ tools:${PREFIX}/tools
 EOF
 }
 
+repo_local_goal_template() {
+  cat <<'EOF'
+# Goal
+<!--
+@dependency-start
+responsibility Defines this repository's local goal loop contract.
+upstream design README.md repository entrypoint
+upstream implementation tools/agent_tools/goal_loop.py consumes this contract
+@dependency-end
+-->
+
+## Loop Contract
+
+- goal_status: achieved
+- run_safety_cap: 0
+- current_iteration: 0
+- active_run_id:
+- stop_reason: no active repo-local goal
+
+## Objective
+
+No active repo-local goal is set.
+
+## Exit Criteria
+
+- [x] G0: No active repo-local goal is pending.
+
+## Backlog
+
+## Loop Log
+
+- initialized repo-local placeholder goal.
+EOF
+}
+
+ensure_repo_local_goal() {
+  local path="$ROOT_DIR/goal.md"
+  local target=""
+  if [ -L "$path" ]; then
+    target="$(readlink "$path")"
+    case "$target" in
+      "$PREFIX"/*|./"$PREFIX"/*|../"$PREFIX"/*|*"$PREFIX"/goal.md)
+        rm -f "$path"
+        repo_local_goal_template >"$path"
+        echo "goal_md=converted_from_shared_symlink"
+        ;;
+    esac
+  elif [ ! -e "$path" ]; then
+    repo_local_goal_template >"$path"
+    echo "goal_md=created_repo_local_placeholder"
+  fi
+}
+
+goal_is_shared_symlink() {
+  local path="$ROOT_DIR/goal.md"
+  local target=""
+  [ -L "$path" ] || return 1
+  target="$(readlink "$path")"
+  case "$target" in
+    "$PREFIX"/*|./"$PREFIX"/*|../"$PREFIX"/*|*"$PREFIX"/goal.md)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 build_removed_legacy_paths() {
   cat <<EOF
 documents/WORKFLOW_GUIDE.md
@@ -341,6 +405,8 @@ cmd_link_root() {
     [ -n "$path" ] || continue
     rm -rf "$ROOT_DIR/$path"
   done < <(build_removed_legacy_paths)
+
+  ensure_repo_local_goal
 }
 
 cmd_snapshot() {
@@ -394,6 +460,11 @@ cmd_check() {
       failed=1
     fi
   done < <(build_removed_legacy_paths)
+
+  if goal_is_shared_symlink; then
+    echo "goal.md=shared-symlink" >&2
+    failed=1
+  fi
 
   if [ "$failed" -ne 0 ]; then
     die "shared surface drift detected; run 'bash tools/sync_agent_canon.sh link-root'"
