@@ -62,6 +62,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/evaluate_agent_run.py`
   - `agent_tools/goal_loop.py`
   - `agent_tools/evaluate_skill_workflow_prompts.py`
+  - `agent_tools/agent_update_branch.sh`
 
 ## Agent Evaluation Tools
 
