@@ -329,6 +329,63 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
 
+    def test_cpp_literal_lines_do_not_trigger_function_length(self) -> None:
+        """Long fixture literals should not count as visible function body lines."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "long_fixture.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "int scenario() {",
+                        '  const char* fixture = R"ir(',
+                        *["  fixture payload" for _ in range(120)],
+                        ')ir";',
+                        "  return 0;",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("function_lines:scenario", result.stdout)
+
+    def test_cpp_literal_lines_do_not_trigger_class_length(self) -> None:
+        """Long fixture literals should not count as visible class body lines."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "long_fixture_class.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "class FixtureOwner {",
+                        " private:",
+                        '  const char* fixture = R"ir(',
+                        *["  fixture payload" for _ in range(120)],
+                        ')ir";',
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--min-score",
+                "100",
+                "--max-class-lines",
+                "10",
+                str(source),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("class_lines:FixtureOwner", result.stdout)
+
     def test_cpp_comment_tokens_inside_literals_do_not_mask_real_code(self) -> None:
         """Literal-contained comment tokens must not suppress later C++ findings."""
         with tempfile.TemporaryDirectory() as tmp_dir:

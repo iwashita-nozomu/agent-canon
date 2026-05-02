@@ -318,8 +318,8 @@ def iter_source_files(root: Path, raw_paths: list[str], exclude_patterns: list[s
 
 
 def line_count(text: str) -> int:
-    """Count source lines in a stable way."""
-    return len(text.splitlines())
+    """Count visible source lines in a stable way."""
+    return sum(1 for line in text.splitlines() if line.strip())
 
 
 def source_loc(text: str) -> int:
