@@ -97,6 +97,10 @@ The default Backlog is a minimum first-iteration packet, not a single tiny TODO.
 It requires a prompt-to-artifact checklist, reuse / consolidation / deletion survey,
 one cohesive implementation slice, task-relevant validation, and immediate continuation
 when `NEXT_ACTION=run_next_iteration` remains.
+`goal_loop.py init` also writes an `Optional Goal Item Catalog`.
+Those catalog entries are non-default: they are visible for humans and agents,
+but they do not block closeout or become `GW*` work units until copied into
+`Exit Criteria` or `Backlog` for the current objective.
 
 ```bash
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md

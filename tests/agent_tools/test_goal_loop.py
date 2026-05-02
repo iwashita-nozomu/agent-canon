@@ -17,7 +17,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "goal_loop.py"
 
 
-def run_goal_loop(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:
+def run_goal_loop(
+    *args: str,
+    cwd: Path = PROJECT_ROOT,
+) -> subprocess.CompletedProcess[str]:
     """Run the goal loop helper."""
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
@@ -49,6 +52,7 @@ class GoalLoopTest(unittest.TestCase):
             self.assertEqual(status.returncode, 0, status.stderr)
             self.assertIn("GOAL_LOOP_STATUS=continue", status.stdout)
             self.assertIn("GOAL_EXIT_CRITERIA_TOTAL=5", status.stdout)
+            self.assertIn("GOAL_OPTIONAL_ITEMS_TOTAL=5", status.stdout)
             text = goal.read_text(encoding="utf-8")
             self.assertIn("run_repo_dependency_review.sh --fail-missing", text)
             self.assertIn("scan_code_dependencies.sh", text)
@@ -58,6 +62,9 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("reusable surfaces", text)
             self.assertIn("one cohesive implementation slice", text)
             self.assertIn("NEXT_ACTION still reports run_next_iteration", text)
+            self.assertIn("## Optional Goal Item Catalog", text)
+            self.assertIn("not active closeout gates", text)
+            self.assertIn("O1: (research)", text)
 
     def test_mark_done_and_goal_status_achieved(self) -> None:
         """A checked criterion plus achieved status closes the loop."""
@@ -183,9 +190,15 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("# Goal Work Breakdown", result.stdout)
             self.assertIn("GOAL_WORK_UNITS=9", result.stdout)
             self.assertIn("exit_criteria:G2", result.stdout)
+            self.assertIn("`scan_code_dependencies.sh` output", result.stdout)
             self.assertIn("Copy every open `GW*` row", result.stdout)
             report_text = report.read_text(encoding="utf-8")
             self.assertIn("one cohesive implementation slice", report_text)
+            self.assertIn("run-bundle artifact with clause mapping", report_text)
+            self.assertIn(
+                "Optional catalog items are not emitted as `GW*`",
+                report_text,
+            )
             self.assertIn("NEXT_ACTION=run_next_iteration", result.stdout)
             self.assertIn("## Work Units", report_text)
 
@@ -212,10 +225,19 @@ class GoalLoopTest(unittest.TestCase):
                         "goal = Path(os.environ['GOAL_FILE'])",
                         "text = goal.read_text()",
                         "for criterion in ('G1', 'G2', 'G3', 'G4', 'G5'):",
-                        "    text = text.replace(f'- [ ] {criterion}:', f'- [x] {criterion}:')",
+                        "    text = text.replace(",
+                        "        f'- [ ] {criterion}:',",
+                        "        f'- [x] {criterion}:',",
+                        "    )",
                         "for backlog in ('B1', 'B2', 'B3', 'B4', 'B5'):",
-                        "    text = text.replace(f'- [ ] {backlog}:', f'- [x] {backlog}:')",
-                        "text = text.replace('- goal_status: active', '- goal_status: achieved')",
+                        "    text = text.replace(",
+                        "        f'- [ ] {backlog}:',",
+                        "        f'- [x] {backlog}:',",
+                        "    )",
+                        "text = text.replace(",
+                        "    '- goal_status: active',",
+                        "    '- goal_status: achieved',",
+                        ")",
                         "goal.write_text(text)",
                     ]
                 ),

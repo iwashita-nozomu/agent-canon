@@ -343,6 +343,12 @@ critical = true
 description = "Prevents Goal setup from shrinking the first iteration to a single micro-fix."
 required_regex = ["minimum first-iteration packet", "prompt-to-artifact checklist", "reuse / consolidation / deletion survey", "one single micro-fix"]
 
+[[evals.checklist]]
+id = "CODEX-GOALS-7"
+critical = true
+description = "Separates default active goal items from optional non-default catalog items."
+required_regex = ["default active goal items", "non-default optional goal", "Optional Goal Item Catalog", "Exit Criteria", "Backlog"]
+
 [[evals]]
 id = "token-efficient-codex-workflow"
 target = "agents/workflows/token-efficient-codex-workflow.md"

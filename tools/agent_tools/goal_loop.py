@@ -2,8 +2,8 @@
 # @dependency-start
 # responsibility Runs goal.md-driven repository improvement loops to completion.
 # upstream design ../../goal.md top-level goal contract
-# upstream design ../../agents/workflows/adaptive-improvement-workflow.md adaptive outer loop rules
-# downstream implementation ../../tests/agent_tools/test_goal_loop.py verifies goal loop automation
+# upstream design ../../agents/workflows/adaptive-improvement-workflow.md loop rules  # noqa: E501
+# downstream implementation ../../tests/agent_tools/test_goal_loop.py tests this  # noqa: E501
 # @dependency-end
 """Run a top-level goal.md loop until the goal contract is achieved."""
 
@@ -18,7 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FIELD_RE = re.compile(r"^\s*-\s*([a-zA-Z_][a-zA-Z0-9_-]*):\s*(.*?)\s*$")
-CHECKBOX_RE = re.compile(r"^\s*-\s*\[(?P<mark>[ xX])\]\s*(?P<id>[A-Za-z0-9_.-]+):\s*(?P<text>.*)$")
+CHECKBOX_RE = re.compile(
+    r"^\s*-\s*\[(?P<mark>[ xX])\]\s*"
+    r"(?P<id>[A-Za-z0-9_.-]+):\s*(?P<text>.*)$"
+)
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
 DEFAULT_EXIT_CRITERIA = (
     (
@@ -39,8 +42,9 @@ DEFAULT_EXIT_CRITERIA = (
     ),
     (
         "G4",
-        "Repo-wide static analysis or CI passes with `make ci`, or the documented fallback "
-        "`python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.",
+        "Repo-wide static analysis or CI passes with `make ci`, or the "
+        "documented fallback `python3 -m pyright` plus "
+        "`python3 -m ruff check python tests --select D,E,F,I,UP`.",
     ),
     ("G5", "Objective-specific completion evidence is recorded."),
 )
@@ -63,12 +67,45 @@ DEFAULT_BACKLOG = (
     (
         "B4",
         "Run dependency review, code dependency scan, OOP/readability, and "
-        "task-relevant prompt/doc/convention checks; fix any failure in the same iteration.",
+        "task-relevant prompt/doc/convention checks; fix any failure in the "
+        "same iteration.",
     ),
     (
         "B5",
         "Refresh the goal work breakdown, close completed backlog items with evidence, "
         "and continue immediately if NEXT_ACTION still reports run_next_iteration.",
+    ),
+)
+OPTIONAL_GOAL_ITEMS = (
+    (
+        "O1",
+        "research",
+        "External web research is required, with source links and current-date "
+        "verification recorded in the run bundle.",
+    ),
+    (
+        "O2",
+        "benchmark",
+        "Benchmark or experiment evidence is required, with reproducible "
+        "commands, seeds, environment, and comparison artifacts.",
+    ),
+    (
+        "O3",
+        "docs",
+        "Long-form documentation, slide, or user-guide review is required before "
+        "closeout.",
+    ),
+    (
+        "O4",
+        "release",
+        "Release, branch-integration, push, or downstream template snapshot "
+        "coordination is required.",
+    ),
+    (
+        "O5",
+        "subagents",
+        "Explicit read-only specialist review or implementation handoff is "
+        "required for the goal.",
     ),
 )
 
@@ -91,6 +128,7 @@ class GoalState:
     fields: dict[str, str]
     exit_criteria: tuple[CheckboxItem, ...]
     backlog: tuple[CheckboxItem, ...]
+    optional_goal_items: tuple[CheckboxItem, ...]
     parse_errors: tuple[str, ...]
 
     @property
@@ -117,6 +155,11 @@ class GoalState:
     def done_backlog_items(self) -> int:
         """Return the number of checked backlog items."""
         return sum(1 for item in self.backlog if item.checked)
+
+    @property
+    def done_optional_goal_items(self) -> int:
+        """Return the number of checked optional catalog items."""
+        return sum(1 for item in self.optional_goal_items if item.checked)
 
     @property
     def achieved(self) -> bool:
@@ -174,7 +217,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum unchecked exit/backlog items to render.",
     )
 
-    run_parser = subparsers.add_parser("run", help="Run a command until goal.md is achieved.")
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run a command until goal.md is achieved.",
+    )
     add_common_goal_args(run_parser)
     run_parser.add_argument(
         "--max-iterations",
@@ -217,14 +263,17 @@ def parse_goal(path: Path) -> GoalState:
             fields={},
             exit_criteria=(),
             backlog=(),
+            optional_goal_items=(),
             parse_errors=(f"missing goal file: {path}",),
         )
     fields: dict[str, str] = {}
     exit_criteria: list[CheckboxItem] = []
     backlog: list[CheckboxItem] = []
+    optional_goal_items: list[CheckboxItem] = []
     parse_errors: list[str] = []
     section = ""
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    goal_lines = path.read_text(encoding="utf-8").splitlines()
+    for line_number, line in enumerate(goal_lines, 1):
         heading = HEADING_RE.match(line)
         if heading:
             section = normalize_heading(heading.group("title"))
@@ -245,6 +294,8 @@ def parse_goal(path: Path) -> GoalState:
             exit_criteria.append(item)
         elif section == "backlog":
             backlog.append(item)
+        elif section == "optional goal item catalog":
+            optional_goal_items.append(item)
     if not exit_criteria:
         parse_errors.append("goal.md must include at least one Exit Criteria checkbox")
     if int_field(fields, "current_iteration", 0) < 0:
@@ -256,6 +307,7 @@ def parse_goal(path: Path) -> GoalState:
         fields=fields,
         exit_criteria=tuple(exit_criteria),
         backlog=tuple(backlog),
+        optional_goal_items=tuple(optional_goal_items),
         parse_errors=tuple(parse_errors),
     )
 
@@ -277,6 +329,8 @@ def render_machine_status(state: GoalState) -> str:
         f"GOAL_EXIT_CRITERIA_DONE={state.done_exit_criteria}",
         f"GOAL_BACKLOG_TOTAL={len(state.backlog)}",
         f"GOAL_BACKLOG_DONE={state.done_backlog_items}",
+        f"GOAL_OPTIONAL_ITEMS_TOTAL={len(state.optional_goal_items)}",
+        f"GOAL_OPTIONAL_ITEMS_DONE={state.done_optional_goal_items}",
         f"GOAL_PARSE_ERRORS={len(state.parse_errors)}",
         f"NEXT_ACTION={next_action(state)}",
     ]
@@ -330,6 +384,16 @@ def render_markdown_report(state: GoalState, dependency_path: str) -> str:
     for item in state.backlog:
         mark = "x" if item.checked else " "
         lines.append(f"- [{mark}] {item.item_id}: {item.text}")
+    if state.optional_goal_items:
+        lines.extend(["", "## Optional Goal Item Catalog", ""])
+        lines.append(
+            "These items are non-default catalog entries and do not block closeout "
+            "unless copied into `Exit Criteria` or `Backlog`."
+        )
+        lines.append("")
+        for item in state.optional_goal_items:
+            mark = "x" if item.checked else " "
+            lines.append(f"- [{mark}] {item.item_id}: {item.text}")
     if state.parse_errors:
         lines.extend(["", "## Parse Errors", ""])
         for error in state.parse_errors:
@@ -365,6 +429,7 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
         f"- next_action: `{next_action(state)}`",
         f"- open_exit_criteria: `{len(unchecked_criteria)}`",
         f"- open_backlog_items: `{len(unchecked_backlog)}`",
+        f"- optional_goal_items: `{len(state.optional_goal_items)}`",
         "",
         "## Work Units",
         "",
@@ -376,18 +441,44 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
             source = "exit_criteria" if item in unchecked_criteria else "backlog"
             evidence = evidence_hint(item)
             lines.append(
-                f"| GW{index} | {source}:{item.item_id} | {item.text} | {evidence} | open |"
+                f"| GW{index} | {source}:{item.item_id} | {item.text} | "
+                f"{evidence} | open |"
             )
     else:
-        lines.append("| none | none | No unchecked goal items. | closeout evidence | complete |")
+        lines.append(
+            "| none | none | No unchecked goal items. | "
+            "closeout evidence | complete |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Optional Goal Item Catalog",
+            "",
+            "Optional catalog items are not emitted as `GW*` work units by default.",
+            "Promote one by copying it into `Exit Criteria` or `Backlog` when the",
+            "current objective requires it.",
+            "",
+            "| Item ID | Text | Status |",
+            "| ------- | ---- | ------ |",
+        ]
+    )
+    if state.optional_goal_items:
+        for item in state.optional_goal_items:
+            status = "selected" if item.checked else "available"
+            lines.append(f"| {item.item_id} | {item.text} | {status} |")
+    else:
+        lines.append("| none | No optional catalog entries. | unavailable |")
     lines.extend(
         [
             "",
             "## Schedule Transfer Rule",
             "",
-            "- Copy every open `GW*` row into the run bundle `schedule.md` before editing.",
-            "- Do not start implementation from a bare objective without this breakdown.",
-            "- If `NEXT_ACTION=run_next_iteration`, create the next iteration slice from the first open work unit.",
+            "- Copy every open `GW*` row into the run bundle `schedule.md` "
+            "before editing.",
+            "- Do not start implementation from a bare objective without this "
+            "breakdown.",
+            "- If `NEXT_ACTION=run_next_iteration`, create the next iteration "
+            "slice from the first open work unit.",
             "",
         ]
     )
@@ -397,13 +488,18 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
 def evidence_hint(item: CheckboxItem) -> str:
     """Return a concise evidence hint for one goal item."""
     text = item.text.lower()
-    if "dependency" in text:
-        return "`run_repo_dependency_review.sh` output"
     if "code dependency" in text or "scan_code_dependencies" in text:
         return "`scan_code_dependencies.sh` output"
     if "oop" in text or "readability" in text:
         return "`analyze_oop_readability.py` report"
-    if "ci" in text or "static analysis" in text or "pyright" in text or "ruff" in text:
+    if "dependency" in text:
+        return "`run_repo_dependency_review.sh` output"
+    if (
+        re.search(r"\bci\b", text)
+        or "static analysis" in text
+        or "pyright" in text
+        or "ruff" in text
+    ):
         return "`make ci` or documented static-analysis fallback"
     if "evidence" in text:
         return "run-bundle artifact with clause mapping"
@@ -430,7 +526,12 @@ def write_work_plan(path: str, state: GoalState, max_items: int) -> None:
     )
 
 
-def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: bool) -> None:
+def write_initial_goal(
+    path: Path,
+    objective: str,
+    run_safety_cap: int,
+    force: bool,
+) -> None:
     """Write a starter goal.md contract."""
     if path.exists() and not force:
         raise RuntimeError(f"goal file already exists: {path}")
@@ -439,9 +540,11 @@ def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: b
             "# Goal",
             "<!--",
             "@dependency-start",
-            "responsibility Defines the top-level goal loop contract for this repository.",
+            "responsibility Defines the top-level goal loop contract for this "
+            "repository.",
             "upstream design README.md repository entrypoint",
-            "downstream implementation tools/agent_tools/goal_loop.py consumes this contract",
+            "downstream implementation tools/agent_tools/goal_loop.py consumes "
+            "this contract",
             "@dependency-end",
             "-->",
             "",
@@ -464,6 +567,17 @@ def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: b
             "## Backlog",
             "",
             *[f"- [ ] {item_id}: {text}" for item_id, text in DEFAULT_BACKLOG],
+            "",
+            "## Optional Goal Item Catalog",
+            "",
+            "These are non-default goal items. They are not active closeout gates "
+            "and are not emitted as `GW*` work units unless copied into "
+            "`Exit Criteria` or `Backlog` for this objective.",
+            "",
+            *[
+                f"- [ ] {item_id}: ({category}) {text}"
+                for item_id, category, text in OPTIONAL_GOAL_ITEMS
+            ],
             "",
             "## Loop Log",
             "",
@@ -530,7 +644,7 @@ def set_goal_status(goal_file: Path, status: str) -> None:
 
 
 def run_goal_command(args: argparse.Namespace) -> int:
-    """Run the configured command until goal.md is achieved or a run-local cap is hit."""
+    """Run the command until goal.md is achieved or a run-local cap is hit."""
     goal_file = Path(str(args.goal_file)).resolve()
     command = list(args.command_args)
     if command and command[0] == "--":
@@ -602,8 +716,16 @@ def handle_plan(args: argparse.Namespace) -> int:
     """Handle goal work-breakdown rendering."""
     goal_file = Path(str(args.goal_file)).resolve()
     state = parse_goal(goal_file)
-    report_path = Path(str(args.report_out)) if args.report_out else Path("reports/goal_work_breakdown.md")
-    text = render_work_plan(state, int(args.max_items), dependency_path_for(report_path))
+    report_path = (
+        Path(str(args.report_out))
+        if args.report_out
+        else Path("reports/goal_work_breakdown.md")
+    )
+    text = render_work_plan(
+        state,
+        int(args.max_items),
+        dependency_path_for(report_path),
+    )
     if args.report_out:
         write_work_plan(str(args.report_out), state, int(args.max_items))
     print(text)
