@@ -13,7 +13,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -51,13 +51,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data = cast(
-            dict[str, Any],
-            tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
-                manifest.read_text(encoding="utf-8")
-            ),
+        data: dict[str, Any] = tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+            manifest.read_text(encoding="utf-8")
         )
-        evals = cast(list[dict[str, Any]], data["evals"])
+        evals: list[dict[str, Any]] = data["evals"]
 
         globs = {
             entry.get("target_glob"): entry.get("expected_count")
