@@ -268,8 +268,8 @@ required_regex = ["skill/workflow eval", "agents/evals/skill_workflow_prompt_eva
 [[evals.checklist]]
 id = "AIL-WF-2"
 critical = true
-description = "Runs the mechanical eval tool and uses its report as evidence."
-required_regex = ["evaluate_skill_workflow_prompts\\.py", "EVAL_STATUS=pass"]
+description = "Runs the mechanical eval tool, audit status, and growth-candidate gate as evidence."
+required_regex = ["evaluate_skill_workflow_prompts\\.py", "EVAL_STATUS=pass", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
 
 [[evals.checklist]]
 id = "AIL-WF-3"
@@ -288,6 +288,12 @@ id = "AIL-WF-5"
 critical = true
 description = "Requires MCP goal.loop_status to decide whether to continue or close."
 required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+
+[[evals.checklist]]
+id = "AIL-WF-7"
+critical = true
+description = "Requires duplicate eval coverage to be consolidated instead of leaving parallel entries."
+required_regex = ["duplicate eval IDs", "duplicate explicit targets", "same target"]
 
 [[evals.checklist]]
 id = "AIL-WF-6"
@@ -356,10 +362,10 @@ description = "Keeps validation and closeout gates mandatory."
 required_regex = ["does not relax", "dependency review", "closeout gates"]
 
 [[evals]]
-id = "codex-config-token-profiles"
+id = "codex-config-shared-features"
 target = ".codex/config.toml"
 kind = "config"
-description = "Shared Codex config must expose token-saving profiles."
+description = "Shared Codex config must expose token-saving profiles and goals."
 
 [[evals.checklist]]
 id = "CODEX-CONFIG-TOKEN-1"
@@ -367,23 +373,23 @@ critical = true
 description = "Defines token-lite, token-standard, and token-deep profiles."
 required_regex = ["\\[profiles\\.token-lite\\]", "\\[profiles\\.token-standard\\]", "\\[profiles\\.token-deep\\]", "tool_output_token_limit"]
 
+[[evals.checklist]]
+id = "CODEX-CONFIG-GOALS-1"
+critical = true
+description = "Enables the goals feature in the shared config."
+required_regex = ["\\[features\\]", "goals\\s*=\\s*true"]
+
 [[evals]]
-id = "codex-workflow-token-preflight"
+id = "codex-workflow-runtime-preflight"
 target = "agents/canonical/CODEX_WORKFLOW.md"
 kind = "workflow"
-description = "The Codex workflow must route token-saving requests through the token-efficient overlay."
+description = "The Codex workflow must route token-saving and goal-driven requests."
 
 [[evals.checklist]]
 id = "CODEX-WF-TOKEN-1"
 critical = true
 description = "Mentions token profiles, agent modes, and non-waivable gates."
 required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "Full dependency review"]
-
-[[evals]]
-id = "codex-workflow-goals-preflight"
-target = "agents/canonical/CODEX_WORKFLOW.md"
-kind = "workflow"
-description = "The Codex workflow must explain goals feature preflight and source-of-truth boundaries."
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"
@@ -396,18 +402,6 @@ id = "CODEX-WF-GOALS-2"
 critical = true
 description = "Requires Plan-mode contract output for user-specified goals."
 required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "Execution Slices"]
-
-[[evals]]
-id = "codex-config-goals-feature"
-target = ".codex/config.toml"
-kind = "config"
-description = "Shared Codex config must enable the goals feature."
-
-[[evals.checklist]]
-id = "CODEX-CONFIG-GOALS-1"
-critical = true
-description = "Enables the goals feature in the shared config."
-required_regex = ["\\[features\\]", "goals\\s*=\\s*true"]
 
 [[evals]]
 id = "repo-mcp-server-goal-loop-tool"
@@ -594,3 +588,33 @@ id = "EVALS-README-BEHAVIOR-2"
 critical = true
 description = "Requires behavior events to be recorded during the run."
 required_regex = ["workflow_monitor\\.py --behavior-event", "Record these events during the run"]
+
+[[evals.checklist]]
+id = "EVALS-README-AUDIT-1"
+critical = true
+description = "Documents prompt eval manifest duplicate and growth-candidate audit gates."
+required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
+
+[[evals]]
+id = "tools-readme-prompt-eval-audit"
+target = "tools/README.md"
+kind = "tool-doc"
+description = "The tool index must document prompt eval manifest audit closeout gates."
+
+[[evals.checklist]]
+id = "TOOLS-README-EVAL-AUDIT-1"
+critical = true
+description = "Requires prompt eval audit status and growth-candidate zero closeout condition."
+required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate explicit targets"]
+
+[[evals]]
+id = "documents-tools-readme-prompt-eval-audit"
+target = "documents/tools/README.md"
+kind = "tool-doc"
+description = "The human-facing tool index must document prompt eval manifest audit closeout gates."
+
+[[evals.checklist]]
+id = "DOCS-TOOLS-EVAL-AUDIT-1"
+critical = true
+description = "Requires prompt eval audit status and duplicate-growth candidate wording."
+required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs"]

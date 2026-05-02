@@ -52,7 +52,8 @@ outer loop は agile、inner change pass は waterfall です。
 - `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
 - `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
 - skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`agents/evals/skill_workflow_prompt_eval.toml` を正本にします。
-- prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass` になるまで loop を閉じません。
+- prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` になるまで loop を閉じません。
+- eval manifest の growth candidate は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs です。既存 prompt surface の coverage を増やす場合は、同じ target / same target の eval entry に checklist を統合し、重複 target の並行 eval を残しません。
 - agent 行動改善では、run 中に `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check を蓄積し、`agents/evals/agent_behavior_eval.toml` を正本にして `evaluate_agent_run.py` で採点します。
 - behavior eval の feedback action は prompt repair、workflow artifact 修正、または monitoring rule 修正のいずれかで閉じ、`AGENT_EVALUATION_STATUS=pass` になるまで loop を閉じません。
 
@@ -77,7 +78,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. `experiment_reviewer` と `report_reviewer` が iteration outcome をレビューする
 1. decision state を確定する
 1. eval drift があれば、対応する prompt repair を行い、同じ eval を rerun する
-1. prompt eval report が `EVAL_STATUS=pass` になるまで次 extension または closeout に進まない
+1. prompt eval report が `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` になるまで次 extension または closeout に進まない
 1. behavior eval feedback があれば、run artifact、workflow prompt、または behavior-event recording rule を修正し、`AGENT_EVALUATION_STATUS=pass` になるまで次 extension または closeout に進まない
 1. `goal.md` の exit criteria と backlog を evidence に合わせて更新する
 1. Codex goals view がある場合は `goal.md` と同じ完了状態に同期し、Codex goals だけで完了判定しない

@@ -57,6 +57,29 @@ class ChecklistResult:
     matched_forbidden: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ManifestAudit:
+    """Manifest-level duplicate and growth-candidate audit."""
+
+    duplicate_eval_ids: tuple[str, ...]
+    duplicate_targets: tuple[str, ...]
+    duplicate_checklist_ids: tuple[str, ...]
+
+    @property
+    def growth_candidates(self) -> int:
+        """Return the number of manifest fixes still required."""
+        return (
+            len(self.duplicate_eval_ids)
+            + len(self.duplicate_targets)
+            + len(self.duplicate_checklist_ids)
+        )
+
+    @property
+    def passed(self) -> bool:
+        """Return true when no manifest growth candidates remain."""
+        return self.growth_candidates == 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -88,12 +111,15 @@ def string_list(value: object, field: str) -> tuple[str, ...]:
     return tuple(value)
 
 
-def load_manifest(path: Path, root: Path) -> tuple[PromptEval, ...]:
+def load_manifest(path: Path, root: Path) -> tuple[tuple[PromptEval, ...], ManifestAudit]:
     """Load a prompt eval manifest."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     evals = data.get("evals")
     if not isinstance(evals, list) or not evals:
         raise ValueError("manifest must define at least one [[evals]] entry")
+    audit = audit_manifest(evals)
+    if not audit.passed:
+        raise ValueError(render_audit_errors(audit))
     loaded: list[PromptEval] = []
     for index, entry in enumerate(evals, 1):
         if not isinstance(entry, dict):
@@ -105,7 +131,60 @@ def load_manifest(path: Path, root: Path) -> tuple[PromptEval, ...]:
             load_checklist_item(item, str(entry.get("id", index))) for item in raw_checklist
         )
         loaded.extend(expand_eval_entry(entry, checklist, root))
-    return tuple(loaded)
+    return tuple(loaded), audit
+
+
+def audit_manifest(raw_evals: list[object]) -> ManifestAudit:
+    """Find duplicate manifest surfaces before prompt evaluation."""
+    eval_ids: list[str] = []
+    explicit_targets: list[str] = []
+    duplicate_checklist_ids: list[str] = []
+    for index, entry in enumerate(raw_evals, 1):
+        if not isinstance(entry, dict):
+            continue
+        eval_id = str(entry.get("id", index))
+        eval_ids.append(eval_id)
+        if "target" in entry:
+            explicit_targets.append(str(entry["target"]))
+        raw_checklist = entry.get("checklist")
+        if isinstance(raw_checklist, list):
+            seen_items: set[str] = set()
+            for item in raw_checklist:
+                if not isinstance(item, dict):
+                    continue
+                item_id = str(item.get("id", ""))
+                key = f"{eval_id}:{item_id}"
+                if item_id in seen_items:
+                    duplicate_checklist_ids.append(key)
+                seen_items.add(item_id)
+    return ManifestAudit(
+        duplicate_eval_ids=duplicates(eval_ids),
+        duplicate_targets=duplicates(explicit_targets),
+        duplicate_checklist_ids=tuple(sorted(duplicate_checklist_ids)),
+    )
+
+
+def duplicates(values: list[str]) -> tuple[str, ...]:
+    """Return duplicate values in stable first-seen order."""
+    seen: set[str] = set()
+    repeated: list[str] = []
+    for value in values:
+        if value in seen and value not in repeated:
+            repeated.append(value)
+        seen.add(value)
+    return tuple(repeated)
+
+
+def render_audit_errors(audit: ManifestAudit) -> str:
+    """Render manifest audit failures for stderr."""
+    lines = ["manifest audit failed"]
+    for eval_id in audit.duplicate_eval_ids:
+        lines.append(f"duplicate eval id: {eval_id}")
+    for target in audit.duplicate_targets:
+        lines.append(f"duplicate explicit target: {target}")
+    for item_id in audit.duplicate_checklist_ids:
+        lines.append(f"duplicate checklist id: {item_id}")
+    return "; ".join(lines)
 
 
 def expand_eval_entry(
@@ -221,19 +300,27 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
     return tuple(evaluate_item(item, eval_def, text) for item in eval_def.checklist)
 
 
-def render_machine_status(results: tuple[ChecklistResult, ...]) -> str:
+def render_machine_status(
+    results: tuple[ChecklistResult, ...],
+    audit: ManifestAudit,
+) -> str:
     """Render machine-readable status."""
     total = len(results)
     passed = sum(1 for result in results if result.passed)
     critical_total = sum(1 for result in results if result.critical)
     critical_failed = sum(1 for result in results if result.critical and not result.passed)
-    status = "pass" if critical_failed == 0 else "fail"
+    status = "pass" if critical_failed == 0 and audit.passed else "fail"
     lines = [
         f"EVAL_STATUS={status}",
         f"EVAL_CHECKS_TOTAL={total}",
         f"EVAL_CHECKS_PASSED={passed}",
         f"EVAL_CRITICAL_TOTAL={critical_total}",
         f"EVAL_CRITICAL_FAILED={critical_failed}",
+        f"EVAL_AUDIT_STATUS={'pass' if audit.passed else 'fail'}",
+        f"EVAL_DUPLICATE_EVAL_IDS={len(audit.duplicate_eval_ids)}",
+        f"EVAL_DUPLICATE_TARGETS={len(audit.duplicate_targets)}",
+        f"EVAL_DUPLICATE_CHECKLIST_IDS={len(audit.duplicate_checklist_ids)}",
+        f"EVAL_GROWTH_CANDIDATES={audit.growth_candidates}",
     ]
     for result in results:
         verdict = "pass" if result.passed else "fail"
@@ -258,6 +345,7 @@ def render_markdown_report(
     manifest: Path,
     evals: tuple[PromptEval, ...],
     results: tuple[ChecklistResult, ...],
+    audit: ManifestAudit,
 ) -> str:
     """Render a Markdown eval report."""
     by_eval = {eval_def.eval_id: eval_def for eval_def in evals}
@@ -275,8 +363,8 @@ def render_markdown_report(
         "## Summary",
         "",
     ]
-    status_lines = render_machine_status(results).strip().splitlines()
-    lines.extend(f"- {line}" for line in status_lines[:5])
+    status_lines = render_machine_status(results, audit).strip().splitlines()
+    lines.extend(f"- {line}" for line in status_lines[:10])
     lines.extend(["", "## Results", ""])
     for result in results:
         eval_def = by_eval[result.eval_id]
@@ -298,23 +386,27 @@ def write_report(
     manifest: Path,
     evals: tuple[PromptEval, ...],
     results: tuple[ChecklistResult, ...],
+    audit: ManifestAudit,
 ) -> None:
     """Write a Markdown eval report."""
     report_path = Path(path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render_markdown_report(manifest, evals, results), encoding="utf-8")
+    report_path.write_text(
+        render_markdown_report(manifest, evals, results, audit),
+        encoding="utf-8",
+    )
 
 
 def run(args: argparse.Namespace) -> int:
     """Run prompt evals."""
     root = Path(str(args.root)).resolve()
     manifest = (root / str(args.manifest)).resolve()
-    evals = load_manifest(manifest, root)
+    evals, audit = load_manifest(manifest, root)
     results = tuple(result for eval_def in evals for result in evaluate_prompt(eval_def))
     if args.report_out:
-        write_report(str(args.report_out), manifest.relative_to(root), evals, results)
-    print(render_machine_status(results), end="")
-    return 0 if all(result.passed or not result.critical for result in results) else 1
+        write_report(str(args.report_out), manifest.relative_to(root), evals, results, audit)
+    print(render_machine_status(results, audit), end="")
+    return 0 if audit.passed and all(result.passed or not result.critical for result in results) else 1
 
 
 def main() -> int:

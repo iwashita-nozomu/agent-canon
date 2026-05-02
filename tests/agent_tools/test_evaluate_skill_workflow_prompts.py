@@ -45,6 +45,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("EVAL_STATUS=pass", result.stdout)
         self.assertIn("EVAL_CRITICAL_FAILED=0", result.stdout)
+        self.assertIn("EVAL_AUDIT_STATUS=pass", result.stdout)
+        self.assertIn("EVAL_GROWTH_CANDIDATES=0", result.stdout)
 
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
@@ -241,6 +243,136 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
             self.assertIn("must define exactly one of target or target_glob", result.stderr)
+
+    def test_duplicate_eval_id_fails_manifest_audit(self) -> None:
+        """Duplicate eval IDs are rejected before prompt scoring."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "a.md").write_text("required-marker\n", encoding="utf-8")
+            (root / "b.md").write_text("required-marker\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines duplicate eval id prompt evals.
+                    # upstream design a.md test prompt
+                    # upstream design b.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "duplicate"
+                    target = "a.md"
+
+                    [[evals.checklist]]
+                    id = "A1"
+                    critical = true
+                    required_regex = ["required-marker"]
+
+                    [[evals]]
+                    id = "duplicate"
+                    target = "b.md"
+
+                    [[evals.checklist]]
+                    id = "B1"
+                    critical = true
+                    required_regex = ["required-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("manifest audit failed", result.stderr)
+            self.assertIn("duplicate eval id: duplicate", result.stderr)
+
+    def test_duplicate_explicit_target_fails_manifest_audit(self) -> None:
+        """Duplicate explicit targets are rejected to force eval consolidation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "prompt.md").write_text("required-marker\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines duplicate target prompt evals.
+                    # upstream design prompt.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "first"
+                    target = "prompt.md"
+
+                    [[evals.checklist]]
+                    id = "A1"
+                    critical = true
+                    required_regex = ["required-marker"]
+
+                    [[evals]]
+                    id = "second"
+                    target = "prompt.md"
+
+                    [[evals.checklist]]
+                    id = "B1"
+                    critical = true
+                    required_regex = ["required-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("manifest audit failed", result.stderr)
+            self.assertIn("duplicate explicit target: prompt.md", result.stderr)
+
+    def test_duplicate_checklist_id_fails_manifest_audit(self) -> None:
+        """Duplicate checklist IDs in one eval are rejected before scoring."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "prompt.md").write_text("required-marker\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines duplicate checklist prompt evals.
+                    # upstream design prompt.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "sample"
+                    target = "prompt.md"
+
+                    [[evals.checklist]]
+                    id = "A1"
+                    critical = true
+                    required_regex = ["required-marker"]
+
+                    [[evals.checklist]]
+                    id = "A1"
+                    critical = true
+                    required_regex = ["required-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("manifest audit failed", result.stderr)
+            self.assertIn("duplicate checklist id: sample:A1", result.stderr)
 
 
 if __name__ == "__main__":

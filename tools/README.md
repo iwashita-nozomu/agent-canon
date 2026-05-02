@@ -102,8 +102,12 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --report-out reports/skill-workflow-prompt-eval.md
 ```
 
-Each tested skill/workflow should have its own eval entry in `agents/evals/skill_workflow_prompt_eval.toml`.
-Do not close prompt-improvement work while `EVAL_STATUS=fail`.
+The runner also audits the manifest itself. Do not close prompt-improvement work unless
+`EVAL_STATUS=pass`, `EVAL_AUDIT_STATUS=pass`, and `EVAL_GROWTH_CANDIDATES=0` all appear in the
+machine-readable output.
+Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
+When one prompt surface needs more coverage, consolidate the checks into that surface's existing
+eval entry instead of adding a parallel duplicate-target eval.
 
 ## Dependency Manifest Tools
 

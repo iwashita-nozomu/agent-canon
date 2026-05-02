@@ -24,7 +24,14 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --manifest agents/evals/skill_workflow_prompt_eval.toml
 ```
 
-An eval passes only when every critical checklist item passes.
+An eval passes only when every critical checklist item passes and the manifest audit passes.
+The manifest audit fails closed on duplicate eval IDs, duplicate explicit targets, and duplicate
+checklist IDs within an eval.
+The growth-candidate buckets are duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs.
+Keep `EVAL_AUDIT_STATUS=pass` and `EVAL_GROWTH_CANDIDATES=0` before closing skill or workflow prompt
+improvement work.
+When a prompt surface needs additional coverage, add checklist items to the existing eval entry for
+that target instead of adding a second explicit-target eval.
 If an eval reports drift, fix the target prompt and rerun the same manifest until the report passes.
 
 Use behavior evals before closeout to check that skills and workflows changed actual agent
