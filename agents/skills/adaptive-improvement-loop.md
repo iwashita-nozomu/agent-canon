@@ -42,7 +42,9 @@ upstream design ../canonical/skills.md skill canon registry
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定します。
 - prompt 修正前後で `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を実行し、`EVAL_STATUS=pass` を evidence にします。
 - eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
-- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
+- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
+- static analysis が workflow / skill / prompt の弱さを示した場合は、結果を `static_analysis_feedback=applied|recorded` として監視し、還元先の skill / workflow / eval を明示します。未処理の `static_analysis_feedback=pending` を残して loop を閉じません。
+- 同じ goal に対して 2 回の実行経路があり得る場合は、`tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path`、`route_efficiency`、`static_analysis_feedback` を比較します。`route_efficiency=inefficient` または `selected_inefficient_route=yes` が出た場合は、agent behavior eval が fail するようにし、非効率経路を選ばないよう skill / workflow prompt を修正します。
 - closeout 前に `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest agents/evals/agent_behavior_eval.toml --write` を実行し、`AGENT_EVALUATION_STATUS=pass` まで workflow artifact または prompt を修正します。
 - 2 つ目の extension に進む前に、直前 extension の `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
@@ -70,6 +72,9 @@ upstream design ../canonical/skills.md skill canon registry
 - `Prompt Eval Result:`
 - `Behavior Eval Manifest:`
 - `Behavior Event Log:`
+- `Static Analysis Feedback Target:`
+- `Two-Run Path Comparison:`
+- `Execution Path Efficiency Decision:`
 - `Agent Behavior Eval Result:`
 - `MCP Goal Loop Status:`
 

@@ -33,6 +33,33 @@ required_any = [
 ]
 
 [[criteria]]
+name = "static_analysis_feedback_recorded"
+max_score = 5
+feedback = "Record static-analysis feedback and the skill/workflow prompt destination that received or explicitly rejected it."
+required_any = [
+  "static_analysis_feedback=applied",
+  "static_analysis_feedback=recorded",
+  "static_analysis_feedback_not_applicable",
+]
+forbidden_any = [
+  "static_analysis_feedback=pending",
+  "static_analysis_feedback=missing",
+]
+
+[[criteria]]
+name = "execution_path_efficiency_recorded"
+max_score = 5
+feedback = "Compare two run paths when behavior may differ, record the selected route, and prevent known inefficient routes."
+required_any = [
+  "execution_path_comparison=pass",
+  "execution_path_comparison_not_required",
+]
+forbidden_any = [
+  "route_efficiency=inefficient",
+  "selected_inefficient_route=yes",
+]
+
+[[criteria]]
 name = "prompt_eval_behavior_recorded"
 max_score = 5
 feedback = "Record prompt eval baseline/rerun behavior for skill or workflow prompt changes."

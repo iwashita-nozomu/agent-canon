@@ -47,6 +47,11 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
 closeout evidence, and validation logs. They require observable events such as skill invocation,
 subagent routing, tool gates, prompt eval runs, feedback resolution, subagent lifecycle closeout,
-and diff-check decisions. Record these events during the run with
+static-analysis feedback, execution path comparison, and diff-check decisions.
+When two runs can choose different paths, compare them with
+`tools/agent_tools/compare_agent_run_paths.py` and record its
+`execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`,
+and `static_analysis_feedback` tokens in `workflow_monitoring.md`.
+Record these events during the run with
 `tools/agent_tools/workflow_monitor.py --behavior-event "..."` instead of reconstructing them only
 at closeout.

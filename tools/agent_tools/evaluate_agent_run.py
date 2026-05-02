@@ -66,6 +66,7 @@ class BehaviorCriterion:
     source: str
     required_all: tuple[str, ...]
     required_any: tuple[str, ...]
+    forbidden_any: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -189,6 +190,10 @@ def behavior_criterion_from_manifest_entry(
         source=source,
         required_all=string_tuple(entry.get("required_all"), f"{name}.required_all"),
         required_any=string_tuple(entry.get("required_any"), f"{name}.required_any"),
+        forbidden_any=string_tuple(
+            entry.get("forbidden_any"),
+            f"{name}.forbidden_any",
+        ),
     )
 
 
@@ -574,12 +579,15 @@ def evaluate_behavior_criterion(
     """Evaluate one manifest-defined behavior criterion."""
     missing_all = tuple(token for token in item.required_all if token.lower() not in text)
     any_passed = not item.required_any or has_any(text, item.required_any)
-    passed = not missing_all and any_passed
+    forbidden_hits = tuple(
+        token for token in item.forbidden_any if token.lower() in text
+    )
+    passed = not missing_all and any_passed and not forbidden_hits
     return criterion(
         f"behavior::{item.name}",
         item.max_score,
         passed,
-        behavior_feedback(item, missing_all, any_passed),
+        behavior_feedback(item, missing_all, any_passed, forbidden_hits),
     )
 
 
@@ -587,9 +595,15 @@ def behavior_feedback(
     item: BehaviorCriterion,
     missing_all: tuple[str, ...],
     any_passed: bool,
+    forbidden_hits: tuple[str, ...],
 ) -> str:
     """Render behavior criterion feedback with missing-token details."""
-    details = behavior_feedback_details(item, missing_all, any_passed)
+    details = behavior_feedback_details(
+        item,
+        missing_all,
+        any_passed,
+        forbidden_hits,
+    )
     return item.feedback if not details else f"{item.feedback} ({'; '.join(details)})"
 
 
@@ -597,6 +611,7 @@ def behavior_feedback_details(
     item: BehaviorCriterion,
     missing_all: tuple[str, ...],
     any_passed: bool,
+    forbidden_hits: tuple[str, ...],
 ) -> tuple[str, ...]:
     """Return missing-token details for one behavior criterion."""
     return tuple(
@@ -607,6 +622,9 @@ def behavior_feedback_details(
             else "",
             "missing any-required token: " + " OR ".join(item.required_any)
             if not any_passed
+            else "",
+            "forbidden token present: " + ", ".join(forbidden_hits)
+            if forbidden_hits
             else "",
         )
         if detail

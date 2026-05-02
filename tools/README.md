@@ -60,6 +60,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
   - `agent_tools/evaluate_agent_run.py`
+  - `agent_tools/compare_agent_run_paths.py`
   - `agent_tools/goal_loop.py`
   - `agent_tools/evaluate_skill_workflow_prompts.py`
   - `agent_tools/agent_update_branch.sh`
@@ -80,6 +81,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitoring.md` is the in-workflow monitoring artifact consumed by the evaluation. Keep it current during the run, not only at closeout.
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
+`compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -87,6 +89,11 @@ python3 tools/agent_tools/workflow_monitor.py \
   --signal "skills=$agent-orchestration,$codex-task-workflow" \
   --intervention "spawned fresh reviewer" \
   --decision workflow_improvement_decision=applied
+
+python3 tools/agent_tools/compare_agent_run_paths.py \
+  --baseline-run reports/agents/<run-a> \
+  --candidate-run reports/agents/<run-b> \
+  --report-out reports/agents/<run-b>/path_comparison.md
 ```
 
 ## Goal Loop Tool

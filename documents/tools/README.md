@@ -87,6 +87,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査し、prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。
+- `tools/agent_tools/compare_agent_run_paths.py`
+  - 2 つの run bundle の `workflow_monitoring.md` から `execution_path`、`route_efficiency`、`static_analysis_feedback` を読み、実行経路差分と非効率経路選択を machine-readable に判定します。
+  - `RUN_PATH_COMPARISON=fail`、`SELECTED_INEFFICIENT_ROUTE=yes`、`NEXT_ACTION=repair_skill_workflow_prompt` は behavior eval と adaptive-improvement prompt repair の入力にします。
 - `tools/agent_tools/analyze_refactor_surface.py`
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/analyze_oop_readability.py`

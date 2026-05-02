@@ -12,162 +12,50 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 - goal_status: active
 - run_safety_cap: 5
-- current_iteration: 8
-- active_run_id: 20260501-oop-readability-loop
+- current_iteration: 0
+- active_run_id: 20260502-132243-add-execution-path-comparison-eval-for-w
 - stop_reason:
 
 ## Objective
 
-Improve OOP readability across all repository code using
-`tools/agent_tools/analyze_oop_readability.py` as the fixed mechanical
-evaluation. The loop should keep running backlog-driven iterations until the
-accepted OOP risk is reduced enough to stop explicitly, without changing runtime
-behavior, public API semantics, or numerical algorithms.
+Organize skill, workflow, and eval surfaces so static-analysis and run-behavior
+findings are fed back into skills. Execute and compare two run paths when
+behavior may differ; if the paths differ, analyze the difference, add an eval
+that fires when the inefficient path is selected, and repair skill/workflow
+prompts until the workflow has no remaining improvement action.
 
 ## Exit Criteria
 
 - [x] G1: Repository dependency review passes with `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`.
-- [x] G2: Code dependency extraction is reviewed with `bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.
-- [x] G3: OOP/readability analysis is run over all code paths before and after the current iteration with the same path set and threshold.
-- [x] G4: The current iteration reduces accepted OOP findings or score-risk concentration without adding behavior changes.
-- [x] G5: Repo-wide static analysis or CI passes with `make ci`, or the documented fallback `python3 -m pyright` plus `python3 -m ruff check python tests --select D,E,F,I,UP`.
-- [x] G6: Objective-specific completion evidence, baseline report, final report, and next backlog decision are recorded.
+- [x] G2: Skill/workflow prompt evals pass with `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml`.
+- [x] G3: Agent behavior eval detects inefficient execution path selection and passes after prompt/workflow repair.
+- [x] G4: A mechanical two-run path comparison tool exists, is tested, and emits evidence suitable for `workflow_monitoring.md`.
+- [x] G5: Static-analysis feedback is represented in workflow monitoring and skill/workflow prompts as a feedback-to-skill loop.
+- [x] G6: Targeted static analysis and tests for the changed surfaces pass.
+- [ ] G7: AgentCanon main and the template snapshot are updated and pushed.
 
 ## Backlog
 
-- [x] B1: Establish the all-code OOP readability baseline and hotspot ranking.
-- [x] B2: Classify hotspot findings into behavior-preserving refactor candidates and intentional/value-object exceptions.
-- [x] B3: Apply iteration 1 behavior-preserving refactor pass to AgentCanon helper hotspots.
-- [x] B4: Rerun iteration 1 all-code OOP readability evaluation and compare baseline versus final counts.
-- [x] B5: Continue with iteration 2 on the next highest accepted hotspot cluster.
-- [x] B6: Rerun the all-code OOP readability evaluation after iteration 2.
-- [x] B7: Record remaining backlog and explicit continue/stop decision.
-- [x] B8: Continue with iteration 3 on the next highest accepted hotspot cluster.
-- [x] B9: Rerun the all-code OOP readability evaluation after iteration 3.
-- [x] B10: Record remaining backlog and explicit continue/stop decision.
-- [x] B11: Continue with iteration 4 using subagent-supported candidate selection.
-- [x] B12: Rerun the all-code OOP readability evaluation after iteration 4.
-- [x] B13: Record remaining backlog and explicit continue/stop decision.
-- [x] B14: Continue with iteration 5 using subagent-supported candidate selection.
-- [x] B15: Rerun the all-code OOP readability evaluation after iteration 5.
-- [x] B16: Record remaining backlog and explicit continue/stop decision.
-- [x] B17: Continue with iteration 6 using subagent-supported candidate selection.
-- [x] B18: Rerun the all-code OOP readability evaluation after iteration 6.
-- [x] B19: Record remaining backlog and explicit continue/stop decision.
-- [x] B20: Continue with iteration 7 using subagent-supported candidate selection.
-- [x] B21: Rerun the all-code OOP readability evaluation after iteration 7.
-- [x] B22: Record remaining backlog and explicit continue/stop decision.
-- [x] B23: Continue with iteration 8 using subagent-supported candidate selection.
-- [x] B24: Rerun the all-code OOP readability evaluation after iteration 8.
-- [x] B25: Record remaining backlog and explicit continue/stop decision.
+- [x] B1: Freeze the prompt-to-artifact checklist for skill/workflow/eval organization and static-analysis feedback.
+- [x] B2: Add or extend eval criteria so inefficient route selection fails mechanically.
+- [x] B3: Add the two-run execution path comparison tool and unit tests.
+- [x] B4: Update adaptive-improvement skill/workflow prompts to require static-analysis feedback and two-run path comparison when behavior may differ.
+- [x] B5: Run baseline and rerun evals; repair drift until prompt eval and behavior eval pass.
+- [x] B6: Update the current run bundle with comparison, validation, and feedback evidence.
+- [x] B7: Recheck `goal_loop.py status`; continue if `NEXT_ACTION=run_next_iteration`.
+
+## Optional Goal Item Catalog
+
+These are non-default goal items. They are not active closeout gates and are not
+emitted as `GW*` work units unless copied into `Exit Criteria` or `Backlog` for
+this objective.
+
+- [ ] O1: (research) External web research is required, with source links and current-date verification recorded in the run bundle.
+- [ ] O2: (benchmark) Benchmark or experiment evidence is required, with reproducible commands, seeds, environment, and comparison artifacts.
+- [ ] O3: (docs) Long-form documentation, slide, or user-guide review is required before closeout.
+- [ ] O4: (release) Release, branch-integration, push, or downstream template snapshot coordination is required.
+- [ ] O5: (subagents) Explicit read-only specialist review or implementation handoff is required for the goal.
 
 ## Loop Log
 
-- iteration 1: started all-code OOP readability improvement loop.
-- iteration 1 result: all-code OOP findings decreased from 834 to 828. This was
-  a completed extension, not loop termination.
-- iteration 2: continue the loop on the next accepted hotspot cluster; remaining
-  backlog is led by `PrimitiveDerivativeBridgePass.cpp`, `smolyak.hpp`,
-  `native_autodiff.hpp`, and `kokkos_backend.hpp`.
-- iteration 2 result: grouped callable and bulk layout count fields in
-  `PrimitiveDerivativeBridgePass.cpp` without changing descriptor ABI or IR
-  generation order. All-code OOP findings decreased from 831 to 829, and the
-  target file decreased from 52 to 50. Decision state is `backlog_continue`;
-  the loop remains open for validation, commit / push, and the next backlog
-  item.
-- iteration 2 validation: `cmake --build build --target
-  native_autodiff_bridge_pass_test native_autodiff_pipeline_smoke
-  native_autodiff_clang_normalization_smoke`, matching `ctest` compiler-pass
-  subset, repo dependency review, and `make ci` passed. Next backlog remains
-  open; likely targets are `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`,
-  or `kokkos_backend.hpp`. `goal_status` stays `active`.
-- iteration 3: continue the loop on the next accepted hotspot cluster, starting
-  from all-code OOP findings 829.
-- iteration 3 result: annotated `make_run_id` in `agent_team.py` with its
-  concrete `datetime` input type. All-code OOP findings decreased from 829 to
-  828, and the target file decreased from 34 to 33. Decision state is
-  `backlog_continue`; validation and commit / push remain open before advancing
-  again.
-- iteration 3 validation: targeted agent-team pytest subset, repo dependency
-  review, and `make ci` passed. Next backlog remains open; likely targets are
-  `smolyak.hpp`, `native_autodiff.hpp`, `kokkos_backend.hpp`, or deeper
-  `agent_team.py` structure. `goal_status` stays `active`.
-- iteration 4: parent manages the loop state and gates; subagents handle
-  read-only candidate selection, validation design, and one bounded writer
-  slice. Starting baseline is all-code OOP findings 828.
-- iteration 4 update: Python report assembly refactor reduced
-  `evaluate_agent_run.py` findings from 10 to 1. C++ registry pass refactor
-  reduced `PrimitiveRegistryPass.cpp` findings from 20 to 18 and lowered that
-  file from severe-risk to low-risk. Source-tree OOP findings are 828 to 818.
-  Targeted Python tests, targeted C++ build/tests, and repo dependency review
-  passed. Repo-wide `make ci` is pending until upstream AgentCanon sync can run
-  from a clean worktree.
-- iteration 4 validation: upstream AgentCanon was synchronized and pushed to
-  `/mnt/git/agent-canon.git`. `make ci` passed with 171 pytest tests plus 6
-  subtests, pyright, pydocstyle, and ruff. Remaining backlog continues with
-  `PrimitiveDerivativeBridgePass.cpp`, `smolyak.hpp`, `native_autodiff.hpp`,
-  `kokkos_backend.hpp`, and deeper C++/Python readability hotspots.
-- iteration 5: loop continues because the objective still has high-risk
-  hotspots. Parent keeps loop state and validation gates; subagents select the
-  next bounded behavior-preserving target before a single write slice starts.
-- iteration 5 update: C++ layout validator refactor in
-  `PrimitiveDerivativeBridgePass.cpp` removed the targeted validator
-  function-length / cognitive-complexity findings. The target file moved from
-  high-risk to moderate-risk; source-tree warn findings dropped from 317 to
-  311 while total info findings rose from 818 to 820. C++ reviewer approved
-  this as risk-concentration reduction. Targeted C++ build/tests and repo
-  dependency review passed. Repo-wide `make ci` is pending until upstream
-  AgentCanon sync can run from a clean worktree.
-- iteration 5 validation: upstream AgentCanon was synchronized and pushed to
-  `/mnt/git/agent-canon.git`. `make ci` passed with 171 pytest tests plus 6
-  subtests, pyright, pydocstyle, and ruff. The loop remains active because
-  `PrimitiveDerivativeBridgePass.cpp`, `agent_team.py`, `smolyak.hpp`,
-  `native_autodiff.hpp`, and `kokkos_backend.hpp` still dominate the hotspot
-  ranking.
-- iteration 6: continue the loop mechanically from a clean pushed baseline.
-  Parent manages loop state and gates; subagents select the next bounded
-  behavior-preserving code hotspot with C++ coverage kept in scope.
-- iteration 6 result: C++ marker dispatch in
-  `PrimitiveDerivativeBridgePass.cpp` was split into classification,
-  primal-resolution, registered-family, and callable rewrite helpers. The
-  `PrimitiveDerivativeBridgePass::run` function/cognitive warnings were
-  removed. Source-tree OOP findings decreased from 820 to 819, warn findings
-  decreased from 311 to 309, and the target file decreased from 52 to 51.
-  C++ reviewer approved the diff as behavior-preserving.
-- iteration 6 validation: targeted C++ build, native autodiff compiler-pass
-  ctests, affected-surface code dependency scan, repo dependency review, and
-  `make ci` passed. The loop remains active because the highest remaining
-  hotspots are `PrimitiveDerivativeBridgePass.cpp`, `agent_team.py`,
-  `smolyak.hpp`, `native_autodiff.hpp`, and `kokkos_backend.hpp`.
-- iteration 7: continue from the pushed iteration 6 baseline. C++ remains in
-  scope because `PrimitiveDerivativeBridgePass.cpp`, `smolyak.hpp`,
-  `native_autodiff.hpp`, and `kokkos_backend.hpp` still dominate native-code
-  OOP/readability hotspots.
-- iteration 7 result: C++ Enzyme augment/gradient wrapper construction in
-  `PrimitiveDerivativeBridgePass.cpp` was split into tape resolution, wrapper
-  creation, augment value assembly, gradient argument collection, and scalar /
-  bulk gradient argument assembly helpers. The target file warning count dropped
-  to zero, source-tree OOP findings decreased from 819 to 817, warn findings
-  decreased from 309 to 305, and the target file decreased from 51 to 49.
-- iteration 7 validation: targeted C++ build, native autodiff compiler-pass
-  ctests, affected-surface code dependency scan, repo dependency review, C++
-  reviewer approval, and `make ci` passed. The loop remains active because
-  `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`, `kokkos_backend.hpp`,
-  and remaining info-only C++ surfaces still dominate the hotspot ranking.
-- iteration 8: continue from the pushed iteration 7 baseline. Candidate
-  selection should prefer the highest remaining behavior-preserving hotspot and
-  keep C++ surfaces in scope unless the next best risk reduction is clearly in
-  AgentCanon tooling.
-- iteration 8 result: C++ Smolyak device batch kernels now take one internal
-  `SmolyakBatchKernelViews` value object instead of repeated wide view/count
-  signatures for materialize, reduce, and finalize. Public integrator API,
-  Kokkos backend selection, team policies, reduction order, and numerical
-  scheduling remain unchanged. Source-tree OOP findings decreased from 817 to
-  816, warn findings decreased from 305 to 303, and `smolyak.hpp` decreased
-  from 29 to 28.
-- iteration 8 validation: targeted Smolyak/backend build, Smolyak/backend plus
-  package-consumer ctests, affected-surface code dependency scan, repo
-  dependency review, C++ reviewer approval, and `make ci` passed. The loop
-  remains active because `agent_team.py`, `smolyak.hpp`, `native_autodiff.hpp`,
-  `kokkos_backend.hpp`, and remaining native info surfaces still dominate the
-  hotspot ranking.
+- iteration 0: initialized goal for skill/workflow/eval feedback-loop repair and two-run execution path comparison.

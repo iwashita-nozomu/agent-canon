@@ -253,6 +253,12 @@ critical = true
 description = "Requires MCP goal.loop_status to keep iterations mechanical."
 required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "MCP Goal Loop Status"]
 
+[[evals.checklist]]
+id = "AIL-HUMAN-6"
+critical = true
+description = "Requires static-analysis feedback and two-run path comparison to feed back into prompts."
+required_regex = ["static_analysis_feedback", "compare_agent_run_paths\\.py", "route_efficiency=inefficient", "selected_inefficient_route=yes"]
+
 [[evals]]
 id = "adaptive-improvement-workflow"
 target = "agents/workflows/adaptive-improvement-workflow.md"
@@ -300,6 +306,12 @@ id = "AIL-WF-6"
 critical = true
 description = "Treats Codex goals as a session view, not the durable goal source."
 required_regex = ["Codex `goals`", "goal\\.md", "session view"]
+
+[[evals.checklist]]
+id = "AIL-WF-8"
+critical = true
+description = "Requires two-run execution path comparison and static-analysis feedback repair."
+required_regex = ["compare_agent_run_paths\\.py", "execution_path", "route_efficiency", "static_analysis_feedback", "selected_inefficient_route"]
 
 [[evals]]
 id = "codex-goals-workflow"
