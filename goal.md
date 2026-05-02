@@ -10,7 +10,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
 - current_iteration: 0
 - active_run_id: 20260502-132243-add-execution-path-comparison-eval-for-w
@@ -32,7 +32,7 @@ prompts until the workflow has no remaining improvement action.
 - [x] G4: A mechanical two-run path comparison tool exists, is tested, and emits evidence suitable for `workflow_monitoring.md`.
 - [x] G5: Static-analysis feedback is represented in workflow monitoring and skill/workflow prompts as a feedback-to-skill loop.
 - [x] G6: Targeted static analysis and tests for the changed surfaces pass.
-- [ ] G7: AgentCanon main and the template snapshot are updated and pushed.
+- [x] G7: AgentCanon main and the template snapshot are updated and pushed.
 
 ## Backlog
 
@@ -59,3 +59,7 @@ this objective.
 ## Loop Log
 
 - iteration 0: initialized goal for skill/workflow/eval feedback-loop repair and two-run execution path comparison.
+- iteration 0 result: added execution-path comparison tooling, behavior eval
+  failure for inefficient route selection, static-analysis feedback monitoring,
+  adaptive-improvement prompt repairs, and tool-index documentation. AgentCanon
+  main and the template snapshot branch were pushed during closeout.
