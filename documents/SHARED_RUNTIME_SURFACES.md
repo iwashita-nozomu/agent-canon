@@ -4,7 +4,7 @@
 @dependency-start
 responsibility Documents Shared Runtime Surfaces for this repository.
 upstream design ../tools/sync_agent_canon.sh shared surface link specification
-upstream design ./agent-canon-subtree-migration.md subtree ownership model
+upstream design ./agent-canon-subtree-migration.md vendoring ownership model
 downstream implementation ../tools/sync_agent_canon.sh enforces this surface list
 downstream design ./algorithm-implementation-boundary.md listed shared algorithm boundary policy surface
 downstream design ./object-oriented-design.md listed shared coding policy surface
@@ -13,6 +13,7 @@ downstream design ./object-oriented-design.md listed shared coding policy surfac
 
 この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
 template root と派生 repo root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
+`vendor/agent-canon/` は新規 repo では submodule pin、legacy repo では subtree snapshot のどちらでもよく、root view の意味は同じです。
 `goal.md` は repo 固有の実行状態なので shared runtime surface ではありません。
 root `goal.md` を `vendor/agent-canon/goal.md` へ symlink してはいけません。
 `tools/sync_agent_canon.sh link-root` は既存の shared `goal.md` symlink を repo-local placeholder に変換します。

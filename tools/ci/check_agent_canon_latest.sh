@@ -15,7 +15,7 @@ printf '%s\n' "$plan_output"
 route="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_route=/{print $2}')"
 
 case "$route" in
-  already_current_tree|already_current_split|local_contains_remote)
+  already_current_tree|already_current_split|already_current_submodule|local_contains_remote)
     echo "AGENT_CANON_LATEST=pass"
     ;;
   *)

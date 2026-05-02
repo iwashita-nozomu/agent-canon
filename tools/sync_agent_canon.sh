@@ -30,6 +30,7 @@ Usage:
   bash tools/sync_agent_canon.sh check
   bash tools/sync_agent_canon.sh snapshot
   bash tools/sync_agent_canon.sh add <remote-url> [branch]
+  bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
   bash tools/sync_agent_canon.sh pull [branch]
   bash tools/sync_agent_canon.sh ensure-latest [branch]
   bash tools/sync_agent_canon.sh push [branch]
@@ -98,6 +99,22 @@ ensure_existing_remote_or_default() {
 
 ensure_prefix_exists() {
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
+}
+
+prefix_git_mode() {
+  git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" 2>/dev/null | awk '{print $1}'
+}
+
+is_submodule_prefix() {
+  [ "$(prefix_git_mode)" = "160000" ]
+}
+
+submodule_commit() {
+  git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
+}
+
+submodule_remote_url() {
+  git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
 }
 
 build_link_specs() {
@@ -627,6 +644,7 @@ print_plan_summary() {
   local route="$9"
   local dirty="${10}"
   local requires_clean="${11}"
+  local prefix_mode="${12:-tree}"
 
   echo "agent_canon_plan_branch=$branch"
   if [ -n "$remote_url" ]; then
@@ -649,6 +667,7 @@ print_plan_summary() {
     echo "agent_canon_plan_local_split=unavailable"
   fi
   echo "agent_canon_plan_has_subtree_metadata=$subtree_metadata"
+  echo "agent_canon_plan_prefix_mode=$prefix_mode"
   echo "agent_canon_plan_dirty_worktree=$dirty"
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
@@ -664,15 +683,26 @@ cmd_plan() {
   local remote_url=""
   local remote_source="unset"
   local subtree_metadata="no"
+  local prefix_mode="tree"
   local route="remote_unconfigured"
   local requires_clean="no"
   local dirty="no"
 
   ensure_prefix_exists
-  local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
-  local_split="$(split_prefix_or_empty)"
-  if has_subtree_metadata; then
-    subtree_metadata="yes"
+  if is_submodule_prefix; then
+    prefix_mode="submodule"
+    local_tree="$(submodule_commit)"
+    local_split=""
+    remote_url="$(submodule_remote_url)"
+    if [ -n "$remote_url" ]; then
+      remote_source="submodule"
+    fi
+  else
+    local_tree="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX")"
+    local_split="$(split_prefix_or_empty)"
+    if has_subtree_metadata; then
+      subtree_metadata="yes"
+    fi
   fi
   if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
     dirty="yes"
@@ -681,6 +711,8 @@ cmd_plan() {
   if [ -n "$PLAN_REMOTE_OVERRIDE_URL" ]; then
     remote_url="$PLAN_REMOTE_OVERRIDE_URL"
     remote_source="plan_override"
+  elif [ "$prefix_mode" = "submodule" ] && [ -n "$remote_url" ]; then
+    :
   elif git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
     remote_url="$(git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME")"
     remote_source="configured"
@@ -694,7 +726,7 @@ cmd_plan() {
   if [ -z "$remote_url" ]; then
     print_plan_summary \
       "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
-      "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean"
+      "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode"
     return
   fi
 
@@ -702,7 +734,19 @@ cmd_plan() {
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
   remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
 
-  if [ "$local_tree" = "$remote_tree" ]; then
+  if [ "$prefix_mode" = "submodule" ]; then
+    if [ "$local_tree" = "$remote_sha" ]; then
+      route="already_current_submodule"
+    elif git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
+      route="local_contains_remote"
+    elif git -C "$ROOT_DIR" merge-base --is-ancestor "$local_tree" "$remote_sha"; then
+      route="submodule_update"
+      requires_clean="yes"
+    else
+      route="diverged_submodule_history"
+      requires_clean="yes"
+    fi
+  elif [ "$local_tree" = "$remote_tree" ]; then
     route="already_current_tree"
   elif [ -n "$local_split" ] && [ "$local_split" = "$remote_sha" ]; then
     route="already_current_split"
@@ -731,7 +775,19 @@ cmd_plan() {
 
   print_plan_summary \
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
-    "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean"
+    "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode"
+}
+
+cmd_submodule_add() {
+  local remote_url="$1"
+  local branch="${2:-$DEFAULT_BRANCH}"
+  require_clean_worktree
+  [ -n "$remote_url" ] || die "submodule-add requires <remote-url>"
+  if [ -e "$ROOT_DIR/$PREFIX" ] || git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" >/dev/null 2>&1; then
+    die "prefix '$PREFIX' already exists; remove the subtree snapshot before adding a submodule"
+  fi
+  git -C "$ROOT_DIR" submodule add -b "$branch" "$remote_url" "$PREFIX"
+  cmd_link_root 1
 }
 
 pull_or_import_snapshot() {
@@ -802,6 +858,44 @@ cmd_ensure_latest() {
   local remote_sha=""
 
   ensure_prefix_exists
+  if is_submodule_prefix; then
+    local remote_url=""
+    local local_commit=""
+    remote_url="$(submodule_remote_url)"
+    [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+    git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
+    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
+    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+    local_commit="$(submodule_commit)"
+    echo "agent_canon_local_submodule=$local_commit"
+    echo "agent_canon_remote=$remote_sha"
+    if [ "$local_commit" = "$remote_sha" ]; then
+      echo "agent_canon_latest=already_current_submodule"
+      if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+        cmd_check
+      else
+        cmd_link_root 1
+      fi
+      return
+    fi
+    if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
+      echo "agent_canon_latest=local_contains_remote"
+      if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
+        cmd_check
+      else
+        cmd_link_root 1
+      fi
+      return
+    fi
+    require_clean_worktree
+    echo "agent_canon_latest=updating_submodule"
+    git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
+    cmd_link_root 1
+    git -C "$ROOT_DIR" add "$PREFIX" .gitmodules
+    commit_sync_paths_if_needed "$remote_sha" "submodule_update"
+    return
+  fi
+
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
   remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
@@ -876,6 +970,7 @@ cmd_status() {
   echo "prefix=$PREFIX"
   echo "remote_name=$REMOTE_NAME"
   echo "default_branch=$DEFAULT_BRANCH"
+  echo "prefix_mode=$(prefix_git_mode)"
   if [ -n "$remote_url" ]; then
     echo "remote_url=$remote_url"
   else
@@ -935,6 +1030,10 @@ main() {
     add)
       [ "${2:-}" ] || die "add requires <remote-url>"
       cmd_add "$2" "${3:-$DEFAULT_BRANCH}"
+      ;;
+    submodule-add)
+      [ "${2:-}" ] || die "submodule-add requires <remote-url>"
+      cmd_submodule_add "$2" "${3:-$DEFAULT_BRANCH}"
       ;;
     pull)
       cmd_pull "${2:-$DEFAULT_BRANCH}"

@@ -29,9 +29,10 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
-    - `ensure-latest` は task 開始時に upstream `agent-canon` と local subtree snapshot を揃えます。
+    - `ensure-latest` は task 開始時に upstream `agent-canon` と local `vendor/agent-canon` を揃えます。
     - `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は自動追加します。
-    - fresh clone で subtree metadata が無い場合は、fast-forward 更新に限って snapshot import へ切り替えます。
+    - submodule repo では gitlink commit を確認し、必要なら submodule pointer を fast-forward 更新します。
+    - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - source repo が設定されている場合、`plan` は `refresh -> local sync` 後の実効 route を出します。source repo が missing / dirty なら fail-closed で止まります。
@@ -52,6 +53,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 
 `sync_agent_canon.sh` は低レベル実装です。
 日常の update 導線では `pull` や `push` を直接選ばず、Make target または `update_agent_canon.sh plan/apply` から入ります。
+submodule 化済み repo では `plan` が `already_current_submodule` / `submodule_update` を返します。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
