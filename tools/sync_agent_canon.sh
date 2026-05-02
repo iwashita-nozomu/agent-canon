@@ -736,9 +736,15 @@ cmd_plan() {
     return
   fi
 
-  git -C "$ROOT_DIR" fetch "$remote_url" "$branch"
-  remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
-  remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
+  if [ "$prefix_mode" = "submodule" ]; then
+    git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch"
+    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+    remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
+  else
+    git -C "$ROOT_DIR" fetch "$remote_url" "$branch"
+    remote_sha="$(git -C "$ROOT_DIR" rev-parse FETCH_HEAD)"
+    remote_tree="$(git -C "$ROOT_DIR" rev-parse "$remote_sha^{tree}")"
+  fi
 
   if [ "$prefix_mode" = "submodule" ]; then
     if [ "$local_tree" = "$remote_sha" ]; then
@@ -870,7 +876,7 @@ cmd_ensure_latest() {
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
-    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
+    git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch"
     remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     local_commit="$(submodule_commit)"
     echo "agent_canon_local_submodule=$local_commit"
