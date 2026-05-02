@@ -212,9 +212,12 @@ def require_string_list(
     value = section.get(key)
     if value is None:
         return ()
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not isinstance(value, list):
         raise ValueError(f"{source}: [{section_name}].{key} must be a list of strings")
-    return tuple(cast("list[str]", value))
+    value_items = cast("list[object]", value)
+    if not all(isinstance(item, str) for item in value_items):
+        raise ValueError(f"{source}: [{section_name}].{key} must be a list of strings")
+    return tuple(cast("list[str]", value_items))
 
 
 def load_pack(path_like: str | Path) -> ContainerPack:
@@ -412,4 +415,4 @@ def load_toml(path_like: str | Path) -> dict[str, Any]:
     """Load one generic TOML file."""
     path = workspace_path(path_like)
     with path.open("rb") as handle:
-        return cast("dict[str, Any]", tomllib.load(handle))
+        return tomllib.load(handle)
