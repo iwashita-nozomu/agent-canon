@@ -40,6 +40,7 @@ outer loop は agile、inner change pass は waterfall です。
 - repo MCP が利用可能な場合は、`goal.loop_status` を iteration gate にします。`NEXT_ACTION=run_next_iteration` なら次 backlog item を選び、`NEXT_ACTION=close_goal_loop` になるまで completion report を出しません。
 - Codex `goals` feature が有効な場合でも、durable state は `goal.md` に置きます。Codex goals は `goal.md` と同じ Objective / Exit Criteria を表示する session view として扱い、食い違う場合は `goal.md` を正本にして修正します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
+- ただし 1 iteration は単発 micro-fix ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
 - iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。

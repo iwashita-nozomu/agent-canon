@@ -45,7 +45,31 @@ DEFAULT_EXIT_CRITERIA = (
     ("G5", "Objective-specific completion evidence is recorded."),
 )
 DEFAULT_BACKLOG = (
-    ("B1", "Define the next smallest iteration that can move one unchecked exit criterion."),
+    (
+        "B1",
+        "Build the prompt-to-artifact checklist that maps objective clauses to "
+        "files, commands, gates, and completion evidence.",
+    ),
+    (
+        "B2",
+        "Survey existing docs, tools, tests, and reusable surfaces before adding "
+        "or deleting anything; list reuse, consolidation, and deletion candidates.",
+    ),
+    (
+        "B3",
+        "Execute one cohesive implementation slice that advances the selected "
+        "related surfaces together instead of stopping after one micro-fix.",
+    ),
+    (
+        "B4",
+        "Run dependency review, code dependency scan, OOP/readability, and "
+        "task-relevant prompt/doc/convention checks; fix any failure in the same iteration.",
+    ),
+    (
+        "B5",
+        "Refresh the goal work breakdown, close completed backlog items with evidence, "
+        "and continue immediately if NEXT_ACTION still reports run_next_iteration.",
+    ),
 )
 
 
@@ -101,6 +125,7 @@ class GoalState:
             self.goal_status == "achieved"
             and bool(self.exit_criteria)
             and self.done_exit_criteria == len(self.exit_criteria)
+            and self.done_backlog_items == len(self.backlog)
             and not self.parse_errors
         )
 

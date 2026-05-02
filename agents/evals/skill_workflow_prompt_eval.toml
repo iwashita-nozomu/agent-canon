@@ -337,6 +337,12 @@ critical = true
 description = "Documents the supported TUI goal command surface and status ownership."
 required_regex = ["/goal pause", "/goal resume", "/goal clear", "budget-limited", "user or system controlled"]
 
+[[evals.checklist]]
+id = "CODEX-GOALS-6"
+critical = true
+description = "Prevents Goal setup from shrinking the first iteration to a single micro-fix."
+required_regex = ["minimum first-iteration packet", "prompt-to-artifact checklist", "reuse / consolidation / deletion survey", "one single micro-fix"]
+
 [[evals]]
 id = "token-efficient-codex-workflow"
 target = "agents/workflows/token-efficient-codex-workflow.md"

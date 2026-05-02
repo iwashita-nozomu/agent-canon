@@ -80,6 +80,11 @@ evidence, or repo-owned state.
 1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
    TODO draft. The output lists unchecked Exit Criteria and Backlog items as
    `GW*` work units with evidence hints.
+   The first iteration must be large enough to move a coherent task slice:
+   prompt-to-artifact checklist, reuse / consolidation / deletion survey,
+   implementation over the selected related surfaces, and validation evidence.
+   Do not reduce Goal setup to one single micro-fix when the objective names
+   multiple deliverables.
 1. The Plan-mode output must include:
    - `Goal Contract`: exact objective, non-goals, constraints, and request
      clauses.
@@ -148,6 +153,8 @@ When starting a goal-driven task:
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
 1. Run `goal_loop.py plan --goal-file goal.md --report-out <run>/goal_work_breakdown.md`.
+   Confirm the generated Backlog contains the minimum first-iteration packet
+   rather than only one tiny "next item" task.
 1. Enter `/plan` and complete the Goal-Specified Plan-Mode Entry before any
    implementation edit.
 1. Run `goal_loop.py status` and MCP `goal.loop_status`.

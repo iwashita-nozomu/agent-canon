@@ -78,6 +78,10 @@ python3 tools/agent_tools/workflow_monitor.py \
 
 `goal_loop.py` manages a top-level `goal.md` contract and repeats a command until explicit exit criteria are checked and `goal_status: achieved` is set.
 The default `goal.md` and `goal_loop.py init` include mandatory criteria for dependency review, code dependency extraction, OOP/readability analysis, repo-wide static analysis or CI, and objective-specific evidence.
+The default Backlog is a minimum first-iteration packet, not a single tiny TODO.
+It requires a prompt-to-artifact checklist, reuse / consolidation / deletion survey,
+one cohesive implementation slice, task-relevant validation, and immediate continuation
+when `NEXT_ACTION=run_next_iteration` remains.
 
 ```bash
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
@@ -89,6 +93,8 @@ python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 -
 
 Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
 Before implementation, run `goal_loop.py plan` and copy every open `GW*` row into the run bundle `schedule.md`; this prevents starting from a bare objective with no explicit work units.
+Do not shrink the first iteration to one micro-fix when the objective names multiple surfaces.
+Select a coherent slice that can move the checklist, survey, implementation, and validation backlog items together.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
 
 ## Skill And Workflow Prompt Evals

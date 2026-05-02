@@ -54,6 +54,10 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("scan_code_dependencies.sh", text)
             self.assertIn("analyze_oop_readability.py", text)
             self.assertIn("make ci", text)
+            self.assertIn("prompt-to-artifact checklist", text)
+            self.assertIn("reusable surfaces", text)
+            self.assertIn("one cohesive implementation slice", text)
+            self.assertIn("NEXT_ACTION still reports run_next_iteration", text)
 
     def test_mark_done_and_goal_status_achieved(self) -> None:
         """A checked criterion plus achieved status closes the loop."""
@@ -82,6 +86,16 @@ class GoalLoopTest(unittest.TestCase):
                     str(goal),
                     "--criterion",
                     criterion,
+                    "--done",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+            for backlog in ("B1", "B2", "B3", "B4", "B5"):
+                result = run_goal_loop(
+                    "mark",
+                    "--goal-file",
+                    str(goal),
+                    "--backlog",
+                    backlog,
                     "--done",
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -162,15 +176,16 @@ class GoalLoopTest(unittest.TestCase):
                 "--report-out",
                 str(report),
                 "--max-items",
-                "3",
+                "12",
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("# Goal Work Breakdown", result.stdout)
-            self.assertIn("GOAL_WORK_UNITS=5", result.stdout)
+            self.assertIn("GOAL_WORK_UNITS=9", result.stdout)
             self.assertIn("exit_criteria:G2", result.stdout)
             self.assertIn("Copy every open `GW*` row", result.stdout)
             report_text = report.read_text(encoding="utf-8")
+            self.assertIn("one cohesive implementation slice", report_text)
             self.assertIn("NEXT_ACTION=run_next_iteration", result.stdout)
             self.assertIn("## Work Units", report_text)
 
@@ -198,6 +213,8 @@ class GoalLoopTest(unittest.TestCase):
                         "text = goal.read_text()",
                         "for criterion in ('G1', 'G2', 'G3', 'G4', 'G5'):",
                         "    text = text.replace(f'- [ ] {criterion}:', f'- [x] {criterion}:')",
+                        "for backlog in ('B1', 'B2', 'B3', 'B4', 'B5'):",
+                        "    text = text.replace(f'- [ ] {backlog}:', f'- [x] {backlog}:')",
                         "text = text.replace('- goal_status: active', '- goal_status: achieved')",
                         "goal.write_text(text)",
                     ]
