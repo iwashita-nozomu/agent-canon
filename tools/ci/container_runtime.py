@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 try:
     import tomllib
@@ -214,14 +214,14 @@ def require_string_list(
         return ()
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{source}: [{section_name}].{key} must be a list of strings")
-    return tuple(value)
+    return tuple(cast("list[str]", value))
 
 
 def load_pack(path_like: str | Path) -> ContainerPack:
     """Load a runtime pack from TOML."""
     path = workspace_path(path_like)
     with path.open("rb") as handle:
-        data = tomllib.load(handle)
+        data = cast("dict[str, object]", tomllib.load(handle))
 
     pack_data = data.get("pack", {})
     smoke_data = data.get("smoke", {})
@@ -232,29 +232,32 @@ def load_pack(path_like: str | Path) -> ContainerPack:
         or not isinstance(runtime_data, dict)
     ):
         raise ValueError(f"{path}: pack, smoke, and runtime sections must be tables")
+    pack_section = cast("dict[str, object]", pack_data)
+    smoke_section = cast("dict[str, object]", smoke_data)
+    runtime_section = cast("dict[str, object]", runtime_data)
 
-    name = require_string(pack_data, "name", path, "pack")
-    dockerfile = require_string(pack_data, "dockerfile", path, "pack")
-    context = require_string(pack_data, "context", path, "pack")
-    image_tag = require_string(pack_data, "image_tag", path, "pack")
+    name = require_string(pack_section, "name", path, "pack")
+    dockerfile = require_string(pack_section, "dockerfile", path, "pack")
+    context = require_string(pack_section, "context", path, "pack")
+    image_tag = require_string(pack_section, "image_tag", path, "pack")
 
-    target = pack_data.get("target")
+    target = pack_section.get("target")
     if target is not None and not isinstance(target, str):
         raise ValueError(f"{path}: [pack].target must be a string if present")
 
-    smoke_shell = smoke_data.get("shell", "/bin/bash")
+    smoke_shell = smoke_section.get("shell", "/bin/bash")
     if not isinstance(smoke_shell, str):
         raise ValueError(f"{path}: [smoke].shell must be a string")
-    runtime_shell = runtime_data.get("shell", "/bin/bash")
+    runtime_shell = runtime_section.get("shell", "/bin/bash")
     if not isinstance(runtime_shell, str):
         raise ValueError(f"{path}: [runtime].shell must be a string")
-    workdir = runtime_data.get("workdir", "/workspace")
+    workdir = runtime_section.get("workdir", "/workspace")
     if not isinstance(workdir, str):
         raise ValueError(f"{path}: [runtime].workdir must be a string")
-    workspace_mount = runtime_data.get("workspace_mount", "/workspace")
+    workspace_mount = runtime_section.get("workspace_mount", "/workspace")
     if not isinstance(workspace_mount, str):
         raise ValueError(f"{path}: [runtime].workspace_mount must be a string")
-    gpus = runtime_data.get("gpus")
+    gpus = runtime_section.get("gpus")
     if gpus is not None and not isinstance(gpus, str):
         raise ValueError(f"{path}: [runtime].gpus must be a string if present")
 
@@ -266,14 +269,14 @@ def load_pack(path_like: str | Path) -> ContainerPack:
         image_tag=image_tag,
         smoke=SmokeSpec(
             shell=smoke_shell,
-            commands=require_string_list(smoke_data, "commands", path, "smoke"),
+            commands=require_string_list(smoke_section, "commands", path, "smoke"),
         ),
         runtime=RuntimeSpec(
             shell=runtime_shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
-            env=require_string_list(runtime_data, "env", path, "runtime"),
-            mounts=require_string_list(runtime_data, "mounts", path, "runtime"),
+            env=require_string_list(runtime_section, "env", path, "runtime"),
+            mounts=require_string_list(runtime_section, "mounts", path, "runtime"),
             gpus=gpus,
         ),
     )
@@ -409,7 +412,4 @@ def load_toml(path_like: str | Path) -> dict[str, Any]:
     """Load one generic TOML file."""
     path = workspace_path(path_like)
     with path.open("rb") as handle:
-        data = tomllib.load(handle)
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: TOML root must be a table")
-    return data
+        return cast("dict[str, Any]", tomllib.load(handle))
