@@ -4,6 +4,7 @@ responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
+downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
@@ -112,6 +113,54 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
 - inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
 - contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
+
+### Codex Goals Feature Preflight
+
+Codex `goals` feature が有効な runtime では、`agents/workflows/codex-goals-workflow.md` を overlay として読みます。
+
+```bash
+codex features list | grep '^goals'
+python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
+```
+
+- shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
+- `goal.md` は durable source of truth、Codex goals は session view、MCP `goal.loop_status` は機械 gate です。
+- goal-driven task では、Codex goals だけを更新して closeout してはいけません。対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を先に更新します。
+- `goal_loop.py status` または MCP `goal.loop_status` が `NEXT_ACTION=run_next_iteration` を返す限り、Codex goals 上で完了に見えても user-facing completion を返しません。
+- Codex goals と `goal.md` が食い違う場合は、repo-owned `goal.md` を正本にして session goal view を修正してから実装へ戻ります。
+
+### Token And Agent Mode Preflight
+
+When the user asks to reduce token usage, or when the session is already long,
+read `agents/workflows/token-efficient-codex-workflow.md` before spawning
+subagents or loading broad context.
+
+Use these parent-session profiles as operator modes:
+
+```bash
+codex -p token-lite
+codex -p token-standard
+codex -p token-deep
+```
+
+- `token-lite` is for narrow diagnosis and low-risk changes. It does not relax
+  required gates.
+- `token-standard` is the default staged repo-work mode.
+- `token-deep` is for broad architecture, research synthesis, high-risk review,
+  and repeated validation failures.
+
+Choose one subagent mode before delegation:
+
+- `parent-direct`: no subagent, only for trivial or mechanical work.
+- `scout-only`: read-only `explorer` / reviewer answers bounded questions.
+- `spark-slice`: `spark_worker` handles approved, design-traced low-risk slices.
+- `full-stage`: normal staged requirements, planning, design, review, and
+  implementation agents.
+- `deep-review`: additional independent read-only reviewers for high-risk work.
+
+Token-saving changes context loading, not correctness. Full dependency review,
+static analysis, diff-check review, closeout gates, and push requirements still
+apply when the task requires them.
 
 ### Edit Execution Surface
 

@@ -54,7 +54,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-workflow-docs"
 target_glob = "agents/workflows/*.md"
-expected_count = 15
+expected_count = 17
 kind = "workflow"
 description = "Every workflow document must be dependency-linked and reader-addressable."
 
@@ -288,6 +288,108 @@ id = "AIL-WF-5"
 critical = true
 description = "Requires MCP goal.loop_status to decide whether to continue or close."
 required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+
+[[evals.checklist]]
+id = "AIL-WF-6"
+critical = true
+description = "Treats Codex goals as a session view, not the durable goal source."
+required_regex = ["Codex `goals`", "goal\\.md", "session view"]
+
+[[evals]]
+id = "codex-goals-workflow"
+target = "agents/workflows/codex-goals-workflow.md"
+kind = "workflow"
+description = "The Codex goals workflow must bind the feature to goal.md and MCP loop status."
+
+[[evals.checklist]]
+id = "CODEX-GOALS-1"
+critical = true
+description = "Defines the role split between goal.md, Codex goals, MCP, and goal_loop.py."
+required_regex = ["goal\\.md", "Codex `goals`", "goal\\.loop_status", "goal_loop\\.py"]
+
+[[evals.checklist]]
+id = "CODEX-GOALS-2"
+critical = true
+description = "Requires feature and MCP preflight commands."
+required_regex = ["codex features list", "check_mcp_inventory\\.py", "goal_loop\\.py status"]
+
+[[evals.checklist]]
+id = "CODEX-GOALS-3"
+critical = true
+description = "Blocks closeout while MCP or goal.md says to continue."
+required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop", "not complete"]
+
+[[evals]]
+id = "token-efficient-codex-workflow"
+target = "agents/workflows/token-efficient-codex-workflow.md"
+kind = "workflow"
+description = "The token-efficient workflow must define profiles, agent modes, and non-waivable gates."
+
+[[evals.checklist]]
+id = "TOKEN-WF-1"
+critical = true
+description = "Defines the three token profiles."
+required_regex = ["token-lite", "token-standard", "token-deep"]
+
+[[evals.checklist]]
+id = "TOKEN-WF-2"
+critical = true
+description = "Defines agent modes for delegation control."
+required_regex = ["parent-direct", "scout-only", "spark-slice", "full-stage", "deep-review"]
+
+[[evals.checklist]]
+id = "TOKEN-WF-3"
+critical = true
+description = "Keeps validation and closeout gates mandatory."
+required_regex = ["does not relax", "dependency review", "closeout gates"]
+
+[[evals]]
+id = "codex-config-token-profiles"
+target = ".codex/config.toml"
+kind = "config"
+description = "Shared Codex config must expose token-saving profiles."
+
+[[evals.checklist]]
+id = "CODEX-CONFIG-TOKEN-1"
+critical = true
+description = "Defines token-lite, token-standard, and token-deep profiles."
+required_regex = ["\\[profiles\\.token-lite\\]", "\\[profiles\\.token-standard\\]", "\\[profiles\\.token-deep\\]", "tool_output_token_limit"]
+
+[[evals]]
+id = "codex-workflow-token-preflight"
+target = "agents/canonical/CODEX_WORKFLOW.md"
+kind = "workflow"
+description = "The Codex workflow must route token-saving requests through the token-efficient overlay."
+
+[[evals.checklist]]
+id = "CODEX-WF-TOKEN-1"
+critical = true
+description = "Mentions token profiles, agent modes, and non-waivable gates."
+required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "Full dependency review"]
+
+[[evals]]
+id = "codex-workflow-goals-preflight"
+target = "agents/canonical/CODEX_WORKFLOW.md"
+kind = "workflow"
+description = "The Codex workflow must explain goals feature preflight and source-of-truth boundaries."
+
+[[evals.checklist]]
+id = "CODEX-WF-GOALS-1"
+critical = true
+description = "Mentions the goals feature preflight and durable goal source."
+required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal\\.loop_status"]
+
+[[evals]]
+id = "codex-config-goals-feature"
+target = ".codex/config.toml"
+kind = "config"
+description = "Shared Codex config must enable the goals feature."
+
+[[evals.checklist]]
+id = "CODEX-CONFIG-GOALS-1"
+critical = true
+description = "Enables the goals feature in the shared config."
+required_regex = ["\\[features\\]", "goals\\s*=\\s*true"]
 
 [[evals]]
 id = "repo-mcp-server-goal-loop-tool"

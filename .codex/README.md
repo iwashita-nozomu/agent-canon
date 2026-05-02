@@ -34,6 +34,29 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
+- token 消費を抑える task では `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile と agent mode を先に宣言します
+
+## Token Profiles
+
+- `token-lite`
+  - `model_reasoning_effort = "low"`
+  - `plan_mode_reasoning_effort = "low"`
+  - `model_verbosity = "low"`
+  - `tool_output_token_limit = 6000`
+- `token-standard`
+  - `model_reasoning_effort = "medium"`
+  - `plan_mode_reasoning_effort = "medium"`
+  - `model_verbosity = "medium"`
+  - `tool_output_token_limit = 12000`
+- `token-deep`
+  - `model_reasoning_effort = "high"`
+  - `plan_mode_reasoning_effort = "high"`
+  - `model_verbosity = "medium"`
+  - `tool_output_token_limit = 24000`
+
+Use `codex -p token-lite` for narrow diagnosis, `codex -p token-standard` for
+normal staged repo work, and `codex -p token-deep` for architecture, research,
+or high-risk review. Profiles do not waive workflow gates.
 
 ## Runtime Spawn Limits
 

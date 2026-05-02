@@ -29,3 +29,5 @@ Do not require a host-global `repo_mcp_server` executable.
   loop uses this tool as the mechanical iteration gate:
   `NEXT_ACTION=run_next_iteration`
   means continue the next backlog item, not completion.
+  When Codex `goals` is enabled, this MCP tool remains the repo-level gate;
+  Codex goals is only the session view of the same `goal.md` contract.

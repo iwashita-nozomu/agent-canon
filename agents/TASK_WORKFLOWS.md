@@ -71,6 +71,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 既存実装や導入済みライブラリで足りない理由、extend ではなく新規追加が必要な理由を詳細設計に書かずに実装へ進みません
 - rate-limit pressure が強い場合は、design trace、naming、test plan、write scope が固定済みの狭い実装sliceだけ `spark_worker` へ移します
 - `spark_worker` は設計判断、scope判断、review判断には使いません
+- token 消費を抑える必要がある場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile (`token-lite` / `token-standard` / `token-deep`) と agent mode (`parent-direct` / `scout-only` / `spark-slice` / `full-stage` / `deep-review`) を先に決めます
+- token 節約は context loading と fan-out の制御であり、required review、dependency analysis、validation、closeout gate を省略する理由にはなりません
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
 - 要件整理では、ユーザーへ戻す前に notes、guardrails、documents、prior logs、local code / tests で解決できる unknown を解決し、根拠を `Resolved From Accumulated Context` に残します
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します

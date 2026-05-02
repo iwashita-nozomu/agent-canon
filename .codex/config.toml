@@ -7,6 +7,7 @@
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
 # downstream implementation ./hooks.json injects MCP startup and prompt context
 # downstream implementation ../tools/agent_tools/check_mcp_inventory.py verifies MCP inventory
+# downstream design ../agents/workflows/token-efficient-codex-workflow.md token-aware runtime modes
 # @dependency-end
 
 approval_policy = "never"
@@ -14,6 +15,25 @@ sandbox_mode = "danger-full-access"
 
 [features]
 codex_hooks = true
+goals = true
+
+[profiles.token-lite]
+model_reasoning_effort = "low"
+plan_mode_reasoning_effort = "low"
+model_verbosity = "low"
+tool_output_token_limit = 6000
+
+[profiles.token-standard]
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "medium"
+model_verbosity = "medium"
+tool_output_token_limit = 12000
+
+[profiles.token-deep]
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+model_verbosity = "medium"
+tool_output_token_limit = 24000
 
 [agents]
 max_threads = 24

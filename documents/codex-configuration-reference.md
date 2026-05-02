@@ -10,7 +10,7 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 
 # Codex Configuration Reference
 
-この文書は Codex CLI / Codex runtime の設定面を、2026-04-27 時点の公式 OpenAI Codex docs、公式 `config-schema.json`、ローカル `codex --help` / `codex exec --help` / `codex review --help` / `codex mcp --help`、およびこの template の `.codex/config.toml` から整理したものです。
+この文書は Codex CLI / Codex runtime の設定面を、2026-05-02 時点の公式 OpenAI Codex docs、公式 `config-schema.json`、ローカル `codex --help` / `codex exec --help` / `codex review --help` / `codex mcp --help` / `codex features list`、およびこの template の `.codex/config.toml` から整理したものです。
 
 目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
 
@@ -71,6 +71,25 @@ sandbox_mode = "danger-full-access"
 
 [features]
 codex_hooks = true
+goals = true
+
+[profiles.token-lite]
+model_reasoning_effort = "low"
+plan_mode_reasoning_effort = "low"
+model_verbosity = "low"
+tool_output_token_limit = 6000
+
+[profiles.token-standard]
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "medium"
+model_verbosity = "medium"
+tool_output_token_limit = 12000
+
+[profiles.token-deep]
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+model_verbosity = "medium"
+tool_output_token_limit = 24000
 
 [agents]
 max_threads = 24
@@ -89,6 +108,8 @@ Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
 - `features.codex_hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
+- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `repo_mcp_server.goal_loop_status`.
+- `token-lite`, `token-standard`, and `token-deep` are reusable runtime profiles. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
 - `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
@@ -104,7 +125,8 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | --- | ------------------------- |
 | `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
-| `features` | Only `features.codex_hooks=true` is configured. |
+| `features` | `features.codex_hooks=true` and `features.goals=true` are configured. |
+| `profiles` | `token-lite`, `token-standard`, and `token-deep` are configured for operator-selected token budgets. |
 | `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
 | `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
 
@@ -112,16 +134,16 @@ They are an explicit inventory of settings that Codex can accept but this templa
 
 | Category | Absent Keys |
 | -------- | ----------- |
-| Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_effort`, `plan_mode_reasoning_effort`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_verbosity`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
+| Model and provider selection | `model`, `review_model`, `model_provider`, `model_providers`, `openai_base_url`, `chatgpt_base_url`, `oss_provider`, `service_tier`, `model_reasoning_summary`, `model_supports_reasoning_summaries`, `model_context_window`, `model_auto_compact_token_limit`, `model_catalog_json`, `model_instructions_file` |
 | Approval, permissions, and sandbox detail | `approvals_reviewer`, `default_permissions`, `permissions`, `sandbox_workspace_write`, `shell_environment_policy`, `allow_login_shell` |
 | Project docs and injected context | `instructions`, `developer_instructions`, `include_apps_instructions`, `include_environment_context`, `include_permissions_instructions`, `project_doc_fallback_filenames`, `project_doc_max_bytes`, `project_root_markers`, `projects` |
-| Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_output_token_limit`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
+| Hooks, tools, skills, and integrations | `hooks`, `tools`, `tool_suggest`, `web_search`, `skills`, `apps`, `plugins`, `marketplaces` |
 | MCP OAuth and auth storage | `mcp_oauth_callback_port`, `mcp_oauth_callback_url`, `mcp_oauth_credentials_store`, `cli_auth_credentials_store`, `forced_chatgpt_workspace_id`, `forced_login_method` |
 | UI, history, logging, and local state | `tui`, `history`, `log_dir`, `sqlite_home`, `notify`, `file_opener`, `feedback`, `analytics`, `notice`, `check_for_update_on_startup`, `suppress_unstable_features_warning`, `disable_paste_burst`, `commit_attribution`, `compact_prompt`, `hide_agent_reasoning`, `show_raw_agent_reasoning`, `background_terminal_max_timeout` |
 | Memory, observability, and snapshots | `memories`, `otel`, `ghost_snapshot`, `auto_review` |
 | Realtime, audio, JS, and platform-specific settings | `realtime`, `audio`, `js_repl_node_module_dirs`, `js_repl_node_path`, `windows`, `windows_wsl_setup_acknowledged`, `zsh_path` |
 | Experimental thread/realtime/tool overrides | `experimental_compact_prompt_file`, `experimental_realtime_start_instructions`, `experimental_realtime_ws_backend_prompt`, `experimental_realtime_ws_base_url`, `experimental_realtime_ws_model`, `experimental_realtime_ws_startup_context`, `experimental_thread_config_endpoint`, `experimental_thread_store_endpoint`, `experimental_use_freeform_apply_patch`, `experimental_use_unified_exec_tool` |
-| Profile selection | `profile`, `profiles`, `personality` |
+| Profile selection | `profile`, `personality` |
 
 Interpretation for this template:
 
@@ -134,7 +156,7 @@ Interpretation for this template:
 ### Feature Flags Not Currently Enabled Here
 
 The schema currently exposes many feature flags under `[features]`.
-This template enables only `codex_hooks`.
+This template enables `codex_hooks` and `goals`.
 All other schema-listed flags are currently absent from the shared repo config:
 
 ```text
@@ -583,6 +605,24 @@ Policy boundary:
 Use profiles for operator modes:
 
 ```toml
+[profiles.token-lite]
+model_reasoning_effort = "low"
+plan_mode_reasoning_effort = "low"
+model_verbosity = "low"
+tool_output_token_limit = 6000
+
+[profiles.token-standard]
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "medium"
+model_verbosity = "medium"
+tool_output_token_limit = 12000
+
+[profiles.token-deep]
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+model_verbosity = "medium"
+tool_output_token_limit = 24000
+
 [profiles.review]
 model = "gpt-5.5"
 model_reasoning_effort = "high"
