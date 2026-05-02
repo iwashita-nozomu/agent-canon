@@ -107,14 +107,18 @@ def string_list(value: object, field: str) -> tuple[str, ...]:
     """Return a tuple of strings from a manifest value."""
     if value is None:
         return ()
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not isinstance(value, list):
         raise ValueError(f"{field} must be a list of strings")
+    items = cast(list[object], value)
+    for item in items:
+        if not isinstance(item, str):
+            raise ValueError(f"{field} must be a list of strings")
     return tuple(cast(list[str], value))
 
 
 def load_manifest(path: Path, root: Path) -> tuple[tuple[PromptEval, ...], ManifestAudit]:
     """Load a prompt eval manifest."""
-    data = cast(dict[str, Any], tomllib.loads(path.read_text(encoding="utf-8")))
+    data: dict[str, Any] = tomllib.loads(path.read_text(encoding="utf-8"))
     evals = data.get("evals")
     if not isinstance(evals, list) or not evals:
         raise ValueError("manifest must define at least one [[evals]] entry")

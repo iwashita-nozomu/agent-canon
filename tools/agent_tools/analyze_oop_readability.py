@@ -1636,7 +1636,7 @@ def write_review_prompt(path: Path, report_path: str | None) -> None:
                 "- Group comments by OOP principle: responsibility, state ownership,",
                 "  typed boundary, composition, mathematical redundancy, and effect separation.",
                 "- For each hotspot, cite `path:line`, `kind`, and the mechanical explanation.",
-                "- Do not request code edits unless the mechanical report identifies a concrete risk.",
+                "- Do not request code edits unless the report identifies a concrete risk.",
                 "",
                 "Expected output:",
                 "- One short executive summary.",
