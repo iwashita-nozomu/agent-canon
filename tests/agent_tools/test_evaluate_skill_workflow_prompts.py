@@ -35,6 +35,16 @@ def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProces
     )
 
 
+def load_toml_document(path: Path) -> dict[str, Any]:
+    """Load one TOML document with a concrete table type for strict pyright."""
+    return cast(
+        dict[str, Any],
+        tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+            path.read_text(encoding="utf-8")
+        ),
+    )
+
+
 class SkillWorkflowPromptEvalTest(unittest.TestCase):
     """Verify prompt eval behavior."""
 
@@ -51,9 +61,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
-        data = tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
-            manifest.read_text(encoding="utf-8")
-        )
+        data = load_toml_document(manifest)
         evals = cast(list[dict[str, Any]], data["evals"])
 
         globs = {
