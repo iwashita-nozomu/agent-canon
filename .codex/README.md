@@ -89,6 +89,7 @@ or high-risk review. Profiles do not waive workflow gates.
 
 - `repo_mcp_server` は [config.toml](config.toml) の `[mcp_servers.repo_mcp_server]` を正本にします。
 - launcher は host-global `repo_mcp_server` command ではなく、repo-local `bash mcp/repo_mcp_server.sh` を使います。
+- `cwd = "."` を設定し、launcher 側でも `CODEX_WORKSPACE_ROOT` を repo root に固定します。Goal / resume 後の restart で current working directory が揺れても、MCP は同じ repo root を見ます。
 - root `mcp/` は `vendor/agent-canon/mcp/` への runtime view で、`tools/sync_agent_canon.sh link-root` が復元します。
 - MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
 - repository task では、ユーザーが MCP を明示していなくても、intake で `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。

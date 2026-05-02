@@ -4,7 +4,7 @@
 # upstream design README.md MCP runtime surface contract
 # upstream implementation ./repo_mcp_server.sh launches this server
 # upstream implementation ../tools/agent_tools/goal_loop.py provides adaptive loop state
-# downstream implementation ../tools/agent_tools/check_mcp_inventory.py validates launcher
+# downstream implementation ../tools/agent_tools/check_mcp_inventory.py validates launcher  # noqa: E501
 # @dependency-end
 """Small repo-local MCP stdio server for Agent Canon repositories."""
 
@@ -27,6 +27,9 @@ def repo_root() -> Path:
     configured = os.environ.get("CODEX_WORKSPACE_ROOT")
     if configured:
         return Path(configured).resolve()
+    script_root = Path(__file__).resolve().parents[1]
+    if (script_root / ".git").exists() or (script_root / "AGENTS.md").exists():
+        return script_root
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         check=False,
@@ -42,7 +45,8 @@ def send(message: Mapping[str, Any]) -> None:
     """Write one JSON-RPC message to stdout."""
     payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
     if use_content_length:
-        sys.stdout.buffer.write(f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii"))
+        header = f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii")
+        sys.stdout.buffer.write(header)
         sys.stdout.buffer.write(payload)
         sys.stdout.buffer.flush()
         return
@@ -57,7 +61,11 @@ def tool_schema() -> dict[str, Any]:
             {
                 "name": "repo.root",
                 "description": "Return the repository root used by this MCP server.",
-                "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "repo.status",
@@ -65,7 +73,11 @@ def tool_schema() -> dict[str, Any]:
                     "Return `git status --short --branch --untracked-files=all` "
                     "for the repository."
                 ),
-                "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "goal.loop_status",
@@ -125,7 +137,8 @@ def goal_loop_status(root: Path, arguments: Mapping[str, Any]) -> dict[str, Any]
         output = f"{output}\n{result.stderr.strip()}".strip()
     prefix = "MCP_GOAL_LOOP_TOOL=goal.loop_status"
     status_line = f"MCP_GOAL_LOOP_EXIT={result.returncode}"
-    return text_result("\n".join(line for line in (prefix, status_line, output) if line))
+    lines = (prefix, status_line, output)
+    return text_result("\n".join(line for line in lines if line))
 
 
 def call_tool(name: str, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -196,7 +209,11 @@ def handle_request(message: Mapping[str, Any]) -> None:
             send_error(request_id, -32602, "tools/call requires params.name")
             return
         if not isinstance(arguments, Mapping):
-            send_error(request_id, -32602, "tools/call params.arguments must be an object")
+            send_error(
+                request_id,
+                -32602,
+                "tools/call params.arguments must be an object",
+            )
             return
         tool_arguments = cast(Mapping[str, Any], arguments)
         try:
@@ -220,7 +237,13 @@ def handle_request(message: Mapping[str, Any]) -> None:
 
 def send_error(request_id: Any, code: int, message: str) -> None:
     """Write one JSON-RPC error."""
-    send({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}})
+    send(
+        {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": code, "message": message},
+        }
+    )
 
 
 def main() -> int:

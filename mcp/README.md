@@ -20,6 +20,11 @@ bash mcp/repo_mcp_server.sh
 
 Do not require a host-global `repo_mcp_server` executable.
 
+The Codex server config pins `cwd = "."`, and the launcher exports
+`CODEX_WORKSPACE_ROOT` from the repo-local `mcp/` path before starting Python.
+This keeps goal/resume cycles from restarting the stdio server against a stale
+or non-root working directory.
+
 ## Tools
 
 - `repo.root`: returns the repository root.

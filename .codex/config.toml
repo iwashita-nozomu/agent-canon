@@ -42,6 +42,7 @@ job_max_runtime_seconds = 3600
 [mcp_servers.repo_mcp_server]
 command = "bash"
 args = ["mcp/repo_mcp_server.sh"]
+cwd = "."
 enabled = true
 required = false
 startup_timeout_sec = 20

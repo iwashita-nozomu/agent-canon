@@ -22,6 +22,7 @@ from typing import Any, cast
 
 from workflow_monitor import append_monitoring
 
+
 @dataclass(frozen=True)
 class McpServer:
     """One configured MCP server entry."""
@@ -30,6 +31,7 @@ class McpServer:
     status: str
     command: str
     args: tuple[str, ...]
+    cwd: str
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -133,6 +135,7 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
                 status = ""
         command = server_data.get("command")
         raw_args = server_data.get("args")
+        cwd = server_data.get("cwd")
         transport = server_data.get("transport")
         if isinstance(transport, dict):
             transport_data = cast(dict[str, Any], transport)
@@ -142,6 +145,10 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
                     command = transport_command
             if not isinstance(raw_args, list):
                 raw_args = transport_data.get("args")
+            if not isinstance(cwd, str):
+                transport_cwd = transport_data.get("cwd")
+                if isinstance(transport_cwd, str):
+                    cwd = transport_cwd
         parsed_args = (
             tuple(
                 item
@@ -157,6 +164,7 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
                 status=status,
                 command=command if isinstance(command, str) else "",
                 args=parsed_args,
+                cwd=cwd if isinstance(cwd, str) else "",
             )
         )
     return servers
@@ -185,11 +193,26 @@ def load_project_config_server_names(root: Path) -> set[str]:
 def launcher_errors(server: McpServer, root: Path) -> list[str]:
     """Return launcher availability errors for one server."""
     errors: list[str] = []
+    launch_root = root
+    if server.cwd:
+        cwd_path = (
+            (root / server.cwd).resolve()
+            if not Path(server.cwd).is_absolute()
+            else Path(server.cwd)
+        )
+        if not cwd_path.exists():
+            errors.append(f"{server.name}: launcher cwd path not found: {server.cwd}")
+        elif not cwd_path.is_dir():
+            errors.append(
+                f"{server.name}: launcher cwd is not a directory: {server.cwd}"
+            )
+        else:
+            launch_root = cwd_path
     if not server.command:
         return [f"{server.name}: missing launcher command"]
     if "/" in server.command:
         command_path = (
-            (root / server.command).resolve()
+            (launch_root / server.command).resolve()
             if not Path(server.command).is_absolute()
             else Path(server.command)
         )
@@ -205,7 +228,11 @@ def launcher_errors(server: McpServer, root: Path) -> list[str]:
     for arg in server.args:
         if arg.startswith("-") or "/" not in arg:
             continue
-        arg_path = (root / arg).resolve() if not Path(arg).is_absolute() else Path(arg)
+        arg_path = (
+            (launch_root / arg).resolve()
+            if not Path(arg).is_absolute()
+            else Path(arg)
+        )
         if not arg_path.exists():
             errors.append(f"{server.name}: launcher argument path not found: {arg}")
     return errors
@@ -219,6 +246,7 @@ def render_servers(servers: Sequence[McpServer]) -> None:
             f"{server.name}\tstatus={server.status or '(unknown)'}"
             f"\tcommand={server.command or '(unknown)'}"
             f"\targs={' '.join(server.args) if server.args else '(none)'}"
+            f"\tcwd={server.cwd or '(default)'}"
         )
 
 

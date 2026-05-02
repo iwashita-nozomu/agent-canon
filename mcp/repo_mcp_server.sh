@@ -9,4 +9,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export CODEX_WORKSPACE_ROOT="${CODEX_WORKSPACE_ROOT:-${REPO_ROOT}}"
 exec python3 "${SCRIPT_DIR}/repo_mcp_server.py"

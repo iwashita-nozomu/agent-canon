@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
@@ -54,6 +55,20 @@ class RepoMcpServerTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             server.call_tool("goal.loop_status", {"goal_file": "../goal.md"})
+
+    def test_repo_root_prefers_server_file_location_over_process_cwd(self) -> None:
+        """The MCP server root should not drift when Codex restarts from elsewhere."""
+        server = load_server()
+        old_root = os.environ.pop("CODEX_WORKSPACE_ROOT", None)
+        old_cwd = Path.cwd()
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                os.chdir(tmp_dir)
+                self.assertEqual(server.repo_root(), PROJECT_ROOT)
+        finally:
+            os.chdir(old_cwd)
+            if old_root is not None:
+                os.environ["CODEX_WORKSPACE_ROOT"] = old_root
 
 
 if __name__ == "__main__":
