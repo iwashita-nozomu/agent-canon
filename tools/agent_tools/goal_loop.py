@@ -269,14 +269,20 @@ def next_action(state: GoalState) -> str:
     return "run_next_iteration"
 
 
-def render_markdown_report(state: GoalState) -> str:
+def dependency_path_for(report_path: Path) -> str:
+    """Return the report-relative path to this tool for dependency headers."""
+    tool_path = Path("tools/agent_tools/goal_loop.py").resolve()
+    return os.path.relpath(tool_path, report_path.parent.resolve())
+
+
+def render_markdown_report(state: GoalState, dependency_path: str) -> str:
     """Render a Markdown report for the goal loop status."""
     lines = [
         "# Goal Loop Status",
         "<!--",
         "@dependency-start",
         "responsibility Records machine status for a top-level goal.md loop.",
-        "upstream implementation ../../tools/agent_tools/goal_loop.py generates this report",
+        f"upstream implementation {dependency_path} generates this report",
         "@dependency-end",
         "-->",
         "",
@@ -312,7 +318,7 @@ def open_items(items: tuple[CheckboxItem, ...]) -> list[CheckboxItem]:
     return [item for item in items if not item.checked]
 
 
-def render_work_plan(state: GoalState, max_items: int) -> str:
+def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> str:
     """Render unchecked goal items as an implementation-ready TODO surface."""
     unchecked_criteria = open_items(state.exit_criteria)
     unchecked_backlog = open_items(state.backlog)
@@ -322,7 +328,7 @@ def render_work_plan(state: GoalState, max_items: int) -> str:
         "<!--",
         "@dependency-start",
         "responsibility Records executable TODO units derived from goal.md.",
-        "upstream implementation ../../tools/agent_tools/goal_loop.py generates this plan",
+        f"upstream implementation {dependency_path} generates this plan",
         "@dependency-end",
         "-->",
         "",
@@ -383,14 +389,20 @@ def write_report(path: str, state: GoalState) -> None:
     """Write a Markdown status report."""
     report_path = Path(path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render_markdown_report(state), encoding="utf-8")
+    report_path.write_text(
+        render_markdown_report(state, dependency_path_for(report_path)),
+        encoding="utf-8",
+    )
 
 
 def write_work_plan(path: str, state: GoalState, max_items: int) -> None:
     """Write a Markdown goal work breakdown."""
     report_path = Path(path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render_work_plan(state, max_items), encoding="utf-8")
+    report_path.write_text(
+        render_work_plan(state, max_items, dependency_path_for(report_path)),
+        encoding="utf-8",
+    )
 
 
 def write_initial_goal(path: Path, objective: str, run_safety_cap: int, force: bool) -> None:
@@ -565,11 +577,13 @@ def handle_plan(args: argparse.Namespace) -> int:
     """Handle goal work-breakdown rendering."""
     goal_file = Path(str(args.goal_file)).resolve()
     state = parse_goal(goal_file)
-    text = render_work_plan(state, int(args.max_items))
+    report_path = Path(str(args.report_out)) if args.report_out else Path("reports/goal_work_breakdown.md")
+    text = render_work_plan(state, int(args.max_items), dependency_path_for(report_path))
     if args.report_out:
         write_work_plan(str(args.report_out), state, int(args.max_items))
     print(text)
-    print(f"GOAL_WORK_UNITS={len(open_items(state.exit_criteria)) + len(open_items(state.backlog))}")
+    work_units = len(open_items(state.exit_criteria)) + len(open_items(state.backlog))
+    print(f"GOAL_WORK_UNITS={work_units}")
     print(f"NEXT_ACTION={next_action(state)}")
     return 0 if state.loop_status != "invalid" else 1
 
