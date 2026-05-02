@@ -1,6 +1,6 @@
 # @dependency-start
 # responsibility Tests skill and workflow prompt eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py
+# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py helper  # noqa: E501
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml eval manifest
 # @dependency-end
 """Tests for skill and workflow prompt evals."""
