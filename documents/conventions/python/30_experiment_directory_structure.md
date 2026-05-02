@@ -12,7 +12,7 @@ upstream design ../README.md convention index
 
 ## 要約
 
-- 再利用できる汎用 runtime は `python/experiment_runner/` に置きます。
+- 再利用できる汎用 runtime は pip installed `experiment_runner` package に置きます。
 - topic 固有のケース生成と実験本体は `experiments/` 配下に置きます。
 - 長時間実行の生成物は topic ごとの `result/<run_name>/` に集約し、ライブラリ本体へ混ぜません。
 - experiment run は 1 回の fresh 実行で完走させ、途中停止 run を継ぎ足して完了扱いにしません。
@@ -21,8 +21,8 @@ upstream design ../README.md convention index
 
 ### 1. 役割分担
 
-- `python/experiment_runner/` は、topic 非依存の実験実行基盤を置く場所とします。
-- ここには、subprocess 実行、resource scheduling、GPU 環境変数の受け渡し、context の整形のような汎用機能だけを置きます。
+- `experiment_runner` package は、topic 非依存の実験実行基盤です。
+- subprocess 実行、resource scheduling、GPU 環境変数の受け渡し、context の整形のような汎用機能は package 側へ置きます。
 - 特定 topic に閉じたケース生成と CLI は `experiments/` 側へ置きます。
 
 ### 2. topic ごとの配置
@@ -51,7 +51,7 @@ experiments/report/
 
 ### 4. どこへ何を置くか
 
-- topic をまたいで再利用する protocol や scheduler は `python/experiment_runner/` に置きます。
+- topic をまたいで再利用する protocol や scheduler は pip installed `experiment_runner` 側へ置きます。
 - その topic のためだけに存在する `cases.py` と `experimentcode.py` は `experiments/<topic>/` に置きます。
 - `cases.py` には case 列の展開と `resource_estimate(case)` を置きます。
 - `experimentcode.py` には `task(case, context)`、`context_builder(case)`、必要なら `initializer(context)` と `SkipController` を置きます。
@@ -79,7 +79,7 @@ experiments/report/
 
 ### 5. テスト
 
-- 汎用 runtime のテストは `tests/experiment_runner/` に置きます。
+- 汎用 runtime のテストは外部 `experiment_runner` package 側に置きます。
 - topic 固有 helper のうち再利用価値が高いものは、対応する unit test を `tests/` 側へ追加します。
 - 一回限りの実行スクリプトは、README の smoke command と集計結果の形式保証を優先し、無理にライブラリ級の API にしません。
 - 実行スクリプトは、指定した条件を 1 回の invocation で完走する責務を持たせます。
@@ -95,7 +95,7 @@ experiments/report/
 ## 補足
 
 - `python/experiment/` という別の top-level package は、現時点では新設しません。
-- 現在の repo では、汎用層はすでに `python/experiment_runner/` にあるため、そこへ責務を集約します。
+- 現在の repo では、汎用層は同梱せず、pip installed `experiment_runner` へ責務を集約します。
 
 ## 更新手順
 

@@ -27,7 +27,7 @@ downstream design ../object-oriented-design.md consumes Protocol boundary rules
 |---|---|---|---|
 | 共有契約 | `python/<package>/protocols.py` または `python/<package>/base/protocols.py` | 共有 `TypeAlias`、共有 `Protocol`、cross-domain な契約 family | 標準ライブラリ、最小の型ライブラリ |
 | domain 契約 | `python/<package>/<domain>/protocols.py` | domain 専用の型と共有契約の特殊化 | 共有契約、domain の最小型定義 |
-| 実験実行契約 | `python/experiment_runner/protocols.py` | runner / scheduler / worker の軽量契約 | 標準ライブラリ、同 package の最小型定義 |
+| 実験実行契約 | pip installed `experiment_runner.protocols` | runner / scheduler / worker の軽量契約 | 標準ライブラリ、同 package の最小型定義 |
 | 実装 | `python/**/{*.py}` | 契約の具象実装 | 対応する `protocols.py` |
 
 ### 2. 共有 `protocols.py` に置くもの

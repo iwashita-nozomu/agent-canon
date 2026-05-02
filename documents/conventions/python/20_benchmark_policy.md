@@ -29,7 +29,7 @@ upstream design ../README.md convention index
 - ベンチマークコードは、対象となる topic に最も近い `experiments/` 配下へ置きます。
 - 既存 topic が単独ディレクトリなら `experiments/<topic>/benchmarks/` または `experiments/<topic>/benchmark_*.py` を使います。
 - 既存 topic が area ごとに整理されているなら `experiments/<area>/<topic>/benchmarks/` を使います。
-- 汎用の subprocess 管理や GPU 割当のような再利用ロジックは、ベンチマーク側へ重複実装せず `python/experiment_runner/` へ寄せます。
+- 汎用の subprocess 管理や GPU 割当のような再利用ロジックは、ベンチマーク側へ重複実装せず pip installed `experiment_runner` へ寄せます。
 - `python/benchmark/` のような新しい top-level tree は、複数 topic にまたがる共通 benchmark 群が実際に揃うまでは新設しません。
 
 ### 3. 実装スタイル

@@ -7,8 +7,8 @@ upstream design README.md durable document index
 -->
 
 
-この文書は、`python/experiment_runner/` を採用するプロジェクトでの推奨設計を定義します。
-テンプレート本体は `experiment_runner` 実装を同梱しないため、この文書は module layout と contract の正本として扱います。
+この文書は、pip install した `experiment_runner` package を採用するプロジェクトでの推奨設計を定義します。
+テンプレート本体は `experiment_runner` 実装を同梱しないため、この文書は利用側の module layout と contract の正本として扱います。
 
 想定する surface は次です。
 

@@ -34,7 +34,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - 分類は次の通りです。
   - `tests/<package>/`: library / package 単位の unit test。
   - `tests/tools/`: repo script や補助 tool の test。
-  - `tests/experiment_runner/`: 汎用 experiment runtime の test。
+  - 外部 `experiment_runner` package 側の tests: 汎用 experiment runtime の test。
   - `tests/integration/`: package をまたぐ結合 test。
 - 大規模ケースは `case` や `*_large` の名称で明示します。
 

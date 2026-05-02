@@ -19,7 +19,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 
 - `python/<package>/`: checked-in library code と shared runtime helper を置きます。
 - `python/<package>/protocols.py`、`python/<package>/typing.py`、または `python/<package>/base/`: 共有の型境界と最下位レイヤを置きます。
-- `python/experiment_runner/`: topic 非依存の experiment runtime を置きます。
+- pip installed `experiment_runner`: topic 非依存の experiment runtime として使います。
 - `tests/`: テストだけを置きます。
 - `scripts/`: 実行補助とログ整形だけを置きます。
 - `documents/`: 規約と設計書の一次情報源とします。
