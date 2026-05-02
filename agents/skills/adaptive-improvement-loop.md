@@ -22,6 +22,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Core References
 
 - `agents/workflows/adaptive-improvement-workflow.md`
+- `agents/workflows/goal-plan-implementation-loop.md`
 - `agents/workflows/research-workflow.md`
 - `agents/workflows/experiment-workflow.md`
 - `agents/workflows/implementation-waterfall-workflow.md`
@@ -33,6 +34,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 最初に top-level `goal.md` を更新し、今回の `Objective`、`Exit Criteria`、`Backlog`、`Loop Log` を固定します。これを tool 追加や prompt 修正より後回しにせず、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で確認します。
 - repo MCP が利用可能な場合は、各 iteration の開始前と closeout 前に MCP tool `goal.loop_status` を見ます。`NEXT_ACTION=run_next_iteration` の間は次 backlog iteration へ進み、user-facing completion にしません。
 - outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
+- Goal-driven iteration では `plan -> implementation -> evidence -> next-action` の短い loop を使い、次 slice が実装可能になったら planning を止めて編集へ戻ります。
 - 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
 - iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、明示的な `goal_status: achieved` なしに完了扱いしません。
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。

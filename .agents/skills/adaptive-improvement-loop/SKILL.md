@@ -14,6 +14,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 
 1. Read `agents/skills/adaptive-improvement-loop.md`.
 1. Read `agents/workflows/adaptive-improvement-workflow.md`.
+1. Read `agents/workflows/goal-plan-implementation-loop.md`.
 1. Read `agents/workflows/research-workflow.md`.
 1. Read `agents/workflows/experiment-workflow.md`.
 1. Confirm MCP loop state with `goal.loop_status` when repo MCP tools are available; if it returns `NEXT_ACTION=run_next_iteration`, continue the next backlog iteration instead of treating the current iteration as completion.
@@ -24,6 +25,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. For agent behavior tuning, record skill invocation, subagent routing, tool gate, prompt eval, review feedback, subagent lifecycle, and diff-check events with `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --behavior-event "..."`.
 1. Before closeout, run `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest agents/evals/agent_behavior_eval.toml --write` and repair workflow artifacts or prompts until `AGENT_EVALUATION_STATUS=pass`.
 1. Keep the outer loop agile and backlog-driven, but keep each repo-changing pass inside `agents/workflows/implementation-waterfall-workflow.md`.
+1. For goal-driven work, use the fast `plan -> implementation -> evidence -> next-action` loop; once the next cohesive slice is implementation-ready, stop broad planning and edit.
 1. Fix `Question`, `Comparison Target`, `Exit Criteria`, `Stop Budget`, and `Improvement Backlog` before choosing the next iteration.
 1. Keep one extension, one waterfall run id, one change pass, and one decision state at a time.
 1. Treat the iteration number as progress metadata, not as a completion condition; only explicit achieved criteria close the loop.

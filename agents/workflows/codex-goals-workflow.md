@@ -3,6 +3,7 @@
 responsibility Documents Codex goals workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md Codex runtime workflow contract
 upstream design adaptive-improvement-workflow.md goal loop source of truth
+downstream design goal-plan-implementation-loop.md defines efficient iteration cadence
 upstream implementation ../../.codex/config.toml enables Codex goals feature
 downstream implementation ../../mcp/repo_mcp_server.py exposes goal loop status
 @dependency-end
@@ -181,6 +182,22 @@ before changing code. The repo-owned `goal.md` wins for durable state.
 If `goal.md` resolves into `vendor/agent-canon/`, run
 `bash tools/sync_agent_canon.sh link-root` or replace it with a repo-local
 contract before trusting `goal.loop_status`.
+
+## Efficiency Rule
+
+Use `agents/workflows/goal-plan-implementation-loop.md` when the goal is active.
+The default cadence is not "plan everything again". It is:
+
+1. plan the next cohesive slice from the open `GW*` rows;
+1. implement that slice;
+1. run the evidence gates that map to that slice;
+1. refresh `goal_loop.py plan`;
+1. continue immediately if `NEXT_ACTION=run_next_iteration`.
+
+Planning should stop as soon as one implementation-ready slice has a source
+packet, reuse decision, validation gates, and rollback point. Do not spend a
+whole iteration only restating the goal unless the goal contract itself is
+invalid.
 
 ## Closeout
 

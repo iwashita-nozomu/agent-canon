@@ -110,6 +110,7 @@ Use the loop for long-running improvement work where closeout must be blocked un
 Before implementation, run `goal_loop.py plan` and copy every open `GW*` row into the run bundle `schedule.md`; this prevents starting from a bare objective with no explicit work units.
 Do not shrink the first iteration to one micro-fix when the objective names multiple surfaces.
 Select a coherent slice that can move the checklist, survey, implementation, and validation backlog items together.
+For efficiency, follow `agents/workflows/goal-plan-implementation-loop.md`: plan only the next implementation-ready slice, implement it, record evidence, refresh `NEXT_ACTION`, and continue immediately when the loop still has open work.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
 
 ## Skill And Workflow Prompt Evals
