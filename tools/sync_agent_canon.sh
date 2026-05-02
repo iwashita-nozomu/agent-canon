@@ -172,7 +172,6 @@ documents/templates/remote_execution_target.template.toml:../../${PREFIX}/docume
 documents/templates/server_host_inventory.template.md:../../${PREFIX}/documents/templates/server_host_inventory.template.md
 documents/templates/server_runtime_layout.template.toml:../../${PREFIX}/documents/templates/server_runtime_layout.template.toml
 documents/tools/README.md:../../${PREFIX}/documents/tools/README.md
-documents/tools/TOOLS_DIRECTORY.md:../../${PREFIX}/documents/tools/TOOLS_DIRECTORY.md
 memory/README.md:../${PREFIX}/memory/README.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md

@@ -41,7 +41,7 @@ set -euo pipefail
 #
 # 【関連ドキュメント】
 #   - documents/FILE_CHECKLIST_OPERATIONS.md: チェックリスト1（新規ブランチ開始）
-#   - documents/tools/TOOLS_DIRECTORY.md: ツール詳細目録
+#   - documents/tools/README.md: ツール入口と主要導線
 #   - documents/worktree-lifecycle.md: worktree 運用の正本
 #
 # ═══════════════════════════════════════════════════════════════════════════

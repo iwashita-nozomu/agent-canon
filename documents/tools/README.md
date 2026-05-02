@@ -8,7 +8,7 @@ upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-own
 # ツール入口
 
 このディレクトリは、repo で使う補助ツールの入口です。
-詳細な台帳ではなく、いま残すべき実行導線だけを整理します。
+詳細な台帳を別 file に分けず、この文書に残すべき実行導線だけを整理します。
 
 agent/worktree helper、review / validation runner、docs-check helper、container runtime helper、experiment scaffold / registry helper のうち shared canon に属するものは `vendor/agent-canon/` が正本です。
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
@@ -66,8 +66,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 重複・統合候補の文書を探します。
 - `tools/worktree_start.sh`
   - worktree kickoff の user-facing 入口です。
+- `tools/update_agent_canon.sh`
+  - 派生 repo で AgentCanon snapshot を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-update` で適用します。
+  - source repo が設定されている場合は `refresh-remote -> ensure-latest` の順に進みます。source repo が missing / dirty なら fail-closed で止めます。
+  - 派生 repo 側の shared canon 差分を upstream に渡す場合は `make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` で proposal branch へ push します。
 - `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期です。task 開始時は `ensure-latest` で upstream `agent-canon` の最新を確認します。
+  - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の `make agent-canon-ensure-latest`、root view 修復の `make agent-canon-links`、drift check の `make agent-canon-check` 経由で使います。
+  - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
 - `tools/agent_tools/goal_loop.py`
@@ -97,4 +102,3 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 
 - [scripts/README.md](../../scripts/README.md)
 - [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md)
-- [TOOLS_DIRECTORY.md](TOOLS_DIRECTORY.md)

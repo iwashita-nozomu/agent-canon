@@ -90,7 +90,6 @@ root では次を symlink view として扱います。
 - `documents/templates/server_host_inventory.template.md`
 - `documents/templates/server_runtime_layout.template.toml`
 - `documents/tools/README.md`
-- `documents/tools/TOOLS_DIRECTORY.md`
 - `memory/README.md`
 - `memory/USER_PREFERENCES.md`
 - `memory/AGENT_PHILOSOPHY.md`

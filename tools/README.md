@@ -40,6 +40,18 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
     - `proposal-branch` は shared canon 差分の既定 push 先 branch を表示します。
     - `push-proposal` は shared canon 差分を repo 専用 proposal branch へ push します。
     - source repo の優先順位は `AGENT_CANON_SOURCE_REPO`、`git config agent-canon.sourceRepo` です。`register-local-bare` は project-local bare repo を seed し、proposal branch を用意し、`agent-canon` remote と optional source repo path を設定します。
+
+## AgentCanon Update Path
+
+通常の派生 repo では `update_agent_canon.sh` を入口にします。
+
+1. `make agent-canon-update-plan` で route を read-only 確認します。
+1. `make agent-canon-update` で source repo refresh と local snapshot sync を適用します。
+1. root view が drift した場合だけ `make agent-canon-links` を使います。
+1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` を使います。
+
+`sync_agent_canon.sh` は低レベル実装です。
+日常の update 導線では `pull` や `push` を直接選ばず、Make target または `update_agent_canon.sh plan/apply` から入ります。
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
