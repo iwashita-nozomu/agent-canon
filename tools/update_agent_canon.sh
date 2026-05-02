@@ -321,7 +321,10 @@ commit_prefix_worktree_snapshot() {
 push_submodule_head_snapshot() {
   local bare_repo_path="$1"
   local branch="$2"
+  local submodule_top=""
 
+  submodule_top="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --show-toplevel 2>/dev/null || true)"
+  [[ "$submodule_top" == "$ROOT_DIR/$PREFIX" ]] || return 1
   git -C "$ROOT_DIR/$PREFIX" rev-parse --verify HEAD^{commit} >/dev/null 2>&1 || return 1
   git -C "$ROOT_DIR/$PREFIX" push "$bare_repo_path" "HEAD:refs/heads/${branch}" >/dev/null
   git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
