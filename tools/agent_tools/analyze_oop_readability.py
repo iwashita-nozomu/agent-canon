@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import fnmatch
 import json
 import re
 from collections import Counter
@@ -229,6 +230,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--review-prompt-out",
         help="Write a read-only reviewer prompt that consumes the mechanical report.",
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help=(
+            "Path, path prefix, path part, or glob to exclude from analysis. "
+            "Repeat for multiple exclusions, for example --exclude vendor --exclude reports."
+        ),
+    )
     parser.add_argument("--max-function-lines", type=int, default=80)
     parser.add_argument("--max-class-lines", type=int, default=220)
     parser.add_argument("--max-public-methods", type=int, default=12)
@@ -246,11 +256,48 @@ def is_hidden(path: Path) -> bool:
     return any(part.startswith(".") for part in path.parts)
 
 
-def iter_source_files(root: Path, raw_paths: list[str]) -> list[Path]:
+def path_is_excluded(relative: Path, exclude_patterns: list[str]) -> bool:
+    """Return true when a root-relative path matches an exclude pattern."""
+    relative_posix = relative.as_posix()
+    for raw_pattern in exclude_patterns:
+        pattern = raw_pattern.strip().strip("/")
+        if not pattern:
+            continue
+        if any(char in pattern for char in "*?[]"):
+            if fnmatch.fnmatch(relative_posix, pattern):
+                return True
+            continue
+        if (
+            relative_posix == pattern
+            or relative_posix.startswith(f"{pattern}/")
+            or pattern in relative.parts
+        ):
+            return True
+    return False
+
+
+def is_excluded_path(root: Path, path: Path, exclude_patterns: list[str]) -> bool:
+    """Return true when either lexical or resolved root-relative path is excluded."""
+    try:
+        lexical_relative = path.relative_to(root)
+    except ValueError:
+        lexical_relative = path
+    candidates = [lexical_relative]
+    resolved = path.resolve()
+    try:
+        candidates.append(resolved.relative_to(root))
+    except ValueError:
+        candidates.append(resolved)
+    return any(path_is_excluded(candidate, exclude_patterns) for candidate in candidates)
+
+
+def iter_source_files(root: Path, raw_paths: list[str], exclude_patterns: list[str]) -> list[Path]:
     """Expand files and directories into supported source files."""
     targets = [root / raw_path for raw_path in raw_paths] if raw_paths else [root]
     files: list[Path] = []
     for target in targets:
+        if is_excluded_path(root, target, exclude_patterns):
+            continue
         if target.is_file() and target.suffix in PYTHON_SUFFIXES | CPP_SUFFIXES:
             files.append(target.resolve())
             continue
@@ -263,6 +310,8 @@ def iter_source_files(root: Path, raw_paths: list[str]) -> list[Path]:
                 except ValueError:
                     relative = path
                 if is_hidden(relative) or "__pycache__" in relative.parts:
+                    continue
+                if is_excluded_path(root, path, exclude_patterns):
                     continue
                 files.append(path.resolve())
     return sorted(set(files))
@@ -1379,6 +1428,7 @@ def summarize_findings(
     findings: list[Finding],
     final_score: int,
     min_score: int,
+    exclude_patterns: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build deterministic summary metrics for report output."""
     loc = 0
@@ -1410,6 +1460,7 @@ def summarize_findings(
         "findings": len(findings),
         "score": final_score,
         "min_score": min_score,
+        "excluded_patterns": list(exclude_patterns or []),
         "status": "pass" if final_score >= min_score else "fail",
         "mechanical_grade": grade,
         "warn_or_error_per_kloc": round(per_kloc, 2),
@@ -1433,9 +1484,17 @@ def render_markdown_report(
     include_snippets: bool,
     snippet_context: int,
     max_report_findings: int,
+    exclude_patterns: list[str],
 ) -> str:
     """Render a human-readable report from deterministic findings."""
-    summary = summarize_findings(root, files, findings, final_score, min_score)
+    summary = summarize_findings(
+        root,
+        files,
+        findings,
+        final_score,
+        min_score,
+        exclude_patterns=exclude_patterns,
+    )
     snippets = (
         build_snippet_map(root, findings, context=snippet_context)
         if include_snippets
@@ -1455,6 +1514,7 @@ def render_markdown_report(
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
+        f"- excluded_patterns: `{', '.join(summary['excluded_patterns']) or 'none'}`",
         "",
         "## Dimensions",
         "",
@@ -1549,7 +1609,7 @@ def main() -> int:
         max_base_classes=args.max_base_classes,
         max_module_helpers=args.max_module_helpers,
     )
-    files = iter_source_files(root, args.paths)
+    files = iter_source_files(root, args.paths, args.exclude)
     findings: list[Finding] = []
     for path in files:
         if path.suffix in PYTHON_SUFFIXES:
@@ -1558,7 +1618,14 @@ def main() -> int:
             findings.extend(analyze_cpp_file(root, path, thresholds))
 
     final_score = score(findings)
-    summary = summarize_findings(root, files, findings, final_score, args.min_score)
+    summary = summarize_findings(
+        root,
+        files,
+        findings,
+        final_score,
+        args.min_score,
+        exclude_patterns=args.exclude,
+    )
     if args.format == "json":
         payload: dict[str, Any] = {
             "summary": summary,
@@ -1584,6 +1651,7 @@ def main() -> int:
                 include_snippets=args.include_snippets,
                 snippet_context=args.snippet_context,
                 max_report_findings=args.max_report_findings,
+                exclude_patterns=args.exclude,
             ),
             end="",
         )

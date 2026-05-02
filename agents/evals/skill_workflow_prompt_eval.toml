@@ -434,6 +434,54 @@ description = "Documents goal.loop_status and run_next_iteration behavior."
 required_regex = ["goal\\.loop_status", "NEXT_ACTION=run_next_iteration", "adaptive improvement"]
 
 [[evals]]
+id = "oop-readability-external-repo-route"
+target = "agents/workflows/comprehensive-refactoring-workflow.md"
+kind = "workflow"
+description = "The comprehensive refactoring workflow must define the external-repo OOP analyzer route."
+
+[[evals.checklist]]
+id = "OOP-ROUTE-1"
+critical = true
+description = "Requires read-only snapshot analysis for external and bare repositories."
+required_regex = ["外部 repo", "bare repo", "git archive", "読み取り専用"]
+
+[[evals.checklist]]
+id = "OOP-ROUTE-2"
+critical = true
+description = "Requires explicit analyzer scope, excludes, reports, and reviewer prompt evidence."
+required_regex = ["OOP Analysis Scope", "Paths", "Excludes", "Markdown report", "JSON report", "oop_readability_reviewer"]
+
+[[evals.checklist]]
+id = "OOP-ROUTE-3"
+critical = true
+description = "Separates survey execution from closeout score-gate execution."
+required_regex = ["--min-score 0", "target score", "pass / fail"]
+
+[[evals]]
+id = "oop-readability-tool-docs"
+target = "documents/object-oriented-design.md"
+kind = "docs"
+description = "The OOP design document must explain analyzer reports and external snapshot exclusions."
+
+[[evals.checklist]]
+id = "OOP-DOC-1"
+critical = true
+description = "Documents exclude usage for vendored snapshots and generated reports."
+required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bundle"]
+
+[[evals]]
+id = "oop-refactor-skill-route"
+target = "agents/skills/behavior-preserving-refactor.md"
+kind = "skill"
+description = "The behavior-preserving refactor skill must preserve OOP analyzer scope evidence."
+
+[[evals.checklist]]
+id = "OOP-SKILL-1"
+critical = true
+description = "Requires external OOP surveys to record commit, paths, excludes, and reports."
+required_regex = ["外部 repo", "commit SHA", "--exclude vendor --exclude reports", "Markdown / JSON report"]
+
+[[evals]]
 id = "agent-learning-workflow-behavior-eval"
 target = "agents/workflows/agent-learning-workflow.md"
 kind = "workflow"

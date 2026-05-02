@@ -80,6 +80,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査し、prompt repair 後に `EVAL_STATUS=pass` まで rerun します。
 - `tools/agent_tools/analyze_refactor_surface.py`
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
+- `tools/agent_tools/analyze_oop_readability.py`
+  - Python / C++ の OOP readability を機械判定します。外部 repo や派生 template snapshot を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
 - `tools/push_origin.sh`
   - commit 後の canonical push 入口です。
 

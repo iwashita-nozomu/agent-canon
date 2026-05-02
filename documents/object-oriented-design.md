@@ -161,10 +161,16 @@ score は設計判断の補助です。
 python3 tools/agent_tools/analyze_oop_readability.py \
   --format markdown \
   --include-snippets \
+  --exclude vendor \
+  --exclude reports \
   --review-prompt-out reports/agents/<run-id>/oop_readability_reviewer_prompt.md \
   python include src tests \
   > reports/agents/<run-id>/oop_readability_report.md
 ```
+
+外部 repo、bare repo snapshot、派生 template を読み取り専用で評価する場合は、commit SHA、展開方法、解析 path、除外 path を report と同じ run bundle に残します。
+`vendor/`、過去の `reports/`、生成物、別 canon snapshot を混ぜると、対象 repo の OOP risk と持ち込み artifact の risk が区別できなくなります。
+除外した surface を後で評価する必要がある場合は、別 report として分けます。
 
 `oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。

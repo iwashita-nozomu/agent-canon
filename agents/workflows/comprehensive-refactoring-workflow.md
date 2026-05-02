@@ -101,12 +101,28 @@ python3 tools/agent_tools/analyze_refactor_surface.py python tests --min-score 8
 Python / C++ の OOP readability baseline では次を使います。
 
 ```bash
-python3 tools/agent_tools/analyze_oop_readability.py python include src tests --min-score 85
+python3 tools/agent_tools/analyze_oop_readability.py \
+  --exclude vendor \
+  --exclude reports \
+  python include src tests \
+  --min-score 85
 ```
 
 この tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method / field 過多、instance state 過多、static method namespace、引数過多、`None` / `nullptr` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。
 score は設計判断の補助であり、behavior correctness の代替ではありません。
 tool が足りない場合は、refactor 対象に合わせて小さい解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
+
+外部 repo、bare repo、または派生 template snapshot を調べる場合は、元 repo を編集せず `git archive` などで読み取り専用 snapshot を作り、run bundle に `OOP Analysis Scope:` として次を残します。
+
+- `Repository:` repo 名、remote / bare path、commit SHA。
+- `Extraction:` snapshot 作成 command と一時 root。
+- `Paths:` 実際に analyzer へ渡した path。
+- `Excludes:` `vendor`、`reports`、生成物、別 canon snapshot など対象 repo の product surface ではない path。
+- `Reports:` Markdown report、JSON report、`oop_readability_reviewer` prompt。
+- `Interpretation:` 最上位 dimensions、finding kinds、hotspot files。score / counts / path / line は機械 report から変更しません。
+
+調査目的で既定 score gate を止めたくない場合は、survey report だけ `--min-score 0` で完走させます。
+closeout gate に使う report は、別途 task の target score を指定して pass / fail を残します。
 
 合格点を使う場合、設計に次を書きます。
 

@@ -4,7 +4,7 @@
 # responsibility Tests OOP readability analyzer behavior.
 # upstream implementation ../../tools/agent_tools/analyze_oop_readability.py analyzer
 # upstream design ../../documents/object-oriented-design.md OOP boundary policy
-# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md static analyzer gate
+# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md OOP gate
 # @dependency-end
 
 from __future__ import annotations
@@ -108,7 +108,10 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("optional_boundary:choose:1>0", result.stdout)
-            self.assertIn("none_runtime_branch:choose:1>typed-variant-boundary", result.stdout)
+            self.assertIn(
+                "none_runtime_branch:choose:1>typed-variant-boundary",
+                result.stdout,
+            )
 
     def test_python_module_helper_name_is_flagged(self) -> None:
         """Module-level helper buckets are discouraged in favor of local helpers."""
@@ -150,7 +153,10 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                         "  int g;",
                         "  int h;",
                         "  int i;",
-                        "  void run(int a, int b, int c, int d, int e, int f, int g) {}",
+                        (
+                            "  void run(int a, int b, int c, int d, int e, "
+                            "int f, int g) {}"
+                        ),
                         "};",
                         "",
                     ]
@@ -194,7 +200,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             )
 
     def test_python_mathematical_redundancy_is_flagged(self) -> None:
-        """Identity, pass-through, stateless callables, and formatting wrappers are reported."""
+        """Identity, pass-through, stateless callables, and format wrappers are reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "redundant.py"
@@ -248,7 +254,10 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             result = self.run_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("cpp:warn:trivial_format_function:format_value", result.stdout)
+            self.assertIn(
+                "cpp:warn:trivial_format_function:format_value",
+                result.stdout,
+            )
 
     def test_json_report_adds_mechanical_interpretation(self) -> None:
         """JSON output includes deterministic summary and explanation fields."""
@@ -284,8 +293,75 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("snippet", finding)
             self.assertIn("mechanical_grade", payload["summary"])
 
+    def test_exclude_skips_vendored_or_report_surfaces(self) -> None:
+        """External scans can exclude vendored snapshots and generated reports."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            product = root / "python"
+            vendor = root / "vendor" / "agent-canon"
+            reports = root / "reports" / "agents"
+            product.mkdir()
+            vendor.mkdir(parents=True)
+            reports.mkdir(parents=True)
+            (product / "model.py").write_text(
+                "\n".join(
+                    [
+                        "from dataclasses import dataclass",
+                        "",
+                        "@dataclass(frozen=True)",
+                        "class Result:",
+                        "    value: int",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            for path in (vendor / "helpers.py", reports / "helpers.py"):
+                path.write_text(
+                    "\n".join(
+                        [
+                            "class DataHelper:",
+                            "    @staticmethod",
+                            "    def calculate(value):",
+                            "        return value",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = self.run_analyzer(
+                root,
+                "--exclude",
+                "vendor",
+                "--exclude",
+                "reports",
+                "--min-score",
+                "100",
+                ".",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
+            self.assertNotIn("DataHelper", result.stdout)
+
+            markdown = self.run_analyzer(
+                root,
+                "--exclude",
+                "vendor",
+                "--exclude",
+                "reports",
+                "--min-score",
+                "100",
+                "--format",
+                "markdown",
+                ".",
+            )
+            self.assertEqual(markdown.returncode, 0, markdown.stdout + markdown.stderr)
+            self.assertIn("excluded_patterns: `vendor, reports`", markdown.stdout)
+
     def test_markdown_report_and_review_prompt_are_generated(self) -> None:
-        """Markdown reports and reviewer prompts are generated without agent judgment."""
+        """Markdown reports and reviewer prompts are generated."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "formatting.py"
@@ -316,9 +392,15 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("# OOP Readability Mechanical Report", result.stdout)
             self.assertIn("trivial_format_function", result.stdout)
-            self.assertIn("This report is generated by static heuristics", result.stdout)
+            self.assertIn(
+                "This report is generated by static heuristics",
+                result.stdout,
+            )
             self.assertTrue(prompt.exists())
-            self.assertIn("Do not invent new findings", prompt.read_text(encoding="utf-8"))
+            self.assertIn(
+                "Do not invent new findings",
+                prompt.read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":

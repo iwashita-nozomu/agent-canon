@@ -125,6 +125,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, simple cognitive-complexity signals, mathematically redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
 - `analyze_oop_readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.
+- `analyze_oop_readability.py --exclude vendor --exclude reports ...` keeps vendored snapshots and generated artifacts out of external-repo scans. Record the exact path set and excludes beside the report.
 - `analyze_oop_readability.py --review-prompt-out <path>` writes a prompt for `oop_readability_reviewer`. The reviewer documents the mechanical report, but does not change the score, thresholds, counts, paths, line numbers, or pass/fail verdict.
 
 These tools are review aids.
