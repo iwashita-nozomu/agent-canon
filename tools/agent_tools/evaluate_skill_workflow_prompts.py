@@ -15,6 +15,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 try:
     import tomllib
@@ -108,27 +109,30 @@ def string_list(value: object, field: str) -> tuple[str, ...]:
         return ()
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{field} must be a list of strings")
-    return tuple(value)
+    return tuple(cast(list[str], value))
 
 
 def load_manifest(path: Path, root: Path) -> tuple[tuple[PromptEval, ...], ManifestAudit]:
     """Load a prompt eval manifest."""
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    data = cast(dict[str, Any], tomllib.loads(path.read_text(encoding="utf-8")))
     evals = data.get("evals")
     if not isinstance(evals, list) or not evals:
         raise ValueError("manifest must define at least one [[evals]] entry")
-    audit = audit_manifest(evals)
+    raw_evals = cast(list[object], evals)
+    audit = audit_manifest(raw_evals)
     if not audit.passed:
         raise ValueError(render_audit_errors(audit))
     loaded: list[PromptEval] = []
-    for index, entry in enumerate(evals, 1):
-        if not isinstance(entry, dict):
+    for index, raw_entry in enumerate(raw_evals, 1):
+        if not isinstance(raw_entry, dict):
             raise ValueError(f"eval entry {index} must be a table")
+        entry = cast(dict[str, object], raw_entry)
         raw_checklist = entry.get("checklist")
         if not isinstance(raw_checklist, list) or not raw_checklist:
             raise ValueError(f"eval {entry.get('id', index)} must define checklist items")
+        checklist_items = cast(list[object], raw_checklist)
         checklist = tuple(
-            load_checklist_item(item, str(entry.get("id", index))) for item in raw_checklist
+            load_checklist_item(item, str(entry.get("id", index))) for item in checklist_items
         )
         loaded.extend(expand_eval_entry(entry, checklist, root))
     return tuple(loaded), audit
@@ -139,19 +143,22 @@ def audit_manifest(raw_evals: list[object]) -> ManifestAudit:
     eval_ids: list[str] = []
     explicit_targets: list[str] = []
     duplicate_checklist_ids: list[str] = []
-    for index, entry in enumerate(raw_evals, 1):
-        if not isinstance(entry, dict):
+    for index, raw_entry in enumerate(raw_evals, 1):
+        if not isinstance(raw_entry, dict):
             continue
+        entry = cast(dict[str, object], raw_entry)
         eval_id = str(entry.get("id", index))
         eval_ids.append(eval_id)
         if "target" in entry:
             explicit_targets.append(str(entry["target"]))
         raw_checklist = entry.get("checklist")
         if isinstance(raw_checklist, list):
+            checklist_items = cast(list[object], raw_checklist)
             seen_items: set[str] = set()
-            for item in raw_checklist:
-                if not isinstance(item, dict):
+            for raw_item in checklist_items:
+                if not isinstance(raw_item, dict):
                     continue
+                item = cast(dict[str, object], raw_item)
                 item_id = str(item.get("id", ""))
                 key = f"{eval_id}:{item_id}"
                 if item_id in seen_items:
@@ -253,12 +260,13 @@ def load_checklist_item(entry: object, eval_id: str) -> ChecklistItem:
     """Load one checklist item."""
     if not isinstance(entry, dict):
         raise ValueError(f"checklist item for {eval_id} must be a table")
+    item = cast(dict[str, object], entry)
     return ChecklistItem(
-        item_id=str(entry["id"]),
-        critical=bool(entry.get("critical", False)),
-        description=str(entry.get("description", "")),
-        required_regex=string_list(entry.get("required_regex"), f"{eval_id}.required_regex"),
-        forbidden_regex=string_list(entry.get("forbidden_regex"), f"{eval_id}.forbidden_regex"),
+        item_id=str(item["id"]),
+        critical=bool(item.get("critical", False)),
+        description=str(item.get("description", "")),
+        required_regex=string_list(item.get("required_regex"), f"{eval_id}.required_regex"),
+        forbidden_regex=string_list(item.get("forbidden_regex"), f"{eval_id}.forbidden_regex"),
     )
 
 
@@ -406,7 +414,8 @@ def run(args: argparse.Namespace) -> int:
     if args.report_out:
         write_report(str(args.report_out), manifest.relative_to(root), evals, results, audit)
     print(render_machine_status(results, audit), end="")
-    return 0 if audit.passed and all(result.passed or not result.critical for result in results) else 1
+    prompt_checks_passed = all(result.passed or not result.critical for result in results)
+    return 0 if audit.passed and prompt_checks_passed else 1
 
 
 def main() -> int:

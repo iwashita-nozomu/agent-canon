@@ -2,10 +2,10 @@
 # @dependency-start
 # responsibility Scores Python and C++ OOP readability risks using lightweight static heuristics.
 # upstream design ../../documents/object-oriented-design.md OOP boundary policy
-# upstream design ../../documents/coding-conventions-house-style.md shared readability and responsibility rules
-# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md static score gate policy
-# downstream implementation ../../.codex/agents/oop_readability_reviewer.toml documents mechanical report output
-# downstream implementation ../../tests/agent_tools/test_analyze_oop_readability.py verifies OOP readability analyzer
+# upstream design ../../documents/coding-conventions-house-style.md shared readability rules
+# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md static score gate
+# downstream implementation ../../.codex/agents/oop_readability_reviewer.toml report output
+# downstream implementation ../../tests/agent_tools/test_analyze_oop_readability.py tests analyzer
 # @dependency-end
 """Evaluate OOP readability risks for Python and C++ source files.
 
@@ -25,7 +25,7 @@ import re
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
@@ -1467,7 +1467,7 @@ def build_snippet_map(
         for line_number in lines:
             start = max(1, line_number - context)
             end = min(len(source_lines), line_number + context)
-            rendered = []
+            rendered: list[str] = []
             for current in range(start, end + 1):
                 marker = ">" if current == line_number else " "
                 rendered.append(f"{marker}{current:5d}: {source_lines[current - 1]}")
@@ -1553,6 +1553,10 @@ def render_markdown_report(
         if include_snippets
         else {}
     )
+    excluded_patterns_summary = cast(list[str], summary["excluded_patterns"])
+    dimension_counts = cast(dict[str, int], summary["dimension_counts"])
+    kind_counts = cast(dict[str, int], summary["kind_counts"])
+    top_files = cast(list[dict[str, object]], summary["top_files"])
     lines = [
         "# OOP Readability Mechanical Report",
         "",
@@ -1567,20 +1571,20 @@ def render_markdown_report(
         f"- source_loc: `{summary['source_loc']}`",
         f"- findings: `{summary['findings']}`",
         f"- warn_or_error_per_kloc: `{summary['warn_or_error_per_kloc']}`",
-        f"- excluded_patterns: `{', '.join(summary['excluded_patterns']) or 'none'}`",
+        f"- excluded_patterns: `{', '.join(excluded_patterns_summary) or 'none'}`",
         "",
         "## Dimensions",
         "",
     ]
-    for dimension, count in Counter(summary["dimension_counts"]).most_common():
+    for dimension, count in Counter(dimension_counts).most_common():
         lines.append(f"- `{dimension}`: {count}")
     lines.extend(["", "## Finding Kinds", ""])
-    for kind, count in Counter(summary["kind_counts"]).most_common():
+    for kind, count in Counter(kind_counts).most_common():
         facts = KIND_FACTS.get(kind)
         explanation = facts[1] if facts else "Static readability signal."
         lines.append(f"- `{kind}`: {count} - {explanation}")
     lines.extend(["", "## Hotspot Files", ""])
-    for item in summary["top_files"]:
+    for item in top_files:
         lines.append(f"- `{item['path']}`: {item['findings']}")
     lines.extend(["", "## Finding Details", ""])
     for finding in sorted(findings, key=finding_rank)[:max_report_findings]:
@@ -1629,10 +1633,10 @@ def write_review_prompt(path: Path, report_path: str | None) -> None:
                 "- Do not change the pass/fail status, score, thresholds, or counts.",
                 "- Treat mechanical findings as facts and write a reader-facing summary of them.",
                 "- Separate false-positive candidates from accepted design risks.",
-                "- Group comments by OOP principle: responsibility, state ownership, typed boundary,",
-                "  composition, mathematical redundancy, and morphism/effect separation.",
+                "- Group comments by OOP principle: responsibility, state ownership,",
+                "  typed boundary, composition, mathematical redundancy, and effect separation.",
                 "- For each hotspot, cite `path:line`, `kind`, and the mechanical explanation.",
-                "- Do not request code edits unless the mechanical report already identifies a concrete risk.",
+                "- Do not request code edits unless the mechanical report identifies a concrete risk.",
                 "",
                 "Expected output:",
                 "- One short executive summary.",
