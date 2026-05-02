@@ -1141,6 +1141,103 @@ def line_at(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
+def mask_cpp_literal_span(text: str, start: int, end: int) -> str:
+    """Return a whitespace mask for one C++ literal while preserving line numbers."""
+    return "".join("\n" if char == "\n" else " " for char in text[start:end])
+
+
+def cpp_raw_string_literal_end(text: str, start: int) -> int | None:
+    """Return the end offset of a C++ raw string literal starting at start."""
+    prefix_end = start
+    if text.startswith("u8", prefix_end):
+        prefix_end += 2
+    elif prefix_end < len(text) and text[prefix_end] in {"u", "U", "L"}:
+        prefix_end += 1
+    if not text.startswith('R"', prefix_end):
+        return None
+    delimiter_start = prefix_end + 2
+    open_paren = text.find("(", delimiter_start)
+    if open_paren == -1:
+        return None
+    delimiter = text[delimiter_start:open_paren]
+    if any(char in delimiter for char in "\\ \t\n\r()"):
+        return None
+    terminator = f"){delimiter}\""
+    close = text.find(terminator, open_paren + 1)
+    if close == -1:
+        return None
+    return close + len(terminator)
+
+
+def cpp_quoted_literal_end(text: str, start: int) -> int | None:
+    """Return the end offset of a regular C++ string or character literal."""
+    prefix_end = start
+    if text.startswith("u8", prefix_end):
+        prefix_end += 2
+    elif prefix_end < len(text) and text[prefix_end] in {"u", "U", "L"}:
+        prefix_end += 1
+    if prefix_end >= len(text) or text[prefix_end] not in {'"', "'"}:
+        return None
+    quote = text[prefix_end]
+    index = prefix_end + 1
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            index += 2
+            continue
+        if char == quote:
+            return index + 1
+        index += 1
+    return None
+
+
+def cpp_line_comment_end(text: str, start: int) -> int:
+    """Return the end offset of a C++ line comment starting at start."""
+    newline = text.find("\n", start + 2)
+    if newline == -1:
+        return len(text)
+    return newline
+
+
+def cpp_block_comment_end(text: str, start: int) -> int | None:
+    """Return the end offset of a C++ block comment starting at start."""
+    close = text.find("*/", start + 2)
+    if close == -1:
+        return None
+    return close + 2
+
+
+def cpp_text_without_comments_or_literals(text: str) -> str:
+    """Mask C++ comments and literals without confusing tokens across states."""
+    pieces: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        raw_end = cpp_raw_string_literal_end(text, cursor)
+        if raw_end is not None:
+            pieces.append(mask_cpp_literal_span(text, cursor, raw_end))
+            cursor = raw_end
+            continue
+        quoted_end = cpp_quoted_literal_end(text, cursor)
+        if quoted_end is not None:
+            pieces.append(mask_cpp_literal_span(text, cursor, quoted_end))
+            cursor = quoted_end
+            continue
+        if text.startswith("//", cursor):
+            comment_end = cpp_line_comment_end(text, cursor)
+            pieces.append(mask_cpp_literal_span(text, cursor, comment_end))
+            cursor = comment_end
+            continue
+        if text.startswith("/*", cursor):
+            comment_end = cpp_block_comment_end(text, cursor)
+            if comment_end is not None:
+                pieces.append(mask_cpp_literal_span(text, cursor, comment_end))
+                cursor = comment_end
+                continue
+        pieces.append(text[cursor])
+        cursor += 1
+    return "".join(pieces)
+
+
 def cpp_public_section(class_kind: str, body: str) -> str:
     """Return the approximate public section for a C++ class/struct body."""
     current_public = class_kind == "struct"
@@ -1220,20 +1317,21 @@ def analyze_cpp_file(root: Path, path: Path, thresholds: Thresholds) -> list[Fin
     """Analyze one C or C++ source file with lightweight text heuristics."""
     findings: list[Finding] = []
     text = path.read_text(encoding="utf-8", errors="ignore")
-    for match in CLASS_RE.finditer(text):
+    analysis_text = cpp_text_without_comments_or_literals(text)
+    for match in CLASS_RE.finditer(analysis_text):
         name = match.group("name")
         class_kind = match.group("kind")
         bases = match.group("bases") or ""
-        open_index = text.find("{", match.end() - 1)
-        close_index = matching_brace(text, open_index)
-        body = text[open_index + 1 : close_index]
-        line = line_at(text, match.start())
+        open_index = analysis_text.find("{", match.end() - 1)
+        close_index = matching_brace(analysis_text, open_index)
+        body = analysis_text[open_index + 1 : close_index]
+        line = line_at(analysis_text, match.start())
         public_body = cpp_public_section(class_kind, body)
         public_members = cpp_member_candidates(public_body)
         public_methods = [item for item in public_members if "(" in item and ")" in item]
         public_fields = [item for item in public_members if item not in public_methods]
         base_count = len([part for part in bases.split(",") if part.strip()])
-        class_lines = line_count(text[match.start() : close_index])
+        class_lines = line_count(analysis_text[match.start() : close_index])
 
         if name.endswith(BAD_CLASS_NAME_PARTS):
             add_finding(
@@ -1320,14 +1418,14 @@ def analyze_cpp_file(root: Path, path: Path, thresholds: Thresholds) -> list[Fin
                 "prefer-composition-over-wide-inheritance",
             )
 
-    for match in FUNCTION_RE.finditer(text):
+    for match in FUNCTION_RE.finditer(analysis_text):
         name = match.group("name")
         params = match.group("params")
-        open_index = text.find("{", match.end() - 1)
-        close_index = matching_brace(text, open_index)
-        body = text[open_index + 1 : close_index]
-        line = line_at(text, match.start())
-        function_lines = line_count(text[match.start() : close_index])
+        open_index = analysis_text.find("{", match.end() - 1)
+        close_index = matching_brace(analysis_text, open_index)
+        body = analysis_text[open_index + 1 : close_index]
+        line = line_at(analysis_text, match.start())
+        function_lines = line_count(analysis_text[match.start() : close_index])
         param_count = cpp_parameter_count(params)
         complexity = cpp_cognitive_complexity(body)
         null_checks = cpp_null_runtime_checks(body)

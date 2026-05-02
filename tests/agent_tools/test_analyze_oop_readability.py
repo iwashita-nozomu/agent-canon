@@ -245,6 +245,116 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_cpp_raw_string_fixture_is_not_analyzed_as_product_code(self) -> None:
+        """Embedded C++ fixture text should not create product-code findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "fixture.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        'const char* fixture = R"cpp(',
+                        "struct FixtureInput {",
+                        "  int a;",
+                        "  int b;",
+                        "  int c;",
+                        "};",
+                        ")cpp\";",
+                        "struct RealInput {",
+                        "  int a;",
+                        "  int b;",
+                        "  int c;",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("FixtureInput", result.stdout)
+            self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
+            self.assertIn("fixture.cpp:8:cpp", result.stdout)
+
+    def test_cpp_comment_quotes_do_not_mask_real_code(self) -> None:
+        """Comment-contained quotes must not suppress later C++ findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "comments.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "// don't let apostrophes mask the rest of the file",
+                        '/* "quoted block comment" stays non-code */',
+                        "struct RealInput {",
+                        "  int a;",
+                        "  int b;",
+                        "  int c;",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
+
+    def test_cpp_unterminated_literals_do_not_mask_later_real_code(self) -> None:
+        """Malformed literals are left visible rather than masking the rest of a file."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "unterminated.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        'const char* raw = R"cpp(',
+                        "struct RealInput {",
+                        "  int a;",
+                        "  int b;",
+                        "  int c;",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
+
+    def test_cpp_comment_tokens_inside_literals_do_not_mask_real_code(self) -> None:
+        """Literal-contained comment tokens must not suppress later C++ findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "literal_tokens.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        'const char* block_marker = "/*";',
+                        'const char* line_marker = "http://example.test";',
+                        "struct RealInput {",
+                        "  int a;",
+                        "  int b;",
+                        "  int c;",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
+
     def test_python_mathematical_redundancy_is_flagged(self) -> None:
         """Identity, pass-through, stateless callables, and format wrappers are reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:
