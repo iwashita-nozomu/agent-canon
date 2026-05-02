@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests algorithm module public surface checker behavior.
 # upstream implementation ../../tools/agent_tools/check_algorithm_module_public_surface.py checker
-# upstream design ../../../../documents/design/jax_util/algorithm_module_contract.md public module names  # noqa: E501
+# upstream design ../../documents/tools/README.md algorithm module surface checker
 # @dependency-end
 """Tests for the algorithm module public surface checker."""
 

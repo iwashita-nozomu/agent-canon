@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Checks algorithm module public surface against the standard solver contract.
-# upstream design ../../../../documents/design/jax_util/algorithm_module_contract.md public module names  # noqa: E501
-# upstream implementation ../../../../python/jax_util/base/algorithm_module_protocol.py base classes
+# upstream design ../../documents/tools/README.md algorithm module surface checker
 # downstream implementation ../../tests/agent_tools/test_check_algorithm_module_public_surface.py tests checker  # noqa: E501
 # @dependency-end
 """Check algorithm modules that import ``algorithm_module_protocol``.
