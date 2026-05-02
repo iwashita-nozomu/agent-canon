@@ -8,8 +8,8 @@
 
 from __future__ import annotations
 
-import shutil
 import shlex
+import shutil
 import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -22,7 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 
 def detect_workspace_root() -> Path:
-    """Return the outer repo root even when the script is reached through a symlink view."""
+    """Return the repo root even when reached through a symlink view."""
     markers = ("docker/packs/default.toml", "README.md")
     search_roots = [Path.cwd().resolve(), Path(__file__).absolute().parent]
     for search_root in search_roots:
@@ -141,7 +141,8 @@ def detect_builder(builder: str) -> str:
                 return candidate
             unavailable_reasons.append(f"{candidate}: {readiness_error}")
         if unavailable_reasons:
-            raise RuntimeError(f"No usable container builder found. {'; '.join(unavailable_reasons)}")
+            details = "; ".join(unavailable_reasons)
+            raise RuntimeError(f"No usable container builder found. {details}")
         raise RuntimeError("Neither docker nor podman is available.")
 
     if shutil.which(builder) is None:
@@ -174,7 +175,8 @@ def builder_readiness_error(builder: str) -> str | None:
     if builder == "docker" and "permission denied" in detail.lower():
         return (
             "docker is installed but the daemon socket is not accessible. "
-            "Use a user with docker access, switch to --builder podman, or run with --print-only."
+            "Use a user with docker access, switch to --builder podman, or run "
+            "with --print-only."
         )
     return f"{builder} is installed but not ready: {detail}"
 
@@ -224,7 +226,11 @@ def load_pack(path_like: str | Path) -> ContainerPack:
     pack_data = data.get("pack", {})
     smoke_data = data.get("smoke", {})
     runtime_data = data.get("runtime", {})
-    if not isinstance(pack_data, dict) or not isinstance(smoke_data, dict) or not isinstance(runtime_data, dict):
+    if (
+        not isinstance(pack_data, dict)
+        or not isinstance(smoke_data, dict)
+        or not isinstance(runtime_data, dict)
+    ):
         raise ValueError(f"{path}: pack, smoke, and runtime sections must be tables")
 
     name = require_string(pack_data, "name", path, "pack")
@@ -335,6 +341,7 @@ def build_run_command(
     container_workspace: str | None = None,
     env: tuple[str, ...] = (),
     mounts: tuple[str, ...] = (),
+    ports: tuple[str, ...] = (),
     gpus: str | None = None,
     user: str | None = None,
     tty: bool = False,
@@ -358,9 +365,13 @@ def build_run_command(
         run_command.extend(["--gpus", resolved_gpus])
 
     run_command.extend(["-v", f"{resolved_workspace}:{resolved_mount}"])
-    auto_mounts = default_host_mounts(auto_mount_host_codex_home=auto_mount_host_codex_home)
+    auto_mounts = default_host_mounts(
+        auto_mount_host_codex_home=auto_mount_host_codex_home
+    )
     for mount in (*auto_mounts, *combined_mounts):
         run_command.extend(["-v", mount])
+    for port in ports:
+        run_command.extend(["-p", port])
     for env_item in combined_env:
         run_command.extend(["-e", env_item])
     run_command.extend(["-w", resolved_workdir, pack.image_tag])

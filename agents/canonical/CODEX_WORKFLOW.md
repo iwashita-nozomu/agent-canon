@@ -128,6 +128,8 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 - shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
 - `goal.md` は durable source of truth、Codex goals は session view、MCP `goal.loop_status` は機械 gate です。
 - `goal.md` は repo-local state であり、`vendor/agent-canon/goal.md` への symlink にしてはいけません。
+- user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が conservative な Objective draft を作り、`goal.md` に先に固定します。通常 task から goal を勝手に推論してはいけません。
+- repo-changing goal task では `/goal` 確定前に provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only fan-out plan を作ります。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、持たない場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。write-capable implementation subagent は `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping が揃うまで起動しません。
 - user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含むまで実装へ進みません。
 - `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。bare objective だけで実装へ進んではいけません。
 - goal-driven task では、Codex goals だけを更新して closeout してはいけません。対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を先に更新します。
@@ -375,6 +377,7 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 
 repo-changing task では bundle 作成と explicit subagent activation を既定にします。
 ただし stage の具体的な責務と禁止事項は prose ではなく `.codex/agents/*.toml` を正本にします。
+goal-driven task では `/goal` 確定前でも provisional bundle を作り、read-only requirements / repo survey / planning review subagent の handoff plan を先に作ります。active runtime が明示許可を要求する場合は、許可があるときだけ実際に起動します。
 
 - repo を編集する
 - specialist handoff を明示したい

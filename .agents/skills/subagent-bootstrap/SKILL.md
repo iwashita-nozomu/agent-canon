@@ -15,6 +15,9 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
 1. For repo-changing tasks, create or inspect a run bundle before implementation.
+1. For goal-driven repo-changing tasks, create a provisional run bundle and start read-only `requirements_organizer` / `explorer` before `/goal` is finalized when the exact objective is not yet fixed.
+1. Keep write-capable implementation subagents blocked until `goal.md` is parseable, the Codex goal view is mirrored or queued, and Plan-mode evidence mapping exists.
+1. If the active runtime requires explicit user authorization before `spawn_agent`, do not silently spawn even read-only pre-goal agents. Record the fan-out plan, handoff packets, and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` in the run bundle, then wait for or request authorization.
 1. Use `--task-id` so `agents/task_catalog.yaml` expands default specialists and review packs.
 1. Keep requirements review, plan review, detailed design review, and document flow review as separate agents.
 1. Check the command output for `IMPLEMENTATION_CODEX_AGENTS`.

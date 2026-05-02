@@ -62,6 +62,10 @@ Mode selection rules:
   higher than token cost.
 - Do not spawn broad reviewer packs at intake. Use stage waves and close unused
   subagents before moving to the next stage.
+- `parent-direct` is not a loophole for goal-driven repo work that requires
+  pre-goal review. If explicit spawn authorization is absent, the token-efficient
+  path is to prepare the bounded fan-out plan and request or wait for
+  authorization, not to treat the parent-only result as equivalent review.
 
 ## Context Budget Rules
 

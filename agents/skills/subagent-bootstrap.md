@@ -17,6 +17,7 @@ specialist delegation が必要な task で、run bundle、役割分担、write-
 - specialist を使う
 - reviewer / implementer の責務を分けたい
 - 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent を分けたい
+- `/goal` 確定前に read-only subagent、または明示許可待ちの handoff plan で goal draft、repo survey、first-slice plan を固めたい
 
 ## Core References
 
@@ -76,6 +77,9 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
+goal-driven repo-changing task では、`/goal` がまだ exact でなくても provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only handoff plan を先に作ります。active runtime が明示許可を持つ場合だけ、その wave を起動します。
+write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
+active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。

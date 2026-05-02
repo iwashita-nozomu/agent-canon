@@ -31,6 +31,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
 - runtime cap は `.codex/config.toml` の `[agents].max_threads = 24` を使い、spawn は depth ではなく bounded concurrency で制御します
+- `[agents]` は上限と timeout の設定であり、上位 runtime / developer instruction が要求する explicit subagent authorization を上書きしません。明示許可が無い session では fan-out plan と handoff packet を作り、実際の spawn は許可後に行います
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
@@ -43,6 +44,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - TUI の user-facing command surface は `/goal`, `/goal <objective>`, `/goal pause`, `/goal resume`, `/goal clear` です。
 - `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は MCP `goal.loop_status` と `tools/agent_tools/goal_loop.py status` に置きます。
 - goal-driven task では `/goal <objective>` の直後に `/plan <goal-driven task summary>` を使い、Plan-mode output に `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を出します。
+- pre-goal subagent fan-out は active runtime の authorization に従います。明示許可がある場合は read-only wave を起動し、無い場合は `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` と handoff packet を artifact に残します。
 - 上記が揃うまで implementation、subagent write handoff、closeout は開始しません。
 
 ## Token Profiles

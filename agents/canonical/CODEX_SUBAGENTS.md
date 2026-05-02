@@ -41,6 +41,8 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 
 - runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - cap は depth 制限ではなく同時実行数の上限として扱います
+- `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
+- active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
 - depth は固定しませんが、active な subagent 数は spawn budget で縛ります
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
@@ -54,6 +56,39 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
+
+## Pre-Goal Activation
+
+Goal-driven repo-changing tasks do not wait for the final `/goal` command before
+preparing subagent fan-out. The parent may draft the initial goal, but the draft
+must be checked by read-only roles before implementation. If the active runtime
+requires explicit spawn authorization, "checked by read-only roles" means
+spawn the roles only after authorization; otherwise persist their handoff
+packets and block implementation until the authorization question is resolved.
+
+Default pre-goal wave:
+
+- `requirements_organizer`: derive a conservative Objective, non-goals,
+  constraints, and Exit Criteria from the user request and durable repo notes.
+- `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
+  tools, and reuse candidates that affect the goal.
+- `execution_planner`: group open `GW*` rows into the first cohesive slice after
+  `goal_loop.py plan` exists.
+- `plan_reviewer`: verify that the candidate goal is checkable and that the
+  first slice has evidence gates and rollback boundaries.
+
+Constraints:
+
+- These pre-goal agents are read-only unless the user explicitly requested a
+  repo edit and the goal has already been mirrored into `goal.md`.
+- Write-capable `worker` / `spark_worker` instances are blocked until
+  `goal.md` is parseable, the Codex goal view is mirrored or queued, and the
+  Plan-mode output contains evidence mapping.
+- If rate limits force fewer agents, keep `requirements_organizer` and
+  `explorer`; record why `execution_planner` or `plan_reviewer` was deferred.
+- Handoffs must include `agents/workflows/codex-goals-workflow.md`,
+  `agents/workflows/goal-plan-implementation-loop.md`, the candidate `goal.md`
+  or goal artifact, and `team_manifest.yaml` lifecycle policy.
 
 ## Codex Command Surface
 

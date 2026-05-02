@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents Codex goals workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md Codex runtime workflow contract
+upstream design ../canonical/CODEX_SUBAGENTS.md pre-goal subagent routing contract
 upstream design adaptive-improvement-workflow.md goal loop source of truth
 downstream design goal-plan-implementation-loop.md defines efficient iteration cadence
 upstream implementation ../../.codex/config.toml enables Codex goals feature
@@ -58,6 +59,81 @@ If repo MCP is available, also read MCP status:
 next backlog item. `NEXT_ACTION=close_goal_loop` means the loop may proceed to
 normal closeout gates.
 
+## Autonomous Goal Draft
+
+When the user asks for `/goal`, goal-driven work, or "達成するまで回す" but does
+not provide an exact objective string, the parent should draft the initial goal
+instead of waiting for the user to restate it.
+
+Rules:
+
+1. Use this only for explicit goal-driven intent. Do not infer a Codex goal for
+   ordinary repo tasks that did not ask for `/goal` or a goal loop.
+1. Draft a conservative Objective from the latest user request, repository
+   state, accumulated preferences, and relevant workflow docs.
+1. Write or update top-level `goal.md` before implementation with
+   `goal_loop.py init --goal-file goal.md --objective "<draft objective>"` or an
+   equivalent checked-in contract containing Objective, Exit Criteria, Backlog,
+   and Loop Log.
+1. Put uncertain scope in non-goals, constraints, or backlog review items. Do
+   not hide uncertainty inside a vague objective.
+1. Mirror the same draft into Codex goals with `/goal <draft objective>` or the
+   runtime goal creation surface only after the draft is explicit in `goal.md`.
+1. If the runtime requires user confirmation before setting `/goal`, record the
+   prepared `/goal <draft objective>` command in the run bundle and continue
+   pre-goal read-only planning; do not start implementation from an unmirrored
+   goal.
+
+The autonomous draft is allowed to start the loop, but it is not a completion
+contract by itself. The first Plan-mode pass and pre-goal reviewers must still
+turn it into checkable exit criteria and evidence.
+
+## Pre-Goal Subagent Authorization And Fan-Out
+
+Do not wait until after `/goal` is finalized to prepare subagent fan-out. For
+repo-changing goal-driven tasks, create a provisional run bundle before
+implementation and prepare the read-only subagent wave while the goal is still a
+candidate.
+
+Actual `spawn_agent` calls are subject to higher-priority runtime and developer
+instructions. Repository docs, `.codex/config.toml`, and hooks may require,
+budget, or remind subagent use, but they cannot grant permission when the active
+runtime requires an explicit user request for subagents. If explicit spawn
+authorization is absent, write the fan-out plan and handoff packets into the run
+bundle, record `PRE_GOAL_SUBAGENT_AUTHORIZATION=required`, and ask or wait for
+authorization instead of silently spawning.
+
+Minimum pattern:
+
+1. `requirements_organizer`: convert the user request and durable preferences
+   into a candidate Objective, constraints, non-goals, and Exit Criteria.
+1. `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
+   tools, and reuse candidates that affect the goal contract.
+1. `execution_planner`: group the first coherent `GW*` slice and validation
+   gates once `goal_loop.py plan` has output.
+1. `plan_reviewer`: review the candidate goal and first slice before
+   implementation.
+
+Allowed before `/goal` is mirrored:
+
+- read-only exploration;
+- requirements and plan drafting;
+- reuse survey;
+- validation gate selection;
+- risk and ambiguity review.
+
+Forbidden before `/goal` is mirrored and `goal.md` is parseable:
+
+- write-capable implementation subagents;
+- marking goal items done;
+- user-facing completion;
+- treating a chat-only goal summary as durable state.
+
+Every pre-goal subagent handoff must include `goal.md` or the candidate goal
+artifact, `agents/workflows/codex-goals-workflow.md`,
+`agents/workflows/goal-plan-implementation-loop.md`, and
+`team_manifest.yaml` lifecycle policy.
+
 ## Goal-Specified Plan-Mode Entry
 
 Use this entry flow whenever the user explicitly sets or asks to set a Codex
@@ -69,6 +145,9 @@ evidence, or repo-owned state.
    instructions. Keep normal `AGENTS.md`, security, approval, and closeout
    rules in force.
 1. Run the preflight commands above and confirm the `goals` feature is enabled.
+1. If the objective is not exact yet, run the Autonomous Goal Draft and Pre-Goal
+   Subagent Authorization And Fan-Out sections above before asking the user to
+   restate the goal.
 1. Create or update top-level `goal.md` before implementation. It must include
    Objective, Exit Criteria, Backlog, and Loop Log entries that can be checked
    by `goal_loop.py status`.
@@ -101,10 +180,11 @@ evidence, or repo-owned state.
    - `Execution Slices`: ordered implementation slices with write scope,
      validation, rollback, and review owner.
    - `Budget Policy`: token profile, subagent mode, and escalation triggers.
-1. Bootstrap the run bundle only after the Plan-mode output is complete. Copy
-   the goal contract into `user_request_contract.md`, put all `GW*` work units
-   into `schedule.md`, and record the `/goal` / `/plan` state in `work_log.md`
-   or `workflow_monitoring.md`.
+1. Convert the provisional run bundle into the implementation run bundle after
+   the Plan-mode output is complete. Copy the goal contract into
+   `user_request_contract.md`, put all `GW*` work units into `schedule.md`, and
+   record the `/goal` / `/plan` state in `work_log.md` or
+   `workflow_monitoring.md`.
 1. Start implementation only after `goal_loop.py status` and MCP
    `goal.loop_status` agree on the next action and the normal workflow gate
    allows implementation.
@@ -150,7 +230,14 @@ documents one.
 
 When starting a goal-driven task:
 
+1. If the user gave goal-driven intent without an exact objective, draft the
+   objective autonomously from the request and repository context.
 1. Write or update top-level `goal.md` first.
+1. Start the pre-goal read-only subagent fan-out for requirements, repo survey,
+   execution planning, and plan review when the task is repo-changing and the
+   active runtime has explicit spawn authorization. Without authorization,
+   persist the same fan-out plan and handoff packets and block implementation
+   until the authorization question is resolved.
 1. Mirror the same Objective and Exit Criteria into Codex goals if the runtime
    exposes an interactive goal UI.
 1. Run `goal_loop.py plan --goal-file goal.md --report-out <run>/goal_work_breakdown.md`.

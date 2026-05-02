@@ -17,6 +17,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Read `agents/workflows/goal-plan-implementation-loop.md`.
 1. Read `agents/workflows/research-workflow.md`.
 1. Read `agents/workflows/experiment-workflow.md`.
+1. If the user gives goal-driven intent without an exact objective, draft a conservative `goal.md` objective and use read-only pre-goal subagents before implementation when explicit spawn authorization exists. If authorization is absent, record the pre-goal handoff plan and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` before requesting or waiting for authorization.
 1. Confirm MCP loop state with `goal.loop_status` when repo MCP tools are available; if it returns `NEXT_ACTION=run_next_iteration`, continue the next backlog iteration instead of treating the current iteration as completion.
 1. Before any implementation or tool addition, update top-level `goal.md` with the current Objective, Exit Criteria, Backlog, and Loop Log entry, then confirm it with `python3 tools/agent_tools/goal_loop.py status --goal-file goal.md`.
 1. For skill/workflow prompt tuning, freeze one eval per tested skill/workflow in `agents/evals/skill_workflow_prompt_eval.toml` before changing the prompt under test.

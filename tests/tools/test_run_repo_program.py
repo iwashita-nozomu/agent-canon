@@ -21,17 +21,30 @@ def resolve_project_root() -> Path:
         rules = candidate / "docker" / "python-execution-rules.toml"
         if script.exists() and default_pack.exists() and rules.exists():
             return candidate
-    raise unittest.SkipTest("repo-program runner tests require template docker runtime files")
+    raise unittest.SkipTest(
+        "repo-program runner tests require template docker runtime files"
+    )
 
 
 PROJECT_ROOT = resolve_project_root()
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_repo_program.py"
+RUN_CONTAINER_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_in_repo_container.py"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the wrapper CLI and capture the output."""
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def run_container_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    """Run the container wrapper CLI and capture the output."""
+    return subprocess.run(
+        [sys.executable, str(RUN_CONTAINER_SCRIPT), *args],
         check=False,
         capture_output=True,
         text=True,
@@ -59,7 +72,8 @@ def test_print_only_shell_script_uses_bash() -> None:
 
     assert result.returncode == 0, result.stderr
     assert (
-        "/bin/bash /workspace/tools/ci/check_docker_build.sh --pack docker/packs/default.toml"
+        "/bin/bash /workspace/tools/ci/check_docker_build.sh "
+        "--pack docker/packs/default.toml"
         in result.stdout
     )
 
@@ -71,3 +85,19 @@ def test_print_only_command_without_workspace_file_runs_directly() -> None:
     assert result.returncode == 0, result.stderr
     assert "run:" in result.stdout
     assert "python3 --version" in result.stdout
+
+
+def test_run_in_repo_container_print_only_publishes_ports() -> None:
+    """The generic container runner should expose requested host ports."""
+    result = run_container_cli(
+        "--print-only",
+        "--port",
+        "8888:8888",
+        "--skip-build",
+        "python3",
+        "--",
+        "--version",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "-p 8888:8888" in result.stdout
