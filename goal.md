@@ -10,7 +10,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
 - current_iteration: 0
 - active_run_id: 20260503-070655-strengthen-hypothesis-to-validation-flow
@@ -30,8 +30,8 @@ hypothesis was supported.
 - [x] G2: Hypothesis-validation workflow defines code-improvement hypothesis, alternative-surface comparison, disconfirming evidence, pre-edit validation, and post-change support / reject decisions.
 - [x] G3: Relevant skill surfaces route code improvement through the strengthened hypothesis-validation workflow.
 - [x] G4: Prompt eval manifest checks the strengthened skill/workflow wording and passes.
-- [ ] G5: Dependency review, targeted prompt eval tests, and template `make ci` pass after snapshot update.
-- [ ] G6: AgentCanon main and template snapshot branch are updated and pushed.
+- [x] G5: Dependency review, targeted prompt eval tests, and template `make ci` pass after snapshot update.
+- [x] G6: AgentCanon main and template snapshot branch are updated and pushed.
 
 ## Backlog
 
@@ -39,8 +39,8 @@ hypothesis was supported.
 - [x] B2: Update `hypothesis-validation-workflow.md` with explicit H1-H5 hypothesis lifecycle gates.
 - [x] B3: Update skill shims / human-facing skills so code improvement invokes dependency analysis plus hypothesis validation before implementation.
 - [x] B4: Run prompt evals and targeted tests; repair wording until they pass.
-- [ ] B5: Update template snapshot and run template validation.
-- [ ] B6: Recheck `goal_loop.py status`; close only when all criteria are checked.
+- [x] B5: Update template snapshot and run template validation.
+- [x] B6: Recheck `goal_loop.py status`; close only when all criteria are checked.
 
 ## Optional Goal Item Catalog
 
@@ -63,3 +63,7 @@ this objective.
   main and the template snapshot branch were pushed during closeout.
 - iteration 0: initialized goal for code-improvement hypothesis-to-validation
   flow strengthening across skill and workflow surfaces.
+- iteration 0 result: strengthened hypothesis-validation gates, dependency
+  analysis routing, adaptive-improvement skill guidance, and prompt eval
+  coverage. AgentCanon validation passed, the template snapshot was refreshed,
+  and template `make ci` passed before closeout.
