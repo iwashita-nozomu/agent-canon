@@ -259,6 +259,12 @@ critical = true
 description = "Requires static-analysis feedback and two-run path comparison to feed back into prompts."
 required_regex = ["static_analysis_feedback", "compare_agent_run_paths\\.py", "route_efficiency=inefficient", "selected_inefficient_route=yes"]
 
+[[evals.checklist]]
+id = "AIL-HUMAN-7"
+critical = true
+description = "Requires code-improvement iterations to carry hypothesis validation evidence."
+required_regex = ["hypothesis-validation-workflow\\.md", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "Hypothesis Decision"]
+
 [[evals]]
 id = "adaptive-improvement-workflow"
 target = "agents/workflows/adaptive-improvement-workflow.md"
@@ -312,6 +318,66 @@ id = "AIL-WF-8"
 critical = true
 description = "Requires two-run execution path comparison and static-analysis feedback repair."
 required_regex = ["compare_agent_run_paths\\.py", "execution_path", "route_efficiency", "static_analysis_feedback", "selected_inefficient_route"]
+
+[[evals]]
+id = "hypothesis-validation-workflow"
+target = "agents/workflows/hypothesis-validation-workflow.md"
+kind = "workflow"
+description = "The analysis-first overlay must force explicit code-improvement hypotheses before implementation."
+
+[[evals.checklist]]
+id = "HV-WF-1"
+critical = true
+description = "Requires separate code and header dependency evidence before hypothesis selection."
+required_regex = ["Code Dependency Evidence", "Header Dependency Evidence", "code dependency", "header dependency"]
+
+[[evals.checklist]]
+id = "HV-WF-2"
+critical = true
+description = "Requires the core hypothesis lifecycle fields before editing."
+required_regex = ["Observation", "Hypothesis", "Expected Mechanism", "Disconfirming Evidence", "Support Evidence", "Validation Before Edit"]
+
+[[evals.checklist]]
+id = "HV-WF-3"
+critical = true
+description = "Requires alternative fix-surface comparison instead of first-candidate edits."
+required_regex = ["Candidate Surfaces", "Candidate Comparison", "Selected Surface", "Rejected Surfaces"]
+
+[[evals.checklist]]
+id = "HV-WF-4"
+critical = true
+description = "Blocks implementation until the fix surface is validated."
+required_regex = ["fix_surface_validated=yes", "Expected Non-Surface", "Fix Surface Justification"]
+
+[[evals.checklist]]
+id = "HV-WF-5"
+critical = true
+description = "Requires post-change support/reject/inconclusive decisions and a next-hypothesis path."
+required_regex = ["Post-Change Evidence", "Hypothesis Decision", "supported", "rejected", "inconclusive", "Next Hypothesis"]
+
+[[evals]]
+id = "dependency-analysis-code-improvement-skill"
+target = "agents/skills/dependency-analysis.md"
+kind = "skill"
+description = "Dependency analysis skill must route fix-surface selection through hypothesis validation."
+
+[[evals.checklist]]
+id = "DA-SKILL-HV-1"
+critical = true
+description = "Requires hypothesis-validation artifacts for code-improvement fix-surface selection."
+required_regex = ["hypothesis-validation-workflow\\.md", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "fix_surface_validated=yes", "Hypothesis Decision"]
+
+[[evals]]
+id = "dependency-analysis-shim-code-improvement"
+target = ".agents/skills/dependency-analysis/SKILL.md"
+kind = "skill"
+description = "Discoverable dependency-analysis skill must block implementation before hypothesis validation."
+
+[[evals.checklist]]
+id = "DA-SHIM-HV-1"
+critical = true
+description = "Requires implementation to wait for hypothesis fields and fix-surface validation."
+required_regex = ["code-improvement", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "fix_surface_validated=yes", "Hypothesis Decision"]
 
 [[evals]]
 id = "codex-goals-workflow"

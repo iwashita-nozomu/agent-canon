@@ -17,6 +17,8 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
 
 1. Read `documents/dependency-manifest-design.md`.
 1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.
+1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
+1. After the change, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
 1. Choose the smallest mode that answers the task:
    - code dependency surface: run `scan_code_dependencies.sh`
    - changed-file closeout gate: use `--changed`

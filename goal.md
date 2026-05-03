@@ -10,39 +10,37 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: achieved
+- goal_status: active
 - run_safety_cap: 5
 - current_iteration: 0
-- active_run_id: 20260502-132243-add-execution-path-comparison-eval-for-w
+- active_run_id: 20260503-070655-strengthen-hypothesis-to-validation-flow
 - stop_reason:
 
 ## Objective
 
-Organize skill, workflow, and eval surfaces so static-analysis and run-behavior
-findings are fed back into skills. Execute and compare two run paths when
-behavior may differ; if the paths differ, analyze the difference, add an eval
-that fires when the inefficient path is selected, and repair skill/workflow
-prompts until the workflow has no remaining improvement action.
+Strengthen the code-improvement hypothesis-to-validation flow from both skill
+and workflow surfaces. The updated canon must force agents to state improvement
+hypotheses, compare alternative fix surfaces, define disconfirming evidence,
+validate before editing, and check post-change evidence before claiming the
+hypothesis was supported.
 
 ## Exit Criteria
 
 - [x] G1: Repository dependency review passes with `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`.
-- [x] G2: Skill/workflow prompt evals pass with `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml`.
-- [x] G3: Agent behavior eval detects inefficient execution path selection and passes after prompt/workflow repair.
-- [x] G4: A mechanical two-run path comparison tool exists, is tested, and emits evidence suitable for `workflow_monitoring.md`.
-- [x] G5: Static-analysis feedback is represented in workflow monitoring and skill/workflow prompts as a feedback-to-skill loop.
-- [x] G6: Targeted static analysis and tests for the changed surfaces pass.
-- [x] G7: AgentCanon main and the template snapshot are updated and pushed.
+- [x] G2: Hypothesis-validation workflow defines code-improvement hypothesis, alternative-surface comparison, disconfirming evidence, pre-edit validation, and post-change support / reject decisions.
+- [x] G3: Relevant skill surfaces route code improvement through the strengthened hypothesis-validation workflow.
+- [x] G4: Prompt eval manifest checks the strengthened skill/workflow wording and passes.
+- [ ] G5: Dependency review, targeted prompt eval tests, and template `make ci` pass after snapshot update.
+- [ ] G6: AgentCanon main and template snapshot branch are updated and pushed.
 
 ## Backlog
 
-- [x] B1: Freeze the prompt-to-artifact checklist for skill/workflow/eval organization and static-analysis feedback.
-- [x] B2: Add or extend eval criteria so inefficient route selection fails mechanically.
-- [x] B3: Add the two-run execution path comparison tool and unit tests.
-- [x] B4: Update adaptive-improvement skill/workflow prompts to require static-analysis feedback and two-run path comparison when behavior may differ.
-- [x] B5: Run baseline and rerun evals; repair drift until prompt eval and behavior eval pass.
-- [x] B6: Update the current run bundle with comparison, validation, and feedback evidence.
-- [x] B7: Recheck `goal_loop.py status`; continue if `NEXT_ACTION=run_next_iteration`.
+- [x] B1: Freeze prompt eval checks for hypothesis-validation and adaptive-improvement surfaces.
+- [x] B2: Update `hypothesis-validation-workflow.md` with explicit H1-H5 hypothesis lifecycle gates.
+- [x] B3: Update skill shims / human-facing skills so code improvement invokes dependency analysis plus hypothesis validation before implementation.
+- [x] B4: Run prompt evals and targeted tests; repair wording until they pass.
+- [ ] B5: Update template snapshot and run template validation.
+- [ ] B6: Recheck `goal_loop.py status`; close only when all criteria are checked.
 
 ## Optional Goal Item Catalog
 
@@ -63,3 +61,5 @@ this objective.
   failure for inefficient route selection, static-analysis feedback monitoring,
   adaptive-improvement prompt repairs, and tool-index documentation. AgentCanon
   main and the template snapshot branch were pushed during closeout.
+- iteration 0: initialized goal for code-improvement hypothesis-to-validation
+  flow strengthening across skill and workflow surfaces.
