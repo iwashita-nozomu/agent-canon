@@ -24,6 +24,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 - `tests/` を触った場合も、まず既定の `pyright` を通し、必要なら対象 path を明示して追加実行します。
 - 実験段階やテストで `pyright` エラーが残る場合は、黙って放置せず `task.md`、`reviews/`、または関連 note に未解消として残します。
 - cast 等のプログラマによる型安全性の確保は避け、pyright による型安全性の確保を優先します。
+- `pyright` とあわせて `python3 tools/agent_tools/check_static_any.py` を通し、明示的な `typing.Any` を repo-wide に禁止します。
 - 型の境界は package root 付近の `protocols.py`、`typing.py`、または typed dataclass に集約し、単一の基準で整合を保ちます。
 - 契約 family を改名するときは、共有契約と domain 特化を同じ naming family で同時に更新します。
 - `OldProblem` のような旧命名と `StructuredProblem` のような新命名を併存させません。
@@ -33,6 +34,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 ## 実行例
 
 - baseline 全体: `pyright`
+- 明示 `Any` 禁止: `python3 tools/agent_tools/check_static_any.py`
 - テストを触ったとき: `pyright tests/<subdir-or-file>`
 - 特定モジュールだけを確認したいとき: `pyright python/<subdir-or-file>`
 

@@ -25,7 +25,7 @@ import re
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
@@ -1538,7 +1538,7 @@ def finding_facts(finding: Finding) -> dict[str, str]:
     }
 
 
-def finding_payload(finding: Finding) -> dict[str, Any]:
+def finding_payload(finding: Finding) -> dict[str, object]:
     """Return JSON payload with mechanical interpretation attached."""
     payload = asdict(finding)
     payload.update(finding_facts(finding))
@@ -1580,7 +1580,7 @@ def summarize_findings(
     final_score: int,
     min_score: int,
     exclude_patterns: list[str] | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Build deterministic summary metrics for report output."""
     loc = 0
     for path in files:
@@ -1782,9 +1782,10 @@ def main() -> int:
         exclude_patterns=args.exclude,
     )
     if args.format == "json":
-        payload: dict[str, Any] = {
+        finding_payloads = [finding_payload(finding) for finding in findings]
+        payload: dict[str, object] = {
             "summary": summary,
-            "findings": [finding_payload(finding) for finding in findings],
+            "findings": finding_payloads,
         }
         if args.include_snippets:
             snippets = build_snippet_map(
@@ -1792,8 +1793,11 @@ def main() -> int:
                 findings,
                 context=args.snippet_context,
             )
-            for finding in payload["findings"]:
-                finding["snippet"] = snippets.get((finding["path"], finding["line"]), "")
+            for payload_item, finding in zip(finding_payloads, findings, strict=True):
+                payload_item["snippet"] = snippets.get(
+                    (finding.path, finding.line),
+                    "",
+                )
         print(json.dumps(payload, indent=2, sort_keys=True))
     elif args.format == "markdown":
         print(

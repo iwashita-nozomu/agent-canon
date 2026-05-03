@@ -12,6 +12,7 @@
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # downstream implementation ../tests/agent_tools/test_evaluate_skill_workflow_prompts.py root symlink view for prompt eval tests
 # downstream implementation ../tests/agent_tools/test_goal_loop.py root symlink view for goal loop tests
+# downstream implementation ../tests/agent_tools/test_check_static_any.py root symlink view for explicit Any tests
 # downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
 # @dependency-end
 set -euo pipefail
@@ -232,6 +233,7 @@ tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/ag
 tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_public_surface.py
 tests/agent_tools/test_check_convention_compliance.py:../../${PREFIX}/tests/agent_tools/test_check_convention_compliance.py
 tests/agent_tools/test_check_hardcoded_numbers.py:../../${PREFIX}/tests/agent_tools/test_check_hardcoded_numbers.py
+tests/agent_tools/test_check_static_any.py:../../${PREFIX}/tests/agent_tools/test_check_static_any.py
 tests/agent_tools/test_analyze_refactor_surface.py:../../${PREFIX}/tests/agent_tools/test_analyze_refactor_surface.py
 tests/agent_tools/test_analyze_oop_readability.py:../../${PREFIX}/tests/agent_tools/test_analyze_oop_readability.py
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py

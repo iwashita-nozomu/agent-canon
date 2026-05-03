@@ -20,7 +20,6 @@ import fnmatch
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 EXPECTED_PUBLIC_NAMES = (
     "InitializeConfig",
@@ -332,7 +331,7 @@ def summarize(
     modules: list[ModuleReport],
     findings: list[Finding],
     files: list[Path],
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Build deterministic summary output."""
     return {
         "files": len(files),

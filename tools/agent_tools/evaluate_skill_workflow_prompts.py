@@ -15,7 +15,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 try:
     import tomllib
@@ -118,7 +118,7 @@ def string_list(value: object, field: str) -> tuple[str, ...]:
 
 def load_manifest(path: Path, root: Path) -> tuple[tuple[PromptEval, ...], ManifestAudit]:
     """Load a prompt eval manifest."""
-    data: dict[str, Any] = tomllib.loads(path.read_text(encoding="utf-8"))
+    data: dict[str, object] = tomllib.loads(path.read_text(encoding="utf-8"))
     evals = data.get("evals")
     if not isinstance(evals, list) or not evals:
         raise ValueError("manifest must define at least one [[evals]] entry")

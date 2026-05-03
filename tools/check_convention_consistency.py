@@ -16,7 +16,15 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
+
+
+class Rule(TypedDict):
+    """One extracted convention rule."""
+
+    type: str
+    subtype: str
+    description: str
 
 
 def load_convention_files() -> dict[str, str]:
@@ -31,9 +39,9 @@ def load_convention_files() -> dict[str, str]:
     return files
 
 
-def extract_rules(content: str) -> list[dict[str, Any]]:
+def extract_rules(content: str) -> list[Rule]:
     """規約ファイルから「must」「should」ルールを抽出。"""
-    rules = []
+    rules: list[Rule] = []
 
     # パターン1: "must ..." や "must not ..."
     must_pattern = r"(?:- \[)?\s*\[✅\]?\s*(must|must\s+not)\s+(.+?)(?:\n|$)"
@@ -52,9 +60,12 @@ def extract_rules(content: str) -> list[dict[str, Any]]:
     return rules
 
 
-def check_contradiction(rules1: list[dict[str, Any]], 
-                       rules2: list[dict[str, Any]], 
-                       file1: str, file2: str) -> list[dict[str, str]]:
+def check_contradiction(
+    rules1: list[Rule],
+    rules2: list[Rule],
+    file1: str,
+    file2: str,
+) -> list[dict[str, str]]:
     """2つのルールセット間の矛盾を検出。"""
     contradictions = []
 

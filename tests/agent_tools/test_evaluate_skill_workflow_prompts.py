@@ -13,7 +13,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -35,7 +35,7 @@ def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProces
     )
 
 
-def load_toml_document(path: Path) -> dict[str, Any]:
+def load_toml_document(path: Path) -> dict[str, object]:
     """Load one TOML document with a concrete table type for strict pyright."""
     return tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
         path.read_text(encoding="utf-8")
@@ -59,7 +59,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         """The canonical manifest covers every skill and workflow prompt family."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
-        evals = cast(list[dict[str, Any]], data["evals"])
+        evals = cast(list[dict[str, object]], data["evals"])
 
         globs = {
             entry.get("target_glob"): entry.get("expected_count")
@@ -79,12 +79,12 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         """The canonical manifest verifies workflow convention gates and skill calls."""
         manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
-        evals = cast(list[dict[str, Any]], data["evals"])
+        evals = cast(list[dict[str, object]], data["evals"])
         by_id = {str(entry["id"]): entry for entry in evals}
         workflow_eval = by_id["all-workflow-docs"]
         workflow_check_ids = {
             str(item["id"])
-            for item in cast(list[dict[str, Any]], workflow_eval["checklist"])
+            for item in cast(list[dict[str, object]], workflow_eval["checklist"])
         }
 
         self.assertIn("CONVENTION-WORKFLOW-1", workflow_check_ids)
@@ -100,7 +100,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             "agent-orchestration-skill-call-routing",
             "codex-task-workflow-convention-gate",
         ):
-            checklists = cast(list[dict[str, Any]], by_id[eval_id]["checklist"])
+            checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
 
     def test_missing_required_pattern_fails(self) -> None:

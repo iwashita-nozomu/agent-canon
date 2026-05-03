@@ -18,7 +18,6 @@ import ast
 import re
 import sys
 from pathlib import Path
-from typing import Any
 
 
 PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+")

@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 try:
     import tomllib
@@ -411,7 +411,7 @@ def print_label_and_command(label: str, command: list[str]) -> None:
     print(shlex.join(command))
 
 
-def load_toml(path_like: str | Path) -> dict[str, Any]:
+def load_toml(path_like: str | Path) -> dict[str, object]:
     """Load one generic TOML file."""
     path = workspace_path(path_like)
     with path.open("rb") as handle:

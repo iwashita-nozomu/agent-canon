@@ -11,12 +11,11 @@
 目的: エラー報告、成功/失敗の一貫した表現、JSON/Markdown 出力
 """
 
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import json
 import sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 
 
 class Severity(Enum):
@@ -75,12 +74,12 @@ class ErrorDetail:
 
     code: ErrorCode
     message: str
-    file: Optional[str] = None
-    line: Optional[int] = None
-    context: Optional[Dict[str, Any]] = None
-    suggestion: Optional[str] = None
+    file: str | None = None
+    line: int | None = None
+    context: dict[str, object] | None = None
+    suggestion: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """辞書形式に変換。"""
         return {
             "code": self.code.value,
@@ -103,22 +102,22 @@ class ExecutionResult:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # 結果データ
-    output: Optional[Dict[str, Any]] = None
-    errors: List[ErrorDetail] = field(default_factory=list)
-    warnings: List[ErrorDetail] = field(default_factory=list)
+    output: dict[str, object] | None = None
+    errors: list[ErrorDetail] = field(default_factory=list)
+    warnings: list[ErrorDetail] = field(default_factory=list)
 
     # メタデータ
     version: str = "1.0"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     def add_error(
         self,
         code: ErrorCode,
         message: str,
-        file: Optional[str] = None,
-        line: Optional[int] = None,
-        context: Optional[Dict[str, Any]] = None,
-        suggestion: Optional[str] = None,
+        file: str | None = None,
+        line: int | None = None,
+        context: dict[str, object] | None = None,
+        suggestion: str | None = None,
     ) -> None:
         """エラーを追加。"""
         error = ErrorDetail(
@@ -136,10 +135,10 @@ class ExecutionResult:
         self,
         code: ErrorCode,
         message: str,
-        file: Optional[str] = None,
-        line: Optional[int] = None,
-        context: Optional[Dict[str, Any]] = None,
-        suggestion: Optional[str] = None,
+        file: str | None = None,
+        line: int | None = None,
+        context: dict[str, object] | None = None,
+        suggestion: str | None = None,
     ) -> None:
         """警告を追加。"""
         warning = ErrorDetail(
@@ -161,7 +160,7 @@ class ExecutionResult:
         else:
             return "FAIL"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """辞書形式に変換。"""
         return {
             "success": self.success,

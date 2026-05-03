@@ -66,6 +66,14 @@ TOOL_GATES = {
             "documents/conventions/common/01_principles.md",
         ),
     ),
+    "static_any": (
+        "tools/agent_tools/check_static_any.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "documents/conventions/python/04_type_annotations.md",
+            "documents/conventions/python/07_type_checker.md",
+        ),
+    ),
     "oop_readability": (
         "tools/agent_tools/analyze_oop_readability.py",
         (

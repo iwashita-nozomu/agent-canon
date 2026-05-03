@@ -18,7 +18,7 @@ import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from workflow_monitor import append_monitoring
 
@@ -120,7 +120,7 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
     for raw_server in raw_servers:
         if not isinstance(raw_server, dict):
             continue
-        server_data = cast(dict[str, Any], raw_server)
+        server_data = cast(dict[str, object], raw_server)
         name = server_data.get("name")
         if not isinstance(name, str) or not name:
             continue
@@ -138,7 +138,7 @@ def load_inventory(codex_bin: str) -> list[McpServer]:
         cwd = server_data.get("cwd")
         transport = server_data.get("transport")
         if isinstance(transport, dict):
-            transport_data = cast(dict[str, Any], transport)
+            transport_data = cast(dict[str, object], transport)
             if not isinstance(command, str):
                 transport_command = transport_data.get("command")
                 if isinstance(transport_command, str):

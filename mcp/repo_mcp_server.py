@@ -16,7 +16,7 @@ import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 SERVER_INFO = {"name": "repo_mcp_server", "version": "0.1.0"}
 use_content_length = False
@@ -41,7 +41,7 @@ def repo_root() -> Path:
     return Path.cwd().resolve()
 
 
-def send(message: Mapping[str, Any]) -> None:
+def send(message: Mapping[str, object]) -> None:
     """Write one JSON-RPC message to stdout."""
     payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
     if use_content_length:
@@ -54,7 +54,7 @@ def send(message: Mapping[str, Any]) -> None:
     sys.stdout.buffer.flush()
 
 
-def tool_schema() -> dict[str, Any]:
+def tool_schema() -> dict[str, object]:
     """Return the available MCP tools."""
     return {
         "tools": [
@@ -103,7 +103,7 @@ def tool_schema() -> dict[str, Any]:
     }
 
 
-def text_result(text: str) -> dict[str, Any]:
+def text_result(text: str) -> dict[str, object]:
     """Build a text content result."""
     return {"content": [{"type": "text", "text": text}]}
 
@@ -118,7 +118,7 @@ def resolve_repo_relative_path(root: Path, raw_path: str) -> Path:
     return candidate
 
 
-def goal_loop_status(root: Path, arguments: Mapping[str, Any]) -> dict[str, Any]:
+def goal_loop_status(root: Path, arguments: Mapping[str, object]) -> dict[str, object]:
     """Return goal.md loop status through the canonical goal loop tool."""
     raw_goal_file = arguments.get("goal_file", "goal.md")
     if not isinstance(raw_goal_file, str) or not raw_goal_file.strip():
@@ -141,7 +141,10 @@ def goal_loop_status(root: Path, arguments: Mapping[str, Any]) -> dict[str, Any]
     return text_result("\n".join(line for line in lines if line))
 
 
-def call_tool(name: str, arguments: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def call_tool(
+    name: str,
+    arguments: Mapping[str, object] | None = None,
+) -> dict[str, object]:
     """Execute a supported tool."""
     root = repo_root()
     tool_arguments = arguments or {}
@@ -162,7 +165,7 @@ def call_tool(name: str, arguments: Mapping[str, Any] | None = None) -> dict[str
     raise KeyError(name)
 
 
-def handle_request(message: Mapping[str, Any]) -> None:
+def handle_request(message: Mapping[str, object]) -> None:
     """Handle one JSON-RPC request or notification."""
     method = message.get("method")
     request_id = message.get("id")
@@ -215,7 +218,7 @@ def handle_request(message: Mapping[str, Any]) -> None:
                 "tools/call params.arguments must be an object",
             )
             return
-        tool_arguments = cast(Mapping[str, Any], arguments)
+        tool_arguments = cast(Mapping[str, object], arguments)
         try:
             result = call_tool(name, tool_arguments)
         except KeyError:
@@ -235,7 +238,7 @@ def handle_request(message: Mapping[str, Any]) -> None:
     send_error(request_id, -32601, f"method not found: {method}")
 
 
-def send_error(request_id: Any, code: int, message: str) -> None:
+def send_error(request_id: object, code: int, message: str) -> None:
     """Write one JSON-RPC error."""
     send(
         {
@@ -278,7 +281,7 @@ def main() -> int:
         except json.JSONDecodeError:
             continue
         if isinstance(message, Mapping):
-            handle_request(cast(Mapping[str, Any], message))
+            handle_request(cast(Mapping[str, object], message))
     return 0
 
 
