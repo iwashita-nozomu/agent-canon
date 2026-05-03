@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -104,6 +105,15 @@ SKILL_ROUTING_MARKERS = (
 )
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
+WORKFLOW_GATE_COMMAND_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?.*\brun\s+`?python3\s+"
+    r"tools/agent_tools/check_convention_compliance\.py`?"
+)
+WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
+    r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?"
+    r"check_convention_compliance\.py|check_convention_compliance\.py"
+    r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
+)
 CLOSEOUT_PROHIBITION_MARKERS = (
     "Close-Out Prohibitions",
     "user-facing completion",
@@ -201,6 +211,23 @@ def check_workflow_hooks(root: Path) -> list[Finding]:
                     "workflow_hook",
                     relative,
                     "missing-convention-compliance-gate",
+                )
+            )
+            continue
+        if not WORKFLOW_GATE_COMMAND_RE.search(text):
+            findings.append(
+                Finding(
+                    "workflow_hook",
+                    relative,
+                    "missing-positive-convention-compliance-command",
+                )
+            )
+        if WORKFLOW_GATE_FORBIDDEN_RE.search(text):
+            findings.append(
+                Finding(
+                    "workflow_hook",
+                    relative,
+                    "forbidden-convention-compliance-suppression",
                 )
             )
     return findings

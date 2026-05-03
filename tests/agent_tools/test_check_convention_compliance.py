@@ -57,6 +57,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             self.assertIn("missing-convention-compliance-gate", result.stdout)
 
+    def test_workflow_hook_requires_positive_command(self) -> None:
+        """A stale mention without a run command is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow.write_text(
+                "# Example\nMention check_convention_compliance.py in prose only.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_rejects_suppression(self) -> None:
+        """A workflow must not be able to pass by saying not to run the gate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "workflows" / "example-workflow.md"
+            workflow.write_text(
+                "# Example\n"
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+                "Do not run check_convention_compliance.py for quick tasks.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "forbidden-convention-compliance-suppression",
+                result.stdout,
+            )
+
     def test_json_output_is_machine_readable(self) -> None:
         """JSON output exposes status and finding records."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -114,7 +155,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "repo_wide_dependency_tools_complete\n"
                 "run_repo_dependency_review.sh\n"
             ),
-            "agents/workflows/example-workflow.md": "check_convention_compliance.py\n",
+            "agents/workflows/example-workflow.md": (
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+            ),
             ".agents/skills/agent-orchestration/SKILL.md": (
                 "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
                 "task-shape skill check_convention_compliance.py\n"

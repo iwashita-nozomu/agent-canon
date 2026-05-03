@@ -74,7 +74,14 @@ required_regex = ["(?m)^#\\s+"]
 id = "CONVENTION-WORKFLOW-1"
 critical = true
 description = "Every workflow calls the convention compliance verifier before closeout or handoff."
-required_regex = ["check_convention_compliance\\.py", "CONVENTION_COMPLIANCE=fail"]
+required_regex = [
+  "run `python3 tools/agent_tools/check_convention_compliance\\.py`",
+  "CONVENTION_COMPLIANCE=fail",
+]
+forbidden_regex = [
+  "(?i)(do not|don't|never|skip|omit)\\s+.*check_convention_compliance\\.py",
+  "(?i)check_convention_compliance\\.py.*(optional|not required)",
+]
 
 [[evals]]
 id = "all-claude-skill-mirrors"
