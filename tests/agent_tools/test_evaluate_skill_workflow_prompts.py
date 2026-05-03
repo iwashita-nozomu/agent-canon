@@ -37,11 +37,8 @@ def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProces
 
 def load_toml_document(path: Path) -> dict[str, Any]:
     """Load one TOML document with a concrete table type for strict pyright."""
-    return cast(
-        dict[str, Any],
-        tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
-            path.read_text(encoding="utf-8")
-        ),
+    return tomllib.loads(  # pyright: ignore[reportUnknownMemberType]
+        path.read_text(encoding="utf-8")
     )
 
 
