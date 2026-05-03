@@ -10,7 +10,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
 - current_iteration: 0
 - active_run_id: 20260503-074518-add-convention-compliance-verifier-and-w
@@ -33,7 +33,7 @@ instructions where practical.
 - [x] G5: Tool-owned convention checks are documented as mechanical gates so prompt surfaces do not duplicate detailed tool logic.
 - [x] G6: Prompt evals, targeted tests, convention verifier, dependency review, and template `make ci` pass after snapshot update.
 - [x] G7: AgentCanon main and template snapshot branch are updated and pushed.
-- [ ] G8: Explicit Python `Any` usage is banned by a repo-wide static checker, CI wiring, convention documentation, and template validation.
+- [x] G8: Explicit Python `Any` usage is banned by a repo-wide static checker, CI wiring, convention documentation, and template validation.
 
 ## Backlog
 
@@ -43,7 +43,7 @@ instructions where practical.
 - [x] B4: Add tests and prompt eval coverage for workflow verifier hooks and skill-call routing.
 - [x] B5: Update workflow / skill prompts to call the verifier and remove or centralize tool-owned details where practical.
 - [x] B6: Run AgentCanon validation, sync template snapshot, run template validation, and close only after `NEXT_ACTION=close_goal_loop`.
-- [ ] B7: Add the explicit-Any checker, remove existing explicit `Any` usage, validate, sync template snapshot, and push both repos.
+- [x] B7: Add the explicit-Any checker, remove existing explicit `Any` usage, validate, sync template snapshot, and push both repos.
 
 ## Optional Goal Item Catalog
 
@@ -80,3 +80,7 @@ this objective.
   closeout.
 - iteration 1: reopened the convention-compliance goal for the additional
   requirement that static analysis must also ban explicit Python `Any`.
+- iteration 1 result: added `check_static_any.py`, removed explicit `Any`
+  annotations/imports from checked Python source, wired the checker into CI and
+  convention compliance, exposed its template test symlink, refreshed the
+  template snapshot, and passed template `make ci`.
