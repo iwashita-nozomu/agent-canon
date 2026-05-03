@@ -10,7 +10,7 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
 - current_iteration: 0
 - active_run_id: 20260503-074518-add-convention-compliance-verifier-and-w
@@ -31,8 +31,8 @@ instructions where practical.
 - [x] G3: Every workflow prompt in `agents/workflows/*.md` calls `check_convention_compliance.py` before closeout or handoff.
 - [x] G4: Skill-routing prompts and evals verify `$agent-orchestration` first, task-shape skill selection, and convention-compliance gate usage.
 - [x] G5: Tool-owned convention checks are documented as mechanical gates so prompt surfaces do not duplicate detailed tool logic.
-- [ ] G6: Prompt evals, targeted tests, convention verifier, dependency review, and template `make ci` pass after snapshot update.
-- [ ] G7: AgentCanon main and template snapshot branch are updated and pushed.
+- [x] G6: Prompt evals, targeted tests, convention verifier, dependency review, and template `make ci` pass after snapshot update.
+- [x] G7: AgentCanon main and template snapshot branch are updated and pushed.
 
 ## Backlog
 
@@ -41,7 +41,7 @@ instructions where practical.
 - [x] B3: Implement the smallest verifier that checks the current manifestable convention gates.
 - [x] B4: Add tests and prompt eval coverage for workflow verifier hooks and skill-call routing.
 - [x] B5: Update workflow / skill prompts to call the verifier and remove or centralize tool-owned details where practical.
-- [ ] B6: Run AgentCanon validation, sync template snapshot, run template validation, and close only after `NEXT_ACTION=close_goal_loop`.
+- [x] B6: Run AgentCanon validation, sync template snapshot, run template validation, and close only after `NEXT_ACTION=close_goal_loop`.
 
 ## Optional Goal Item Catalog
 
@@ -71,3 +71,8 @@ this objective.
 - iteration 0: initialized convention-compliance verifier objective with
   workflow hook, skill-call eval, tool/prompt split, and template snapshot
   closeout gates.
+- iteration 0 result: added `check_convention_compliance.py`, hardcoded-number
+  gate coverage, workflow positive-command checks, skill-call prompt evals,
+  behavior eval hooks, docs, tests, and CI wiring. AgentCanon validation passed,
+  the template snapshot was refreshed, and template `make ci` passed before
+  closeout.
