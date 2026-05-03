@@ -173,3 +173,7 @@ python3 tools/docs/audit_and_fix_links.py --check documents notes
 - 長文一般の構成技法は `agents/workflows/long-form-writing-workflow.md`
 - 学術文章一般の原則は `agents/workflows/academic-writing-workflow.md`
 - 文献探索が主 task なら `agents/workflows/research-workflow.md`
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

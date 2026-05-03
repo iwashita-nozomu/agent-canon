@@ -539,6 +539,8 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 7. Closeout
 
+#### Close-Out Prohibitions
+
 - repo に残す差分がある task では、validation 後に commit を作る
 - user が明示的に止めていなければ、final report の前に branch を push する
 - user-facing final report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` で、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` になるまで出さない

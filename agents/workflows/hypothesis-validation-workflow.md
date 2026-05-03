@@ -182,3 +182,7 @@ closeout 前に、実装後 diff が仮説と一致しているか確認しま�
 - 次回の agent が同じ誤った候補を選ばないよう、必要なら workflow monitoring、agent learning、eval、guardrail のいずれかへ feedback を残している。
 
 この workflow では、実装量が少なくても「仮説なし」「修正箇所妥当性なし」の completion を認めません。
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

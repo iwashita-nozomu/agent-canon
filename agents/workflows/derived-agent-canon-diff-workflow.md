@@ -178,3 +178,7 @@ repo 全体の runtime 影響がある場合、または template snapshot を�
 - non-canonical draft、backup copy、dated snapshot、旧 root surface 参照が tracked tree に残っていない
 - `closeout_gate.md` が `unfinished_tasks_absent=yes`、`dependency_headers_complete=yes`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked`
 - run-local diff-check artifact が現在 tracked diff ref の read-only independent approval と findings disposition を示している
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

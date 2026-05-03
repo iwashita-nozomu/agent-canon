@@ -745,3 +745,7 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - [agents/workflows/research-workflow.md](../../../../agents/workflows/research-workflow.md)
 - [agents/workflows/experiment-workflow.md](../../../../agents/workflows/experiment-workflow.md)
 - [agents/workflows/workflow-references.md](../../../../agents/workflows/workflow-references.md)
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

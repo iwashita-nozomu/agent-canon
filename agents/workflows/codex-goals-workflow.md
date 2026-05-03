@@ -305,3 +305,7 @@ Before user-facing completion:
 - Validation evidence must be attached to every closed criterion.
 
 The ordinary closeout gates in `agents/canonical/CODEX_WORKFLOW.md` still apply.
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

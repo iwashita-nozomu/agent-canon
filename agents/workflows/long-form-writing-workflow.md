@@ -167,3 +167,7 @@ validation command が通っても readability は自動では pass しません
   - line edit より先に focus、purpose、organization を直す review 順序
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
   - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる考え方
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

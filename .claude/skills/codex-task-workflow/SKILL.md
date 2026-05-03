@@ -37,4 +37,5 @@ upstream design ../../../agents/skills/codex-task-workflow.md documents the huma
 1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, final review, validation, closeout gate, commit, and push are complete.
 1. Validate dependency manifests with `python3 tools/agent_tools/check_dependency_headers.py --changed`, `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`, and `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header` before closeout.
 1. If dependency edges changed, run `bash tools/agent_tools/check_dependency_graph.sh --print-edges` or record the migration baseline and evidence that the current diff introduced no new graph error.
+1. Run `python3 tools/agent_tools/check_convention_compliance.py` before closeout so workflow prohibitions, convention tool gates, and skill-routing hooks are verified by the tool instead of repeated in prompt prose.
 1. Validate with `make ci-quick` first and escalate to broader checks only when needed.

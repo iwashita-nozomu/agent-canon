@@ -10,37 +10,38 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: achieved
+- goal_status: active
 - run_safety_cap: 5
 - current_iteration: 0
-- active_run_id: 20260503-070655-strengthen-hypothesis-to-validation-flow
+- active_run_id: 20260503-074518-add-convention-compliance-verifier-and-w
 - stop_reason:
 
 ## Objective
 
-Strengthen the code-improvement hypothesis-to-validation flow from both skill
-and workflow surfaces. The updated canon must force agents to state improvement
-hypotheses, compare alternative fix surfaces, define disconfirming evidence,
-validate before editing, and check post-change evidence before claiming the
-hypothesis was supported.
+Create a convention-compliance verifier that maps repository conventions and
+workflow prohibitions to concrete mechanical gates. Ensure every workflow prompt
+calls the verifier, skill-routing prompts invoke the appropriate skills, prompt
+evals verify that routing, and tool-owned checks replace duplicated prompt-only
+instructions where practical.
 
 ## Exit Criteria
 
 - [x] G1: Repository dependency review passes with `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`.
-- [x] G2: Hypothesis-validation workflow defines code-improvement hypothesis, alternative-surface comparison, disconfirming evidence, pre-edit validation, and post-change support / reject decisions.
-- [x] G3: Relevant skill surfaces route code improvement through the strengthened hypothesis-validation workflow.
-- [x] G4: Prompt eval manifest checks the strengthened skill/workflow wording and passes.
-- [x] G5: Dependency review, targeted prompt eval tests, and template `make ci` pass after snapshot update.
-- [x] G6: AgentCanon main and template snapshot branch are updated and pushed.
+- [x] G2: A convention-compliance verifier exists, is tested, and checks convention source inventory, workflow prohibition hooks, workflow verifier invocation, skill routing hooks, and tool-gate wiring.
+- [x] G3: Every workflow prompt in `agents/workflows/*.md` calls `check_convention_compliance.py` before closeout or handoff.
+- [x] G4: Skill-routing prompts and evals verify `$agent-orchestration` first, task-shape skill selection, and convention-compliance gate usage.
+- [x] G5: Tool-owned convention checks are documented as mechanical gates so prompt surfaces do not duplicate detailed tool logic.
+- [ ] G6: Prompt evals, targeted tests, convention verifier, dependency review, and template `make ci` pass after snapshot update.
+- [ ] G7: AgentCanon main and template snapshot branch are updated and pushed.
 
 ## Backlog
 
-- [x] B1: Freeze prompt eval checks for hypothesis-validation and adaptive-improvement surfaces.
-- [x] B2: Update `hypothesis-validation-workflow.md` with explicit H1-H5 hypothesis lifecycle gates.
-- [x] B3: Update skill shims / human-facing skills so code improvement invokes dependency analysis plus hypothesis validation before implementation.
-- [x] B4: Run prompt evals and targeted tests; repair wording until they pass.
-- [x] B5: Update template snapshot and run template validation.
-- [x] B6: Recheck `goal_loop.py status`; close only when all criteria are checked.
+- [x] B1: Build a prompt-to-artifact checklist for every explicit requirement in the objective.
+- [x] B2: Inventory convention docs, workflow prohibition sources, existing tools, and prompt eval surfaces.
+- [x] B3: Implement the smallest verifier that checks the current manifestable convention gates.
+- [x] B4: Add tests and prompt eval coverage for workflow verifier hooks and skill-call routing.
+- [x] B5: Update workflow / skill prompts to call the verifier and remove or centralize tool-owned details where practical.
+- [ ] B6: Run AgentCanon validation, sync template snapshot, run template validation, and close only after `NEXT_ACTION=close_goal_loop`.
 
 ## Optional Goal Item Catalog
 
@@ -67,3 +68,6 @@ this objective.
   analysis routing, adaptive-improvement skill guidance, and prompt eval
   coverage. AgentCanon validation passed, the template snapshot was refreshed,
   and template `make ci` passed before closeout.
+- iteration 0: initialized convention-compliance verifier objective with
+  workflow hook, skill-call eval, tool/prompt split, and template snapshot
+  closeout gates.

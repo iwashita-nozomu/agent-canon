@@ -166,3 +166,7 @@ closeout 前に次を確認します。
 - static score pass は behavior evidence と混同していない。
 
 これらを満たさない場合、refactor は未完了です。
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

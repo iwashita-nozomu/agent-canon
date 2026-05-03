@@ -30,6 +30,8 @@ required_any = [
   "repo_dependency_review=pass",
   "tool_call=make ci",
   "static_analysis=pass",
+  "tool_call=check_convention_compliance.py",
+  "CONVENTION_COMPLIANCE=pass",
 ]
 
 [[criteria]]

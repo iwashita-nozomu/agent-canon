@@ -451,3 +451,7 @@ carry-over のルールは次です。
 - Towards Scientific Discovery with Generative AI: Progress, Opportunities and Challenges
 - Wu et al. (2025), Automated Literature Research and Review-Generation Method Based on Large Language Models
 - OpenReviewer: A Specialized Large Language Model for Generating Critical Scientific Paper Reviews
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

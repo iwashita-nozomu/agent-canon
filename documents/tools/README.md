@@ -92,6 +92,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `RUN_PATH_COMPARISON=fail`、`SELECTED_INEFFICIENT_ROUTE=yes`、`NEXT_ACTION=repair_skill_workflow_prompt` は behavior eval と adaptive-improvement prompt repair の入力にします。
 - `tools/agent_tools/analyze_refactor_surface.py`
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
+- `tools/agent_tools/check_convention_compliance.py`
+  - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/analyze_oop_readability.py`

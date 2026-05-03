@@ -175,3 +175,7 @@ close 前には、少なくとも次を残します。
 - `Next Best Backlog Item Or Stop Reason:`
 - `Notes Promotion Decision:`
 - 各 extension の waterfall run-id、gate evidence、decision state
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

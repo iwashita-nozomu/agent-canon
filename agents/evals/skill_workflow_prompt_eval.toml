@@ -70,6 +70,12 @@ critical = true
 description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
 
+[[evals.checklist]]
+id = "CONVENTION-WORKFLOW-1"
+critical = true
+description = "Every workflow calls the convention compliance verifier before closeout or handoff."
+required_regex = ["check_convention_compliance\\.py", "CONVENTION_COMPLIANCE=fail"]
+
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
@@ -180,6 +186,37 @@ id = "TASK-WORKFLOWS-1"
 critical = true
 description = "Includes dependency manifest markers and a title."
 required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals.checklist]]
+id = "CONVENTION-SKILL-ROUTING-1"
+critical = true
+description = "Routes skill selection through agent-orchestration first and keeps convention compliance as a tool gate."
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
+
+[[evals]]
+id = "agent-orchestration-skill-call-routing"
+target = ".agents/skills/agent-orchestration/SKILL.md"
+kind = "skill"
+description = "The discoverable agent-orchestration skill must enforce mandatory skill-call routing and convention compliance tool delegation."
+
+[[evals.checklist]]
+id = "CONVENTION-SKILL-1"
+critical = true
+description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
+required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
+forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
+
+[[evals]]
+id = "codex-task-workflow-convention-gate"
+target = ".agents/skills/codex-task-workflow/SKILL.md"
+kind = "skill"
+description = "The discoverable Codex task workflow skill must call convention compliance before closeout."
+
+[[evals.checklist]]
+id = "CONVENTION-SKILL-2"
+critical = true
+description = "Requires convention compliance verifier during repo task closeout."
+required_regex = ["check_convention_compliance\\.py", "before closeout"]
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"

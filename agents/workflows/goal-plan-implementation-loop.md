@@ -83,3 +83,7 @@ Use this exact decision:
 Goal-driven work is slow when the agent returns to broad planning after every
 small edit. The correct behavior is to use the previous evidence checkpoint as
 the context for the next slice and keep moving.
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

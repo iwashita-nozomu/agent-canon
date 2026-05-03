@@ -89,3 +89,7 @@ git merge --ff-only integrate/<topic>-YYYYMMDD
 - `python3 tools/ci/check_merge_structure.py ...` が pass
 - `make ci-quick` が pass
 - 必要な note、doc、test が `main` から辿れる
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

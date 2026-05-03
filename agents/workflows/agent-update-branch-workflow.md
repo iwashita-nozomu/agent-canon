@@ -52,3 +52,7 @@ make ci
 
 1. Push the integration branch.
 1. Merge to `main` only after the integration branch is clean, validated, and reviewed.
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

@@ -149,3 +149,7 @@ closeout 前に次を確認します。
 - 反復して観測された、または user が明示的に durable とした項目だけを promotion candidate にします。
 - `AGENTS.md` へ昇格するときは短い rule にし、source、rationale、例は note 側に残します。
 - agent personality は自由作文にしません。repo の作業品質を改善する observable rule として残します。
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

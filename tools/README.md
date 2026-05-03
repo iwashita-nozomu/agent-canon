@@ -63,6 +63,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/compare_agent_run_paths.py`
   - `agent_tools/goal_loop.py`
   - `agent_tools/evaluate_skill_workflow_prompts.py`
+  - `agent_tools/check_convention_compliance.py`
   - `agent_tools/agent_update_branch.sh`
 
 ## Agent Evaluation Tools
@@ -162,6 +163,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 
 ## Static Design Analysis Tools
 
+- `check_convention_compliance.py` aggregates convention compliance wiring. It does not semantically prove every natural-language rule; it verifies that every manifestable convention gate has a source document, a tool or prompt-eval check, workflow hook coverage, and skill-routing prompt coverage.
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, simple cognitive-complexity signals, mathematically redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.

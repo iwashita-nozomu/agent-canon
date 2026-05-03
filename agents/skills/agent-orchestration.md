@@ -35,6 +35,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
 1. `agents/skills/README.md` から必要最小限の public skill を足す
 1. starter command と review / specialist stack を family と mode に合わせて決める
+1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
 
 mode の意味:
@@ -86,6 +87,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - large refactor では `behavior-preserving-refactor`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較が task の中心にある場合は `dependency-analysis` を足し、`agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - 関係のない family skill は足しません
+- tool 化済みの規約検証は task-shape skill として増やさず、`check_convention_compliance.py` の gate に委譲します
 
 ## Entrypoint Precedence
 

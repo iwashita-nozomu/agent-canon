@@ -433,3 +433,7 @@ review artifact では、次のラベルで切り分けます。
 - Weber LM, Saelens W, Cannoodt R, et al. [Essential guidelines for computational method benchmarking](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1738-8). Genome Biology, 2019.
 - Bartz-Beielstein T, Doerr C, van den Berg D, et al. [Benchmarking in Optimization: Best Practice and Open Issues](https://arxiv.org/abs/2007.03488). arXiv, 2020.
 - NeurIPS. [Paper Checklist Guidelines](https://nips.cc/public/guides/PaperChecklist).
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

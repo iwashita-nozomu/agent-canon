@@ -218,3 +218,7 @@ python3 tools/docs/audit_and_fix_links.py --check documents notes
   - reverse outline で focus と gap を検査する根拠
 - [Writing Tips | MIT OpenCourseWare](https://ocw.mit.edu/courses/8-06-quantum-physics-iii-spring-2016/e498e7c0d2db9e3846df12bfdac3e10e_MIT8_06S16_TermPaper.pdf)
   - scientific writing では ambiguity を避け、導入した quantity を明確に定義する根拠
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

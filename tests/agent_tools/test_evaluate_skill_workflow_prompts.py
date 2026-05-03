@@ -76,6 +76,36 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], 29)
 
+    def test_default_manifest_includes_convention_compliance_eval_coverage(
+        self,
+    ) -> None:
+        """The canonical manifest verifies workflow convention gates and skill calls."""
+        manifest = PROJECT_ROOT / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, Any]], data["evals"])
+        by_id = {str(entry["id"]): entry for entry in evals}
+        workflow_eval = by_id["all-workflow-docs"]
+        workflow_check_ids = {
+            str(item["id"])
+            for item in cast(list[dict[str, Any]], workflow_eval["checklist"])
+        }
+
+        self.assertIn("CONVENTION-WORKFLOW-1", workflow_check_ids)
+        self.assertEqual(
+            by_id["agent-orchestration-skill-call-routing"]["target"],
+            ".agents/skills/agent-orchestration/SKILL.md",
+        )
+        self.assertEqual(
+            by_id["codex-task-workflow-convention-gate"]["target"],
+            ".agents/skills/codex-task-workflow/SKILL.md",
+        )
+        for eval_id in (
+            "agent-orchestration-skill-call-routing",
+            "codex-task-workflow-convention-gate",
+        ):
+            checklists = cast(list[dict[str, Any]], by_id[eval_id]["checklist"])
+            self.assertTrue(all(bool(item["critical"]) for item in checklists))
+
     def test_missing_required_pattern_fails(self) -> None:
         """A target missing required prompt language fails."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -114,6 +144,49 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("EVAL_STATUS=fail", result.stdout)
             self.assertIn("EVAL_MISSING_REQUIRED", result.stdout)
+
+    def test_forbidden_pattern_fails(self) -> None:
+        """A forbidden prompt route produces a matched-forbidden failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "prompt.md"
+            manifest = root / "eval.toml"
+            target.write_text(
+                "required-marker\nDo not run check_convention_compliance.py.\n",
+                encoding="utf-8",
+            )
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines forbidden prompt evals.
+                    # upstream design prompt.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "sample"
+                    target = "prompt.md"
+                    kind = "skill"
+                    description = "sample"
+
+                    [[evals.checklist]]
+                    id = "S1"
+                    critical = true
+                    description = "requires marker and forbids bad route"
+                    required_regex = ["required-marker"]
+                    forbidden_regex = ["Do not run check_convention_compliance"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("EVAL_STATUS=fail", result.stdout)
+            self.assertIn("EVAL_MATCHED_FORBIDDEN", result.stdout)
 
     def test_report_out_writes_markdown(self) -> None:
         """The runner writes a Markdown eval artifact."""

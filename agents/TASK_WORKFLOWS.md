@@ -82,6 +82,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
 - 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、read-only diff-check agent が最新 diff を approve するまで completion loop を反復します
+- すべての repo-changing workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
+- skill selection は `$agent-orchestration` を先頭に置き、repo-changing execution では `$codex-task-workflow` と `$subagent-bootstrap` を足し、さらに task-shape skill を最小限だけ追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
 - parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
 - user-facing completion は、全 active clause、全 planned work unit、mechanical completion loop、diff-check agent approval、final review、validation、closeout gate、commit / push が揃ったときだけ返します

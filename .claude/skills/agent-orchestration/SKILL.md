@@ -15,6 +15,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 
 1. Read `agents/skills/agent-orchestration.md`.
 1. Read `agents/TASK_WORKFLOWS.md`, `agents/canonical/CLI_ENTRYPOINTS.md`, and `agents/canonical/CODEX_SUBAGENTS.md` before making any routing choice.
+1. For repository tasks, keep convention verification in the execution path: include `python3 tools/agent_tools/check_convention_compliance.py` in the selected workflow closeout gates instead of restating every mechanical convention inside this prompt.
 1. First classify the request into one of these modes:
    - `repo-changing execution`: the user is asking to edit the repo, start the run, or produce a concrete kickoff command now
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
