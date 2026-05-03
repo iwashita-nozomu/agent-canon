@@ -51,7 +51,7 @@ outer loop は agile、inner change pass は waterfall です。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。
 - tuning 中でも、既存コード再利用と既存 style の踏襲を優先します。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
-- `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
+- `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
 - `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
 - skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`agents/evals/skill_workflow_prompt_eval.toml` を正本にします。
 - prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` になるまで loop を閉じません。

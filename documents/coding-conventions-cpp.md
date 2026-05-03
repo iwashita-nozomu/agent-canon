@@ -48,6 +48,20 @@ layout と build tree の正本は [cpp-build-layout.md](cpp-build-layout.md) �
 - 近似や数値安定性の注意点を必ず記述します。
 - 実装 boundary が担う式、state、guard、fallback を Boundary Map と一致させます。
 
+## 4.5 数値リテラル
+
+- 裸の数値リテラルは、`documents/conventions/common/01_principles.md` のマジックナンバー規約に従います。
+- `constexpr` / `inline constexpr` の名前付き定数、typed configuration、または public API 引数へ分離できる値は、式の途中に直接書きません。
+- `-1`、`0`、`1`、`2`、`0.5` のような普遍的な符号・倍数以外を実装に置く場合は、`// hardcoded-number-ok: <理由>` で数式や標準上の根拠を書きます。
+- C++ source / header を変更した後は、次を実行します。
+
+```bash
+python3 tools/agent_tools/check_hardcoded_numbers.py \
+  include src tests/cpp \
+  --exclude vendor \
+  --exclude reports
+```
+
 ## 5. テスト
 
 - 小さく決定的な入力で検証します。

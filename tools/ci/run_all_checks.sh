@@ -4,6 +4,7 @@
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/scan_dependency_headers.sh scans changed-file manifest coverage
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
+# upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
@@ -130,6 +131,12 @@ if bash tools/agent_tools/check_dependency_header_format.sh --changed 2>&1; then
   echo "✅ dependency manifest format checks 成功"
 else
   echo "❌ dependency manifest format checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports 2>&1; then
+  echo "✅ hardcoded numeric literal checks 成功"
+else
+  echo "❌ hardcoded numeric literal checks 失敗"
   EXIT_CODE=1
 fi
 echo ""

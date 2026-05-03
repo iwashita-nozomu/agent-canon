@@ -23,7 +23,8 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 | 4 | OOP 境界を決める | [object-oriented-design.md](./object-oriented-design.md) |
 | 5 | 配置と責務を決める | [09_file_roles.md](./conventions/python/09_file_roles.md) |
 | 6 | 名前を確定する | [11_naming.md](./conventions/python/11_naming.md) |
-| 7 | `pyright` と `pytest` を通す | [07_type_checker.md](./conventions/python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
+| 7 | 数値リテラルの由来を確認 | [基本方針](./conventions/common/01_principles.md#数値ハードコード検証) |
+| 8 | `pyright` と `pytest` を通す | [07_type_checker.md](./conventions/python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
 
 ## よくある間違い
 
@@ -103,6 +104,7 @@ def load_config(path: Path) -> dict[str, str]:
 
 ## Python ファイル修正後
 
+- `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
 - `python3 -m pyright`
 - `python3 -m pytest tests/ -q --tb=short`
 - `python3 -m ruff check python tests --select D,E,F,I,UP`

@@ -527,6 +527,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - repo-changing task は差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。失敗した header は修正してから再実行する
 - repo-changing task は user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。`make ci-quick` は途中 checkpoint 用であり、final closeout の静的解析 evidence にはしない
+- Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
 - agent runtime / skill 変更では `make agent-checks`
 - checkpoint では `make ci-quick` を使ってよいが、final closeout では `make ci` を優先する
 - 必要に応じて `make ci`

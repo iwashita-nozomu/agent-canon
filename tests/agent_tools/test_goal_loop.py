@@ -51,7 +51,7 @@ class GoalLoopTest(unittest.TestCase):
             self.assertEqual(init.returncode, 0, init.stderr)
             self.assertEqual(status.returncode, 0, status.stderr)
             self.assertIn("GOAL_LOOP_STATUS=continue", status.stdout)
-            self.assertIn("GOAL_EXIT_CRITERIA_TOTAL=5", status.stdout)
+            self.assertIn("GOAL_EXIT_CRITERIA_TOTAL=6", status.stdout)
             self.assertIn("GOAL_OPTIONAL_ITEMS_TOTAL=5", status.stdout)
             text = goal.read_text(encoding="utf-8")
             self.assertIn("run_repo_dependency_review.sh --fail-missing", text)
@@ -83,10 +83,10 @@ class GoalLoopTest(unittest.TestCase):
                 "--goal-file",
                 str(goal),
                 "--criterion",
-                "G5",
+                "G6",
                 "--done",
             )
-            for criterion in ("G1", "G2", "G3", "G4"):
+            for criterion in ("G1", "G2", "G3", "G4", "G5"):
                 result = run_goal_loop(
                     "mark",
                     "--goal-file",
@@ -111,7 +111,7 @@ class GoalLoopTest(unittest.TestCase):
                 "--goal-file",
                 str(goal),
                 "--criterion",
-                "G5",
+                "G6",
                 "--done",
                 "--goal-status",
                 "achieved",
@@ -188,7 +188,7 @@ class GoalLoopTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("# Goal Work Breakdown", result.stdout)
-            self.assertIn("GOAL_WORK_UNITS=9", result.stdout)
+            self.assertIn("GOAL_WORK_UNITS=10", result.stdout)
             self.assertIn("exit_criteria:G2", result.stdout)
             self.assertIn("`scan_code_dependencies.sh` output", result.stdout)
             self.assertIn("Copy every open `GW*` row", result.stdout)
@@ -224,7 +224,7 @@ class GoalLoopTest(unittest.TestCase):
                         "import os",
                         "goal = Path(os.environ['GOAL_FILE'])",
                         "text = goal.read_text()",
-                        "for criterion in ('G1', 'G2', 'G3', 'G4', 'G5'):",
+                        "for criterion in ('G1', 'G2', 'G3', 'G4', 'G5', 'G6'):",
                         "    text = text.replace(",
                         "        f'- [ ] {criterion}:',",
                         "        f'- [x] {criterion}:',",

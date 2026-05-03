@@ -23,6 +23,7 @@ CHECKBOX_RE = re.compile(
     r"(?P<id>[A-Za-z0-9_.-]+):\s*(?P<text>.*)$"
 )
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
+DEFAULT_MAX_PLAN_ITEMS = 12
 DEFAULT_EXIT_CRITERIA = (
     (
         "G1",
@@ -42,11 +43,17 @@ DEFAULT_EXIT_CRITERIA = (
     ),
     (
         "G4",
+        "Hardcoded numeric literal analysis is run with "
+        "`python3 tools/agent_tools/check_hardcoded_numbers.py` and findings are "
+        "fixed or locally justified.",
+    ),
+    (
+        "G5",
         "Repo-wide static analysis or CI passes with `make ci`, or the "
         "documented fallback `python3 -m pyright` plus "
         "`python3 -m ruff check python tests --select D,E,F,I,UP`.",
     ),
-    ("G5", "Objective-specific completion evidence is recorded."),
+    ("G6", "Objective-specific completion evidence is recorded."),
 )
 DEFAULT_BACKLOG = (
     (
@@ -66,9 +73,9 @@ DEFAULT_BACKLOG = (
     ),
     (
         "B4",
-        "Run dependency review, code dependency scan, OOP/readability, and "
-        "task-relevant prompt/doc/convention checks; fix any failure in the "
-        "same iteration.",
+        "Run dependency review, code dependency scan, OOP/readability, hardcoded "
+        "numeric literal analysis, and task-relevant prompt/doc/convention checks; "
+        "fix any failure in the same iteration.",
     ),
     (
         "B5",
@@ -213,7 +220,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument(
         "--max-items",
         type=int,
-        default=12,
+        default=DEFAULT_MAX_PLAN_ITEMS,
         help="Maximum unchecked exit/backlog items to render.",
     )
 
@@ -492,6 +499,8 @@ def evidence_hint(item: CheckboxItem) -> str:
         return "`scan_code_dependencies.sh` output"
     if "oop" in text or "readability" in text:
         return "`analyze_oop_readability.py` report"
+    if "hardcoded numeric" in text or "check_hardcoded_numbers" in text:
+        return "`check_hardcoded_numbers.py` output"
     if "dependency" in text:
         return "`run_repo_dependency_review.sh` output"
     if (

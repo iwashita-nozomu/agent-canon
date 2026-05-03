@@ -21,6 +21,13 @@ upstream design ../canonical/skills.md skill canon registry
 - `make ci-quick`
 - `make ci`
 - `make docs-check`
+- `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
+
+## Numeric Literal Gate
+
+- Python / C++ implementation changes must run `check_hardcoded_numbers.py` before closeout.
+- `HARDCODED_NUMBERS=fail` is not a style-only warning. Fix it by naming the value, moving it to typed configuration / API input, or adding a local `hardcoded-number-ok` reason when the literal is clearer in the formula.
+- Test fixture numbers are excluded from the default changed-source gate, but nontrivial repeated test parameters should still be named in the test file.
 
 ## Boundary
 

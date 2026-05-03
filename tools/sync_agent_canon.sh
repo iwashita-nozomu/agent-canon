@@ -230,6 +230,7 @@ notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTRE
 tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
 tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_public_surface.py
+tests/agent_tools/test_check_hardcoded_numbers.py:../../${PREFIX}/tests/agent_tools/test_check_hardcoded_numbers.py
 tests/agent_tools/test_analyze_refactor_surface.py:../../${PREFIX}/tests/agent_tools/test_analyze_refactor_surface.py
 tests/agent_tools/test_analyze_oop_readability.py:../../${PREFIX}/tests/agent_tools/test_analyze_oop_readability.py
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
