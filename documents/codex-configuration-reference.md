@@ -74,8 +74,8 @@ codex_hooks = true
 goals = true
 
 [profiles.token-lite]
-model_reasoning_effort = "low"
-plan_mode_reasoning_effort = "low"
+model_reasoning_effort = "minimal"
+plan_mode_reasoning_effort = "minimal"
 model_verbosity = "low"
 tool_output_token_limit = 2000
 
@@ -606,8 +606,8 @@ Use profiles for operator modes:
 
 ```toml
 [profiles.token-lite]
-model_reasoning_effort = "low"
-plan_mode_reasoning_effort = "low"
+model_reasoning_effort = "minimal"
+plan_mode_reasoning_effort = "minimal"
 model_verbosity = "low"
 tool_output_token_limit = 3000
 

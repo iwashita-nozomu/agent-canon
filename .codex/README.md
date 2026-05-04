@@ -50,8 +50,8 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 ## Token Profiles
 
 - `token-lite`
-  - `model_reasoning_effort = "low"`
-  - `plan_mode_reasoning_effort = "low"`
+  - `model_reasoning_effort = "minimal"`
+  - `plan_mode_reasoning_effort = "minimal"`
   - `model_verbosity = "low"`
   - `tool_output_token_limit = 2000`
 - `token-standard`
