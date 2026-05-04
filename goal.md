@@ -10,11 +10,11 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
-- current_iteration: 0
+- current_iteration: 1
 - active_run_id: 20260504-todo-goal-workflow
-- stop_reason:
+- stop_reason: goal achieved
 
 ## Objective
 
@@ -73,46 +73,46 @@ Turn the TODO list into a repeatable goal loop that:
 
 ## Exit Criteria
 
-- [ ] G1: The goal contract, workflow, and backlog are written from the TODO
+- [x] G1: The goal contract, workflow, and backlog are written from the TODO
   list and can be parsed by `goal_loop.py status`.
-- [ ] G2: Model-routing workflow and prompt surfaces route simple coding to the
+- [x] G2: Model-routing workflow and prompt surfaces route simple coding to the
   cheapest suitable model while keeping code-reading on Spark.
-- [ ] G3: Slide workflow uses a fixed PPT template and supports text, equation,
+- [x] G3: Slide workflow uses a fixed PPT template and supports text, equation,
   image, and reference placement with layout review.
-- [ ] G4: Hypothesis-validation workflow enforces read-first survey, checklist
+- [x] G4: Hypothesis-validation workflow enforces read-first survey, checklist
   creation, tool selection, and quantitative plus qualitative rejection
   analysis before edits.
-- [ ] G5: Coding workflow prompts are revised when tools discard or rewrite
+- [x] G5: Coding workflow prompts are revised when tools discard or rewrite
   changes, and the repair path is covered by evals.
-- [ ] G6: The goal run produces a cumulative quantitative closeout report that
+- [x] G6: The goal run produces a cumulative quantitative closeout report that
   records per-step intent, path, evidence, and intermediate results.
-- [ ] G7: Repository dependency review, prompt evals, and template `make ci`
+- [x] G7: Repository dependency review, prompt evals, and template `make ci`
   pass after snapshot update.
-- [ ] G8: AgentCanon main, the template snapshot branch, and repo-local runtime
+- [x] G8: AgentCanon main, the template snapshot branch, and repo-local runtime
   views are updated and pushed through the canonical update lane.
-- [ ] G9: The token-efficient workflow slice shows at least 50% lower token
+- [x] G9: The token-efficient workflow slice shows at least 50% lower token
   usage for the same skill/workflow eval envelope, while skill and behavior
   evals remain pass, `compare_codex_token_footprints.py` reports a ratio at or
   below 0.5, and no inefficient route is selected.
 
 ## Backlog
 
-- [ ] B1: Draft the goal work breakdown from the TODO into checkable work
+- [x] B1: Draft the goal work breakdown from the TODO into checkable work
   units, owner notes, and evidence hints.
-- [ ] B2: Survey existing routing, slide, hypothesis, coding, and reporting
+- [x] B2: Survey existing routing, slide, hypothesis, coding, and reporting
   surfaces before editing anything.
-- [ ] B3: Implement the model-routing slice and its eval coverage first.
-- [ ] B4: Implement the slide-workflow slice with template locking and layout
+- [x] B3: Implement the model-routing slice and its eval coverage first.
+- [x] B4: Implement the slide-workflow slice with template locking and layout
   validation.
-- [ ] B5: Implement the hypothesis-validation and coding-prompt repair slices
+- [x] B5: Implement the hypothesis-validation and coding-prompt repair slices
   with tool and eval updates.
-- [ ] B6: Implement the AgentCanon main unification and template snapshot
+- [x] B6: Implement the AgentCanon main unification and template snapshot
   synchronization slice through the canonical branch lane.
-- [ ] B7: Implement the token-efficiency reduction slice and record the baseline
+- [x] B7: Implement the token-efficiency reduction slice and record the baseline
   and comparison evidence with `compare_codex_token_footprints.py`.
-- [ ] B8: Implement the cumulative closeout report slice and wire it into the
+- [x] B8: Implement the cumulative closeout report slice and wire it into the
   goal loop.
-- [ ] B9: Run AgentCanon validation, sync the template snapshot, and close only
+- [x] B9: Run AgentCanon validation, sync the template snapshot, and close only
   after `NEXT_ACTION=close_goal_loop`.
 
 ## Optional Goal Item Catalog
@@ -132,3 +132,6 @@ this objective.
 - iteration 0: initialized goal from TODO items covering model routing, slide
   workflow, hypothesis validation, coding prompt repair, quantitative
   closeout reporting, AgentCanon unification, and token-efficiency reduction.
+- iteration 1: goal achieved after slide workflow coverage, token-efficiency
+  measurement, cumulative closeout reporting, and canonical runtime alignment
+  updates passed validation and the vendor main branch was advanced.
