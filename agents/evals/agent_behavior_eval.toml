@@ -89,6 +89,19 @@ required_any = [
 ]
 
 [[criteria]]
+name = "runtime_feedback_prompt_update_recorded"
+max_score = 5
+feedback = "Record any user/reviewer runtime feedback as a structured event and route it to a skill, workflow, eval, memory, or explicit no-op decision."
+required_any = [
+  "runtime_feedback=observed",
+  "runtime_feedback_not_observed",
+]
+forbidden_any = [
+  "runtime_feedback=pending",
+  "runtime_feedback=missing",
+]
+
+[[criteria]]
 name = "review_feedback_behavior_recorded"
 max_score = 5
 feedback = "Record review decisions and feedback resolution as observable behavior."

@@ -103,6 +103,7 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 `bootstrap_agent_run.py` / `task_start.py` は routing と preflight の初期 signals を自動追記します。
 `check_mcp_inventory.py --report-dir <run>` と `run_repo_dependency_review.sh --report-dir <run>` はそれぞれ MCP preflight と dependency review の evidence を追記します。
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
+利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
 
 必須 signals:
 
@@ -112,6 +113,7 @@ agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Ev
 - repo dependency intake 結果、または `repo_dependency_intake_not_required`
 - web research / external research 結果、または `web_research_not_required`
 - behavior event: skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check のいずれか
+- runtime feedback event: `runtime_feedback=observed` または feedback が無い場合の `runtime_feedback_not_observed`
 
 closeout では `skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` を `applied`、`recorded`、`not_applicable` のいずれかにします。
 `pending` のまま Eval を通してはいけません。

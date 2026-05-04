@@ -20,7 +20,7 @@ downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluate
 
 ## Behavior Events
 
-<!-- Record observable agent behavior as structured events, not retrospective prose. Prefer `workflow_monitor.py --behavior-event "..."`. Required event families include skill invocation, stage/subagent routing, tool calls that gate implementation, prompt eval baseline/rerun status, dependency/static-analysis runs, token-efficiency protocol activation or explicit opt-out, token footprint comparison, static_analysis_feedback=applied|recorded|not_applicable, execution_path=..., route_efficiency=..., selected_inefficient_route=..., review decisions, feedback actions, subagent lifecycle closeout, and diff-check approval. -->
+<!-- Record observable agent behavior as structured events, not retrospective prose. Prefer `workflow_monitor.py --behavior-event "..."`. Required event families include skill invocation, stage/subagent routing, tool calls that gate implementation, prompt eval baseline/rerun status, dependency/static-analysis runs, token-efficiency protocol activation or explicit opt-out, token footprint comparison, runtime_feedback=observed or runtime_feedback_not_observed, static_analysis_feedback=applied|recorded|not_applicable, execution_path=..., route_efficiency=..., selected_inefficient_route=..., review decisions, feedback actions, subagent lifecycle closeout, and diff-check approval. Use `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` when feedback from actual use should update skill prompts, workflow prompts, evals, or memory. -->
 
 ## Interventions
 

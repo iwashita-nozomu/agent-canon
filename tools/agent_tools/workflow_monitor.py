@@ -62,6 +62,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--runtime-feedback",
+        action="append",
+        default=[],
+        help=(
+            "User- or reviewer-observed runtime feedback as key=value tokens, for "
+            "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
+        ),
+    )
+    parser.add_argument(
         "--decision",
         action="append",
         default=[],
@@ -133,6 +142,16 @@ def normalize_entry(entry: str, timestamp: str) -> str:
     if not stripped:
         raise ValueError("workflow monitoring entries must not be empty")
     return f"- {timestamp_prefix(timestamp)}{stripped}"
+
+
+def normalize_runtime_feedback(entry: str) -> str:
+    """Render one runtime feedback event with stable machine-readable tokens."""
+    stripped = entry.strip()
+    if not stripped:
+        raise ValueError("runtime feedback entries must not be empty")
+    if "target=" not in stripped or "action=" not in stripped:
+        raise ValueError("runtime feedback must include target=... and action=...")
+    return f"runtime_feedback=observed {stripped}"
 
 
 def section_bounds(lines: list[str], heading: str) -> tuple[int, int]:
@@ -210,6 +229,7 @@ def append_monitoring(
     *,
     signals: list[str] | None = None,
     behavior_events: list[str] | None = None,
+    runtime_feedback: list[str] | None = None,
     interventions: list[str] | None = None,
     decisions: dict[str, str] | None = None,
     timestamp: str = "",
@@ -224,6 +244,10 @@ def append_monitoring(
     behavior_entries = [
         normalize_entry(item, timestamp) for item in behavior_events or []
     ]
+    behavior_entries.extend(
+        normalize_entry(normalize_runtime_feedback(item), timestamp)
+        for item in runtime_feedback or []
+    )
     intervention_entries = [
         normalize_entry(item, timestamp) for item in interventions or []
     ]
@@ -243,6 +267,7 @@ def main() -> int:
         resolve_report_dir(args),
         signals=list(args.signal),
         behavior_events=list(args.behavior_event),
+        runtime_feedback=list(args.runtime_feedback),
         interventions=list(args.intervention),
         decisions=decisions,
         timestamp=str(args.timestamp),

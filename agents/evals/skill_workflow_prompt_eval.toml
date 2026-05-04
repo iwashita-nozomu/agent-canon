@@ -256,6 +256,12 @@ description = "Requires behavior-event monitoring and agent behavior eval before
 required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "evaluate_agent_run\\.py"]
 
 [[evals.checklist]]
+id = "AIL-SHIM-6"
+critical = true
+description = "Routes runtime user/reviewer feedback into prompt, eval, or memory updates."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair"]
+
+[[evals.checklist]]
 id = "AIL-SHIM-5"
 critical = true
 description = "Uses MCP goal.loop_status as the mechanical iteration gate."
@@ -290,6 +296,12 @@ id = "AIL-HUMAN-4"
 critical = true
 description = "Requires behavior-event capture and behavior eval repair for agent behavior tuning."
 required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-8"
+critical = true
+description = "Routes runtime feedback to a concrete prompt, eval, memory, or no-op decision."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "eval_update", "memory_record"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-5"
@@ -338,6 +350,12 @@ id = "AIL-WF-4"
 critical = true
 description = "Repairs behavior eval feedback and reruns until agent behavior monitoring passes."
 required_regex = ["agent_behavior_eval\\.toml", "workflow_monitor\\.py --behavior-event", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-WF-9"
+critical = true
+description = "Turns observed runtime feedback into structured monitoring plus prompt/eval/memory repair."
+required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-feedback", "target=...", "action=..."]
 
 [[evals.checklist]]
 id = "AIL-WF-5"
@@ -670,6 +688,12 @@ critical = true
 description = "Lists observable agent behavior families."
 required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
 
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-4"
+critical = true
+description = "Requires runtime feedback capture and routing to prompt/eval/memory updates."
+required_regex = ["workflow_monitor\\.py --runtime-feedback", "runtime_feedback=observed", "prompt_repair", "memory_record"]
+
 [[evals]]
 id = "workflow-monitoring-template-behavior-events"
 target = "agents/templates/workflow_monitoring.md"
@@ -687,6 +711,12 @@ id = "WMT-BEHAVIOR-2"
 critical = true
 description = "Mentions observable event families required by the behavior eval."
 required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-3"
+critical = true
+description = "Exposes runtime feedback as a structured behavior event."
+required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-feedback", "target=<skill-or-workflow>"]
 
 [[evals]]
 id = "agent-behavior-eval-manifest"
@@ -706,6 +736,12 @@ critical = true
 description = "Covers prompt eval, review feedback, subagent lifecycle, and diff-check behavior."
 required_regex = ["prompt_eval_behavior_recorded", "review_feedback_behavior_recorded", "subagent_lifecycle_behavior_recorded", "diff_check_behavior_recorded"]
 
+[[evals.checklist]]
+id = "ABEM-3"
+critical = true
+description = "Covers runtime feedback capture for prompt/eval/memory update loops."
+required_regex = ["runtime_feedback_prompt_update_recorded", "runtime_feedback=observed", "runtime_feedback_not_observed"]
+
 [[evals]]
 id = "agent-learning-skill-shim-behavior-eval"
 target = ".agents/skills/agent-learning/SKILL.md"
@@ -724,6 +760,12 @@ critical = true
 description = "Requires behavior-manifest based run evaluation."
 required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feedback actions"]
 
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-3"
+critical = true
+description = "Requires runtime feedback to be routed to update surfaces."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair"]
+
 [[evals]]
 id = "agent-learning-human-skill-behavior-eval"
 target = "agents/skills/agent-learning.md"
@@ -741,6 +783,12 @@ id = "ALH-BEHAVIOR-2"
 critical = true
 description = "Names behavior manifest and pass status."
 required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-3"
+critical = true
+description = "Documents runtime feedback capture and prompt/eval/memory routing."
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record"]
 
 [[evals]]
 id = "evals-readme-behavior-eval"

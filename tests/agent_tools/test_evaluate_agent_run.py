@@ -97,6 +97,11 @@ def write_ready_run(report_dir: Path) -> None:
                 ),
                 "- static_analysis_feedback=applied target=$adaptive-improvement-loop",
                 "- prompt_eval_not_required reason=unit-test-run-bundle",
+                (
+                    "- runtime_feedback=observed source=user "
+                    "target=.agents/skills/agent-learning/SKILL.md "
+                    "action=prompt_repair evidence=unit-test"
+                ),
                 "- review_decision=approve feedback_actions_resolved=yes",
                 "- subagent_lifecycle=closed subagents_closed=yes",
                 "- diff_check_not_required reason=unit-test-run-bundle",
@@ -379,6 +384,41 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
             self.assertIn("inefficient route", result.stdout.lower())
+
+    def test_evaluate_missing_runtime_feedback_event_fails(self) -> None:
+        """Run evaluation should require runtime feedback capture or explicit opt-out."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    (
+                        "- runtime_feedback=observed source=user "
+                        "target=.agents/skills/agent-learning/SKILL.md "
+                        "action=prompt_repair evidence=unit-test\n"
+                    ),
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("runtime feedback", result.stdout.lower())
 
     def test_evaluate_incomplete_run_fails_with_feedback(self) -> None:
         """Missing evidence should create fix-now feedback actions."""

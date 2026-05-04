@@ -40,6 +40,11 @@ class WorkflowMonitorTest(unittest.TestCase):
                     "skills=$agent-orchestration",
                     "--behavior-event",
                     "skill_invocation=$agent-orchestration status=observed",
+                    "--runtime-feedback",
+                    (
+                        "source=user target=.agents/skills/agent-learning/SKILL.md "
+                        "action=prompt_repair evidence=observed-drift"
+                    ),
                     "--intervention",
                     "spawned reviewer",
                     "--decision",
@@ -63,9 +68,35 @@ class WorkflowMonitorTest(unittest.TestCase):
             )
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("skill_invocation=$agent-orchestration status=observed", text)
+            self.assertIn("runtime_feedback=observed", text)
+            self.assertIn("target=.agents/skills/agent-learning/SKILL.md", text)
+            self.assertIn("action=prompt_repair", text)
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- memory_learning_decision: not_applicable", text)
+
+    def test_monitor_rejects_runtime_feedback_without_target_action(self) -> None:
+        """Runtime feedback should be routeable to a concrete update surface."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--runtime-feedback",
+                    "source=user evidence=unclear",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("target=", result.stderr)
 
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
