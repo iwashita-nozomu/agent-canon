@@ -74,6 +74,14 @@ TOOL_GATES = {
             "documents/conventions/python/07_type_checker.md",
         ),
     ),
+    "log_helper_names": (
+        "tools/agent_tools/check_log_helper_names.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "documents/coding-conventions-logging.md",
+            "documents/conventions/common/02_naming.md",
+        ),
+    ),
     "oop_readability": (
         "tools/agent_tools/analyze_oop_readability.py",
         (

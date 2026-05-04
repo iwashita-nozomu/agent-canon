@@ -1167,7 +1167,17 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             check=True,
         )
         (work_dir / "README.md").write_text("# AgentCanon\n", encoding="utf-8")
-        subprocess.run(["git", "add", "README.md"], cwd=work_dir, check=True)
+        (work_dir / ".github" / "workflows").mkdir(parents=True)
+        (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
+        (work_dir / ".github" / "workflows" / "agent-coordination.yml").write_text(
+            "name: agent coordination\n",
+            encoding="utf-8",
+        )
+        (work_dir / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md").write_text(
+            "# AgentCanon PR\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "add", "README.md", ".github"], cwd=work_dir, check=True)
         subprocess.run(["git", "commit", "-m", "initial agent canon"], cwd=work_dir, check=True)
         subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
         subprocess.run(
@@ -1232,6 +1242,38 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertNotIn("Not a valid commit name", plan.stderr)
             self.assertIn("agent_canon_plan_prefix_mode=submodule", plan.stdout)
             self.assertIn("agent_canon_plan_route=submodule_update", plan.stdout)
+
+    def test_apply_updates_submodule_pin_with_untracked_root_file(self) -> None:
+        """Apply should update the gitlink without requiring unrelated root cleanup."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            (repo / "UNTRACKED_ROOT_FILE").write_text("root dirty\n", encoding="utf-8")
+
+            apply = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "apply"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(apply.returncode, 0, apply.stderr)
+            self.assertIn("agent_canon_latest=updating_submodule", apply.stdout)
+            self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertIn("?? UNTRACKED_ROOT_FILE", status)
 
     def test_push_proposal_pushes_submodule_head_even_when_root_has_untracked_files(self) -> None:
         """Proposal push should use the submodule HEAD instead of subtree split."""

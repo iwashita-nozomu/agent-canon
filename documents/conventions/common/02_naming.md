@@ -22,3 +22,5 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 - directory、branch、run_name、report 名のように検索性や運用手順へ効く名前は、script や口頭運用の中だけに閉じません。
 - repo 全体へ効く naming rule は `documents/` 配下の正本へ残し、topic 固有の naming rule は対応する `README.md` に残します。
 - experiment では少なくとも、topic 名、report 名、`result/<run_name>/` の構成、run_name 形式を文書に明記します。
+- Python のログ用 helper 関数は `documents/coding-conventions-logging.md` に従い、必ず `_log` から始めます。
+- ログ helper 命名は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` で検証します。

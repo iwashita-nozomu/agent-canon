@@ -37,7 +37,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--current",
         action="store_true",
-        help="Inspect the current workspace root instead of creating or resuming a branch worktree.",
+        help=(
+            "Inspect the current workspace root instead of creating or resuming "
+            "a branch worktree."
+        ),
     )
     parser.add_argument(
         "--no-log",
@@ -115,7 +118,11 @@ def resolve_existing_worktree(repo_root: Path, branch: str) -> Path | None:
     return None
 
 
-def ensure_branch_worktree(repo_root: Path, branch: str, worktree_path: str | None) -> tuple[Path, str]:
+def ensure_branch_worktree(
+    repo_root: Path,
+    branch: str,
+    worktree_path: str | None,
+) -> tuple[Path, str]:
     """Create or reuse the target branch worktree."""
     requested_path = (
         Path(worktree_path).expanduser().resolve()
@@ -223,7 +230,10 @@ def resolve_user_request_contract_path(workspace_root: Path, scope_file: Path) -
     """Return the user request contract path from WORKTREE_SCOPE.md when available."""
     sections = parse_sections(scope_file)
     for section_name in ("Working Notes During Execution", "Kickoff Status"):
-        raw_value = extract_named_value(sections.get(section_name, []), "User request contract path")
+        raw_value = extract_named_value(
+            sections.get(section_name, []),
+            "User request contract path",
+        )
         if not raw_value or "<" in raw_value or "<run-id>" in raw_value:
             continue
         token = raw_value.split("`")
@@ -238,7 +248,7 @@ def resolve_user_request_contract_path(workspace_root: Path, scope_file: Path) -
     return None
 
 
-def append_action_log_entry(action_log_path: Path, entry: str) -> None:
+def _log_action_entry(action_log_path: Path, entry: str) -> None:
     """Append one entry to the action log, creating a minimal file when missing."""
     action_log_path.parent.mkdir(parents=True, exist_ok=True)
     if not action_log_path.exists():
@@ -247,6 +257,11 @@ def append_action_log_entry(action_log_path: Path, entry: str) -> None:
         if action_log_path.stat().st_size > 0:
             handle.write("\n")
         handle.write(f"- {entry}\n")
+
+
+def append_action_log_entry(action_log_path: Path, entry: str) -> None:
+    """Append one entry to the action log."""
+    _log_action_entry(action_log_path, entry)
 
 
 def summarize_scope_presence(repo_root: Path) -> list[str]:
@@ -270,7 +285,11 @@ def main() -> int:
         workspace_root = starting_root
         status = "current-workspace"
     elif args.branch is not None:
-        workspace_root, status = ensure_branch_worktree(starting_root, args.branch, args.worktree_path)
+        workspace_root, status = ensure_branch_worktree(
+            starting_root,
+            args.branch,
+            args.worktree_path,
+        )
     else:
         workspace_root = starting_root
         status = "current-workspace"
@@ -280,12 +299,17 @@ def main() -> int:
         bootstrap_worktree_notes(starting_root, workspace_root, branch)
     scope_file = workspace_root / "WORKTREE_SCOPE.md"
     findings = lint_scope(workspace_root)
-    action_log_path = resolve_action_log_path(workspace_root, scope_file) if scope_file.is_file() else None
+    action_log_path = (
+        resolve_action_log_path(workspace_root, scope_file) if scope_file.is_file() else None
+    )
 
     if action_log_path is not None and not args.no_log:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")
-        entry = f"`{timestamp} | {status} | branch={branch} worktree={workspace_root} | next: refresh scope and kickoff checks`"
-        append_action_log_entry(action_log_path, entry)
+        entry = (
+            f"`{timestamp} | {status} | branch={branch} "
+            f"worktree={workspace_root} | next: refresh scope and kickoff checks`"
+        )
+        _log_action_entry(action_log_path, entry)
 
     print(f"WORKTREE_STATUS={status}")
     print(f"WORKSPACE_ROOT={workspace_root}")
@@ -306,7 +330,8 @@ def main() -> int:
     print("  1. Confirm action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
     print(
-        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> --message '<what changed>' --next '<next>' after each meaningful step."
+        "  3. Use python3 tools/agent_tools/work_log.py --kind <kind> "
+        "--message '<what changed>' --next '<next>' after each meaningful step."
     )
     print("  4. Start editing only after the kickoff record is updated.")
     return 0

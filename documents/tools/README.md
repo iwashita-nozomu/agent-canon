@@ -98,6 +98,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/check_static_any.py`
   - Python source の明示的な `typing.Any` を検出します。`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にし、外部境界は `object`、`Mapping[str, object]`、`TypedDict`、または typed dataclass に寄せます。
+- `tools/agent_tools/check_log_helper_names.py`
+  - Python source のログ用 helper 関数名を検出します。ログを書き出す、emit する、保存する、整形する helper は `_log` から始め、`write_log_*` や `append_log_*` のような prefix を fail にします。
 - `tools/agent_tools/analyze_oop_readability.py`
   - Python / C++ の OOP readability を機械判定します。外部 repo や派生 template snapshot を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
 - `tools/agent_tools/check_algorithm_module_public_surface.py`

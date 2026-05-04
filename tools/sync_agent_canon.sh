@@ -880,13 +880,17 @@ cmd_ensure_latest() {
   if is_submodule_prefix; then
     local remote_url=""
     local local_commit=""
+    local worktree_commit=""
+    local submodule_status=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
     git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch"
     remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     local_commit="$(submodule_commit)"
+    worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     echo "agent_canon_local_submodule=$local_commit"
+    echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
     if [ "$local_commit" = "$remote_sha" ]; then
       echo "agent_canon_latest=already_current_submodule"
@@ -906,11 +910,19 @@ cmd_ensure_latest() {
       fi
       return
     fi
-    require_clean_worktree
+    submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+    if [ "$worktree_commit" != "$remote_sha" ] && [ -n "$submodule_status" ]; then
+      die "submodule '$PREFIX' is dirty; commit or clean it before updating"
+    fi
     echo "agent_canon_latest=updating_submodule"
-    git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
-    cmd_link_root 1
-    git -C "$ROOT_DIR" add "$PREFIX" .gitmodules
+    if [ "$worktree_commit" != "$remote_sha" ]; then
+      git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
+    fi
+    if [ -n "$(git -C "$ROOT_DIR" status --short -- "$PREFIX" .gitmodules)" ]; then
+      AGENT_CANON_FORCE_RELINK=1 cmd_link_root 1
+    else
+      cmd_link_root 1
+    fi
     commit_sync_paths_if_needed "$remote_sha" "submodule_update"
     return
   fi

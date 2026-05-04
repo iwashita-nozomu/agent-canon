@@ -6,6 +6,7 @@
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
 # upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
+# upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
@@ -145,6 +146,12 @@ if "$PYTHON_BIN" tools/agent_tools/check_static_any.py 2>&1; then
   echo "✅ explicit Any static checks 成功"
 else
   echo "❌ explicit Any static checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports 2>&1; then
+  echo "✅ log helper naming checks 成功"
+else
+  echo "❌ log helper naming checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/agent_tools/check_convention_compliance.py 2>&1; then

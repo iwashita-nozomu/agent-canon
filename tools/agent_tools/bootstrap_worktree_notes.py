@@ -100,7 +100,10 @@ def fill_scope_file(
         ("- Action log path:", f"`{action_log_rel}`"),
         ("- Branch summary path:", f"`{branch_summary_rel}`"),
         ("- Kickoff checks completed:", "`pending`"),
-        ("- Next step after kickoff:", "refresh references and append the first execution log entry"),
+        (
+            "- Next step after kickoff:",
+            "refresh references and append the first execution log entry",
+        ),
         ("- `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`", f"`{action_log_rel}`"),
         ("- `notes/branches/<branch_topic>.md`", f"`{branch_summary_rel}`"),
     )
@@ -109,7 +112,7 @@ def fill_scope_file(
     scope_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def ensure_worktree_log(path: Path, *, branch: str, workspace_root: Path, purpose: str) -> None:
+def _log_ensure_worktree(path: Path, *, branch: str, workspace_root: Path, purpose: str) -> None:
     """Create the worktree log from the template when missing."""
     if path.exists():
         return
@@ -128,7 +131,8 @@ def ensure_worktree_log(path: Path, *, branch: str, workspace_root: Path, purpos
             "- Current state: kickoff",
             "- Scope file: `WORKTREE_SCOPE.md`",
             f"- Branch summary path: `notes/branches/{topic_slug(branch)}.md`",
-            f"- Main carry-over targets: `notes/worktrees/worktree_{topic_slug(branch)}_{today}.md`",
+            "- Main carry-over targets: "
+            f"`notes/worktrees/worktree_{topic_slug(branch)}_{today}.md`",
             "",
             "## Kickoff Record",
             "",
@@ -222,8 +226,18 @@ def main() -> int:
         owner=args.owner,
         force=args.force,
     )
-    ensure_worktree_log(action_log_path, branch=branch, workspace_root=workspace_root, purpose=args.purpose)
-    ensure_branch_summary(branch_summary_path, branch=branch, action_log_rel=action_log_rel, purpose=args.purpose)
+    _log_ensure_worktree(
+        action_log_path,
+        branch=branch,
+        workspace_root=workspace_root,
+        purpose=args.purpose,
+    )
+    ensure_branch_summary(
+        branch_summary_path,
+        branch=branch,
+        action_log_rel=action_log_rel,
+        purpose=args.purpose,
+    )
 
     print(f"ACTION_LOG={action_log_rel}")
     print(f"BRANCH_SUMMARY={branch_summary_rel}")

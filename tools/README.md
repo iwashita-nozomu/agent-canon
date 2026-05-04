@@ -65,6 +65,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/evaluate_skill_workflow_prompts.py`
   - `agent_tools/check_convention_compliance.py`
   - `agent_tools/check_static_any.py`
+  - `agent_tools/check_log_helper_names.py`
   - `agent_tools/agent_update_branch.sh`
 
 ## Agent Evaluation Tools
@@ -102,6 +103,15 @@ python3 tools/agent_tools/compare_codex_token_footprints.py \
   --baseline-session ~/.codex/sessions/<baseline>.jsonl \
   --candidate-session ~/.codex/sessions/<candidate>.jsonl \
   --report-out reports/agents/<run-id>/token_footprint.md
+```
+
+## Log Helper Naming Tool
+
+`check_log_helper_names.py` fails Python functions that look like logging helpers but do not start with `_log`.
+Use it when changing logging, report-writing, run-bundle, or JSONL helper code.
+
+```bash
+python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports
 ```
 
 ## Goal Loop Tool

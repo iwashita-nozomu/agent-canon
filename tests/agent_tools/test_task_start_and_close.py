@@ -115,7 +115,7 @@ def write_ready_schedule(report_dir: Path) -> None:
     )
 
 
-def write_ready_work_log(report_dir: Path) -> None:
+def _log_ready_work(report_dir: Path) -> None:
     """Write a filled work-log artifact."""
     (report_dir / "work_log.md").write_text(
         "\n".join(
@@ -261,7 +261,7 @@ def write_ready_closeout_bundle(
         encoding="utf-8",
     )
     write_ready_schedule(report_dir)
-    write_ready_work_log(report_dir)
+    _log_ready_work(report_dir)
     write_ready_agent_evaluation(report_dir)
 
 
@@ -663,7 +663,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -787,7 +787,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
@@ -1177,7 +1177,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -1271,7 +1271,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -1384,7 +1384,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
@@ -1476,7 +1476,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             write_ready_schedule(report_dir)
-            write_ready_work_log(report_dir)
+            _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_diff_check_artifact(report_dir)
 

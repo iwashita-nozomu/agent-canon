@@ -25,7 +25,11 @@ from worktree_start import (
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description="Append one action-log entry.")
-    parser.add_argument("--workspace-root", default=".", help="Workspace root that owns WORKTREE_SCOPE.md.")
+    parser.add_argument(
+        "--workspace-root",
+        default=".",
+        help="Workspace root that owns WORKTREE_SCOPE.md.",
+    )
     parser.add_argument("--report-dir", help="Explicit run bundle directory to update.")
     parser.add_argument("--run-id", help="Run id under reports/agents/.")
     parser.add_argument(
@@ -35,7 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
             "<workspace-root>/reports/agents."
         ),
     )
-    parser.add_argument("--kind", default="work", help="Short event kind, for example kickoff/test/edit/review.")
+    parser.add_argument(
+        "--kind",
+        default="work",
+        help="Short event kind, for example kickoff/test/edit/review.",
+    )
     parser.add_argument("--message", required=True, help="What happened in this step.")
     parser.add_argument("--next", default="", help="Explicit next step.")
     parser.add_argument(
@@ -66,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def append_run_work_log_entry(report_dir: Path, entry: str) -> Path:
+def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
     """Append one entry to the run-bundle work log."""
     report_dir.mkdir(parents=True, exist_ok=True)
     work_log_path = report_dir / "work_log.md"
@@ -136,7 +144,8 @@ def main() -> int:
             )
         if report_dir is None:
             raise SystemExit(
-                "Missing clause ids are only allowed when --report-dir or --run-id resolves a run bundle."
+                "Missing clause ids are only allowed when --report-dir or --run-id "
+                "resolves a run bundle."
             )
 
     if action_log_path is None and report_dir is None:
@@ -164,7 +173,7 @@ def main() -> int:
         append_action_log_entry(action_log_path, entry)
     work_log_path: Path | None = None
     if report_dir is not None:
-        work_log_path = append_run_work_log_entry(report_dir, entry)
+        work_log_path = _log_run_work_entry(report_dir, entry)
     print(f"ACTION_LOG={action_log_path if action_log_path is not None else '(not-written)'}")
     print(f"WORK_LOG={work_log_path if work_log_path is not None else '(not-written)'}")
     print(entry)
