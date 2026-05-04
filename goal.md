@@ -10,40 +10,87 @@ downstream implementation tools/agent_tools/goal_loop.py consumes this contract
 
 ## Loop Contract
 
-- goal_status: achieved
+- goal_status: active
 - run_safety_cap: 5
 - current_iteration: 0
-- active_run_id: 20260503-074518-add-convention-compliance-verifier-and-w
+- active_run_id: 20260504-todo-goal-workflow
 - stop_reason:
 
 ## Objective
 
-Create a convention-compliance verifier that maps repository conventions and
-workflow prohibitions to concrete mechanical gates. Ensure every workflow prompt
-calls the verifier, skill-routing prompts invoke the appropriate skills, prompt
-evals verify that routing, and tool-owned checks replace duplicated prompt-only
-instructions where practical.
+Turn the TODO list into a repeatable goal loop that:
+
+1. dynamically routes coding work to the cheapest suitable model while keeping
+   code-reading tasks on `gpt-5.3-codex-spark`;
+1. standardizes slide production on a fixed PPT template that can combine text,
+   equations, generated images, and references without layout drift;
+1. strengthens hypothesis-validation so every slice starts with a read/survey
+   pass, a checklist, and tool creation before edits;
+1. repairs coding prompts when tools discard or rewrite changes after edit
+   attempts; and
+1. produces one cumulative quantitative closeout report that records each step's
+   intent, path, evidence, and intermediate results.
+
+## Workflow
+
+1. Intake the TODO, write the goal contract, and mirror the same objective into
+   the run bundle and Codex goal view.
+1. Use `goal_loop.py status` and `goal_loop.py plan` to turn the goal into a
+   concrete work breakdown before editing.
+1. For each slice, follow `plan -> implementation -> evidence -> next-action`.
+1. For the model-routing slice, survey existing routing prompts and adjust the
+   orchestration so simple coding can be delegated to a cheaper model while
+   code-reading stays on Spark.
+1. For the slide slice, lock the PPT template, then wire image generation,
+   textual content, equation content, and reference placement into the same
+   workflow.
+1. For the hypothesis-validation slice, require repo/document reading,
+   checklist creation, reusable tool selection, and post-rejection analysis
+   before any edit.
+1. For the coding-prompt slice, record which tools rejected or rewrote code,
+   then revise the coding workflow prompts and evals to remove the failure mode.
+1. For the reporting slice, append the intent, path, validation, and result of
+   each step into one cumulative closeout report.
+1. Keep each iteration narrow enough to complete one cohesive slice, but large
+   enough to include validation and evidence.
+1. When `goal_loop.py status` and MCP `goal.loop_status` both report
+   `NEXT_ACTION=close_goal_loop`, move to normal closeout gates.
 
 ## Exit Criteria
 
-- [x] G1: Repository dependency review passes with `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`.
-- [x] G2: A convention-compliance verifier exists, is tested, and checks convention source inventory, workflow prohibition hooks, workflow verifier invocation, skill routing hooks, and tool-gate wiring.
-- [x] G3: Every workflow prompt in `agents/workflows/*.md` calls `check_convention_compliance.py` before closeout or handoff.
-- [x] G4: Skill-routing prompts and evals verify `$agent-orchestration` first, task-shape skill selection, and convention-compliance gate usage.
-- [x] G5: Tool-owned convention checks are documented as mechanical gates so prompt surfaces do not duplicate detailed tool logic.
-- [x] G6: Prompt evals, targeted tests, convention verifier, dependency review, and template `make ci` pass after snapshot update.
-- [x] G7: AgentCanon main and template snapshot branch are updated and pushed.
-- [x] G8: Explicit Python `Any` usage is banned by a repo-wide static checker, CI wiring, convention documentation, and template validation.
+- [ ] G1: The goal contract, workflow, and backlog are written from the TODO
+  list and can be parsed by `goal_loop.py status`.
+- [ ] G2: Model-routing workflow and prompt surfaces route simple coding to the
+  cheapest suitable model while keeping code-reading on Spark.
+- [ ] G3: Slide workflow uses a fixed PPT template and supports text, equation,
+  image, and reference placement with layout review.
+- [ ] G4: Hypothesis-validation workflow enforces read-first survey, checklist
+  creation, tool selection, and quantitative plus qualitative rejection
+  analysis before edits.
+- [ ] G5: Coding workflow prompts are revised when tools discard or rewrite
+  changes, and the repair path is covered by evals.
+- [ ] G6: The goal run produces a cumulative quantitative closeout report that
+  records per-step intent, path, evidence, and intermediate results.
+- [ ] G7: Repository dependency review, prompt evals, and template `make ci`
+  pass after snapshot update.
+- [ ] G8: AgentCanon main and the template snapshot branch are updated and
+  pushed.
 
 ## Backlog
 
-- [x] B1: Build a prompt-to-artifact checklist for every explicit requirement in the objective.
-- [x] B2: Inventory convention docs, workflow prohibition sources, existing tools, and prompt eval surfaces.
-- [x] B3: Implement the smallest verifier that checks the current manifestable convention gates.
-- [x] B4: Add tests and prompt eval coverage for workflow verifier hooks and skill-call routing.
-- [x] B5: Update workflow / skill prompts to call the verifier and remove or centralize tool-owned details where practical.
-- [x] B6: Run AgentCanon validation, sync template snapshot, run template validation, and close only after `NEXT_ACTION=close_goal_loop`.
-- [x] B7: Add the explicit-Any checker, remove existing explicit `Any` usage, validate, sync template snapshot, and push both repos.
+- [ ] B1: Draft the goal work breakdown from the TODO into checkable work
+  units, owner notes, and evidence hints.
+- [ ] B2: Survey existing routing, slide, hypothesis, coding, and reporting
+  surfaces before editing anything.
+- [ ] B3: Implement the model-routing slice and its eval coverage first.
+- [ ] B4: Implement the slide-workflow slice with template locking and layout
+  validation.
+- [ ] B5: Implement the hypothesis-validation and coding-prompt repair slices
+  with tool and eval updates.
+- [ ] B6: Implement the cumulative closeout report slice and wire it into the
+  goal loop.
+- [ ] B7: Run AgentCanon validation, sync the template snapshot, and close only
+  after `NEXT_ACTION=close_goal_loop`.
 
 ## Optional Goal Item Catalog
 
@@ -59,28 +106,6 @@ this objective.
 
 ## Loop Log
 
-- iteration 0: initialized goal for skill/workflow/eval feedback-loop repair and two-run execution path comparison.
-- iteration 0 result: added execution-path comparison tooling, behavior eval
-  failure for inefficient route selection, static-analysis feedback monitoring,
-  adaptive-improvement prompt repairs, and tool-index documentation. AgentCanon
-  main and the template snapshot branch were pushed during closeout.
-- iteration 0: initialized goal for code-improvement hypothesis-to-validation
-  flow strengthening across skill and workflow surfaces.
-- iteration 0 result: strengthened hypothesis-validation gates, dependency
-  analysis routing, adaptive-improvement skill guidance, and prompt eval
-  coverage. AgentCanon validation passed, the template snapshot was refreshed,
-  and template `make ci` passed before closeout.
-- iteration 0: initialized convention-compliance verifier objective with
-  workflow hook, skill-call eval, tool/prompt split, and template snapshot
-  closeout gates.
-- iteration 0 result: added `check_convention_compliance.py`, hardcoded-number
-  gate coverage, workflow positive-command checks, skill-call prompt evals,
-  behavior eval hooks, docs, tests, and CI wiring. AgentCanon validation passed,
-  the template snapshot was refreshed, and template `make ci` passed before
-  closeout.
-- iteration 1: reopened the convention-compliance goal for the additional
-  requirement that static analysis must also ban explicit Python `Any`.
-- iteration 1 result: added `check_static_any.py`, removed explicit `Any`
-  annotations/imports from checked Python source, wired the checker into CI and
-  convention compliance, exposed its template test symlink, refreshed the
-  template snapshot, and passed template `make ci`.
+- iteration 0: initialized goal from TODO items covering model routing, slide
+  workflow, hypothesis validation, coding prompt repair, and quantitative
+  closeout reporting.
