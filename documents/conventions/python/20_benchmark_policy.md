@@ -64,3 +64,7 @@ upstream design ../README.md convention index
 
 - experiment の配置方針を変えた場合は、[30_experiment_directory_structure.md](./30_experiment_directory_structure.md) と合わせて更新します。
 - 実験運用全体を変えた場合は [documents/coding-conventions-experiments.md](../../coding-conventions-experiments.md) も同時に更新します。
+
+## 検証
+
+- この文書の規範表現は `python3 tools/agent_tools/check_convention_compliance.py` の convention assertions inventory で確認します。

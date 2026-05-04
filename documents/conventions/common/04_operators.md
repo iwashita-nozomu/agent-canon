@@ -27,3 +27,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 - 作用素の適用は `@`、合成は `*` を基本とします。
 - 記法の混在は括弧で明示し、読み間違いを避けます。
 - 線形と非線形の区別、禁止事項、投影・前処理の細かい表記は言語別規約で定めます。
+
+## 検証
+
+- この文書の規範表現は `python3 tools/agent_tools/check_convention_compliance.py` の convention assertions inventory で確認します。

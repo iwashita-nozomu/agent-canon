@@ -156,6 +156,9 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - run 固有の intake、design、review、verification、retrospective は `reports/agents/<run-id>/` に置きます。
 - project-wide な分析や再利用する長文 report は `reports/` に置きます。
 - 一時メモや cross-run の補助知見は `notes/` に置きます。
+
+## 禁止事項
+
 - dated な completion summary や古い review 文書を `documents/` や repo root に残すことを禁止します。
 - current tree head 以外の design truth や implementation truth を tracked tree に残すことを禁止します。parallel design doc、implementation copy、snapshot tree、backup file は削除対象です。
 

@@ -103,3 +103,13 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - 実験結果のような生成物は `./reviews/` ではなく `experiments/.../results/` で管理します。
 - 実験環境の運用ルールは `coding-conventions-experiments.md` に書きます。
 - プロジェクト全体の branch / worktree 運用は `coding-conventions-project.md` に書きます。
+
+## 10. 禁止事項
+
+- `reviews/` 以外へ新規レビュー文書を置くことを禁止します。
+- `main` と worktree の指摘を同じ事実として混ぜることを禁止します。
+- review directory を履歴保管庫として使うことを禁止します。
+
+## 11. 検証
+
+- この文書の規範表現、禁止表現、検証経路は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。

@@ -133,6 +133,20 @@ PROMPT_EVAL_MARKERS = (
     "CONVENTION-WORKFLOW",
     "CONVENTION-SKILL",
 )
+NORMATIVE_RE = re.compile(
+    r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
+    r"must|must not|required|forbidden)",
+    flags=re.IGNORECASE,
+)
+PROHIBITION_RE = re.compile(
+    r"(?m)^\s*[-*]\s+.*(?:を禁止|禁止します|してはいけません|must not|forbidden)",
+    flags=re.IGNORECASE,
+)
+VERIFICATION_RE = re.compile(
+    r"(?:tools/|check_|pyright|pytest|ruff|make ci|make agent-checks|"
+    r"CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)"
+)
+PROHIBITION_SECTION_RE = re.compile(r"(?m)^#{2,6}\s+(?:.*禁止事項|Close-Out Prohibitions)")
 
 
 @dataclass(frozen=True)
@@ -285,6 +299,34 @@ def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     return findings
 
 
+def check_convention_assertions(root: Path) -> list[Finding]:
+    """Verify convention documents expose checkable normative assertions."""
+    findings: list[Finding] = []
+    for path in CONVENTION_SOURCES:
+        full_path = root / path
+        if not full_path.is_file():
+            continue
+        text = full_path.read_text(encoding="utf-8")
+        normative_lines = NORMATIVE_RE.findall(text)
+        if normative_lines and not VERIFICATION_RE.search(text):
+            findings.append(
+                Finding(
+                    "convention_assertions",
+                    path,
+                    "normative-lines-without-verification-route",
+                )
+            )
+        if PROHIBITION_RE.search(text) and not PROHIBITION_SECTION_RE.search(text):
+            findings.append(
+                Finding(
+                    "convention_assertions",
+                    path,
+                    "prohibition-lines-without-prohibition-section",
+                )
+            )
+    return findings
+
+
 def run_checks(root: Path) -> list[Finding]:
     """Run all convention compliance wiring checks."""
     findings: list[Finding] = []
@@ -296,6 +338,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_closeout_prohibitions(root))
     findings.extend(check_prompt_eval_wiring(root))
+    findings.extend(check_convention_assertions(root))
     return sorted(
         findings,
         key=lambda finding: (finding.check, finding.path, finding.detail),

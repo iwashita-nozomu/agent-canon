@@ -31,6 +31,11 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-
 - 互換 alias を置いて一時しのぎにせず、参照箇所をまとめて更新して型境界を 1 系統に保ちます。
 - `pyright: ignore` / `# type: ignore` の使用は避け、型注釈や設計側で解消します。
 
+## 禁止事項
+
+- 明示的な `typing.Any` を repo-wide に禁止します。
+- 型注釈や設計側で解消できる `pyright: ignore` / `# type: ignore` を禁止します。
+
 ## 実行例
 
 - baseline 全体: `pyright`

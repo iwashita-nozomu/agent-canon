@@ -365,8 +365,13 @@ def improvement_decisions_complete(evidence: RunEvidence) -> bool:
 def orchestration_evidence_present(evidence: RunEvidence) -> bool:
     """Return whether pre-design orchestration signals are present."""
     signals_text = evidence.signals_text
+    behavior_events_text = evidence.behavior_events_text
     return (
         has_any(signals_text, ("skills=", "$agent-orchestration"))
+        and has_any(
+            behavior_events_text,
+            ("skill_invocation=", "skill_invocation_not_required"),
+        )
         and has_any(
             signals_text,
             ("subagent", "stage owner", "parent_direct_reason", "trivial_direct_edit"),

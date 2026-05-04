@@ -115,6 +115,37 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["findings"])
 
+    def test_normative_convention_without_verification_route_fails(self) -> None:
+        """A convention source with normative assertions needs a verification route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / "documents" / "coding-conventions-python.md").write_text(
+                "# Python\n\n- 公開関数には型注釈が必須です。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("normative-lines-without-verification-route", result.stdout)
+
+    def test_prohibition_without_prohibition_section_fails(self) -> None:
+        """A convention source with prohibitions needs a prohibition section."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / "documents" / "coding-conventions-python.md").write_text(
+                "# Python\n\n- 型なし公開関数を禁止します。\n\n"
+                "## 検証\n\n- `python3 -m pyright`\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("prohibition-lines-without-prohibition-section", result.stdout)
+
     def copy_minimal_repo(self, root: Path) -> None:
         """Create the minimum tree needed by the checker."""
         files = {

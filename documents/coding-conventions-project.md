@@ -73,6 +73,13 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - C++ build は必ず out-of-source にし、`build/cpp/<profile>/` を使わなければなりません。
 - 再利用する local install tree は `.state/cpp-install/<profile>/`、再利用する local `jax.export` artifact は `.state/jax-export/<profile>/` に置かなければなりません。
 
+## 禁止事項
+
+- run-time entrypoint や ad hoc env だけで `safe.directory` を後付けすることを禁止します。
+- host-global install を repo の正本手順として採用することを禁止します。
+- CI でも使う tool を、手元だけの補助 install として導入することを禁止します。
+- `src/` や `include/` の下に別 CMake root を増やすことを禁止します。
+
 ## 5. テストとレビュー
 
 - 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。

@@ -22,6 +22,9 @@ layout と build tree の正本は [cpp-build-layout.md](cpp-build-layout.md) �
 - template 既定の C++ 実装形態は header-only にします。
 - root `CMakeLists.txt` を canonical entrypoint にします。
 - `cmake/` は helper module、`include/` は public header 兼 template 既定の実装置き場、`tests/cpp/` は test/smoke source に固定します。
+
+## 禁止事項
+
 - `src/` は header-only で収まらない特例実装だけに使います。新規 template 利用で最初から `src/` に実装を書くことを禁止します。
 - in-source build を禁止します。`build/cpp/<profile>/` を使います。
 
