@@ -577,6 +577,8 @@ def evaluate_behavior_criterion(
     item: BehaviorCriterion,
 ) -> CriterionResult:
     """Evaluate one manifest-defined behavior criterion."""
+    if item.name == "token_efficiency_recorded":
+        return evaluate_token_efficiency_criterion(text, item)
     missing_all = tuple(token for token in item.required_all if token.lower() not in text)
     any_passed = not item.required_any or has_any(text, item.required_any)
     forbidden_hits = tuple(
@@ -588,6 +590,44 @@ def evaluate_behavior_criterion(
         item.max_score,
         passed,
         behavior_feedback(item, missing_all, any_passed, forbidden_hits),
+    )
+
+
+def evaluate_token_efficiency_criterion(
+    text: str,
+    item: BehaviorCriterion,
+) -> CriterionResult:
+    """Evaluate token-efficiency evidence with an explicit opt-out."""
+    active_tokens = (
+        "token_efficiency_protocol=active",
+        "token_footprint_comparison=",
+        "TOKEN_FOOTPRINT_COMPARISON=",
+        "token_ratio=",
+        "TOKEN_FOOTPRINT_RATIO=",
+    )
+    if has_any(text, active_tokens):
+        missing_all = tuple(
+            token for token in item.required_all if token.lower() not in text
+        )
+        any_passed = not item.required_any or has_any(text, item.required_any)
+        forbidden_hits = tuple(
+            token for token in item.forbidden_any if token.lower() in text
+        )
+        passed = not missing_all and any_passed and not forbidden_hits
+        return criterion(
+            f"behavior::{item.name}",
+            item.max_score,
+            passed,
+            behavior_feedback(item, missing_all, any_passed, forbidden_hits),
+        )
+    opt_out_passed = has_any(text, ("token_efficiency_not_required",))
+    return criterion(
+        f"behavior::{item.name}",
+        item.max_score,
+        opt_out_passed,
+        item.feedback
+        if opt_out_passed
+        else f"{item.feedback} (missing opt-out token: token_efficiency_not_required)",
     )
 
 

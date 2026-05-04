@@ -14,6 +14,10 @@ This overlay keeps repo work rigorous while reducing unnecessary context,
 subagent fan-out, and tool-output token load. Use it when the user asks to save
 tokens, when a task is small, or when the current session is already long.
 
+Token reduction is treated as a measurable claim: compare a baseline session footprint
+against the candidate slice, record the ratio, and keep only the changes that preserve
+skill accuracy while cutting total tokens by at least half for the same eval envelope.
+
 ## Runtime Profiles
 
 Use Codex profiles as parent-session modes:
@@ -82,6 +86,20 @@ Mode selection rules:
   `verification.txt` as durable memory instead of repeating long chat context.
 - Use `tool_output_token_limit` profiles to keep large command output from
   flooding the session; rerun targeted commands when exact lines are needed.
+
+## Token Reduction Protocol
+
+- Capture a baseline Codex session footprint before changing prompts or
+  workflows.
+- Capture a candidate footprint after the change using the same skill / workflow
+  eval envelope.
+- Compare the two with `tools/agent_tools/compare_codex_token_footprints.py`.
+- Record the baseline session, candidate session, total tokens, and token ratio
+  in `workflow_monitoring.md`.
+- Treat `token_ratio <= 0.5` as the target, but do not accept the reduction if
+  the relevant prompt or behavior eval regresses.
+- If a reduction is achieved by narrowing context too far, continue until the
+  skill or behavior evals still pass for the same surface.
 
 ## Escalation Triggers
 

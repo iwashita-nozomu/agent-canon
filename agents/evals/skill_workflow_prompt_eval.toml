@@ -495,6 +495,19 @@ critical = true
 description = "Keeps validation and closeout gates mandatory."
 required_regex = ["does not relax", "dependency review", "closeout gates"]
 
+[[evals.checklist]]
+id = "TOKEN-WF-4"
+critical = true
+description = "Requires measurable token footprint comparison with a 50 percent target."
+required_regex = [
+  "Token Reduction Protocol",
+  "compare_codex_token_footprints\\.py",
+  "baseline session footprint",
+  "candidate footprint",
+  "token_ratio <= 0.5",
+  "skill accuracy",
+]
+
 [[evals]]
 id = "codex-config-shared-features"
 target = ".codex/config.toml"

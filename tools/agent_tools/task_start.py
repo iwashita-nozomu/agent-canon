@@ -337,6 +337,9 @@ def main() -> int:
             interventions=[
                 f"created run bundle and workflow_monitoring.md at {report_dir}",
             ],
+            behavior_events=[
+                "token_efficiency_not_required reason=task_start_default",
+            ],
         )
         print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
         print(f"CREATED_FILES={','.join(created_files)}")

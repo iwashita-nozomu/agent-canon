@@ -62,6 +62,22 @@ forbidden_any = [
 ]
 
 [[criteria]]
+name = "token_efficiency_recorded"
+max_score = 5
+feedback = "Record baseline and candidate token footprints plus the measured ratio in workflow monitoring."
+required_any = [
+  "token_footprint_comparison=",
+  "TOKEN_FOOTPRINT_COMPARISON=",
+  "token_ratio=",
+  "TOKEN_FOOTPRINT_RATIO=",
+  "token_efficiency_not_required",
+]
+required_all = [
+  "baseline_total",
+  "candidate_total",
+]
+
+[[criteria]]
 name = "prompt_eval_behavior_recorded"
 max_score = 5
 feedback = "Record prompt eval baseline/rerun behavior for skill or workflow prompt changes."

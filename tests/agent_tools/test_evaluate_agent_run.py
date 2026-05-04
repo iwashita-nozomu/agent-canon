@@ -100,6 +100,7 @@ def write_ready_run(report_dir: Path) -> None:
                 "- review_decision=approve feedback_actions_resolved=yes",
                 "- subagent_lifecycle=closed subagents_closed=yes",
                 "- diff_check_not_required reason=unit-test-run-bundle",
+                "- token_efficiency_not_required reason=unit-test-run-bundle",
                 "## Interventions",
                 (
                     "- Monitoring kept implementation local and required dependency review "

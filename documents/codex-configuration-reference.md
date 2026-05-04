@@ -77,19 +77,19 @@ goals = true
 model_reasoning_effort = "low"
 plan_mode_reasoning_effort = "low"
 model_verbosity = "low"
-tool_output_token_limit = 6000
+tool_output_token_limit = 3000
 
 [profiles.token-standard]
 model_reasoning_effort = "medium"
 plan_mode_reasoning_effort = "medium"
 model_verbosity = "medium"
-tool_output_token_limit = 12000
+tool_output_token_limit = 6000
 
 [profiles.token-deep]
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 model_verbosity = "medium"
-tool_output_token_limit = 24000
+tool_output_token_limit = 12000
 
 [agents]
 max_threads = 24
@@ -609,19 +609,19 @@ Use profiles for operator modes:
 model_reasoning_effort = "low"
 plan_mode_reasoning_effort = "low"
 model_verbosity = "low"
-tool_output_token_limit = 6000
+tool_output_token_limit = 3000
 
 [profiles.token-standard]
 model_reasoning_effort = "medium"
 plan_mode_reasoning_effort = "medium"
 model_verbosity = "medium"
-tool_output_token_limit = 12000
+tool_output_token_limit = 6000
 
 [profiles.token-deep]
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 model_verbosity = "medium"
-tool_output_token_limit = 24000
+tool_output_token_limit = 12000
 
 [profiles.review]
 model = "gpt-5.5"

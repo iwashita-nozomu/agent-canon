@@ -84,6 +84,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
+`compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -96,6 +97,11 @@ python3 tools/agent_tools/compare_agent_run_paths.py \
   --baseline-run reports/agents/<run-a> \
   --candidate-run reports/agents/<run-b> \
   --report-out reports/agents/<run-b>/path_comparison.md
+
+python3 tools/agent_tools/compare_codex_token_footprints.py \
+  --baseline-session ~/.codex/sessions/<baseline>.jsonl \
+  --candidate-session ~/.codex/sessions/<candidate>.jsonl \
+  --report-out reports/agents/<run-id>/token_footprint.md
 ```
 
 ## Goal Loop Tool

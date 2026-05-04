@@ -62,9 +62,10 @@ Turn the TODO list into a repeatable goal loop that:
    refresh the template snapshot and repo-local runtime views from that source
    before any further feature edits.
 1. For the token-efficiency slice, choose the lowest safe parent profile and
-   agent mode, record the baseline token footprint, apply prompt/workflow
-   simplifications, then compare the same eval envelope again and keep only
-   changes that preserve skill accuracy while reducing tokens by at least half.
+   agent mode, record the baseline token footprint with
+   `compare_codex_token_footprints.py`, apply prompt/workflow simplifications,
+   then compare the same eval envelope again and keep only changes that
+   preserve skill accuracy while reducing tokens by at least half.
 1. Keep each iteration narrow enough to complete one cohesive slice, but large
    enough to include validation and evidence.
 1. When `goal_loop.py status` and MCP `goal.loop_status` both report
@@ -91,7 +92,8 @@ Turn the TODO list into a repeatable goal loop that:
   views are updated and pushed through the canonical update lane.
 - [ ] G9: The token-efficient workflow slice shows at least 50% lower token
   usage for the same skill/workflow eval envelope, while skill and behavior
-  evals remain pass and no inefficient route is selected.
+  evals remain pass, `compare_codex_token_footprints.py` reports a ratio at or
+  below 0.5, and no inefficient route is selected.
 
 ## Backlog
 
@@ -107,7 +109,7 @@ Turn the TODO list into a repeatable goal loop that:
 - [ ] B6: Implement the AgentCanon main unification and template snapshot
   synchronization slice through the canonical branch lane.
 - [ ] B7: Implement the token-efficiency reduction slice and record the baseline
-  and comparison evidence.
+  and comparison evidence with `compare_codex_token_footprints.py`.
 - [ ] B8: Implement the cumulative closeout report slice and wire it into the
   goal loop.
 - [ ] B9: Run AgentCanon validation, sync the template snapshot, and close only
