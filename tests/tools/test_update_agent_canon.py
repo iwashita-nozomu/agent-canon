@@ -1215,7 +1215,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             cwd=repo,
             check=True,
         )
-        subprocess.run(["git", "add", ".gitmodules", "tools", "vendor/agent-canon"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "add", ".gitmodules", "tools", "vendor/agent-canon"],
+            cwd=repo,
+            check=True,
+        )
         subprocess.run(["git", "commit", "-m", "add submodule"], cwd=repo, check=True)
         return repo
 
