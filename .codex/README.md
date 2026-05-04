@@ -53,17 +53,17 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
   - `model_reasoning_effort = "low"`
   - `plan_mode_reasoning_effort = "low"`
   - `model_verbosity = "low"`
-  - `tool_output_token_limit = 6000`
+  - `tool_output_token_limit = 2000`
 - `token-standard`
   - `model_reasoning_effort = "medium"`
   - `plan_mode_reasoning_effort = "medium"`
   - `model_verbosity = "medium"`
-  - `tool_output_token_limit = 12000`
+  - `tool_output_token_limit = 3000`
 - `token-deep`
   - `model_reasoning_effort = "high"`
   - `plan_mode_reasoning_effort = "high"`
   - `model_verbosity = "medium"`
-  - `tool_output_token_limit = 24000`
+  - `tool_output_token_limit = 6000`
 
 Use `codex -p token-lite` for narrow diagnosis, `codex -p token-standard` for
 normal staged repo work, and `codex -p token-deep` for architecture, research,
@@ -129,7 +129,7 @@ or high-risk review. Profiles do not waive workflow gates.
   - `project_reviewer`
   - `report_reviewer`
   - perspective reviewer 全般
-- `gpt-5.3-codex-spark` + `medium`
+- `gpt-5.3-codex-spark` + `low`
   - `explorer`
   - `test_designer`
   - `python_reviewer`
@@ -137,7 +137,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - design-traced narrow implementation default
   - `gpt-5.3-codex-spark`
     - `spark_worker`
-- code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `medium` reasoning effort to keep output bounded
+- code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `low` reasoning effort to keep output bounded
 - broad or ambiguous implementation fallback
   - `gpt-5.5`
     - `worker`

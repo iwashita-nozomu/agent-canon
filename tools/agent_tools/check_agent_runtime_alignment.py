@@ -127,8 +127,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "medium",
-            f"{role_id} model_reasoning_effort must be medium",
+            config.get("model_reasoning_effort") == "low",
+            f"{role_id} model_reasoning_effort must be low",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,
@@ -148,8 +148,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "medium",
-            f"{role_id} model_reasoning_effort must be medium",
+            config.get("model_reasoning_effort") == "low",
+            f"{role_id} model_reasoning_effort must be low",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,

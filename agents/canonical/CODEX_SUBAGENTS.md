@@ -32,7 +32,7 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の default は、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5` `high`、code survey / static test design / language-specific code review を `gpt-5.3-codex-spark` `medium`、design-traced narrow implementation slice を `gpt-5.3-codex-spark` `medium` に分ける
+- Codex の default は、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5` `high`、code survey / static test design / language-specific code review を `gpt-5.3-codex-spark` `low`、design-traced narrow implementation slice を `gpt-5.3-codex-spark` `low` に分ける
 - `gpt-5.3-codex-spark` は `spark_worker` で使い、approved design packet で完全に切れる低リスク slice の first implementation candidate とする
 - 設計・レビュー・scope 判断、曖昧な実装判断、multi-surface conflict resolution は `gpt-5.5` 側に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
@@ -236,13 +236,13 @@ Constraints:
 | Requirements / Planning / Detailed Design / Long-Form Writing | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer` | `gpt-5.5` | `high` |
 | Research Synthesis / Workflow Canon Docs | `literature_researcher`, `docs_workflow_steward` | `gpt-5.5` | `high` |
 | Broad Or Ambiguous Implementation | `worker` | `gpt-5.5` | `high` |
-| Codebase Survey / Test Design / Language-Specific Code Review | `explorer`, `test_designer`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex-spark` | `medium` |
-| Low-Latency Narrow Implementation | `spark_worker` | `gpt-5.3-codex-spark` | `medium` |
+| Codebase Survey / Test Design / Language-Specific Code Review | `explorer`, `test_designer`, `python_reviewer`, `cpp_reviewer` | `gpt-5.3-codex-spark` | `low` |
+| Low-Latency Narrow Implementation | `spark_worker` | `gpt-5.3-codex-spark` | `low` |
 | Reviews And Final Judgment | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `document_flow_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `oop_readability_reviewer`, `reviewer`, `project_reviewer`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer` | `gpt-5.5` | `high` |
 
 運用メモ:
 - OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
-- この repo ではそれに合わせて、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5`、狭い code survey / static test design / language review を `gpt-5.3-codex-spark` `medium`、設計済み低リスク実装 slice を `gpt-5.3-codex-spark` `medium` に寄せます。
+- この repo ではそれに合わせて、文書・計画・research・review と broad / ambiguous implementation を `gpt-5.5`、狭い code survey / static test design / language review を `gpt-5.3-codex-spark` `low`、設計済み低リスク実装 slice を `gpt-5.3-codex-spark` `low` に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします

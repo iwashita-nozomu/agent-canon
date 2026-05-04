@@ -17,6 +17,9 @@ tokens, when a task is small, or when the current session is already long.
 Token reduction is treated as a measurable claim: compare a baseline session footprint
 against the candidate slice, record the ratio, and keep only the changes that preserve
 skill accuracy while cutting total tokens by at least half for the same eval envelope.
+The first lever is reasoning-effort reduction on narrow code-reading and bounded
+implementation roles; only after that should broader profile changes or output caps
+be considered.
 
 ## Runtime Profiles
 
