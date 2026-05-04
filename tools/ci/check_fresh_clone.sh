@@ -26,7 +26,7 @@ overlay_current_tree() {
   find "${CLONE_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   (
     cd "${ROOT_DIR}"
-    tar --exclude='./.git' -cf - .
+    tar --exclude='./.git' --exclude='*/.git' -cf - .
   ) | (
     cd "${CLONE_DIR}"
     tar -xf -
@@ -37,6 +37,10 @@ git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
+  rm -rf vendor/agent-canon
+  git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
+fi
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
   git config user.email "fresh-clone-check@example.invalid"
@@ -68,10 +72,14 @@ PY
 bash tools/sync_agent_canon.sh check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
-AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD 2>/dev/null \
-  || git subtree split --ignore-joins --prefix=vendor/agent-canon HEAD)"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
-git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
+  git -C vendor/agent-canon push "${AGENT_CANON_TEST_REMOTE}" "HEAD:refs/heads/main" >/dev/null
+else
+  AGENT_CANON_SPLIT_SHA="$(git subtree split --prefix=vendor/agent-canon HEAD 2>/dev/null \
+    || git subtree split --ignore-joins --prefix=vendor/agent-canon HEAD)"
+  git push "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_SPLIT_SHA}:refs/heads/main" >/dev/null
+fi
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
 git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
@@ -82,11 +90,17 @@ git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
   git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon snapshot" >/dev/null
   git push origin main >/dev/null
 )
-git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
+  git config -f .gitmodules submodule.vendor/agent-canon.url "${AGENT_CANON_TEST_REMOTE}"
+  git submodule sync vendor/agent-canon >/dev/null
+  git -C vendor/agent-canon remote set-url origin "${AGENT_CANON_TEST_REMOTE}"
+else
+  git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
+fi
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -q "agent_canon_plan_route=subtree_pull" "${TMP_DIR}/agent-canon-plan.txt"
+grep -Eq "agent_canon_plan_route=(subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
 bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
@@ -98,7 +112,7 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash tools/update_agent_canon.sh apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
 make agent-checks

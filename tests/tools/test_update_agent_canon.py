@@ -1146,5 +1146,143 @@ class UpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(status, "")
 
 
+@unittest.skipUnless(
+    AGENT_CANON_IS_SUBMODULE,
+    "submodule wrapper tests only apply when vendor/agent-canon is a submodule",
+)
+class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
+    """Exercise submodule-specific update routes."""
+
+    def make_agent_canon_remote(self, root: Path) -> tuple[Path, Path]:
+        """Create one bare AgentCanon remote and working clone."""
+        bare_repo = root / "agent-canon.git"
+        work_dir = root / "agent-canon-work"
+        subprocess.run(["git", "init", "--bare", str(bare_repo)], check=True)
+        subprocess.run(["git", "clone", str(bare_repo), str(work_dir)], check=True)
+        subprocess.run(["git", "switch", "-c", "main"], cwd=work_dir, check=True)
+        subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=work_dir, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "submodule-test@example.invalid"],
+            cwd=work_dir,
+            check=True,
+        )
+        (work_dir / "README.md").write_text("# AgentCanon\n", encoding="utf-8")
+        subprocess.run(["git", "add", "README.md"], cwd=work_dir, check=True)
+        subprocess.run(["git", "commit", "-m", "initial agent canon"], cwd=work_dir, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+        subprocess.run(
+            ["git", "--git-dir", str(bare_repo), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=True,
+        )
+        return bare_repo, work_dir
+
+    def make_superproject(self, root: Path, bare_repo: Path) -> Path:
+        """Create one derived repo with AgentCanon as a submodule."""
+        repo = root / "derived"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "submodule-test@example.invalid"],
+            cwd=repo,
+            check=True,
+        )
+        (repo / "tools").mkdir()
+        shutil.copy2(REPO_ROOT / "tools" / "sync_agent_canon.sh", repo / "tools")
+        shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", repo / "tools")
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "-b",
+                "main",
+                str(bare_repo),
+                "vendor/agent-canon",
+            ],
+            cwd=repo,
+            check=True,
+        )
+        subprocess.run(["git", "add", ".gitmodules", "tools", "vendor/agent-canon"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "add submodule"], cwd=repo, check=True)
+        return repo
+
+    def test_plan_reports_submodule_update_without_root_commit_lookup_errors(self) -> None:
+        """Plan should compare submodule commits inside the submodule repo."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertNotIn("Not a valid commit name", plan.stderr)
+            self.assertIn("agent_canon_plan_prefix_mode=submodule", plan.stdout)
+            self.assertIn("agent_canon_plan_route=submodule_update", plan.stdout)
+
+    def test_push_proposal_pushes_submodule_head_even_when_root_has_untracked_files(self) -> None:
+        """Proposal push should use the submodule HEAD instead of subtree split."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            (repo / "UNTRACKED_ROOT_FILE").write_text("root dirty\n", encoding="utf-8")
+
+            push = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "push-proposal", "canon-proposal/test"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(push.returncode, 0, push.stderr)
+            proposal_tree = subprocess.run(
+                [
+                    "git",
+                    "--git-dir",
+                    str(bare_repo),
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    "canon-proposal/test",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertIn("proposal-marker.txt", proposal_tree)
+
+
 if __name__ == "__main__":
     unittest.main()

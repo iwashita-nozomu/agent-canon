@@ -756,9 +756,9 @@ cmd_plan() {
   if [ "$prefix_mode" = "submodule" ]; then
     if [ "$local_tree" = "$remote_sha" ]; then
       route="already_current_submodule"
-    elif git -C "$ROOT_DIR" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
+    elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
       route="local_contains_remote"
-    elif git -C "$ROOT_DIR" merge-base --is-ancestor "$local_tree" "$remote_sha"; then
+    elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$local_tree" "$remote_sha"; then
       route="submodule_update"
       requires_clean="yes"
     else
@@ -971,9 +971,21 @@ cmd_ensure_latest() {
 cmd_push() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local local_split=""
-  require_clean_worktree
-  require_existing_remote
   [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
+  if is_submodule_prefix; then
+    local submodule_status=""
+    local remote_url=""
+    remote_url="$(submodule_remote_url)"
+    [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+    submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+    [ -z "$submodule_status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before pushing"
+    git -C "$ROOT_DIR/$PREFIX" rev-parse --verify HEAD^{commit} >/dev/null 2>&1 \
+      || die "submodule '$PREFIX' has no valid HEAD"
+    git -C "$ROOT_DIR/$PREFIX" push "$remote_url" "HEAD:refs/heads/${branch}"
+    return
+  fi
+  require_existing_remote
+  require_clean_worktree
   local_split="$(split_prefix_or_empty)"
   [ -n "$local_split" ] || die "could not split prefix '$PREFIX'"
   git -C "$ROOT_DIR" push "$REMOTE_NAME" "${local_split}:refs/heads/${branch}"
