@@ -2,15 +2,16 @@
 # @dependency-start
 # responsibility Provides agent canon preflight agent workflow automation.
 # upstream design ../README.md shared automation index
+# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
 # @dependency-end
 
 """Preflight helpers for agent-canon freshness at task entrypoints."""
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,13 @@ def run_agent_canon_preflight(
             next_step="run make agent-canon-ensure-latest manually before editing shared surfaces",
         )
 
+    if is_agent_canon_source_repo(project_root):
+        return AgentCanonPreflightResult(
+            status="skipped_source_canon",
+            reason="workspace is the shared agent-canon source repository",
+            next_step="ensure derived template snapshots after committing canon changes",
+        )
+
     status_result = subprocess.run(
         ["git", "status", "--short"],
         cwd=project_root,
@@ -56,7 +64,10 @@ def run_agent_canon_preflight(
     if status_result.stdout.strip():
         return AgentCanonPreflightResult(
             status="blocked_dirty_worktree",
-            reason="worktree is dirty; automatic agent-canon ensure-latest is skipped until commit or stash",
+            reason=(
+                "worktree is dirty; automatic agent-canon ensure-latest is skipped "
+                "until commit or stash"
+            ),
             next_step="commit_or_stash_then_run_make_agent-canon-ensure-latest",
         )
 
@@ -77,4 +88,13 @@ def run_agent_canon_preflight(
         status="pass",
         reason="agent-canon snapshot is current",
         next_step="none",
+    )
+
+
+def is_agent_canon_source_repo(project_root: Path) -> bool:
+    """Return true when the workspace is AgentCanon itself, not a derived repo."""
+    return (
+        (project_root / "agents" / "canonical" / "CODEX_WORKFLOW.md").is_file()
+        and (project_root / "tools" / "agent_tools" / "agent_canon_preflight.py").is_file()
+        and not (project_root / "vendor" / "agent-canon").exists()
     )

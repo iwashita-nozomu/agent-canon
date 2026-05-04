@@ -268,6 +268,33 @@ def write_ready_closeout_bundle(
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
+    def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
+        """AgentCanon source runs do not require a derived-repo update target."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "source canon preflight smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "source-canon-preflight",
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(Path(tmp_dir) / "reports"),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout)
+
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
         with tempfile.TemporaryDirectory() as tmp_dir:
