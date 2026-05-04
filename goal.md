@@ -11,11 +11,11 @@ downstream implementation tools/agent_tools/check_convention_compliance.py verif
 
 ## Loop Contract
 
-- goal_status: active
+- goal_status: achieved
 - run_safety_cap: 5
 - current_iteration: 1
 - active_run_id: 20260504-convention-compliance-goal
-- stop_reason: in progress
+- stop_reason: goal achieved
 
 ## Objective
 
@@ -50,7 +50,7 @@ Make convention compliance mechanically checkable and workflow-enforced across A
 - [x] C7: Convention documents with normative assertions expose verification routes, and prohibition-bearing convention documents expose prohibition sections.
 - [x] C8: Read-only review approves the current diff after the Goal is updated.
 - [x] C9: Validation passes: convention checker, convention checker tests, prompt eval, repo dependency review, `make agent-checks`, and `make ci`.
-- [ ] C10: AgentCanon main and the template snapshot branch are pushed with the final convention-compliance state.
+- [x] C10: AgentCanon main and the template snapshot branch are pushed with the final convention-compliance state.
 
 ## Backlog
 
@@ -61,7 +61,7 @@ Make convention compliance mechanically checkable and workflow-enforced across A
 - [x] B5: Replace stale `goal.md` with this convention-compliance Goal.
 - [x] B6: Run focused tests and full validation.
 - [x] B7: Run read-only audit and resolve findings.
-- [ ] B8: Commit and push AgentCanon, then update and push the template snapshot.
+- [x] B8: Commit and push AgentCanon, then update and push the template snapshot.
 
 ## Loop Log
 
@@ -69,3 +69,4 @@ Make convention compliance mechanically checkable and workflow-enforced across A
 - iteration 1: strengthened checker coverage, added convention assertion checks, fixed convention docs to expose prohibition sections and verification routes, tightened runtime skill invocation evidence, and rewrote this Goal around the active objective.
 - iteration 2: fixed review-identified Markdown and pycache issues, then reran convention checker, focused tests, prompt eval, repo dependency review, `make agent-checks`, and `make ci` successfully.
 - iteration 3: read-only diff reviewer approved the current convention-compliance diff after pycache cleanup, leaving only AgentCanon and template snapshot push closeout.
+- iteration 4: pushed AgentCanon main, recorded final closeout, and prepared the template snapshot branch update.
