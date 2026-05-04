@@ -269,7 +269,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
-        """AgentCanon source runs do not require a derived-repo update target."""
+        """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = subprocess.run(
                 [
