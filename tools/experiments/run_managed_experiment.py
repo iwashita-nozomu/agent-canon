@@ -22,7 +22,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl")
+DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
 
 try:
@@ -98,6 +98,23 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Resolve run paths and command metadata but do not write files or execute the command."
+        ),
+    )
+    parser.add_argument(
+        "--config-json",
+        help=(
+            "Optional JSON object file to merge into result/<run_name>/config.json. "
+            "The file must decode to a dictionary."
+        ),
+    )
+    parser.add_argument(
+        "--config",
+        action="append",
+        default=[],
+        metavar="KEY=JSON",
+        help=(
+            "Add one JSON-encoded config value to result/<run_name>/config.json. "
+            "Example: --config seed=0 --config protocol='\"smoke\"'."
         ),
     )
     parser.add_argument(
@@ -181,6 +198,80 @@ def command_version(name: str) -> str | None:
     return output.splitlines()[0]
 
 
+def load_config_json(path: Path) -> dict[str, object]:
+    """Load one experiment config JSON object."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"--config-json must decode to a JSON object: {path}")
+    config: dict[str, object] = {}
+    for key, value in data.items():
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError(f"--config-json contains an invalid key: {key!r}")
+        config[key] = value
+    return config
+
+
+def parse_config_pairs(pairs: list[str]) -> dict[str, object]:
+    """Parse repeated KEY=JSON config arguments."""
+    config: dict[str, object] = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise ValueError(f"--config must use KEY=JSON form: {pair}")
+        key, raw_value = pair.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"--config has an empty key: {pair}")
+        try:
+            config[key] = json.loads(raw_value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"--config value for {key!r} is not valid JSON: {exc}") from exc
+    return config
+
+
+def build_run_config(
+    *,
+    topic: str,
+    run_name: str,
+    variant: str,
+    result_dir: Path,
+    report_path: Path,
+    manifest_path: Path,
+    eval_manifest_path: Path,
+    config_path: Path,
+    command: list[str],
+    command_source: str,
+    registered_command_match: str | None,
+    registry_entry: dict[str, object] | None,
+    explicit_config: dict[str, object],
+) -> dict[str, object]:
+    """Build one JSON-serializable experiment run configuration dictionary."""
+    run_config: dict[str, object] = {
+        "topic": topic,
+        "run_name": run_name,
+        "variant": variant,
+        "paths": {
+            "result_dir": str(result_dir),
+            "report_path": str(report_path),
+            "run_manifest": str(manifest_path),
+            "eval_manifest": str(eval_manifest_path),
+            "config": str(config_path),
+        },
+        "command": command,
+        "command_source": command_source,
+        "registered_command_match": registered_command_match,
+        "config": explicit_config,
+    }
+    if registry_entry is not None:
+        run_config["registry"] = {
+            "name": registry_entry.get("name"),
+            "canonical_entrypoint": registry_entry.get("canonical_entrypoint"),
+            "default_variant": registry_entry.get("default_variant"),
+            "smoke_inner_command": registry_entry.get("smoke_inner_command"),
+            "formal_inner_command": registry_entry.get("formal_inner_command"),
+        }
+    return run_config
+
+
 def git_value(repo_root: Path, *args: str) -> str | None:
     """Return one git value or None when unavailable."""
     result = subprocess.run(
@@ -204,6 +295,7 @@ def render_report_stub(
     result_dir: Path,
     manifest_path: Path,
     eval_manifest_path: Path,
+    config_path: Path,
     command: list[str],
     created_at: str,
     branch: str | None,
@@ -222,6 +314,7 @@ def render_report_stub(
 - Result Dir: {result_dir}
 - Run Manifest: {manifest_path}
 - Eval Manifest: {eval_manifest_path}
+- Config: {config_path}
 - Registry: {registry_text}
 - Branch: {branch_text}
 - Commit: {commit_text}
@@ -246,6 +339,7 @@ def render_report_stub(
 ## Reproducibility Record
 
 - `run_manifest.json`
+- `config.json`
 - `eval_manifest.json`
 - `run.log`
 - `summary.json`
@@ -597,6 +691,7 @@ def main() -> int:
         report_path = (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
     manifest_path = result_dir / "run_manifest.json"
     eval_manifest_path = result_dir / "eval_manifest.json"
+    config_path = result_dir / "config.json"
     log_path = result_dir / "run.log"
     try:
         required_eval_patterns, optional_eval_patterns = resolve_eval_artifact_patterns(
@@ -616,8 +711,18 @@ def main() -> int:
         "report_path": str(report_path),
         "manifest_path": str(manifest_path),
         "eval_manifest_path": str(eval_manifest_path),
+        "config_path": str(config_path),
         "log_path": str(log_path),
     }
+
+    try:
+        explicit_config: dict[str, object] = {}
+        if args.config_json:
+            explicit_config.update(load_config_json(Path(args.config_json).resolve()))
+        explicit_config.update(parse_config_pairs(args.config))
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     if args.use_registered_command and args.command:
         print("do not pass both a manual command and --use-registered-command", file=sys.stderr)
@@ -657,6 +762,23 @@ def main() -> int:
         command_source=command_source,
         registered_command_match=registered_match,
     )
+    run_config = build_run_config(
+        topic=args.topic,
+        run_name=run_name,
+        variant=args.variant,
+        result_dir=result_dir,
+        report_path=report_path,
+        manifest_path=manifest_path,
+        eval_manifest_path=eval_manifest_path,
+        config_path=config_path,
+        command=command,
+        command_source=command_source,
+        registered_command_match=registered_match,
+        registry_entry=registry_entry,
+        explicit_config=explicit_config,
+    )
+    manifest["config_path"] = str(config_path)
+    manifest["config"] = run_config
 
     if args.dry_run:
         print(f"run_name={run_name}")
@@ -664,6 +786,7 @@ def main() -> int:
         print(f"report_path={report_path}")
         print(f"manifest_path={manifest_path}")
         print(f"eval_manifest_path={eval_manifest_path}")
+        print(f"config_path={config_path}")
         print(f"command_source={command_source}")
         print("required_eval_patterns=" + ",".join(required_eval_patterns))
         print("optional_eval_patterns=" + ",".join(optional_eval_patterns))
@@ -677,6 +800,7 @@ def main() -> int:
 
     result_dir.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(config_path, run_config)
     write_manifest(manifest_path, manifest)
 
     if not args.skip_report_init and not report_path.exists():
@@ -691,6 +815,7 @@ def main() -> int:
                 result_dir=result_dir,
                 manifest_path=manifest_path,
                 eval_manifest_path=eval_manifest_path,
+                config_path=config_path,
                 command=command,
                 created_at=created_at,
                 branch=git_info.get("branch") if isinstance(git_info.get("branch"), str) else None,
@@ -708,6 +833,7 @@ def main() -> int:
             "EXPERIMENT_RUN_DIR": str(result_dir),
             "EXPERIMENT_REPORT_PATH": str(report_path),
             "EXPERIMENT_RUN_MANIFEST": str(manifest_path),
+            "EXPERIMENT_CONFIG_PATH": str(config_path),
             "EXPERIMENT_RUN_LOG": str(log_path),
         }
     )

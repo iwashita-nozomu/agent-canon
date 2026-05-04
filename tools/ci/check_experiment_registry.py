@@ -299,6 +299,14 @@ def validate_topic(
                     f"{topic_name}: {command_kind}_inner_command must contain {{run_dir}}",
                 )
             )
+        if "{config_path}" not in command_text:
+            findings.append(
+                Finding(
+                    "error",
+                    f"{topic_name}: {command_kind}_inner_command must contain "
+                    "{config_path} so exported run configuration is part of the protocol",
+                )
+            )
         if entrypoint_raw not in command_text:
             findings.append(
                 Finding(

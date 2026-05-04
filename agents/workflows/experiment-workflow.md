@@ -59,6 +59,8 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
   - topic 名、run_name、result ディレクトリ名、report 名の規則を先に決め、topic README か対応する正本文書へ残します。
 - `Registry Plan:`
   - `experiments/registry.toml` の topic entry、canonical entrypoint、formal command、必要なら `active_branch` を先に固定します。
+- `Config Snapshot Plan:`
+  - `result/<run_name>/config.json` に書き出す設定 dictionary を先に固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象は Python closure や notebook state に閉じ込めません。
 - `Execution Plan:`
   - `main` で進めるか、隔離が必要な場合だけ短期 branch を使うかを先に決めます。既定は `main` です。
 - `Server Run Surface:`
@@ -93,6 +95,7 @@ top-level の `reports/` は project-wide な review、automation、management r
 - runtime 生成物
   - `result/<run_name>/summary.json`
   - `result/<run_name>/cases.jsonl`
+  - `result/<run_name>/config.json`
   - `result/<run_name>/run_manifest.json`
   - `result/<run_name>/run.log`
   - 図を出力する場合は `result/<run_name>/figures/`
@@ -193,6 +196,8 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
   - top-level import と package path が壊れていないことを確認する。
 - 出力 schema
   - `summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
+- 設定 schema
+  - `--config {config_path}` または同等の入口があり、実験 script が JSON object / dict として設定を読めることを確認する。
 
 静的チェックの段階では、まだ正式な benchmark conclusion を出しません。
 ここでの目的は「長時間 run を始めても、型・import・引数の破綻で止まらない状態」にすることです。
@@ -239,6 +244,7 @@ server 実行の formal run では、少なくとも `run_manifest.json`、`run.
 - workers per GPU
 - allocator 方針
 - 出力先
+- `config.json` に固定した設定 dictionary
 
 は run 開始前に固定し、途中で script を書き換えながら継ぎ足しません。
 
@@ -250,7 +256,7 @@ python3 tools/experiments/run_managed_experiment.py \
   --use-registered-command formal
 ```
 
-この wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
+この wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
 
 #### 4.4 long run のルール
 
@@ -276,6 +282,7 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 
 - `summary.json`
 - `cases.jsonl`
+- `config.json`
 - `run_manifest.json`
 - `run.log`
 - report へのリンク
@@ -395,6 +402,7 @@ carry-over のルールは次です。
 - 静的チェック結果
 - 実行コマンド
 - `result/<run_name>/` の所在
+- `config.json` の所在と主要 key
 - report の所在
 - 置き場と命名規則の変更有無
 - `Critical Review:`

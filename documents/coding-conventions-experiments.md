@@ -32,8 +32,18 @@ upstream design README.md durable document index
 - 1 回の run は 1 つの `run_name` と 1 つの出力先に閉じた fresh 実行として扱います。
 - partial run を正式結果として継ぎ足しません。
 - 比較条件は run 開始前に固定します。
+- 実験設定は Python object の暗黙状態ではなく、JSON object / dict / TOML table など書き出し可能な形式で固定します。
+- formal run では `result/<run_name>/config.json` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に書き出します。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
+
+## 3.1 設定 snapshot
+
+- 実験 script は `--config <path>` または同等の引数で、書き出し済みの JSON object を読めるようにします。
+- `tools/experiments/run_managed_experiment.py` を使う run では、wrapper が `result/<run_name>/config.json` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
+- `experiments/registry.toml` の `smoke_inner_command` と `formal_inner_command` は `{config_path}` を含めます。
+- `summary.json` には、少なくとも `config_path` または config digest / config key list を残します。
+- 実験中に Python closure、module global、notebook cell state、環境変数だけで条件を変えた場合、その run は正式 evidence にしません。
 
 ## 4. report と notes
 
