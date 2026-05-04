@@ -69,6 +69,8 @@ The current shared template config is intentionally small:
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
+review_model = "gpt-5.5"
+
 [features]
 codex_hooks = true
 goals = true
@@ -90,6 +92,12 @@ model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 model_verbosity = "medium"
 tool_output_token_limit = 6000
+
+[profiles.review]
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+approval_policy = "never"
 
 [agents]
 max_threads = 24

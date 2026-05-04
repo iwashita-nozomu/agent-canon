@@ -34,6 +34,7 @@ from agent_team import (
     workflow_spawn_budget,
 )
 
+PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTIER_MODEL = "gpt-5.5"
@@ -102,6 +103,23 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
     return parsed
 
 
+def validate_project_config() -> None:
+    """Check that the shared project config exposes the review route."""
+    config = tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
+    ensure(config.get("review_model") == FRONTIER_MODEL, f"review_model must be {FRONTIER_MODEL}")
+    profiles = config.get("profiles", {})
+    ensure(isinstance(profiles, dict), "profiles must be a mapping")
+    review_profile = profiles.get("review", {})
+    ensure(isinstance(review_profile, dict), "review profile must be a mapping")
+    ensure(review_profile.get("model") == FRONTIER_MODEL, f"review profile model must be {FRONTIER_MODEL}")
+    ensure(
+        review_profile.get("model_reasoning_effort") == "high",
+        "review profile model_reasoning_effort must be high",
+    )
+    ensure(review_profile.get("sandbox_mode") == "read-only", "review profile sandbox_mode must be read-only")
+    ensure(review_profile.get("approval_policy") == "never", "review profile approval_policy must be never")
+
+
 def validate_codex_agent_settings() -> None:
     """Check that Codex agent settings use the expected model split."""
     configs = parse_codex_agents()
@@ -127,8 +145,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "low",
-            f"{role_id} model_reasoning_effort must be low",
+            config.get("model_reasoning_effort") == "minimal",
+            f"{role_id} model_reasoning_effort must be minimal",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,
@@ -148,8 +166,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "low",
-            f"{role_id} model_reasoning_effort must be low",
+            config.get("model_reasoning_effort") == "minimal",
+            f"{role_id} model_reasoning_effort must be minimal",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,
@@ -432,6 +450,7 @@ def validate_bundle_outputs() -> None:
 
 def main() -> int:
     """Run all runtime-alignment checks."""
+    validate_project_config()
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()

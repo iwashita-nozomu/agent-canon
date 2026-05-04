@@ -65,6 +65,12 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
   - `model_verbosity = "medium"`
   - `tool_output_token_limit = 6000`
 
+- `review`
+  - `model = "gpt-5.5"`
+  - `model_reasoning_effort = "high"`
+  - `sandbox_mode = "read-only"`
+  - `approval_policy = "never"`
+
 Use `codex -p token-lite` for narrow diagnosis, `codex -p token-standard` for
 normal staged repo work, and `codex -p token-deep` for architecture, research,
 or high-risk review. Profiles do not waive workflow gates.
