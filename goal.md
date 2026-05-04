@@ -30,6 +30,12 @@ Turn the TODO list into a repeatable goal loop that:
    attempts; and
 1. produces one cumulative quantitative closeout report that records each step's
    intent, path, evidence, and intermediate results.
+1. keeps AgentCanon main, the template snapshot, and the repo-local runtime
+   views aligned through the canonical update branch lane instead of letting
+   drift accumulate across copies.
+1. cuts token usage by at least half for the same skill/workflow envelope while
+   preserving prompt-eval and behavior-eval pass rates, using the token-
+   efficient workflow overlay and measured run comparisons.
 
 ## Workflow
 
@@ -51,6 +57,14 @@ Turn the TODO list into a repeatable goal loop that:
    then revise the coding workflow prompts and evals to remove the failure mode.
 1. For the reporting slice, append the intent, path, validation, and result of
    each step into one cumulative closeout report.
+1. For the AgentCanon unification slice, treat vendor/agent-canon as the shared
+   canon source, update it through the canonical update branch lane, then
+   refresh the template snapshot and repo-local runtime views from that source
+   before any further feature edits.
+1. For the token-efficiency slice, choose the lowest safe parent profile and
+   agent mode, record the baseline token footprint, apply prompt/workflow
+   simplifications, then compare the same eval envelope again and keep only
+   changes that preserve skill accuracy while reducing tokens by at least half.
 1. Keep each iteration narrow enough to complete one cohesive slice, but large
    enough to include validation and evidence.
 1. When `goal_loop.py status` and MCP `goal.loop_status` both report
@@ -73,8 +87,11 @@ Turn the TODO list into a repeatable goal loop that:
   records per-step intent, path, evidence, and intermediate results.
 - [ ] G7: Repository dependency review, prompt evals, and template `make ci`
   pass after snapshot update.
-- [ ] G8: AgentCanon main and the template snapshot branch are updated and
-  pushed.
+- [ ] G8: AgentCanon main, the template snapshot branch, and repo-local runtime
+  views are updated and pushed through the canonical update lane.
+- [ ] G9: The token-efficient workflow slice shows at least 50% lower token
+  usage for the same skill/workflow eval envelope, while skill and behavior
+  evals remain pass and no inefficient route is selected.
 
 ## Backlog
 
@@ -87,9 +104,13 @@ Turn the TODO list into a repeatable goal loop that:
   validation.
 - [ ] B5: Implement the hypothesis-validation and coding-prompt repair slices
   with tool and eval updates.
-- [ ] B6: Implement the cumulative closeout report slice and wire it into the
+- [ ] B6: Implement the AgentCanon main unification and template snapshot
+  synchronization slice through the canonical branch lane.
+- [ ] B7: Implement the token-efficiency reduction slice and record the baseline
+  and comparison evidence.
+- [ ] B8: Implement the cumulative closeout report slice and wire it into the
   goal loop.
-- [ ] B7: Run AgentCanon validation, sync the template snapshot, and close only
+- [ ] B9: Run AgentCanon validation, sync the template snapshot, and close only
   after `NEXT_ACTION=close_goal_loop`.
 
 ## Optional Goal Item Catalog
@@ -107,5 +128,5 @@ this objective.
 ## Loop Log
 
 - iteration 0: initialized goal from TODO items covering model routing, slide
-  workflow, hypothesis validation, coding prompt repair, and quantitative
-  closeout reporting.
+  workflow, hypothesis validation, coding prompt repair, quantitative
+  closeout reporting, AgentCanon unification, and token-efficiency reduction.
