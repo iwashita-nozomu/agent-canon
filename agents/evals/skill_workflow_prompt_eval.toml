@@ -54,7 +54,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-workflow-docs"
 target_glob = "agents/workflows/*.md"
-expected_count = 19
+expected_count = 20
 kind = "workflow"
 description = "Every workflow document must be dependency-linked and reader-addressable."
 
@@ -507,6 +507,30 @@ required_regex = [
   "token_ratio <= 0.5",
   "skill accuracy",
 ]
+
+[[evals]]
+id = "slide-production-workflow"
+target = "agents/workflows/slide-production-workflow.md"
+kind = "workflow"
+description = "The slide workflow must lock a template and preserve layout review for text, equations, images, and references."
+
+[[evals.checklist]]
+id = "SLIDE-WF-1"
+critical = true
+description = "Requires a fixed PPT template and a recorded template path."
+required_regex = ["fixed PPT template", "template path", "lock the template"]
+
+[[evals.checklist]]
+id = "SLIDE-WF-2"
+critical = true
+description = "Requires slots for text, equations, generated images, and references."
+required_regex = ["Title", "Body text", "Equation", "Generated image", "Reference block"]
+
+[[evals.checklist]]
+id = "SLIDE-WF-3"
+critical = true
+description = "Requires a layout review before closeout."
+required_regex = ["layout drift", "layout review", "reference visibility", "closeout checklist"]
 
 [[evals]]
 id = "codex-config-shared-features"

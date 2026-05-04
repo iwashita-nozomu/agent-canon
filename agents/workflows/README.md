@@ -46,6 +46,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - `agents/workflows/token-efficient-codex-workflow.md`
 - README、guide、workflow、migration 文書のような長文
   - `agents/workflows/long-form-writing-workflow.md`
+- スライド、PPT、presentation のような固定テンプレート型の文書
+  - `agents/workflows/slide-production-workflow.md`
 - 論文、thesis chapter、scholarly note、claim-heavy document
   - `agents/workflows/academic-writing-workflow.md`
 - 投稿論文や paper-like draft
@@ -101,6 +103,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 
 - `long-form-writing-workflow.md`
   - README、guide、workflow、migration 文書
+- `slide-production-workflow.md`
+  - 固定 PPT template を使う slide / presentation production
 - `academic-writing-workflow.md`
   - notation / logic を強く扱う scholarly writing
 - `paper-writing-workflow.md`

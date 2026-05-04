@@ -60,6 +60,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
 - `実行計画 -> 計画レビュー`、`詳細設計 -> 詳細設計レビュー -> 文書通読レビュー`、`実装 -> 実装 checkpoint review` は、それぞれ review decision が `approve` になるまで同じ段を反復します
 - README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で docs completeness review も通します
+- slide、presentation、PPT production では `slide-production-workflow.md` を追加し、固定 template、slot mapping、layout review、reference visibility を先に固めます
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
 - 原因考察、コード改善、修正箇所選定、複数候補比較が必要な task では `agents/workflows/hypothesis-validation-workflow.md` を overlay とし、code dependency scan と header dependency graph を別々に取得してから仮説、expected mechanism、candidate comparison、反証条件、support evidence、fix surface 妥当性を固定します
