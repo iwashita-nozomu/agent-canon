@@ -37,7 +37,6 @@ from agent_team import (
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTIER_MODEL = "gpt-5.5"
-CODEX_CODING_MODEL = "gpt-5.3-codex"
 SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
@@ -64,7 +63,7 @@ WRITING_AND_REVIEW_ROLE_IDS = {
     "ml_science_reviewer",
     "literature_researcher",
 }
-CODING_ROLE_IDS = {
+SPARK_READ_ROLE_IDS = {
     "explorer",
     "test_designer",
     "python_reviewer",
@@ -108,7 +107,7 @@ def validate_codex_agent_settings() -> None:
     configs = parse_codex_agents()
     required_role_ids = (
         WRITING_AND_REVIEW_ROLE_IDS
-        | CODING_ROLE_IDS
+        | SPARK_READ_ROLE_IDS
         | FRONTIER_IMPLEMENTATION_ROLE_IDS
         | SPARK_CODING_ROLE_IDS
     )
@@ -124,16 +123,16 @@ def validate_codex_agent_settings() -> None:
         )
         ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
 
-    for role_id in sorted(CODING_ROLE_IDS):
+    for role_id in sorted(SPARK_READ_ROLE_IDS):
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "high",
-            f"{role_id} model_reasoning_effort must be high",
+            config.get("model_reasoning_effort") == "medium",
+            f"{role_id} model_reasoning_effort must be medium",
         )
         ensure(
-            config.get("model") == CODEX_CODING_MODEL,
-            f"{role_id} model must be {CODEX_CODING_MODEL}",
+            config.get("model") == SPARK_CODING_MODEL,
+            f"{role_id} model must be {SPARK_CODING_MODEL}",
         )
 
     for role_id in sorted(FRONTIER_IMPLEMENTATION_ROLE_IDS):
@@ -149,8 +148,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "high",
-            f"{role_id} model_reasoning_effort must be high",
+            config.get("model_reasoning_effort") == "medium",
+            f"{role_id} model_reasoning_effort must be medium",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,

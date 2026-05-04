@@ -28,8 +28,8 @@ upstream design README.md workflow catalog
   - complex real-world work、coding、research、tool use を担う model としての safety / capability 境界確認に使います。
 - [GPT-5.4 Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.4)
   - `gpt-5.4` を previous frontier baseline として比較するときの根拠です。
-- [GPT-5.3-Codex Model | OpenAI API](https://developers.openai.com/api/docs/models/gpt-5.3-codex)
-  - `gpt-5.3-codex` を coding-specialist の default に置く根拠です。
+- [GPT-5.3-Codex-Spark Model | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
+  - `gpt-5.3-codex-spark` を code-reading と narrow implementation の default に置く根拠です。
 - [All models | OpenAI API](https://developers.openai.com/api/docs/models/all)
   - GPT-5.5 / GPT-5.4 系を frontier family、Codex 系を coding-specialist family として分ける根拠です。
 - [Introducing GPT-5.4 | OpenAI](https://openai.com/index/introducing-gpt-5-4/)
@@ -37,7 +37,7 @@ upstream design README.md workflow catalog
 - [Introducing GPT-5.4 mini and nano | OpenAI](https://openai.com/index/introducing-gpt-5-4-mini-and-nano/)
   - GPT-5.4 mini の得意領域が fast coding/subagents であること、対してこの repo では coding を Codex 系へ寄せるときの比較根拠です。
 - [Introducing GPT-5.3-Codex-Spark | OpenAI](https://openai.com/index/introducing-gpt-5-3-codex-spark/)
-  - `gpt-5.3-codex-spark` を smaller、text-only、128k の low-latency override に留める根拠です。
+  - `gpt-5.3-codex-spark` を smaller、text-only、128k の low-latency override かつ code-reading / narrow implementation の default にする根拠です。
 - [Slash commands in Codex CLI | OpenAI Developers](https://developers.openai.com/codex/cli/slash-commands)
   - `/plan`、`/model`、`/permissions` が session-level command であり、per-agent TOML に mode を持たせない根拠です。
 - [Introducing GPT-5.4 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/5/introducing-gpt54/)
@@ -45,7 +45,7 @@ upstream design README.md workflow catalog
 - [GPT-5.4 mini and GPT-5.4 nano, which can describe 76,000 photos for $52 | Simon Willison's Weblog](https://simonwillison.net/2026/Mar/17/mini-and-nano/)
   - mini / nano の速度、価格、reasoning tier の実地感を補う資料です。
 - [I Tested GPT 5.4 Against Every Rival — Here's My Honest Review | Thomas Wiegold Blog](https://thomas-wiegold.com/blog/i-tested-gpt-5-4-against-every-rival/)
-  - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex` override を残す判断の補助資料です。
+  - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex-spark` override を残す判断の補助資料です。
 - [How Claude remembers your project - Claude Code Docs](https://code.claude.com/docs/en/memory)
   - `CLAUDE.md` を薄い adapter にする判断の参考です。
 - [Copilot customization cheat sheet - GitHub Docs](https://docs.github.com/en/copilot/reference/customization-cheat-sheet)

@@ -129,7 +129,7 @@ or high-risk review. Profiles do not waive workflow gates.
   - `project_reviewer`
   - `report_reviewer`
   - perspective reviewer 全般
-- `gpt-5.3-codex` + `high`
+- `gpt-5.3-codex-spark` + `medium`
   - `explorer`
   - `test_designer`
   - `python_reviewer`
@@ -137,6 +137,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - design-traced narrow implementation default
   - `gpt-5.3-codex-spark`
     - `spark_worker`
+- code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `medium` reasoning effort to keep output bounded
 - broad or ambiguous implementation fallback
   - `gpt-5.5`
     - `worker`
