@@ -36,6 +36,17 @@ DERIVED_REPO_STALE_STRINGS = (
 )
 
 
+def is_shared_template_bootstrap_doc(relative_path: Path, path: Path) -> bool:
+    """Return whether ``path`` is the shared template bootstrap document view."""
+    if relative_path != Path("documents/template-bootstrap.md") or not path.is_symlink():
+        return False
+    try:
+        resolved_parts = path.resolve(strict=True).parts
+    except FileNotFoundError:
+        return False
+    return "vendor" in resolved_parts and "agent-canon" in resolved_parts
+
+
 def current_project_name() -> str | None:
     """Return the configured project name from ``pyproject.toml`` when available."""
     pyproject_path = ROOT / "pyproject.toml"
@@ -61,12 +72,13 @@ def iter_findings() -> list[str]:
         path = ROOT / relative_path
         if not path.is_file():
             continue
+        skip_derived_stale_strings = is_shared_template_bootstrap_doc(relative_path, path)
         for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if ABSOLUTE_WORKSPACE_LINK.search(line):
                 findings.append(
                     f"{relative_path}:{line_no}: replace workspace-absolute markdown links with relative links"
                 )
-            if not check_derived_stale_strings:
+            if not check_derived_stale_strings or skip_derived_stale_strings:
                 continue
             for stale_string in DERIVED_REPO_STALE_STRINGS:
                 if stale_string in line:

@@ -272,7 +272,9 @@ tests/agent_tools/test_work_log.py:../../${PREFIX}/tests/agent_tools/test_work_l
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_check_markdown_math.py:../../${PREFIX}/tests/tools/test_check_markdown_math.py
+tests/tools/test_check_bootstrap_docs.py:../../${PREFIX}/tests/tools/test_check_bootstrap_docs.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
+tests/tools/test_python_env_policy.py:../../${PREFIX}/tests/tools/test_python_env_policy.py
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
 tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
