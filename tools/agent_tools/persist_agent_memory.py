@@ -4,8 +4,7 @@
 # upstream design ../../agents/workflows/agent-learning-workflow.md defines memory closeout.
 # upstream implementation ./log_agent_learning.py appends agent-side memory observations.
 # upstream implementation ./log_user_preference.py appends user preference observations.
-# downstream implementation ../../tests/agent_tools/test_persist_agent_memory.py
-# verifies persistence behavior.
+# downstream implementation ../../tests/agent_tools/test_persist_agent_memory.py tests CLI.
 # @dependency-end
 
 """Persist AgentCanon memory note changes after logging observations."""
