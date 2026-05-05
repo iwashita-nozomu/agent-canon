@@ -43,7 +43,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `docker/Dockerfile` または `docker/requirements.txt` を更新した変更では、`make docker-build-check` を必須にします。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口を Python 専用にはしません。
-- canonical container の `safe.directory` は repo workspace の `/workspace` だけを Docker image 側で明示設定します。
+- canonical container の `safe.directory` は `docker/register_safe_directories.sh` で管理します。Docker image build 時は repo workspace の `/workspace` を登録し、devcontainer 作成時や smoke test では mount 済み workspace の `vendor/*` を列挙して `/workspace/vendor/<name>` を動的に登録しなければなりません。
 - Template / AgentCanon 固有の local mirror path、たとえば `/mnt/git/template.git` や `/mnt/git/agent-canon.git` は Dockerfile に焼きません。具体の remote / mirror 名は `documents/template-github-remote.md` と `documents/agent-canon-github-remote.md` を正本にし、必要な repo だけ host git config や run profile で opt-in します。
 - Docker container 内から Docker を使う手順を正本にする場合は、同梱するのは CLI だけとし、host socket mount または別 daemon が必要であることを文書へ明記しなければなりません。
 - canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は script の fallback で検証を継続できますが、Dockerfile 側の欠落を放置してはいけません。
