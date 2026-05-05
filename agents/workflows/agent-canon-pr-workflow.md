@@ -6,6 +6,7 @@ upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 downstream design ../../documents/agent-canon-subtree-migration.md subtree migration contract consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
+upstream design ../../documents/template-github-remote.md defines template remote evidence
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 @dependency-end
 -->
@@ -25,6 +26,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 
 - shared canon の正本は `vendor/agent-canon/` です。
 - GitHub 上の canonical shared canon repo は `https://github.com/iwashita-nozomu/agent-canon.git` です。
+- template の canonical repo は `https://github.com/iwashita-nozomu/project_template.git` です。
 - template を GitHub 管理にする場合は、`.gitmodules` の AgentCanon URL を canonical GitHub URL にし、local bare mirror は別名 remote または明示 override として残します。
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。

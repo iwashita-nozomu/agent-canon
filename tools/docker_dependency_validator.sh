@@ -71,7 +71,7 @@ check_dockerfile_coherence() {
   grep -q 'cli.github.com/packages' "$dockerfile" \
     || report_issue "docker/Dockerfile must install GitHub CLI from the official GitHub CLI apt repository"
   grep -Eq '(^|[[:space:]])gh([[:space:]]|\\|$)' "$dockerfile" \
-    || report_issue "docker/Dockerfile must install gh for GitHub-backed AgentCanon operations"
+    || report_issue "docker/Dockerfile must install gh for GitHub PR and release operations"
   grep -q 'gh --version' "$dockerfile" \
     || report_issue "docker/Dockerfile must smoke-check gh --version"
 }

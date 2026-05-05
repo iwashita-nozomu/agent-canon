@@ -3,6 +3,7 @@
 responsibility Documents Template Bootstrap for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 upstream design ./agent-canon-github-remote.md GitHub canonical remote policy
+upstream design ./template-github-remote.md template GitHub canonical remote policy
 @dependency-end
 -->
 
@@ -66,7 +67,9 @@ shared upstream refresh も使いたいときだけ `--source-repo /mnt/l/worksp
 
 shared canon の変更を maintainer に渡すときは、`push-proposal` で project-local bare repo の proposal branch へ投げます。maintainer はその branch を fetch して整理用 branch に merge します。
 
-GitHub 管理では `.gitmodules` の AgentCanon URL を
+GitHub 管理では template の canonical remote を
+`https://github.com/iwashita-nozomu/project_template.git` にし、local
+`/mnt/git/template.git` は mirror として残します。`.gitmodules` の AgentCanon URL は
 `https://github.com/iwashita-nozomu/agent-canon.git` にします。
 local `/mnt/git` bare mirror は高速な日常 validation 用に残してよいですが、
 PR と security 設定の正本は GitHub 側に置きます。

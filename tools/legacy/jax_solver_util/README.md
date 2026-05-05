@@ -16,6 +16,12 @@ These files are not canonical AgentCanon defaults. They are retained so future
 PRs can promote, rewrite, or delete them with provenance instead of rediscovering
 them repo by repo.
 
+OOP / convention-check support legacy files are grouped in
+`oop_check_support/`. They are not executable policy; the canonical OOP check
+surface is `tools/agent_tools/analyze_oop_readability.py`,
+`tools/agent_tools/oop_rule_inventory.py`, and
+`documents/object-oriented-design.md`.
+
 Promotion requirements:
 
 - remove project-specific `/workspace` or `jax_util` assumptions;

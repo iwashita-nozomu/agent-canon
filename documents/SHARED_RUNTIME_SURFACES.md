@@ -51,6 +51,7 @@ root では次を symlink view として扱います。
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/agent-canon-github-remote.md`
 - `documents/agent-canon-subtree-migration.md`
+- `documents/template-github-remote.md`
 - `documents/coding-conventions-cpp.md`
 - `documents/coding-conventions-experiments.md`
 - `documents/coding-conventions-house-style.md`

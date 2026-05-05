@@ -7,6 +7,7 @@ upstream design ./coding-conventions-house-style.md shared implementation style 
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./design/protocols.md Protocol and type-boundary placement contract
 downstream implementation ../tools/agent_tools/analyze_oop_readability.py OOP readability score gate
+downstream implementation ../tools/agent_tools/oop_rule_inventory.py inventories OOP rule surfaces
 upstream implementation ../tools/sync_agent_canon.sh root symlink view generation
 @dependency-end
 -->
@@ -140,6 +141,7 @@ Python / C++ surface では次を baseline として使います。
 
 ```bash
 python3 tools/agent_tools/analyze_oop_readability.py python include src tests --min-score 85
+python3 tools/agent_tools/oop_rule_inventory.py --include-legacy
 ```
 
 この tool は次の risk を検出します。
@@ -171,6 +173,13 @@ python3 tools/agent_tools/analyze_oop_readability.py \
 外部 repo、bare repo snapshot、派生 template を読み取り専用で評価する場合は、commit SHA、展開方法、解析 path、除外 path を report と同じ run bundle に残します。
 `vendor/`、過去の `reports/`、生成物、別 canon snapshot を混ぜると、対象 repo の OOP risk と持ち込み artifact の risk が区別できなくなります。
 除外した surface を後で評価する必要がある場合は、別 report として分けます。
+
+OOP policy、analyzer、reviewer、test、legacy support の配置確認は
+`oop_rule_inventory.py` を使います。`tools/legacy/.../oop_check_support/`
+は provenance であり、workflow や CI の正本入口ではありません。
+旧 convention viewer や code-review skill restructuring script の挙動を使う場合は、
+そのまま呼ばず、repo-neutral な rule inventory / analyzer / reviewer prompt へ
+書き直してから昇格します。
 
 `oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。

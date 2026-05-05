@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Preserves imported jax_solver_util legacy script for provenance.
-# upstream design ../README.md legacy import policy
+# upstream design README.md legacy OOP check support policy
 # @dependency-end
 """
 .code-review-SKILL.md のセクション分離・再構成スクリプト

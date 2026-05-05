@@ -97,6 +97,27 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 既定 Backlog は小さな `B1` だけではなく、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、`NEXT_ACTION=run_next_iteration` 継続判断までを 1 回目の iteration packet として持ちます。
   - `goal_loop.py init` は default active items と non-default optional items を分けます。`Exit Criteria` と `Backlog` は機械 gate の対象で、`Optional Goal Item Catalog` は必要時に active section へ昇格する候補です。
   - `goal_loop.py plan` は未完了の exit criteria / backlog を `Goal Work Breakdown` として `GW*` work unit へ展開します。implementation 前にこの行を run bundle `schedule.md` へ移し、bare objective から直接実装へ入らないようにします。
+- `tools/agent_tools/vector_search.py`
+  - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
+  - exact symbol / path / error message は `rg` を優先し、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
+  - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
+  - 例:
+
+```bash
+python3 tools/agent_tools/vector_search.py --query "dependency header graph"
+python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
+```
+
+- `tools/agent_tools/oop_rule_inventory.py`
+  - OOP policy、analyzer、reviewer、test、legacy support placement を machine-readable に確認します。
+  - jax_solver_util 由来の旧 convention viewer は `tools/legacy/jax_solver_util/oop_check_support/` に provenance として隔離し、default workflow ではこの inventory と `analyze_oop_readability.py` を使います。
+  - 例:
+
+```bash
+python3 tools/agent_tools/oop_rule_inventory.py --include-legacy
+python3 tools/agent_tools/oop_rule_inventory.py --format markdown
+```
+
 - Codex `goals` feature
   - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は MCP `goal.loop_status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
 - `mcp/repo_mcp_server.py` の `goal.loop_status`

@@ -1,7 +1,7 @@
 #!/bin/bash
 # @dependency-start
 # responsibility Preserves imported jax_solver_util legacy script for provenance.
-# upstream design ../README.md legacy import policy
+# upstream design README.md legacy OOP check support policy
 # @dependency-end
 # 規約ファイルを整理して表示するスクリプト
 

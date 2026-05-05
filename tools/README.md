@@ -15,6 +15,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
+  - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
+  - `oop_rule_inventory.py` は OOP policy、analyzer、reviewer、test、legacy support placement を検査し、旧 convention viewer を default workflow から切り離します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
@@ -76,6 +78,8 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/check_log_helper_names.py`
   - `agent_tools/check_algorithm_module_nested_contract.py`
   - `agent_tools/agent_update_branch.sh`
+  - `agent_tools/vector_search.py`
+  - `agent_tools/oop_rule_inventory.py`
 
 ## Repo-Local Tool Import Policy
 
@@ -106,6 +110,10 @@ Current promoted helpers:
 
 Legacy imports live under `tools/legacy/jax_solver_util/` and are excluded from
 default workflow promises until a dedicated promotion PR modernizes them.
+OOP / convention-check support legacy files are grouped under
+`tools/legacy/jax_solver_util/oop_check_support/`; use
+`tools/agent_tools/oop_rule_inventory.py` and
+`tools/agent_tools/analyze_oop_readability.py` for canonical checks.
 
 ## Result Log And Visualization Tools
 
@@ -160,6 +168,28 @@ python3 tools/agent_tools/compare_codex_token_footprints.py \
   --candidate-session ~/.codex/sessions/<candidate>.jsonl \
   --report-out reports/agents/<run-id>/token_footprint.md
 ```
+
+## Vector Search Tool
+
+Use `rg` first for exact symbol, path, and error-message lookup. Use
+`vector_search.py` when the question is semantic: "どの tool が dependency graph
+を見ているか", "GitHub remote migration に近い文書はどれか", "safe.directory
+周りの helper はどこか" のような再利用候補探索です。
+
+The default index is dependency-free and transient. It scans shared text
+surfaces with TF-IDF vectors and does not write embedding artifacts or require
+network access.
+
+```bash
+python3 tools/agent_tools/vector_search.py --query "dependency header graph"
+python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
+python3 tools/agent_tools/vector_search.py --query "mcp goal loop" --format json
+```
+
+If a repo later adds embedding-backed search, keep it optional: put generated
+indices under `reports/` or another ignored artifact path, never commit
+embedding vectors, and do not add API keys or model choices to Dockerfile
+defaults.
 
 ## Log Helper Naming Tool
 

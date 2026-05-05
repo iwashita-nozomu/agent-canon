@@ -36,6 +36,8 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 | `scripts/tools/find_similar_designs.py` | `tools/docs/find_similar_designs.py` | Promoted as design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/docs/organize_designs.py` | Promoted as conservative design organization helper. |
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
+| `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/agent_tools/oop_rule_inventory.py` | Reimplemented as repo-neutral OOP rule inventory instead of project-root convention viewers. |
+| `scripts/restructure_code_review_skill.py` | `tools/legacy/jax_solver_util/oop_check_support/restructure_code_review_skill.py` | Reclassified as OOP / review-rule provenance; not promoted because it rewrites one historical skill layout. |
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 | `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
@@ -54,14 +56,15 @@ need separate review before becoming defaults.
 - `docker_dependency_validator.py`
 - `extract_deps_from_svg.sh`
 - `guide.sh`
-- `read_conventions.sh`
-- `restructure_code_review_skill.py`
 - `run_week1_tests.py`
 - `setup_week1_env.py`
 - `verify_week1.py`
-- `view_conventions.sh`
 - `security/*`
 - repo-local copies of docs, audit, HLO, and Markdown tools
+
+OOP / convention-check legacy support now lives under
+`tools/legacy/jax_solver_util/oop_check_support/` and is represented by the
+canonical `tools/agent_tools/oop_rule_inventory.py` inventory tool.
 
 Legacy provenance files are not default CI entrypoints. A future PR may promote
 one legacy tool only after it has repo-neutral paths, current dependency
