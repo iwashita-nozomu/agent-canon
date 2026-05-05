@@ -19,5 +19,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Record user or reviewer feedback observed during actual use with `python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op>"`, then update the targeted skill prompt, workflow prompt, eval, or memory note before closeout.
 1. Before closeout, run `python3 tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest agents/evals/agent_behavior_eval.toml --write` and resolve any feedback actions.
 1. Log concise evidence-backed observations with `tools/agent_tools/log_agent_learning.py`.
+1. If memory files changed, run `python3 tools/agent_tools/persist_agent_memory.py --commit --push` and, from a template superproject, also close the `vendor/agent-canon` pin with `--commit-superproject --push-superproject` or an equivalent explicit commit.
 1. Keep raw chat out of notes; record source, evidence, scope, and confidence.
 1. Promote only stable items into `AGENTS.md`, workflow docs, or guardrails.
