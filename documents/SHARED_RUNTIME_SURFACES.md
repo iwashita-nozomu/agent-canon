@@ -141,6 +141,12 @@ root では次を symlink view として扱います。
 - `.github/workflows/agent-coordination.yml`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
 
+### AgentCanon standalone-only surface
+
+次は standalone `agent-canon` GitHub repository 用の正本であり、template root へ同期しません。
+
+- `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md`
+
 ## Editing Rule
 
 - shared runtime surface を直すときは `vendor/agent-canon/` 側を編集します

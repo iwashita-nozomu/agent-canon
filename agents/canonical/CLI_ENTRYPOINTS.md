@@ -58,6 +58,7 @@ upstream design README.md canonical workflow index
 - `.github/copilot-instructions.md`
 - `AGENTS.md`
 - `.agents/skills/`
+- `agents/workflows/github-copilot-workflow.md`
 
 使いどころ:
 - GitHub Copilot CLI
@@ -66,6 +67,7 @@ upstream design README.md canonical workflow index
 
 補足:
 - repo instructions は `.github/copilot-instructions.md` に置く
+- issue / PR / IDE 起点の作業は `agents/workflows/github-copilot-workflow.md` を overlay として扱う
 - old `gh-copilot` extension 前提の説明は正本にしない
 - GitHub-hosted agent は issue / PR 起点で使うことがあるため、repo 正本は特定ローカル wrapper に寄せすぎない
 

@@ -54,6 +54,8 @@ root の入口は symlink view または明示的な synced copy にします。
 - `memory/*`、`notes/*`、`tests/*`: `documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
 - `.github/copilot-instructions.md`: shared Copilot entrypoint の synced copy。
 - `.github/workflows/agent-coordination.yml`: shared coordination workflow の synced copy。
+- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。
+- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: shared PR template の synced copy。
 
 repo-local の正本として残すもの:

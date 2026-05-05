@@ -13,3 +13,5 @@ GitHub 側の薄い入口です。
 - human canonical hub: `/agents/README.md`
 - copilot custom instructions: `/.github/copilot-instructions.md`
 - curated project skills: `/.agents/skills/`
+- default PR checklist: `/.github/PULL_REQUEST_TEMPLATE.md`
+- AgentCanon-in-template PR checklist: `/.github/PULL_REQUEST_TEMPLATE/agent_canon.md`

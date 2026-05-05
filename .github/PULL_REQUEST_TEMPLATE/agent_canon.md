@@ -9,18 +9,22 @@ upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR
 
 - changed shared canon surfaces:
 - why shared canon needs this change:
+- derived repo or template issue that exposed the need:
 
 ## Scope
 
 - [ ] This PR edits `vendor/agent-canon/` as the source of truth.
 - [ ] This PR does not mix repo-local implementation work with shared canon changes.
 - [ ] Root symlink views were not edited directly.
+- [ ] Standalone AgentCanon PR checklist was considered when the change should land in `iwashita-nozomu/agent-canon` first.
 
 ## Validation
 
 - [ ] `bash tools/sync_agent_canon.sh link-root`
 - [ ] `bash tools/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
+- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
+- [ ] GitHub workflow or PR checklist changes were checked for submodule-aware checkout, least-privilege permissions, and review evidence fields.
 
 Validation output:
 
@@ -61,6 +65,8 @@ Upstream sync note:
 - local bare mirror SHA:
 - `git submodule status vendor/agent-canon`:
 - branch protection / vulnerability alert / Dependabot status:
+- GitHub Actions workflow affected:
+- PR checklist affected:
 
 ## Risks
 
