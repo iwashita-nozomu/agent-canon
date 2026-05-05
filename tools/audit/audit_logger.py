@@ -19,7 +19,7 @@ Audit Logger — 監査ログシステム
 import json
 import os
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import ParamSpec, TypeAlias, TypeVar, cast
@@ -80,9 +80,9 @@ class AuditLogger:
         Returns:
             ログエントリ
         """
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         
-        log_entry = {
+        log_entry = cast(JsonObject, {
             "timestamp": timestamp,
             "action": action,
             "actor": actor,
@@ -93,7 +93,7 @@ class AuditLogger:
             "metadata": metadata or {},
             "git_commit": self._get_current_commit(),
             "branch": self._get_current_branch(),
-        }
+        })
         
         # ファイルに追記
         with open(self.log_file, "a", encoding="utf-8") as f:

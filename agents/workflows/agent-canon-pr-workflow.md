@@ -5,7 +5,7 @@ responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 downstream design ../../documents/agent-canon-subtree-migration.md subtree migration contract consumes PR workflow
-downstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
+upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 @dependency-end
 -->

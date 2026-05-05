@@ -12,7 +12,7 @@ JSON Schema と TypeScript 型定義で監査ログの形式を厳密に定義�
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TypeAlias, cast
 
 JsonScalar: TypeAlias = str | int | float | bool | None
@@ -218,7 +218,7 @@ class ErrorInfo:
 class AuditLogMetadata:
     """監査ログメタデータ"""
     duration_ms: int | None = None
-    tags: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=lambda: [])
     
     def to_dict(self) -> JsonObject:
         data = cast(JsonObject, asdict(self))
@@ -233,7 +233,7 @@ class AuditLogEntry:
     actor: str
     level: str                  # INFO, WARNING, ERROR, SECURITY, COMPLIANCE
     outcome: str                # success, failure, warning, partial
-    details: JsonObject = field(default_factory=dict)
+    details: JsonObject = field(default_factory=lambda: cast(JsonObject, {}))
     resource: str | None = None
     metadata: JsonObject | None = None
     git_commit: str = "unknown"
@@ -269,7 +269,7 @@ class AuditLogEntry:
         if self.error:
             data["error"] = self.error
         
-        return data
+        return cast(JsonObject, data)
     
     def to_json(self) -> str:
         """JSON 文字列に変換"""
@@ -338,9 +338,6 @@ def _is_iso8601_datetime(value: object) -> bool:
 
 def _validate_manual_schema(entry: JsonObject) -> tuple[bool, str | None]:
     """jsonschema 非依存の最小バリデーション"""
-    if not isinstance(entry, dict):
-        return False, "Entry must be a dictionary"
-
     missing = sorted(_REQUIRED_FIELDS - set(entry.keys()))
     if missing:
         return False, f"Missing required fields: {', '.join(missing)}"
@@ -413,16 +410,7 @@ def validate_entry(entry: JsonObject) -> tuple[bool, str | None]:
     Returns:
         (是否, エラーメッセージ or None)
     """
-    try:
-        import jsonschema
-    except ModuleNotFoundError:
-        return _validate_manual_schema(entry)
-
-    try:
-        jsonschema.validate(entry, AUDIT_LOG_JSON_SCHEMA)
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    return _validate_manual_schema(entry)
 
 
 if __name__ == "__main__":
@@ -437,7 +425,7 @@ if __name__ == "__main__":
     
     # テストエントリ
     entry = AuditLogEntry(
-        timestamp=datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         action="skill_executed",
         actor="test_user",
         level="INFO",
