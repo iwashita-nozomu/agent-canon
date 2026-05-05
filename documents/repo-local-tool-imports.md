@@ -38,6 +38,7 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
+| `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
 
 ## Preserved As Legacy Provenance
 

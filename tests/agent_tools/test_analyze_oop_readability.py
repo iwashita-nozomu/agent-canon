@@ -59,6 +59,48 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("OOP_READABILITY_FINDINGS=0", result.stdout)
             self.assertIn("OOP_READABILITY=pass", result.stdout)
 
+    def test_algorithm_protocol_value_classes_are_not_thin_classes(self) -> None:
+        """Standard algorithm-module protocol classes are intentional contracts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "solver.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from jax_util.base import algorithm_module_protocol as amp",
+                        "",
+                        "class InitializeConfig(amp.InitializeConfig):",
+                        "    pass",
+                        "",
+                        "class SolveConfig(amp.SolveConfig):",
+                        "    pass",
+                        "",
+                        "class Problem(amp.Problem):",
+                        "    pass",
+                        "",
+                        "class State(amp.State):",
+                        "    pass",
+                        "",
+                        "class Answer(amp.Answer):",
+                        "    pass",
+                        "",
+                        "class Info(amp.Info):",
+                        "    pass",
+                        "",
+                        "class Algorithm(amp.Algorithm):",
+                        "    def __call__(self, problem, state, config):",
+                        "        return Answer(), State(), Info()",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("thin_class", result.stdout)
+
     def test_python_vague_static_namespace_is_flagged(self) -> None:
         """A vague utility class with static methods is reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:

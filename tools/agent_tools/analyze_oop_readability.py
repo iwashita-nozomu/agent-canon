@@ -587,6 +587,32 @@ def is_dataclass(node: ast.ClassDef) -> bool:
     return False
 
 
+def base_class_name(base: ast.expr) -> str:
+    """Return a dotted-ish base class name for lightweight contract checks."""
+    if isinstance(base, ast.Name):
+        return base.id
+    if isinstance(base, ast.Attribute):
+        prefix = base_class_name(base.value)
+        return f"{prefix}.{base.attr}" if prefix else base.attr
+    if isinstance(base, ast.Subscript):
+        return base_class_name(base.value)
+    return ""
+
+
+def is_algorithm_contract_class(node: ast.ClassDef) -> bool:
+    """Return true for standard algorithm module protocol value classes."""
+    contract_bases = {
+        "amp.InitializeConfig",
+        "amp.SolveConfig",
+        "amp.Problem",
+        "amp.State",
+        "amp.Answer",
+        "amp.Info",
+        "amp.Algorithm",
+    }
+    return any(base_class_name(base) in contract_bases for base in node.bases)
+
+
 def parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST]:
     """Build a parent map for top-level and nested function classification."""
     parents: dict[ast.AST, ast.AST] = {}
@@ -875,7 +901,12 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     0,
                     "replace-namespace-class-with-module-functions",
                 )
-            if len(public_methods) <= 1 and not attrs and not is_dataclass(node):
+            if (
+                len(public_methods) <= 1
+                and not attrs
+                and not is_dataclass(node)
+                and not is_algorithm_contract_class(node)
+            ):
                 add_finding(
                     findings,
                     root,
