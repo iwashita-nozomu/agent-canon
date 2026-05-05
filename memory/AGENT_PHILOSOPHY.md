@@ -129,7 +129,12 @@ upstream design README.md memory surface index
 
 ## Promotion Candidates
 
-- まだなし
+
+- 2026-05-05 | failure-avoidance | AgentCanon memory logging is incomplete unless the memory note change is committed and pushed in AgentCanon; leaving it as a submodule dirty diff makes the observation disappear from durable shared memory.
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: User reported that AgentCanon memory is not accumulating; root memory is a symlink into vendor/agent-canon, but log tools only appended files without persistence.
 
 ## Open Questions
 
