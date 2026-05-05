@@ -3,8 +3,8 @@
 @dependency-start
 responsibility Documents the GitHub Copilot workflow for repository and AgentCanon tasks.
 upstream design ../canonical/CLI_ENTRYPOINTS.md defines runtime entrypoints
-upstream design ../../.github/copilot-instructions.md defines Copilot repository instructions
 upstream design agent-canon-pr-workflow.md defines shared canon PR discipline
+downstream design ../../.github/copilot-instructions.md consumes Copilot workflow
 downstream design ../workflows/README.md indexes workflow routing
 @dependency-end
 -->
