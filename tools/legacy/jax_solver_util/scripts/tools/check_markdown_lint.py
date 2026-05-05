@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
-# upstream implementation ../README.md directory index and local context contract
+# responsibility Preserves imported jax_solver_util legacy script for provenance.
+# upstream design ../README.md legacy import policy
 # @dependency-end
 """Markdown Lint チェッカー（.markdownlint.json 規格準拠）.
 

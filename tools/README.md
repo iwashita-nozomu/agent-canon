@@ -74,6 +74,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/check_convention_compliance.py`
   - `agent_tools/check_static_any.py`
   - `agent_tools/check_log_helper_names.py`
+  - `agent_tools/check_algorithm_module_nested_contract.py`
   - `agent_tools/agent_update_branch.sh`
 
 ## Repo-Local Tool Import Policy
@@ -94,6 +95,7 @@ Current promoted helpers:
 
 - `tools/data/jsonl_to_md.py`
 - `tools/hlo/summarize_hlo_jsonl.py`
+- `tools/experiments/update_latest_result.py`
 - `tools/audit/audit_log_schema.py`
 - `tools/audit/audit_logger.py`
 - `tools/docs/create_design_template.py`

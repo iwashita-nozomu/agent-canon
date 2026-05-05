@@ -36,6 +36,8 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 | `scripts/tools/find_similar_designs.py` | `tools/docs/find_similar_designs.py` | Promoted as design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/docs/organize_designs.py` | Promoted as conservative design organization helper. |
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
+| `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
+| `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 
 ## Preserved As Legacy Provenance
 
@@ -66,3 +68,10 @@ Current AgentCanon versions were kept for core runtime files such as
 `tools/agent_tools/agent_team.py`, `bootstrap_agent_run.py`,
 `tools/ci/run_all_checks.sh`, `tools/validation/triplet_validator.py`, and
 Markdown tooling that already has newer AgentCanon behavior.
+
+## Additional Local Preference Captured
+
+jax_solver_util had a local AgentCanon memory note requiring OOP readability,
+public surface, and nested-contract checks in implementation/experiment paths.
+The shared canon now keeps the nested-contract checker and runs it from
+`tools/ci/run_all_checks.sh` when a repo has a `python/` tree.

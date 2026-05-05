@@ -5,7 +5,7 @@ upstream design coding-conventions-logging.md defines JSONL logging conventions
 upstream design experiment-report-style.md defines human-readable experiment reports
 upstream implementation ../tools/data/jsonl_to_md.py converts JSONL to Markdown
 upstream implementation ../tools/hlo/summarize_hlo_jsonl.py summarizes HLO JSONL
-downstream environment ../docker/packs/default.toml smokes result tooling availability
+downstream implementation ../tools/docker_dependency_validator.sh validates runtime support
 @dependency-end
 -->
 

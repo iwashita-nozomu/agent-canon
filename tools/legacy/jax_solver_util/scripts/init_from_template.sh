@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
-# upstream design README.md template overview
-# downstream implementation start_repository.sh wraps template initialization
+# responsibility Preserves imported jax_solver_util legacy script for provenance.
+# upstream design ../README.md legacy import policy
 # @dependency-end
 set -euo pipefail
 

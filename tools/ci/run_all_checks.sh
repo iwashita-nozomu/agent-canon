@@ -7,6 +7,7 @@
 # upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
+# upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
@@ -153,6 +154,14 @@ if "$PYTHON_BIN" tools/agent_tools/check_log_helper_names.py --changed --exclude
 else
   echo "❌ log helper naming checks 失敗"
   EXIT_CODE=1
+fi
+if [ -d python ]; then
+  if "$PYTHON_BIN" tools/agent_tools/check_algorithm_module_nested_contract.py python 2>&1; then
+    echo "✅ algorithm module nested contract checks 成功"
+  else
+    echo "❌ algorithm module nested contract checks 失敗"
+    EXIT_CODE=1
+  fi
 fi
 if "$PYTHON_BIN" tools/agent_tools/check_convention_compliance.py 2>&1; then
   echo "✅ convention compliance wiring checks 成功"

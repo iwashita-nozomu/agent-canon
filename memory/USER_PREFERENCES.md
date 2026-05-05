@@ -132,6 +132,9 @@ upstream design README.md memory surface index
 - 2026-04-18 | 外部から受領した Excel などの source artifact は tracked datafiles ではなく rootdata に置き、final 成果物は code で再生成する前提にする。
   - source: chat
 
+- 2026-05-05 | 各実装・実験パスでは OOP readability / public surface / nested contract チェッカを実行し、失敗はチェッカ不具合ではなく実装違反として扱う。
+  - source: repo-local jax_solver_util AgentCanon memory diff
+
 ## Promotion Candidates
 
 - まだなし
