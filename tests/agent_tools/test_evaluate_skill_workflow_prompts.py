@@ -72,7 +72,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertEqual(globs[".agents/skills/*/SKILL.md"], 26)
         self.assertEqual(globs[".claude/skills/*/SKILL.md"], 26)
         self.assertEqual(globs["agents/skills/*.md"], 48)
-        self.assertEqual(globs["agents/workflows/*.md"], 20)
+        self.assertEqual(globs["agents/workflows/*.md"], 21)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], 29)
 
