@@ -255,6 +255,7 @@ tests/agent_tools/test_analyze_oop_readability.py:../../${PREFIX}/tests/agent_to
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
 tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
 tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
+tests/agent_tools/test_persist_agent_memory.py:../../${PREFIX}/tests/agent_tools/test_persist_agent_memory.py
 tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
 tests/agent_tools/test_codex_hooks.py:../../${PREFIX}/tests/agent_tools/test_codex_hooks.py
 tests/agent_tools/test_repo_mcp_server.py:../../${PREFIX}/tests/agent_tools/test_repo_mcp_server.py

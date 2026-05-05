@@ -43,7 +43,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
 - 利用中に得られた user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、skill prompt、workflow prompt、eval、memory のどれへ還元したかを残す
 - behavior eval は `agents/evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる
-- `memory/` への追記を template local artifact だけで終わらせず、shared canon update として closeout する
+- `memory/` への追記を template local artifact や submodule dirty state だけで終わらせず、`persist_agent_memory.py` で shared canon commit / push と template pin 更新まで closeout する
 - promotion candidate は `AGENTS.md` へ直書きせず、periodic sweep で昇格する
 - 確定した禁止事項は `engineering_avoidances.md` への昇格候補にする
 
@@ -86,6 +86,14 @@ python3 tools/agent_tools/log_agent_learning.py \
   --evidence "<task/run/commit>" \
   --scope task-family \
   --confidence tentative
+```
+
+```bash
+python3 tools/agent_tools/persist_agent_memory.py \
+  --commit \
+  --push \
+  --commit-superproject \
+  --push-superproject
 ```
 
 ## Boundary

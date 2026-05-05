@@ -70,6 +70,19 @@ python3 tools/agent_tools/log_user_preference.py \
   --source chat
 ```
 
+`memory/` は AgentCanon submodule の実体を更新します。追記だけで止めると
+submodule の未コミット差分になり、latest sync や別 repo では durable memory
+として読まれません。memory を残した run では、closeout 前に次で AgentCanon
+commit、push、必要なら template pin commit まで閉じます。
+
+```bash
+python3 tools/agent_tools/persist_agent_memory.py \
+  --commit \
+  --push \
+  --commit-superproject \
+  --push-superproject
+```
+
 ## Agent Run Evaluation
 
 closeout 前に run bundle を評価し、採点結果と feedback action を `agent_evaluation.md` に固定します。
@@ -143,7 +156,8 @@ closeout 前に次を確認します。
 1. agent の作業哲学や対話上の再発防止は `AGENT_PHILOSOPHY.md` に入れるべきか
 1. 確定した禁止事項は `engineering_avoidances.md` に昇格すべきか
 1. stable な項目は `AGENTS.md`、`CODEX_WORKFLOW.md`、review TOML に昇格すべきか
-1. `memory/` への追記が shared canon 側の更新として commit / push まで反映されたか
+1. `memory/` への追記が `persist_agent_memory.py --commit --push` で shared canon 側の更新として commit / push まで反映されたか
+1. template root から作業した場合、`persist_agent_memory.py --commit-superproject` または同等の commit で `vendor/agent-canon` pin が更新されたか
 
 ## Promotion Rule
 
