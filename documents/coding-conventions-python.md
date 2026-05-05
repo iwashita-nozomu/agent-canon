@@ -87,6 +87,13 @@ def load_config(path: Path) -> dict[str, str]:
 - Python で書かれた `scripts/` のうち、repo 運用の正面入口になるもの
 - JAX のような framework 固有ルールは、必要な repo だけ補足として読みます
 
+## 行長
+
+- 固定の 100 文字制限を Python 規約にしません。
+- 長い import、URL、dependency header、型注釈、表形式データなどは、無理に折り返して機械可読性や検索性を落とさないでください。
+- 行長は lint の fail 条件ではなく、可読性、既存 formatter、project-local `pyproject.toml` の明示設定に従って判断します。
+- Ruff を使う repo では、行長だけを理由に fail させたくない場合、`E501` を ignore します。
+
 ## 目次
 
 1. [対象](./conventions/python/01_scope.md)
