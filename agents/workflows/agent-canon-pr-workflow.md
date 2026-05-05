@@ -28,6 +28,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
+- repo-local tool を AgentCanon に集約する変更は、原則 PR で行い、今回のような direct update は user が明示した特例だけにします。
 - 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
 - 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo snapshot を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
@@ -118,6 +119,29 @@ local history divergence や unsafe snapshot import で `ensure-latest` が止�
 bash tools/update_agent_canon.sh proposal-branch
 bash tools/update_agent_canon.sh push-proposal
 ```
+
+## Repo-Local Tool Collection PR
+
+Derived repositories often grow local scripts before they are ready for shared
+canon. Collect them by PR with this sequence:
+
+1. Inventory `tools/`, `scripts/`, `tests/tools/`, `documents/tools/`, and
+   result/log/report helpers in the derived repo.
+1. Compare each candidate with current AgentCanon; do not overwrite newer
+   canonical tools with stale repo-local copies.
+1. Promote repo-neutral tools into the nearest canonical family under
+   `tools/agent_tools/`, `tools/ci/`, `tools/docs/`, `tools/data/`,
+   `tools/hlo/`, `tools/audit/`, `tools/experiments/`, or `tools/validation/`.
+1. Preserve project-specific or unsafe tools under `tools/legacy/<repo-slug>/`
+   with a README and no default workflow wiring.
+1. Update `documents/repo-local-tool-imports.md`,
+   `documents/tools/README.md`, and `tools/README.md`.
+1. Add or update smoke tests, help checks, or static checks before wiring a new
+   tool into default CI.
+1. Run `make agent-canon-pr-check` and include the import disposition table in
+   the PR body.
+
+Direct updates must still leave the same evidence in the commit and run bundle.
 
 ## PR 完了条件
 

@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents ログ/デバッグ出力の規約（共通） for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+downstream design ./result-log-retention-and-visualization.md defines retention and visualization
 @dependency-end
 -->
 
@@ -13,6 +14,9 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 
 - 対象は、数値計算・テスト・HLO 解析のログ出力です。
 - 目的は、標準出力と保存ログの形式を揃え、再現と比較をしやすくすることです。
+- 保存期間、配置、summary、可視化 artifact の扱いは
+  [result-log-retention-and-visualization.md](result-log-retention-and-visualization.md)
+  を正本にします。
 
 ## 2. 基本方針
 
@@ -52,6 +56,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
   - `pytest.raw.txt`: 進捗や例外を含む生ログ
   - `pytest.jsonl`: JSON オブジェクトのみ（1 行 1 JSON）
   - `exit_code.txt`: 終了コード（数値のみ）
+- 実験や benchmark の raw result は `experiments/<topic>/result/<run-id>/` に置き、
+  human-readable report は `experiments/report/<run-id>.md` に置きます。
+- user-facing claim の根拠になる run は、raw log だけでなく `summary.json`、
+  Markdown report、または compact JSONL summary を残します。
 
 ## 5. ディレクトリ名規約（ログ）
 
@@ -73,4 +81,12 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 
 ```bash
 python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports
+```
+
+結果ログと可視化 helper:
+
+```bash
+python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
+python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+dot -V
 ```

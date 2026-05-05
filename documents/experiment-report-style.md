@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents 実験レポートの書き方 for this repository.
 upstream design README.md durable document index
+upstream design result-log-retention-and-visualization.md defines artifact retention
 @dependency-end
 -->
 
@@ -10,6 +11,9 @@ upstream design README.md durable document index
 この文書は、`experiments/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。
 対象は、`experiments/` 配下の比較実験、benchmark、アルゴリズム改造後の検証レポートです。
 human-readable な experiment report の正本は `experiments/report/` とし、render された HTML / SVG や JSON / JSONL / log は `experiments/<topic>/result/<run_name>/` に置きます。top-level の `reports/` は project-wide な review や automation report の置き場であり、topic ごとの experiment report の正本にはしません。
+raw log、summary、可視化 artifact の保持と closeout evidence は
+[result-log-retention-and-visualization.md](result-log-retention-and-visualization.md)
+を正本にします。
 
 repo 固有の結論を先に言うと、実験レポートは IMRaD をそのまま縮小再現するのではなく、次の `IMRaD+` で書くのがよいです。
 

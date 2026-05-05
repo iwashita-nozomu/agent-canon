@@ -64,6 +64,22 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - conservatively な Markdown 整形を当てます。
 - `tools/docs/find_similar_documents.py`
   - 重複・統合候補の文書を探します。
+- `tools/docs/find_redundant_designs.py`
+  - `documents/design/` の exact duplicate を検出し、consolidation report を作ります。
+- `tools/docs/find_similar_designs.py`
+  - `documents/design/` の類似候補を検出します。
+- `tools/docs/organize_designs.py`
+  - design 文書を submodule 別に整理するための conservative report を作ります。
+- `tools/docs/tfidf_similar_docs.py`
+  - Markdown 文書の TF-IDF 類似候補と merge draft を作ります。
+- `tools/data/jsonl_to_md.py`
+  - JSONL の実行結果を Markdown table report に変換します。
+- `tools/hlo/summarize_hlo_jsonl.py`
+  - HLO JSONL から dialect、tag、operation count の summary JSON を出します。
+- `tools/audit/audit_logger.py`
+  - agent / repo automation event を JSONL audit log として保存します。
+- `tools/legacy/<repo-slug>/`
+  - 派生 repo 由来の未昇格 tool を provenance として保持します。default CI / workflow からは呼びません。
 - `tools/worktree_start.sh`
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
@@ -107,6 +123,23 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
 - `tools/push_origin.sh`
   - commit 後の canonical push 入口です。
+
+## 結果ログと可視化
+
+保存先、summary、可視化 artifact、retention decision は
+[result-log-retention-and-visualization.md](../result-log-retention-and-visualization.md)
+を正本にします。
+
+よく使う変換:
+
+```bash
+python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
+python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+dot -V
+```
+
+closeout では raw log だけでなく、summary/report path と可視化 path、または
+可視化なしの理由を `verification.txt` に残します。
 
 ## 補足
 

@@ -6,6 +6,8 @@ downstream design ./algorithm-implementation-boundary.md algorithm math-to-code 
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./codex-configuration-slides.md Codex configuration slide deck
 downstream design ./object-oriented-design.md general OOP coding policy
+downstream design ./result-log-retention-and-visualization.md result artifact policy
+downstream design ./repo-local-tool-imports.md repo-local tool import ledger
 @dependency-end
 -->
 
@@ -25,3 +27,8 @@ template の初期状態では、ここを shared workflow のリンク集にし
 
 - [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md): 数理・仕様境界と implementation boundary の対応表、変更種別、review gate。
 - [Object-Oriented Design Policy](./object-oriented-design.md): class、dataclass、Protocol、composition、継承の判断基準。
+
+## Tooling And Artifact References
+
+- [Result Log Retention And Visualization](./result-log-retention-and-visualization.md): run result、summary、visualization artifact、retention decision の正本ルール。
+- [Repo-Local Tool Imports](./repo-local-tool-imports.md): 派生 repo で育った tool を AgentCanon に取り込むときの disposition 台帳。

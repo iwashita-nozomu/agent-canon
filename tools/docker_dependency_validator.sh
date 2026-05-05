@@ -66,12 +66,35 @@ check_dockerfile_coherence() {
     || report_issue "docker/Dockerfile must install rsync so fresh-clone overlay works in the canonical container"
   grep -q 'openssh-client' "$dockerfile" \
     || report_issue "docker/Dockerfile must install openssh-client so GitHub SSH and agent forwarding work"
+  grep -Eq '(^|[[:space:]])graphviz([[:space:]]|\\|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must install graphviz so result/dependency graphs can render"
   grep -q 'cli.github.com/packages' "$dockerfile" \
     || report_issue "docker/Dockerfile must install GitHub CLI from the official GitHub CLI apt repository"
   grep -Eq '(^|[[:space:]])gh([[:space:]]|\\|$)' "$dockerfile" \
     || report_issue "docker/Dockerfile must install gh for GitHub-backed AgentCanon operations"
   grep -q 'gh --version' "$dockerfile" \
     || report_issue "docker/Dockerfile must smoke-check gh --version"
+}
+
+check_result_visualization_requirements() {
+  local req_file="docker/requirements.txt"
+  local requirement=""
+  local missing=0
+
+  printf '\n3. Checking result-log and visualization requirements...\n'
+  if [ ! -f "$req_file" ]; then
+    report_issue "docker/requirements.txt not found"
+    return
+  fi
+
+  for requirement in jupyterlab notebook ipykernel pydeps snakeviz pyyaml; do
+    if ! grep -Eiq "^${requirement}([<>=~![:space:]]|$)" "$req_file"; then
+      report_issue "docker/requirements.txt must include ${requirement}"
+      missing=1
+    fi
+  done
+
+  [ "$missing" -eq 0 ] && printf '   result-log / visualization requirements present\n'
 }
 
 is_container_runtime() {
@@ -87,7 +110,7 @@ check_repo_local_venv_policy() {
   local pattern='python3?[[:space:]]+-m[[:space:]]+venv|virtualenv|conda[[:space:]]+create|uv[[:space:]]+venv|pipenv|poetry[[:space:]]+env'
   local canonical_tool="tools/ci/python_env_policy.py"
 
-  printf '\n3. Checking repo-local virtual-environment policy...\n'
+  printf '\n4. Checking repo-local virtual-environment policy...\n'
 
   for path in venv env .conda conda-env .venv-*; do
     if [ -e "$path" ]; then
@@ -141,7 +164,7 @@ check_pythonpath_documentation() {
   local docker_documented=0
   local file=""
 
-  printf '\n4. Checking PYTHONPATH and Docker documentation...\n'
+  printf '\n5. Checking PYTHONPATH and Docker documentation...\n'
   for file in README.md QUICK_START.md documents/coding-conventions-project.md; do
     [ -f "$file" ] || continue
     if grep -q 'PYTHONPATH' "$file" && grep -q '=/workspace/python' "$file"; then
@@ -161,6 +184,7 @@ check_pythonpath_documentation() {
 printf 'Checking Docker environment consistency without Python-dependent tooling...\n\n'
 check_requirements_format
 check_dockerfile_coherence
+check_result_visualization_requirements
 check_repo_local_venv_policy
 check_pythonpath_documentation
 

@@ -19,9 +19,17 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
 - `docs/`
-  - Markdown lint、math check、link audit、format、mirror sync
+  - Markdown lint、math check、link audit、format、mirror sync、design document consolidation helpers
+- `data/`
+  - JSONL-to-Markdown conversion and compact result-data transforms
+- `hlo/`
+  - HLO JSONL summary helpers
+- `audit/`
+  - portable audit-log schema and JSONL writer
 - `experiments/`
   - topic scaffold、registry sync、managed run
+- `legacy/`
+  - imported repo-local tools kept for provenance and future promotion PRs
 - `shared/`
   - shared helper
 - `validation/`
@@ -67,6 +75,52 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/check_static_any.py`
   - `agent_tools/check_log_helper_names.py`
   - `agent_tools/agent_update_branch.sh`
+
+## Repo-Local Tool Import Policy
+
+Repo-local tools discovered in derived repositories are not copied over newer
+AgentCanon implementations blindly. Use this order:
+
+1. Compare the repo-local file with the current AgentCanon path.
+1. Keep the current AgentCanon implementation when it is newer or broader.
+1. Promote unique, repo-neutral capability into the nearest canonical family:
+   `agent_tools/`, `ci/`, `docs/`, `data/`, `hlo/`, `audit/`,
+   `experiments/`, or `validation/`.
+1. Preserve project-specific or stale tools under `tools/legacy/<repo-slug>/`
+   with provenance and no default CI wiring.
+1. Record the disposition in `documents/repo-local-tool-imports.md`.
+
+Current promoted helpers:
+
+- `tools/data/jsonl_to_md.py`
+- `tools/hlo/summarize_hlo_jsonl.py`
+- `tools/audit/audit_log_schema.py`
+- `tools/audit/audit_logger.py`
+- `tools/docs/create_design_template.py`
+- `tools/docs/find_redundant_designs.py`
+- `tools/docs/find_similar_designs.py`
+- `tools/docs/organize_designs.py`
+- `tools/docs/tfidf_similar_docs.py`
+
+Legacy imports live under `tools/legacy/jax_solver_util/` and are excluded from
+default workflow promises until a dedicated promotion PR modernizes them.
+
+## Result Log And Visualization Tools
+
+Result-log retention is governed by
+`documents/result-log-retention-and-visualization.md`.
+
+Canonical helper commands:
+
+```bash
+python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
+python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+dot -V
+```
+
+Closeout evidence should point to a raw path, a summary/report path, and a
+retention decision. Do not leave only raw logs when the user-facing claim relies
+on the result.
 
 ## Agent Evaluation Tools
 
