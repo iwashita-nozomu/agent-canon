@@ -46,5 +46,5 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - the starter command when the scenario asks for kickoff guidance
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`
 1. Mention Codex implementation routing only when implementation is in scope. Read `agents/canonical/CODEX_SUBAGENTS.md` before assigning agents.
-1. For implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced, low-risk slices; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
+1. For implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
 1. Do not route detailed design, review, or final judgment to `spark_worker`.
