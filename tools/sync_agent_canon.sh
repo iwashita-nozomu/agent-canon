@@ -14,6 +14,11 @@
 # downstream implementation ../tests/agent_tools/test_goal_loop.py root symlink view for goal loop tests
 # downstream implementation ../tests/agent_tools/test_check_static_any.py root symlink view for explicit Any tests
 # downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
+# downstream implementation ../tests/agent_tools/test_check_algorithm_module_nested_contract.py root symlink view
+# downstream implementation ../tests/agent_tools/test_check_log_helper_names.py root symlink view
+# downstream implementation ../tests/agent_tools/test_compare_codex_token_footprints.py root symlink view
+# downstream implementation ../tests/tools/test_result_log_tools.py root symlink view
+# downstream implementation ../tests/tools/test_update_latest_result.py root symlink view
 # @dependency-end
 set -euo pipefail
 
@@ -234,6 +239,9 @@ tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/
 tests/agent_tools/test_check_convention_compliance.py:../../${PREFIX}/tests/agent_tools/test_check_convention_compliance.py
 tests/agent_tools/test_check_hardcoded_numbers.py:../../${PREFIX}/tests/agent_tools/test_check_hardcoded_numbers.py
 tests/agent_tools/test_check_static_any.py:../../${PREFIX}/tests/agent_tools/test_check_static_any.py
+tests/agent_tools/test_check_algorithm_module_nested_contract.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_nested_contract.py
+tests/agent_tools/test_check_log_helper_names.py:../../${PREFIX}/tests/agent_tools/test_check_log_helper_names.py
+tests/agent_tools/test_compare_codex_token_footprints.py:../../${PREFIX}/tests/agent_tools/test_compare_codex_token_footprints.py
 tests/agent_tools/test_analyze_refactor_surface.py:../../${PREFIX}/tests/agent_tools/test_analyze_refactor_surface.py
 tests/agent_tools/test_analyze_oop_readability.py:../../${PREFIX}/tests/agent_tools/test_analyze_oop_readability.py
 tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
@@ -260,6 +268,8 @@ tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_s
 tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
 tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
 tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
+tests/tools/test_result_log_tools.py:../../${PREFIX}/tests/tools/test_result_log_tools.py
+tests/tools/test_update_latest_result.py:../../${PREFIX}/tests/tools/test_update_latest_result.py
 tools:${PREFIX}/tools
 EOF
 }
