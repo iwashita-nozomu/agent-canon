@@ -39,6 +39,9 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 | `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
+| `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` follow-up local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted public-boundary filtering and algorithm config factory exemptions. |
+| `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` follow-up local diff | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted explicit summary return type so the checker avoids `Any`. |
+| `vendor/agent-canon/tools/experiments/update_latest_result.py` follow-up local diff | `tools/experiments/update_latest_result.py` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
 
 ## Preserved As Legacy Provenance
 
@@ -76,3 +79,8 @@ jax_solver_util had a local AgentCanon memory note requiring OOP readability,
 public surface, and nested-contract checks in implementation/experiment paths.
 The shared canon now keeps the nested-contract checker and runs it from
 `tools/ci/run_all_checks.sh` when a repo has a `python/` tree.
+
+The jax_solver_util local diff that excluded `python/jax_util`,
+`python/tests`, and several tool families from `check_static_any.py` was not
+promoted because it is repo-specific and weakens the shared explicit-`Any`
+policy.

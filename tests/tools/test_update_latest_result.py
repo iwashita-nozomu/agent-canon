@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from tools.experiments.update_latest_result import update_latest_result
@@ -46,6 +47,8 @@ def test_update_latest_result_selects_newest_manifest(tmp_path: Path) -> None:
     new_dir.mkdir()
     (old_dir / "result_manifest.json").write_text("{}", encoding="utf-8")
     (new_dir / "result_manifest.json").write_text("{}", encoding="utf-8")
+    os.utime(old_dir / "result_manifest.json", ns=(1_000_000_000, 1_000_000_000))
+    os.utime(new_dir / "result_manifest.json", ns=(2_000_000_000, 2_000_000_000))
 
     selected = update_latest_result(result_root)
 

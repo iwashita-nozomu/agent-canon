@@ -636,6 +636,36 @@ def is_direct_method(
     return isinstance(parents.get(node), ast.ClassDef)
 
 
+def direct_class_parent(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, parents: dict[ast.AST, ast.AST]
+) -> ast.ClassDef | None:
+    """Return the direct class parent for a method, when present."""
+    parent = parents.get(node)
+    return parent if isinstance(parent, ast.ClassDef) else None
+
+
+def is_public_python_boundary(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parents: dict[ast.AST, ast.AST],
+) -> bool:
+    """Return true when a function is part of a public source boundary."""
+    if node.name.startswith("_"):
+        return False
+    if is_top_level_function(node, parents):
+        return True
+    parent = direct_class_parent(node, parents)
+    return parent is not None and not parent.name.startswith("_")
+
+
+def is_algorithm_contract_factory_method(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parents: dict[ast.AST, ast.AST],
+) -> bool:
+    """Return true for named constructor methods on algorithm contract classes."""
+    parent = direct_class_parent(node, parents)
+    return parent is not None and is_algorithm_contract_class(parent)
+
+
 def python_boundary_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     """Return source-level parameter names, excluding self and cls."""
     args = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
@@ -887,7 +917,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     for item in node.body
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
                 ]
-            ):
+            ) and not is_algorithm_contract_class(node):
                 add_finding(
                     findings,
                     root,
@@ -964,6 +994,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
             is_top_level = is_top_level_function(node, parents)
             is_method = is_direct_method(node, parents)
             is_nested = not is_top_level and not is_method
+            is_public_boundary = is_public_python_boundary(node, parents)
             if is_top_level and symbol_has_vague_helper_name(node.name):
                 module_helper_count += 1
                 add_finding(
@@ -1021,7 +1052,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     thresholds.max_cognitive_complexity,
                     "flatten-control-flow-and-extract-named-steps",
                 )
-            if not node.name.startswith("_") and annotation_missing(node):
+            if is_public_boundary and annotation_missing(node):
                 add_finding(
                     findings,
                     root,
@@ -1035,7 +1066,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     "complete",
                     "add-public-boundary-types",
                 )
-            if is_top_level and optional_annotations > 0:
+            if is_public_boundary and optional_annotations > 0:
                 add_finding(
                     findings,
                     root,
@@ -1049,7 +1080,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     0,
                     "split-input-variants-so-static-analysis-knows-the-shape",
                 )
-            if none_checks > 0 and optional_annotations > 0:
+            if is_public_boundary and none_checks > 0 and optional_annotations > 0:
                 add_finding(
                     findings,
                     root,
@@ -1093,7 +1124,10 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
                     "remove-wrapper-or-document-domain-contract",
                 )
             passthrough = is_passthrough_call(node)
-            if passthrough is not None:
+            if passthrough is not None and not is_algorithm_contract_factory_method(
+                node,
+                parents,
+            ):
                 callee, forwarded_count = passthrough
                 add_finding(
                     findings,

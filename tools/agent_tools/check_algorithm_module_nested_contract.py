@@ -27,7 +27,6 @@ import fnmatch
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 EXPECTED_PUBLIC_NAME_SET = frozenset(
     {
@@ -436,7 +435,7 @@ def summarize(
     modules: list[ModuleReport],
     findings: list[Finding],
     files: list[Path],
-) -> dict[str, Any]:
+) -> dict[str, int | str]:
     """Build deterministic summary output."""
     return {
         "files": len(files),

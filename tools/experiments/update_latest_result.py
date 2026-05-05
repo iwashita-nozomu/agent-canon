@@ -29,7 +29,13 @@ def _latest_result_dir(result_root: Path, /) -> Path:
         raise FileNotFoundError(
             f"No result_manifest.json found below result root: {result_root}"
         )
-    return max(candidates, key=lambda path: (path / "result_manifest.json").stat().st_mtime)
+    return max(
+        enumerate(candidates),
+        key=lambda item: (
+            (item[1] / "result_manifest.json").stat().st_mtime_ns,
+            item[0],
+        ),
+    )[1]
 
 
 def _latest_payload(result_dir: Path, /) -> dict[str, object]:

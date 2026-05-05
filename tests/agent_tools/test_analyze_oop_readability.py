@@ -101,6 +101,73 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("thin_class", result.stdout)
 
+    def test_algorithm_config_factories_are_not_namespace_smells(self) -> None:
+        """Named algorithm config constructors are the module contract DSL."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "solver.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from jax_util.base import algorithm_module_protocol as amp",
+                        "",
+                        "class InitializeConfig(amp.InitializeConfig):",
+                        "    kind: str",
+                        "",
+                        "    @staticmethod",
+                        "    def identity() -> 'InitializeConfig':",
+                        "        return InitializeConfig(kind='identity')",
+                        "",
+                        "class SolveConfig(amp.SolveConfig):",
+                        "    kind: str",
+                        "",
+                        "    @staticmethod",
+                        "    def identity() -> 'SolveConfig':",
+                        "        return SolveConfig(kind='identity')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("static_method_namespace", result.stdout)
+            self.assertNotIn("pass_through_function", result.stdout)
+
+    def test_private_and_nested_functions_are_not_public_boundary_findings(self) -> None:
+        """Private helpers and closures do not create public API boundary findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "implementation.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from typing import Any",
+                        "",
+                        "def _private(value: Any | None):",
+                        "    if value is None:",
+                        "        return 0",
+                        "    return value",
+                        "",
+                        "def public(value: int) -> int:",
+                        "    def branch(inner):",
+                        "        return inner",
+                        "    return branch(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("optional_boundary:_private", result.stdout)
+            self.assertNotIn("none_runtime_branch:_private", result.stdout)
+            self.assertNotIn("missing_public_annotations:branch", result.stdout)
+
     def test_python_vague_static_namespace_is_flagged(self) -> None:
         """A vague utility class with static methods is reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:
