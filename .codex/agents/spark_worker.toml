@@ -9,7 +9,7 @@ nickname_candidates = ["spark-impl", "fast-change", "narrow-fix"]
 sandbox_mode = "workspace-write"
 approval_policy = "never"
 model = "gpt-5.3-codex-spark"
-model_reasoning_effort = "minimal"
+model_reasoning_effort = "low"
 
 developer_instructions = """
 You are the low-latency implementation agent for this repository.

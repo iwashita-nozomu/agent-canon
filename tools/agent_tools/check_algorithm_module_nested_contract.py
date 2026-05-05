@@ -3,7 +3,7 @@
 # responsibility Checks nested algorithm ownership fields for algorithm modules.
 # upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
 # upstream implementation ./check_algorithm_module_public_surface.py discovers algorithm modules
-# downstream implementation ../../tests/agent_tools/test_check_algorithm_module_nested_contract.py
+# downstream implementation ../../tests/agent_tools/test_check_algorithm_module_nested_contract.py tests  # noqa: E501
 # @dependency-end
 """Check nested algorithm ownership in modules using ``algorithm_module_protocol``.
 

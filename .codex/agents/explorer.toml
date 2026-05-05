@@ -9,7 +9,7 @@ nickname_candidates = ["trace", "map", "survey"]
 sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.3-codex-spark"
-model_reasoning_effort = "minimal"
+model_reasoning_effort = "low"
 
 developer_instructions = """
 You are the read-only exploration agent for this repository.

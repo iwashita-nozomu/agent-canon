@@ -39,6 +39,7 @@ CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTIER_MODEL = "gpt-5.5"
 SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
+SPARK_REASONING_EFFORT = "low"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
     "manager_reviewer",
@@ -111,13 +112,22 @@ def validate_project_config() -> None:
     ensure(isinstance(profiles, dict), "profiles must be a mapping")
     review_profile = profiles.get("review", {})
     ensure(isinstance(review_profile, dict), "review profile must be a mapping")
-    ensure(review_profile.get("model") == FRONTIER_MODEL, f"review profile model must be {FRONTIER_MODEL}")
+    ensure(
+        review_profile.get("model") == FRONTIER_MODEL,
+        f"review profile model must be {FRONTIER_MODEL}",
+    )
     ensure(
         review_profile.get("model_reasoning_effort") == "high",
         "review profile model_reasoning_effort must be high",
     )
-    ensure(review_profile.get("sandbox_mode") == "read-only", "review profile sandbox_mode must be read-only")
-    ensure(review_profile.get("approval_policy") == "never", "review profile approval_policy must be never")
+    ensure(
+        review_profile.get("sandbox_mode") == "read-only",
+        "review profile sandbox_mode must be read-only",
+    )
+    ensure(
+        review_profile.get("approval_policy") == "never",
+        "review profile approval_policy must be never",
+    )
 
 
 def validate_codex_agent_settings() -> None:
@@ -145,8 +155,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "minimal",
-            f"{role_id} model_reasoning_effort must be minimal",
+            config.get("model_reasoning_effort") == SPARK_REASONING_EFFORT,
+            f"{role_id} model_reasoning_effort must be {SPARK_REASONING_EFFORT}",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,
@@ -166,8 +176,8 @@ def validate_codex_agent_settings() -> None:
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
-            config.get("model_reasoning_effort") == "minimal",
-            f"{role_id} model_reasoning_effort must be minimal",
+            config.get("model_reasoning_effort") == SPARK_REASONING_EFFORT,
+            f"{role_id} model_reasoning_effort must be {SPARK_REASONING_EFFORT}",
         )
         ensure(
             config.get("model") == SPARK_CODING_MODEL,
@@ -267,7 +277,10 @@ def validate_task_catalog_references() -> None:
         ensure(isinstance(prompt, dict), f"family {family['id']} subagent_prompt must be a mapping")
         for key in ("purpose", "prompt_preamble", "workflow_focus", "reviewer_prompt"):
             ensure(key in prompt, f"family {family['id']} subagent_prompt missing {key}")
-        ensure(str(prompt["purpose"]).strip(), f"family {family['id']} subagent_prompt purpose empty")
+        ensure(
+            str(prompt["purpose"]).strip(),
+            f"family {family['id']} subagent_prompt purpose empty",
+        )
         for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
             values = prompt[key]
             ensure(
@@ -278,7 +291,10 @@ def validate_task_catalog_references() -> None:
             members = roles.get(bucket, [])
             ensure(isinstance(members, list), f"family {family['id']} {bucket} must be a list")
             for role_id in members:
-                ensure(role_id in role_ids, f"family {family['id']} references unknown role {role_id}")
+                ensure(
+                    role_id in role_ids,
+                    f"family {family['id']} references unknown role {role_id}",
+                )
         active_budget, max_write_budget = workflow_spawn_budget(catalog, str(family["id"]))
         ensure(
             active_budget <= runtime_max_threads,
@@ -291,7 +307,10 @@ def validate_task_catalog_references() -> None:
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
-        ensure(task["family"] in family_ids, f"task {task_id} references unknown family {task['family']}")
+        ensure(
+            task["family"] in family_ids,
+            f"task {task_id} references unknown family {task['family']}",
+        )
         _ = default_specialists_for_task(
             config=config,
             catalog=catalog,
@@ -301,11 +320,20 @@ def validate_task_catalog_references() -> None:
 
     for pack in catalog.review_packs:
         for role_id in pack.get("specialists", []):
-            ensure(role_id in role_ids, f"review pack {pack['id']} references unknown role {role_id}")
+            ensure(
+                role_id in role_ids,
+                f"review pack {pack['id']} references unknown role {role_id}",
+            )
         for task_id in pack.get("default_for_tasks", []):
-            ensure(task_id in task_ids(catalog), f"review pack {pack['id']} default task missing: {task_id}")
+            ensure(
+                task_id in task_ids(catalog),
+                f"review pack {pack['id']} default task missing: {task_id}",
+            )
         for task_id in pack.get("optional_for_tasks", []):
-            ensure(task_id in task_ids(catalog), f"review pack {pack['id']} optional task missing: {task_id}")
+            ensure(
+                task_id in task_ids(catalog),
+                f"review pack {pack['id']} optional task missing: {task_id}",
+            )
 
 
 def validate_public_skill_shims() -> None:
@@ -378,7 +406,9 @@ def validate_bundle_outputs() -> None:
                     include_default_review_packs=True,
                 )
             )
-            roles = tuple(config.always_on_roles) + tuple(resolve_role(config, role_id) for role_id in enabled)
+            roles = tuple(config.always_on_roles) + tuple(
+                resolve_role(config, role_id) for role_id in enabled
+            )
             report_dir = report_root / task_id
             create_run_bundle(
                 config=config,
@@ -399,7 +429,9 @@ def validate_bundle_outputs() -> None:
             ]
             ensure(
                 not missing_outputs,
-                f"task {task_id} did not generate required outputs: {', '.join(sorted(set(missing_outputs)))}",
+                "task "
+                f"{task_id} did not generate required outputs: "
+                f"{', '.join(sorted(set(missing_outputs)))}",
             )
             manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
                 encoding="utf-8",

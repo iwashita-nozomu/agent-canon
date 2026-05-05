@@ -81,6 +81,8 @@ goal-driven repo-changing task では、`/goal` がまだ exact でなくても 
 write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
+repo inventory、tool drift survey、static validation planning、diff-local Python / C++ review は、明示許可がある場合に `gpt-5.3-codex-spark` `low` の read-only wave へ先に切ります。parent は結果統合、設計判断、scope 判断、最終責任へ集中します。
+`explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を `model="gpt-5.3-codex-spark"`、`reasoning_effort="low"` で再起動します。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。

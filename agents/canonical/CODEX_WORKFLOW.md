@@ -390,7 +390,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex-spark` が code survey、static test design、language-specific code review、そして設計packetで完全に切れる狭い実装sliceを担当する形です。設計判断、scope判断、重要 review は `gpt-5.5` 側に残し、Spark 側は reasoning effort を minimal まで抑えて token usage を絞ります。
+default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex-spark` が code survey、static test design、language-specific code review、そして設計packetで完全に切れる狭い実装sliceを担当する形です。設計判断、scope判断、重要 review は `gpt-5.5` 側に残し、Spark 側は reasoning effort を `low` に抑えて token usage と tool compatibility の両方を守ります。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。

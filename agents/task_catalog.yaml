@@ -16,6 +16,7 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
         - Include request_clause_ids, expected artifact path, write scope, validation command, and next review gate in every handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates.
         - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
         - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
@@ -59,6 +60,7 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, research_notes.md or cited sources, and team_manifest.yaml.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
         - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
         - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
@@ -116,6 +118,7 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml.
         - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
         - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
@@ -159,6 +162,7 @@ workflow_families:
         - Start from the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml.
         - State the triggering code requirement, blocked command, source-of-truth surface, rollback path, and validation command in every handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
         - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
         - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
@@ -201,6 +205,7 @@ workflow_families:
         - Start from the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml.
         - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, tool drift survey, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Review the whole repository, not only the local diff; keep root adapters thin and shared canon authoritative.
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
@@ -250,6 +255,7 @@ workflow_families:
         - Start from the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml.
         - State backlog item, hypothesis, run protocol, success metric, stopping rule, and next decision gate in every handoff.
       workflow_focus:
+        - Route repo inventory, static validation planning, diff-local language review, and design-traced narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Keep the adaptive outer loop separate from one implementation slice; one iteration is not whole-loop completion.
         - Do not mix code change, experiment protocol change, runtime flag change, and claim/report rewrite in one iteration without an explicit clause.
         - Promote only validated lessons into notes or memory; keep failed attempts traceable.
