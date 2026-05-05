@@ -70,6 +70,23 @@ class VectorSearchTest(unittest.TestCase):
             self.assertIn("tools/docker_dependency_validator.sh", result.stdout)
             self.assertNotIn("documents/github.md", result.stdout)
 
+    def test_symlinked_surface_is_indexed(self) -> None:
+        """Template root symlink views should be indexed through the root path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "vendor" / "agent-canon" / "tools" / "agent_tools"
+            target.mkdir(parents=True)
+            (target / "vector_search.py").write_text(
+                "AgentCanon directory link vector search helper.\n",
+                encoding="utf-8",
+            )
+            (root / "tools").symlink_to(root / "vendor" / "agent-canon" / "tools")
+
+            result = run_search(root, "--surface", "tools", "--query", "directory link vector")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("tools/agent_tools/vector_search.py", result.stdout)
+
     def test_json_output_is_machine_readable(self) -> None:
         """JSON output should expose indexed file count and hits."""
         with tempfile.TemporaryDirectory() as tmp_dir:

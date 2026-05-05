@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from collections import Counter
@@ -132,9 +133,12 @@ def tokenize_text(text: str) -> tuple[str, ...]:
 def relative_path(root: Path, path: Path) -> str:
     """Return a stable slash-separated path relative to root when possible."""
     try:
-        return path.resolve().relative_to(root.resolve()).as_posix()
+        return path.absolute().relative_to(root.absolute()).as_posix()
     except ValueError:
-        return path.as_posix()
+        try:
+            return path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            return path.as_posix()
 
 
 def matches_exclude(relative: str, excludes: Sequence[str]) -> bool:
@@ -182,9 +186,11 @@ def iter_surface_files(
         if surface_path.is_file() and is_indexable(root, surface_path, excludes, excluded_parts):
             yield surface_path
         elif surface_path.is_dir():
-            for candidate in sorted(surface_path.rglob("*")):
-                if is_indexable(root, candidate, excludes, excluded_parts):
-                    yield candidate
+            for current_root, _, filenames in os.walk(surface_path, followlinks=True):
+                for filename in sorted(filenames):
+                    candidate = Path(current_root) / filename
+                    if is_indexable(root, candidate, excludes, excluded_parts):
+                        yield candidate
 
 
 def read_document(root: Path, path: Path) -> Document:
