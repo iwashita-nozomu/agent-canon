@@ -7,6 +7,8 @@
 # downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
 # downstream implementation ../documents/algorithm-implementation-boundary.md root symlink view for algorithm boundary policy
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
+# downstream implementation ../documents/result-log-retention-and-visualization.md root symlink view
+# downstream implementation ../documents/repo-local-tool-imports.md root symlink view
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_compare_agent_run_paths.py root symlink view for run path comparison tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
@@ -153,6 +155,8 @@ documents/codex-configuration-reference.md:../${PREFIX}/documents/codex-configur
 documents/codex-configuration-slides.md:../${PREFIX}/documents/codex-configuration-slides.md
 documents/algorithm-implementation-boundary.md:../${PREFIX}/documents/algorithm-implementation-boundary.md
 documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-design.md
+documents/result-log-retention-and-visualization.md:../${PREFIX}/documents/result-log-retention-and-visualization.md
+documents/repo-local-tool-imports.md:../${PREFIX}/documents/repo-local-tool-imports.md
 documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
