@@ -7,6 +7,7 @@
 # @dependency-end
 
 set -euo pipefail
+export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
@@ -105,6 +106,14 @@ configured_source_repo() {
     git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.sourceRepo"
     return
   fi
+}
+
+default_remote_url() {
+  if [[ -n "${AGENT_CANON_REMOTE_URL:-}" ]]; then
+    printf '%s\n' "${AGENT_CANON_REMOTE_URL}"
+    return
+  fi
+  printf '%s\n' "${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
 }
 
 configured_remote_url() {

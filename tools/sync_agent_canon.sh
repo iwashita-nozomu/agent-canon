@@ -25,6 +25,7 @@
 # downstream implementation ../tests/tools/test_update_latest_result.py root symlink view
 # @dependency-end
 set -euo pipefail
+export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"

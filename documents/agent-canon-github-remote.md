@@ -27,6 +27,8 @@ targets, not the source of truth.
 `tools/sync_agent_canon.sh` uses the GitHub URL when `AGENT_CANON_REMOTE_URL`
 is unset. Set `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git` only when a
 repo intentionally works against a local mirror.
+AgentCanon latest checks run with `GIT_TERMINAL_PROMPT=0` by default so GitHub
+auth problems fail non-interactively instead of hanging inside task startup.
 
 ## Existing Local-Bare Repos
 
