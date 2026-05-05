@@ -135,7 +135,7 @@ python3 -m pydocstyle python tests
 ### 4. Code Quality (Ruff)
 
 ```bash
-python3 -m ruff check python tests --select E,F,I,D,UP
+python3 -m ruff check python tests --select E,F,I,D,UP --ignore E501
 ```
 
 **対象**: `python/` 配下の全 Python ファイル
@@ -147,6 +147,7 @@ python3 -m ruff check python tests --select E,F,I,D,UP
 - **D**: docstring チェック
 - **UP**: pyupgrade（最新構文へ upgrade）
 
+**行長**: E501 は固定文字数制限なので fail 条件にしない
 **失敗時の対応**: スタイル or import 順序を修正
 
 ---
@@ -276,7 +277,7 @@ python3 -m pyright
 python3 -m pytest tests/ -q
 
 # Ruff のみ
-python3 -m ruff check python tests --select E,F,I,D,UP
+python3 -m ruff check python tests --select E,F,I,D,UP --ignore E501
 ```
 
 ---
@@ -303,7 +304,7 @@ python3 -m ruff check python tests --select E,F,I,D,UP
   run: python3 -m pydocstyle python tests
 
 - name: Code quality
-  run: python3 -m ruff check python tests --select E,F,I,D,UP
+  run: python3 -m ruff check python tests --select E,F,I,D,UP --ignore E501
 ```
 
 ---

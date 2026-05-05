@@ -534,7 +534,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - agent runtime / skill 変更では `make agent-checks`
 - checkpoint では `make ci-quick` を使ってよいが、final closeout では `make ci` を優先する
 - 必要に応じて `make ci`
-- Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP` を確認する
+- Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP --ignore E501` を確認する
 - C / C++ 変更では project-native configure / build / test evidence を確認し、CMake project なら `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build` を既定候補にする
 - 文書変更では markdown / link check を使う
 - report を閉じる前には `documents/experiment-report-style.md` を確認する
@@ -551,7 +551,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
 - `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
 - `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、header 修正まで完了していない completion report を出さない
-- `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` の static analysis evidence が無い completion report を出さない
+- `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence が無い completion report を出さない
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` が揃い、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断が構造化 loop evidence として残るまで completion report を出さない
 - `closeout_gate.md` の `subagents_closed=yes` が揃い、run-local subagent が閉じられ、新規 user request で前 task の subagent を使い回していないことが `Subagent Lifecycle Evidence` に残るまで completion report を出さない

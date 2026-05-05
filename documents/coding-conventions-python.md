@@ -114,7 +114,7 @@ def load_config(path: Path) -> dict[str, str]:
 - `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
 - `python3 -m pyright`
 - `python3 -m pytest tests/ -q --tb=short`
-- `python3 -m ruff check python tests --select D,E,F,I,UP`
+- `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
 
 ## Markdown ファイル修正後
 

@@ -171,7 +171,7 @@ fi
 # 4. Code quality
 echo ""
 echo -e "${BLUE}4️⃣  Code quality checks (Ruff)...${NC}"
-if python3 -m ruff check python tests --select E,F,I,D,UP; then
+if python3 -m ruff check python tests --select E,F,I,D,UP --ignore E501; then
     echo -e "${GREEN}✅ Code quality checks passed${NC}"
     write_report "ruff=pass"
 else

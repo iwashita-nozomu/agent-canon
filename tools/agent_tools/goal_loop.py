@@ -51,7 +51,7 @@ DEFAULT_EXIT_CRITERIA = (
         "G5",
         "Repo-wide static analysis or CI passes with `make ci`, or the "
         "documented fallback `python3 -m pyright` plus "
-        "`python3 -m ruff check python tests --select D,E,F,I,UP`.",
+        "`python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`.",
     ),
     ("G6", "Objective-specific completion evidence is recorded."),
 )

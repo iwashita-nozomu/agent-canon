@@ -130,7 +130,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - user-facing completion report は、作成・編集した human-authored text file の冒頭に `@dependency-start` / `@dependency-end` manifest block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
 - repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、依存 graph、header 欠落、header format を確認します。失敗した header は修正してから再実行し、`closeout_gate.md` に evidence を残します。
 - repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の静的解析を通します。既定は `make ci` です。時間短縮目的の `make ci-quick` だけでは closeout evidence にしてはいけません。
-- `make ci` が環境要因で実行不能な場合は、少なくとも `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP` を全 repo 設定で実行し、不足 toolchain は修復します。未実行のまま user-facing completion report を返してはいけません。
+- `make ci` が環境要因で実行不能な場合は、少なくとも `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` を全 repo 設定で実行し、不足 toolchain は修復します。未実行のまま user-facing completion report を返してはいけません。
 - If a shared surface drifts, repair it with `bash tools/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
 - If you need to change shared canon itself, treat `vendor/agent-canon/` as the source of truth.
@@ -179,5 +179,5 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `make docs-check`
 - `python3 -m pytest tests/ -q --tb=short`
 - `python3 -m pyright`
-- `python3 -m ruff check python tests --select D,E,F,I,UP`
+- `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 変更では project-native configure / build / test evidence

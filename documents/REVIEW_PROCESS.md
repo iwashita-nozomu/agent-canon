@@ -70,7 +70,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - Python 差分を含む場合は、必要に応じて次を追加します。
   - `python3 -m pyright`
   - `python3 -m pytest tests/ -q --tb=short`
-  - `python3 -m ruff check python tests --select D,E,F,I,UP`
+  - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
   - CMake project なら `cmake -S . -B build`
   - CMake project なら `cmake --build build`

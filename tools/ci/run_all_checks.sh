@@ -230,7 +230,7 @@ if [ $QUICK_MODE -eq 0 ]; then
   echo "   - UP: Python 最新構文チェック"
   echo ""
   
-  if "$PYTHON_BIN" -m ruff check python tests --select D,E,F,I,UP 2>&1; then
+  if "$PYTHON_BIN" -m ruff check python tests --select D,E,F,I,UP --ignore E501 2>&1; then
     echo "✅ ruff 成功"
   else
     echo "❌ ruff 失敗"

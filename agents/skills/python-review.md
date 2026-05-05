@@ -22,7 +22,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 - `pyright`
 - `pytest tests/`
-- `ruff check python tests --select D,E,F,I,UP`
+- `ruff check python tests --select D,E,F,I,UP --ignore E501`
 
 ## Core References
 
@@ -40,7 +40,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 
 - `pyright` の結果を確認し、型エラーや warning を見逃していない
 - `pytest tests/` の対象範囲が今回の変更に対して妥当である
-- `ruff check python tests --select D,E,F,I,UP` の違反を確認している
+- `ruff check python tests --select D,E,F,I,UP --ignore E501` の違反を確認している
 - public function、CLI、config、serialization の境界を触った場合は call site 影響を見ている
 - 例外処理、default 値、`Any` 境界、型 narrowing の崩れを見ている
 - Python 実装に追随すべき docstring や docs があれば確認している
@@ -50,7 +50,7 @@ Python 差分を型、テスト、lint、境界設計の観点で厳密に確認
 1. changed Python files と関連 test files を固定します。
 1. `pyright` を見て型境界と import 破綻を確認します。
 1. `pytest tests/` で behavior を確認します。
-1. `ruff check python tests --select D,E,F,I,UP` で style / import / docstring / upgrade 逸脱を見ます。
+1. `ruff check python tests --select D,E,F,I,UP --ignore E501` で style / import / docstring / upgrade 逸脱を見ます。
 1. findings を API behavior、type safety、test coverage、docs drift に分けて返します。
 
 ## Common Failure Modes

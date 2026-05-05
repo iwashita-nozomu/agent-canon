@@ -79,7 +79,7 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 ## Repo-Wide Static Analysis Evidence
 
-<!-- Before user-facing completion, run full-repo static analysis. Preferred evidence is `make ci` because it includes pyright and ruff without quick-mode skips. If environment constraints prevent `make ci`, record full-repo `python3 -m pyright` and `python3 -m ruff check python tests --select D,E,F,I,UP` evidence and the toolchain repair performed. Do not unlock closeout with only `make ci-quick`. -->
+<!-- Before user-facing completion, run full-repo static analysis. Preferred evidence is `make ci` because it includes pyright and ruff without quick-mode skips. If environment constraints prevent `make ci`, record full-repo `python3 -m pyright` and `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` evidence and the toolchain repair performed. Do not unlock closeout with only `make ci-quick`. -->
 
 ## Spec-To-Product Coverage Evidence
 
