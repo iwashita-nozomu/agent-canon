@@ -11,7 +11,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from container_runtime import detect_host_runtime_features, load_or_default_pack, workspace_path
+from container_runtime import (
+    HOST_GH_CONFIG,
+    HOST_SSH_DIR,
+    detect_host_runtime_features,
+    load_or_default_pack,
+    workspace_path,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,8 +50,16 @@ def main() -> int:
         volume_lines.append("      - /mnt/git:/mnt/git")
     if features.has_host_codex_home:
         volume_lines.append(f"      - {Path.home() / '.codex'}:/root/.codex")
+    if features.has_host_gh_config:
+        volume_lines.append(f"      - {HOST_GH_CONFIG}:/root/.config/gh")
+    if features.has_host_ssh_dir:
+        volume_lines.append(f"      - {HOST_SSH_DIR}:/root/.ssh:ro")
+    if features.ssh_auth_sock is not None:
+        volume_lines.append(f"      - {features.ssh_auth_sock}:/ssh-agent")
 
     environment_lines = ['      DEVCONTAINER_RUNTIME_MODE: "generated"']
+    if features.ssh_auth_sock is not None:
+        environment_lines.append('      SSH_AUTH_SOCK: "/ssh-agent"')
     if features.has_gpu:
         environment_lines.extend(
             [
@@ -87,6 +101,9 @@ def main() -> int:
         f" gpu={int(features.has_gpu)}"
         f" mount_mnt_git={int(features.has_mnt_git)}"
         f" mount_host_codex={int(features.has_host_codex_home)}"
+        f" mount_host_gh={int(features.has_host_gh_config)}"
+        f" mount_host_ssh={int(features.has_host_ssh_dir)}"
+        f" forward_ssh_agent={int(features.ssh_auth_sock is not None)}"
         f" pack={args.pack}"
     )
     return 0

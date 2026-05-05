@@ -40,6 +40,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - WSL2 では repo workspace を ext4 側に置く
 - Docker state と build cache を Linux filesystem 側に置く
 - `~/.codex/` と `~/.ssh/` を Linux 側 home に持つ
+- GitHub CLI を host 側で認証し、`~/.config/gh/` を Linux 側 home に持つ
+- SSH agent を使う場合は `SSH_AUTH_SOCK` が現在の shell で有効な socket を指す
 - `git config user.name` と `git config user.email` を設定する
 - `rg` を入れる
 - VS Code を使う場合は `.vscode/extensions.json` の推奨拡張を入れる
@@ -82,6 +84,8 @@ dev container は `.devcontainer/` を使います。起動時に generated comp
 - GPU があれば `gpus: all`
 - GPU がなければ CPU-only
 - `/mnt/git` があれば bind mount
+- `~/.codex`、`~/.config/gh`、`~/.ssh` があれば bind mount
+- `SSH_AUTH_SOCK` が有効なら agent socket を forward
 
 で動きます。
 
@@ -101,6 +105,9 @@ GPU が無いこと自体を failure 条件にしません。
 
 - `codex` は host に入っていることを推奨します
 - container 内の Codex CLI は `docker/Dockerfile` に同梱します
+- `gh` は host に入っていることを推奨します。container 内の GitHub CLI も `docker/Dockerfile` に同梱します
+- 初回 `gh auth login` は host 側で行い、container は mounted `~/.config/gh` を使います
+- `~/.ssh` は read-only mount 前提なので、key 追加や GitHub host key 登録は host 側で行います
 - local bare remote を使う前提なので、host から対象 repository の bare remote と `/mnt/git/agent-canon.git` へ到達できることを確認します
 
 ## 9. 最低限の初期確認
@@ -111,6 +118,8 @@ python3 --version
 git --version
 make --version
 docker version
+gh auth status
+ssh -T git@github.com
 test -d /mnt/git
 git status --short
 make ci-quick

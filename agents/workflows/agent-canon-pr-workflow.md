@@ -23,6 +23,8 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 ## 固定ルール
 
 - shared canon の正本は `vendor/agent-canon/` です。
+- GitHub 上の canonical shared canon repo は `iwashita-nozomu/agent-canon` です。
+- template を GitHub 管理にする場合は、同じ owner の template repo と `agent-canon` repo を並べ、`.gitmodules` の relative URL `../agent-canon.git` が GitHub clone と local bare mirror の両方で解決できる状態を保ちます。
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
@@ -30,6 +32,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo snapshot を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
+- `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash tools/sync_agent_canon.sh push` を実行します。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
@@ -123,8 +126,24 @@ bash tools/update_agent_canon.sh push-proposal
 - `make agent-canon-pr-check` が pass
 - root shared surface が `bash tools/sync_agent_canon.sh check` で clean
 - PR 本文に changed surface と validation が記録されている
+- PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態が記録されている
 - file 構成変更がある場合は integration worktree merge と tree check が完了
 - template `main` へ merge 後、`bash tools/sync_agent_canon.sh push` の実行結果、または external block / user stop による未実行理由が残っている
+
+## GitHub Security Baseline
+
+AgentCanon / template の GitHub repo は private を既定にし、少なくとも次を PR 前に確認します。
+
+```bash
+gh repo view iwashita-nozomu/agent-canon --json nameWithOwner,visibility,isPrivate,defaultBranchRef
+gh api repos/iwashita-nozomu/agent-canon/branches/main/protection
+gh api repos/iwashita-nozomu/agent-canon/vulnerability-alerts
+gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
+```
+
+- branch protection が無い場合は `missing_or_unavailable` として PR 本文へ残し、必要なら GitHub UI で `main` 保護、required checks、delete branch on merge を設定します。
+- vulnerability alert / Dependabot alert が disabled の場合は、private repo 側の security settings で有効化するか、無効の理由を PR に残します。
+- `gh auth status` は host で人間が初回認証します。container は host `~/.config/gh` mount を使い、token を repo に書きません。
 
 ## 禁止事項
 

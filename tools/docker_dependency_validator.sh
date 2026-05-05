@@ -64,6 +64,8 @@ check_dockerfile_coherence() {
     || report_warning "Dockerfile does not install docker/requirements.txt through pip -r"
   grep -Eq '(^|[[:space:]])rsync([[:space:]]|\\|$)' "$dockerfile" \
     || report_issue "docker/Dockerfile must install rsync so fresh-clone overlay works in the canonical container"
+  grep -q 'openssh-client' "$dockerfile" \
+    || report_issue "docker/Dockerfile must install openssh-client so GitHub SSH and agent forwarding work"
   grep -q 'cli.github.com/packages' "$dockerfile" \
     || report_issue "docker/Dockerfile must install GitHub CLI from the official GitHub CLI apt repository"
   grep -Eq '(^|[[:space:]])gh([[:space:]]|\\|$)' "$dockerfile" \

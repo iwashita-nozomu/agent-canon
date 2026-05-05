@@ -63,6 +63,16 @@ shared upstream refresh も使いたいときだけ `--source-repo /mnt/l/worksp
 
 shared canon の変更を maintainer に渡すときは、`push-proposal` で project-local bare repo の proposal branch へ投げます。maintainer はその branch を fetch して整理用 branch に merge します。
 
+GitHub 管理にする場合は、template repo と `agent-canon` repo を同じ owner に置き、`.gitmodules` の `../agent-canon.git` がそのまま解決できる構成を標準にします。local `/mnt/git` bare mirror は高速な日常 validation 用に残してよいですが、PR と security 設定の正本は GitHub 側に置きます。
+
+最低限の確認:
+
+```bash
+gh repo view <owner>/<template-repo> --json nameWithOwner,visibility,isPrivate,defaultBranchRef
+gh repo view <owner>/agent-canon --json nameWithOwner,visibility,isPrivate,defaultBranchRef
+git submodule status vendor/agent-canon
+```
+
 ## 3. 受け入れ確認
 
 fresh clone と runtime surface が壊れていないことを確認します。

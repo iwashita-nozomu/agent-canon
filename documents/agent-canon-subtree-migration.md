@@ -25,9 +25,11 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
 ## 固定構成
 
 - upstream repo:
-  - `agent-canon`
+  - `iwashita-nozomu/agent-canon`
 - template / 派生 repo 側の pin:
   - `vendor/agent-canon/`
+- submodule URL:
+  - `.gitmodules` では `../agent-canon.git` を標準にし、GitHub 上で同じ owner に template repo と `agent-canon` repo を並べた場合も、local `/mnt/git` bare mirror の場合も同じ構成で解決できるようにします。
 - root 側の shared runtime surface:
   - `documents/SHARED_RUNTIME_SURFACES.md` に載っている symlink view または synced copy
 - root 側の template entrypoint:
@@ -88,6 +90,7 @@ bash tools/sync_agent_canon.sh push
 - shared canon 変更は repo-local implementation change と同じ PR に混ぜません。
 - PR 前の機械 gate は `make agent-canon-pr-check` を使います。
 - merge 後は `bash tools/sync_agent_canon.sh push` で upstream `agent-canon` を更新します。
+- GitHub 管理では、template PR と AgentCanon PR / commit の対応、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態を PR 本文に残します。
 
 ## 完了条件
 

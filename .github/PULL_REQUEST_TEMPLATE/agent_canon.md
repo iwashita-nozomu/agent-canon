@@ -49,6 +49,19 @@ Integration notes:
 
 Upstream sync note:
 
+## GitHub Mirror / Submodule Evidence
+
+- AgentCanon GitHub repo: `iwashita-nozomu/agent-canon`
+- Template GitHub repo:
+- template PR URL:
+- AgentCanon PR URL or commit:
+- template `vendor/agent-canon` pin:
+- AgentCanon GitHub `main` SHA:
+- template GitHub `main` SHA:
+- local bare mirror SHA:
+- `git submodule status vendor/agent-canon`:
+- branch protection / vulnerability alert / Dependabot status:
+
 ## Risks
 
 - stale route risk:
