@@ -49,6 +49,7 @@ root では次を symlink view として扱います。
 - `documents/SKILL_IMPLEMENTATION_GUIDE.md`
 - `documents/TROUBLESHOOTING.md`
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
+- `documents/agent-canon-github-remote.md`
 - `documents/agent-canon-subtree-migration.md`
 - `documents/coding-conventions-cpp.md`
 - `documents/coding-conventions-experiments.md`

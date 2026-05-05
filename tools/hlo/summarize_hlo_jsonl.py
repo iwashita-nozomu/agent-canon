@@ -11,19 +11,23 @@ import json
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TypeAlias, cast
+
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject: TypeAlias = dict[str, JsonValue]
 
 
-def _iter_jsonl(path: Path) -> Iterable[dict[str, Any]]:
+def _iter_jsonl(path: Path) -> Iterable[JsonObject]:
     """JSONL を 1 行ずつ読み込みます。"""
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             s = line.strip()
             if not s:
                 continue
-            obj = json.loads(s)
+            obj = cast(object, json.loads(s))
             if isinstance(obj, dict):
-                yield obj
+                yield cast(JsonObject, obj)
 
 
 def _count_hlo_ops(hlo_text: str) -> Counter[str]:
@@ -51,7 +55,7 @@ def _count_hlo_ops(hlo_text: str) -> Counter[str]:
     return counter
 
 
-def _get_record_key(rec: dict[str, Any], key: str) -> str:
+def _get_record_key(rec: JsonObject, key: str) -> str:
     value = rec.get(key)
     if value is None:
         return ""
@@ -60,6 +64,11 @@ def _get_record_key(rec: dict[str, Any], key: str) -> str:
 
 def _count_lines(text: str) -> int:
     return len([line for line in text.splitlines() if line.strip()])
+
+
+def _counter_pairs(counter: Counter[str], limit: int | None = None) -> list[list[JsonValue]]:
+    """Return JSON-compatible pairs instead of tuple values."""
+    return [[name, count] for name, count in counter.most_common(limit)]
 
 
 def main() -> None:
@@ -107,19 +116,19 @@ def main() -> None:
             hlo_lines_total += _count_lines(hlo)
             hlo_chars_total += len(hlo)
 
-    out: dict[str, Any] = {
+    out = cast(JsonObject, {
         "jsonl": str(path),
         "total_records": total_records,
         "total_selected": total_selected,
         "filter": {"only_case": args.only_case},
-        "tags": tags.most_common(),
-        "dialects": dialects.most_common(),
+        "tags": _counter_pairs(tags),
+        "dialects": _counter_pairs(dialects),
         "hlo_text": {
             "total_lines": hlo_lines_total,
             "total_chars": hlo_chars_total,
         },
-        "top_ops": ops_total.most_common(args.top),
-    }
+        "top_ops": _counter_pairs(ops_total, args.top),
+    })
     print(json.dumps(out, ensure_ascii=False))
 
 

@@ -13,11 +13,15 @@ JSON Schema と TypeScript 型定義で監査ログの形式を厳密に定義�
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import TypeAlias, cast
+
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject: TypeAlias = dict[str, JsonValue]
 
 # ========== JSON Schema Definition ==========
 
-AUDIT_LOG_JSON_SCHEMA = {
+AUDIT_LOG_JSON_SCHEMA: dict[str, object] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Audit Log Entry",
     "description": "統一監査ログスキーマ",
@@ -190,10 +194,11 @@ interface AuditLogStatistics {
 
 
 _REQUIRED_FIELDS = {"timestamp", "action", "actor", "level", "outcome"}
-_ALLOWED_FIELDS = set(AUDIT_LOG_JSON_SCHEMA["properties"].keys())
-_ALLOWED_ACTIONS = set(AUDIT_LOG_JSON_SCHEMA["properties"]["action"]["enum"])
-_ALLOWED_LEVELS = set(AUDIT_LOG_JSON_SCHEMA["properties"]["level"]["enum"])
-_ALLOWED_OUTCOMES = set(AUDIT_LOG_JSON_SCHEMA["properties"]["outcome"]["enum"])
+_SCHEMA_PROPERTIES = cast(dict[str, dict[str, object]], AUDIT_LOG_JSON_SCHEMA["properties"])
+_ALLOWED_FIELDS = set(_SCHEMA_PROPERTIES.keys())
+_ALLOWED_ACTIONS = set(cast(list[str], _SCHEMA_PROPERTIES["action"]["enum"]))
+_ALLOWED_LEVELS = set(cast(list[str], _SCHEMA_PROPERTIES["level"]["enum"]))
+_ALLOWED_OUTCOMES = set(cast(list[str], _SCHEMA_PROPERTIES["outcome"]["enum"]))
 
 
 # ========== Python Dataclass Models ==========
@@ -205,8 +210,8 @@ class ErrorInfo:
     message: str
     traceback: str | None = None
     
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> JsonObject:
+        return cast(JsonObject, asdict(self))
 
 
 @dataclass
@@ -215,8 +220,8 @@ class AuditLogMetadata:
     duration_ms: int | None = None
     tags: list[str] = field(default_factory=list)
     
-    def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
+    def to_dict(self) -> JsonObject:
+        data = cast(JsonObject, asdict(self))
         return {k: v for k, v in data.items() if v is not None}
 
 
@@ -228,12 +233,12 @@ class AuditLogEntry:
     actor: str
     level: str                  # INFO, WARNING, ERROR, SECURITY, COMPLIANCE
     outcome: str                # success, failure, warning, partial
-    details: dict[str, Any] = field(default_factory=dict)
+    details: JsonObject = field(default_factory=dict)
     resource: str | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: JsonObject | None = None
     git_commit: str = "unknown"
     branch: str = "unknown"
-    error: dict[str, Any] | None = None
+    error: JsonObject | None = None
     
     def validate(self) -> bool:
         """スキーマバリデーション"""
@@ -242,7 +247,7 @@ class AuditLogEntry:
             print(f"Validation error: {error}")
         return is_valid
     
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> JsonObject:
         """辞書に変換"""
         data = {
             "timestamp": self.timestamp,
@@ -283,8 +288,8 @@ class AuditLogQuery:
     end_date: str | None = None     # ISO 8601
     limit: int = 100
     
-    def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
+    def to_dict(self) -> JsonObject:
+        data = cast(JsonObject, asdict(self))
         return {k: v for k, v in data.items() if v is not None}
 
 
@@ -300,8 +305,8 @@ class AuditLogStatistics:
     error_rate: float
     security_events: int
     
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> JsonObject:
+        return cast(JsonObject, asdict(self))
     
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
@@ -309,7 +314,7 @@ class AuditLogStatistics:
 
 # ========== Schema Export ==========
 
-def get_json_schema() -> dict[str, Any]:
+def get_json_schema() -> dict[str, object]:
     """JSON Schema を取得"""
     return AUDIT_LOG_JSON_SCHEMA
 
@@ -319,7 +324,7 @@ def get_typescript_definitions() -> str:
     return TYPE_DEFINITIONS
 
 
-def _is_iso8601_datetime(value: Any) -> bool:
+def _is_iso8601_datetime(value: object) -> bool:
     """ISO 8601 の日時文字列かを判定"""
     if not isinstance(value, str):
         return False
@@ -331,7 +336,7 @@ def _is_iso8601_datetime(value: Any) -> bool:
         return False
 
 
-def _validate_manual_schema(entry: dict[str, Any]) -> tuple[bool, str | None]:
+def _validate_manual_schema(entry: JsonObject) -> tuple[bool, str | None]:
     """jsonschema 非依存の最小バリデーション"""
     if not isinstance(entry, dict):
         return False, "Entry must be a dictionary"
@@ -399,7 +404,7 @@ def _validate_manual_schema(entry: dict[str, Any]) -> tuple[bool, str | None]:
     return True, None
 
 
-def validate_entry(entry: dict[str, Any]) -> tuple[bool, str | None]:
+def validate_entry(entry: JsonObject) -> tuple[bool, str | None]:
     """ログエントリをバリデーション
     
     Args:

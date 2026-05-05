@@ -11,6 +11,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 `git clone <template>` 直後に、新しい repo として使い始めるための初期化手順を固定します。
 project slug、display name、project bare repo、project-local `agent-canon` bare repo の登録を同じ入口で扱います。
+AgentCanon の source of truth は GitHub remote で、project-local bare repo は proposal / mirror 用の互換 surface として扱います。
 
 ## Use When
 
@@ -26,6 +27,7 @@ project slug、display name、project bare repo、project-local `agent-canon` ba
 - `scripts/start_repository.sh`
 - `scripts/init_from_template.sh`
 - `documents/agent-canon-subtree-migration.md`
+- `documents/agent-canon-github-remote.md`
 - `tools/sync_agent_canon.sh`
 
 ## Default Sequence
@@ -40,7 +42,7 @@ bash scripts/start_repository.sh \
   --dry-run
 ```
 
-1. 初期化します。wrapper は clean clone なら実 init の前に `make agent-canon-ensure-latest` を実行し、そのあと `/mnt/git/<project-slug>-agent-canon.git` を作成して `vendor/agent-canon/` snapshot を `main` として seed します。dirty state なら preflight の未実行理由を出して init を続行します。
+1. 初期化します。wrapper は clean clone なら実 init の前に `make agent-canon-ensure-latest` を実行します。dirty state なら preflight の未実行理由を出して init を続行します。
 
 ```bash
 bash scripts/start_repository.sh \
@@ -48,7 +50,7 @@ bash scripts/start_repository.sh \
   --display-name "Your Project"
 ```
 
-1. project-local agent-canon bare repo 名を固定したい場合は明示します。
+1. project-local agent-canon bare repo を proposal / mirror 用に使う場合は明示します。
 
 ```bash
 bash scripts/start_repository.sh \
@@ -57,7 +59,7 @@ bash scripts/start_repository.sh \
   --agent-canon-bare-repo your-project-agent-canon.git
 ```
 
-1. shared `agent-canon` remote を使い続ける場合だけ opt out します。
+1. GitHub canonical remote だけを使う場合は local bare seed を opt out します。
 
 ```bash
 bash scripts/start_repository.sh \

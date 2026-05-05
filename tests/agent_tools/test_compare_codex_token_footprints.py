@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests Codex token footprint comparison behavior.
-# upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py compares session logs
-# upstream design ../../agents/workflows/token-efficient-codex-workflow.md defines the token comparison protocol
+# upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py token comparer
+# upstream design ../../agents/workflows/token-efficient-codex-workflow.md token protocol
 # @dependency-end
 """Tests for Codex session token footprint comparison."""
 

@@ -12,7 +12,11 @@ import argparse
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TypeAlias, cast
+
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject: TypeAlias = dict[str, JsonValue]
 
 PREFERRED_KEYS = (
     "case",
@@ -26,7 +30,7 @@ PREFERRED_KEYS = (
 )
 
 
-def _format_value(value: Any) -> str:
+def _format_value(value: JsonValue) -> str:
     """Render a JSON value safely inside a Markdown table cell."""
     if isinstance(value, Mapping | Sequence) and not isinstance(value, str):
         rendered = json.dumps(value, ensure_ascii=False)
@@ -35,9 +39,9 @@ def _format_value(value: Any) -> str:
     return rendered.replace("|", "\\|").replace("\n", "<br>")
 
 
-def _ordered_items(record: Mapping[str, Any]) -> list[tuple[str, Any]]:
+def _ordered_items(record: Mapping[str, JsonValue]) -> list[tuple[str, JsonValue]]:
     """Return preferred keys first, then remaining keys in lexical order."""
-    items: list[tuple[str, Any]] = []
+    items: list[tuple[str, JsonValue]] = []
     used: set[str] = set()
     for key in PREFERRED_KEYS:
         if key in record:
@@ -47,24 +51,24 @@ def _ordered_items(record: Mapping[str, Any]) -> list[tuple[str, Any]]:
     return items
 
 
-def iter_jsonl_records(path: Path) -> list[dict[str, Any]]:
+def iter_jsonl_records(path: Path) -> list[JsonObject]:
     """Read JSON object records from a JSONL file, skipping malformed lines."""
-    records: list[dict[str, Any]] = []
+    records: list[JsonObject] = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             stripped = line.strip()
             if not stripped:
                 continue
             try:
-                value = json.loads(stripped)
+                value = cast(object, json.loads(stripped))
             except json.JSONDecodeError:
                 continue
             if isinstance(value, dict):
-                records.append(value)
+                records.append(cast(JsonObject, value))
     return records
 
 
-def render_markdown(input_path: Path, records: Sequence[Mapping[str, Any]]) -> str:
+def render_markdown(input_path: Path, records: Sequence[Mapping[str, JsonValue]]) -> str:
     """Render records as a Markdown document."""
     lines = [
         "# JSONL Report",

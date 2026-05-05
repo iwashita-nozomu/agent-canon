@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents Template Bootstrap for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./agent-canon-github-remote.md GitHub canonical remote policy
 @dependency-end
 -->
 
@@ -36,8 +37,10 @@ bash scripts/start_repository.sh \
   --dry-run
 ```
 
-既定では `/mnt/git/your-project-agent-canon.git` も初期化し、clone に含まれる `vendor/agent-canon/` snapshot を seed します。
-このとき proposal branch `canon-proposal/your-project` も bare repo に用意し、clone の git config に既定 branch として記録します。
+GitHub-backed template では、`vendor/agent-canon` submodule は
+`https://github.com/iwashita-nozomu/agent-canon.git` を canonical remote として使います。
+必要な repo だけ `/mnt/git/your-project-agent-canon.git` を proposal / local mirror 用に追加します。
+local bare を追加する場合は、proposal branch `canon-proposal/your-project` も bare repo に用意し、clone の git config に既定 branch として記録します。
 `--force` を init に渡すと wrapper は agent-canon preflight を block 扱いで skip し、dirty worktree override を優先します。
 既存の shared `agent-canon` remote を使い続ける場合だけ、`--skip-agent-canon-bare-repo` を付けます。
 
@@ -63,7 +66,10 @@ shared upstream refresh も使いたいときだけ `--source-repo /mnt/l/worksp
 
 shared canon の変更を maintainer に渡すときは、`push-proposal` で project-local bare repo の proposal branch へ投げます。maintainer はその branch を fetch して整理用 branch に merge します。
 
-GitHub 管理にする場合は、template repo と `agent-canon` repo を同じ owner に置き、`.gitmodules` の `../agent-canon.git` がそのまま解決できる構成を標準にします。local `/mnt/git` bare mirror は高速な日常 validation 用に残してよいですが、PR と security 設定の正本は GitHub 側に置きます。
+GitHub 管理では `.gitmodules` の AgentCanon URL を
+`https://github.com/iwashita-nozomu/agent-canon.git` にします。
+local `/mnt/git` bare mirror は高速な日常 validation 用に残してよいですが、
+PR と security 設定の正本は GitHub 側に置きます。
 
 最低限の確認:
 

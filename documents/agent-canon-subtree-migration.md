@@ -7,6 +7,7 @@ upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR w
 downstream design ../agents/workflows/derived-agent-canon-diff-workflow.md consumes the subtree migration contract
 upstream implementation ../tools/sync_agent_canon.sh vendoring sync tool
 upstream implementation ../tools/update_agent_canon.sh derived repo update helper
+upstream design ./agent-canon-github-remote.md defines GitHub canonical remote policy
 downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root
 @dependency-end
 -->
@@ -25,11 +26,11 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
 ## 固定構成
 
 - upstream repo:
-  - `iwashita-nozomu/agent-canon`
+  - `https://github.com/iwashita-nozomu/agent-canon.git`
 - template / 派生 repo 側の pin:
   - `vendor/agent-canon/`
 - submodule URL:
-  - `.gitmodules` では `../agent-canon.git` を標準にし、GitHub 上で同じ owner に template repo と `agent-canon` repo を並べた場合も、local `/mnt/git` bare mirror の場合も同じ構成で解決できるようにします。
+  - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。local `/mnt/git` bare repo は mirror / proposal target として明示 opt-in します。
 - root 側の shared runtime surface:
   - `documents/SHARED_RUNTIME_SURFACES.md` に載っている symlink view または synced copy
 - root 側の template entrypoint:
@@ -83,6 +84,17 @@ bash tools/sync_agent_canon.sh push
   - upstream `agent-canon` の更新を template 側 snapshot へ取り込む
 - `push`:
   - template 側で育った shared canon を upstream `agent-canon` へ戻す
+
+## GitHub canonical remote
+
+AgentCanon の source of truth は GitHub の
+`https://github.com/iwashita-nozomu/agent-canon.git` です。
+`/mnt/git/agent-canon.git` は高速 validation や offline 作業用の local mirror であり、
+canonical remote ではありません。
+
+既存 repo が `agent-canon` remote や `.gitmodules` を `/mnt/git/agent-canon.git`
+または `../agent-canon.git` に向けている場合は、repo が clean なタイミングで
+`documents/agent-canon-github-remote.md` の migration runbook に従います。
 
 ## PR ルール
 
@@ -305,8 +317,10 @@ shared canon の差分を maintainer に渡すときは `proposal-branch` で既
 
 `ensure-latest` は task 開始時の入口です。
 clean worktree では upstream `agent-canon` と local submodule pin または legacy subtree split を比較し、古い場合だけ更新します。
-`agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は、`agent-canon` remote を自動追加します。
-別の upstream を使う場合は `AGENT_CANON_REMOTE_URL` を指定します。
+`agent-canon` remote が未設定の場合は、GitHub canonical remote
+`https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
+local bare mirror を使う repo は `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git`
+を明示します。
 通常は `git subtree pull --squash` を使います。
 fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
 local subtree split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
@@ -318,7 +332,8 @@ dirty worktree で stale が見つかった場合は、作業差分を保護す�
 既存 subtree repo を submodule へ移すときは、repo ごとに専用 commit を作ります。
 commit message には `AgentCanon subtree-to-submodule migration` と、local worktree 利用者が `git fetch` / merge / conflict resolution で追従できることを書きます。
 
-標準 pin は `vendor/agent-canon` の submodule URL `../agent-canon.git`、branch `main` です。
+標準 pin は `vendor/agent-canon` の submodule URL
+`https://github.com/iwashita-nozomu/agent-canon.git`、branch `main` です。
 親 repo の root symlink view は維持し、`bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` で検証します。
 
 ### 7.6 template / 派生 repo 側の shared canon 変更を upstream へ戻す
@@ -344,6 +359,8 @@ bash tools/update_agent_canon.sh register-local-bare \
 ```
 
 この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
+これは legacy compatibility / proposal transport 用の opt-in path です。
+通常の GitHub-backed repo は canonical GitHub submodule URL を使い、local bare は `agent-canon-local` のような別名 remote として残します。
 既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
 同時に `canon-proposal/<project-slug>` を既定 proposal branch として用意し、clone の git config に保存します。`--source-repo` を渡すと、その path も git config に保存され、以後の `apply` は `remote snapshot refresh -> local sync` の順で動きます。
 

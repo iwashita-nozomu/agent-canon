@@ -38,7 +38,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
     - `ensure-latest` は task 開始時に upstream `agent-canon` と local `vendor/agent-canon` を揃えます。
-    - `agent-canon` remote が未設定で `/mnt/git/agent-canon.git` が存在する場合は自動追加します。
+    - `agent-canon` remote が未設定なら GitHub canonical remote `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。local bare mirror を使う repo だけ `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git` を明示します。
     - submodule repo では gitlink commit を確認し、必要なら submodule pointer を fast-forward 更新します。
     - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
   - `update_agent_canon.sh`

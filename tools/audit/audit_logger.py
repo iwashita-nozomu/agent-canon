@@ -18,10 +18,17 @@ Audit Logger — 監査ログシステム
 
 import json
 import os
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import ParamSpec, TypeAlias, TypeVar, cast
+
+JsonScalar: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject: TypeAlias = dict[str, JsonValue]
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class AuditLevel(Enum):
@@ -36,7 +43,7 @@ class AuditLevel(Enum):
 class AuditLogger:
     """監査ログ記録システム"""
     
-    def __init__(self, log_dir: Path = None):
+    def __init__(self, log_dir: Path | None = None):
         """初期化
         
         Args:
@@ -54,11 +61,11 @@ class AuditLogger:
         action: str,
         actor: str,
         level: AuditLevel = AuditLevel.INFO,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
         resource: str | None = None,
         outcome: str = "success",
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        metadata: JsonObject | None = None,
+    ) -> JsonObject:
         """監査ログを記録
         
         Args:
@@ -98,7 +105,7 @@ class AuditLogger:
         
         return log_entry
     
-    def _log_to_security_file(self, entry: dict[str, Any]) -> None:
+    def _log_to_security_file(self, entry: JsonObject) -> None:
         """セキュリティ・コンプライアンスログを分離ファイルに記録"""
         security_file = self.log_dir / "security.jsonl"
         with open(security_file, "a", encoding="utf-8") as f:
@@ -140,7 +147,7 @@ class AuditLogger:
         action: str | None = None,
         level: AuditLevel | None = None,
         limit: int = 100,
-    ) -> list[dict[str, Any]]:
+    ) -> list[JsonObject]:
         """監査ログを検索
         
         Args:
@@ -152,7 +159,7 @@ class AuditLogger:
         Returns:
             フィルター済みログリスト
         """
-        logs = []
+        logs: list[JsonObject] = []
         
         if not self.log_file.exists():
             return logs
@@ -162,63 +169,70 @@ class AuditLogger:
                 if not line.strip():
                     continue
                 try:
-                    entry = json.loads(line)
+                    entry = cast(object, json.loads(line))
+                    if not isinstance(entry, dict):
+                        continue
+                    log_entry = cast(JsonObject, entry)
                     
                     # フィルター適用
-                    if actor and entry.get("actor") != actor:
+                    if actor and log_entry.get("actor") != actor:
                         continue
-                    if action and entry.get("action") != action:
+                    if action and log_entry.get("action") != action:
                         continue
-                    if level and entry.get("level") != level.value:
+                    if level and log_entry.get("level") != level.value:
                         continue
                     
-                    logs.append(entry)
+                    logs.append(log_entry)
                 except json.JSONDecodeError:
                     continue
         
         return logs[-limit:]
     
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> JsonObject:
         """監査ログ統計を計算"""
         if not self.log_file.exists():
-            return {
+            return cast(JsonObject, {
                 "total_entries": 0,
                 "by_action": {},
                 "by_actor": {},
                 "by_level": {},
                 "by_outcome": {},
-            }
-        
-        stats = {
-            "total_entries": 0,
-            "by_action": {},
-            "by_actor": {},
-            "by_level": {},
-            "by_outcome": {},
-        }
+            })
         
         logs = self.get_logs(limit=10000)
+        by_action: dict[str, int] = {}
+        by_actor: dict[str, int] = {}
+        by_level: dict[str, int] = {}
+        by_outcome: dict[str, int] = {}
         
         for entry in logs:
-            stats["total_entries"] += 1
-            
             action = entry.get("action", "unknown")
-            stats["by_action"][action] = stats["by_action"].get(action, 0) + 1
+            action_key = str(action)
+            by_action[action_key] = by_action.get(action_key, 0) + 1
             
             actor = entry.get("actor", "unknown")
-            stats["by_actor"][actor] = stats["by_actor"].get(actor, 0) + 1
+            actor_key = str(actor)
+            by_actor[actor_key] = by_actor.get(actor_key, 0) + 1
             
             level = entry.get("level", "unknown")
-            stats["by_level"][level] = stats["by_level"].get(level, 0) + 1
+            level_key = str(level)
+            by_level[level_key] = by_level.get(level_key, 0) + 1
             
             outcome = entry.get("outcome", "unknown")
-            stats["by_outcome"][outcome] = stats["by_outcome"].get(outcome, 0) + 1
+            outcome_key = str(outcome)
+            by_outcome[outcome_key] = by_outcome.get(outcome_key, 0) + 1
         
-        return stats
+        return cast(JsonObject, {
+            "total_entries": len(logs),
+            "by_action": by_action,
+            "by_actor": by_actor,
+            "by_level": by_level,
+            "by_outcome": by_outcome,
+        })
 
 
 # グローバルインスタンス
-_logger = None
+_logger: AuditLogger | None = None
 
 
 def get_audit_logger() -> AuditLogger:
@@ -229,7 +243,10 @@ def get_audit_logger() -> AuditLogger:
     return _logger
 
 
-def audit_log(action: str, level: AuditLevel = AuditLevel.INFO):
+def audit_log(
+    action: str,
+    level: AuditLevel = AuditLevel.INFO,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """監査ログデコレーター
     
     使用例:
@@ -237,8 +254,8 @@ def audit_log(action: str, level: AuditLevel = AuditLevel.INFO):
         def run_skill(skill_id: str):
             pass
     """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             logger = get_audit_logger()
             actor = os.getenv("GITHUB_ACTOR", os.getenv("USER", "unknown"))
             

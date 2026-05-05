@@ -8,6 +8,7 @@ downstream design ./codex-configuration-slides.md Codex configuration slide deck
 downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./result-log-retention-and-visualization.md result artifact policy
 downstream design ./repo-local-tool-imports.md repo-local tool import ledger
+downstream design ./agent-canon-github-remote.md GitHub canonical remote policy
 @dependency-end
 -->
 
@@ -32,3 +33,4 @@ template の初期状態では、ここを shared workflow のリンク集にし
 
 - [Result Log Retention And Visualization](./result-log-retention-and-visualization.md): run result、summary、visualization artifact、retention decision の正本ルール。
 - [Repo-Local Tool Imports](./repo-local-tool-imports.md): 派生 repo で育った tool を AgentCanon に取り込むときの disposition 台帳。
+- [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical remote と local bare mirror 互換運用。

@@ -9,6 +9,7 @@
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
 # downstream implementation ../documents/result-log-retention-and-visualization.md root symlink view
 # downstream implementation ../documents/repo-local-tool-imports.md root symlink view
+# downstream implementation ../documents/agent-canon-github-remote.md root symlink view
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_compare_agent_run_paths.py root symlink view for run path comparison tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
@@ -36,6 +37,7 @@ REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
+CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
 
 usage() {
   cat <<EOF
@@ -55,6 +57,7 @@ Environment overrides:
   AGENT_CANON_PREFIX
   AGENT_CANON_REMOTE_NAME
   AGENT_CANON_REMOTE_URL
+  AGENT_CANON_GITHUB_REMOTE_URL
   AGENT_CANON_BRANCH
   AGENT_CANON_FORCE_RELINK=1
 EOF
@@ -92,10 +95,7 @@ default_remote_url() {
     echo "$AGENT_CANON_REMOTE_URL"
     return
   fi
-  if [ -d "/mnt/git/agent-canon.git" ]; then
-    echo "/mnt/git/agent-canon.git"
-    return
-  fi
+  echo "$CANONICAL_AGENT_CANON_REMOTE_URL"
   return 0
 }
 
@@ -157,6 +157,7 @@ documents/algorithm-implementation-boundary.md:../${PREFIX}/documents/algorithm-
 documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-design.md
 documents/result-log-retention-and-visualization.md:../${PREFIX}/documents/result-log-retention-and-visualization.md
 documents/repo-local-tool-imports.md:../${PREFIX}/documents/repo-local-tool-imports.md
+documents/agent-canon-github-remote.md:../${PREFIX}/documents/agent-canon-github-remote.md
 documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
 documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md

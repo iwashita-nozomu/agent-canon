@@ -24,6 +24,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `.agents/skills/`
 - `.codex/agents/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/agent-canon-github-remote.md`
 - `agents/workflows/README.md`
   - workflow catalog と routing guide の入口
 - `agents/workflows/agent-canon-pr-workflow.md`
@@ -49,3 +50,4 @@ bash tools/sync_agent_canon.sh push
 ```
 
 pull / push / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
+canonical remote の詳細は `documents/agent-canon-github-remote.md` を見ます。

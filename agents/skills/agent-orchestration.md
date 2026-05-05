@@ -106,6 +106,6 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - implementation が scope に入るときだけ routing を出します
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS` を確認してから route します
-- design trace、identifier naming、test plan、write scope が固定済みの低リスク slice は `spark_worker` を先に使います。
+- design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。
