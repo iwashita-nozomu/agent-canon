@@ -27,6 +27,9 @@ upstream design README.md memory surface index
 - 2026-04-23 | Review must always check full consistency with existing code, docs, workflows, and canonical surfaces, not only the diff.
   - source: chat
 
+- 2026-05-05 | Do not enforce a fixed 100-character line-length limit; treat line length as a readability judgment governed by project-local formatter/lint configuration, and ignore E501 when fixed line-length failures are not desired.
+  - source: chat
+
 ## Provisional Preferences
 
 - 2026-04-10 | agent の作業哲学、知識、対話から得た学習を task / dialogue ごとに更新可能な仕組みにしたい
