@@ -42,6 +42,7 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 | `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` follow-up local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted public-boundary filtering and algorithm config factory exemptions. |
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` follow-up local diff | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted explicit summary return type so the checker avoids `Any`. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` follow-up local diff | `tools/experiments/update_latest_result.py` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
+| `vendor/agent-canon/tools/__init__.py` and `tools/experiments/__init__.py` | `tools/__init__.py`, `tools/experiments/__init__.py` | Promoted package markers used by shared tool tests. |
 
 ## Preserved As Legacy Provenance
 
