@@ -3,8 +3,6 @@
 <!--
 @dependency-start
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
-upstream design ../agents/canonical/CODEX_WORKFLOW.md dependency header workflow requirement
-upstream design ../agents/templates/closeout_gate.md closeout dependency evidence requirement
 downstream implementation ../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
 downstream implementation ../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax
