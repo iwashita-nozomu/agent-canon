@@ -7,7 +7,7 @@ upstream design AGENTS.md shared canon runtime contract
 -->
 
 
-このディレクトリは `agent-canon` 自体の committed snapshot です。
+このディレクトリは `agent-canon` 自体の source tree です。
 template や派生 repo に配布する shared agent canon の正本をここに置きます。
 
 ## このディレクトリの役割
@@ -52,11 +52,11 @@ root の入口は symlink view または明示的な synced copy にします。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: `documents/SHARED_RUNTIME_SURFACES.md` に列挙された canon-owned docs だけを symlink view にします。
 - `memory/*`、`notes/*`、`tests/*`: `documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
-- `.github/copilot-instructions.md`: shared Copilot entrypoint の synced copy。
-- `.github/workflows/agent-coordination.yml`: shared coordination workflow の synced copy。
-- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: shared PR template の synced copy。
+- `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
+- `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
+- `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
+- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
+- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。
 
 repo-local の正本として残すもの:
 
@@ -109,8 +109,9 @@ bash tools/sync_agent_canon.sh check
 template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
 
 ```bash
-bash tools/sync_agent_canon.sh push
+bash tools/update_agent_canon.sh review-submodule
+bash tools/update_agent_canon.sh push-proposal
 ```
 
-pull / push / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
+update / proposal / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
 canonical remote の詳細は `documents/agent-canon-github-remote.md` を見ます。

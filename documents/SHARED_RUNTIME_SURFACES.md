@@ -11,12 +11,13 @@ downstream design ./object-oriented-design.md listed shared coding policy surfac
 @dependency-end
 -->
 
-この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
+この文書は、`vendor/agent-canon/` submodule pin を source of truth とする runtime surface をまとめます。
 template root と派生 repo root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
-`vendor/agent-canon/` は新規 repo では submodule pin、legacy repo では subtree snapshot のどちらでもよく、root view の意味は同じです。
+legacy subtree repo は移行完了まで互換 path として扱います。通常運用、PR checklist、clone 手順では submodule pin を既定にします。
 `goal.md` は repo 固有の実行状態なので shared runtime surface ではありません。
 root `goal.md` を `vendor/agent-canon/goal.md` へ symlink してはいけません。
 `tools/sync_agent_canon.sh link-root` は既存の shared `goal.md` symlink を repo-local placeholder に変換します。
+`.gitmodules` は template-local runtime contract です。AgentCanon URL、branch、checkout behavior に関わる変更では必ず review し、shared surface には同期しません。
 
 ## Surface Types
 
@@ -141,11 +142,37 @@ root では次を symlink view として扱います。
 - `.github/workflows/agent-coordination.yml`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
 
+| root path | AgentCanon source | verification |
+| --- | --- | --- |
+| `.github/workflows/agent-coordination.yml` | `vendor/agent-canon/.github/workflows/agent-coordination.yml` | `bash tools/sync_agent_canon.sh check` |
+| `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` | `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE/agent_canon.md` | `bash tools/sync_agent_canon.sh check` |
+
+### GitHub symlink root views
+
+次は root 側では symlink view です。regular file として編集しません。
+
+| root path | AgentCanon source | verification |
+| --- | --- | --- |
+| `.github/AGENTS.md` | `vendor/agent-canon/.github/AGENTS.md` | `bash tools/sync_agent_canon.sh check` |
+| `.github/copilot-instructions.md` | `vendor/agent-canon/.github/copilot-instructions.md` | `bash tools/sync_agent_canon.sh check` |
+
 ### AgentCanon standalone-only surface
 
 次は standalone `agent-canon` GitHub repository 用の正本であり、template root へ同期しません。
 
 - `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md`
+
+| AgentCanon path | root behavior |
+| --- | --- |
+| `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md` | standalone AgentCanon repo 専用。template root へ同期しません。 |
+
+### Template-local surfaces
+
+次は template / derived repo 側の runtime contract であり、AgentCanon から同期しません。
+
+| root path | owner | review trigger |
+| --- | --- | --- |
+| `.gitmodules` | template / derived repo | AgentCanon URL、branch、submodule checkout behavior が変わる PR |
 
 ## Editing Rule
 
@@ -153,6 +180,9 @@ root では次を symlink view として扱います。
 - root 側の symlink view や copy surface を直接編集しません
 - root copy が drift したら `bash tools/sync_agent_canon.sh link-root` で復元します
 - drift を確認したいときは `bash tools/sync_agent_canon.sh check` を使います
+- shared surface audit は `bash tools/sync_agent_canon.sh check` を正本にします
+- root copy surface の dependency header は AgentCanon source path を名前で示します
+- root copy surface の変更は、source-side diff があるか、template-local override として PR / closeout evidence に理由を残した場合だけ認めます
 - root 側で shared surface の file / directory 欠落を見つけたときは、再作成前に template root、`vendor/agent-canon/`、standalone `agent-canon`、この surface list、`tools/sync_agent_canon.sh` の順で確認します
 - 欠落が broken symlink、root copy drift、surface list 漏れ、canon 側 rename、意図的削除のどれかを分類してから、`link-root`、vendor update、surface list update、または削除 follow-up に進みます
 - template と canon の両方で欠落している path だけを repo-local 新規 file 候補にします
@@ -163,6 +193,12 @@ root では次を symlink view として扱います。
 bash tools/sync_agent_canon.sh check
 make agent-checks
 make agent-canon-pr-check
+```
+
+shared surface audit:
+
+```bash
+bash tools/sync_agent_canon.sh check
 ```
 
 ## Root-Side Interpretation

@@ -5,6 +5,9 @@ upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR
 @dependency-end
 -->
 
+<!-- Synced to /.github/PULL_REQUEST_TEMPLATE/agent_canon.md by tools/sync_agent_canon.sh link-root. -->
+<!-- Edit vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE/agent_canon.md, not the root copy. -->
+
 ## Summary
 
 - changed shared canon surfaces:
