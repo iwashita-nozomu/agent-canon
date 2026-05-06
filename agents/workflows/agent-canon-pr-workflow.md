@@ -92,6 +92,8 @@ make agent-canon-pr-check
 
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
+- GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
+- default template PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
 
 7. merge する
 
@@ -145,6 +147,75 @@ canon. Collect them by PR with this sequence:
    the PR body.
 
 Direct updates must still leave the same evidence in the commit and run bundle.
+
+## PR Body Examples
+
+### AgentCanon Pin-Only Update
+
+```text
+Summary:
+- Updated template vendor/agent-canon pin only.
+
+Validation:
+- bash tools/sync_agent_canon.sh check: pass
+- make agent-checks: pass
+- make ci: pass
+
+AgentCanon Evidence:
+- AgentCanon GitHub SHA: <sha>
+- template submodule SHA: <sha>
+- .gitmodules reviewed: unchanged
+```
+
+### AgentCanon Source Change Plus Template Pin
+
+```text
+Summary:
+- Changed AgentCanon source under vendor/agent-canon.
+- Advanced template submodule pin after AgentCanon main was updated.
+
+Validation:
+- make agent-canon-pr-check: pass
+- bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing: pass
+- make ci: pass
+
+Propagation:
+- AgentCanon commit / PR: <url-or-sha>
+- Template commit / PR: <url-or-sha>
+- local bare mirror: pushed or not used
+```
+
+### Root-Only Template Workflow Change
+
+```text
+Summary:
+- Changed template-local GitHub Actions or PR checklist.
+
+Scope:
+- No vendor/agent-canon source change.
+- vendor/agent-canon pin unchanged because the change is template-local.
+
+Validation:
+- python3 tools/ci/check_github_workflows.py: pass
+- make docs-check: pass
+- make ci: pass
+```
+
+### Copilot-Only Instruction Change
+
+```text
+Summary:
+- Updated .github/copilot-instructions.md routing text only.
+
+Read packet:
+- AGENTS.md
+- agents/README.md
+- agents/workflows/github-copilot-workflow.md
+
+Validation:
+- python3 tools/ci/check_github_workflows.py: pass
+- bash tools/sync_agent_canon.sh check: pass
+```
 
 ## PR 完了条件
 

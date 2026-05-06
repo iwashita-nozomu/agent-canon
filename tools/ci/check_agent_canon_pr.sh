@@ -89,6 +89,10 @@ echo "2️⃣  shared surface drift check"
 bash tools/sync_agent_canon.sh check
 echo ""
 
+echo "2b️⃣  GitHub workflow and PR template checks"
+python3 tools/ci/check_github_workflows.py
+echo ""
+
 echo "3️⃣  changed shared canon paths"
 git status --short -- vendor/agent-canon .github/workflows/agent-coordination.yml .github/PULL_REQUEST_TEMPLATE/agent_canon.md || true
 echo ""

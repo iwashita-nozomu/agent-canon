@@ -20,6 +20,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
+  - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence、Copilot discovery surface を検査します。
 - `docs/`
   - Markdown lint、math check、link audit、format、mirror sync、design document consolidation helpers
 - `data/`

@@ -61,3 +61,21 @@ git config -f .gitmodules submodule.vendor/agent-canon.url \
   https://github.com/iwashita-nozomu/agent-canon.git
 git submodule sync vendor/agent-canon
 ```
+
+## Branch Protection Baseline
+
+Template `main` should be protected in GitHub UI when the repository is used by
+other projects as a source template.
+
+Minimum settings:
+
+- Require pull request before merge.
+- Require status checks for `make ci` / CI, `make agent-canon-pr-check` when
+  AgentCanon surfaces are touched, and Docker build checks when Docker paths are
+  touched.
+- Restrict force-push and deletion on `main`.
+- Keep vulnerability alerts and Dependabot alerts enabled for the canonical
+  GitHub repository.
+
+Record `missing_or_unavailable` in PR evidence when private-repo permissions
+prevent the agent from reading branch protection.

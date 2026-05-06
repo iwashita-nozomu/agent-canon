@@ -132,6 +132,7 @@ root では次を symlink view として扱います。
 - `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_check_markdown_math.py`
 - `tests/tools/test_mirror_skill_shims.py`
+- `tests/tools/test_check_github_workflows.py`
 - `tests/tools/test_run_managed_experiment.py`
 - `tools/`
 

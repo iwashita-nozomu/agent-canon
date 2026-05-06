@@ -76,3 +76,21 @@ AgentCanon remote migration:
 - vendor/agent-canon remains a submodule pinned to main
 - local bare remotes are compatibility mirrors, not source of truth
 ```
+
+## Branch Protection Baseline
+
+AgentCanon `main` should be protected because template and derived repos consume
+it through submodule pins.
+
+Minimum settings:
+
+- Require pull request before merge unless the user explicitly authorizes a
+  direct maintenance update.
+- Require status checks for dependency review, skill mirror sync, runtime
+  alignment, convention compliance, and relevant pytest / pyright / ruff gates.
+- Restrict force-push and deletion on `main`.
+- Keep vulnerability alerts and Dependabot alerts enabled for the canonical
+  GitHub repository.
+
+If GitHub API access cannot read branch protection, record
+`missing_or_unavailable` in PR evidence instead of assuming protection is absent.
