@@ -31,6 +31,11 @@ pull request.
   read-only Contents access to `iwashita-nozomu/agent-canon`,
   `AGENT_CANON_REPO_SSH_KEY` backed by a read-only deploy key, or a documented
   GitHub App token with equivalent read-only scope.
+- If `AGENT_CANON_SUBMODULE_AUTH=token_persisted` or
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_persisted` appears before a later AgentCanon
+  fetch fails with `could not read Username`, classify that as a helper
+  persistence regression. Do not patch individual `make` commands to carry
+  credentials by hand.
 - Do not create, rotate, paste, or expose repository secrets from a PR branch.
   Leave the exact missing-secret evidence in the PR body instead.
 - When an error is environment-only, keep the validation checklist item open and

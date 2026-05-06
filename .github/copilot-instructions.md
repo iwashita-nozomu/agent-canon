@@ -46,6 +46,10 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
   code to hide the failure. Record that repository secret
   `AGENT_CANON_REPO_TOKEN` or `AGENT_CANON_REPO_SSH_KEY` is missing or
   unavailable in that run context.
+- If `AGENT_CANON_SUBMODULE_AUTH=token_persisted` or
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_persisted` appears and a later same-job step
+  still fails with `could not read Username`, treat the helper persistence path
+  as broken instead of changing individual validation commands.
 
 ## Validation
 

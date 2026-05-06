@@ -67,16 +67,21 @@ git submodule sync vendor/agent-canon
 Because both the template repository and AgentCanon can be private, GitHub
 Actions needs an explicit cross-repo read credential for `vendor/agent-canon`.
 
-Configure this repository secret in `iwashita-nozomu/project_template`:
+Configure one of these repository secrets in `iwashita-nozomu/project_template`:
 
 - `AGENT_CANON_REPO_TOKEN`: read-only Contents access to
   `iwashita-nozomu/agent-canon`.
+- `AGENT_CANON_REPO_SSH_KEY`: private half of a read-only deploy key whose
+  public half is installed on `iwashita-nozomu/agent-canon`.
 
 Do not rely on automatic `actions/checkout` submodule fetch for the private
 AgentCanon submodule. Workflows should checkout the template root with
 `submodules: false`, then run
 `bash .github/scripts/checkout_agent_canon_submodule.sh` so missing credentials fail
-with a precise remediation message.
+with a precise remediation message. In GitHub Actions, the helper also
+persists AgentCanon-specific auth for later `make ci`,
+`make fresh-clone-check`, and `make agent-canon-pr-check` steps in the same
+job, whether the credential is a token or a deploy key.
 
 ## Branch Protection Baseline
 

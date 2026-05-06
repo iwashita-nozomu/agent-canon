@@ -109,6 +109,14 @@ Current GitHub Actions behavior to account for:
   `AGENT_CANON_SUBMODULE_AUTH=missing`, the next action is to configure
   `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY`, or an equivalent GitHub
   App token, not to change the implementation under review.
+- If `checkout_agent_canon_submodule.sh` prints
+  `AGENT_CANON_SUBMODULE_AUTH=token_persisted` or
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_persisted`, the credential was accepted and
+  the job now carries AgentCanon-specific auth for later `make ci`,
+  `make fresh-clone-check`, and `make agent-canon-pr-check` steps. A later
+  `could not read Username` failure in the same job means this persistence path
+  regressed and should be fixed in the helper, not worked around in each
+  workflow command.
 
 ## PR Error Triage
 

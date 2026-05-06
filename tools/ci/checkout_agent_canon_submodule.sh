@@ -12,6 +12,7 @@ submodule_path="${AGENT_CANON_SUBMODULE_PATH:-vendor/agent-canon}"
 token="${AGENT_CANON_REPO_TOKEN:-}"
 ssh_key="${AGENT_CANON_REPO_SSH_KEY:-}"
 ssh_key_dir=""
+ssh_key_persistent=0
 
 if [ ! -f ".gitmodules" ]; then
   echo "AGENT_CANON_SUBMODULE=absent reason=no_gitmodules"
@@ -25,6 +26,9 @@ if [ -z "$submodule_url" ]; then
 fi
 
 cleanup_ssh_key() {
+  if [ "$ssh_key_persistent" = "1" ]; then
+    return
+  fi
   if [ -n "$ssh_key_dir" ]; then
     rm -rf "$ssh_key_dir"
   fi
@@ -32,13 +36,65 @@ cleanup_ssh_key() {
 
 trap cleanup_ssh_key EXIT
 
+github_repo_path() {
+  case "$submodule_url" in
+    https://github.com/*)
+      printf '%s\n' "${submodule_url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      printf '%s\n' "${submodule_url#git@github.com:}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+github_ssh_url() {
+  repo_path="$(github_repo_path || true)"
+  [ -n "$repo_path" ] || return 1
+  printf 'git@github.com:%s\n' "$repo_path"
+}
+
+persist_github_actions_token_auth() {
+  [ -n "${GITHUB_ENV:-}" ] || return 0
+  [ -n "$token" ] || return 0
+  token_repo_path="$(github_repo_path || true)"
+  [ -n "$token_repo_path" ] || return 0
+
+  token_submodule_url="https://x-access-token:${token}@github.com/${token_repo_path}"
+  git config --global "url.${token_submodule_url}.insteadOf" "$submodule_url"
+  echo "AGENT_CANON_SUBMODULE_AUTH=token_persisted scope=github_actions"
+}
+
+persist_github_actions_ssh_auth() {
+  [ -n "${GITHUB_ENV:-}" ] || return 0
+  ssh_submodule_url="$(github_ssh_url || true)"
+  [ -n "$ssh_submodule_url" ] || return 0
+
+  printf 'GIT_SSH_COMMAND=%s\n' "$GIT_SSH_COMMAND" >>"$GITHUB_ENV"
+  if [ "$submodule_url" != "$ssh_submodule_url" ]; then
+    git config --global "url.${ssh_submodule_url}.insteadOf" "$submodule_url"
+  fi
+  echo "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted scope=github_actions"
+}
+
 prepare_ssh_key() {
   [ -n "$ssh_key" ] || return 0
-  ssh_key_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/agent-canon-ssh.XXXXXX")"
+  [ -z "$token" ] || return 0
+  if [ -n "${GITHUB_ENV:-}" ]; then
+    ssh_key_dir="${RUNNER_TEMP:-/tmp}/agent-canon-ssh"
+    rm -rf "$ssh_key_dir"
+    mkdir -p "$ssh_key_dir"
+    ssh_key_persistent=1
+  else
+    ssh_key_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/agent-canon-ssh.XXXXXX")"
+  fi
   printf '%s\n' "$ssh_key" | tr -d '\r' >"${ssh_key_dir}/key"
   chmod 600 "${ssh_key_dir}/key"
   ssh-keyscan github.com >"${ssh_key_dir}/known_hosts" 2>/dev/null
   export GIT_SSH_COMMAND="ssh -i ${ssh_key_dir}/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${ssh_key_dir}/known_hosts"
+  persist_github_actions_ssh_auth
 }
 
 if git -C "$submodule_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -71,6 +127,7 @@ git_auth() {
 
 export GIT_TERMINAL_PROMPT=0
 git config --global --add safe.directory "$PWD" || true
+persist_github_actions_token_auth
 prepare_ssh_key
 
 if ! git_auth ls-remote "$submodule_url" HEAD >/dev/null 2>&1; then

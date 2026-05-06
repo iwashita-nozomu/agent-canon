@@ -21,8 +21,13 @@ Your job is to make PR status understandable and actionable:
 
 - Separate code/test failures from environment or authentication failures.
 - Treat `AGENT_CANON_SUBMODULE_AUTH=missing`,
-  `AGENT_CANON_SUBMODULE_AUTH=denied`, and private `agent-canon.git` clone
+  `AGENT_CANON_SUBMODULE_AUTH=denied`,
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_denied`, and private `agent-canon.git` clone
   failures as AgentCanon access problems until proven otherwise.
+- Treat `AGENT_CANON_SUBMODULE_AUTH=token_persisted` or
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_persisted` followed by a same-job
+  `could not read Username` failure as a checkout helper persistence bug, not
+  as a code failure or a reason to remove validation commands.
 - Do not delete the AgentCanon submodule, vendor a copied snapshot, loosen
   workflow permissions, or switch to automatic submodule checkout to make a PR
   appear green.

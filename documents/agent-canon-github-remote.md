@@ -131,3 +131,15 @@ If a personal or app token is not desired, use a repository deploy key instead:
 
 The checkout helper prefers `AGENT_CANON_REPO_TOKEN` when present, then falls
 back to `AGENT_CANON_REPO_SSH_KEY`.
+
+When `AGENT_CANON_REPO_TOKEN` or `AGENT_CANON_REPO_SSH_KEY` is used inside
+GitHub Actions, the checkout helper persists AgentCanon-specific auth for later
+steps in the same job. The token path adds an exact AgentCanon URL rewrite. The
+deploy-key path persists a job-local `GIT_SSH_COMMAND` through `$GITHUB_ENV`
+and adds an AgentCanon-specific HTTPS-to-SSH rewrite for the submodule URL.
+This is intentional: later steps such as `make ci`, `make fresh-clone-check`,
+and `make agent-canon-pr-check` may fetch `vendor/agent-canon` again after the
+initial checkout helper has exited. The rewrite must stay scoped to the
+AgentCanon URL, not all of `https://github.com/`, so the job does not
+accidentally route unrelated repository access through the AgentCanon
+credential.
