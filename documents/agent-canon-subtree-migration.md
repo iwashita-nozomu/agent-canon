@@ -1,8 +1,8 @@
-# agent-canon vendoring 構成
+# AgentCanon Submodule Update And Legacy Subtree Migration
 
 <!--
 @dependency-start
-responsibility Documents agent-canon vendoring 構成 for this repository.
+responsibility Documents AgentCanon submodule update and legacy subtree migration for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
 downstream design ../agents/workflows/derived-agent-canon-diff-workflow.md consumes the subtree migration contract
 upstream implementation ../tools/sync_agent_canon.sh vendoring sync tool
@@ -12,14 +12,14 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
 @dependency-end
 -->
 
-この文書は、`agent-canon` maintainer が derived repo の `vendor/agent-canon` 構成を保守するときの正本です。
-template 利用者向けの短い説明は root 側の `documents/agent-canon-subtree-migration.md` を見ます。
+この文書は、`agent-canon` maintainer が template / derived repo の `vendor/agent-canon` 構成を保守するときの正本です。
 新規 repo と移行済み repo では submodule pin を標準にし、legacy subtree repo は移行完了まで互換 path として扱います。
+ファイル名に `subtree-migration` が残っているのは既存リンク互換のためです。通常運用の正本タイトルと本文は submodule-first です。
 
 ## 目的
 
 - `git clone <template>` 後に submodule init で shared canon を使える状態を保つ
-- shared canon の source of truth を upstream `agent-canon` repo と `vendor/agent-canon/` pin に固定する
+- shared canon の source of truth を upstream `agent-canon` repo と `vendor/agent-canon/` submodule pin に固定する
 - template root には runtime discovery に必要な surface だけを残す
 - template 利用者向けの入口文書は root regular file として残す
 
@@ -43,13 +43,13 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
 
 ## 所有境界
 
-- `vendor/agent-canon/`:
+- `vendor/agent-canon/` submodule:
   - workflow canon
   - skill canon
   - subagent 定義
   - shared notes template
   - shared CI / review / runtime helper
-  - subtree / PR / shared surface ownership 文書
+  - submodule update / PR / shared surface ownership 文書
 - root 側:
   - template 利用者向けの入口
   - implementation 本体
@@ -66,24 +66,35 @@ template 利用者向けの短い説明は root 側の `documents/agent-canon-su
 
 ## 同期ルール
 
-template repo 側では次を使います。
+template repo 側では submodule-first の入口を使います。
 
 ```bash
+bash tools/update_agent_canon.sh plan
+bash tools/update_agent_canon.sh review-submodule
+bash tools/update_agent_canon.sh apply
+bash tools/update_agent_canon.sh push-proposal
+bash tools/update_agent_canon.sh align-main
 bash tools/sync_agent_canon.sh status
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
-bash tools/sync_agent_canon.sh pull
-bash tools/sync_agent_canon.sh push
 ```
 
+- `plan`:
+  - derived repo から見た AgentCanon update route を read-only で表示する
+- `review-submodule`:
+  - submodule 内で AgentCanon main との差分、proposal 要否、merge conflict 有無、safe align 可否を表示する
+- `apply`:
+  - upstream AgentCanon main を取り込み、template / derived repo の submodule pin を更新する
+- `push-proposal`:
+  - local-only AgentCanon commit を proposal branch へ push する
+- `align-main`:
+  - 前回 proposal が main に取り込まれたと ancestry、tree match、または git-cherry equivalence で確認できる場合だけ submodule pin を main に揃える
 - `link-root`:
   - root の symlink view と synced copy を vendor 正本から再構成する
 - `check`:
   - root surface と vendor 正本の drift を検出する
-- `pull`:
-  - upstream `agent-canon` の更新を template 側 snapshot へ取り込む
-- `push`:
-  - template 側で育った shared canon を upstream `agent-canon` へ戻す
+- `sync_agent_canon.sh pull` / `push`:
+  - legacy subtree 互換または maintainer 低レベル操作に限る。通常の submodule repo では `update_agent_canon.sh` の route を優先する
 
 ## GitHub canonical remote
 
@@ -106,12 +117,13 @@ canonical remote ではありません。
 
 ## 完了条件
 
-次をすべて満たしたときだけ subtree 変更を完了扱いにします。
+次をすべて満たしたときだけ AgentCanon update を完了扱いにします。
 
 - `bash tools/sync_agent_canon.sh check` が pass
 - `make agent-canon-pr-check` が pass
 - root 側の shared surface が構成どおりに再同期されている
-- template 側の PR merge 後に upstream `agent-canon` push を実行したか、未実行理由が明示されている
+- AgentCanon GitHub `main` SHA、template submodule pin SHA、`git submodule status vendor/agent-canon` が PR / closeout evidence に残っている
+- local bare mirror を使った場合だけ、その mirror SHA と GitHub SHA の関係が明示されている
 
 ## 参照先
 
@@ -256,19 +268,19 @@ root 側は次のような薄い wrapper と symlink view にします。
   - `vendor/agent-canon/.github/workflows/agent-coordination.yml` から root へ同期する copy surface
 
 重要:
-- subtree 配下にも `AGENTS.md` は置けますが、通常は canon 開発 subtree 用 override としてのみ使います
+- `vendor/agent-canon/AGENTS.md` は standalone AgentCanon repo 用 entrypoint として扱い、template root runtime は root `AGENTS.md` symlink view から入ります
 - root runtime の正面入口は root に固定します
 - shared canon の source of truth は root 側ではなく `vendor/agent-canon/` です
 
-## 6. worktree と subtree の関係
+## 6. worktree と submodule pin の関係
 
-- template / 派生 repo で worktree を切ると、その branch / commit に入っている `vendor/agent-canon/` snapshot がそのまま見えます
+- template / 派生 repo で worktree を切ると、その branch / commit に入っている `vendor/agent-canon` gitlink が見えます
 - upstream `agent-canon` の最新が自動で流入するわけではありません
-- shared canon の更新は、明示的に subtree pull した branch にだけ反映されます
+- shared canon の更新は、明示的に submodule pin を更新した branch にだけ反映されます
 
 つまり:
-- worktree は snapshot を使う仕組み
-- shared canon 更新は subtree sync で行う仕組み
+- worktree は親 repo の gitlink を使う仕組み
+- shared canon 更新は submodule pin commit で行う仕組み
 
 ## 7. 標準運用
 
@@ -287,10 +299,14 @@ bash tools/sync_agent_canon.sh check
 bash tools/sync_agent_canon.sh snapshot
 ```
 
-### 7.3 初回取り込み
+### 7.3 初回 clone / recovery
 
 ```bash
-bash tools/sync_agent_canon.sh add git@github.com:<org>/agent-canon.git
+git clone --recurse-submodules <template-url> <repo>
+cd <repo>
+git submodule sync vendor/agent-canon
+git submodule update --init --recursive vendor/agent-canon
+bash tools/sync_agent_canon.sh check
 ```
 
 ### 7.4 upstream から更新取得
@@ -304,9 +320,9 @@ bash tools/update_agent_canon.sh push-proposal
 
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
 通常の動線は `plan -> apply` です。
-`sync_agent_canon.sh ensure-latest` は task 開始時の freshness gate、`link-root` は root view drift 修復、`push` は shared canon subtree を直接 upstream に戻す保守者向け低レベル入口です。
+`sync_agent_canon.sh ensure-latest` は task 開始時の freshness gate、`link-root` は root view drift 修復、`push` は shared canon を直接 upstream に戻す保守者向け低レベル入口です。
 通常の派生 repo update で `sync_agent_canon.sh pull` を直接選びません。
-derived repo の `vendor/agent-canon/` に local 差分があり、proposal branch、shared canon main、derived snapshot の順で閉じる必要がある場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` を使います。
+derived repo の `vendor/agent-canon/` に local 差分があり、proposal branch、shared canon main、derived submodule pin の順で閉じる必要がある場合は、先に `bash tools/update_agent_canon.sh review-submodule` と `agents/workflows/derived-agent-canon-diff-workflow.md` を使います。
 `plan` は read-only で route を示します。
 submodule repo では `already_current_submodule` / `submodule_update`、legacy subtree metadata がある branch では `subtree_pull`、fresh clone や subtree metadata が無い branch では `snapshot_import_no_subtree*` 系 route を表示します。
 source repo が設定されていれば、`refresh -> local sync` 後の実効 route を表示します。
@@ -321,11 +337,28 @@ clean worktree では upstream `agent-canon` と local submodule pin または l
 `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
 local bare mirror を使う repo は `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git`
 を明示します。
-通常は `git subtree pull --squash` を使います。
+submodule repo では通常 `git subtree pull --squash` を使いません。
 fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
 local subtree split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
 local split も current prefix tree も remote history に無い場合は、shared canon の上書きを避けるため fail-closed で停止します。proposal branch を maintainer が merge するか、shared canon change を upstream へ戻したあとで再実行します。
 dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
+
+### 7.4.1 local submodule 差分の分類
+
+親 repo の tree diff だけで AgentCanon 差分を判断しません。必ず submodule 内の履歴を見ます。
+
+```bash
+bash tools/update_agent_canon.sh review-submodule
+```
+
+- `ahead_of_remote`:
+  - local-only AgentCanon commit です。`push-proposal` で proposal branch に push し、AgentCanon PR / merge 依頼へ進みます。
+- `diverged_clean_merge`:
+  - remote main と local commit は非 conflict で統合できます。`vendor/agent-canon/` 内で remote main を merge してから proposal branch へ push します。
+- `diverged_conflict`:
+  - AgentCanon PR 側で conflict 解消が必要です。template 側で silent overwrite しません。
+- `local_changes_already_in_remote`:
+  - 以前の proposal が main に取り込まれた状態です。`align-main` で submodule pin を GitHub main に揃えられます。
 
 ### 7.5 subtree から submodule への移行
 
@@ -342,7 +375,7 @@ commit message には `AgentCanon subtree-to-submodule migration` と、local wo
 bash tools/sync_agent_canon.sh push
 ```
 
-通常は proposal branch 経由で戻します。`sync_agent_canon.sh push` は maintainer が direct subtree push を選ぶ場合だけ使います。
+通常は proposal branch 経由で戻します。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
 
 ### 7.6 現在の設定確認
 
@@ -358,7 +391,7 @@ bash tools/update_agent_canon.sh register-local-bare \
   --source-repo /mnt/l/workspace/agent-canon
 ```
 
-この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
+この command は bare repo が未作成なら初期化し、`vendor/agent-canon/` の現在の submodule head または legacy snapshot を seed し、`agent-canon` remote をその bare repo に向けます。
 これは legacy compatibility / proposal transport 用の opt-in path です。
 通常の GitHub-backed repo は canonical GitHub submodule URL を使い、local bare は `agent-canon-local` のような別名 remote として残します。
 既存 bare repo にすでに `main` がある場合は上書きせず、その remote を再利用します。
@@ -370,22 +403,22 @@ bash tools/update_agent_canon.sh register-local-bare \
 
 この template で完了していること:
 - migration 正本を作る
-- `vendor/agent-canon/` の committed snapshot を置く
-- subtree sync script を追加する
+- `vendor/agent-canon/` の submodule pin を置く
+- submodule-first の sync / review script を追加する
 - root `AGENTS.md` を shared runtime surface に寄せる
 - root の shared docs / scripts / discovery surface を symlink view に寄せる
 - root `.codex/config.toml` も shared default に寄せる
 
 ### Phase 1. upstream `agent-canon` repo を作る
 
-残タスク:
-- `vendor/agent-canon/` の履歴を upstream repo として切り出す
-- template 側に subtree remote を設定する
-- `subtree add / pull / push` の正規運用へ移る
+完了条件:
+- `https://github.com/iwashita-nozomu/agent-canon.git` を canonical remote にする
+- template 側の `.gitmodules` を canonical GitHub URL にする
+- AgentCanon PR / template submodule pin PR の対応を PR 本文に残す
 
 exit 条件:
 - upstream repo 単体で shared canon を保持できる
-- template / 派生 repo 側に subtree add / split できる snapshot history を持てる
+- template / 派生 repo 側に submodule pin update できる gitlink history を持てる
 
 ### Phase 2. template bootstrap command を追加する
 
@@ -395,7 +428,7 @@ exit 条件:
 
 役割:
 - template clone 後の repo 名差し替え
-- subtree remote 設定
+- submodule URL / proposal branch 設定
 - optional pack 選択
 
 ## 9. リスクと抑止策
@@ -416,23 +449,35 @@ exit 条件:
 
 抑止:
 - `vendor/agent-canon/` の変更は専用 commit に分ける
-- `git subtree push --prefix=vendor/agent-canon` を標準運用にする
-- 外部 repo をまだ作っていない段階では `snapshot` で vendor tree を更新し、repo 作成時に `git subtree split --prefix=vendor/agent-canon` から初期 history を切り出す
+- `bash tools/update_agent_canon.sh push-proposal` で proposal branch へ push する
+- AgentCanon main に取り込まれたら `bash tools/update_agent_canon.sh align-main` で pin を main に揃える
 
-### worktree ごとに shared canon がばらつく
+## 9.1 Legacy Subtree Appendix
+
+legacy subtree repo は移行完了まで次を互換 path として使えます。
+
+- `bash tools/sync_agent_canon.sh pull`
+- `bash tools/sync_agent_canon.sh push`
+- `git subtree pull --prefix=vendor/agent-canon`
+- `git subtree push --prefix=vendor/agent-canon`
+- `snapshot_import_no_subtree*` fallback
+
+これらは新規 repo の標準 path ではありません。submodule 化済み repo で subtree route を選ぶ場合は、互換対応である理由を PR / closeout evidence に残します。
+
+### worktree ごとに shared canon pin がばらつく
 
 抑止:
-- それは意図した snapshot 運用とみなす
-- どの branch がどの subtree commit を含むかを commit history で追えるようにする
+- それは親 repo の gitlink による意図した pin 運用とみなす
+- どの branch がどの AgentCanon commit を指すかを commit history と `git submodule status vendor/agent-canon` で追えるようにする
 
 ## 10. 完了条件
 
 - upstream `agent-canon` repo が存在する
-- template repo が `vendor/agent-canon/` subtree snapshot を持つ
+- template repo が `vendor/agent-canon/` submodule pin を持つ
 - root `AGENTS.md` と root `.codex/` は root discovery path として機能する
-- template / 派生 repo で worktree を切ったとき、その時点の shared canon snapshot が `vendor/agent-canon/` として見える
-- template / 派生 repo 側で直した shared canon を `git subtree push` で upstream へ戻せる
-- upstream repo 作成前でも、`git clone <template>` 直後に `vendor/agent-canon/` snapshot が揃っている
+- template / 派生 repo で worktree を切ったとき、その時点の shared canon pin が `vendor/agent-canon/` として見える
+- template / 派生 repo 側で直した shared canon を proposal branch / AgentCanon PR で upstream へ戻せる
+- `git clone --recurse-submodules <template>` 直後に `vendor/agent-canon/` を参照できる
 
 ## 11. 関連
 

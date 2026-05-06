@@ -52,8 +52,18 @@ paste the key pass lines here
 
 - [ ] AgentCanon GitHub `main` will be updated first.
 - [ ] Template `vendor/agent-canon` pin will be updated after AgentCanon merge.
+- [ ] Template `.gitmodules` impact was reviewed when URL, branch, or checkout behavior is affected.
 - [ ] Local bare mirror, if used, is compatibility-only and not the latest source of truth.
 - [ ] Derived repos that need the update are listed or intentionally deferred.
+
+## Submodule Pin Impact
+
+- [ ] This PR requires a template `vendor/agent-canon` submodule pin update after merge.
+- [ ] This PR does not require a template submodule pin update.
+
+- AgentCanon GitHub SHA:
+- expected template submodule SHA:
+- submodule pin changed / unchanged rationale:
 
 ## Review Focus
 
