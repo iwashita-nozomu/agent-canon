@@ -1500,7 +1500,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             (new_work_dir / "new-remote-marker.txt").write_text("new remote\n", encoding="utf-8")
             subprocess.run(["git", "add", "new-remote-marker.txt"], cwd=new_work_dir, check=True)
-            subprocess.run(["git", "commit", "-m", "advance new remote"], cwd=new_work_dir, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "advance new remote"],
+                cwd=new_work_dir,
+                check=True,
+            )
             subprocess.run(["git", "push", "origin", "main"], cwd=new_work_dir, check=True)
 
             result = subprocess.run(
@@ -1645,7 +1649,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             (work_dir / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
             subprocess.run(["git", "add", "proposal-marker.txt"], cwd=work_dir, check=True)
-            subprocess.run(["git", "commit", "-m", "merge proposal marker"], cwd=work_dir, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "merge proposal marker"],
+                cwd=work_dir,
+                check=True,
+            )
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
             remote_sha = subprocess.run(
                 ["git", "-C", str(work_dir), "rev-parse", "HEAD"],

@@ -423,7 +423,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "MISSING_DEPENDENCY_MANIFEST=.github/workflows/agent-coordination.yml owner=root_view",
+                "MISSING_DEPENDENCY_MANIFEST=.github/workflows/"
+                "agent-coordination.yml owner=root_view",
                 result.stdout,
             )
             self.assertIn(
@@ -431,7 +432,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "DEPENDENCY_HEADER_SCAN_MISSING_BY_OWNER product_file=1 root_view=1 symlink=0 submodule_source=1 other=0",
+                "DEPENDENCY_HEADER_SCAN_MISSING_BY_OWNER product_file=1 root_view=1 "
+                "symlink=0 submodule_source=1 other=0",
                 result.stdout,
             )
             self.assertIn("MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout)

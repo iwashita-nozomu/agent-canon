@@ -3,7 +3,6 @@
 <!--
 @dependency-start
 responsibility Documents Closeout Gate for this repository.
-upstream design ../canonical/CODEX_WORKFLOW.md closeout workflow contract
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
 downstream design ../../documents/dependency-manifest-design.md defines dependency manifest evidence
