@@ -12,12 +12,14 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 CHECK_BIDIRECTIONAL=0
 FAIL_MISSING=0
+ALLOW_FRONTMATTER=0
+EXPLAIN_MISSING=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--report-dir DIR]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--report-dir DIR]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -37,6 +39,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fail-missing)
       FAIL_MISSING=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
+      shift
+      ;;
+    --explain-missing)
+      EXPLAIN_MISSING=1
       shift
       ;;
     --report-dir)
@@ -72,6 +82,13 @@ if [[ "$FAIL_MISSING" -eq 1 ]]; then
   scan_args+=(--fail-missing)
   format_args+=(--require-header)
 fi
+if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
+  scan_args+=(--allow-frontmatter)
+  format_args+=(--allow-frontmatter)
+fi
+if [[ "$EXPLAIN_MISSING" -eq 1 ]]; then
+  scan_args+=(--explain-missing)
+fi
 
 bash "${scan_args[@]}" "${checkable_paths[@]}"
 bash "${format_args[@]}" "${checkable_paths[@]}"
@@ -79,6 +96,9 @@ bash "${format_args[@]}" "${checkable_paths[@]}"
 graph_args=(tools/agent_tools/check_dependency_graph.sh)
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
+fi
+if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
+  graph_args+=(--allow-frontmatter)
 fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
 

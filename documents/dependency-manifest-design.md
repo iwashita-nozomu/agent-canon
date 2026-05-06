@@ -235,6 +235,8 @@ Responsibilities:
 - enumerate tracked files with `git ls-files`
 - classify binary, generated, vendored external, commentless, unsupported, and checkable files
 - report files missing `@dependency-start` / `@dependency-end`
+- group missing manifest output by owner class: `product_file`, `root_view`, `symlink`, `submodule_source`, or `other`
+- with `--explain-missing`, print the detected missing-marker reason and the first 20 lines for fast repair
 - run in report-only mode during migration
 - later become a CI fail gate
 
@@ -250,6 +252,7 @@ Responsibilities:
 - validate direction and kind enum values
 - validate path is relative
 - validate target path exists
+- accept `--allow-frontmatter` as an explicit policy flag; frontmatter is already allowed by default within the top-of-file scan window
 
 This tool does not check bidirectional consistency, self reference, closure, or cycles.
 
@@ -280,7 +283,11 @@ Responsibilities:
 - run the scan, format, and graph tools over all tracked checkable files
 - keep missing manifests report-only by default while repository-wide migration is incomplete
 - offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
+- offer `--explain-missing` for owner-classified missing-header repair output
+- accept `--allow-frontmatter` and pass it to the manifest tools for policy-explicit CI callers
 - pass `--check-bidirectional` through to graph validation when strict reverse-edge review is requested
+
+Template repos expose `make dependency-review-surfaces` to run strict review against both the parent root view and `vendor/agent-canon` source tree.
 
 ## Migration Plan
 

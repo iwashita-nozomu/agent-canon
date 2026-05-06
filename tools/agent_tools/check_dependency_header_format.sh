@@ -10,16 +10,18 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REQUIRE_HEADER=0
 CHANGED=0
+ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_header_format.sh [--root DIR] [--changed] [--require-header] [paths...]
+  check_dependency_header_format.sh [--root DIR] [--changed] [--require-header] [--allow-frontmatter] [paths...]
 
 Validates @dependency-start / @dependency-end manifest syntax.
 Files without a manifest are skipped unless --require-header is set.
+--allow-frontmatter is accepted for policy-explicit callers; frontmatter is allowed by default.
 EOF
 }
 
@@ -35,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-header)
       REQUIRE_HEADER=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
       shift
       ;;
     -h|--help)

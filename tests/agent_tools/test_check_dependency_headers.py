@@ -77,7 +77,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(skill)],
+                [sys.executable, str(SCRIPT), "--allow-frontmatter", str(skill)],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,

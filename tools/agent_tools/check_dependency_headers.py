@@ -61,6 +61,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Repository root. Defaults to the current directory.",
     )
+    parser.add_argument(
+        "--allow-frontmatter",
+        action="store_true",
+        help=(
+            "Accepted for policy-explicit callers. YAML frontmatter and Markdown H1 "
+            "titles are allowed before the manifest by default."
+        ),
+    )
     return parser
 
 

@@ -335,8 +335,156 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADER_SCAN=pass", scan.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
 
-    def test_symlink_root_views_resolve_to_manifest_source(self) -> None:
-        """Root symlink views resolve to their manifest-bearing source files."""
+    def test_allow_frontmatter_flag_is_accepted_by_manifest_tools(self) -> None:
+        """Manifest tools accept an explicit frontmatter policy flag."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "SKILL.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "name: demo",
+                        "description: Demo skill.",
+                        "---",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises explicit frontmatter allowance.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            scan = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--allow-frontmatter",
+                str(source),
+                root=root,
+            )
+            fmt = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                "--require-header",
+                "--allow-frontmatter",
+                str(source),
+                root=root,
+            )
+            graph = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--allow-frontmatter",
+                str(source),
+                root=root,
+            )
+
+            self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
+            self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
+            self.assertEqual(graph.returncode, 0, graph.stdout + graph.stderr)
+
+    def test_scan_groups_missing_manifests_by_owner_and_explains(self) -> None:
+        """Missing manifest output includes owner grouping and first-lines evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            product = root / "product.md"
+            root_view = root / ".github" / "workflows" / "agent-coordination.yml"
+            submodule = root / "vendor" / "agent-canon" / "shared.md"
+            root_view.parent.mkdir(parents=True)
+            submodule.parent.mkdir(parents=True)
+            product.write_text("# Product\n\nBody.\n", encoding="utf-8")
+            root_view.write_text("name: Agent Coordination\n", encoding="utf-8")
+            submodule.write_text("# Shared\n\nBody.\n", encoding="utf-8")
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--explain-missing",
+                str(product),
+                str(root_view),
+                str(submodule),
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "MISSING_DEPENDENCY_MANIFEST=product.md owner=product_file",
+                result.stdout,
+            )
+            self.assertIn(
+                "MISSING_DEPENDENCY_MANIFEST=.github/workflows/agent-coordination.yml owner=root_view",
+                result.stdout,
+            )
+            self.assertIn(
+                "MISSING_DEPENDENCY_MANIFEST=vendor/agent-canon/shared.md owner=submodule_source",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_MISSING_BY_OWNER product_file=1 root_view=1 symlink=0 submodule_source=1 other=0",
+                result.stdout,
+            )
+            self.assertIn("MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout)
+            self.assertIn(
+                "missing_start_and_end_markers_in_first_80_lines",
+                result.stdout,
+            )
+
+    def test_graph_distinguishes_root_symlink_from_vendor_source(self) -> None:
+        """Graph extraction should report the real vendor source, not the root symlink."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            vendor = root / "vendor" / "agent-canon"
+            vendor.mkdir(parents=True)
+            source = vendor / "ROOT_AGENTS.md"
+            target = vendor / "README.md"
+            target.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Root Agents",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines the vendor source for root agent instructions.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            os.symlink("vendor/agent-canon/ROOT_AGENTS.md", root / "AGENTS.md")
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--print-edges",
+                str(root / "AGENTS.md"),
+                str(source),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "upstream\tdesign\tvendor/agent-canon/ROOT_AGENTS.md\tvendor/agent-canon/README.md",
+                result.stdout,
+            )
+            self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
+
+    def test_symlink_root_views_are_skipped_without_breaking_scan(self) -> None:
+        """Root symlink views are owned by link-root and do not fail header scans."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             vendor = root / "vendor" / "agent-canon"
@@ -377,7 +525,7 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
             self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
-            self.assertIn("DEPENDENCY_HEADER_SCAN_CHECKED=1", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_SKIPPED=1", scan.stdout)
             self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", scan.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
 
@@ -398,6 +546,20 @@ class DependencyManifestToolTest(unittest.TestCase):
             "agents/workflows/agent-canon-pr-workflow.md",
             "agents/workflows/agent-learning-workflow.md",
             "agents/workflows/experiment-workflow.md",
+            "agents/workflows/implementation-waterfall-workflow.md",
+            "documents/BRANCH_SCOPE.md",
+            "documents/algorithm-implementation-boundary.md",
+            "documents/codex-configuration-reference.md",
+            "documents/coding-conventions-project.md",
+            "documents/coding-conventions-reviews.md",
+            "documents/conventions/python/20_benchmark_policy.md",
+            "documents/experiment-critical-review.md",
+            "documents/tools/README.md",
+            "documents/worktree-lifecycle.md",
+            "memory/AGENT_PHILOSOPHY.md",
+            "memory/USER_PREFERENCES.md",
+            "notes/README.md",
+            "notes/guardrails/engineering_avoidances.md",
         ]
 
         scan = run_tool(

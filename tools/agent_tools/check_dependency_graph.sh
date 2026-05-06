@@ -11,13 +11,14 @@ ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>
 PRINT_EDGES=0
 CHANGED=0
 CHECK_BIDIRECTIONAL=0
+ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [paths...]
+  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [--allow-frontmatter] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
   - isolated manifest files with no graph edge
@@ -46,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --check-bidirectional)
       CHECK_BIDIRECTIONAL=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
       shift
       ;;
     -h|--help)

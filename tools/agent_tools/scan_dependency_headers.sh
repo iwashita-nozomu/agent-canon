@@ -10,16 +10,21 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
 FAIL_MISSING=0
 CHANGED=0
+EXPLAIN_MISSING=0
+ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
+MISSING_PREVIEW_LINES="${DEPENDENCY_MISSING_PREVIEW_LINES:-20}"
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  scan_dependency_headers.sh [--root DIR] [--changed] [--fail-missing] [paths...]
+  scan_dependency_headers.sh [--root DIR] [--changed] [--fail-missing] [--allow-frontmatter] [--explain-missing] [paths...]
 
 Scans checkable text files for @dependency-start / @dependency-end manifest markers.
 Without --fail-missing this is report-only and exits 0.
+--allow-frontmatter is accepted for policy-explicit callers; frontmatter is allowed by default.
+--explain-missing prints a short first-lines preview and owner classification for missing manifests.
 EOF
 }
 
@@ -35,6 +40,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fail-missing)
       FAIL_MISSING=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
+      shift
+      ;;
+    --explain-missing)
+      EXPLAIN_MISSING=1
       shift
       ;;
     -h|--help)
@@ -83,7 +96,82 @@ has_manifest_markers() {
 }
 
 display_path() {
+  local raw="$1"
+  raw="${raw#./}"
+  if [[ "$raw" = /* ]]; then
+    case "$raw" in
+      "$ROOT_DIR"/*) printf '%s\n' "${raw#$ROOT_DIR/}" ;;
+      *) realpath -m --relative-to="$ROOT_DIR" "$raw" ;;
+    esac
+    return
+  fi
+  printf '%s\n' "$raw"
+}
+
+to_repo_path() {
+  local raw="$1"
+  raw="${raw#./}"
+  if [[ "$raw" = /* ]]; then
+    case "$raw" in
+      "$ROOT_DIR"/*) printf '%s\n' "${raw#$ROOT_DIR/}" ;;
+      *) realpath -m --relative-to="$ROOT_DIR" "$raw" ;;
+    esac
+    return
+  fi
+  printf '%s\n' "$raw"
+}
+
+real_source_path() {
   realpath -m --relative-to="$ROOT_DIR" "$1"
+}
+
+path_owner() {
+  local path="$1"
+  case "$path" in
+    vendor/agent-canon/*)
+      printf '%s\n' "submodule_source"
+      return
+      ;;
+    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+      printf '%s\n' "root_view"
+      return
+      ;;
+  esac
+  if [[ -L "$path" ]]; then
+    printf '%s\n' "symlink"
+    return
+  fi
+  printf '%s\n' "product_file"
+}
+
+missing_reason() {
+  local path="$1"
+  local has_start=0
+  local has_end=0
+  if head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-start'; then
+    has_start=1
+  fi
+  if head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-end'; then
+    has_end=1
+  fi
+  if [[ "$has_start" -eq 0 && "$has_end" -eq 0 ]]; then
+    printf '%s\n' "missing_start_and_end_markers_in_first_${HEADER_SCAN_LINES}_lines"
+  elif [[ "$has_start" -eq 0 ]]; then
+    printf '%s\n' "missing_start_marker_in_first_${HEADER_SCAN_LINES}_lines"
+  else
+    printf '%s\n' "missing_end_marker_in_first_${HEADER_SCAN_LINES}_lines"
+  fi
+}
+
+print_missing_explanation() {
+  local path="$1"
+  local shown
+  shown="$(display_path "$path")"
+  echo "MISSING_DEPENDENCY_EXPLANATION_BEGIN=$shown"
+  echo "MISSING_DEPENDENCY_REASON=$shown $(missing_reason "$path")"
+  echo "MISSING_DEPENDENCY_PREVIEW_LINES=$shown count=$MISSING_PREVIEW_LINES"
+  sed -n "1,${MISSING_PREVIEW_LINES}p" "$path" | nl -ba -w1 -s ':'
+  echo "MISSING_DEPENDENCY_EXPLANATION_END=$shown"
 }
 
 collect_paths() {
@@ -104,20 +192,33 @@ collect_paths() {
 missing=0
 checked=0
 skipped=0
+missing_product_file=0
+missing_root_view=0
+missing_symlink=0
+missing_submodule_source=0
+missing_other=0
 
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
-  path="${raw_path#./}"
-  if [[ "$path" = /* ]]; then
-    path="$(realpath -m --relative-to="$ROOT_DIR" "$path")"
-  fi
+  path="$(to_repo_path "$raw_path")"
   [[ -f "$path" && ! -L "$path" ]] || { skipped=$((skipped + 1)); continue; }
   is_skip_path "$path" && { skipped=$((skipped + 1)); continue; }
   is_checkable_suffix "$path" || { skipped=$((skipped + 1)); continue; }
   is_binary_file "$path" || { skipped=$((skipped + 1)); continue; }
   checked=$((checked + 1))
   if ! has_manifest_markers "$path"; then
-    echo "MISSING_DEPENDENCY_MANIFEST=$(display_path "$path")"
+    owner="$(path_owner "$path")"
+    case "$owner" in
+      product_file) missing_product_file=$((missing_product_file + 1)) ;;
+      root_view) missing_root_view=$((missing_root_view + 1)) ;;
+      symlink) missing_symlink=$((missing_symlink + 1)) ;;
+      submodule_source) missing_submodule_source=$((missing_submodule_source + 1)) ;;
+      *) missing_other=$((missing_other + 1)) ;;
+    esac
+    echo "MISSING_DEPENDENCY_MANIFEST=$(display_path "$path") owner=$owner realpath=$(real_source_path "$path") reason=$(missing_reason "$path")"
+    if [[ "$EXPLAIN_MISSING" -eq 1 ]]; then
+      print_missing_explanation "$path"
+    fi
     missing=$((missing + 1))
   fi
 done < <(collect_paths)
@@ -125,6 +226,7 @@ done < <(collect_paths)
 echo "DEPENDENCY_HEADER_SCAN_CHECKED=$checked"
 echo "DEPENDENCY_HEADER_SCAN_SKIPPED=$skipped"
 echo "DEPENDENCY_HEADER_SCAN_MISSING=$missing"
+echo "DEPENDENCY_HEADER_SCAN_MISSING_BY_OWNER product_file=$missing_product_file root_view=$missing_root_view symlink=$missing_symlink submodule_source=$missing_submodule_source other=$missing_other"
 
 if [[ "$missing" -gt 0 && "$FAIL_MISSING" -eq 1 ]]; then
   echo "DEPENDENCY_HEADER_SCAN=fail"
