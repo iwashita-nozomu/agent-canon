@@ -19,7 +19,7 @@ upstream design README.md workflow catalog
 - [Git - git-worktree Documentation](https://git-scm.com/docs/git-worktree)
   - worktree ごとに snapshot を持つ、という運用整理の根拠です。
 - [About Git subtree merges - GitHub Docs](https://docs.github.com/en/get-started/using-git/about-git-subtree-merges)
-  - shared canon を subtree として template / 派生 repo へ取り込む運用整理の参考です。
+  - legacy subtree repo を submodule-first 運用へ移行する互換整理だけに使う参考です。新規 template / 派生 repo の標準 path は AgentCanon submodule pin です。
 - [Models | OpenAI API](https://developers.openai.com/api/docs/models)
   - current model lineup と mainline chooser の根拠です。
 - [Introducing GPT-5.5 | OpenAI](https://openai.com/index/introducing-gpt-5-5/)
@@ -52,6 +52,16 @@ upstream design README.md workflow catalog
   - GitHub Copilot 用 adapter と custom instructions の整理に使った資料です。
 - [Your first custom instructions - GitHub Docs](https://docs.github.com/en/copilot/tutorials/customization-library/custom-instructions/your-first-custom-instructions)
   - Copilot 側の最小入口設計の参考です。
+- [Adding repository custom instructions for GitHub Copilot - GitHub Docs](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions)
+  - `.github/copilot-instructions.md`、`.github/instructions/*.instructions.md`、`AGENTS.md` の使い分けの根拠です。
+- [About custom agents - GitHub Docs](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-custom-agents)
+  - `.github/agents/*.md` に PR maintenance agent profile を置く根拠です。
+- [About GitHub Copilot cloud agent - GitHub Docs](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-cloud-agent)
+  - Copilot cloud agent が GitHub Actions powered ephemeral environment で PR 作業する前提の根拠です。
+- [Events that trigger workflows - GitHub Docs](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
+  - fork-like PR で repository secrets が渡らない場合があることの根拠です。
+- [Secrets - GitHub Docs](https://docs.github.com/en/actions/concepts/security/secrets)
+  - `AGENT_CANON_REPO_TOKEN` のような secret は workflow 側で明示的に渡す必要があること、最小権限の根拠です。
 
 ## System Development, Security, Release, And Operations
 

@@ -14,6 +14,7 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - `agents/README.md`
 - `documents/README.md`
 - `agents/workflows/github-copilot-workflow.md`
+- `.github/instructions/pr-processing.instructions.md`
 
 ## Defaults
 
@@ -27,6 +28,8 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - If a task matches a project skill, use the skill before inventing a new local workflow.
 - CLI/runtime differences are summarized in `agents/canonical/CLI_ENTRYPOINTS.md`.
 - For issue, PR, and IDE tasks, follow `agents/workflows/github-copilot-workflow.md` before adding Copilot-only instructions.
+- For PR triage, use `.github/instructions/pr-processing.instructions.md`; if
+  custom agents are available, select `.github/agents/pr-maintainer.md`.
 
 ## Pull Requests
 
@@ -38,6 +41,9 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
   treat it as private submodule authentication. The repository needs
   `AGENT_CANON_REPO_TOKEN` with read-only Contents access to AgentCanon, or
   AgentCanon must be made public by a human security decision.
+- If PR checks fail with `AGENT_CANON_SUBMODULE_AUTH=missing`, do not change
+  code to hide the failure. Record that repository secret
+  `AGENT_CANON_REPO_TOKEN` is missing or unavailable in that run context.
 
 ## Validation
 

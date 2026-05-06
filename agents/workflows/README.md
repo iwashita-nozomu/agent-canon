@@ -20,7 +20,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、MCP `goal.loop_status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
 - token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context budget、escalation trigger を先に決めます。
-- GitHub Copilot から issue / PR / IDE 起点で作業する場合は `github-copilot-workflow.md` を overlay とし、Copilot instructions、PR checklist、GitHub Actions evidence を揃えます。
+- GitHub Copilot から issue / PR / IDE 起点で作業する場合は `github-copilot-workflow.md` を overlay とし、Copilot instructions、path-specific PR instructions、custom PR maintainer agent、PR checklist、GitHub Actions evidence を揃えます。
 
 ## Quick Routing
 
@@ -91,7 +91,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `token-efficient-codex-workflow.md`
   - Codex parent profile、agent mode、context budget、token-saving escalation trigger
 - `github-copilot-workflow.md`
-  - GitHub Copilot の repository instructions、PR checklist、Actions validation の運用
+  - GitHub Copilot の repository instructions、path-specific PR instructions、custom PR maintainer agent、PR checklist、Actions validation の運用
 
 ### Research And Experiment
 

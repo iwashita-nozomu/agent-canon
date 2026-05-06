@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_team import (
+    RunBundleSpec,
     create_run_bundle,
     load_team_config,
     make_run_id,
@@ -132,15 +133,17 @@ def main() -> int:
     created_files: tuple[str, ...] = ()
     if not args.dry_run:
         created_files = create_run_bundle(
-            config=config,
-            report_dir=report_dir,
-            run_id=run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root,
-            workflow_family_id=str(kind_spec["workflow_family_id"]),
+            RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id=run_id,
+                task=args.task,
+                owner=args.owner,
+                created_at_iso=created_at_iso,
+                roles=roles,
+                workspace_root=workspace_root,
+                workflow_family_id=str(kind_spec["workflow_family_id"]),
+            )
         )
 
     review_roles = tuple(

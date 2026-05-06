@@ -184,6 +184,20 @@ OOP policy、analyzer、reviewer、test、legacy support の配置確認は
 `oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。
 
+## Finding から Backlog への変換
+
+`analyze_oop_readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
+
+- `function_lines` / `cognitive_complexity`: まず関数を decision、pure transform、effect boundary、formatting の単位へ分ける。
+- `parameters`: stable な入力集合を dataclass / typed request object / existing value object へ寄せる。
+- `optional_boundary` / `none_runtime_branch`: `None` sentinel ではなく、別 entrypoint、variant、Protocol、validated value object のいずれかへ寄せる。
+- `mixed_morphism_effect`: 戻り値を作る純粋変換と file / process / mutation / print などの effect を分離する。
+- `identity_function` / `pass_through_function` / `trivial_format_function`: domain contract が無ければ削除または caller へ inline する。
+- `public_methods` / `instance_attributes` / `public_fields`: state owner、adapter、renderer、writer、value object に責務を再分類する。
+
+backlog item には、少なくとも `path:line`、finding kind、対象責務、予定する境界変更、validation を含めます。
+機械 finding を許容する場合も、許容理由を design artifact か run bundle に残し、score を改善した事実と混同しません。
+
 ## 例外
 
 - CLI entrypoint や短い運用 script では、class 化せず関数で閉じてよいです。

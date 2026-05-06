@@ -14,7 +14,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 
 - Ubuntu などの Linux host
 - WSL2 上の Linux distro
-- bare repo、workspace、Docker build、VS Code dev container を扱う開発 host
+- workspace、Docker build、VS Code dev container、必要に応じて local bare mirror を扱う開発 host
 
 ## 2. 必須
 
@@ -24,16 +24,17 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `make` が使えること
 - `docker` か `podman` の少なくとも 1 つが使えること
 - repo workspace を置く path が決まっていること
-- bare repo を置く path が決まっていること
+- local bare mirror を使う場合は、その置き場が決まっていること
 
 この template の既定は次です。
 
 - workspace root:
   - `/mnt/l/workspace`
-- local bare repo root:
+- optional local bare mirror root:
   - `/mnt/git`
 
-`/mnt/git` は optional ではなく、template の local push / subtree sync / bare remote 運用の既定 path とみなします。
+`/mnt/git` は互換 mirror / proposal target の既定 path です。
+GitHub canonical remote と AgentCanon submodule pin が source of truth であり、local mirror を使わない repo では `/mnt/git` を必須にしません。
 
 ## 3. 推奨
 
@@ -51,7 +52,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - WSL2 を main 開発環境として使って構いません
 - repo は `/home/...` か `/mnt/wsl/...` のような Linux filesystem 側へ置くことを推奨します
 - `/mnt/c/...` のような Windows drive mount は、I/O、permission、symlink、case sensitivity の点で正本運用にしません
-- `/mnt/git` は WSL Linux 側に作ります
+- local mirror を使う場合、`/mnt/git` は WSL Linux 側に作ります
 - Docker Desktop 連携を使う場合でも、workspace と bare repo は Linux 側 path を既定にします
 
 ## 5. Docker / Container Requirement
@@ -59,7 +60,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `docker version` か `podman version` が通ること
 - Docker を使う場合、現在の shell から daemon socket に到達できること
 - host で `make docker-build-check` を実行できることを推奨します
-- nested Codex や dev container を使う場合、`/mnt/git` を mount できることを推奨します
+- local mirror を使う nested Codex や dev container では、`/mnt/git` を mount できることを推奨します
 
 補足:
 
@@ -108,7 +109,8 @@ GPU が無いこと自体を failure 条件にしません。
 - `gh` は host に入っていることを推奨します。container 内の GitHub CLI も `docker/Dockerfile` に同梱します
 - 初回 `gh auth login` は host 側で行い、container は mounted `~/.config/gh` を使います
 - `~/.ssh` は read-only mount 前提なので、key 追加や GitHub host key 登録は host 側で行います
-- local bare remote を使う前提なので、host から対象 repository の bare remote と `/mnt/git/agent-canon.git` へ到達できることを確認します
+- GitHub canonical remote と AgentCanon submodule を使う前提なので、host から GitHub へ到達できることを確認します
+- local bare mirror を併用する repo だけ、host から対象 repository の bare remote と `/mnt/git/agent-canon.git` へ到達できることを確認します
 
 ## 9. 最低限の初期確認
 
@@ -120,7 +122,7 @@ make --version
 docker version
 gh auth status
 ssh -T git@github.com
-test -d /mnt/git
+test -d /mnt/git || true
 git status --short
 make ci-quick
 make docker-build-check
@@ -136,7 +138,7 @@ docker context ls
 ## 10. 置き場の原則
 
 - workspace は Linux filesystem 側に置く
-- bare repo は `/mnt/git` に集約する
+- local bare mirror を使う場合は `/mnt/git` に集約する
 - `docker` state、Codex state、SSH key は Linux 側に置く
 - template の canonical docs は host-global install を正本にしない
 

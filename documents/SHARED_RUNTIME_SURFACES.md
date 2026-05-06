@@ -32,6 +32,8 @@ root では次を symlink view として扱います。
 - `CLAUDE.md`
 - `.github/AGENTS.md`
 - `.github/copilot-instructions.md`
+- `.github/instructions/`
+- `.github/agents/`
 - `.codex/config.toml`
 - `.codex/README.md`
 - `.codex/agents`
@@ -142,11 +144,13 @@ root では次を symlink view として扱います。
 
 - `.github/workflows/agent-coordination.yml`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
+- `.github/scripts/checkout_agent_canon_submodule.sh`
 
 | root path | AgentCanon source | verification |
 | --- | --- | --- |
 | `.github/workflows/agent-coordination.yml` | `vendor/agent-canon/.github/workflows/agent-coordination.yml` | `bash tools/sync_agent_canon.sh check` |
 | `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` | `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE/agent_canon.md` | `bash tools/sync_agent_canon.sh check` |
+| `.github/scripts/checkout_agent_canon_submodule.sh` | `vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh` | `bash tools/sync_agent_canon.sh check` |
 
 ### GitHub symlink root views
 
@@ -156,6 +160,8 @@ root では次を symlink view として扱います。
 | --- | --- | --- |
 | `.github/AGENTS.md` | `vendor/agent-canon/.github/AGENTS.md` | `bash tools/sync_agent_canon.sh check` |
 | `.github/copilot-instructions.md` | `vendor/agent-canon/.github/copilot-instructions.md` | `bash tools/sync_agent_canon.sh check` |
+| `.github/instructions/` | `vendor/agent-canon/.github/instructions/` | `bash tools/sync_agent_canon.sh check` |
+| `.github/agents/` | `vendor/agent-canon/.github/agents/` | `bash tools/sync_agent_canon.sh check` |
 
 ### AgentCanon standalone-only surface
 

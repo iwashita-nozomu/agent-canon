@@ -17,7 +17,7 @@ AgentCanon の source of truth は GitHub remote で、project-local bare repo �
 
 - template clone を新 repo として初期化する
 - `/mnt/git/<project>.git` のような新しい bare repo に向ける
-- clone 直後の `agent-canon` subtree snapshot と project-local `agent-canon` bare repo の関係を揃えたい
+- clone 直後の `vendor/agent-canon` submodule pin と project-local proposal / mirror bare repo の関係を揃えたい
 - `make agent-canon-ensure-latest` が別 repo 向け remote で安全判定に止まるのを bootstrap 時点で避けたい
 
 ## Core References

@@ -21,6 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
 
 from agent_team import (
     ROOT,
+    RunBundleSpec,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
@@ -411,15 +412,17 @@ def validate_bundle_outputs() -> None:
             )
             report_dir = report_root / task_id
             create_run_bundle(
-                config=config,
-                report_dir=report_dir,
-                run_id=task_id,
-                task=f"alignment smoke for {task_id}",
-                owner="codex",
-                created_at_iso=created_at_iso,
-                roles=roles,
-                workspace_root=workspace_root,
-                workflow_family_id=str(task["family"]),
+                RunBundleSpec(
+                    config=config,
+                    report_dir=report_dir,
+                    run_id=task_id,
+                    task=f"alignment smoke for {task_id}",
+                    owner="codex",
+                    created_at_iso=created_at_iso,
+                    roles=roles,
+                    workspace_root=workspace_root,
+                    workflow_family_id=str(task["family"]),
+                )
             )
             missing_outputs = [
                 output
@@ -457,15 +460,17 @@ def validate_bundle_outputs() -> None:
         full_team_roles = config.always_on_roles + config.specialist_roles
         full_team_dir = report_root / "full-team"
         create_run_bundle(
-            config=config,
-            report_dir=full_team_dir,
-            run_id="full-team",
-            task="alignment smoke full team",
-            owner="codex",
-            created_at_iso=created_at_iso,
-            roles=full_team_roles,
-            workspace_root=workspace_root,
-            workflow_family_id="comprehensive_development",
+            RunBundleSpec(
+                config=config,
+                report_dir=full_team_dir,
+                run_id="full-team",
+                task="alignment smoke full team",
+                owner="codex",
+                created_at_iso=created_at_iso,
+                roles=full_team_roles,
+                workspace_root=workspace_root,
+                workflow_family_id="comprehensive_development",
+            )
         )
         missing_outputs = [
             output

@@ -5,6 +5,7 @@
 # upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
 # downstream implementation ../documents/codex-configuration-reference.md root symlink view for Codex config docs
 # downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
+# downstream implementation ../documents/project-template-overview-slides.md root symlink view for template overview slides
 # downstream implementation ../documents/algorithm-implementation-boundary.md root symlink view for algorithm boundary policy
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
 # downstream implementation ../documents/result-log-retention-and-visualization.md root symlink view
@@ -160,6 +161,8 @@ CLAUDE.md:${PREFIX}/CLAUDE.md
 .codex/hooks:../${PREFIX}/.codex/hooks
 .github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
 .github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
+.github/instructions:../${PREFIX}/.github/instructions
+.github/agents:../${PREFIX}/.github/agents
 documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
 documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
 documents/DOCSTRING_GUIDE.md:../${PREFIX}/documents/DOCSTRING_GUIDE.md
@@ -167,6 +170,7 @@ documents/FILE_CHECKLIST_OPERATIONS.md:../${PREFIX}/documents/FILE_CHECKLIST_OPE
 documents/README.md:../${PREFIX}/documents/README.md
 documents/codex-configuration-reference.md:../${PREFIX}/documents/codex-configuration-reference.md
 documents/codex-configuration-slides.md:../${PREFIX}/documents/codex-configuration-slides.md
+documents/project-template-overview-slides.md:../${PREFIX}/documents/project-template-overview-slides.md
 documents/algorithm-implementation-boundary.md:../${PREFIX}/documents/algorithm-implementation-boundary.md
 documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-design.md
 documents/result-log-retention-and-visualization.md:../${PREFIX}/documents/result-log-retention-and-visualization.md

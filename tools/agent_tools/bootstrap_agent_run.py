@@ -14,6 +14,7 @@ from pathlib import Path
 
 from agent_canon_preflight import run_agent_canon_preflight
 from agent_team import (
+    RunBundleSpec,
     TeamConfig,
     auto_language_specialists,
     codex_runtime_max_threads,
@@ -243,15 +244,17 @@ def main() -> int:
 
     if not args.dry_run:
         created_files = create_run_bundle(
-            config=config,
-            report_dir=report_dir,
-            run_id=run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root,
-            workflow_family_id=workflow_family_id,
+            RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id=run_id,
+                task=args.task,
+                owner=args.owner,
+                created_at_iso=created_at_iso,
+                roles=roles,
+                workspace_root=workspace_root,
+                workflow_family_id=workflow_family_id or "",
+            )
         )
 
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")

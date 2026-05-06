@@ -227,14 +227,38 @@ def check_pr_templates(root: Path) -> list[Finding]:
 def check_copilot_surfaces(root: Path) -> list[Finding]:
     """Check Copilot and PR-template discovery surfaces."""
     readme_path = root / "README.md"
-    if (root / "vendor" / "agent-canon").exists():
+    template_mode = (root / "vendor" / "agent-canon").exists()
+    if template_mode:
         readme_path = root / "vendor" / "agent-canon" / "README.md"
-    return [
+    findings = [
         *require_text(
             root / ".github" / "copilot-instructions.md",
             [
                 "agents/workflows/github-copilot-workflow.md",
+                ".github/instructions/pr-processing.instructions.md",
+                ".github/agents/pr-maintainer.md",
                 "AGENT_CANON_REPO_TOKEN",
+            ],
+        ),
+        *require_text(
+            root
+            / ".github"
+            / "instructions"
+            / "pr-processing.instructions.md",
+            [
+                'applyTo: "**"',
+                "AGENT_CANON_SUBMODULE_AUTH=missing",
+                "private submodule authentication",
+                "AGENT_CANON_REPO_TOKEN",
+            ],
+        ),
+        *require_text(
+            root / ".github" / "agents" / "pr-maintainer.md",
+            [
+                "description:",
+                "AGENT_CANON_SUBMODULE_AUTH=missing",
+                "AGENT_CANON_REPO_TOKEN",
+                "Do not delete the AgentCanon submodule",
             ],
         ),
         *require_text(
@@ -246,6 +270,20 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
             ["/.github/PULL_REQUEST_TEMPLATE/agent_canon.md"],
         ),
     ]
+    if template_mode:
+        findings.extend(
+            require_text(
+                root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
+                [
+                    "AGENT_CANON_SUBMODULE_AUTH=missing",
+                    "AGENT_CANON_SUBMODULE_AUTH=denied",
+                    "AGENT_CANON_REPO_TOKEN",
+                    "untrusted PR context",
+                    "exit 86",
+                ],
+            )
+        )
+    return findings
 
 def run(root: Path) -> int:
     """Run all checks and print a compact status report."""

@@ -83,7 +83,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/worktree_start.sh`
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
-  - 派生 repo で AgentCanon snapshot を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-update` で適用します。
+  - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-update` で適用します。
+  - legacy subtree / snapshot route は移行互換のためだけに残し、submodule 化済み repo の通常 path にはしません。
   - source repo が設定されている場合は `refresh-remote -> ensure-latest` の順に進みます。source repo が missing / dirty なら fail-closed で止めます。
   - 派生 repo 側の shared canon 差分を upstream に渡す場合は `make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` で proposal branch へ push します。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、local bare mirror SHA、submodule pin を PR 本文に残します。
@@ -151,7 +152,7 @@ python3 tools/agent_tools/oop_rule_inventory.py --format markdown
 - `tools/agent_tools/check_log_helper_names.py`
   - Python source のログ用 helper 関数名を検出します。ログを書き出す、emit する、保存する、整形する helper は `_log` から始め、`write_log_*` や `append_log_*` のような prefix を fail にします。
 - `tools/agent_tools/analyze_oop_readability.py`
-  - Python / C++ の OOP readability を機械判定します。外部 repo や派生 template snapshot を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
+  - Python / C++ の OOP readability を機械判定します。外部 repo、bare 展開、派生 template worktree を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
 - `tools/agent_tools/check_algorithm_module_public_surface.py`
   - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
 - `tools/agent_tools/check_algorithm_module_nested_contract.py`

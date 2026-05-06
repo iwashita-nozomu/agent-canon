@@ -5,6 +5,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./codex-configuration-slides.md Codex configuration slide deck
+downstream design ./project-template-overview-slides.md project template overview slide deck
 downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./result-log-retention-and-visualization.md result artifact policy
 downstream design ./repo-local-tool-imports.md repo-local tool import ledger
@@ -24,6 +25,7 @@ template の初期状態では、ここを shared workflow のリンク集にし
 
 - [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI / config schema / hooks / MCP / skills / subagents の設定一覧。
 - [Codex Configuration Slides](./codex-configuration-slides.md): 上記 reference から作成した Markdown slide deck。
+- [Project Template Overview Slides](./project-template-overview-slides.md): この repo の構成、AgentCanon submodule、workflow、validation の説明 slide deck。
 
 ## Coding Policy References
 

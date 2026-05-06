@@ -54,6 +54,9 @@ AGENT_CANON_SUBMODULE_AUTH=missing
 AgentCanon submodule '${submodule_url}' is not readable with the default workflow credentials.
 For private AgentCanon repositories, add a repository secret named AGENT_CANON_REPO_TOKEN
 with read-only Contents access to the AgentCanon repository, then rerun the workflow.
+If this is a fork-like or untrusted PR context, repository secrets may be intentionally
+unavailable; request a trusted maintainer rerun after reviewing the workflow diff.
+Do not remove the submodule or change implementation code to hide this authentication failure.
 EOF
   else
     cat >&2 <<EOF

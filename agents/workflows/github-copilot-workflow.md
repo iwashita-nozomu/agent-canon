@@ -16,6 +16,7 @@ context rather than a prepared local run bundle.
 ## Entry Packet
 
 1. Read `.github/copilot-instructions.md`.
+1. Read `.github/instructions/pr-processing.instructions.md` when available.
 1. Read `AGENTS.md`.
 1. Read `agents/README.md`.
 1. Read `documents/README.md`.
@@ -24,6 +25,19 @@ context rather than a prepared local run bundle.
 1. If the task touches GitHub Actions or PR templates, read this workflow and
    `.github/PULL_REQUEST_TEMPLATE.md` or
    `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` as applicable.
+1. If GitHub custom agents are available and the task is PR triage or PR
+   maintenance, use `.github/agents/pr-maintainer.md`.
+
+## Copilot Customization Surfaces
+
+- `.github/copilot-instructions.md` is the thin repository-wide entrypoint.
+- `.github/instructions/pr-processing.instructions.md` is the path-wide PR
+  processing instruction file used by Copilot cloud agent and Copilot code
+  review.
+- `.github/agents/pr-maintainer.md` is the optional custom agent profile for
+  PR maintenance and check-failure triage.
+- Keep these surfaces synchronized through AgentCanon. Do not add one-off
+  Copilot rules in derived repos unless the rule is truly repo-local.
 
 ## Operating Rules
 
@@ -80,6 +94,37 @@ submodule needs one of these human-controlled fixes:
 Copilot must not rewrite `.gitmodules`, remove the submodule, vendor a copied
 snapshot, or mark the PR as code-broken when the only failure is missing
 private-submodule credentials.
+
+Current GitHub Actions behavior to account for:
+
+- Workflow secrets are only available when the workflow explicitly passes them
+  to a step.
+- Pull requests from fork-like or untrusted contexts may not receive repository
+  secrets. In that case, record the blocker and request a trusted maintainer
+  rerun after reviewing the workflow diff.
+- If `checkout_agent_canon_submodule.sh` prints
+  `AGENT_CANON_SUBMODULE_AUTH=missing`, the next action is to configure
+  `AGENT_CANON_REPO_TOKEN` or an equivalent GitHub App token, not to change the
+  implementation under review.
+
+## PR Error Triage
+
+Use this order when Copilot reports a PR processing error:
+
+1. Check whether the failure happened before dependency installation or test
+   execution. If yes, inspect checkout, token, workflow syntax, or runner setup
+   first.
+1. Search the failed log for `AGENT_CANON_SUBMODULE_AUTH=missing`,
+   `AGENT_CANON_SUBMODULE_AUTH=denied`, `repository ... agent-canon.git not
+   found`, or `could not read Username`.
+1. If one of those strings appears, classify the PR as blocked on private
+   AgentCanon access and leave the code diff unchanged unless there is another
+   independent finding.
+1. If tests or linters actually ran and failed, treat those as code or docs
+   findings and fix them through the normal workflow.
+1. Record the classification in the PR body or comment with the exact command,
+   the failing job name, and whether the blocker is missing secret, denied
+   secret, fork/untrusted context, workflow syntax, or real validation failure.
 
 ## PR Checklist Use
 

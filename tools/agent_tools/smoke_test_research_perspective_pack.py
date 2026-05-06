@@ -15,7 +15,13 @@ from pathlib import Path
 
 import yaml
 
-from agent_team import create_run_bundle, load_team_config, resolve_role, resolve_role_write_scope
+from agent_team import (
+    RunBundleSpec,
+    create_run_bundle,
+    load_team_config,
+    resolve_role,
+    resolve_role_write_scope,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -228,14 +234,16 @@ def main() -> int:
         report_dir = (report_root / args.run_id).resolve()
 
         create_run_bundle(
-            config=config,
-            report_dir=report_dir,
-            run_id=args.run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root.resolve(),
+            RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id=args.run_id,
+                task=args.task,
+                owner=args.owner,
+                created_at_iso=created_at_iso,
+                roles=roles,
+                workspace_root=workspace_root.resolve(),
+            )
         )
 
         validate_runtime_surfaces(report_dir, workspace_root.resolve())

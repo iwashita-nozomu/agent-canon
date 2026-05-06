@@ -94,6 +94,27 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_missing_copilot_pr_instruction_fails(self) -> None:
+        """Copilot PR triage instructions are required surfaces."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            (root / ".github" / "instructions" / "pr-processing.instructions.md").unlink()
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "path=.github/instructions/pr-processing.instructions.md",
+                result.stdout,
+            )
+
     def write_valid_workflow(self, root: Path) -> None:
         """Write one minimal valid workflow."""
         workflow_dir = root / ".github" / "workflows"
@@ -125,10 +146,18 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         for relative in [
             ".github/AGENTS.md",
             ".github/copilot-instructions.md",
+            ".github/instructions/pr-processing.instructions.md",
+            ".github/agents/pr-maintainer.md",
+            ".github/scripts/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
             "README.md",
         ]:
             source = REPO_ROOT / relative
+            if (
+                relative == ".github/scripts/checkout_agent_canon_submodule.sh"
+                and not source.exists()
+            ):
+                source = REPO_ROOT / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             if source.is_symlink():
