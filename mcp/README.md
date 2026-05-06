@@ -34,5 +34,7 @@ or non-root working directory.
   loop uses this tool as the mechanical iteration gate:
   `NEXT_ACTION=run_next_iteration`
   means continue the next backlog item, not completion.
+- `goal.plan`: runs `tools/agent_tools/goal_loop.py plan` for `goal.md` and
+  returns the next implementation-ready slice for goal-loop planning.
   When Codex `goals` is enabled, this MCP tool remains the repo-level gate;
   Codex goals is only the session view of the same `goal.md` contract.
