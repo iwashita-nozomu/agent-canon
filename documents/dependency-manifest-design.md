@@ -102,6 +102,9 @@ shared canon は派生 repo に配布されるため、environment edge はそ�
 
 内部 marker と DSL は全 file type 共通です。
 外側 comment syntax だけを file type に合わせます。
+manifest は「file 先頭付近」に置き、`check_dependency_headers.py` は先頭 40 行、shell tool 群は既定で先頭 80 行を走査します。
+この範囲内であれば、`SKILL.md` の YAML frontmatter、Markdown の H1 title、shebang、encoding comment の後に manifest block を置いてよいです。
+ただし、長い前置き prose や generated banner を manifest より前に置いて、agent が責務と依存を読むまでの距離を伸ばしてはいけません。
 
 Markdown:
 
@@ -299,6 +302,8 @@ Each touched file must be converted from `Dependency Files:` to `@dependency-sta
 
 Phase 4: enable CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
+この repository では full-repo migration 後の strict baseline を `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で固定します。
+goal-driven cleanup や shared surface migration の closeout では、この strict baseline を繰り返し実行して `DEPENDENCY_HEADER_SCAN_MISSING=0` と `REPO_DEPENDENCY_REVIEW=pass` が安定することを evidence にします。
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
 

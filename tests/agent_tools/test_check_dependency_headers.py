@@ -53,6 +53,40 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
+    def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
+        """SKILL.md may keep YAML frontmatter before the dependency manifest."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            skill = Path(tmp_dir) / "SKILL.md"
+            skill.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "name: demo-skill",
+                        "description: Demonstrates frontmatter before the dependency manifest.",
+                        "---",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Documents a skill under test.",
+                        "upstream design README.md repo overview",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(skill)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
     def test_rejects_missing_dependency_manifest(self) -> None:
         """Checkable text files must declare dependency manifest markers near the top."""
         with tempfile.TemporaryDirectory() as tmp_dir:

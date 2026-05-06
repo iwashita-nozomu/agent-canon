@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import unittest
@@ -60,6 +61,82 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_repo_review_output_is_stable_across_repeated_runs(self) -> None:
+        """Strict repo dependency review should be stable across repeated runs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            target = root / "target.md"
+            source = root / "source.md"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines target fixture for stable review.",
+                        "downstream design source.md source consumes target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines source fixture for stable review.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "target.md", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            first = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                root=root,
+            )
+            second = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                root=root,
+            )
+
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertEqual(first.stdout, second.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", first.stdout)
 
     def test_code_scan_extracts_python_import_edges(self) -> None:
         """The code dependency scanner resolves local Python imports."""
@@ -136,6 +213,224 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_accepts_markdown_h1_before_manifest(self) -> None:
+        """Markdown H1 titles may precede the dependency manifest near the top."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "target.md"
+            source = root / "source.md"
+            target.write_text("# Target\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source Title",
+                        "",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises H1 before manifest parsing.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_accepts_skill_frontmatter_before_html_manifest(self) -> None:
+        """YAML frontmatter may precede an HTML-comment dependency manifest."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "SKILL.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "name: demo",
+                        "description: Demo skill.",
+                        "---",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises skill frontmatter manifest parsing.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_scan_and_format_accept_shell_and_toml_line_comments(self) -> None:
+        """Shell and TOML files can use line-comment dependency manifests."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "target.md"
+            shell = root / "script.sh"
+            toml = root / "config.toml"
+            target.write_text("# Target\n", encoding="utf-8")
+            shell.write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "# @dependency-start",
+                        "# responsibility Exercises shell manifest parsing.",
+                        "# upstream design target.md target context",
+                        "# @dependency-end",
+                        "set -euo pipefail",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            toml.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Exercises TOML manifest parsing.",
+                        "# upstream design target.md target context",
+                        "# @dependency-end",
+                        "[tool.demo]",
+                        'enabled = true',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            scan = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                str(shell),
+                str(toml),
+                root=root,
+            )
+            fmt = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                "--require-header",
+                str(shell),
+                str(toml),
+                root=root,
+            )
+
+            self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
+            self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
+
+    def test_symlink_root_views_resolve_to_manifest_source(self) -> None:
+        """Root symlink views resolve to their manifest-bearing source files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            vendor = root / "vendor" / "agent-canon"
+            vendor.mkdir(parents=True)
+            (vendor / "README.md").write_text(
+                "\n".join(
+                    [
+                        "# Vendor",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines a vendor source fixture.",
+                        "upstream design README.md self fixture",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            os.symlink("vendor/agent-canon/README.md", root / "README.md")
+
+            scan = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                str(root / "README.md"),
+                root=root,
+            )
+            fmt = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                "--require-header",
+                str(root / "README.md"),
+                root=root,
+            )
+
+            self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
+            self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_CHECKED=1", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
+
+    def test_agent_runtime_surfaces_pass_manifest_scan_and_format(self) -> None:
+        """Agent runtime docs and skill surfaces stay compatible with manifest tools."""
+        paths = [
+            ".agents/skills/codex-task-workflow/SKILL.md",
+            ".claude/skills/adaptive-improvement-loop/SKILL.md",
+            ".claude/skills/codex-task-workflow/SKILL.md",
+            ".codex/README.md",
+            "ROOT_AGENTS.md",
+            "agents/TASK_WORKFLOWS.md",
+            "agents/USER_GUIDE_JA.md",
+            "agents/skills/catalog.yaml",
+            "agents/skills/worktree-start.md",
+            "agents/task_catalog.yaml",
+            "agents/workflows/adaptive-improvement-workflow.md",
+            "agents/workflows/agent-canon-pr-workflow.md",
+            "agents/workflows/agent-learning-workflow.md",
+            "agents/workflows/experiment-workflow.md",
+        ]
+
+        scan = run_tool(
+            str(SCAN),
+            "--root",
+            str(PROJECT_ROOT),
+            "--fail-missing",
+            *paths,
+            root=PROJECT_ROOT,
+        )
+        fmt = run_tool(
+            str(FORMAT),
+            "--root",
+            str(PROJECT_ROOT),
+            "--require-header",
+            *paths,
+            root=PROJECT_ROOT,
+        )
+
+        self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
+        self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
+        self.assertIn("DEPENDENCY_HEADER_SCAN=pass", scan.stdout)
+        self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
+        self.assertTrue((PROJECT_ROOT / "ROOT_AGENTS.md").is_file())
+        template_root = PROJECT_ROOT.parent.parent
+        embedded_vendor = template_root / "vendor" / "agent-canon"
+        if embedded_vendor.exists() and embedded_vendor.resolve() == PROJECT_ROOT:
+            self.assertFalse((template_root / "ROOT_AGENTS.md").exists())
+            self.assertTrue((template_root / "AGENTS.md").is_symlink())
+            self.assertEqual(
+                (template_root / "AGENTS.md").readlink().as_posix(),
+                "vendor/agent-canon/ROOT_AGENTS.md",
+            )
 
     def test_format_accepts_json_string_manifest(self) -> None:
         """JSON files can keep valid syntax by storing manifest lines as strings."""
