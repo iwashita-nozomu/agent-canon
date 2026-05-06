@@ -75,7 +75,7 @@ Configure this repository secret in `iwashita-nozomu/project_template`:
 Do not rely on automatic `actions/checkout` submodule fetch for the private
 AgentCanon submodule. Workflows should checkout the template root with
 `submodules: false`, then run
-`bash tools/ci/checkout_agent_canon_submodule.sh` so missing credentials fail
+`bash .github/scripts/checkout_agent_canon_submodule.sh` so missing credentials fail
 with a precise remediation message.
 
 ## Branch Protection Baseline

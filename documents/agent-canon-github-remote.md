@@ -105,7 +105,7 @@ Template and derived repos should checkout the root repository with
 `submodules: false`, then run:
 
 ```bash
-bash tools/ci/checkout_agent_canon_submodule.sh
+bash .github/scripts/checkout_agent_canon_submodule.sh
 ```
 
 The workflow must pass:

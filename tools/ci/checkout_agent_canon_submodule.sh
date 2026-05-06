@@ -3,7 +3,7 @@
 # responsibility Checks out the AgentCanon submodule in GitHub Actions after root checkout.
 # upstream design ../../documents/agent-canon-github-remote.md defines private submodule auth policy.
 # upstream design ../../agents/workflows/github-copilot-workflow.md defines GitHub runtime behavior.
-# downstream implementation check_github_workflows.py enforces workflow usage.
+# downstream implementation ../../tools/ci/check_github_workflows.py enforces workflow usage.
 # @dependency-end
 
 set -euo pipefail

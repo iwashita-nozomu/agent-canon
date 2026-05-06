@@ -51,7 +51,7 @@ For `.github/workflows/*.yml` changes:
 - Checkout must fetch the root repository first with `submodules: false` and
   `persist-credentials: false`.
 - Jobs that need AgentCanon-backed root surfaces must then run
-  `bash tools/ci/checkout_agent_canon_submodule.sh` with
+  `bash .github/scripts/checkout_agent_canon_submodule.sh` with
   `AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}`.
 - Do not use `actions/checkout` automatic submodule checkout for private
   AgentCanon repos. It fails before the repository helper can print an

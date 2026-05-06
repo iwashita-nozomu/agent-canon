@@ -114,7 +114,7 @@ def check_workflow(path: Path) -> list[Finding]:
         findings.append(Finding("warning", path, "missing_top_level_concurrency"))
 
     checkouts = checkout_steps(workflow)
-    if checkouts and "tools/ci/checkout_agent_canon_submodule.sh" not in workflow_text:
+    if checkouts and ".github/scripts/checkout_agent_canon_submodule.sh" not in workflow_text:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
     if checkouts and "AGENT_CANON_REPO_TOKEN" not in workflow_text:
         findings.append(Finding("error", path, "missing_agent_canon_repo_token_env"))

@@ -116,7 +116,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             + "      - name: Checkout AgentCanon submodule\n"
             + "        env:\n"
             + "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
-            + "        run: bash tools/ci/checkout_agent_canon_submodule.sh\n",
+            + "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n",
             encoding="utf-8",
         )
 

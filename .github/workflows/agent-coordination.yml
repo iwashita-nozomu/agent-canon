@@ -53,7 +53,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -99,7 +99,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -146,7 +146,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -193,7 +193,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -240,7 +240,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -294,7 +294,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -348,7 +348,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -402,7 +402,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -456,7 +456,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -510,7 +510,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -564,7 +564,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -618,7 +618,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -672,7 +672,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -726,7 +726,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -780,7 +780,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -827,7 +827,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -874,7 +874,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -921,7 +921,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -968,7 +968,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1015,7 +1015,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1062,7 +1062,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1109,7 +1109,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1156,7 +1156,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Install Python and deps
         uses: actions/setup-python@v5
         with:
@@ -1195,7 +1195,7 @@ jobs:
       - name: Checkout AgentCanon submodule
         env:
           AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+        run: bash .github/scripts/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
