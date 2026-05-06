@@ -48,14 +48,38 @@ context rather than a prepared local run bundle.
 
 For `.github/workflows/*.yml` changes:
 
-- Checkout must include `submodules: true` when the job needs AgentCanon-backed
-  root surfaces.
+- Checkout must fetch the root repository first with `submodules: false` and
+  `persist-credentials: false`.
+- Jobs that need AgentCanon-backed root surfaces must then run
+  `bash tools/ci/checkout_agent_canon_submodule.sh` with
+  `AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}`.
+- Do not use `actions/checkout` automatic submodule checkout for private
+  AgentCanon repos. It fails before the repository helper can print an
+  actionable remediation.
 - Workflows should declare minimal `permissions`.
 - Long-running validation workflows should use `concurrency` to avoid stale
   duplicate runs unless the workflow is intentionally fan-out oriented.
 - Job names should describe the gate they enforce, not only the tool they call.
 - Validation must include the repository command that the workflow wraps, such
   as `make ci`, `make agent-canon-pr-check`, or Docker pack checks.
+
+## Private AgentCanon Submodule Failures
+
+If GitHub Actions or Copilot PR processing shows `Repository not found` while
+cloning `vendor/agent-canon`, diagnose authentication before changing code.
+`GITHUB_TOKEN` is scoped to the current repository, so a private AgentCanon
+submodule needs one of these human-controlled fixes:
+
+- Add repository secret `AGENT_CANON_REPO_TOKEN` with read-only Contents access
+  to `iwashita-nozomu/agent-canon`.
+- Make AgentCanon public only after a human security review decides that the
+  shared runtime can be public.
+- Replace the PAT with a GitHub App token only after the workflow documents the
+  app permissions and installation scope.
+
+Copilot must not rewrite `.gitmodules`, remove the submodule, vendor a copied
+snapshot, or mark the PR as code-broken when the only failure is missing
+private-submodule credentials.
 
 ## PR Checklist Use
 

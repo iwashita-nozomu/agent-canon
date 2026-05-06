@@ -106,22 +106,29 @@ def checkout_steps(workflow: dict[str, object]) -> list[dict[str, object]]:
 def check_workflow(path: Path) -> list[Finding]:
     """Check one GitHub Actions workflow."""
     workflow = load_workflow(path)
+    workflow_text = read_text(path)
     findings: list[Finding] = []
     if "permissions" not in workflow:
         findings.append(Finding("error", path, "missing_top_level_permissions"))
     if "concurrency" not in workflow:
         findings.append(Finding("warning", path, "missing_top_level_concurrency"))
 
-    for index, step in enumerate(checkout_steps(workflow), start=1):
+    checkouts = checkout_steps(workflow)
+    if checkouts and "tools/ci/checkout_agent_canon_submodule.sh" not in workflow_text:
+        findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
+    if checkouts and "AGENT_CANON_REPO_TOKEN" not in workflow_text:
+        findings.append(Finding("error", path, "missing_agent_canon_repo_token_env"))
+
+    for index, step in enumerate(checkouts, start=1):
         with_block = as_string_dict(step.get("with"))
         if with_block is None:
             findings.append(
                 Finding("error", path, f"checkout_{index}_missing_with_block")
             )
             continue
-        if not is_true(with_block.get("submodules")):
+        if not is_false(with_block.get("submodules")):
             findings.append(
-                Finding("error", path, f"checkout_{index}_missing_submodules_true")
+                Finding("error", path, f"checkout_{index}_missing_submodules_false")
             )
         if not is_false(with_block.get("persist-credentials")):
             findings.append(
@@ -225,7 +232,10 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
     return [
         *require_text(
             root / ".github" / "copilot-instructions.md",
-            ["agents/workflows/github-copilot-workflow.md"],
+            [
+                "agents/workflows/github-copilot-workflow.md",
+                "AGENT_CANON_REPO_TOKEN",
+            ],
         ),
         *require_text(
             readme_path,

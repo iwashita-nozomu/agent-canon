@@ -34,6 +34,10 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - Use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` when a template PR changes `vendor/agent-canon/`.
 - In the standalone AgentCanon repository, use its `.github/PULL_REQUEST_TEMPLATE.md`.
 - Keep validation evidence explicit; do not mark commands complete if Copilot could not run them.
+- If PR checks fail before tests with `repository ... agent-canon.git not found`,
+  treat it as private submodule authentication. The repository needs
+  `AGENT_CANON_REPO_TOKEN` with read-only Contents access to AgentCanon, or
+  AgentCanon must be made public by a human security decision.
 
 ## Validation
 

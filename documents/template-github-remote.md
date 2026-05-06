@@ -62,6 +62,22 @@ git config -f .gitmodules submodule.vendor/agent-canon.url \
 git submodule sync vendor/agent-canon
 ```
 
+## Private Submodule Workflow Secret
+
+Because both the template repository and AgentCanon can be private, GitHub
+Actions needs an explicit cross-repo read credential for `vendor/agent-canon`.
+
+Configure this repository secret in `iwashita-nozomu/project_template`:
+
+- `AGENT_CANON_REPO_TOKEN`: read-only Contents access to
+  `iwashita-nozomu/agent-canon`.
+
+Do not rely on automatic `actions/checkout` submodule fetch for the private
+AgentCanon submodule. Workflows should checkout the template root with
+`submodules: false`, then run
+`bash tools/ci/checkout_agent_canon_submodule.sh` so missing credentials fail
+with a precise remediation message.
+
 ## Branch Protection Baseline
 
 Template `main` should be protected in GitHub UI when the repository is used by

@@ -45,11 +45,15 @@ jobs:
       run_id: ${{ steps.bootstrap.outputs.run_id }}
       report_dir: ${{ steps.bootstrap.outputs.report_dir }}
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -87,11 +91,15 @@ jobs:
     needs: bootstrap
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -130,11 +138,15 @@ jobs:
     needs: [bootstrap, manager]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -173,11 +185,15 @@ jobs:
     needs: [bootstrap, manager_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -216,11 +232,15 @@ jobs:
     needs: [bootstrap, manager_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -266,11 +286,15 @@ jobs:
     needs: [bootstrap, researcher]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -316,11 +340,15 @@ jobs:
     needs: [bootstrap, research_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -366,11 +394,15 @@ jobs:
     needs: [bootstrap, research_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -416,11 +448,15 @@ jobs:
     needs: [bootstrap, scheduler]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -466,11 +502,15 @@ jobs:
     needs: [bootstrap, schedule_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -516,11 +556,15 @@ jobs:
     needs: [bootstrap, schedule_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -566,11 +610,15 @@ jobs:
     needs: [bootstrap, infra_steward]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -616,11 +664,15 @@ jobs:
     needs: [bootstrap, infra_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -666,11 +718,15 @@ jobs:
     needs: [bootstrap, infra_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -716,11 +772,15 @@ jobs:
     needs: [bootstrap, manager_specialist_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -759,11 +819,15 @@ jobs:
     needs: [bootstrap, designer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -802,11 +866,15 @@ jobs:
     needs: [bootstrap, design_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -845,11 +913,15 @@ jobs:
     needs: [bootstrap, design_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -888,11 +960,15 @@ jobs:
     needs: [bootstrap, implementer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -931,11 +1007,15 @@ jobs:
     needs: [bootstrap, change_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -974,11 +1054,15 @@ jobs:
     needs: [bootstrap, implementer_change_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1017,11 +1101,15 @@ jobs:
     needs: [bootstrap, final_reviewer]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -1060,11 +1148,15 @@ jobs:
     needs: [bootstrap, implementer_final_response]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Install Python and deps
         uses: actions/setup-python@v5
         with:
@@ -1095,11 +1187,15 @@ jobs:
     needs: [bootstrap, verifier]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository with AgentCanon
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: false
           persist-credentials: false
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

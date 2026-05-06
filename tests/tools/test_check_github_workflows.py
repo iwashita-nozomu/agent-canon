@@ -33,8 +33,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
-    def test_missing_submodule_checkout_fails(self) -> None:
-        """Checkout steps must request submodules and disable credentials."""
+    def test_legacy_auto_submodule_checkout_fails(self) -> None:
+        """Checkout steps must use the explicit AgentCanon helper."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             workflow_dir = root / ".github" / "workflows"
@@ -50,6 +50,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "    steps:\n"
                 "      - uses: actions/checkout@v4\n"
                 "        with:\n"
+                "          submodules: true\n"
                 "          persist-credentials: true\n",
                 encoding="utf-8",
             )
@@ -63,8 +64,10 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("checkout_1_missing_submodules_true", result.stdout)
+            self.assertIn("checkout_1_missing_submodules_false", result.stdout)
             self.assertIn("checkout_1_missing_persist_credentials_false", result.stdout)
+            self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+            self.assertIn("missing_agent_canon_repo_token_env", result.stdout)
 
     def test_missing_pr_template_evidence_fails(self) -> None:
         """PR templates must retain validation and submodule evidence fields."""
@@ -108,8 +111,12 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             "        with:\n"
-            "          submodules: true\n"
-            "          persist-credentials: false\n",
+            "          submodules: false\n"
+            "          persist-credentials: false\n"
+            + "      - name: Checkout AgentCanon submodule\n"
+            + "        env:\n"
+            + "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
+            + "        run: bash tools/ci/checkout_agent_canon_submodule.sh\n",
             encoding="utf-8",
         )
 

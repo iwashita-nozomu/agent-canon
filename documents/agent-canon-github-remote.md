@@ -94,3 +94,29 @@ Minimum settings:
 
 If GitHub API access cannot read branch protection, record
 `missing_or_unavailable` in PR evidence instead of assuming protection is absent.
+
+## GitHub Actions Access From Template Repos
+
+`iwashita-nozomu/agent-canon` may be private. In that case, a workflow running
+inside a different private repository cannot read the AgentCanon submodule with
+only that repository's default `GITHUB_TOKEN`.
+
+Template and derived repos should checkout the root repository with
+`submodules: false`, then run:
+
+```bash
+bash tools/ci/checkout_agent_canon_submodule.sh
+```
+
+The workflow must pass:
+
+```yaml
+env:
+  AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+```
+
+`AGENT_CANON_REPO_TOKEN` should be a fine-grained PAT or equivalent GitHub App
+token with read-only Contents access to the AgentCanon repository. If the
+secret is missing, the helper fails with `AGENT_CANON_SUBMODULE_AUTH=missing`
+instead of letting `actions/checkout` fail during an opaque automatic submodule
+clone.
