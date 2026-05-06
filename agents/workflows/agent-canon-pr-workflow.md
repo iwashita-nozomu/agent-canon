@@ -4,15 +4,15 @@
 responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
-downstream design ../../documents/agent-canon-subtree-migration.md subtree migration contract consumes PR workflow
+downstream design ../../documents/agent-canon-subtree-migration.md submodule migration and legacy compatibility consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 @dependency-end
 -->
 
-この文書は、`vendor/agent-canon/` を source of truth とする shared canon 変更を PR に乗せるときの正本です。
-template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本の手順で扱います。
+この文書は、AgentCanon source change と template submodule pin change を PR に乗せるときの正本です。
+standalone AgentCanon repo、template repo 側の branch、PR、merge、submodule pin 更新を 1 本の手順で扱います。
 
 ## 対象
 
@@ -24,7 +24,7 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 
 ## 固定ルール
 
-- shared canon の正本は `vendor/agent-canon/` です。
+- shared canon の正本は standalone AgentCanon repo です。template 内で作業する場合は `vendor/agent-canon/` submodule worktree がその working copy になります。
 - GitHub 上の canonical shared canon repo は `https://github.com/iwashita-nozomu/agent-canon.git` です。
 - template の canonical repo は `https://github.com/iwashita-nozomu/project_template.git` です。
 - template を GitHub 管理にする場合は、`.gitmodules` の AgentCanon URL を canonical GitHub URL にし、local bare mirror は別名 remote または明示 override として残します。
@@ -33,12 +33,12 @@ template repo 側の branch、PR、merge、upstream `agent-canon` sync を 1 本
 - shared canon 変更は dedicated commit に分けます。
 - repo-local tool を AgentCanon に集約する変更は、原則 PR で行い、今回のような direct update は user が明示した特例だけにします。
 - 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
-- 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo snapshot を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
+- 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo submodule pin を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
 - PR 前の validation は `make agent-canon-pr-check` を使います。
 - `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
-- template repo の PR merge と upstream `agent-canon` push は別 step です。merge 後に `bash tools/sync_agent_canon.sh push` を実行します。
+- AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
 
 ## Branch ルール
@@ -58,9 +58,9 @@ git checkout -b canon/<topic>-YYYYMMDD
 git merge --no-ff FETCH_HEAD
 ```
 
-2. `vendor/agent-canon/` 側を編集する
+2. AgentCanon source worktree を編集する
 
-- workflow doc、skill、subagent、script は vendor 側の正本を編集します。
+- workflow doc、skill、subagent、script は standalone AgentCanon repo、または template 内の `vendor/agent-canon/` submodule worktree を編集します。
 - root 側の symlink view は編集しません。
 
 3. shared surface を再同期する
@@ -85,7 +85,8 @@ make agent-canon-pr-check
 
 5. commit を分ける
 
-- `vendor/agent-canon/` と root copy / link spec の変更だけを commit します。
+- AgentCanon source commit と template parent gitlink / root copy commit を分けます。
+- template 側では `vendor/agent-canon` の gitlink、`.gitmodules`、root copy / link spec の変更だけを commit します。
 - unrelated change を同じ commit に混ぜません。
 
 6. PR を作る
@@ -100,12 +101,14 @@ make agent-canon-pr-check
 - file 構成変更がある場合は integration worktree で merge します。
 - `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 
-8. merge 後に upstream `agent-canon` を更新する
+8. merge 後に template pin を更新する
 
 ```bash
 git checkout main
 git pull --ff-only origin main
-bash tools/sync_agent_canon.sh push
+make agent-canon-ensure-latest
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
 ```
 
 9. local working clone がある場合は fast-forward する
@@ -118,7 +121,7 @@ git -C /mnt/l/workspace/agent-canon pull --ff-only
 
 派生 repo では、shared canon の差分を直接 `main` へ push しません。
 repo ごとの proposal branch に積み、maintainer が整理用 branch へ merge します。
-local history divergence や unsafe snapshot import で `ensure-latest` が止まった場合も、この proposal branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
+local submodule divergence や unsafe local submodule state で `ensure-latest` が止まった場合も、この proposal branch 経由で出所を固定してから shared canon main へ取り込み、派生 repo 側で `make agent-canon-ensure-latest` を再実行します。
 
 ```bash
 bash tools/update_agent_canon.sh proposal-branch
@@ -226,7 +229,7 @@ Validation:
 - PR 本文に changed surface と validation が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態が記録されている
 - file 構成変更がある場合は integration worktree merge と tree check が完了
-- template `main` へ merge 後、`bash tools/sync_agent_canon.sh push` の実行結果、または external block / user stop による未実行理由が残っている
+- AgentCanon main へ merge 後、template 側で `make agent-canon-ensure-latest` と parent gitlink commit / push の実行結果、または external block / user stop による未実行理由が残っている
 
 ## GitHub Security Baseline
 

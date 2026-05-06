@@ -31,6 +31,8 @@ contract.
   criteria.
 - MCP `goal.loop_status` is the mechanical close/continue gate for repo-level
   loops.
+- MCP `goal.plan` is the mechanical next-slice work-unit surface when the repo
+  server provides it.
 - `tools/agent_tools/goal_loop.py` is the file parser and command-line fallback.
 
 ## Preflight
@@ -57,6 +59,7 @@ If repo MCP is available, also read MCP status:
 
 ```bash
 # Via repo MCP: goal.loop_status
+# Via repo MCP: goal.plan
 ```
 
 `NEXT_ACTION=run_next_iteration` means the task is not complete. Continue the
@@ -168,6 +171,8 @@ evidence, or repo-owned state.
 1. Generate `Goal Work Breakdown` with `goal_loop.py plan` and treat it as the
    TODO draft. The output lists unchecked Exit Criteria and Backlog items as
    `GW*` work units with evidence hints.
+   If MCP `goal.plan` is available, use the MCP output as the same mechanical
+   work-unit surface and record it with `goal.loop_status`.
    The first iteration must be large enough to move a coherent task slice:
    prompt-to-artifact checklist, reuse / consolidation / deletion survey,
    implementation over the selected related surfaces, and validation evidence.

@@ -43,6 +43,7 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - `goals` feature は `.codex/config.toml` の `[features].goals = true` で有効にします。
 - TUI の user-facing command surface は `/goal`, `/goal <objective>`, `/goal pause`, `/goal resume`, `/goal clear` です。
 - `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は MCP `goal.loop_status` と `tools/agent_tools/goal_loop.py status` に置きます。
+- template repo の active `goal.md` は runtime state であり、派生 repo seed に混入させません。tracked product state に入れず、必要なら `.gitignore` で ignored local file として保持します。
 - goal-driven task では `/goal <objective>` の直後に `/plan <goal-driven task summary>` を使い、Plan-mode output に `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を出します。
 - pre-goal subagent fan-out は active runtime の authorization に従います。明示許可がある場合は read-only wave を起動し、無い場合は `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` と handoff packet を artifact に残します。
 - 上記が揃うまで implementation、subagent write handoff、closeout は開始しません。
@@ -99,8 +100,8 @@ or high-risk review. Profiles do not waive workflow gates.
 - root `mcp/` は `vendor/agent-canon/mcp/` への runtime view で、`tools/sync_agent_canon.sh link-root` が復元します。
 - MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
 - repository task では、ユーザーが MCP を明示していなくても、intake で `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
-- inventory が pass した task では、repo root / status / MCP-covered context checks で repo MCP tools を優先候補にします。
-- current `repo_mcp_server` は repo root / status / context check 専用で、file edit tool は提供しません。
+- inventory が pass した task では、repo root / status / goal loop status / goal plan / MCP-covered context checks で repo MCP tools を優先候補にします。
+- current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / context check 専用で、file edit tool は提供しません。
 - MCP が pass している通常作業では、この制限を user update で毎回説明しません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
 - `repo_mcp_server` が configured inventory に無い場合は fail closed とし、bridge-local process の暗黙起動で代替しません。
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに `codex mcp list --json` が空の場合は、project trust または Codex project-config loading を先に修復します。

@@ -30,12 +30,19 @@ context rather than a prepared local run bundle.
 - Keep `.github/copilot-instructions.md` as a thin runtime entrypoint.
 - Do not create Copilot-only policy that conflicts with `AGENTS.md` or
   AgentCanon workflows.
+- Treat Copilot as a contributor surface, not as the closeout authority. Codex
+  closeout gates, full-repo dependency review, static analysis, AgentCanon pin
+  evidence, and PR checklist evidence still need to be produced by the repo
+  workflow before a Copilot-authored change is accepted.
 - Prefer existing tools and workflow docs before adding new GitHub-only helper
   scripts.
 - Treat root shared surfaces as views into `vendor/agent-canon/`; edit the
   AgentCanon source when the change is shared.
 - When Copilot cannot run a local command, leave a PR checklist item with the
   exact command and the missing environment reason instead of marking it done.
+- When Copilot changes AgentCanon-owned text, require the same submodule-era
+  sequence as Codex: source change in AgentCanon, `make agent-canon-pr-check`,
+  template submodule pin update, and root shared-surface drift check.
 
 ## GitHub Actions Changes
 
@@ -67,9 +74,12 @@ Before Copilot-authored changes are accepted:
 1. Confirm the PR checklist maps every requested requirement to evidence.
 1. Confirm shared surfaces are synchronized with
    `bash tools/sync_agent_canon.sh check`.
-1. Confirm dependency review and task-relevant validation pass.
-1. Confirm AgentCanon changes have an upstream path before template pins are
-   updated.
+1. Confirm full-repo dependency review and task-relevant validation pass, not
+   just the checks Copilot could run inside the editor.
+1. Confirm AgentCanon changes have an upstream path and recorded GitHub SHA
+   before template pins are updated.
+1. Confirm any unrun command is explicitly blocked by environment, not omitted
+   because it was outside Copilot's runtime.
 
 ## Convention Compliance Gate
 

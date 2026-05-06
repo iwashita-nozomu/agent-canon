@@ -172,6 +172,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - Gate 0 の前に `user_request_contract.md` へ must-do、must-not-do、completion-evidence clause を書きます
 - Gate 0 の直後から `schedule.md` を task TODO の正本として更新し、repo-changing task では `work_log.md` を kickoff から closeout まで残します
 - repo-changing task では explicit subagent activation を省略しません
+- active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を run bundle に固定し、許可が出るまでその specialist review を完了扱いにしません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
 - 包括的開発では、同一 worktree の writer を 1 人に固定します

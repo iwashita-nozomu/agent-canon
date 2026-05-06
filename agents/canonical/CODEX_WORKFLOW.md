@@ -55,13 +55,14 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は、local snapshot の `vendor/agent-canon/` を upstream `agent-canon` に合わせます。
+task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submodule worktree を upstream `agent-canon` に合わせます。
 
-- clean worktree では `make agent-canon-ensure-latest` を実行します
-- dirty worktree では `bash tools/sync_agent_canon.sh ensure-latest` が stale 判定時に止まるため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します
-- `ensure-latest` は `git subtree split --prefix=vendor/agent-canon HEAD` と upstream `agent-canon/<branch>` を比較し、必要なときだけ subtree pull を行います
-- upstream より local shared canon が進んでいて remote history が local split の祖先なら pull せず、closeout で `bash tools/sync_agent_canon.sh push` を自然な次手として実行します。external block や user stop がある場合だけ未実行理由を残します
-- local shared canon history が upstream `main` と diverge している場合は `ensure-latest` を fail-closed で停止し、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、maintainer merge、派生 repo snapshot 再同期を完了してから実装へ戻ります
+- clean worktree では `make agent-canon-ensure-latest` を実行します。
+- dirty worktree では `make agent-canon-ensure-latest` が parent pin update を作れないため、未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。
+- submodule repo に local commit や dirty state がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh review-submodule` で proposal 要否、merge conflict、safe align 可否を確認します。
+- `ensure-latest` は `.gitmodules` の URL と submodule `origin/main` を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定します。remote main が進んでいれば submodule を fast-forward し、parent repo の gitlink commit と root shared surface を同期します。
+- local submodule commit が remote main に ancestry、tree match、または git-cherry equivalence で含まれている場合だけ、`bash tools/update_agent_canon.sh align-main` で parent pin を remote main へ揃えます。
+- local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 
 ### Context Sweep
 
@@ -87,7 +88,7 @@ agent の作業哲学と対話から得た学習を見落とさないため、`m
 file や path の欠落を見つけたときは、再作成、削除済み判定、repo-local 例外扱いの前に template と shared canon を確認します。
 
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
-1. template root または登録された template remote / snapshot で同じ path の有無と現在の正本形を確認する
+1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
 1. `vendor/agent-canon/` と standalone `agent-canon` で同じ path の有無、rename、移動、sync 対象からの除外理由を確認する
 1. canon-owned surface なら `documents/SHARED_RUNTIME_SURFACES.md` と `tools/sync_agent_canon.sh` の surface list に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
@@ -105,8 +106,8 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
-- MCP inventory が pass した場合は、repo state、repo root、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
-- current `repo_mcp_server` は repo root / status / MCP-covered context check 用です。file editing capability は持ちません。
+- MCP inventory が pass した場合は、repo state、repo root、goal loop status、goal plan、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
+- current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / MCP-covered context check 用です。file editing capability は持ちません。
 - MCP が pass したあと、毎回「MCP は編集できないので patch で編集する」と user update に書いてはいけません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
 - `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは「MCP をユーザーが明示しなくても思い出す」ための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。

@@ -159,6 +159,15 @@ class McpInventoryCheckTest(unittest.TestCase):
             result.stdout,
         )
         self.assertIn(
+            "EXPECTED_REPO_MCP_LAUNCHER=.codex/config.toml -> "
+            "bash mcp/repo_mcp_server.sh",
+            result.stdout,
+        )
+        self.assertIn(
+            "REPAIR_REPO_MCP=trust_project_or_restore_.codex_and_mcp_link_root",
+            result.stdout,
+        )
+        self.assertIn(
             "NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work",
             result.stdout,
         )

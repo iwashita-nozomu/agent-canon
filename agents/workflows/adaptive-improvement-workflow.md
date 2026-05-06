@@ -39,6 +39,7 @@ outer loop は agile、inner change pass は waterfall です。
 - 最初に top-level `goal.md` を更新し、今回の Objective、Exit Criteria、Backlog、Loop Log を固定します。これを tool 追加、prompt repair、workflow 編集より後回しにしてはいけません。
 - repo MCP が利用可能な場合は、`goal.loop_status` を iteration gate にします。`NEXT_ACTION=run_next_iteration` なら次 backlog item を選び、`NEXT_ACTION=close_goal_loop` になるまで completion report を出しません。
 - Codex `goals` feature が有効な場合でも、durable state は `goal.md` に置きます。Codex goals は `goal.md` と同じ Objective / Exit Criteria を表示する session view として扱い、食い違う場合は `goal.md` を正本にして修正します。
+- template repo では active `goal.md` は repo-local runtime state です。派生 repo の seed に混ぜないため tracked product state からは外し、必要なら `.gitignore` で ignored local state として保持します。
 - goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
 - ただし 1 iteration は単発 micro-fix ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
@@ -69,7 +70,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
 1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
 1. Codex `goals` feature が有効な場合は `codex features list | grep '^goals'` の結果を記録し、Codex goals view を `goal.md` と同じ Objective / Exit Criteria に揃える
-1. repo MCP が利用可能な場合は MCP `goal.loop_status` でも同じ `GOAL_LOOP_STATUS` と `NEXT_ACTION` を確認し、run bundle に evidence を残す
+1. repo MCP が利用可能な場合は MCP `goal.loop_status` でも同じ `GOAL_LOOP_STATUS` と `NEXT_ACTION` を確認し、run bundle に evidence を残す。MCP `goal.plan` が使える場合は次 open work units も同じ MCP surface から取得する
 1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定する
 1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を baseline として実行する
 1. agent 行動改善の場合は、`agents/evals/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する

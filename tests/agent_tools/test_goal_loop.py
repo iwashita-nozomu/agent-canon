@@ -53,6 +53,7 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("GOAL_LOOP_STATUS=continue", status.stdout)
             self.assertIn("GOAL_EXIT_CRITERIA_TOTAL=6", status.stdout)
             self.assertIn("GOAL_OPTIONAL_ITEMS_TOTAL=5", status.stdout)
+            self.assertIn("GOAL_NEXT_OPEN_ITEM=backlog:B1", status.stdout)
             text = goal.read_text(encoding="utf-8")
             self.assertIn("run_repo_dependency_review.sh --fail-missing", text)
             self.assertIn("scan_code_dependencies.sh", text)
@@ -126,6 +127,7 @@ class GoalLoopTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
             self.assertIn("GOAL_LOOP_STATUS=achieved", status.stdout)
+            self.assertIn("GOAL_NEXT_OPEN_ITEM=none", status.stdout)
             self.assertIn("NEXT_ACTION=close_goal_loop", status.stdout)
 
     def test_status_report_is_written(self) -> None:
@@ -154,6 +156,7 @@ class GoalLoopTest(unittest.TestCase):
             text = report.read_text(encoding="utf-8")
             self.assertIn("# Goal Loop Status", text)
             self.assertIn("goal_loop_status: `continue`", text)
+            self.assertIn("next_open_item: `backlog:B1`", text)
 
     def test_plan_writes_goal_work_breakdown(self) -> None:
         """Plan turns unchecked goal items into schedule-ready work units."""
@@ -189,7 +192,7 @@ class GoalLoopTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("# Goal Work Breakdown", result.stdout)
             self.assertIn("GOAL_WORK_UNITS=10", result.stdout)
-            self.assertIn("exit_criteria:G2", result.stdout)
+            self.assertIn("backlog:B1", result.stdout)
             self.assertIn("`scan_code_dependencies.sh` output", result.stdout)
             self.assertIn("Copy every open `GW*` row", result.stdout)
             report_text = report.read_text(encoding="utf-8")

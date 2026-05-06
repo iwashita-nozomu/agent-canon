@@ -73,6 +73,10 @@ Mode selection rules:
   pre-goal review. If explicit spawn authorization is absent, the token-efficient
   path is to prepare the bounded fan-out plan and request or wait for
   authorization, not to treat the parent-only result as equivalent review.
+- If a higher-priority runtime blocks implicit spawn, record
+  `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` or `SUBAGENT_AUTHORIZATION=required`
+  in the run artifact and keep the parent slice narrow. Token efficiency does
+  not permit fabricating specialist review evidence.
 
 ## Context Budget Rules
 

@@ -212,6 +212,7 @@ workflow_families:
         - Route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, and eligible narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Treat a narrow implementation slice as Spark-eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Review the whole repository, not only the local diff; keep root adapters thin and shared canon authoritative.
+        - For AgentCanon tasks, classify whether the change is standalone AgentCanon source, template parent gitlink, root shared-surface sync, or derived repo proposal before editing.
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
         - Preserve single-writer discipline; additional agents are read-only unless a separate worktree is explicitly planned.
@@ -427,7 +428,7 @@ tasks:
       - infra_steward
       - infra_reviewer
   - id: T12
-    name: agent workflow tooling or canon rearchitecture
+    name: agent workflow tooling, AgentCanon submodule flow, or canon rearchitecture
     family: comprehensive_development
     specialists:
       - scheduler

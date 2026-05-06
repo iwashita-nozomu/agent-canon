@@ -99,6 +99,31 @@ def tool_schema() -> dict[str, object]:
                     "additionalProperties": False,
                 },
             },
+            {
+                "name": "goal.plan",
+                "description": (
+                    "Return the next unchecked goal.md work units as a "
+                    "machine-readable plan. Use this before selecting the next "
+                    "adaptive-improvement-loop slice."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "goal_file": {
+                            "type": "string",
+                            "description": (
+                                "Goal file path relative to repo root. "
+                                "Defaults to goal.md."
+                            ),
+                        },
+                        "max_items": {
+                            "type": "integer",
+                            "description": "Maximum open work units to emit.",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+            },
         ]
     }
 
@@ -118,15 +143,27 @@ def resolve_repo_relative_path(root: Path, raw_path: str) -> Path:
     return candidate
 
 
-def goal_loop_status(root: Path, arguments: Mapping[str, object]) -> dict[str, object]:
-    """Return goal.md loop status through the canonical goal loop tool."""
+def goal_loop_command(
+    root: Path,
+    arguments: Mapping[str, object],
+    subcommand: str,
+    tool_label: str,
+) -> dict[str, object]:
+    """Return goal.md output through the canonical goal loop tool."""
     raw_goal_file = arguments.get("goal_file", "goal.md")
     if not isinstance(raw_goal_file, str) or not raw_goal_file.strip():
         raise ValueError("goal_file must be a non-empty string")
     goal_file = resolve_repo_relative_path(root, raw_goal_file)
     script = root / "tools" / "agent_tools" / "goal_loop.py"
+    command = [sys.executable, str(script), subcommand, "--goal-file", str(goal_file)]
+    if subcommand == "plan":
+        raw_max_items = arguments.get("max_items")
+        if raw_max_items is not None:
+            if isinstance(raw_max_items, bool) or not isinstance(raw_max_items, int):
+                raise ValueError("max_items must be an integer")
+            command.extend(["--max-items", str(raw_max_items)])
     result = subprocess.run(
-        [sys.executable, str(script), "status", "--goal-file", str(goal_file)],
+        command,
         cwd=root,
         check=False,
         capture_output=True,
@@ -135,10 +172,20 @@ def goal_loop_status(root: Path, arguments: Mapping[str, object]) -> dict[str, o
     output = result.stdout.strip()
     if result.stderr.strip():
         output = f"{output}\n{result.stderr.strip()}".strip()
-    prefix = "MCP_GOAL_LOOP_TOOL=goal.loop_status"
+    prefix = f"MCP_GOAL_LOOP_TOOL={tool_label}"
     status_line = f"MCP_GOAL_LOOP_EXIT={result.returncode}"
     lines = (prefix, status_line, output)
     return text_result("\n".join(line for line in lines if line))
+
+
+def goal_loop_status(root: Path, arguments: Mapping[str, object]) -> dict[str, object]:
+    """Return goal.md loop status through the canonical goal loop tool."""
+    return goal_loop_command(root, arguments, "status", "goal.loop_status")
+
+
+def goal_loop_plan(root: Path, arguments: Mapping[str, object]) -> dict[str, object]:
+    """Return goal.md work units through the canonical goal loop tool."""
+    return goal_loop_command(root, arguments, "plan", "goal.plan")
 
 
 def call_tool(
@@ -162,6 +209,8 @@ def call_tool(
         return text_result(output)
     if name == "goal.loop_status":
         return goal_loop_status(root, tool_arguments)
+    if name == "goal.plan":
+        return goal_loop_plan(root, tool_arguments)
     raise KeyError(name)
 
 

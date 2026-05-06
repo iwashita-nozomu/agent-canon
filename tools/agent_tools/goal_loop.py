@@ -105,7 +105,7 @@ OPTIONAL_GOAL_ITEMS = (
     (
         "O4",
         "release",
-        "Release, branch-integration, push, or downstream template snapshot "
+        "Release, branch-integration, push, or downstream template submodule pin "
         "coordination is required.",
     ),
     (
@@ -339,6 +339,7 @@ def render_machine_status(state: GoalState) -> str:
         f"GOAL_OPTIONAL_ITEMS_TOTAL={len(state.optional_goal_items)}",
         f"GOAL_OPTIONAL_ITEMS_DONE={state.done_optional_goal_items}",
         f"GOAL_PARSE_ERRORS={len(state.parse_errors)}",
+        f"GOAL_NEXT_OPEN_ITEM={next_open_item(state)}",
         f"NEXT_ACTION={next_action(state)}",
     ]
     for error in state.parse_errors:
@@ -353,6 +354,17 @@ def next_action(state: GoalState) -> str:
     if state.loop_status == "invalid":
         return "repair_goal_md"
     return "run_next_iteration"
+
+
+def next_open_item(state: GoalState) -> str:
+    """Return the first active unchecked item for large backlog iteration."""
+    for item in state.backlog:
+        if not item.checked:
+            return f"backlog:{item.item_id}"
+    for item in state.exit_criteria:
+        if not item.checked:
+            return f"exit_criteria:{item.item_id}"
+    return "none"
 
 
 def dependency_path_for(report_path: Path) -> str:
@@ -379,6 +391,7 @@ def render_markdown_report(state: GoalState, dependency_path: str) -> str:
         f"- goal_loop_status: `{state.loop_status}`",
         f"- current_iteration: `{state.current_iteration}`",
         f"- run_safety_cap: `{state.run_safety_cap}`",
+        f"- next_open_item: `{next_open_item(state)}`",
         f"- next_action: `{next_action(state)}`",
         "",
         "## Exit Criteria",
@@ -418,7 +431,7 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
     """Render unchecked goal items as an implementation-ready TODO surface."""
     unchecked_criteria = open_items(state.exit_criteria)
     unchecked_backlog = open_items(state.backlog)
-    selected = [*unchecked_criteria, *unchecked_backlog][: max(0, max_items)]
+    selected = [*unchecked_backlog, *unchecked_criteria][: max(0, max_items)]
     lines = [
         "# Goal Work Breakdown",
         "<!--",
