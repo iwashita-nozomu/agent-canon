@@ -16,7 +16,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `cmake/`
   - CMake helper module
 - `include/`
-  - public header 兼 template 既定の header-only 実装
+  - public header。派生 repo が C++ を使う場合に追加する
 - `src/`
   - header-only で収まらない特例実装だけ
 - `lib/`
@@ -25,7 +25,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
   - smoke / test source
 
 `CMakeLists.txt` を `src/` や `cpp/` の下へ分散させることを禁止します。entrypoint は root に 1 つだけ置きます。
-template 既定では `include/project_template/*.hpp` に実装を書きます。`src/` を先に使う設計を template の標準にしません。
+template 既定では C++ 実装を持たず、root `CMakeLists.txt` は空の `INTERFACE` target だけを提供します。
+派生 repo が C++ を使う場合は `include/<project>/*.hpp` から始め、`src/` を先に使う設計を標準にしません。
 
 ## Default Build Directories
 
@@ -33,16 +34,16 @@ template 既定では `include/project_template/*.hpp` に実装を書きます�
   - out-of-source build tree
 - `.state/cpp-install/<profile>/`
   - local install tree
-- `.state/jax-export/<profile>/`
-  - reusable local `jax.export` artifact
 
 `build/` と `.state/` の内容は commit しません。人手で編集することも禁止します。
 
-## jax.export Flow
+## Optional jax.export Flow
 
-JAX 側は Python で `jax.export` artifact を生成し、IREE を artifact consumer の既定 runtime にします。C++ 側は同じ workspace の `include/` と root `CMakeLists.txt` から header-only bridge を build します。`src/` は特例時だけ使います。
+JAX / IREE / XLA FFI は template default ではありません。
+必要な project だけ、Python export artifact、IREE runtime、C++ bridge、CMake module、smoke target を同じ change set で追加します。
+C++ 側は同じ workspace の `include/` と root `CMakeLists.txt` から bridge を build し、`src/` は特例時だけ使います。
 
-この template が baseline に含めるものは次です。
+追加するときに候補になるものは次です。
 
 - `jax.export`
   - StableHLO producer
@@ -53,27 +54,25 @@ JAX 側は Python で `jax.export` artifact を生成し、IREE を artifact con
 - `jaxlib/include`
   - XLA FFI header
 
-最低限の smoke として、template 既定では次を通します。
+追加した project では、project-local smoke target を用意して次の形で通します。
 
 ```bash
 python3 tools/ci/check_jax_export_stack.py
-cmake -S . -B build/cpp/dev -DPROJECT_TEMPLATE_ENABLE_CPP_SMOKE=ON
-cmake --build build/cpp/dev --target project_template_cpp_smoke
+cmake -S . -B build/cpp/dev
+cmake --build build/cpp/dev --target <project-cpp-smoke-target>
 ctest --test-dir build/cpp/dev --output-on-failure
 ```
 
 ## Reuse Policy
 
-`build/cpp/<profile>/`、`.state/cpp-install/<profile>/`、`.state/jax-export/<profile>/` は再利用してよいですが、次のどれかが変わったら rebuild します。
+`build/cpp/<profile>/`、`.state/cpp-install/<profile>/` は再利用してよいですが、次のどれかが変わったら rebuild します。
 
 - `docker/Dockerfile`
 - `docker/requirements.txt`
 - root `CMakeLists.txt`
 - `cmake/` 配下
 - `src/`, `include/`, `lib/`, `tests/cpp/`
-- `jax` / `jaxlib` version
-- `JAX_EXPORT_CALLING_CONVENTION_VERSION`
-- export する関数の signature、shape、dtype、platform
+- optional JAX export を使う場合は `jax` / `jaxlib` version、calling convention、export する関数の signature、shape、dtype、platform
 
 再利用は「同じ toolchain / 同じ ABI / 同じ export contract の範囲」に限定します。怪しい場合は cache を消して rebuild します。
 
@@ -85,11 +84,9 @@ ctest --test-dir build/cpp/dev --output-on-failure
   - Docker smoke
 - `.state/cpp-install/dev`
   - local reusable install
-- `.state/jax-export/dev`
-  - local reusable export artifact
 
 ## Header-Only Default
 
-- canonical C++ target は `INTERFACE` library を既定にします。
-- smoke / test binary だけが compile / link される前提にします。
+- canonical C++ target は空の `INTERFACE` library を既定にします。
+- 派生 repo が C++ を使う場合だけ smoke / test binary を追加します。
 - header-only で済むものを安易に `.cpp` へ分離しません。

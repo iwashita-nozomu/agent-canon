@@ -12,7 +12,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent_canon_preflight import project_root_from_script, run_agent_canon_preflight
+from agent_canon_preflight import run_agent_canon_preflight
 from agent_team import (
     TeamConfig,
     auto_language_specialists,
@@ -188,10 +188,10 @@ def main() -> int:
     config = load_team_config()
     catalog = load_task_catalog(config)
     args = build_parser(specialist_role_ids(config), task_ids(catalog)).parse_args()
-    project_root = project_root_from_script(Path(__file__))
+    workspace_root = Path(args.workspace_root).resolve()
     try:
         preflight = run_agent_canon_preflight(
-            project_root,
+            workspace_root,
             skip=args.skip_agent_canon_preflight,
         )
     except RuntimeError as exc:
@@ -199,7 +199,6 @@ def main() -> int:
         return 1
     created_at = datetime.now(timezone.utc).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
-    workspace_root = Path(args.workspace_root).resolve()
     report_root = resolve_report_root(args.report_root, workspace_root)
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id

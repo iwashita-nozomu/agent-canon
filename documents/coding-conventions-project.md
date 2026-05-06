@@ -68,10 +68,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残しなければなりません。
 - Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、script 側へ path 分岐を埋め込んではなりません。
 - main server host の path、mount、builder 前提は `documents/server-host-contract.md` と `documents/templates/server_runtime_layout.template.toml` を正本にし、口頭運用にしてはなりません。
-- C++ / JAX export を使う場合の canonical CMake entrypoint は root `CMakeLists.txt` です。`src/` や `include/` の下に別 root を増やすことを禁止します。
-- template 既定の C++ 実装形態は header-only です。`include/` を実装の主置き場にし、`src/` は特例実装だけに使います。
+- C++ を使う場合の canonical CMake entrypoint は root `CMakeLists.txt` です。`src/` や `include/` の下に別 root を増やすことを禁止します。
+- template 既定では C++ 実装を持ちません。C++ を追加する project では `include/` を実装の主置き場にし、`src/` は特例実装だけに使います。
 - C++ build は必ず out-of-source にし、`build/cpp/<profile>/` を使わなければなりません。
-- 再利用する local install tree は `.state/cpp-install/<profile>/`、再利用する local `jax.export` artifact は `.state/jax-export/<profile>/` に置かなければなりません。
+- 再利用する local install tree は `.state/cpp-install/<profile>/` に置かなければなりません。optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
 
 ## 禁止事項
 

@@ -62,6 +62,26 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
 
+    def test_scan_reports_display_path_and_real_source_path(self) -> None:
+        """Missing-header findings should include review path and real source path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            doc = root / "doc.md"
+            doc.write_text("# Doc\n\nBody.\n", encoding="utf-8")
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                str(doc),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
+            self.assertIn("realpath=doc.md", result.stdout)
+            self.assertIn("owner=product_file", result.stdout)
+
     def test_repo_review_output_is_stable_across_repeated_runs(self) -> None:
         """Strict repo dependency review should be stable across repeated runs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -137,6 +157,71 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             self.assertEqual(first.stdout, second.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", first.stdout)
+
+    def test_repo_review_default_root_uses_current_worktree(self) -> None:
+        """Default root should be cwd, not the symlinked tool source repository."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.parent.mkdir(parents=True)
+            tool_dir.symlink_to(PROJECT_ROOT / "tools" / "agent_tools")
+            target = root / "target.md"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines cwd-root dependency fixture.",
+                        "upstream design README.md readme context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "README.md").write_text(
+                "\n".join(
+                    [
+                        "# Readme",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines readme fixture.",
+                        "downstream design target.md target fixture",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "README.md", "target.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = subprocess.run(
+                ["bash", str(REPO_REVIEW), "--fail-missing"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_code_scan_extracts_python_import_edges(self) -> None:
         """The code dependency scanner resolves local Python imports."""

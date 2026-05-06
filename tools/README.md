@@ -17,6 +17,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `oop_rule_inventory.py` は OOP policy、analyzer、reviewer、test、legacy support placement を検査し、旧 convention viewer を default workflow から切り離します。
+  - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
+  - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
@@ -37,6 +39,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - shared helper
 - `validation/`
   - generic validation helper
+- `static_analysis/`
+  - language-organized index for Python, C/C++, and common static-analysis entrypoints. Implementations remain in `agent_tools/` until a language family needs a dedicated package.
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
@@ -82,6 +86,8 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/check_convention_compliance.py`
   - `agent_tools/check_static_any.py`
   - `agent_tools/check_log_helper_names.py`
+  - `agent_tools/file_surface_inventory.py`
+  - `agent_tools/review_backlog_scan.sh`
   - `agent_tools/check_algorithm_module_nested_contract.py`
   - `agent_tools/agent_update_branch.sh`
   - `agent_tools/vector_search.py`
@@ -153,6 +159,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `task_close.py` requires `agent_evaluation.md` to report `evaluation_status: pass`, `feedback_actions_resolved: yes`, and `learning_capture_complete: yes`.
 `workflow_monitoring.md` is the in-workflow monitoring artifact consumed by the evaluation. Keep it current during the run, not only at closeout.
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
+After evidence is verified, `workflow_monitor.py --closeout-token-preset` records the standard behavior tokens consumed by `evaluate_agent_run.py`; it is a recording shortcut, not a substitute for validation evidence.
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 `compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
@@ -163,6 +170,10 @@ python3 tools/agent_tools/workflow_monitor.py \
   --signal "skills=$agent-orchestration,$codex-task-workflow" \
   --intervention "spawned fresh reviewer" \
   --decision workflow_improvement_decision=applied
+
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --closeout-token-preset
 
 python3 tools/agent_tools/compare_agent_run_paths.py \
   --baseline-run reports/agents/<run-a> \
@@ -205,6 +216,27 @@ Use it when changing logging, report-writing, run-bundle, or JSONL helper code.
 ```bash
 python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports
 ```
+
+## Review Backlog Scan
+
+`review_backlog_scan.sh` is the integrated file-by-file review entrypoint for
+large goal iterations. It writes a machine-readable inventory, a Markdown
+inventory, tool logs, and a command-status summary under the run bundle.
+
+```bash
+make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>"
+bash tools/agent_tools/review_backlog_scan.sh \
+  --report-dir reports/agents/<run-id> \
+  --submodule-aware
+```
+
+Scope flags:
+
+- `--submodule-aware`: scan the template/root surface and `vendor/agent-canon`
+  as separate scopes.
+- `--root-only`: scan the parent repo surface and exclude submodule internals.
+- `--agentcanon-only`: scan AgentCanon source, using `vendor/agent-canon` in a
+  derived repo and `.` in the source repo.
 
 ## Goal Loop Tool
 

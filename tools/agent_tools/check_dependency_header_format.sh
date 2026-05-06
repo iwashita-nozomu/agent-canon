@@ -7,7 +7,7 @@
 # @dependency-end
 set -euo pipefail
 
-ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
+ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REQUIRE_HEADER=0
 CHANGED=0
 ALLOW_FRONTMATTER=0

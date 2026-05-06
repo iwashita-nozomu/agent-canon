@@ -3,6 +3,7 @@
 # responsibility Provides agent canon preflight agent workflow automation.
 # upstream design ../README.md shared automation index
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
+# downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
 
 """Preflight helpers for agent-canon freshness at task entrypoints."""
@@ -54,6 +55,13 @@ def run_agent_canon_preflight(
             next_step="ensure derived template snapshots after committing canon changes",
         )
 
+    if not is_git_worktree(project_root):
+        return AgentCanonPreflightResult(
+            status="skipped_non_git_workspace",
+            reason="workspace root is not a git worktree; preflight is not applicable",
+            next_step="run from a git worktree before editing shared AgentCanon surfaces",
+        )
+
     status_result = subprocess.run(
         ["git", "status", "--short"],
         cwd=project_root,
@@ -89,6 +97,17 @@ def run_agent_canon_preflight(
         reason="agent-canon snapshot is current",
         next_step="none",
     )
+
+
+def is_git_worktree(project_root: Path) -> bool:
+    """Return true when project_root can run repository-local git checks."""
+    result = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--is-inside-work-tree"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
 
 
 def is_agent_canon_source_repo(project_root: Path) -> bool:

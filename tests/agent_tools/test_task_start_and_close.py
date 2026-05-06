@@ -271,6 +271,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = PROJECT_ROOT / "vendor" / "agent-canon"
+            if not source_root.exists():
+                source_root = PROJECT_ROOT
             result = subprocess.run(
                 [
                     sys.executable,
@@ -282,7 +285,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "--run-id",
                     "source-canon-preflight",
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(source_root),
                     "--report-root",
                     str(Path(tmp_dir) / "reports"),
                 ],

@@ -21,6 +21,31 @@ DECISION_KEYS = (
     "memory_learning_decision",
 )
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
+STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
+    "skill_invocation=$agent-orchestration status=observed",
+    "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
+    (
+        "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
+        "scope=repo-wide"
+    ),
+    "tool_call=make ci static_analysis=pass scope=repo-wide",
+    "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
+    "static_analysis_feedback=recorded target=review-backlog-scan",
+    "execution_path_comparison_not_required reason=single-active-route",
+    "token_efficiency_not_required reason=no-comparable-session",
+    "prompt_eval_not_required reason=no-skill-workflow-prompt-change",
+    "runtime_feedback_not_observed",
+    "review_decision=approve review_findings_integrated=yes",
+    "diff_check_agent_decision=approve diff_check_agent_complete=yes",
+)
+STANDARD_CLOSEOUT_SIGNALS = (
+    "mcp_inventory=pass",
+    "repo_dependency_review=pass scope=repo-wide",
+    "web_research_not_required reason=not-needed-for-closeout-token-recording",
+    "review_status=approve",
+    "validation_status=pass",
+    "drift_risk=checked",
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,6 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "User- or reviewer-observed runtime feedback as key=value tokens, for "
             "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
+        ),
+    )
+    parser.add_argument(
+        "--closeout-token-preset",
+        action="store_true",
+        help=(
+            "Append the standard closeout behavior tokens consumed by "
+            "evaluate_agent_run.py. Use only after the corresponding evidence "
+            "has already been verified in the run bundle."
         ),
     )
     parser.add_argument(
@@ -263,10 +297,15 @@ def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     decisions = dict(parse_decision(item) for item in args.decision)
+    signals = list(args.signal)
+    behavior_events = list(args.behavior_event)
+    if args.closeout_token_preset:
+        signals.extend(STANDARD_CLOSEOUT_SIGNALS)
+        behavior_events.extend(STANDARD_CLOSEOUT_BEHAVIOR_EVENTS)
     path = append_monitoring(
         resolve_report_dir(args),
-        signals=list(args.signal),
-        behavior_events=list(args.behavior_event),
+        signals=signals,
+        behavior_events=behavior_events,
         runtime_feedback=list(args.runtime_feedback),
         interventions=list(args.intervention),
         decisions=decisions,

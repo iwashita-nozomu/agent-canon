@@ -63,6 +63,7 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - `ensure-latest` は `.gitmodules` の URL と submodule `origin/main` を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定します。remote main が進んでいれば submodule を fast-forward し、parent repo の gitlink commit と root shared surface を同期します。
 - local submodule commit が remote main に ancestry、tree match、または git-cherry equivalence で含まれている場合だけ、`bash tools/update_agent_canon.sh align-main` で parent pin を remote main へ揃えます。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
+- `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
 ### Context Sweep
 
@@ -558,7 +559,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `subagents_closed=yes` が揃い、run-local subagent が閉じられ、新規 user request で前 task の subagent を使い回していないことが `Subagent Lifecycle Evidence` に残るまで completion report を出さない
 - `closeout_gate.md` の `diff_check_agent_complete=yes` が揃い、run-local diff-check artifact が read-only independent agent、latest diff ref、`approve` decision、findings disposition を示すまで completion report を出さない
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` が揃うまで、正本でない設計文書、implementation copy、snapshot tree、backup path が残る completion report を出さない
-- `workflow_monitoring.md` の signals / interventions / improvement decisions が埋まり、skill / config / workflow / memory の改善判断が `applied`、`recorded`、`not_applicable` のいずれかになるまで、workflow 監視が未完了の completion report を出さない
+- `workflow_monitoring.md` の signals / behavior events / interventions / improvement decisions が埋まり、skill / config / workflow / memory の改善判断が `applied`、`recorded`、`not_applicable` のいずれかになるまで、workflow 監視が未完了の completion report を出さない
+- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、`make ci`、dependency review、diff-check approval、review finding resolution の代替ではありません。
 - `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest agents/evals/agent_behavior_eval.toml --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃うまで、agent behavior evaluation と feedback resolution が未完了の completion report を出さない
 - `schedule.md` が TODO 正本として埋まっておらず、または `work_log.md` に意味のある execution trail が無い場合は completion evidence 不足として closeout を止める
 - `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更が残る場合、final report を出さず、修正または reviewer escalation に戻す

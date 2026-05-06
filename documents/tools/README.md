@@ -108,6 +108,18 @@ python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
 ```
 
+- `tools/agent_tools/file_surface_inventory.py`
+  - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
+  - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
+- `tools/agent_tools/review_backlog_scan.sh`
+  - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
+  - 例:
+
+```bash
+make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>"
+bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id> --submodule-aware
+```
+
 - `tools/agent_tools/oop_rule_inventory.py`
   - OOP policy、analyzer、reviewer、test、legacy support placement を machine-readable に確認します。
   - jax_solver_util 由来の旧 convention viewer は `tools/legacy/jax_solver_util/oop_check_support/` に provenance として隔離し、default workflow ではこの inventory と `analyze_oop_readability.py` を使います。

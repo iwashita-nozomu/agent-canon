@@ -136,6 +136,31 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotIn("static_method_namespace", result.stdout)
             self.assertNotIn("pass_through_function", result.stdout)
 
+    def test_symlink_and_source_paths_do_not_duplicate_findings(self) -> None:
+        """Root symlink views and real source paths should deduplicate by real file."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_dir = root / "vendor" / "agent-canon" / "tools"
+            source_dir.mkdir(parents=True)
+            (root / "tools").symlink_to(source_dir, target_is_directory=True)
+            source = source_dir / "bad.py"
+            source.write_text(
+                "def helper_value(value: int) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "tools",
+                "vendor/agent-canon/tools",
+                "--min-score",
+                "0",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
+            self.assertEqual(result.stdout.count("module_helper_name"), 1)
+
     def test_private_and_nested_functions_are_not_public_boundary_findings(self) -> None:
         """Private helpers and closures do not create public API boundary findings."""
         with tempfile.TemporaryDirectory() as tmp_dir:

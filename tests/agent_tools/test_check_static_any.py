@@ -89,6 +89,38 @@ class CheckStaticAnyTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("STATIC_ANY=pass", result.stdout)
 
+    def test_submodule_aware_scope_avoids_symlink_duplicate_findings(self) -> None:
+        """Root symlink views and AgentCanon source should not duplicate findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_dir = root / "vendor" / "agent-canon" / "tools"
+            source_dir.mkdir(parents=True)
+            (root / "tools").symlink_to(source_dir, target_is_directory=True)
+            (source_dir / "bad.py").write_text(
+                "from typing import Any\nvalue: Any = 1\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--root",
+                    str(root),
+                    "--submodule-aware",
+                    "tools",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("STATIC_ANY_FILES=1", result.stdout)
+            self.assertEqual(result.stdout.count("typing_any_import"), 1)
+            self.assertEqual(result.stdout.count("any_annotation"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -56,7 +56,7 @@ class AuditLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.log_dir / "audit.jsonl"
     
-    def log(
+    def record(
         self,
         action: str,
         actor: str,
@@ -261,7 +261,7 @@ def audit_log(
             
             try:
                 result = func(*args, **kwargs)
-                logger.log(
+                logger.record(
                     action=action,
                     actor=actor,
                     level=level,
@@ -270,7 +270,7 @@ def audit_log(
                 )
                 return result
             except Exception as e:
-                logger.log(
+                logger.record(
                     action=action,
                     actor=actor,
                     level=level,
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     print("Testing Audit Logger...")
     
     # テストログ
-    logger.log(
+    logger.record(
         action="test_action",
         actor="test_user",
         level=AuditLevel.INFO,
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     )
     
     # セキュリティログ
-    logger.log(
+    logger.record(
         action="security_check",
         actor="system",
         level=AuditLevel.SECURITY,

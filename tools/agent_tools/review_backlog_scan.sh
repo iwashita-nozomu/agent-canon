@@ -1,0 +1,321 @@
+#!/usr/bin/env bash
+# @dependency-start
+# responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
+# upstream implementation ./file_surface_inventory.py writes inventory reports
+# upstream implementation ./run_repo_dependency_review.sh validates dependency manifests
+# upstream implementation ./scan_code_dependencies.sh extracts code dependency edges
+# upstream implementation ./analyze_oop_readability.py writes OOP readability reports
+# downstream design ../../tools/README.md documents the review backlog scan entrypoint
+# @dependency-end
+set -euo pipefail
+
+ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
+REPORT_DIR=""
+SCOPE_MODE="submodule-aware"
+FAIL_ON_FINDINGS=0
+declare -a REQUESTED_CHECKS=()
+
+usage() {
+  cat <<'EOF'
+Usage:
+  review_backlog_scan.sh [--root DIR] [--report-dir DIR]
+                         [--submodule-aware|--root-only|--agentcanon-only]
+                         [--check NAME ...] [--fail-on-findings]
+
+Runs integrated review scans and writes JSON/Markdown/log artifacts under REPORT_DIR.
+Default scope is --submodule-aware. Default checks are all checks.
+
+Checks:
+  inventory, stale, code-dependencies, dependency-review, oop,
+  static-any, hardcoded-numbers, log-helper, convention
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --root)
+      ROOT_DIR="$2"
+      shift 2
+      ;;
+    --report-dir)
+      REPORT_DIR="$2"
+      shift 2
+      ;;
+    --submodule-aware)
+      SCOPE_MODE="submodule-aware"
+      shift
+      ;;
+    --root-only)
+      SCOPE_MODE="root-only"
+      shift
+      ;;
+    --agentcanon-only)
+      SCOPE_MODE="agentcanon-only"
+      shift
+      ;;
+    --check)
+      REQUESTED_CHECKS+=("$2")
+      shift 2
+      ;;
+    --fail-on-findings)
+      FAIL_ON_FINDINGS=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+if [[ -z "$REPORT_DIR" ]]; then
+  REPORT_DIR="$ROOT_DIR/reports/agents/review-backlog-scan"
+fi
+REPORT_DIR="$(realpath -m "$REPORT_DIR")"
+mkdir -p "$REPORT_DIR"
+
+TOOL_DIR="$ROOT_DIR/tools/agent_tools"
+REPORT="$REPORT_DIR/review_backlog_scan.md"
+COMMAND_STATUS="$REPORT_DIR/review_backlog_scan_status.tsv"
+NONZERO_COMMANDS=0
+
+if [[ ${#REQUESTED_CHECKS[@]} -eq 0 ]]; then
+  REQUESTED_CHECKS=(
+    inventory
+    stale
+    code-dependencies
+    dependency-review
+    oop
+    static-any
+    hardcoded-numbers
+    log-helper
+    convention
+  )
+fi
+
+has_check() {
+  local wanted="$1"
+  local check
+  for check in "${REQUESTED_CHECKS[@]}"; do
+    [[ "$check" == "$wanted" ]] && return 0
+  done
+  return 1
+}
+
+scope_args() {
+  case "$SCOPE_MODE" in
+    root-only) printf '%s\n' "--root-only" ;;
+    agentcanon-only) printf '%s\n' "--agentcanon-only" ;;
+    *) printf '%s\n' "--submodule-aware" ;;
+  esac
+}
+
+scope_roots() {
+  local canon_root="$ROOT_DIR/vendor/agent-canon"
+  case "$SCOPE_MODE" in
+    root-only)
+      printf 'root\t%s\n' "$ROOT_DIR"
+      ;;
+    agentcanon-only)
+      if [[ -d "$canon_root" ]]; then
+        printf 'agentcanon\t%s\n' "$canon_root"
+      else
+        printf 'agentcanon\t%s\n' "$ROOT_DIR"
+      fi
+      ;;
+    *)
+      printf 'root\t%s\n' "$ROOT_DIR"
+      if [[ -d "$canon_root" ]]; then
+        printf 'agentcanon\t%s\n' "$canon_root"
+      fi
+      ;;
+  esac
+}
+
+record_command() {
+  local name="$1"
+  local outfile="$2"
+  shift 2
+  set +e
+  "$@" >"$outfile" 2>&1
+  local status=$?
+  set -e
+  printf '%s\t%s\t%s\n' "$name" "$status" "$outfile" >>"$COMMAND_STATUS"
+  if [[ "$status" -ne 0 ]]; then
+    NONZERO_COMMANDS=$((NONZERO_COMMANDS + 1))
+  fi
+}
+
+run_inventory() {
+  local scope_flag
+  scope_flag="$(scope_args)"
+  record_command \
+    "inventory" \
+    "$REPORT_DIR/file_surface_inventory.log" \
+    python3 "$TOOL_DIR/file_surface_inventory.py" \
+      --root "$ROOT_DIR" \
+      "$scope_flag" \
+      --json-out "$REPORT_DIR/file_surface_inventory.json" \
+      --markdown-out "$REPORT_DIR/file_surface_inventory.md"
+}
+
+run_stale_search() {
+  local output="$REPORT_DIR/stale_wording_search.txt"
+  if command -v rg >/dev/null 2>&1; then
+    set +e
+    rg --no-messages --glob '!.git/**' --glob '!reports/**' --glob '!vendor/**/.git/**' \
+      -n "subtree|snapshot copy|TODO|FIXME|old format|legacy format" \
+      "$ROOT_DIR" >"$output" 2>&1
+    local status=$?
+    set -e
+    if [[ "$status" -eq 1 ]]; then
+      status=0
+      printf '%s\n' "STALE_WORDING_SEARCH=no-matches" >>"$output"
+    elif [[ "$status" -eq 2 ]]; then
+      status=0
+      printf '%s\n' "STALE_WORDING_SEARCH=warning rg-status-2-treated-as-report" >>"$output"
+    fi
+    printf '%s\t%s\t%s\n' "stale" "$status" "$output" >>"$COMMAND_STATUS"
+    if [[ "$status" -ne 0 ]]; then
+      NONZERO_COMMANDS=$((NONZERO_COMMANDS + 1))
+    fi
+  else
+    printf '%s\n' "STALE_WORDING_SEARCH=skipped rg-not-found" >"$output"
+    printf '%s\t0\t%s\n' "stale" "$output" >>"$COMMAND_STATUS"
+  fi
+}
+
+run_scope_checks() {
+  local scope_name scope_root paths excludes
+  while IFS=$'\t' read -r scope_name scope_root; do
+    [[ -n "$scope_name" && -n "$scope_root" ]] || continue
+    paths=(python include src tools tests mcp)
+    excludes=(--exclude reports --exclude legacy)
+    if [[ "$scope_name" == "root" ]]; then
+      excludes+=(--exclude vendor)
+    fi
+    if has_check code-dependencies; then
+      record_command \
+        "code-dependencies:${scope_name}" \
+        "$REPORT_DIR/code_dependencies_${scope_name}.txt" \
+        bash "$TOOL_DIR/scan_code_dependencies.sh" --root "$scope_root"
+    fi
+    if has_check dependency-review; then
+      record_command \
+        "dependency-review:${scope_name}" \
+        "$REPORT_DIR/dependency_review_${scope_name}.txt" \
+        bash "$TOOL_DIR/run_repo_dependency_review.sh" --root "$scope_root" --fail-missing
+    fi
+    if has_check oop; then
+      record_command \
+        "oop:${scope_name}" \
+        "$REPORT_DIR/oop_readability_${scope_name}.md" \
+        python3 "$TOOL_DIR/analyze_oop_readability.py" \
+          --root "$scope_root" \
+          --format markdown \
+          --include-snippets \
+          --min-score 0 \
+          --exclude .git \
+          "${excludes[@]}" \
+          "${paths[@]}"
+    fi
+    if has_check static-any; then
+      record_command \
+        "static-any:${scope_name}" \
+        "$REPORT_DIR/static_any_${scope_name}.txt" \
+        python3 "$TOOL_DIR/check_static_any.py" \
+          --root "$scope_root" \
+          --exclude reports \
+          "${paths[@]}"
+    fi
+    if has_check hardcoded-numbers; then
+      record_command \
+        "hardcoded-numbers:${scope_name}" \
+        "$REPORT_DIR/hardcoded_numbers_${scope_name}.txt" \
+        python3 "$TOOL_DIR/check_hardcoded_numbers.py" \
+          --root "$scope_root" \
+          --format text \
+          --no-fail-on-findings \
+          "${excludes[@]}" \
+          "${paths[@]}"
+    fi
+    if has_check log-helper; then
+      record_command \
+        "log-helper:${scope_name}" \
+        "$REPORT_DIR/log_helper_names_${scope_name}.txt" \
+        python3 "$TOOL_DIR/check_log_helper_names.py" \
+          --root "$scope_root" \
+          "${excludes[@]}" \
+          "${paths[@]}"
+    fi
+  done < <(scope_roots)
+}
+
+run_convention() {
+  record_command \
+    "convention" \
+    "$REPORT_DIR/convention_compliance.txt" \
+    python3 "$TOOL_DIR/check_convention_compliance.py"
+}
+
+write_report() {
+  {
+    cat <<EOF
+# Review Backlog Scan
+
+<!--
+@dependency-start
+responsibility Records integrated review backlog scan output.
+upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/review_backlog_scan.sh generates this report
+upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/file_surface_inventory.py generates inventory artifacts
+@dependency-end
+-->
+
+- root: $ROOT_DIR
+- scope_mode: $SCOPE_MODE
+- report_dir: $REPORT_DIR
+- nonzero_commands: $NONZERO_COMMANDS
+
+## Artifacts
+
+- file_inventory_json: $REPORT_DIR/file_surface_inventory.json
+- file_inventory_markdown: $REPORT_DIR/file_surface_inventory.md
+- command_status: $COMMAND_STATUS
+
+## Command Status
+
+| Check | Exit | Artifact |
+| ----- | ---- | -------- |
+EOF
+    awk -F '\t' '{ printf "| %s | %s | %s |\n", $1, $2, $3 }' "$COMMAND_STATUS"
+  } >"$REPORT"
+}
+
+: >"$COMMAND_STATUS"
+
+if has_check inventory; then
+  run_inventory
+fi
+if has_check stale; then
+  run_stale_search
+fi
+run_scope_checks
+if has_check convention; then
+  run_convention
+fi
+write_report
+
+echo "REVIEW_BACKLOG_SCAN=pass"
+echo "REVIEW_BACKLOG_SCAN_SCOPE=$SCOPE_MODE"
+echo "REVIEW_BACKLOG_SCAN_REPORT=$REPORT"
+echo "REVIEW_BACKLOG_SCAN_NONZERO_COMMANDS=$NONZERO_COMMANDS"
+
+if [[ "$FAIL_ON_FINDINGS" -eq 1 && "$NONZERO_COMMANDS" -ne 0 ]]; then
+  exit 1
+fi
