@@ -44,18 +44,21 @@ CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://githu
 usage() {
   cat <<EOF
 Usage:
+  # Normal submodule-era routes
   bash tools/sync_agent_canon.sh plan [branch]
   bash tools/sync_agent_canon.sh submodule-review [branch]
   bash tools/sync_agent_canon.sh align-main [branch]
   bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
+  bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
+  bash tools/sync_agent_canon.sh ensure-latest [branch]
+  bash tools/sync_agent_canon.sh status
+
+  # Legacy / low-level compatibility routes
   bash tools/sync_agent_canon.sh snapshot
   bash tools/sync_agent_canon.sh add <remote-url> [branch]
-  bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
   bash tools/sync_agent_canon.sh pull [branch]
-  bash tools/sync_agent_canon.sh ensure-latest [branch]
-  bash tools/sync_agent_canon.sh push [branch]
-  bash tools/sync_agent_canon.sh status
+  bash tools/sync_agent_canon.sh push <proposal-branch>
 
 Environment overrides:
   AGENT_CANON_PREFIX
@@ -78,7 +81,7 @@ require_git_repo() {
 
 require_clean_worktree() {
   if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
-    die "worktree is dirty; commit or stash changes before subtree operations"
+    die "worktree is dirty; commit or stash changes before AgentCanon operations"
   fi
 }
 
@@ -469,6 +472,7 @@ cmd_link_root() {
 }
 
 cmd_snapshot() {
+  echo "agent_canon_snapshot_alias=deprecated_use_link_root"
   cmd_link_root
 }
 
@@ -891,7 +895,7 @@ cmd_submodule_review() {
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
 
   ensure_submodule_checkout
-  git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch" >/dev/null
+  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
   parent_pin="$(submodule_commit)"
   worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
   remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
@@ -984,7 +988,7 @@ cmd_align_main() {
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
 
   ensure_submodule_checkout
-  git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch" >/dev/null
+  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
   parent_pin="$(submodule_commit)"
   worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
   remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
@@ -1077,6 +1081,11 @@ cmd_pull() {
   local local_tree=""
   local remote_sha=""
 
+  if is_submodule_prefix; then
+    cmd_ensure_latest "$branch"
+    return
+  fi
+
   require_clean_worktree
   ensure_existing_remote_or_default
   git -C "$ROOT_DIR" fetch "$REMOTE_NAME" "$branch"
@@ -1107,11 +1116,21 @@ cmd_ensure_latest() {
     local submodule_status=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
-    git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
-    git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch"
-    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     local_commit="$(submodule_commit)"
-    worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+    if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+      if [ "$worktree_commit" != "$local_commit" ]; then
+        echo "agent_canon_local_submodule=$local_commit"
+        echo "agent_canon_worktree_submodule=$worktree_commit"
+        echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
+        die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin, align main, or push a proposal before ensure-latest"
+      fi
+    else
+      git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
+      worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+    fi
+    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
+    remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
@@ -1212,6 +1231,9 @@ cmd_push() {
     local remote_url=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+    if [ "$branch" = "$DEFAULT_BRANCH" ] && [ "${AGENT_CANON_ALLOW_DIRECT_MAIN_PUSH:-0}" != "1" ]; then
+      die "submodule push to '$DEFAULT_BRANCH' is forbidden; use 'bash tools/update_agent_canon.sh push-proposal <branch>' or set AGENT_CANON_ALLOW_DIRECT_MAIN_PUSH=1 intentionally"
+    fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
     [ -z "$submodule_status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before pushing"
     git -C "$ROOT_DIR/$PREFIX" rev-parse --verify HEAD^{commit} >/dev/null 2>&1 \
@@ -1236,7 +1258,18 @@ cmd_status() {
   echo "prefix=$PREFIX"
   echo "remote_name=$REMOTE_NAME"
   echo "default_branch=$DEFAULT_BRANCH"
-  echo "prefix_mode=$(prefix_git_mode)"
+  local mode=""
+  mode="$(prefix_git_mode)"
+  echo "prefix_mode=$mode"
+  if [ "$mode" = "160000" ]; then
+    echo "prefix_mode_name=submodule"
+    echo "submodule_url=$(submodule_remote_url)"
+    echo "submodule_pin=$(submodule_commit)"
+  elif [ "$mode" = "040000" ]; then
+    echo "prefix_mode_name=legacy_tree"
+  else
+    echo "prefix_mode_name=unknown"
+  fi
   if [ -n "$remote_url" ]; then
     echo "remote_url=$remote_url"
   else

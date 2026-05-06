@@ -68,6 +68,17 @@ echo "=========================================="
 echo "workspace_root=${WORKSPACE_ROOT}"
 echo "agent_canon_remote=${REMOTE_URL}"
 echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"
+agent_canon_gitmodules_url="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
+agent_canon_submodule_mode="$(git ls-tree HEAD vendor/agent-canon 2>/dev/null | awk '{print $1}')"
+agent_canon_submodule_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
+echo "agent_canon_gitmodules_url=${agent_canon_gitmodules_url:-<missing>}"
+echo "agent_canon_submodule_mode=${agent_canon_submodule_mode:-<missing>}"
+echo "agent_canon_submodule_pin=${agent_canon_submodule_pin:-<missing>}"
+if [[ -z "$agent_canon_gitmodules_url" || "$agent_canon_submodule_mode" != "160000" || -z "$agent_canon_submodule_pin" ]]; then
+  echo "AGENT_CANON_SUBMODULE_EVIDENCE=fail"
+  exit 1
+fi
+echo "AGENT_CANON_SUBMODULE_EVIDENCE=pass"
 echo ""
 
 echo "1️⃣  shared surface status"
