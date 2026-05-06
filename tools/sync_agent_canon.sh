@@ -45,6 +45,8 @@ usage() {
   cat <<EOF
 Usage:
   bash tools/sync_agent_canon.sh plan [branch]
+  bash tools/sync_agent_canon.sh submodule-review [branch]
+  bash tools/sync_agent_canon.sh align-main [branch]
   bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
   bash tools/sync_agent_canon.sh snapshot
@@ -132,6 +134,13 @@ submodule_commit() {
 
 submodule_remote_url() {
   git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
+}
+
+ensure_submodule_checkout() {
+  if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return
+  fi
+  git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX" >/dev/null
 }
 
 build_link_specs() {
@@ -569,6 +578,49 @@ find_commit_by_tree() {
   return 1
 }
 
+find_submodule_commit_by_tree() {
+  local tree_sha="$1"
+  local history_head="$2"
+  local commit=""
+
+  while IFS= read -r commit; do
+    if [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$commit^{tree}")" = "$tree_sha" ]; then
+      echo "$commit"
+      return
+    fi
+  done < <(git -C "$ROOT_DIR/$PREFIX" rev-list "$history_head")
+
+  return 1
+}
+
+submodule_cherry_equivalent_to_remote() {
+  local remote_sha="$1"
+  local worktree_head="$2"
+  local cherry_output=""
+
+  cherry_output="$(git -C "$ROOT_DIR/$PREFIX" cherry "$remote_sha" "$worktree_head" 2>/dev/null || true)"
+  if [ -z "$cherry_output" ]; then
+    echo "yes"
+    return
+  fi
+  if printf '%s\n' "$cherry_output" | grep -q '^+'; then
+    echo "no"
+    return
+  fi
+  echo "yes"
+}
+
+submodule_merge_conflicts() {
+  local local_head="$1"
+  local remote_sha="$2"
+
+  if git -C "$ROOT_DIR/$PREFIX" merge-tree --write-tree "$local_head" "$remote_sha" >/dev/null 2>&1; then
+    echo "no"
+    return
+  fi
+  echo "yes"
+}
+
 materialize_cached_snapshot_diff() {
   local base_sha="$1"
   local remote_sha="$2"
@@ -816,6 +868,156 @@ cmd_plan() {
   print_plan_summary \
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
     "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode"
+}
+
+cmd_submodule_review() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local remote_url=""
+  local parent_pin=""
+  local worktree_head=""
+  local remote_sha=""
+  local status=""
+  local history_status=""
+  local merge_conflicts="not_checked"
+  local proposal_required="no"
+  local align_allowed="no"
+  local cherry_equivalent="not_checked"
+  local tree_match_commit=""
+  local next_action="none"
+
+  ensure_prefix_exists
+  is_submodule_prefix || die "submodule-review requires '$PREFIX' to be a git submodule"
+  remote_url="$(submodule_remote_url)"
+  [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+
+  ensure_submodule_checkout
+  git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch" >/dev/null
+  parent_pin="$(submodule_commit)"
+  worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+  status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+
+  echo "agent_canon_submodule_review_prefix=$PREFIX"
+  echo "agent_canon_submodule_review_branch=$branch"
+  echo "agent_canon_submodule_review_remote_url=$remote_url"
+  echo "agent_canon_submodule_parent_pin=$parent_pin"
+  echo "agent_canon_submodule_worktree_head=$worktree_head"
+  echo "agent_canon_submodule_remote_sha=$remote_sha"
+
+  if [ -n "$status" ]; then
+    echo "agent_canon_submodule_worktree_status=dirty"
+    echo "agent_canon_submodule_history_status=dirty_worktree"
+    echo "agent_canon_submodule_merge_conflicts=not_checked"
+    echo "agent_canon_submodule_proposal_required=yes_after_commit"
+    echo "agent_canon_submodule_align_main_allowed=no"
+    echo "agent_canon_submodule_next=commit_submodule_changes_then_run_push_proposal"
+    return
+  fi
+  echo "agent_canon_submodule_worktree_status=clean"
+
+  if [ "$worktree_head" = "$remote_sha" ]; then
+    history_status="already_current"
+    next_action="none"
+    align_allowed="yes"
+  elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$worktree_head" "$remote_sha"; then
+    history_status="behind_remote"
+    merge_conflicts="no"
+    next_action="run_apply"
+    align_allowed="yes"
+  elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$worktree_head"; then
+    history_status="ahead_of_remote"
+    merge_conflicts="no"
+    proposal_required="yes"
+    next_action="push_proposal"
+  else
+    merge_conflicts="$(submodule_merge_conflicts "$worktree_head" "$remote_sha")"
+    cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
+    tree_match_commit="$(find_submodule_commit_by_tree "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$worktree_head^{tree}")" "$remote_sha" || true)"
+    if [ "$cherry_equivalent" = "yes" ] || [ -n "$tree_match_commit" ]; then
+      history_status="local_changes_already_in_remote"
+      align_allowed="yes"
+      next_action="align_main"
+    elif [ "$merge_conflicts" = "no" ]; then
+      history_status="diverged_clean_merge"
+      proposal_required="yes"
+      next_action="merge_remote_then_push_proposal"
+    else
+      history_status="diverged_conflict"
+      proposal_required="yes"
+      next_action="resolve_conflicts_in_agentcanon_pr"
+    fi
+  fi
+
+  if [ "$cherry_equivalent" = "not_checked" ] && [ "$align_allowed" != "yes" ]; then
+    cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
+  fi
+
+  echo "agent_canon_submodule_history_status=$history_status"
+  echo "agent_canon_submodule_merge_conflicts=$merge_conflicts"
+  echo "agent_canon_submodule_cherry_equivalent_in_remote=$cherry_equivalent"
+  if [ -n "$tree_match_commit" ]; then
+    echo "agent_canon_submodule_tree_match_commit=$tree_match_commit"
+  else
+    echo "agent_canon_submodule_tree_match_commit=<unset>"
+  fi
+  echo "agent_canon_submodule_proposal_required=$proposal_required"
+  echo "agent_canon_submodule_align_main_allowed=$align_allowed"
+  echo "agent_canon_submodule_next=$next_action"
+  echo "agent_canon_submodule_apply_command=bash tools/update_agent_canon.sh apply $branch"
+  echo "agent_canon_submodule_proposal_command=bash tools/update_agent_canon.sh push-proposal"
+  echo "agent_canon_submodule_align_command=bash tools/update_agent_canon.sh align-main $branch"
+}
+
+cmd_align_main() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local remote_url=""
+  local parent_pin=""
+  local worktree_head=""
+  local remote_sha=""
+  local status=""
+  local cherry_equivalent=""
+  local tree_match_commit=""
+
+  ensure_prefix_exists
+  is_submodule_prefix || die "align-main requires '$PREFIX' to be a git submodule"
+  remote_url="$(submodule_remote_url)"
+  [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+
+  ensure_submodule_checkout
+  git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch" >/dev/null
+  parent_pin="$(submodule_commit)"
+  worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+  status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+  [ -z "$status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before aligning to main"
+
+  if [ "$worktree_head" = "$remote_sha" ]; then
+    echo "agent_canon_align_main=already_current"
+    cmd_link_root 1
+    return
+  fi
+
+  tree_match_commit="$(find_submodule_commit_by_tree "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$worktree_head^{tree}")" "$remote_sha" || true)"
+  cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
+
+  if ! git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$worktree_head" "$remote_sha" \
+    && [ -z "$tree_match_commit" ] \
+    && [ "$cherry_equivalent" != "yes" ]; then
+    echo "agent_canon_align_main_allowed=no"
+    echo "agent_canon_submodule_parent_pin=$parent_pin"
+    echo "agent_canon_submodule_worktree_head=$worktree_head"
+    echo "agent_canon_submodule_remote_sha=$remote_sha"
+    die "local submodule commits are not known to be included in remote main; push a proposal PR or merge remote first"
+  fi
+
+  echo "agent_canon_align_main_allowed=yes"
+  echo "agent_canon_submodule_parent_pin=$parent_pin"
+  echo "agent_canon_submodule_worktree_head=$worktree_head"
+  echo "agent_canon_submodule_remote_sha=$remote_sha"
+  git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha" >/dev/null
+  cmd_link_root 1
+  commit_sync_paths_if_needed "$remote_sha" "submodule_align_main"
+  echo "agent_canon_align_main=updated_to_remote"
 }
 
 cmd_submodule_add() {
@@ -1084,6 +1286,12 @@ main() {
       ;;
     plan)
       cmd_plan "${2:-$DEFAULT_BRANCH}"
+      ;;
+    submodule-review)
+      cmd_submodule_review "${2:-$DEFAULT_BRANCH}"
+      ;;
+    align-main)
+      cmd_align_main "${2:-$DEFAULT_BRANCH}"
       ;;
     check)
       cmd_check

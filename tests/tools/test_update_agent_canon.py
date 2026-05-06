@@ -1329,6 +1329,109 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             ).stdout
             self.assertIn("proposal-marker.txt", proposal_tree)
 
+    def test_review_submodule_reports_local_proposal_requirement(self) -> None:
+        """Review should classify clean local submodule commits as proposal work."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+
+            review = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "review-submodule"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(review.returncode, 0, review.stderr)
+            self.assertIn("agent_canon_submodule_history_status=ahead_of_remote", review.stdout)
+            self.assertIn("agent_canon_submodule_proposal_required=yes", review.stdout)
+            self.assertIn("agent_canon_submodule_next=push_proposal", review.stdout)
+
+    def test_align_main_accepts_tree_equivalent_merged_proposal(self) -> None:
+        """Align-main may reset to main when a previous proposal tree is present there."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            (work_dir / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "merge proposal marker"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            remote_sha = subprocess.run(
+                ["git", "-C", str(work_dir), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+            review = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "review-submodule"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            align = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "align-main"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            pinned_sha = subprocess.run(
+                ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+            self.assertEqual(review.returncode, 0, review.stderr)
+            self.assertIn(
+                "agent_canon_submodule_history_status=local_changes_already_in_remote",
+                review.stdout,
+            )
+            self.assertIn("agent_canon_submodule_align_main_allowed=yes", review.stdout)
+            self.assertEqual(align.returncode, 0, align.stderr)
+            self.assertIn("agent_canon_align_main=updated_to_remote", align.stdout)
+            self.assertEqual(pinned_sha, remote_sha)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,13 +1,19 @@
 <!--
 @dependency-start
 responsibility Documents Agent Instructions for this repository.
+upstream design README.md repository entrypoint and clone/update guidance.
+upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
+upstream design documents/agent-canon-subtree-migration.md legacy vendoring compatibility policy.
+downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
+downstream implementation tools/agent_tools/goal_loop.py controls active goal iteration state.
+downstream implementation tools/agent_tools/task_close.py validates run-bundle closeout gates.
 @dependency-end
 -->
 
 # Agent Instructions
 
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
-The shared agent canon lives in `vendor/agent-canon/`, and the root discovery paths are runtime views into that snapshot.
+The shared agent canon lives in `vendor/agent-canon/`. In this template and migrated derived repositories, that path is the AgentCanon Git submodule pin, and the root discovery paths are runtime views into that pin.
 
 ## Subagent Usage
 
@@ -59,10 +65,23 @@ The shared agent canon lives in `vendor/agent-canon/`, and the root discovery pa
 - Template-default environment and runtime guidance live in `docker/`.
 - Repo-wide durable rules live in `documents/`.
 
+## AgentCanon Submodule Update Flow
+
+- Default AgentCanon routing is submodule-first: update the standalone AgentCanon repository, push AgentCanon `main` or open the AgentCanon PR, update the template `vendor/agent-canon` submodule pin, run `bash tools/sync_agent_canon.sh link-root`, validate, commit the template pin/root-view changes, then push the template.
+- Legacy subtree or committed-snapshot wording is compatibility-only for repositories not yet migrated. It must not be presented as the normal path in this template or in newly migrated repositories.
+- Missing shared-surface files must be checked in the template root, `vendor/agent-canon/`, the standalone AgentCanon checkout, `.gitmodules`, and `documents/SHARED_RUNTIME_SURFACES.md` before recreating files.
+- AgentCanon changes found while working on a template PR must first be evaluated against the standalone AgentCanon PR/checklist path. Do not hide shared-canon changes inside a template-only diff unless the scope explicitly says the change is template-local.
+- Root shared-surface edits must be made in `vendor/agent-canon/` unless the file is intentionally template-local. Root symlink/copy views should be repaired with `bash tools/sync_agent_canon.sh link-root` instead of edited as a separate truth surface.
+- `goal.md` is always repo-local state. It must not be restored as a shared symlink and must not be copied from AgentCanon during `link-root` repair.
+- For shared-canon tasks, closeout evidence must include `git submodule status vendor/agent-canon`, the AgentCanon GitHub `main` SHA or PR head SHA, and the template submodule pin SHA.
+- Local bare mirror status is required only when the user request, goal, or workflow scope mentions `/mnt/git` or local mirror propagation.
+- Root `AGENTS.md` is an allowed edit target during workflow-wide reviews, but the edit must be applied to its AgentCanon source file when `AGENTS.md` is a shared root view.
+- Before judging AgentCanon submodule drift by parent-tree diff, run `bash tools/update_agent_canon.sh review-submodule`. If it reports local-only submodule changes, push them with `bash tools/update_agent_canon.sh push-proposal` and request AgentCanon PR merge. If it reports a clean remote merge, merge remote main inside `vendor/agent-canon/` before pushing the proposal. If it reports the previous proposal is already included in main by ancestry, tree match, or git-cherry equivalence, `bash tools/update_agent_canon.sh align-main` may align the submodule pin to main.
+
 ## Required Before Implementation
 
-- task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` snapshot を upstream `agent-canon` の最新にします。
-- task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。
+- task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。
+- task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補と、既存実装では足りない理由を確認します。
@@ -121,7 +140,20 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - closeout 前に、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目があれば実装または該当 stage へ戻ります。
-- closeout 前に read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して最新 diff の approve / revise / escalate decision を artifact に残します。
+- closeout 前に `python3 tools/agent_tools/task_close.py ...` の結果を mechanical closeout authority として扱い、chat 上の自己申告だけで完了扱いにしてはいけません。
+- closeout 前に independent diff-check を通します。user が multi-agent work を明示した場合は read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して approve / revise / escalate decision を artifact に残します。
+- runtime の上位制約で spontaneous subagent spawn が禁止され、user も multi-agent work を明示していない場合は、read-only diff-check agent を起動せず、no-spawn rationale、mechanical diff review、`task_close.py` evidence を artifact に残します。
+- eval feedback action は chat で認めるだけでは完了ではありません。`workflow_monitoring.md`、eval report、goal backlog、workflow、skill、memory、または closeout artifact の該当箇所へ反映してから closeout します。
+- `workflow_monitoring.md` は `evaluate_agent_run.py` が読める machine-readable token を含めます。少なくとも skills、subagent routing、MCP preflight、dependency review、web research decision、eval feedback decision、intervention、next improvement target を token 化します。
+- adaptive-improvement-loop では `python3 tools/agent_tools/goal_loop.py` または repo MCP `goal_loop_status` の `NEXT_ACTION` が closeout 判断を支配します。
+- `NEXT_ACTION=run_next_iteration` は active goal の完了報告を禁止し、次の backlog iteration へ戻ります。
+- `NEXT_ACTION=close_goal_loop` は closeout 候補にすぎません。validation、dependency review、static analysis、commit / push、shared-canon evidence が揃って初めて user-facing completion report を返せます。
+
+## Close-Out Gate Model
+
+- Product gates confirm the durable repository state: implementation/doc diffs, shared-canon sync, dependency headers, dependency graph, static analysis, tests, stale reference sweep, commit, push, and submodule pin evidence.
+- Artifact gates confirm the run process: user request contract, schedule, work log, workflow monitoring tokens, eval feedback handling, review decisions, subagent lifecycle evidence or no-spawn rationale, and `task_close.py` status.
+- Product gates and artifact gates are both required, but they are not interchangeable. A clean run bundle cannot excuse a broken product diff, and passing tests cannot excuse missing required closeout artifacts.
 - user-facing completion report は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` になるまで出してはいけません。
 - user-facing completion report は、`user_request_contract.md` が `all_clauses_resolved=yes` で、`forbidden_drift_detected=no` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` になるまで出してはいけません。

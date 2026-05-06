@@ -26,6 +26,8 @@ usage() {
   cat <<EOF
 Usage:
   bash tools/update_agent_canon.sh plan [branch]
+  bash tools/update_agent_canon.sh review-submodule [branch]
+  bash tools/update_agent_canon.sh align-main [branch]
   bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh refresh-remote [branch]
   bash tools/update_agent_canon.sh register-remote <remote-url>
@@ -36,6 +38,12 @@ Usage:
 Commands:
   plan
       Print the derived-repo update route for agent-canon only.
+  review-submodule
+      Classify the submodule-local diff against AgentCanon main: proposal
+      required, merge conflict status, and whether safe main alignment is allowed.
+  align-main
+      Align the submodule worktree/pin to AgentCanon main only when local commits
+      are already included by ancestry, tree match, or git-cherry equivalence.
   apply
       Refresh the remote snapshot from the source repo when configured, then update
       vendor/agent-canon via sync_agent_canon.sh ensure-latest.
@@ -211,6 +219,16 @@ cmd_apply() {
     cmd_refresh_remote "$branch"
   fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch"
+}
+
+cmd_review_submodule() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" submodule-review "$branch"
+}
+
+cmd_align_main() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" align-main "$branch"
 }
 
 cmd_register_remote() {
@@ -477,6 +495,14 @@ main() {
     plan)
       shift
       cmd_plan "${1:-$DEFAULT_BRANCH}"
+      ;;
+    review-submodule)
+      shift
+      cmd_review_submodule "${1:-$DEFAULT_BRANCH}"
+      ;;
+    align-main)
+      shift
+      cmd_align_main "${1:-$DEFAULT_BRANCH}"
       ;;
     apply)
       shift
