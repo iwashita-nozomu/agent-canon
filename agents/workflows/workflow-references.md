@@ -62,6 +62,8 @@ upstream design README.md workflow catalog
   - fork-like PR で repository secrets が渡らない場合があることの根拠です。
 - [Secrets - GitHub Docs](https://docs.github.com/en/actions/concepts/security/secrets)
   - `AGENT_CANON_REPO_TOKEN` のような secret は workflow 側で明示的に渡す必要があること、最小権限の根拠です。
+- [REST API endpoints for deploy keys - GitHub Docs](https://docs.github.com/en/rest/deploy-keys/deploy-keys)
+  - private AgentCanon を PAT ではなく read-only deploy key で読む fallback の根拠です。
 
 ## System Development, Security, Release, And Operations
 

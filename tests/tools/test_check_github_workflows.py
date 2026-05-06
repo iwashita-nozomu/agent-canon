@@ -67,7 +67,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertIn("checkout_1_missing_submodules_false", result.stdout)
             self.assertIn("checkout_1_missing_persist_credentials_false", result.stdout)
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
-            self.assertIn("missing_agent_canon_repo_token_env", result.stdout)
+            self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
 
     def test_missing_pr_template_evidence_fails(self) -> None:
         """PR templates must retain validation and submodule evidence fields."""
@@ -137,6 +137,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             + "      - name: Checkout AgentCanon submodule\n"
             + "        env:\n"
             + "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
+            + "          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}\n"
             + "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n",
             encoding="utf-8",
         )

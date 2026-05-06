@@ -86,6 +86,9 @@ submodule needs one of these human-controlled fixes:
 
 - Add repository secret `AGENT_CANON_REPO_TOKEN` with read-only Contents access
   to `iwashita-nozomu/agent-canon`.
+- Add repository secret `AGENT_CANON_REPO_SSH_KEY` containing the private half
+  of a read-only deploy key whose public half is installed on
+  `iwashita-nozomu/agent-canon`.
 - Make AgentCanon public only after a human security review decides that the
   shared runtime can be public.
 - Replace the PAT with a GitHub App token only after the workflow documents the
@@ -104,8 +107,8 @@ Current GitHub Actions behavior to account for:
   rerun after reviewing the workflow diff.
 - If `checkout_agent_canon_submodule.sh` prints
   `AGENT_CANON_SUBMODULE_AUTH=missing`, the next action is to configure
-  `AGENT_CANON_REPO_TOKEN` or an equivalent GitHub App token, not to change the
-  implementation under review.
+  `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY`, or an equivalent GitHub
+  App token, not to change the implementation under review.
 
 ## PR Error Triage
 
@@ -115,8 +118,9 @@ Use this order when Copilot reports a PR processing error:
    execution. If yes, inspect checkout, token, workflow syntax, or runner setup
    first.
 1. Search the failed log for `AGENT_CANON_SUBMODULE_AUTH=missing`,
-   `AGENT_CANON_SUBMODULE_AUTH=denied`, `repository ... agent-canon.git not
-   found`, or `could not read Username`.
+   `AGENT_CANON_SUBMODULE_AUTH=denied`,
+   `AGENT_CANON_SUBMODULE_AUTH=ssh_denied`,
+   `repository ... agent-canon.git not found`, or `could not read Username`.
 1. If one of those strings appears, classify the PR as blocked on private
    AgentCanon access and leave the code diff unchanged unless there is another
    independent finding.

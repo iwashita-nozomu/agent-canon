@@ -29,7 +29,7 @@ upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `bash .github/scripts/checkout_agent_canon_submodule.sh` when AgentCanon is needed.
-- [ ] Private AgentCanon submodule access is covered by repository secret `AGENT_CANON_REPO_TOKEN`, or the PR explains why the workflow does not need it.
+- [ ] Private AgentCanon submodule access is covered by repository secret `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or the PR explains why the workflow does not need it.
 - [ ] GitHub workflow changes: `persist-credentials: false` is set unless the job has documented write intent.
 - [ ] GitHub workflow changes: `permissions:` is set at workflow or job level.
 - [ ] GitHub workflow changes: `concurrency:` is present or explicitly not needed.

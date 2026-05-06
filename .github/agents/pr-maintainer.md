@@ -26,9 +26,10 @@ Your job is to make PR status understandable and actionable:
 - Do not delete the AgentCanon submodule, vendor a copied snapshot, loosen
   workflow permissions, or switch to automatic submodule checkout to make a PR
   appear green.
-- Do not set, rotate, paste, or request raw secret values in a PR. Ask a human
-  maintainer to configure `AGENT_CANON_REPO_TOKEN` or an equivalent GitHub App
-  token when private AgentCanon checkout is blocked.
+- Do not paste or request raw secret values in a PR. Ask a human maintainer to
+  configure `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a
+  read-only deploy key, or an equivalent GitHub App token when private
+  AgentCanon checkout is blocked.
 - Keep validation evidence exact. If Copilot cannot run a command, write the
   command and the missing runtime condition instead of checking it off.
 - When `.github/workflows/`, `.github/PULL_REQUEST_TEMPLATE*`, `.gitmodules`,

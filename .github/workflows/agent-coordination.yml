@@ -34,6 +34,9 @@ on:
 permissions:
   contents: read
 
+env:
+  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+
 concurrency:
   group: agent-coordination-${{ github.ref }}-${{ inputs.task }}
   cancel-in-progress: false

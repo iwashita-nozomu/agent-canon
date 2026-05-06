@@ -116,8 +116,11 @@ def check_workflow(path: Path) -> list[Finding]:
     checkouts = checkout_steps(workflow)
     if checkouts and ".github/scripts/checkout_agent_canon_submodule.sh" not in workflow_text:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if checkouts and "AGENT_CANON_REPO_TOKEN" not in workflow_text:
-        findings.append(Finding("error", path, "missing_agent_canon_repo_token_env"))
+    if checkouts and (
+        "AGENT_CANON_REPO_TOKEN" not in workflow_text
+        and "AGENT_CANON_REPO_SSH_KEY" not in workflow_text
+    ):
+        findings.append(Finding("error", path, "missing_agent_canon_repo_credential_env"))
 
     for index, step in enumerate(checkouts, start=1):
         with_block = as_string_dict(step.get("with"))
@@ -238,6 +241,7 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
                 ".github/instructions/pr-processing.instructions.md",
                 ".github/agents/pr-maintainer.md",
                 "AGENT_CANON_REPO_TOKEN",
+                "AGENT_CANON_REPO_SSH_KEY",
             ],
         ),
         *require_text(
@@ -250,6 +254,7 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
                 "AGENT_CANON_SUBMODULE_AUTH=missing",
                 "private submodule authentication",
                 "AGENT_CANON_REPO_TOKEN",
+                "AGENT_CANON_REPO_SSH_KEY",
             ],
         ),
         *require_text(
@@ -258,6 +263,7 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
                 "description:",
                 "AGENT_CANON_SUBMODULE_AUTH=missing",
                 "AGENT_CANON_REPO_TOKEN",
+                "AGENT_CANON_REPO_SSH_KEY",
                 "Do not delete the AgentCanon submodule",
             ],
         ),
@@ -277,7 +283,9 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
                 [
                     "AGENT_CANON_SUBMODULE_AUTH=missing",
                     "AGENT_CANON_SUBMODULE_AUTH=denied",
+                    "AGENT_CANON_SUBMODULE_AUTH=ssh_denied",
                     "AGENT_CANON_REPO_TOKEN",
+                    "AGENT_CANON_REPO_SSH_KEY",
                     "untrusted PR context",
                     "exit 86",
                 ],

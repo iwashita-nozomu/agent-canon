@@ -40,10 +40,12 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - If PR checks fail before tests with `repository ... agent-canon.git not found`,
   treat it as private submodule authentication. The repository needs
   `AGENT_CANON_REPO_TOKEN` with read-only Contents access to AgentCanon, or
-  AgentCanon must be made public by a human security decision.
+  `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or AgentCanon must be
+  made public by a human security decision.
 - If PR checks fail with `AGENT_CANON_SUBMODULE_AUTH=missing`, do not change
   code to hide the failure. Record that repository secret
-  `AGENT_CANON_REPO_TOKEN` is missing or unavailable in that run context.
+  `AGENT_CANON_REPO_TOKEN` or `AGENT_CANON_REPO_SSH_KEY` is missing or
+  unavailable in that run context.
 
 ## Validation
 

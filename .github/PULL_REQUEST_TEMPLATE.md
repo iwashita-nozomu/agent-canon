@@ -41,7 +41,7 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `bash .github/scripts/checkout_agent_canon_submodule.sh` instead of automatic `actions/checkout` submodules.
-- [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN` or an equivalent documented GitHub App token covers private AgentCanon reads.
+- [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or an equivalent documented GitHub App token covers private AgentCanon reads.
 - [ ] Relevant `pytest` target:
 - [ ] Relevant `pyright` / `ruff` / `bash -n` target:
 

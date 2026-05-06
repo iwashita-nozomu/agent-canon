@@ -120,3 +120,14 @@ token with read-only Contents access to the AgentCanon repository. If the
 secret is missing, the helper fails with `AGENT_CANON_SUBMODULE_AUTH=missing`
 instead of letting `actions/checkout` fail during an opaque automatic submodule
 clone.
+
+If a personal or app token is not desired, use a repository deploy key instead:
+
+- Add the public key to `iwashita-nozomu/agent-canon` as read-only.
+- Store the private key in the consuming repository secret
+  `AGENT_CANON_REPO_SSH_KEY`.
+- Keep `AGENT_CANON_REPO_TOKEN` unset, or use it only when a GitHub App /
+  fine-grained PAT is the chosen credential.
+
+The checkout helper prefers `AGENT_CANON_REPO_TOKEN` when present, then falls
+back to `AGENT_CANON_REPO_SSH_KEY`.

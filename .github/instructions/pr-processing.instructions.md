@@ -28,7 +28,8 @@ pull request.
   a missing secret.
 - If a workflow needs private AgentCanon, the expected remediation is a human
   repository or organization secret named `AGENT_CANON_REPO_TOKEN` with
-  read-only Contents access to `iwashita-nozomu/agent-canon`, or a documented
+  read-only Contents access to `iwashita-nozomu/agent-canon`,
+  `AGENT_CANON_REPO_SSH_KEY` backed by a read-only deploy key, or a documented
   GitHub App token with equivalent read-only scope.
 - Do not create, rotate, paste, or expose repository secrets from a PR branch.
   Leave the exact missing-secret evidence in the PR body instead.
