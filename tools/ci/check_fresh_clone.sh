@@ -63,6 +63,12 @@ compose_path = Path(".devcontainer/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
 assert "services" in data and "workspace" in data["services"], "workspace service missing"
 assert data["services"]["workspace"]["working_dir"] == "/workspace"
+if Path("/mnt/git").is_dir():
+    build = data["services"]["workspace"]["build"]
+    if Path("/mnt/git/experiment_runner.git").is_dir():
+        assert build["additional_contexts"]["experiment_runner_repo"] == "/mnt/git/experiment_runner.git"
+    if Path("/mnt/git/agent-canon.git").is_dir():
+        assert build["additional_contexts"]["agent_canon_repo"] == "/mnt/git/agent-canon.git"
 PY
 
 bash tools/sync_agent_canon.sh check

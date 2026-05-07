@@ -21,12 +21,15 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `docker` / `podman` がない環境では、GitHub Actions の `Docker Build` workflow を使います。
 - `docker/Dockerfile` と `docker/requirements.txt` の更新漏れがないか確認します。
 - Linux / WSL host の前提が怪しい場合は `documents/linux-wsl-host-requirements.md` を見ます。
+- `git+file:///mnt/git/...` 依存で落ちる場合は、host の `/mnt/git/experiment_runner.git` と `/mnt/git/agent-canon.git` が存在し、devcontainer build に渡せることを確認します。
 
 ## WSL / host 前提が怪しい
 
 - repo が Linux filesystem 側にあるか確認します。
 - `/mnt/git` があるか確認します。
+- `/mnt/git/experiment_runner.git` と `/mnt/git/agent-canon.git` があるか確認します。
 - `docker version` と `id` を見て、今の shell から daemon に到達できるか確認します。
+- devcontainer build failure が `pip install -r /tmp/requirements.txt` 以前なら、runtime mount ではなく build-time `/mnt/git` forward を疑います。
 - VS Code dev container が不安定なら `.devcontainer/` と `documents/linux-wsl-host-requirements.md` を見直します。
 
 ## import や依存が壊れる

@@ -77,6 +77,8 @@ class HostRuntimeFeatures:
 
     has_gpu: bool
     has_mnt_git: bool
+    has_experiment_runner_bare_repo: bool
+    has_agent_canon_bare_repo: bool
     has_host_codex_home: bool
 
 
@@ -84,10 +86,14 @@ def detect_host_runtime_features() -> HostRuntimeFeatures:
     """Detect host-dependent runtime features once."""
     has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None
     has_mnt_git = Path("/mnt/git").is_dir()
+    has_experiment_runner_bare_repo = Path("/mnt/git/experiment_runner.git").is_dir()
+    has_agent_canon_bare_repo = Path("/mnt/git/agent-canon.git").is_dir()
     has_host_codex_home = HOST_CODEX_HOME.is_dir()
     return HostRuntimeFeatures(
         has_gpu=has_gpu,
         has_mnt_git=has_mnt_git,
+        has_experiment_runner_bare_repo=has_experiment_runner_bare_repo,
+        has_agent_canon_bare_repo=has_agent_canon_bare_repo,
         has_host_codex_home=has_host_codex_home,
     )
 
@@ -318,6 +324,7 @@ def build_build_command(
     no_cache: bool = False,
 ) -> list[str]:
     """Build the container build command for one pack."""
+    features = detect_host_runtime_features()
     command = [
         builder,
         "build",
@@ -332,6 +339,10 @@ def build_build_command(
         command.append("--no-cache")
     if pack.target:
         command.extend(["--target", pack.target])
+    if features.has_experiment_runner_bare_repo:
+        command.extend(["--build-context", "experiment_runner_repo=/mnt/git/experiment_runner.git"])
+    if features.has_agent_canon_bare_repo:
+        command.extend(["--build-context", "agent_canon_repo=/mnt/git/agent-canon.git"])
     command.append(str(workspace_path(pack.context)))
     return command
 

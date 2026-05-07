@@ -63,13 +63,27 @@ def main() -> int:
         "    build:",
         "      context: ..",
         f"      dockerfile: {pack.dockerfile}",
-        f"    working_dir: {pack.runtime.workdir}",
-        "    volumes:",
-        *volume_lines,
-        '    command: /bin/bash -lc "sleep infinity"',
-        "    tty: true",
-        "    init: true",
     ]
+    if features.has_experiment_runner_bare_repo or features.has_agent_canon_bare_repo:
+        lines.extend(
+            [
+                "      additional_contexts:",
+            ]
+        )
+        if features.has_experiment_runner_bare_repo:
+            lines.append("        experiment_runner_repo: /mnt/git/experiment_runner.git")
+        if features.has_agent_canon_bare_repo:
+            lines.append("        agent_canon_repo: /mnt/git/agent-canon.git")
+    lines.extend(
+        [
+            f"    working_dir: {pack.runtime.workdir}",
+            "    volumes:",
+            *volume_lines,
+            '    command: /bin/bash -lc "sleep infinity"',
+            "    tty: true",
+            "    init: true",
+        ]
+    )
     if features.has_gpu:
         lines.append("    gpus: all")
     lines.extend(

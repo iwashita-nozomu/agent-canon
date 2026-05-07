@@ -58,6 +58,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - Docker を使う場合、現在の shell から daemon socket に到達できること
 - host で `make docker-build-check` を実行できることを推奨します
 - nested Codex や dev container を使う場合、`/mnt/git` を mount できることを推奨します
+- local bare repo 依存を使う current devcontainer build では、少なくとも `/mnt/git/experiment_runner.git` と `/mnt/git/agent-canon.git` が image build に渡せることを前提にします
 
 補足:
 
@@ -82,6 +83,7 @@ dev container は `.devcontainer/` を使います。起動時に generated comp
 - GPU があれば `gpus: all`
 - GPU がなければ CPU-only
 - `/mnt/git` があれば bind mount
+- `/mnt/git/experiment_runner.git` と `/mnt/git/agent-canon.git` があれば build context としても forward
 
 で動きます。
 
