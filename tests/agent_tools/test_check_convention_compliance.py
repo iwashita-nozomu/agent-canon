@@ -153,14 +153,16 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/conventions/common/01_principles.md": (
                 "check_hardcoded_numbers.py\n"
             ),
-            "documents/conventions/common/02_naming.md": "naming\n",
+            "documents/conventions/common/02_naming.md": "check_log_helper_names.py\n",
             "documents/conventions/common/03_comments.md": "comments\n",
             "documents/conventions/common/04_operators.md": "operators\n",
             "documents/conventions/common/05_docs.md": "docs\n",
             "documents/conventions/python/01_scope.md": "scope\n",
-            "documents/conventions/python/04_type_annotations.md": "types\n",
+            "documents/conventions/python/04_type_annotations.md": (
+                "check_static_any.py\n"
+            ),
             "documents/conventions/python/06_comments.md": "comments\n",
-            "documents/conventions/python/07_type_checker.md": "type checker\n",
+            "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
             "documents/conventions/python/09_file_roles.md": "roles\n",
             "documents/conventions/python/11_naming.md": "naming\n",
             "documents/conventions/python/15_jax_rules.md": "jax\n",
@@ -175,10 +177,16 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/coding-conventions-testing.md": "testing\n",
             "documents/coding-conventions-reviews.md": "reviews\n",
             "documents/coding-conventions-experiments.md": "experiments\n",
-            "documents/coding-conventions-logging.md": "logging\n",
+            "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
             "documents/algorithm-implementation-boundary.md": "algorithm\n",
             "documents/object-oriented-design.md": "analyze_oop_readability.py\n",
             "documents/REVIEW_PROCESS.md": "review\n",
+            "documents/tools/README.md": (
+                "check_tool_catalog.py check_tool_convention_drift.py\n"
+            ),
+            "tools/README.md": (
+                "check_tool_catalog.py check_tool_convention_drift.py\n"
+            ),
             "agents/canonical/CODEX_WORKFLOW.md": (
                 "Close-Out Prohibitions\n"
                 "user-facing completion\n"
@@ -212,25 +220,43 @@ class CheckConventionComplianceTest(unittest.TestCase):
             ),
             "agents/workflows/hypothesis-validation-workflow.md": (
                 "scan_code_dependencies.sh\n"
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
             ),
             "agents/workflows/comprehensive-refactoring-workflow.md": (
                 "analyze_oop_readability.py check_convention_compliance.py\n"
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
             ),
             "agents/workflows/adaptive-improvement-workflow.md": (
                 "evaluate_skill_workflow_prompts.py check_convention_compliance.py\n"
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+            ),
+            "agents/workflows/agent-canon-pr-workflow.md": (
+                "check_github_workflows.py\n"
+                "Before closeout, run "
+                "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
             ),
             "tools/ci/run_all_checks.sh": (
-                "check_hardcoded_numbers.py check_convention_compliance.py\n"
+                "check_hardcoded_numbers.py check_static_any.py "
+                "check_log_helper_names.py check_convention_compliance.py "
+                "check_tool_catalog.py check_tool_convention_drift.py "
+                "check_github_workflows.py\n"
             ),
         }
         tools = [
             "run_repo_dependency_review.sh",
             "scan_code_dependencies.sh",
             "check_hardcoded_numbers.py",
+            "check_static_any.py",
+            "check_log_helper_names.py",
             "analyze_oop_readability.py",
             "evaluate_skill_workflow_prompts.py",
             "evaluate_agent_run.py",
             "check_convention_compliance.py",
+            "check_tool_catalog.py",
+            "check_tool_convention_drift.py",
         ]
         for path, text in files.items():
             target = root / path
@@ -240,6 +266,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target = root / "tools" / "agent_tools" / tool
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        github_checker = root / "tools" / "ci" / "check_github_workflows.py"
+        github_checker.parent.mkdir(parents=True, exist_ok=True)
+        github_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

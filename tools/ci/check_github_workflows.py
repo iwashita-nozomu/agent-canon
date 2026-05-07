@@ -2,6 +2,15 @@
 # responsibility Checks GitHub workflow, PR template, and Copilot runtime conventions.
 # upstream design ../../agents/workflows/github-copilot-workflow.md GitHub Actions rules
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream design ../../README.md AgentCanon surface index
+# upstream design ../../.github/AGENTS.md GitHub agent entrypoint
+# upstream design ../../.github/copilot-instructions.md Copilot instruction surface
+# upstream design ../../.github/instructions/pr-processing.instructions.md PR processing surface
+# upstream design ../../.github/agents/pr-maintainer.md PR maintainer surface
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
+# upstream design ../../.github/workflows/agent-coordination.yml workflow source
+# upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
 
@@ -17,6 +26,20 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+
+HELPER_PATHS = (
+    ".github/scripts/checkout_agent_canon_submodule.sh",
+    "tools/ci/checkout_agent_canon_submodule.sh",
+)
+AGENT_CANON_CREDENTIALS = (
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+)
+
+
+def is_template_or_derived_repo(root: Path) -> bool:
+    """Return whether root is a template or derived repo with AgentCanon vendored."""
+    return (root / "vendor" / "agent-canon").exists() and (root / ".gitmodules").is_file()
 
 
 @dataclass(frozen=True)
@@ -80,16 +103,35 @@ def workflow_paths(root: Path) -> list[Path]:
     return paths
 
 
-def checkout_steps(workflow: dict[str, object]) -> list[dict[str, object]]:
-    """Return every actions/checkout step in one workflow."""
-    steps: list[dict[str, object]] = []
+@dataclass(frozen=True)
+class StepContext:
+    """One workflow step with inherited job context."""
+
+    index: int
+    job_name: str
+    job: dict[str, object]
+    step: dict[str, object]
+
+
+def job_items(workflow: dict[str, object]) -> list[tuple[str, dict[str, object]]]:
+    """Return workflow jobs as string-keyed dictionaries."""
+    items: list[tuple[str, dict[str, object]]] = []
     jobs = as_string_dict(workflow.get("jobs"))
     if jobs is None:
-        return steps
-    for job_object in jobs.values():
+        return items
+    for job_name, job_object in jobs.items():
         job = as_string_dict(job_object)
         if job is None:
             continue
+        items.append((job_name, job))
+    return items
+
+
+def step_contexts(workflow: dict[str, object]) -> list[StepContext]:
+    """Return every workflow step with job context."""
+    contexts: list[StepContext] = []
+    index = 0
+    for job_name, job in job_items(workflow):
         job_steps = job.get("steps")
         if not isinstance(job_steps, list):
             continue
@@ -97,33 +139,89 @@ def checkout_steps(workflow: dict[str, object]) -> list[dict[str, object]]:
             step = as_string_dict(step_object)
             if step is None:
                 continue
-            uses = step.get("uses")
-            if isinstance(uses, str) and uses.startswith("actions/checkout@"):
-                steps.append(step)
+            index += 1
+            contexts.append(
+                StepContext(index=index, job_name=job_name, job=job, step=step)
+            )
+    return contexts
+
+
+def checkout_steps(workflow: dict[str, object]) -> list[StepContext]:
+    """Return every actions/checkout step in one workflow."""
+    steps: list[StepContext] = []
+    for context in step_contexts(workflow):
+        uses = context.step.get("uses")
+        if isinstance(uses, str) and uses.startswith("actions/checkout@"):
+            steps.append(context)
     return steps
 
 
-def check_workflow(path: Path) -> list[Finding]:
+def has_permissions(workflow: dict[str, object]) -> bool:
+    """Return whether permissions are declared at workflow or every job level."""
+    if "permissions" in workflow:
+        return True
+    jobs = job_items(workflow)
+    return bool(jobs) and all("permissions" in job for _job_name, job in jobs)
+
+
+def has_credential_env(
+    workflow: dict[str, object],
+    context: StepContext,
+) -> bool:
+    """Return whether a helper step receives AgentCanon credentials."""
+    env_values: list[object] = []
+    for source in (workflow, context.job, context.step):
+        env = as_string_dict(source.get("env"))
+        if env is not None:
+            env_values.extend(env.keys())
+    return any(name in env_values for name in AGENT_CANON_CREDENTIALS)
+
+
+def helper_steps(workflow: dict[str, object]) -> list[StepContext]:
+    """Return steps that invoke the AgentCanon checkout helper."""
+    steps: list[StepContext] = []
+    for context in step_contexts(workflow):
+        run = context.step.get("run")
+        if isinstance(run, str) and any(path in run for path in HELPER_PATHS):
+            steps.append(context)
+    return steps
+
+
+def referenced_helper_exists(root: Path, workflow_text: str) -> bool:
+    """Return whether at least one helper path referenced by the workflow exists."""
+    return any(path in workflow_text and (root / path).is_file() for path in HELPER_PATHS)
+
+
+def check_workflow(root: Path, path: Path) -> list[Finding]:
     """Check one GitHub Actions workflow."""
     workflow = load_workflow(path)
     workflow_text = read_text(path)
     findings: list[Finding] = []
-    if "permissions" not in workflow:
-        findings.append(Finding("error", path, "missing_top_level_permissions"))
+    if not has_permissions(workflow):
+        findings.append(Finding("error", path, "missing_permissions"))
     if "concurrency" not in workflow:
         findings.append(Finding("warning", path, "missing_top_level_concurrency"))
 
     checkouts = checkout_steps(workflow)
-    if checkouts and ".github/scripts/checkout_agent_canon_submodule.sh" not in workflow_text:
+    helpers = helper_steps(workflow)
+    if checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if checkouts and (
-        "AGENT_CANON_REPO_TOKEN" not in workflow_text
-        and "AGENT_CANON_REPO_SSH_KEY" not in workflow_text
-    ):
+    if checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
         findings.append(Finding("error", path, "missing_agent_canon_repo_credential_env"))
+    if helpers and not referenced_helper_exists(root, workflow_text):
+        findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
+    for helper_index, context in enumerate(helpers, start=1):
+        if not has_credential_env(workflow, context):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"checkout_helper_{helper_index}_missing_agent_canon_repo_credential_env",
+                )
+            )
 
-    for index, step in enumerate(checkouts, start=1):
-        with_block = as_string_dict(step.get("with"))
+    for index, context in enumerate(checkouts, start=1):
+        with_block = as_string_dict(context.step.get("with"))
         if with_block is None:
             findings.append(
                 Finding("error", path, f"checkout_{index}_missing_with_block")
@@ -190,7 +288,7 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
 
 def check_pr_templates(root: Path) -> list[Finding]:
     """Check PR template evidence fields."""
-    template_mode = (root / "vendor" / "agent-canon").exists()
+    template_mode = is_template_or_derived_repo(root)
     if template_mode:
         checks = {
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
@@ -230,7 +328,7 @@ def check_pr_templates(root: Path) -> list[Finding]:
 def check_copilot_surfaces(root: Path) -> list[Finding]:
     """Check Copilot and PR-template discovery surfaces."""
     readme_path = root / "README.md"
-    template_mode = (root / "vendor" / "agent-canon").exists()
+    template_mode = is_template_or_derived_repo(root)
     if template_mode:
         readme_path = root / "vendor" / "agent-canon" / "README.md"
     findings = [
@@ -299,16 +397,42 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
         )
     return findings
 
+
+def check_pr_flow_docs(root: Path) -> list[Finding]:
+    """Check that PR flow docs route standalone and template PRs separately."""
+    workflow_path = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+    template_mode = is_template_or_derived_repo(root)
+    if template_mode:
+        workflow_path = (
+            root
+            / "vendor"
+            / "agent-canon"
+            / "agents"
+            / "workflows"
+            / "agent-canon-pr-workflow.md"
+        )
+    return require_text(
+        workflow_path,
+        [
+            "standalone AgentCanon repo",
+            "`.github/PULL_REQUEST_TEMPLATE.md`",
+            "template / derived repo",
+            "`.github/PULL_REQUEST_TEMPLATE/agent_canon.md`",
+        ],
+    )
+
+
 def run(root: Path) -> int:
     """Run all checks and print a compact status report."""
     root = root.resolve()
     findings: list[Finding] = []
     workflows = workflow_paths(root)
     for path in workflows:
-        findings.extend(check_workflow(path))
+        findings.extend(check_workflow(root, path))
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_copilot_surfaces(root))
+    findings.extend(check_pr_flow_docs(root))
 
     errors = [finding for finding in findings if finding.severity == "error"]
     warnings = [finding for finding in findings if finding.severity == "warning"]

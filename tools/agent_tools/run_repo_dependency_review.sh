@@ -2,9 +2,14 @@
 # @dependency-start
 # responsibility Runs repo dependency review agent workflow automation.
 # upstream design ../../documents/dependency-manifest-design.md dependency review policy
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
+# upstream design ../../agents/templates/closeout_gate.md closeout dependency evidence gate
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist
+# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR dependency checklist
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates repo-wide dependency graph
+# downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail

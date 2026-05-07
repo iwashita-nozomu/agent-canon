@@ -2,16 +2,29 @@
 @dependency-start
 responsibility Documents ツール入口 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+downstream implementation ../../tools/agent_tools/check_tool_catalog.py validates catalog/docs consistency
+downstream implementation ../../tools/agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
 @dependency-end
 -->
 
 # ツール入口
 
 このディレクトリは、repo で使う補助ツールの入口です。
-詳細な台帳を別 file に分けず、この文書に残すべき実行導線だけを整理します。
+詳細な機械可読台帳は `tools/catalog.yaml` を正本にし、この文書では
+root 側からよく使う実行導線だけを整理します。
 
 agent/worktree helper、review / validation runner、docs-check helper、container runtime helper、experiment scaffold / registry helper のうち shared canon に属するものは `vendor/agent-canon/` が正本です。
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
+
+## AgentCanon Tool Catalog
+
+- `tools/catalog.yaml`
+  - canonical tool、compatibility wrapper、legacy provenance の構造化カタログです。
+- `tools/agent_tools/check_tool_catalog.py`
+  - catalog の schema、path、docs/tests、default wiring、legacy provenance 制約を検査します。
+- `tools/agent_tools/check_tool_convention_drift.py`
+  - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
 
 ## 置き場所の固定ルール
 
@@ -145,6 +158,10 @@ python3 tools/agent_tools/oop_rule_inventory.py --format markdown
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/check_convention_compliance.py`
   - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
+- `tools/agent_tools/check_tool_catalog.py`
+  - `tools/catalog.yaml` の構造、default wiring、docs/tests、legacy provenance を検査します。
+- `tools/agent_tools/check_tool_convention_drift.py`
+  - GitHub PR flow、AgentCanon PR check、dependency review、convention compliance、tool catalog の dependency-header trace を検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/check_static_any.py`

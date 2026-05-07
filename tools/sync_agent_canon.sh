@@ -21,6 +21,9 @@
 # downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
 # downstream implementation ../tests/agent_tools/test_check_algorithm_module_nested_contract.py root symlink view
 # downstream implementation ../tests/agent_tools/test_check_log_helper_names.py root symlink view
+# downstream implementation ../tests/agent_tools/test_check_tool_catalog.py root symlink view
+# downstream implementation ../tests/agent_tools/test_check_tool_convention_drift.py root symlink view
+# downstream implementation ../tests/agent_tools/test_oop_rule_inventory.py root symlink view
 # downstream implementation ../tests/agent_tools/test_compare_codex_token_footprints.py root symlink view
 # downstream implementation ../tests/tools/test_result_log_tools.py root symlink view
 # downstream implementation ../tests/tools/test_update_latest_result.py root symlink view
@@ -259,6 +262,9 @@ notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
 tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
+tests/agent_tools/test_check_tool_catalog.py:../../${PREFIX}/tests/agent_tools/test_check_tool_catalog.py
+tests/agent_tools/test_check_tool_convention_drift.py:../../${PREFIX}/tests/agent_tools/test_check_tool_convention_drift.py
+tests/agent_tools/test_oop_rule_inventory.py:../../${PREFIX}/tests/agent_tools/test_oop_rule_inventory.py
 tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_public_surface.py
 tests/agent_tools/test_check_convention_compliance.py:../../${PREFIX}/tests/agent_tools/test_check_convention_compliance.py
 tests/agent_tools/test_check_hardcoded_numbers.py:../../${PREFIX}/tests/agent_tools/test_check_hardcoded_numbers.py

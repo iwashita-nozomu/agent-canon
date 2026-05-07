@@ -2,8 +2,10 @@
 @dependency-start
 responsibility Records imported repo-local tools and their canonical disposition.
 upstream design tools/README.md defines shared tool families
+upstream design ../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design result-log-retention-and-visualization.md defines result tooling policy
 downstream design tools/README.md lists canonical and legacy tool locations
+downstream implementation ../tools/agent_tools/check_tool_catalog.py validates legacy catalog status
 @dependency-end
 -->
 
@@ -22,6 +24,16 @@ instead of direct updates.
 - `/mnt/l/workspace/test2`
 
 The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
+
+## Ledger Versus Catalog
+
+This document is the historical import-disposition ledger. The live
+machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
+`check_tool_catalog.py` and cross-checked by `check_tool_convention_drift.py`.
+When a tool is promoted, preserved as Legacy provenance, or converted into a
+compatibility wrapper, update both this ledger and the corresponding catalog
+entry. Do not treat update-route legacy subtree wording as the same status as
+`legacy_provenance` tool imports.
 
 ## Promoted To Canonical Tool Families
 
@@ -65,6 +77,9 @@ need separate review before becoming defaults.
 OOP / convention-check legacy support now lives under
 `tools/legacy/jax_solver_util/oop_check_support/` and is represented by the
 canonical `tools/agent_tools/oop_rule_inventory.py` inventory tool.
+The corresponding structured entries are
+`legacy-jax-solver-util-scripts` and `legacy-jax-solver-util-oop-support` in
+`tools/catalog.yaml`.
 
 Legacy provenance files are not default CI entrypoints. A future PR may promote
 one legacy tool only after it has repo-neutral paths, current dependency

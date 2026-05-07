@@ -3,6 +3,7 @@
 responsibility Indexes legacy OOP check support tools imported from jax_solver_util.
 upstream design ../README.md explains legacy import policy
 upstream design ../../../../documents/repo-local-tool-imports.md records canonical disposition
+upstream design ../../../catalog.yaml records legacy provenance status
 downstream implementation restructure_code_review_skill.py legacy review-rule restructuring provenance
 downstream implementation read_conventions.sh legacy convention listing provenance
 downstream implementation view_conventions.sh legacy convention viewer provenance
@@ -14,6 +15,10 @@ downstream implementation view_conventions.sh legacy convention viewer provenanc
 This directory keeps jax_solver_util scripts that influenced AgentCanon's OOP
 readability and convention-checking workflow. They are provenance files, not
 canonical workflow entrypoints.
+
+The structured AgentCanon tool catalog records this directory as
+`legacy-jax-solver-util-oop-support` with `status: legacy_provenance` and
+`callable_by_default: false`.
 
 Canonical replacements:
 

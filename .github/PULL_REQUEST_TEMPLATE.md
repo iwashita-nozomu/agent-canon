@@ -5,6 +5,9 @@ responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
 upstream design ../documents/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
+upstream design ../tools/catalog.yaml defines structured tool catalog
+downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
+downstream implementation ../tools/agent_tools/check_tool_convention_drift.py validates PR/tool trace contracts
 downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side AgentCanon PRs
 @dependency-end
 -->
@@ -39,8 +42,12 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - [ ] `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
+- [ ] `python3 tools/agent_tools/check_tool_catalog.py`
+- [ ] `python3 tools/agent_tools/check_tool_convention_drift.py`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
-- [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `bash .github/scripts/checkout_agent_canon_submodule.sh` instead of automatic `actions/checkout` submodules.
+- [ ] `bash tools/ci/run_docs_checks.sh`
+- [ ] `bash tools/ci/run_all_checks.sh --quick`
+- [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots, or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source, instead of automatic `actions/checkout` submodules.
 - [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or an equivalent documented GitHub App token covers private AgentCanon reads.
 - [ ] Relevant `pytest` target:
 - [ ] Relevant `pyright` / `ruff` / `bash -n` target:

@@ -3,7 +3,11 @@
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
+# upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream implementation ./check_tool_convention_drift.py validates tool/convention drift
+# downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
 """Verify that convention, workflow, and skill-routing gates are wired."""
@@ -103,6 +107,29 @@ TOOL_GATES = {
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
         ("tools/ci/run_all_checks.sh", "agents/evals/skill_workflow_prompt_eval.toml"),
+    ),
+    "tool_catalog": (
+        "tools/agent_tools/check_tool_catalog.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
+    "tool_convention_drift": (
+        "tools/agent_tools/check_tool_convention_drift.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
+    "github_workflow_pr_flow": (
+        "tools/ci/check_github_workflows.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "agents/workflows/agent-canon-pr-workflow.md",
+        ),
     ),
 }
 

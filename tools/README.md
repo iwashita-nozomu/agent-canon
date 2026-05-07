@@ -3,12 +3,36 @@
 @dependency-start
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
+downstream design catalog.yaml structured AgentCanon tool catalog
+downstream implementation agent_tools/check_tool_catalog.py validates catalog/docs consistency
+downstream implementation agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
 @dependency-end
 -->
 
 
 `tools/` は shared automation の正本です。
 agent helper、CI/check、container runner、experiment helper、Markdown 整備、validation はここに置きます。
+
+## Tool Catalog
+
+`tools/catalog.yaml` is the structured AgentCanon tool catalog. It separates
+canonical shared tools, compatibility wrappers, and legacy provenance entries
+without turning README prose into a second registry. Use it to check whether a
+tool is callable by default, wired into CI / PR validation, covered by tests, or
+preserved only for import provenance.
+
+Validation entrypoints:
+
+```bash
+python3 tools/agent_tools/check_tool_catalog.py
+python3 tools/agent_tools/check_tool_convention_drift.py
+```
+
+`check_tool_catalog.py` validates catalog shape, path existence, docs/tests,
+default wiring, and `legacy_provenance` constraints.
+`check_tool_convention_drift.py` uses dependency manifests plus the catalog to
+detect stale tool/convention links, missing required PR-flow checks, and
+Legacy/default confusion.
 
 ## 含めるもの
 
@@ -17,6 +41,8 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `oop_rule_inventory.py` は OOP policy、analyzer、reviewer、test、legacy support placement を検査し、旧 convention viewer を default workflow から切り離します。
+  - `check_tool_catalog.py` は `tools/catalog.yaml` を検査し、canonical tool、compatibility wrapper、legacy provenance の混在を止めます。
+  - `check_tool_convention_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
 - `ci/`
@@ -34,7 +60,7 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 - `experiments/`
   - topic scaffold、registry sync、managed run
 - `legacy/`
-  - imported repo-local tools kept for provenance and future promotion PRs
+  - imported repo-local tools kept for provenance and future promotion PRs. These entries must be represented in `tools/catalog.yaml` with `status: legacy_provenance` and `callable_by_default: false`.
 - `shared/`
   - shared helper
 - `validation/`
@@ -106,6 +132,7 @@ AgentCanon implementations blindly. Use this order:
 1. Preserve project-specific or stale tools under `tools/legacy/<repo-slug>/`
    with provenance and no default CI wiring.
 1. Record the disposition in `documents/repo-local-tool-imports.md`.
+1. Add or update the corresponding `tools/catalog.yaml` entry.
 
 Current promoted helpers:
 
@@ -121,7 +148,9 @@ Current promoted helpers:
 - `tools/docs/tfidf_similar_docs.py`
 
 Legacy imports live under `tools/legacy/jax_solver_util/` and are excluded from
-default workflow promises until a dedicated promotion PR modernizes them.
+default workflow promises until a dedicated promotion PR modernizes them. The
+machine-readable status is `legacy_provenance` in `tools/catalog.yaml`; do not
+use update-route legacy subtree wording for these tool provenance entries.
 OOP / convention-check support legacy files are grouped under
 `tools/legacy/jax_solver_util/oop_check_support/`; use
 `tools/agent_tools/oop_rule_inventory.py` and
@@ -294,6 +323,8 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
+- `check_tool_catalog.py` validates the structured AgentCanon tool catalog, default wiring, docs/tests, and legacy provenance constraints.
+- `check_tool_convention_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
 
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
@@ -305,6 +336,8 @@ Use code dependency evidence to understand import/include/source reachability, a
 ## Static Design Analysis Tools
 
 - `check_convention_compliance.py` aggregates convention compliance evidence. It verifies that every convention source exists, every normative convention document exposes a verification route, prohibition-bearing documents carry a prohibition section, every manifestable convention gate has a tool or prompt-eval check, every workflow calls the convention gate, workflow prohibitions remain wired, and skill-routing prompts delegate tool-covered rules to the checker.
+- `check_tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, and callable legacy provenance entries.
+- `check_tool_convention_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, and the tool catalog.
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, simple cognitive-complexity signals, mathematically redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.

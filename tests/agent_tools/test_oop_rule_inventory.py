@@ -34,7 +34,7 @@ class OopRuleInventoryTest(unittest.TestCase):
     """Exercise OOP rule inventory behavior."""
 
     def test_current_repository_passes(self) -> None:
-        """AgentCanon contains the required OOP rule and analyzer surfaces."""
+        """The AgentCanon repo contains required OOP rule and analyzer surfaces."""
         result = run_inventory(PROJECT_ROOT, "--include-legacy")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

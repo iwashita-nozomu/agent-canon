@@ -9,6 +9,9 @@
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
 # upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
+# upstream implementation ../agent_tools/check_tool_catalog.py validates structured tool catalog
+# upstream implementation ../agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
+# upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
@@ -171,6 +174,24 @@ if "$PYTHON_BIN" tools/agent_tools/check_convention_compliance.py 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/check_tool_catalog.py 2>&1; then
+  echo "✅ tool catalog checks 成功"
+else
+  echo "❌ tool catalog checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/check_tool_convention_drift.py 2>&1; then
+  echo "✅ tool/convention drift checks 成功"
+else
+  echo "❌ tool/convention drift checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
+  echo "✅ GitHub workflow / PR template checks 成功"
+else
+  echo "❌ GitHub workflow / PR template checks 失敗"
   EXIT_CODE=1
 fi
 echo ""

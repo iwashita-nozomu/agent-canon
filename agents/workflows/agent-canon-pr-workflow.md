@@ -4,6 +4,9 @@
 responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
+upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
+upstream implementation ../../tools/agent_tools/check_tool_convention_drift.py tool/convention trace gate
+upstream design ../../tools/catalog.yaml structured tool catalog
 downstream design ../../documents/agent-canon-subtree-migration.md submodule migration and legacy compatibility consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
@@ -35,7 +38,8 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - 派生 repo 由来の shared canon 差分は、まず repo 専用 proposal branch へ push して出所を分けます。
 - 派生 repo 側の local diff、proposal branch、shared canon main、派生 repo submodule pin を一連で閉じる場合は、先に `agents/workflows/derived-agent-canon-diff-workflow.md` で状態分類と closeout 順を固定します。
 - shared surface を増減したら `bash tools/sync_agent_canon.sh link-root` を同じ pass で実行します。
-- PR 前の validation は `make agent-canon-pr-check` を使います。
+- standalone AgentCanon repo では Makefile 前提を置かず、下の explicit validation commands を使います。
+- template / derived repo では `make agent-canon-pr-check` を使います。
 - `make agent-canon-pr-check` は GitHub mirror / submodule / security evidence も出します。`AGENT_CANON_GITHUB_REPO` と `TEMPLATE_GITHUB_REPO` で repository name を上書きできます。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
@@ -72,16 +76,33 @@ bash tools/sync_agent_canon.sh check
 
 4. PR 前の validation を流す
 
+standalone AgentCanon repo:
+
+```bash
+bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+python3 tools/agent_tools/check_tool_catalog.py
+python3 tools/agent_tools/check_tool_convention_drift.py
+python3 tools/ci/check_github_workflows.py
+bash tools/ci/run_docs_checks.sh
+bash tools/ci/run_all_checks.sh --quick
+```
+
+template / derived repo:
+
 ```bash
 make agent-canon-pr-check
 ```
 
-この command は次をまとめて実行します。
+`make agent-canon-pr-check` は次をまとめて実行します。
 
 - shared surface drift check
-- `make agent-checks`
-- `make docs-check`
-- `make ci-quick`
+- agent runtime checks
+- `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
+- `python3 tools/agent_tools/check_tool_catalog.py`
+- `python3 tools/agent_tools/check_tool_convention_drift.py`
+- `python3 tools/ci/check_github_workflows.py`
+- docs checks
+- quick CI
 
 5. commit を分ける
 
@@ -91,10 +112,12 @@ make agent-canon-pr-check
 
 6. PR を作る
 
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
+- standalone AgentCanon repo へ shared canon source change を出す PR では `.github/PULL_REQUEST_TEMPLATE.md` を使います。
+- template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
-- GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
-- default template PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
+- standalone AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
+- template / derived repo の AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
+- default template / repo-local PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
 
 7. merge する
 
@@ -143,11 +166,12 @@ canon. Collect them by PR with this sequence:
 1. Preserve project-specific or unsafe tools under `tools/legacy/<repo-slug>/`
    with a README and no default workflow wiring.
 1. Update `documents/repo-local-tool-imports.md`,
-   `documents/tools/README.md`, and `tools/README.md`.
+   `documents/tools/README.md`, `tools/README.md`, and `tools/catalog.yaml`.
 1. Add or update smoke tests, help checks, or static checks before wiring a new
    tool into default CI.
-1. Run `make agent-canon-pr-check` and include the import disposition table in
-   the PR body.
+1. Run the standalone explicit validation commands or `make agent-canon-pr-check`
+   in template / derived repos, and include the import disposition table in the
+   PR body.
 
 Direct updates must still leave the same evidence in the commit and run bundle.
 
@@ -178,8 +202,10 @@ Summary:
 - Advanced template submodule pin after AgentCanon main was updated.
 
 Validation:
-- make agent-canon-pr-check: pass
 - bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing: pass
+- python3 tools/agent_tools/check_tool_catalog.py: pass
+- python3 tools/agent_tools/check_tool_convention_drift.py: pass
+- python3 tools/ci/check_github_workflows.py: pass
 - make ci: pass
 
 Propagation:
@@ -224,7 +250,7 @@ Validation:
 
 次をすべて満たしたときだけ shared canon PR を完了扱いにします。
 
-- `make agent-canon-pr-check` が pass
+- standalone AgentCanon repo では explicit validation commands が pass、template / derived repo では `make agent-canon-pr-check` が pass
 - root shared surface が `bash tools/sync_agent_canon.sh check` で clean
 - PR 本文に changed surface と validation が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態が記録されている
@@ -250,7 +276,7 @@ gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
 
 - root 側の symlink view を直接編集して shared canon 変更を close してはいけません。
 - shared canon 変更を repo-local implementation change と同じ PR に混ぜてはいけません。
-- `make agent-canon-pr-check` を省略して PR を close してはいけません。
+- standalone AgentCanon repo では explicit validation commands、template / derived repo では `make agent-canon-pr-check` を省略して PR を close してはいけません。
 - `vendor/agent-canon/` の構成変更を file 単位の拾い直しで `main` に戻してはいけません。
 - template `main` merge 後に upstream `agent-canon` sync の有無を曖昧なままにしてはいけません。
 

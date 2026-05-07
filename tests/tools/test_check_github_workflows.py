@@ -115,30 +115,184 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def write_valid_workflow(self, root: Path) -> None:
+    def test_job_level_permissions_are_accepted(self) -> None:
+        """Workflow permissions may be declared on every job."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root, top_permissions=False, job_permissions=True)
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_missing_referenced_helper_path_fails(self) -> None:
+        """Standalone workflows must reference an available checkout helper."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root, helper_fallback=False)
+            self.copy_required_surfaces(root)
+            (root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh").unlink()
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_referenced_agent_canon_checkout_helper", result.stdout)
+
+    def test_helper_step_requires_credential_env(self) -> None:
+        """Checkout helper steps need token or SSH credential context."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root, helper_env=False)
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "checkout_helper_1_missing_agent_canon_repo_credential_env",
+                result.stdout,
+            )
+
+    def test_pr_flow_requires_separate_standalone_and_template_templates(self) -> None:
+        """Ensure PR workflow does not route all PRs to one template."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            workflow_path = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+            workflow_path.write_text(
+                "6. PR を作る\n\n"
+                "- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:standalone AgentCanon repo", result.stdout)
+            self.assertIn("missing_text:template / derived repo", result.stdout)
+
+    def test_vendor_path_without_gitmodules_uses_standalone_mode(self) -> None:
+        """A vendor path alone must not trigger template-mode checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            (root / "vendor" / "agent-canon").mkdir(parents=True)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_template_mode_requires_template_agent_canon_template(self) -> None:
+        """A real template root must keep the template-side AgentCanon PR template."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            (root / ".gitmodules").write_text(
+                "[submodule \"vendor/agent-canon\"]\n"
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "path=.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+                result.stdout,
+            )
+
+    def write_valid_workflow(
+        self,
+        root: Path,
+        *,
+        top_permissions: bool = True,
+        job_permissions: bool = False,
+        helper_env: bool = True,
+        helper_fallback: bool = True,
+    ) -> None:
         """Write one minimal valid workflow."""
         workflow_dir = root / ".github" / "workflows"
         workflow_dir.mkdir(parents=True, exist_ok=True)
+        permissions = "permissions:\n  contents: read\n" if top_permissions else ""
+        job_permission_block = (
+            "    permissions:\n"
+            "      contents: read\n"
+            if job_permissions
+            else ""
+        )
+        env_block = (
+            "        env:\n"
+            "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
+            "          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}\n"
+            if helper_env
+            else ""
+        )
+        helper_command = (
+            "        run: |\n"
+            "          if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then\n"
+            "            bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+            "          else\n"
+            "            bash tools/ci/checkout_agent_canon_submodule.sh\n"
+            "          fi\n"
+            if helper_fallback
+            else "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+        )
         (workflow_dir / "ci.yml").write_text(
             "name: CI\n"
-            "on: [push]\n"
-            "permissions:\n"
-            "  contents: read\n"
-            "concurrency:\n"
-            "  group: ci-${{ github.ref }}\n"
-            "jobs:\n"
-            "  test:\n"
-            "    runs-on: ubuntu-latest\n"
-            "    steps:\n"
-            "      - uses: actions/checkout@v4\n"
-            "        with:\n"
-            "          submodules: false\n"
-            "          persist-credentials: false\n"
+            + "on: [push]\n"
+            + permissions
+            + "concurrency:\n"
+            + "  group: ci-${{ github.ref }}\n"
+            + "jobs:\n"
+            + "  test:\n"
+            + job_permission_block
+            + "    runs-on: ubuntu-latest\n"
+            + "    steps:\n"
+            + "      - uses: actions/checkout@v4\n"
+            + "        with:\n"
+            + "          submodules: false\n"
+            + "          persist-credentials: false\n"
             + "      - name: Checkout AgentCanon submodule\n"
-            + "        env:\n"
-            + "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
-            + "          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}\n"
-            + "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n",
+            + env_block
+            + helper_command,
             encoding="utf-8",
         )
 
@@ -151,6 +305,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/agents/pr-maintainer.md",
             ".github/scripts/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
+            "agents/workflows/agent-canon-pr-workflow.md",
             "README.md",
         ]:
             source = REPO_ROOT / relative
@@ -160,6 +315,21 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ):
                 source = REPO_ROOT / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
             destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_symlink():
+                source = source.resolve()
+            shutil.copy2(source, destination)
+
+    def copy_vendor_surfaces(self, root: Path) -> None:
+        """Copy minimal vendor surfaces required by template-mode checks."""
+        for relative in [
+            "README.md",
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            "agents/workflows/agent-canon-pr-workflow.md",
+            ".github/workflows/agent-coordination.yml",
+        ]:
+            source = REPO_ROOT / relative
+            destination = root / "vendor" / "agent-canon" / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             if source.is_symlink():
                 source = source.resolve()

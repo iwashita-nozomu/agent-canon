@@ -128,6 +128,9 @@ root では次を symlink view として扱います。
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_check_agent_runtime_alignment.py`
 - `tests/agent_tools/test_analyze_refactor_surface.py`
+- `tests/agent_tools/test_check_tool_catalog.py`
+- `tests/agent_tools/test_check_tool_convention_drift.py`
+- `tests/agent_tools/test_oop_rule_inventory.py`
 - `tests/agent_tools/test_check_mcp_inventory.py`
 - `tests/agent_tools/test_work_log.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
