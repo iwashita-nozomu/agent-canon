@@ -4,6 +4,7 @@
 responsibility Documents the GitHub Copilot workflow for repository and AgentCanon tasks.
 upstream design ../canonical/CLI_ENTRYPOINTS.md defines runtime entrypoints
 upstream design agent-canon-pr-workflow.md defines shared canon PR discipline
+upstream design ../../documents/github-copilot-configuration.md Copilot configuration catalog
 downstream design ../../.github/copilot-instructions.md consumes Copilot workflow
 downstream design ../workflows/README.md indexes workflow routing
 @dependency-end
@@ -18,6 +19,7 @@ context rather than a prepared local run bundle.
 1. Read `.github/copilot-instructions.md`.
 1. Read `.github/instructions/pr-processing.instructions.md` when available.
 1. Read `AGENTS.md`.
+1. Read `documents/github-copilot-configuration.md`.
 1. Read `agents/README.md`.
 1. Read `documents/README.md`.
 1. If the task touches shared AgentCanon surfaces, read
@@ -36,8 +38,22 @@ context rather than a prepared local run bundle.
   review.
 - `.github/agents/pr-maintainer.md` is the optional custom agent profile for
   PR maintenance and check-failure triage.
+- `documents/github-copilot-configuration.md` is the catalog for GitHub
+  Copilot settings, custom agent frontmatter, MCP placement, Copilot setup
+  workflows, and PR-template routing.
 - Keep these surfaces synchronized through AgentCanon. Do not add one-off
   Copilot rules in derived repos unless the rule is truly repo-local.
+
+## Plan Mode And Multi-Agent Routing
+
+- Use Plan mode before non-trivial GitHub Actions, Copilot settings, PR
+  templates, AgentCanon sync, or multi-file runtime-surface changes.
+- Codex uses `/plan` when available. If a GitHub Copilot surface lacks an
+  explicit Plan mode command, write the plan in the issue, PR body, or PR
+  comment before editing.
+- Use custom agents or subagents for bounded sidecar work such as PR triage,
+  existing-surface survey, or adversarial test design. Keep implementation
+  ownership clear and do not let a triage agent become the closeout authority.
 
 ## Operating Rules
 
@@ -147,6 +163,9 @@ Use this order when Copilot reports a PR processing error:
   `.github/PULL_REQUEST_TEMPLATE.md`.
 - If a PR changes Copilot instructions, include the expected read packet and
   the validation command in the PR body.
+- If a PR changes Copilot settings, custom agents, MCP, setup workflows, or PR
+  templates, include `documents/github-copilot-configuration.md`, Plan Mode
+  Evidence, and Copilot Configuration Impact in the PR body.
 
 ## Closeout
 

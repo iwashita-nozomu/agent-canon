@@ -2,7 +2,8 @@
 
 # @dependency-start
 # responsibility Tests OOP readability analyzer behavior.
-# upstream implementation ../../tools/agent_tools/analyze_oop_readability.py analyzer
+# upstream implementation ../../tools/oop/python/readability.py Python analyzer
+# upstream implementation ../../tools/oop/cpp/readability.py C++ analyzer
 # upstream design ../../documents/object-oriented-design.md OOP boundary policy
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md OOP gate
 # @dependency-end
@@ -17,7 +18,8 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ANALYZER = PROJECT_ROOT / "tools" / "agent_tools" / "analyze_oop_readability.py"
+PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "python" / "readability.py"
+CPP_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "cpp" / "readability.py"
 
 
 class AnalyzeOopReadabilityTest(unittest.TestCase):
@@ -26,7 +28,17 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
     def run_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the analyzer against a temporary root."""
         return subprocess.run(
-            [sys.executable, str(ANALYZER), "--root", str(root), *args],
+            [sys.executable, str(PYTHON_ANALYZER), "--root", str(root), *args],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def run_cpp_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        """Run the C++ analyzer against a temporary root."""
+        return subprocess.run(
+            [sys.executable, str(CPP_ANALYZER), "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -344,7 +356,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cpp:warn:vague_class_name:SolverManager", result.stdout)
@@ -371,7 +383,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -405,7 +417,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("FixtureInput", result.stdout)
@@ -433,7 +445,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -458,7 +470,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -483,7 +495,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("function_lines:scenario", result.stdout)
@@ -508,7 +520,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(
+            result = self.run_cpp_analyzer(
                 root,
                 "--min-score",
                 "100",
@@ -541,7 +553,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("state_heavy_public_surface:RealInput", result.stdout)
@@ -598,7 +610,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_analyzer(root, "--min-score", "100", str(source))
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(

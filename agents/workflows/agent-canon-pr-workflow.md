@@ -5,7 +5,7 @@ responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
-upstream implementation ../../tools/agent_tools/check_tool_convention_drift.py tool/convention trace gate
+upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
 upstream design ../../tools/catalog.yaml structured tool catalog
 downstream design ../../documents/agent-canon-subtree-migration.md submodule migration and legacy compatibility consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
@@ -45,6 +45,22 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
 
+## Freshness Gate Route
+
+`check_agent_canon_latest.sh` や `make agent-canon-pr-check` が dirty shared-canon 差分を理由に止まった場合、その失敗は「pin を更新して消す」合図ではなく、PR-first route へ入る合図です。
+
+扱いは次の順に固定します。
+
+1. `vendor/agent-canon/` の shared canon 差分を dedicated branch / commit に分ける
+1. 派生 repo 起点なら `bash tools/update_agent_canon.sh push-proposal` で proposal branch へ push する
+1. standalone AgentCanon repo へ PR を作り、merge する
+1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行する
+1. `bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` を通す
+1. parent gitlink / root shared surface commit を AgentCanon source PR とは別に作る
+
+pre-merge の AgentCanon source PR では、standalone validation command を正本にします。
+post-merge の template / derived pin PR では、`make agent-canon-pr-check` が pass することを正本にします。
+
 ## Branch ルール
 
 - branch 名は `canon/<topic>-YYYYMMDD` を使います。
@@ -80,8 +96,8 @@ standalone AgentCanon repo:
 
 ```bash
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
-python3 tools/agent_tools/check_tool_catalog.py
-python3 tools/agent_tools/check_tool_convention_drift.py
+python3 tools/agent_tools/tool_catalog.py
+python3 tools/agent_tools/tool_drift.py
 python3 tools/ci/check_github_workflows.py
 bash tools/ci/run_docs_checks.sh
 bash tools/ci/run_all_checks.sh --quick
@@ -93,13 +109,16 @@ template / derived repo:
 make agent-canon-pr-check
 ```
 
+template / derived repo でこの段階の `make agent-canon-pr-check` が `AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest` を出した場合は、failure を PR-first handoff evidence として扱います。
+そのまま pin を戻したり `sync_agent_canon.sh push` で bypass せず、AgentCanon PR / proposal merge 後にこの check を再実行します。
+
 `make agent-canon-pr-check` は次をまとめて実行します。
 
 - shared surface drift check
 - agent runtime checks
 - `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
-- `python3 tools/agent_tools/check_tool_catalog.py`
-- `python3 tools/agent_tools/check_tool_convention_drift.py`
+- `python3 tools/agent_tools/tool_catalog.py`
+- `python3 tools/agent_tools/tool_drift.py`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI
@@ -162,11 +181,14 @@ canon. Collect them by PR with this sequence:
    canonical tools with stale repo-local copies.
 1. Promote repo-neutral tools into the nearest canonical family under
    `tools/agent_tools/`, `tools/ci/`, `tools/docs/`, `tools/data/`,
-   `tools/hlo/`, `tools/audit/`, `tools/experiments/`, or `tools/validation/`.
-1. Preserve project-specific or unsafe tools under `tools/legacy/<repo-slug>/`
-   with a README and no default workflow wiring.
+   `tools/hlo/`, `tools/audit/`, `tools/experiments/`, `tools/oop/`, or
+   `tools/validation/`.
+1. Keep project-specific or unsafe tools in the derived source repository, or
+   delete them after review. Do not create new `tools/legacy/` paths in
+   AgentCanon.
 1. Update `documents/repo-local-tool-imports.md`,
-   `documents/tools/README.md`, `tools/README.md`, and `tools/catalog.yaml`.
+   `documents/tools/README.md`, `documents/tools/tool-docs.toml`,
+   `tools/README.md`, and `tools/catalog.yaml`.
 1. Add or update smoke tests, help checks, or static checks before wiring a new
    tool into default CI.
 1. Run the standalone explicit validation commands or `make agent-canon-pr-check`
@@ -203,8 +225,8 @@ Summary:
 
 Validation:
 - bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing: pass
-- python3 tools/agent_tools/check_tool_catalog.py: pass
-- python3 tools/agent_tools/check_tool_convention_drift.py: pass
+- python3 tools/agent_tools/tool_catalog.py: pass
+- python3 tools/agent_tools/tool_drift.py: pass
 - python3 tools/ci/check_github_workflows.py: pass
 - make ci: pass
 
@@ -278,7 +300,7 @@ gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
 - shared canon 変更を repo-local implementation change と同じ PR に混ぜてはいけません。
 - standalone AgentCanon repo では explicit validation commands、template / derived repo では `make agent-canon-pr-check` を省略して PR を close してはいけません。
 - `vendor/agent-canon/` の構成変更を file 単位の拾い直しで `main` に戻してはいけません。
-- template `main` merge 後に upstream `agent-canon` sync の有無を曖昧なままにしてはいけません。
+- template `main` merge 後に AgentCanon PR / merge と template pin 更新の対応を曖昧なままにしてはいけません。
 
 ## 使う入口
 

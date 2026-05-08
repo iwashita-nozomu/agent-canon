@@ -3,8 +3,8 @@
 responsibility Documents ツール入口 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-downstream implementation ../../tools/agent_tools/check_tool_catalog.py validates catalog/docs consistency
-downstream implementation ../../tools/agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
+downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
+downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
 @dependency-end
 -->
 
@@ -20,11 +20,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 ## AgentCanon Tool Catalog
 
 - `tools/catalog.yaml`
-  - canonical tool、compatibility wrapper、legacy provenance の構造化カタログです。
-- `tools/agent_tools/check_tool_catalog.py`
-  - catalog の schema、path、docs/tests、default wiring、legacy provenance 制約を検査します。
-- `tools/agent_tools/check_tool_convention_drift.py`
+  - canonical tool と compatibility wrapper の構造化カタログです。
+- `tools/agent_tools/tool_catalog.py`
+  - catalog の schema、path、説明、docs/tests、default wiring、retired legacy 混入を検査し、`--format markdown` で対応表を出します。
+- `tools/agent_tools/tool_drift.py`
   - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
+- `documents/tools/tool-docs.toml`
+  - tool 実装と説明文書を一対一で対応させる機械可読 map です。`tool` と `doc` は同じ basename にし、`tool_catalog.py` が path、dependency header、catalog docs wiring を検査します。
 
 ## 置き場所の固定ルール
 
@@ -32,6 +34,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - repo-local bootstrap の実装は `scripts/` に置きます。
 - agent helper、CI、review、validation、container runner、experiment helper、Markdown helper は `tools/` に置きます。
 - template 固有の slug 置換や bare remote 初期化だけを `scripts/` に置きます。
+- 過去の `tools/legacy/` 配置は廃止済みです。派生 repo 由来の tool は repo-neutral に昇格するか、元 repo 側に残すか、削除判断を `documents/repo-local-tool-imports.md` に記録します。
 
 ## よく使うもの
 
@@ -43,6 +46,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - repo-wide の Markdown 体裁とリンク監査をまとめて実行します。
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
+- `tools/ci/container_config.py`
+  - Dockerfile、runtime pack、devcontainer 生成導線の静的整合を検査します。standalone AgentCanon source で `docker/` と `.devcontainer/` が無い場合は skip します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -91,15 +96,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - HLO JSONL から dialect、tag、operation count の summary JSON を出します。
 - `tools/audit/audit_logger.py`
   - agent / repo automation event を JSONL audit log として保存します。
-- `tools/legacy/<repo-slug>/`
-  - 派生 repo 由来の未昇格 tool を provenance として保持します。default CI / workflow からは呼びません。
 - `tools/worktree_start.sh`
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
   - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-update` で適用します。
   - legacy subtree / snapshot route は移行互換のためだけに残し、submodule 化済み repo の通常 path にはしません。
   - source repo が設定されている場合は `refresh-remote -> ensure-latest` の順に進みます。source repo が missing / dirty なら fail-closed で止めます。
-  - 派生 repo 側の shared canon 差分を upstream に渡す場合は `make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` で proposal branch へ push します。
+  - 派生 repo 側の shared canon 差分を upstream に渡す場合は `make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` で proposal branch へ push します。AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰ります。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、local bare mirror SHA、submodule pin を PR 本文に残します。
 - `tools/sync_agent_canon.sh`
   - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の `make agent-canon-ensure-latest`、root view 修復の `make agent-canon-links`、drift check の `make agent-canon-check` 経由で使います。
@@ -134,14 +137,21 @@ make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>"
 bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id> --submodule-aware
 ```
 
-- `tools/agent_tools/oop_rule_inventory.py`
-  - OOP policy、analyzer、reviewer、test、legacy support placement を machine-readable に確認します。
-  - jax_solver_util 由来の旧 convention viewer は `tools/legacy/jax_solver_util/oop_check_support/` に provenance として隔離し、default workflow ではこの inventory と `analyze_oop_readability.py` を使います。
+- `tools/oop/python/readability.py`
+  - Python source の OOP readability を機械判定します。説明文書は同名の `documents/tools/oop/python/readability.md` です。
+- `tools/oop/python/rule_inventory.py`
+  - Python OOP policy、checker、reviewer、test、説明文書の配置を確認します。説明文書は同名の `documents/tools/oop/python/rule_inventory.md` です。
+- `tools/oop/cpp/readability.py`
+  - C / C++ source の OOP readability を機械判定します。説明文書は同名の `documents/tools/oop/cpp/readability.md` です。
+- `tools/oop/cpp/rule_inventory.py`
+  - C++ OOP policy、checker、reviewer、test、説明文書の配置を確認します。説明文書は同名の `documents/tools/oop/cpp/rule_inventory.md` です。
   - 例:
 
 ```bash
-python3 tools/agent_tools/oop_rule_inventory.py --include-legacy
-python3 tools/agent_tools/oop_rule_inventory.py --format markdown
+python3 tools/oop/python/readability.py --format markdown python tools tests
+python3 tools/oop/python/rule_inventory.py --format markdown
+python3 tools/oop/cpp/readability.py --format markdown include src tests/cpp
+python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
 - Codex `goals` feature
@@ -158,9 +168,9 @@ python3 tools/agent_tools/oop_rule_inventory.py --format markdown
   - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
 - `tools/agent_tools/check_convention_compliance.py`
   - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
-- `tools/agent_tools/check_tool_catalog.py`
-  - `tools/catalog.yaml` の構造、default wiring、docs/tests、legacy provenance を検査します。
-- `tools/agent_tools/check_tool_convention_drift.py`
+- `tools/agent_tools/tool_catalog.py`
+  - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
+- `tools/agent_tools/tool_drift.py`
   - GitHub PR flow、AgentCanon PR check、dependency review、convention compliance、tool catalog の dependency-header trace を検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
@@ -168,8 +178,8 @@ python3 tools/agent_tools/oop_rule_inventory.py --format markdown
   - Python source の明示的な `typing.Any` を検出します。`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にし、外部境界は `object`、`Mapping[str, object]`、`TypedDict`、または typed dataclass に寄せます。
 - `tools/agent_tools/check_log_helper_names.py`
   - Python source のログ用 helper 関数名を検出します。ログを書き出す、emit する、保存する、整形する helper は `_log` から始め、`write_log_*` や `append_log_*` のような prefix を fail にします。
-- `tools/agent_tools/analyze_oop_readability.py`
-  - Python / C++ の OOP readability を機械判定します。外部 repo、bare 展開、派生 template worktree を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
+- `tools/oop/python/readability.py` / `tools/oop/cpp/readability.py`
+  - Python と C/C++ の OOP readability を言語別 entrypoint で機械判定します。外部 repo、bare 展開、派生 template worktree を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
 - `tools/agent_tools/check_algorithm_module_public_surface.py`
   - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
 - `tools/agent_tools/check_algorithm_module_nested_contract.py`

@@ -148,7 +148,7 @@ check_repo_local_venv_policy() {
 
   while IFS= read -r match_file; do
     case "$match_file" in
-      tools/legacy/*|*/__pycache__/*|*.pyc|*/docker_dependency_validator.sh|*/python_env_policy.py)
+      */__pycache__/*|*.pyc|*/docker_dependency_validator.sh|*/python_env_policy.py)
         continue
         ;;
     esac

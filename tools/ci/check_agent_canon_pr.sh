@@ -157,4 +157,5 @@ run_make_or_direct ci-quick bash tools/ci/run_all_checks.sh --quick
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"
-echo "NEXT_ACTION=Open_or_update_agent-canon_PR_then_merge_and_run_bash_tools/sync_agent_canon.sh_push"
+echo "AGENT_CANON_PR_PROPAGATION_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
+echo "NEXT_ACTION=Open_or_update_AgentCanon_PR_then_after_merge_run_make_agent-canon-ensure-latest_and_commit_template_pin"

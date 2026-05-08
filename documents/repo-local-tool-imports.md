@@ -1,11 +1,10 @@
 <!--
 @dependency-start
 responsibility Records imported repo-local tools and their canonical disposition.
-upstream design tools/README.md defines shared tool families
-upstream design ../tools/catalog.yaml structured AgentCanon tool catalog
+upstream design ../tools/README.md defines shared tool families
 upstream design result-log-retention-and-visualization.md defines result tooling policy
-downstream design tools/README.md lists canonical and legacy tool locations
-downstream implementation ../tools/agent_tools/check_tool_catalog.py validates legacy catalog status
+downstream design ../tools/README.md lists canonical tool locations
+downstream implementation ../tools/agent_tools/tool_catalog.py validates retired legacy catalog status
 @dependency-end
 -->
 
@@ -29,11 +28,11 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 
 This document is the historical import-disposition ledger. The live
 machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
-`check_tool_catalog.py` and cross-checked by `check_tool_convention_drift.py`.
-When a tool is promoted, preserved as Legacy provenance, or converted into a
-compatibility wrapper, update both this ledger and the corresponding catalog
-entry. Do not treat update-route legacy subtree wording as the same status as
-`legacy_provenance` tool imports.
+`tool_catalog.py` and cross-checked by `tool_drift.py`.
+When a tool is promoted, left in the source repository, deleted, or converted
+into a compatibility wrapper, update both this ledger and the corresponding
+catalog entry. AgentCanon no longer keeps `tools/legacy/` provenance paths;
+update-route legacy subtree wording is unrelated to tool import disposition.
 
 ## Promoted To Canonical Tool Families
 
@@ -48,21 +47,23 @@ entry. Do not treat update-route legacy subtree wording as the same status as
 | `scripts/tools/find_similar_designs.py` | `tools/docs/find_similar_designs.py` | Promoted as design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/docs/organize_designs.py` | Promoted as conservative design organization helper. |
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
-| `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/agent_tools/oop_rule_inventory.py` | Reimplemented as repo-neutral OOP rule inventory instead of project-root convention viewers. |
-| `scripts/restructure_code_review_skill.py` | `tools/legacy/jax_solver_util/oop_check_support/restructure_code_review_skill.py` | Reclassified as OOP / review-rule provenance; not promoted because it rewrites one historical skill layout. |
+| `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/oop/python/rule_inventory.py`, `tools/oop/cpp/rule_inventory.py` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
+| `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted from jax_solver_util submodule diff as a repo-neutral algorithm module ownership checker. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` | `tools/experiments/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
-| `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
-| `vendor/agent-canon/tools/agent_tools/analyze_oop_readability.py` follow-up local diff | `tools/agent_tools/analyze_oop_readability.py` | Promoted public-boundary filtering and algorithm config factory exemptions. |
+| OOP readability local diff | `tools/oop/shared/readability_core.py` with `tools/oop/python/readability.py` and `tools/oop/cpp/readability.py` entrypoints | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |
+| OOP readability follow-up local diff | `tools/oop/shared/readability_core.py` with `tools/oop/python/readability.py` and `tools/oop/cpp/readability.py` entrypoints | Promoted public-boundary filtering and algorithm config factory exemptions. |
 | `vendor/agent-canon/tools/agent_tools/check_algorithm_module_nested_contract.py` follow-up local diff | `tools/agent_tools/check_algorithm_module_nested_contract.py` | Promoted explicit summary return type so the checker avoids `Any`. |
 | `vendor/agent-canon/tools/experiments/update_latest_result.py` follow-up local diff | `tools/experiments/update_latest_result.py` | Promoted deterministic nanosecond timestamp tie-break for latest-result selection. |
 | `vendor/agent-canon/tools/__init__.py` and `tools/experiments/__init__.py` | `tools/__init__.py`, `tools/experiments/__init__.py` | Promoted package markers used by shared tool tests. |
 
-## Preserved As Legacy Provenance
+## Retired Legacy Imports
 
-The following tools are retained under `tools/legacy/jax_solver_util/scripts/`
-because they are project-specific, stale compared with current AgentCanon, or
-need separate review before becoming defaults.
+The following tools were historically discovered under
+`/mnt/l/workspace/jax_solver_util/scripts/` but are no longer retained inside
+AgentCanon. They are project-specific, stale compared with current AgentCanon,
+or need separate review before promotion. Keep them in the source repository or
+promote them through a focused PR; do not restore `tools/legacy/`.
 
 - `create_toml.sh`
 - `docker_dependency_validator.py`
@@ -74,16 +75,11 @@ need separate review before becoming defaults.
 - `security/*`
 - repo-local copies of docs, audit, HLO, and Markdown tools
 
-OOP / convention-check legacy support now lives under
-`tools/legacy/jax_solver_util/oop_check_support/` and is represented by the
-canonical `tools/agent_tools/oop_rule_inventory.py` inventory tool.
-The corresponding structured entries are
-`legacy-jax-solver-util-scripts` and `legacy-jax-solver-util-oop-support` in
-`tools/catalog.yaml`.
-
-Legacy provenance files are not default CI entrypoints. A future PR may promote
-one legacy tool only after it has repo-neutral paths, current dependency
-headers, strict static checks, and tests or help-smoke evidence.
+OOP / convention-check support is now represented by the canonical
+`tools/oop/python/*` and `tools/oop/cpp/*` entrypoints. A future PR may promote
+one retired tool only after it has repo-neutral paths, current dependency
+headers, strict static checks, catalog coverage, same-named tool docs when
+needed, and tests or help-smoke evidence.
 
 ## Explicitly Not Overwritten
 

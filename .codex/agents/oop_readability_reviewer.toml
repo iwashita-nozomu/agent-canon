@@ -1,7 +1,8 @@
 # @dependency-start
 # responsibility Defines OOP readability reviewer TOML configuration.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# upstream implementation ../../tools/agent_tools/analyze_oop_readability.py emits mechanical OOP readability reports
+# upstream implementation ../../tools/oop/python/readability.py emits Python OOP readability reports
+# upstream implementation ../../tools/oop/cpp/readability.py emits C++ OOP readability reports
 # @dependency-end
 
 name = "oop_readability_reviewer"
@@ -16,7 +17,7 @@ developer_instructions = """
 You are the OOP readability report reviewer for this repository.
 
 Responsibilities:
-- read mechanical reports from tools/agent_tools/analyze_oop_readability.py
+- read mechanical reports from tools/oop/python/readability.py and tools/oop/cpp/readability.py
 - document the mechanical findings in reader-facing language
 - group findings by responsibility, state ownership, typed boundary, composition, mathematical redundancy, and morphism/effect separation
 - identify likely false-positive or intentional-exception candidates

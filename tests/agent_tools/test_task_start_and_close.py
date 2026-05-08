@@ -1,6 +1,7 @@
 # @dependency-start
 # responsibility Tests test task start and close behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""
@@ -297,6 +298,50 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout)
+
+    def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
+        """Dirty shared-canon surfaces should not point only to commit-or-stash."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            (workspace_root / "vendor" / "agent-canon").mkdir(parents=True)
+            (workspace_root / "vendor" / "agent-canon" / "README.md").write_text(
+                "shared canon candidate\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "shared canon preflight route",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "shared-canon-preflight",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
+                result.stdout,
+            )
+            self.assertIn("open_agent-canon_PR", result.stdout)
+            self.assertNotIn(
+                "AGENT_CANON_PREFLIGHT_NEXT=commit_or_stash_then_run_make_agent-canon-ensure-latest",
+                result.stdout,
+            )
 
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""

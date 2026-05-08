@@ -5,6 +5,7 @@ applyTo: "**"
 @dependency-start
 responsibility Documents GitHub Copilot PR processing instructions for all repository paths.
 upstream design ../../agents/workflows/github-copilot-workflow.md Copilot PR workflow and error triage
+upstream design ../../documents/github-copilot-configuration.md Copilot configuration and PR-template routing
 upstream implementation ../../tools/ci/checkout_agent_canon_submodule.sh private AgentCanon checkout diagnostics
 downstream implementation ../../tools/ci/check_github_workflows.py enforces Copilot PR instruction availability
 @dependency-end
@@ -20,6 +21,13 @@ pull request.
 - Read `.github/copilot-instructions.md`, `AGENTS.md`, and
   `agents/workflows/github-copilot-workflow.md` before changing PR automation,
   workflow YAML, PR templates, or AgentCanon references.
+- Read `documents/github-copilot-configuration.md` before changing Copilot
+  settings, custom agents, MCP references, setup workflows, or PR-template
+  routing.
+- Use Plan mode before non-trivial PR automation, GitHub Actions, Copilot
+  settings, PR-template, or AgentCanon sync changes. If the current Copilot
+  surface lacks a Plan mode command, write the plan in the issue, PR body, or
+  PR comment before editing.
 - If a check fails with `AGENT_CANON_SUBMODULE_AUTH=missing` or a private
   `agent-canon.git` clone error, classify it as private submodule authentication,
   not as a code or test failure.

@@ -23,7 +23,6 @@ DEFAULT_EXCLUDES = (
     "build",
     "dist",
     "reports",
-    "tools/legacy",
     "vendor",
 )
 

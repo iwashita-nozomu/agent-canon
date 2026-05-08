@@ -2,6 +2,9 @@
 # @dependency-start
 # responsibility Provides agent canon preflight agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines task-entry freshness routing
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first shared-canon propagation
+# upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived proposal routing
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
 # downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
@@ -13,6 +16,28 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+
+GIT_STATUS_PATH_COLUMN = 3
+RENAMED_PATH_SPLIT_MAX = 1
+SHARED_CANON_DIRTY_PATH_PREFIXES = (
+    ".agents/",
+    ".claude/",
+    ".codex/",
+    ".github/AGENTS.md",
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+    ".github/agents/",
+    ".github/copilot-instructions.md",
+    ".github/instructions/",
+    ".github/workflows/agent-coordination.yml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "ROOT_AGENTS.md",
+    "agents/",
+    "documents/SHARED_RUNTIME_SURFACES.md",
+    "mcp/",
+    "tools/sync_agent_canon.sh",
+    "vendor/agent-canon",
+)
 
 
 @dataclass(frozen=True)
@@ -63,13 +88,25 @@ def run_agent_canon_preflight(
         )
 
     status_result = subprocess.run(
-        ["git", "status", "--short"],
+        ["git", "status", "--short", "--untracked-files=all"],
         cwd=project_root,
         check=True,
         capture_output=True,
         text=True,
     )
     if status_result.stdout.strip():
+        if dirty_status_mentions_shared_canon(status_result.stdout):
+            return AgentCanonPreflightResult(
+                status="blocked_shared_canon_workflow",
+                reason=(
+                    "shared AgentCanon surface is dirty; route it through a proposal "
+                    "or AgentCanon PR before refreshing the template pin"
+                ),
+                next_step=(
+                    "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
+                    "run_make_agent-canon-ensure-latest"
+                ),
+            )
         return AgentCanonPreflightResult(
             status="blocked_dirty_worktree",
             reason=(
@@ -108,6 +145,20 @@ def is_git_worktree(project_root: Path) -> bool:
         text=True,
     )
     return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def dirty_status_mentions_shared_canon(status_text: str) -> bool:
+    """Return true when git status includes shared AgentCanon surfaces."""
+    for line in status_text.splitlines():
+        if len(line) < GIT_STATUS_PATH_COLUMN:
+            continue
+        path_text = line[GIT_STATUS_PATH_COLUMN:].strip()
+        if " -> " in path_text:
+            path_text = path_text.rsplit(" -> ", maxsplit=RENAMED_PATH_SPLIT_MAX)[-1]
+        for prefix in SHARED_CANON_DIRTY_PATH_PREFIXES:
+            if path_text == prefix.rstrip("/") or path_text.startswith(prefix):
+                return True
+    return False
 
 
 def is_agent_canon_source_repo(project_root: Path) -> bool:

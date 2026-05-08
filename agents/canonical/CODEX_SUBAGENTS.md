@@ -160,7 +160,7 @@ Constraints:
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
-  - `analyze_oop_readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
+  - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う
 - `spark_worker`

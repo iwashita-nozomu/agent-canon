@@ -7,6 +7,7 @@
 # upstream design ../../.github/copilot-instructions.md Copilot instruction surface
 # upstream design ../../.github/instructions/pr-processing.instructions.md PR processing surface
 # upstream design ../../.github/agents/pr-maintainer.md PR maintainer surface
+# upstream design ../../documents/github-copilot-configuration.md Copilot configuration catalog
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
@@ -293,6 +294,10 @@ def check_pr_templates(root: Path) -> list[Finding]:
         checks = {
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
+                "Plan Mode Evidence",
+                "Copilot Configuration Impact",
+                "documents/github-copilot-configuration.md",
+                "Template / derived project PR",
                 "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
                 "make ci",
                 "AgentCanon Evidence",
@@ -300,6 +305,12 @@ def check_pr_templates(root: Path) -> list[Finding]:
             ],
             root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md": [
                 "make agent-canon-pr-check",
+                "make agent-canon-ensure-latest",
+                "Plan Mode Evidence",
+                "Copilot Configuration Impact",
+                "documents/github-copilot-configuration.md",
+                "AgentCanon source PR / proposal",
+                "Direct `bash tools/sync_agent_canon.sh push` was not used",
                 "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
                 "Submodule Pin Change",
                 "GitHub Mirror / Submodule Evidence",
@@ -307,6 +318,11 @@ def check_pr_templates(root: Path) -> list[Finding]:
             ],
             root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
+                "Plan Mode Evidence",
+                "Copilot Configuration Impact",
+                "documents/github-copilot-configuration.md",
+                "standalone AgentCanon repository",
+                "make agent-canon-ensure-latest",
                 "Submodule Pin Impact",
                 "expected template submodule SHA:",
             ],
@@ -315,6 +331,11 @@ def check_pr_templates(root: Path) -> list[Finding]:
         checks = {
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
+                "Plan Mode Evidence",
+                "Copilot Configuration Impact",
+                "documents/github-copilot-configuration.md",
+                "standalone AgentCanon repository",
+                "make agent-canon-ensure-latest",
                 "Submodule Pin Impact",
                 "expected template submodule SHA:",
             ],
@@ -336,8 +357,10 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
             root / ".github" / "copilot-instructions.md",
             [
                 "agents/workflows/github-copilot-workflow.md",
+                "documents/github-copilot-configuration.md",
                 ".github/instructions/pr-processing.instructions.md",
                 ".github/agents/pr-maintainer.md",
+                "Plan mode",
                 "AGENT_CANON_REPO_TOKEN",
                 "AGENT_CANON_REPO_SSH_KEY",
             ],
@@ -349,6 +372,8 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
             / "pr-processing.instructions.md",
             [
                 'applyTo: "**"',
+                "documents/github-copilot-configuration.md",
+                "Plan mode",
                 "AGENT_CANON_SUBMODULE_AUTH=missing",
                 "private submodule authentication",
                 "AGENT_CANON_REPO_TOKEN",
@@ -359,6 +384,8 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
             root / ".github" / "agents" / "pr-maintainer.md",
             [
                 "description:",
+                "documents/github-copilot-configuration.md",
+                "Plan mode",
                 "AGENT_CANON_SUBMODULE_AUTH=missing",
                 "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
                 "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
@@ -369,11 +396,38 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
         ),
         *require_text(
             readme_path,
-            [".github/PULL_REQUEST_TEMPLATE.md"],
+            [
+                ".github/PULL_REQUEST_TEMPLATE.md",
+                "documents/github-copilot-configuration.md",
+            ],
         ),
         *require_text(
             root / ".github" / "AGENTS.md",
-            ["/.github/PULL_REQUEST_TEMPLATE/agent_canon.md"],
+            [
+                "/.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+                "documents/github-copilot-configuration.md",
+                "Plan mode",
+            ],
+        ),
+        *require_text(
+            root / "documents" / "github-copilot-configuration.md",
+            [
+                "GitHub Copilot Configuration",
+                ".github/copilot-instructions.md",
+                ".github/instructions/**/*.instructions.md",
+                "AGENTS.md",
+                ".github/agents/*.md",
+                "tools:",
+                "mcp-servers:",
+                ".github/workflows/copilot-setup-steps.yml",
+                "standalone AgentCanon repository",
+                "Template / derived",
+                "Plan mode",
+                "AGENT_CANON_REPO_TOKEN",
+                "AGENT_CANON_REPO_SSH_KEY",
+                "COPILOT_MCP_",
+                "MCP",
+            ],
         ),
     ]
     if template_mode:
@@ -418,6 +472,8 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
             "`.github/PULL_REQUEST_TEMPLATE.md`",
             "template / derived repo",
             "`.github/PULL_REQUEST_TEMPLATE/agent_canon.md`",
+            "Freshness Gate Route",
+            "AgentCanon PR / proposal merge 後にこの check を再実行します",
         ],
     )
 

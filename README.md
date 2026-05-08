@@ -26,6 +26,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `tools/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-github-remote.md`
+- `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
 - `agents/workflows/README.md`
   - workflow catalog と routing guide の入口
@@ -54,6 +55,7 @@ root の入口は symlink view または明示的な synced copy にします。
 - `memory/*`、`notes/*`、`tests/*`: `documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
 - `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
 - `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
+- `documents/github-copilot-configuration.md`: root `documents/github-copilot-configuration.md` から symlink される Copilot configuration catalog。
 - `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
 - `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。

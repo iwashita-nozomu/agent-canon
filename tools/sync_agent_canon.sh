@@ -10,7 +10,13 @@
 # downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
 # downstream implementation ../documents/result-log-retention-and-visualization.md root symlink view
 # downstream implementation ../documents/repo-local-tool-imports.md root symlink view
+# downstream implementation ../documents/tools/tool-docs.toml root symlink view
+# downstream implementation ../documents/tools/oop/python/readability.md root symlink view
+# downstream implementation ../documents/tools/oop/python/rule_inventory.md root symlink view
+# downstream implementation ../documents/tools/oop/cpp/readability.md root symlink view
+# downstream implementation ../documents/tools/oop/cpp/rule_inventory.md root symlink view
 # downstream implementation ../documents/agent-canon-github-remote.md root symlink view
+# downstream implementation ../documents/github-copilot-configuration.md root symlink view
 # downstream implementation ../documents/template-github-remote.md root symlink view
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
 # downstream implementation ../tests/agent_tools/test_compare_agent_run_paths.py root symlink view for run path comparison tests
@@ -21,10 +27,11 @@
 # downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
 # downstream implementation ../tests/agent_tools/test_check_algorithm_module_nested_contract.py root symlink view
 # downstream implementation ../tests/agent_tools/test_check_log_helper_names.py root symlink view
-# downstream implementation ../tests/agent_tools/test_check_tool_catalog.py root symlink view
-# downstream implementation ../tests/agent_tools/test_check_tool_convention_drift.py root symlink view
+# downstream implementation ../tests/agent_tools/test_tool_catalog.py root symlink view
+# downstream implementation ../tests/agent_tools/test_tool_drift.py root symlink view
 # downstream implementation ../tests/agent_tools/test_oop_rule_inventory.py root symlink view
 # downstream implementation ../tests/agent_tools/test_compare_codex_token_footprints.py root symlink view
+# downstream implementation ../tests/tools/test_container_config.py root symlink view
 # downstream implementation ../tests/tools/test_result_log_tools.py root symlink view
 # downstream implementation ../tests/tools/test_update_latest_result.py root symlink view
 # @dependency-end
@@ -179,6 +186,7 @@ documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-desig
 documents/result-log-retention-and-visualization.md:../${PREFIX}/documents/result-log-retention-and-visualization.md
 documents/repo-local-tool-imports.md:../${PREFIX}/documents/repo-local-tool-imports.md
 documents/agent-canon-github-remote.md:../${PREFIX}/documents/agent-canon-github-remote.md
+documents/github-copilot-configuration.md:../${PREFIX}/documents/github-copilot-configuration.md
 documents/template-github-remote.md:../${PREFIX}/documents/template-github-remote.md
 documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
 documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
@@ -229,6 +237,11 @@ documents/templates/remote_execution_target.template.toml:../../${PREFIX}/docume
 documents/templates/server_host_inventory.template.md:../../${PREFIX}/documents/templates/server_host_inventory.template.md
 documents/templates/server_runtime_layout.template.toml:../../${PREFIX}/documents/templates/server_runtime_layout.template.toml
 documents/tools/README.md:../../${PREFIX}/documents/tools/README.md
+documents/tools/tool-docs.toml:../../${PREFIX}/documents/tools/tool-docs.toml
+documents/tools/oop/python/readability.md:../../../../${PREFIX}/documents/tools/oop/python/readability.md
+documents/tools/oop/python/rule_inventory.md:../../../../${PREFIX}/documents/tools/oop/python/rule_inventory.md
+documents/tools/oop/cpp/readability.md:../../../../${PREFIX}/documents/tools/oop/cpp/readability.md
+documents/tools/oop/cpp/rule_inventory.md:../../../../${PREFIX}/documents/tools/oop/cpp/rule_inventory.md
 memory/README.md:../${PREFIX}/memory/README.md
 memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
 memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
@@ -262,8 +275,8 @@ notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
 notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
 tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
 tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
-tests/agent_tools/test_check_tool_catalog.py:../../${PREFIX}/tests/agent_tools/test_check_tool_catalog.py
-tests/agent_tools/test_check_tool_convention_drift.py:../../${PREFIX}/tests/agent_tools/test_check_tool_convention_drift.py
+tests/agent_tools/test_tool_catalog.py:../../${PREFIX}/tests/agent_tools/test_tool_catalog.py
+tests/agent_tools/test_tool_drift.py:../../${PREFIX}/tests/agent_tools/test_tool_drift.py
 tests/agent_tools/test_oop_rule_inventory.py:../../${PREFIX}/tests/agent_tools/test_oop_rule_inventory.py
 tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_public_surface.py
 tests/agent_tools/test_check_convention_compliance.py:../../${PREFIX}/tests/agent_tools/test_check_convention_compliance.py
@@ -295,6 +308,7 @@ tests/agent_tools/test_work_log.py:../../${PREFIX}/tests/agent_tools/test_work_l
 tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
 tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
 tests/tools/test_check_markdown_math.py:../../${PREFIX}/tests/tools/test_check_markdown_math.py
+tests/tools/test_container_config.py:../../${PREFIX}/tests/tools/test_container_config.py
 tests/tools/test_check_bootstrap_docs.py:../../${PREFIX}/tests/tools/test_check_bootstrap_docs.py
 tests/tools/test_check_github_workflows.py:../../${PREFIX}/tests/tools/test_check_github_workflows.py
 tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py

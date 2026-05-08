@@ -8,6 +8,7 @@ upstream design ./agent-canon-subtree-migration.md vendoring ownership model
 downstream implementation ../tools/sync_agent_canon.sh enforces this surface list
 downstream design ./algorithm-implementation-boundary.md listed shared algorithm boundary policy surface
 downstream design ./object-oriented-design.md listed shared coding policy surface
+downstream design ./github-copilot-configuration.md listed shared Copilot configuration surface
 @dependency-end
 -->
 
@@ -54,6 +55,7 @@ root では次を symlink view として扱います。
 - `documents/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/agent-canon-github-remote.md`
 - `documents/agent-canon-subtree-migration.md`
+- `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
 - `documents/coding-conventions-cpp.md`
 - `documents/coding-conventions-experiments.md`
@@ -96,6 +98,11 @@ root では次を symlink view として扱います。
 - `documents/templates/server_host_inventory.template.md`
 - `documents/templates/server_runtime_layout.template.toml`
 - `documents/tools/README.md`
+- `documents/tools/tool-docs.toml`
+- `documents/tools/oop/python/readability.md`
+- `documents/tools/oop/python/rule_inventory.md`
+- `documents/tools/oop/cpp/readability.md`
+- `documents/tools/oop/cpp/rule_inventory.md`
 - `memory/README.md`
 - `memory/USER_PREFERENCES.md`
 - `memory/AGENT_PHILOSOPHY.md`
@@ -128,14 +135,15 @@ root では次を symlink view として扱います。
 - `tests/agent_tools/__init__.py`
 - `tests/agent_tools/test_check_agent_runtime_alignment.py`
 - `tests/agent_tools/test_analyze_refactor_surface.py`
-- `tests/agent_tools/test_check_tool_catalog.py`
-- `tests/agent_tools/test_check_tool_convention_drift.py`
+- `tests/agent_tools/test_tool_catalog.py`
+- `tests/agent_tools/test_tool_drift.py`
 - `tests/agent_tools/test_oop_rule_inventory.py`
 - `tests/agent_tools/test_check_mcp_inventory.py`
 - `tests/agent_tools/test_work_log.py`
 - `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
 - `tests/tools/test_check_merge_structure.py`
 - `tests/tools/test_check_markdown_math.py`
+- `tests/tools/test_container_config.py`
 - `tests/tools/test_mirror_skill_shims.py`
 - `tests/tools/test_check_github_workflows.py`
 - `tests/tools/test_run_managed_experiment.py`

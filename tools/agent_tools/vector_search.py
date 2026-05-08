@@ -110,11 +110,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Path part, prefix, or glob to exclude. Repeatable.",
     )
-    parser.add_argument(
-        "--include-legacy",
-        action="store_true",
-        help="Include tools/legacy provenance files. Defaults to false.",
-    )
     parser.add_argument("--top", type=int, default=DEFAULT_TOP, help="Number of hits to print.")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
@@ -326,8 +321,6 @@ def main(argv: Sequence[str]) -> int:
     root = Path(args.root).resolve()
     surfaces = tuple(args.surface) if args.surface else DEFAULT_SURFACES
     excluded_parts = set(EXCLUDED_PARTS)
-    if args.include_legacy:
-        excluded_parts.discard("legacy")
     documents = read_documents(root, surfaces, args.exclude, excluded_parts)
     hits = search(documents, args.query, max(args.top, 0))
     if args.format == "json":

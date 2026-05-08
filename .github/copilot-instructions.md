@@ -4,6 +4,7 @@
 responsibility Documents GitHub Copilot Repository Instructions for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime workflow
+upstream design ../documents/github-copilot-configuration.md Copilot configuration catalog
 @dependency-end
 -->
 
@@ -13,6 +14,7 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - `AGENTS.md`
 - `agents/README.md`
 - `documents/README.md`
+- `documents/github-copilot-configuration.md`
 - `agents/workflows/github-copilot-workflow.md`
 - `.github/instructions/pr-processing.instructions.md`
 
@@ -28,8 +30,21 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - If a task matches a project skill, use the skill before inventing a new local workflow.
 - CLI/runtime differences are summarized in `agents/canonical/CLI_ENTRYPOINTS.md`.
 - For issue, PR, and IDE tasks, follow `agents/workflows/github-copilot-workflow.md` before adding Copilot-only instructions.
+- For Copilot settings, custom agents, MCP, setup workflows, or PR-template
+  routing, read `documents/github-copilot-configuration.md` first.
 - For PR triage, use `.github/instructions/pr-processing.instructions.md`; if
   custom agents are available, select `.github/agents/pr-maintainer.md`.
+
+## Plan Mode
+
+- Use Plan mode before non-trivial repo-changing work, especially Copilot
+  settings, GitHub Actions, PR templates, AgentCanon sync, or multi-file runtime
+  surface changes.
+- Codex uses `/plan` when available. If GitHub Copilot does not expose an
+  explicit Plan mode in the current surface, write the plan in the issue, PR
+  body, or PR comment before editing.
+- Keep the plan separate from validation evidence; PR closeout still needs
+  command output, AgentCanon SHA/pin evidence, and sync checks.
 
 ## Pull Requests
 

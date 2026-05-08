@@ -38,8 +38,8 @@ DEFAULT_EXIT_CRITERIA = (
     (
         "G3",
         "OOP/readability analysis is run with "
-        "`python3 tools/agent_tools/analyze_oop_readability.py` and findings are fixed "
-        "or documented.",
+        "`python3 tools/oop/python/readability.py` and, when C++ is in scope, "
+        "`python3 tools/oop/cpp/readability.py`; findings are fixed or documented.",
     ),
     (
         "G4",
@@ -511,7 +511,7 @@ def evidence_hint(item: CheckboxItem) -> str:
     if "code dependency" in text or "scan_code_dependencies" in text:
         return "`scan_code_dependencies.sh` output"
     if "oop" in text or "readability" in text:
-        return "`analyze_oop_readability.py` report"
+        return "`tools/oop/*/readability.py` report"
     if "hardcoded numeric" in text or "check_hardcoded_numbers" in text:
         return "`check_hardcoded_numbers.py` output"
     if "dependency" in text:

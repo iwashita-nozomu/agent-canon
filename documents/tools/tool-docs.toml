@@ -1,0 +1,37 @@
+# @dependency-start
+# responsibility Maps canonical tools to same-named explanatory documents.
+# upstream design README.md tool documentation placement policy
+# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+# downstream implementation ../../tools/agent_tools/tool_catalog.py validates one-to-one tool docs
+# @dependency-end
+
+catalog_kind = "agent_canon_tool_docs"
+version = 1
+
+[[tool]]
+id = "oop-python-readability"
+tool = "tools/oop/python/readability.py"
+doc = "documents/tools/oop/python/readability.md"
+language = "python"
+summary = "Python OOP readability checker documentation."
+
+[[tool]]
+id = "oop-python-rule-inventory"
+tool = "tools/oop/python/rule_inventory.py"
+doc = "documents/tools/oop/python/rule_inventory.md"
+language = "python"
+summary = "Python OOP rule inventory documentation."
+
+[[tool]]
+id = "oop-cpp-readability"
+tool = "tools/oop/cpp/readability.py"
+doc = "documents/tools/oop/cpp/readability.md"
+language = "cpp"
+summary = "C++ OOP readability checker documentation."
+
+[[tool]]
+id = "oop-cpp-rule-inventory"
+tool = "tools/oop/cpp/rule_inventory.py"
+doc = "documents/tools/oop/cpp/rule_inventory.md"
+language = "cpp"
+summary = "C++ OOP rule inventory documentation."

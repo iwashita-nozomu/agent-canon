@@ -4,6 +4,7 @@ responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/agent-canon-subtree-migration.md legacy vendoring compatibility policy.
+upstream design documents/github-copilot-configuration.md GitHub Copilot configuration and PR-template routing.
 downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
 downstream implementation tools/agent_tools/goal_loop.py controls active goal iteration state.
 downstream implementation tools/agent_tools/task_close.py validates run-bundle closeout gates.
@@ -27,6 +28,12 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起動します。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません。
+
+## Plan Mode
+
+- repo-changing task では、実装前に Plan mode を積極的に使います。Codex runtime では `/plan` を使い、Plan mode が無い runtime では同等の written plan を run bundle、issue、PR body、または作業 update に固定します。
+- GitHub Actions、Copilot settings、PR template、AgentCanon sync、runtime entrypoint、multi-file shared surface の変更では、trivial でない限り Plan mode を先に起動します。
+- Plan mode は validation の代替ではありません。実装後に dependency review、static analysis、test、shared-surface sync、PR checklist evidence を別途揃えます。
 
 ## Read Packets
 
@@ -82,6 +89,7 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 
 - task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。
 - task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
+- repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補と、既存実装では足りない理由を確認します。

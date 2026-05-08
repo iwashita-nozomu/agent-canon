@@ -57,7 +57,7 @@ class GoalLoopTest(unittest.TestCase):
             text = goal.read_text(encoding="utf-8")
             self.assertIn("run_repo_dependency_review.sh --fail-missing", text)
             self.assertIn("scan_code_dependencies.sh", text)
-            self.assertIn("analyze_oop_readability.py", text)
+            self.assertIn("tools/oop/python/readability.py", text)
             self.assertIn("make ci", text)
             self.assertIn("prompt-to-artifact checklist", text)
             self.assertIn("reusable surfaces", text)

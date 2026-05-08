@@ -9,9 +9,10 @@
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
 # upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
-# upstream implementation ../agent_tools/check_tool_catalog.py validates structured tool catalog
-# upstream implementation ../agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
+# upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
+# upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
+# upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
@@ -176,13 +177,13 @@ else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_tool_catalog.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/tool_catalog.py 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
   echo "❌ tool catalog checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/check_tool_convention_drift.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/tool_drift.py 2>&1; then
   echo "✅ tool/convention drift checks 成功"
 else
   echo "❌ tool/convention drift checks 失敗"
@@ -192,6 +193,12 @@ if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/ci/container_config.py 2>&1; then
+  echo "✅ container configuration checks 成功"
+else
+  echo "❌ container configuration checks 失敗"
   EXIT_CODE=1
 fi
 echo ""
@@ -208,7 +215,10 @@ echo ""
 
 # 2. experiment registry checks
 echo "2️⃣  experiment registry checks を実行中..."
-if "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
+if [ ! -e experiments/registry.toml ]; then
+  echo "EXPERIMENT_REGISTRY=skip"
+  echo "experiment registry absent in this checkout; skipping registry validation"
+elif "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"

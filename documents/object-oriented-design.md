@@ -6,8 +6,12 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror ownership
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./design/protocols.md Protocol and type-boundary placement contract
-downstream implementation ../tools/agent_tools/analyze_oop_readability.py OOP readability score gate
-downstream implementation ../tools/agent_tools/oop_rule_inventory.py inventories OOP rule surfaces
+downstream implementation ../tools/oop/python/readability.py Python OOP readability score gate
+downstream implementation ../tools/oop/cpp/readability.py C++ OOP readability score gate
+downstream implementation ../tools/oop/python/rule_inventory.py inventories Python OOP rule surfaces
+downstream implementation ../tools/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
+downstream implementation ../tools/catalog.yaml records OOP tool catalog status
+downstream implementation ../tools/agent_tools/tool_catalog.py validates OOP catalog entries
 upstream implementation ../tools/sync_agent_canon.sh root symlink view generation
 @dependency-end
 -->
@@ -137,11 +141,18 @@ public class、public dataclass、public `Protocol` は module docstring と `__
 ## 機械評価
 
 OOP 的な可読性は reviewer の判断を必要としますが、危険な形は機械的に先に落とします。
-Python / C++ surface では次を baseline として使います。
+Python surface では次を baseline として使います。
 
 ```bash
-python3 tools/agent_tools/analyze_oop_readability.py python include src tests --min-score 85
-python3 tools/agent_tools/oop_rule_inventory.py --include-legacy
+python3 tools/oop/python/readability.py python tools tests --min-score 85
+python3 tools/oop/python/rule_inventory.py
+```
+
+C++ surface では次を baseline として使います。
+
+```bash
+python3 tools/oop/cpp/readability.py include src tests/cpp --min-score 85
+python3 tools/oop/cpp/rule_inventory.py
 ```
 
 この tool は次の risk を検出します。
@@ -160,7 +171,7 @@ score は設計判断の補助です。
 重要な変更では、機械 report を正本にします。
 
 ```bash
-python3 tools/agent_tools/analyze_oop_readability.py \
+python3 tools/oop/python/readability.py \
   --format markdown \
   --include-snippets \
   --exclude vendor \
@@ -174,19 +185,18 @@ python3 tools/agent_tools/analyze_oop_readability.py \
 `vendor/`、過去の `reports/`、生成物、別 canon snapshot を混ぜると、対象 repo の OOP risk と持ち込み artifact の risk が区別できなくなります。
 除外した surface を後で評価する必要がある場合は、別 report として分けます。
 
-OOP policy、analyzer、reviewer、test、legacy support の配置確認は
-`oop_rule_inventory.py` を使います。`tools/legacy/.../oop_check_support/`
-は provenance であり、workflow や CI の正本入口ではありません。
-旧 convention viewer や code-review skill restructuring script の挙動を使う場合は、
-そのまま呼ばず、repo-neutral な rule inventory / analyzer / reviewer prompt へ
-書き直してから昇格します。
+OOP policy、analyzer、reviewer、test の配置確認は、言語別の
+`tools/oop/python/rule_inventory.py` と `tools/oop/cpp/rule_inventory.py`
+を使います。旧 `tools/legacy/` provenance は廃止済みであり、workflow や
+CI の正本入口には戻しません。canonical analyzer と inventory の tool
+status は `tools/catalog.yaml` に記録し、`tool_catalog.py` の検査対象にします。
 
 `oop_readability_reviewer` は `oop_readability_report.md` を読み、score、threshold、count、path、line、pass/fail を変えずに文書化します。
 false positive / allowed warning は reviewer の推測ではなく、機械 finding に `path:line` で紐づけて design artifact に書きます。
 
 ## Finding から Backlog への変換
 
-`analyze_oop_readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
+`tools/oop/*/readability.py` の finding は、chat の感想で終わらせず、次のように改善 backlog へ変換します。
 
 - `function_lines` / `cognitive_complexity`: まず関数を decision、pure transform、effect boundary、formatting の単位へ分ける。
 - `parameters`: stable な入力集合を dataclass / typed request object / existing value object へ寄せる。

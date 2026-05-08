@@ -172,20 +172,20 @@ class CheckConventionComplianceTest(unittest.TestCase):
             ),
             "documents/coding-conventions-python.md": "python\n",
             "documents/coding-conventions-cpp.md": "cpp\n",
-            "documents/coding-conventions-project.md": "project\n",
+            "documents/coding-conventions-project.md": "project container_config.py\n",
             "documents/coding-conventions-house-style.md": "house\n",
             "documents/coding-conventions-testing.md": "testing\n",
             "documents/coding-conventions-reviews.md": "reviews\n",
             "documents/coding-conventions-experiments.md": "experiments\n",
             "documents/coding-conventions-logging.md": "check_log_helper_names.py\n",
             "documents/algorithm-implementation-boundary.md": "algorithm\n",
-            "documents/object-oriented-design.md": "analyze_oop_readability.py\n",
+            "documents/object-oriented-design.md": "readability.py\n",
             "documents/REVIEW_PROCESS.md": "review\n",
             "documents/tools/README.md": (
-                "check_tool_catalog.py check_tool_convention_drift.py\n"
+                "tool_catalog.py tool_drift.py\n"
             ),
             "tools/README.md": (
-                "check_tool_catalog.py check_tool_convention_drift.py\n"
+                "tool_catalog.py tool_drift.py\n"
             ),
             "agents/canonical/CODEX_WORKFLOW.md": (
                 "Close-Out Prohibitions\n"
@@ -224,7 +224,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
             ),
             "agents/workflows/comprehensive-refactoring-workflow.md": (
-                "analyze_oop_readability.py check_convention_compliance.py\n"
+                "readability.py check_convention_compliance.py\n"
                 "Before closeout, run "
                 "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
             ),
@@ -241,9 +241,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "tools/ci/run_all_checks.sh": (
                 "check_hardcoded_numbers.py check_static_any.py "
                 "check_log_helper_names.py check_convention_compliance.py "
-                "check_tool_catalog.py check_tool_convention_drift.py "
-                "check_github_workflows.py\n"
+                "tool_catalog.py tool_drift.py "
+                "check_github_workflows.py container_config.py\n"
             ),
+            "agents/skills/environment-maintenance.md": "container_config.py\n",
         }
         tools = [
             "run_repo_dependency_review.sh",
@@ -251,12 +252,11 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "check_hardcoded_numbers.py",
             "check_static_any.py",
             "check_log_helper_names.py",
-            "analyze_oop_readability.py",
             "evaluate_skill_workflow_prompts.py",
             "evaluate_agent_run.py",
             "check_convention_compliance.py",
-            "check_tool_catalog.py",
-            "check_tool_convention_drift.py",
+            "tool_catalog.py",
+            "tool_drift.py",
         ]
         for path, text in files.items():
             target = root / path
@@ -266,9 +266,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target = root / "tools" / "agent_tools" / tool
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        for tool_path in [
+            "tools/oop/python/readability.py",
+            "tools/oop/cpp/readability.py",
+        ]:
+            target = root / tool_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         github_checker = root / "tools" / "ci" / "check_github_workflows.py"
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        container_checker = root / "tools" / "ci" / "container_config.py"
+        container_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

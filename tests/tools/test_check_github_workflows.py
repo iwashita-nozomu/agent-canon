@@ -115,6 +115,49 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_missing_copilot_configuration_doc_fails(self) -> None:
+        """Copilot configuration catalog is a required shared surface."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            (root / "documents" / "github-copilot-configuration.md").unlink()
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "path=documents/github-copilot-configuration.md",
+                result.stdout,
+            )
+
+    def test_missing_plan_mode_guidance_fails(self) -> None:
+        """Copilot entrypoints must tell agents when to use Plan mode."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            path = root / ".github" / "copilot-instructions.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace("Plan mode", "planning"),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:Plan mode", result.stdout)
+
     def test_job_level_permissions_are_accepted(self) -> None:
         """Workflow permissions may be declared on every job."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -306,6 +349,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/scripts/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
             "agents/workflows/agent-canon-pr-workflow.md",
+            "documents/github-copilot-configuration.md",
             "README.md",
         ]:
             source = REPO_ROOT / relative

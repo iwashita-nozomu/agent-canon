@@ -53,7 +53,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 | Route | Meaning | Required Next Step |
 | ----- | ------- | ------------------ |
 | `already_current_submodule` | parent gitlink、submodule worktree、shared canon main が一致 | root drift だけなら `link-root` / `check` へ進む |
-| `submodule_update` | shared canon main が進んでいる | clean parent worktree で `make agent-canon-ensure-latest` を実行し、parent pin commit を作る |
+| `submodule_update` | shared canon main が進んでいる | clean parent worktree で `make agent-canon-ensure-latest` を実行し、parent pin commit を作る。dirty shared-canon 差分が同時にある場合は、先に proposal / AgentCanon PR に出して merge 後に再実行する |
 | `diverged_submodule_history` | local submodule commit と remote main が分岐 | `review-submodule` で proposal / conflict / safe-align を判定する |
 | `already_current_tree` / `already_current_split` | legacy subtree 互換 mode で local tree と shared canon main が一致 | legacy appendix のみ。submodule repo では使わない |
 | `snapshot_import_*` / `subtree_pull` | legacy subtree 互換 mode の update route | maintainer が legacy cleanup として扱い、通常の submodule repo には持ち込まない |

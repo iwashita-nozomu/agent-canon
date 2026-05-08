@@ -42,6 +42,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - repo-changing task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` を併用する
+- clean worktree では `make agent-canon-ensure-latest` を実行し、repo-local dirty だけなら commit / stash 後に再実行する。dirty state が shared AgentCanon source、root shared surface、workflow、skill、subagent、shared tool の場合は pin 更新で消さず、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
 - repository task の intake では、ユーザーが MCP を明示していなくても `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行し、pass したら repo MCP tools を repo root / status / context 確認の優先候補にする
 - current `repo_mcp_server` は status/context 専用なので、file editing capability が無いことを毎回 user update で説明しない。MCP failure / mismatch または user の質問がある場合だけ説明する
 - 編集手段は、小〜中規模は patch-based edit、機械生成・一括変換は repo script / formatter、MCP editing は explicit edit tool 実装後、の順に選ぶ

@@ -6,7 +6,7 @@
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../tools/catalog.yaml structured tool catalog
-# upstream implementation ./check_tool_convention_drift.py validates tool/convention drift
+# upstream implementation ./tool_drift.py validates tool/convention drift
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
@@ -87,7 +87,14 @@ TOOL_GATES = {
         ),
     ),
     "oop_readability": (
-        "tools/agent_tools/analyze_oop_readability.py",
+        "tools/oop/python/readability.py",
+        (
+            "documents/object-oriented-design.md",
+            "agents/workflows/comprehensive-refactoring-workflow.md",
+        ),
+    ),
+    "oop_cpp_readability": (
+        "tools/oop/cpp/readability.py",
         (
             "documents/object-oriented-design.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
@@ -109,7 +116,7 @@ TOOL_GATES = {
         ("tools/ci/run_all_checks.sh", "agents/evals/skill_workflow_prompt_eval.toml"),
     ),
     "tool_catalog": (
-        "tools/agent_tools/check_tool_catalog.py",
+        "tools/agent_tools/tool_catalog.py",
         (
             "tools/ci/run_all_checks.sh",
             "tools/README.md",
@@ -117,7 +124,7 @@ TOOL_GATES = {
         ),
     ),
     "tool_convention_drift": (
-        "tools/agent_tools/check_tool_convention_drift.py",
+        "tools/agent_tools/tool_drift.py",
         (
             "tools/ci/run_all_checks.sh",
             "tools/README.md",
@@ -129,6 +136,14 @@ TOOL_GATES = {
         (
             "tools/ci/run_all_checks.sh",
             "agents/workflows/agent-canon-pr-workflow.md",
+        ),
+    ),
+    "container_config": (
+        "tools/ci/container_config.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "agents/skills/environment-maintenance.md",
+            "documents/coding-conventions-project.md",
         ),
     ),
 }

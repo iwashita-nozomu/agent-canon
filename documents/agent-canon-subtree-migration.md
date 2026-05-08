@@ -112,7 +112,9 @@ canonical remote ではありません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は repo-local implementation change と同じ PR に混ぜません。
 - PR 前の機械 gate は `make agent-canon-pr-check` を使います。
-- merge 後は `bash tools/sync_agent_canon.sh push` で upstream `agent-canon` を更新します。
+- dirty shared-canon 差分は pin 更新で消さず、proposal branch または AgentCanon PR で upstream に取り込みます。
+- AgentCanon PR / proposal merge 後は template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
+- `bash tools/sync_agent_canon.sh push` は maintainer が direct upstream push を明示した例外だけにします。
 - GitHub 管理では、template PR と AgentCanon PR / commit の対応、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態を PR 本文に残します。
 
 ## 完了条件
@@ -372,10 +374,11 @@ commit message には `AgentCanon subtree-to-submodule migration` と、local wo
 ### 7.6 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 
 ```bash
-bash tools/sync_agent_canon.sh push
+bash tools/update_agent_canon.sh proposal-branch
+bash tools/update_agent_canon.sh push-proposal
 ```
 
-通常は proposal branch 経由で戻します。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
+通常は proposal branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
 
 ### 7.6 現在の設定確認
 
@@ -457,7 +460,7 @@ exit 条件:
 legacy subtree repo は移行完了まで次を互換 path として使えます。
 
 - `bash tools/sync_agent_canon.sh pull`
-- `bash tools/sync_agent_canon.sh push`
+- `bash tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
 - `git subtree pull --prefix=vendor/agent-canon`
 - `git subtree push --prefix=vendor/agent-canon`
 - `snapshot_import_no_subtree*` fallback

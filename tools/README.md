@@ -4,8 +4,9 @@
 responsibility Documents tools for this repository.
 upstream design ../AGENTS.md shared canon runtime contract
 downstream design catalog.yaml structured AgentCanon tool catalog
-downstream implementation agent_tools/check_tool_catalog.py validates catalog/docs consistency
-downstream implementation agent_tools/check_tool_convention_drift.py validates tool/convention trace contracts
+downstream design ../documents/tools/tool-docs.toml same-named tool documentation map
+downstream implementation agent_tools/tool_catalog.py validates catalog/docs consistency
+downstream implementation agent_tools/tool_drift.py validates tool/convention trace contracts
 @dependency-end
 -->
 
@@ -16,23 +17,30 @@ agent helper、CI/check、container runner、experiment helper、Markdown 整備
 ## Tool Catalog
 
 `tools/catalog.yaml` is the structured AgentCanon tool catalog. It separates
-canonical shared tools, compatibility wrappers, and legacy provenance entries
-without turning README prose into a second registry. Use it to check whether a
-tool is callable by default, wired into CI / PR validation, covered by tests, or
-preserved only for import provenance.
+canonical shared tools and compatibility wrappers without turning README prose
+into a second registry. Use it to check whether a tool is callable by default,
+wired into CI / PR validation, covered by tests, or documented by the
+same-named tool-doc map.
+
+`documents/tools/tool-docs.toml` maps selected tool entrypoints to one
+reader-facing Markdown file each. The tool and document basenames must match
+so the catalog can be enumerated mechanically.
 
 Validation entrypoints:
 
 ```bash
-python3 tools/agent_tools/check_tool_catalog.py
-python3 tools/agent_tools/check_tool_convention_drift.py
+python3 tools/agent_tools/tool_catalog.py
+python3 tools/agent_tools/tool_drift.py
 ```
 
-`check_tool_catalog.py` validates catalog shape, path existence, docs/tests,
-default wiring, and `legacy_provenance` constraints.
-`check_tool_convention_drift.py` uses dependency manifests plus the catalog to
+`tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
+docs/tests, default wiring, retired legacy paths, and tool-doc one-to-one
+mapping. Use
+`--format markdown` when you need the catalog crosswalk as a reader-facing
+tool table.
+`tool_drift.py` uses dependency manifests plus the catalog to
 detect stale tool/convention links, missing required PR-flow checks, and
-Legacy/default confusion.
+retired legacy tool reintroduction.
 
 ## 含めるもの
 
@@ -40,15 +48,15 @@ Legacy/default confusion.
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
-  - `oop_rule_inventory.py` は OOP policy、analyzer、reviewer、test、legacy support placement を検査し、旧 convention viewer を default workflow から切り離します。
-  - `check_tool_catalog.py` は `tools/catalog.yaml` を検査し、canonical tool、compatibility wrapper、legacy provenance の混在を止めます。
-  - `check_tool_convention_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
+  - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
+  - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
   - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence、Copilot discovery surface を検査します。
+  - `container_config.py` は standalone AgentCanon では runtime config absence を skip として扱い、template / derived repo では `docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の静的整合を検査します。
 - `docs/`
   - Markdown lint、math check、link audit、format、mirror sync、design document consolidation helpers
 - `data/`
@@ -59,14 +67,14 @@ Legacy/default confusion.
   - portable audit-log schema and JSONL writer
 - `experiments/`
   - topic scaffold、registry sync、managed run
-- `legacy/`
-  - imported repo-local tools kept for provenance and future promotion PRs. These entries must be represented in `tools/catalog.yaml` with `status: legacy_provenance` and `callable_by_default: false`.
+- `oop/`
+  - `python/` と `cpp/` に分けた OOP readability / inventory entrypoint。共有実装は `oop/shared/` に置き、言語別の default path を機械的に列挙できるようにします。
 - `shared/`
   - shared helper
 - `validation/`
   - generic validation helper
 - `static_analysis/`
-  - language-organized index for Python, C/C++, and common static-analysis entrypoints. Implementations remain in `agent_tools/` until a language family needs a dedicated package.
+  - language-organized index for Python, C/C++, and common static-analysis entrypoints. OOP readability implementations are exposed through `oop/python/` and `oop/cpp/`.
 - top-level helper
   - `sync_agent_canon.sh`
     - `plan` は derived repo から見た update route を read-only で出します。
@@ -75,7 +83,7 @@ Legacy/default confusion.
     - `ensure-latest` は task 開始時に upstream `agent-canon` と local `vendor/agent-canon` を揃えます。
     - `agent-canon` remote が未設定なら GitHub canonical remote `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。local bare mirror を使う repo だけ `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git` を明示します。
     - submodule repo では gitlink commit を確認し、必要なら submodule pointer を fast-forward 更新します。
-    - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
+  - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - `review-submodule` は submodule-local 差分の PR 要否、conflict、safe align 可否を判定します。
@@ -93,6 +101,8 @@ Legacy/default confusion.
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
 1. submodule 内に local 差分がある場合は `bash tools/update_agent_canon.sh review-submodule` で proposal / conflict / safe-align 判断を機械化します。
+1. dirty shared-canon 差分がある場合は `make agent-canon-ensure-latest` で消さず、`make agent-canon-proposal-branch` / `make agent-canon-push-proposal` または AgentCanon PR に出します。
+1. AgentCanon PR / proposal が merge された後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。
 1. `make agent-canon-update` で source repo refresh と local snapshot sync を適用します。
 1. root view が drift した場合だけ `make agent-canon-links` を使います。
 1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` を使います。
@@ -103,6 +113,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `run_comprehensive_review.sh`
   - `run_pytest_with_logs.sh`
   - `docker_dependency_validator.sh`
+  - `ci/container_config.py`
   - `check_doc_test_triplet.py`
   - `agent_tools/waterfall_gate_check.py`
   - `agent_tools/evaluate_agent_run.py`
@@ -117,7 +128,10 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/check_algorithm_module_nested_contract.py`
   - `agent_tools/agent_update_branch.sh`
   - `agent_tools/vector_search.py`
-  - `agent_tools/oop_rule_inventory.py`
+  - `oop/python/readability.py`
+  - `oop/python/rule_inventory.py`
+  - `oop/cpp/readability.py`
+  - `oop/cpp/rule_inventory.py`
 
 ## Repo-Local Tool Import Policy
 
@@ -128,9 +142,9 @@ AgentCanon implementations blindly. Use this order:
 1. Keep the current AgentCanon implementation when it is newer or broader.
 1. Promote unique, repo-neutral capability into the nearest canonical family:
    `agent_tools/`, `ci/`, `docs/`, `data/`, `hlo/`, `audit/`,
-   `experiments/`, or `validation/`.
-1. Preserve project-specific or stale tools under `tools/legacy/<repo-slug>/`
-   with provenance and no default CI wiring.
+   `experiments/`, `oop/`, or `validation/`.
+1. Keep project-specific or stale tools in the source repository, or delete
+   them after review. Do not add new `tools/legacy/` paths to AgentCanon.
 1. Record the disposition in `documents/repo-local-tool-imports.md`.
 1. Add or update the corresponding `tools/catalog.yaml` entry.
 
@@ -147,14 +161,11 @@ Current promoted helpers:
 - `tools/docs/organize_designs.py`
 - `tools/docs/tfidf_similar_docs.py`
 
-Legacy imports live under `tools/legacy/jax_solver_util/` and are excluded from
-default workflow promises until a dedicated promotion PR modernizes them. The
-machine-readable status is `legacy_provenance` in `tools/catalog.yaml`; do not
-use update-route legacy subtree wording for these tool provenance entries.
-OOP / convention-check support legacy files are grouped under
-`tools/legacy/jax_solver_util/oop_check_support/`; use
-`tools/agent_tools/oop_rule_inventory.py` and
-`tools/agent_tools/analyze_oop_readability.py` for canonical checks.
+Legacy tool imports are retired in AgentCanon. Historical disposition remains
+in `documents/repo-local-tool-imports.md`; live tooling must be represented as
+canonical or compatibility entries in `tools/catalog.yaml`, with reader-facing
+docs registered in `documents/tools/tool-docs.toml` when the tool needs a
+one-to-one explanation page.
 
 ## Result Log And Visualization Tools
 
@@ -323,8 +334,8 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
-- `check_tool_catalog.py` validates the structured AgentCanon tool catalog, default wiring, docs/tests, and legacy provenance constraints.
-- `check_tool_convention_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
+- `tool_catalog.py` validates the structured AgentCanon tool catalog, per-entry summaries, default wiring, docs/tests, retired legacy paths, and one-to-one tool docs.
+- `tool_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
 
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
@@ -336,19 +347,31 @@ Use code dependency evidence to understand import/include/source reachability, a
 ## Static Design Analysis Tools
 
 - `check_convention_compliance.py` aggregates convention compliance evidence. It verifies that every convention source exists, every normative convention document exposes a verification route, prohibition-bearing documents carry a prohibition section, every manifestable convention gate has a tool or prompt-eval check, every workflow calls the convention gate, workflow prohibitions remain wired, and skill-routing prompts delegate tool-covered rules to the checker.
-- `check_tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, and callable legacy provenance entries.
-- `check_tool_convention_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, and the tool catalog.
+- `tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, retired legacy entries, and broken tool-doc mappings.
+- `tool_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, and the tool catalog.
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
-- `analyze_oop_readability.py` scores Python and C++ OOP readability risks. It checks vague class and helper names, oversized classes/functions, wide public surfaces, excessive state/parameters, static-method namespace classes, `None` / `nullptr` runtime routing, mixed transform/effect boundaries, simple cognitive-complexity signals, mathematically redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
-- `analyze_oop_readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.
-- `analyze_oop_readability.py --exclude vendor --exclude reports ...` keeps vendored snapshots and generated artifacts out of external-repo scans. Record the exact path set and excludes beside the report.
-- `analyze_oop_readability.py --review-prompt-out <path>` writes a prompt for `oop_readability_reviewer`. The reviewer documents the mechanical report, but does not change the score, thresholds, counts, paths, line numbers, or pass/fail verdict.
+- `tools/oop/python/readability.py` scores Python OOP readability risks. It checks vague class/helper names, oversized classes/functions, wide public surfaces, excessive instance state/parameters, static-method namespace classes, `None` runtime routing, mixed transform/effect boundaries, cognitive-complexity signals, redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
+- `tools/oop/cpp/readability.py` scores C/C++ OOP readability risks. It checks vague type names, oversized classes/functions, wide public fields/methods, excessive parameters/base classes, `nullptr` runtime routing, mixed transform/effect boundaries, pass-through wrappers, identity functions, and trivial formatting functions.
+- `tools/oop/*/readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.
+- `tools/oop/*/readability.py --exclude vendor --exclude reports ...` keeps vendored snapshots and generated artifacts out of external-repo scans. Record the exact path set and excludes beside the report.
+- `tools/oop/*/readability.py --review-prompt-out <path>` writes a prompt for `oop_readability_reviewer`. The reviewer documents the mechanical report, but does not change the score, thresholds, counts, paths, line numbers, or pass/fail verdict.
 
 These tools are review aids.
 Use them to set baseline / target / actual scores in refactor or design artifacts.
 For hardcoded numeric literals, treat `HARDCODED_NUMBERS=fail` as a fix-surface issue: either name the value, move it to typed configuration / API input, or justify the literal with a local allowance.
 For OOP readability, keep the mechanical report as the source of truth and use `oop_readability_reviewer` only to write the reader-facing interpretation and false-positive notes.
+
+## Container Configuration Tools
+
+- `tools/ci/container_config.py` statically validates Dockerfile, runtime pack,
+  and devcontainer configuration without requiring Docker or Podman to run. It
+  returns `CONTAINER_CONFIG=skip` when a standalone AgentCanon source checkout
+  has no `docker/` or `.devcontainer/` surface.
+- `tools/docker_dependency_validator.sh` remains the shell-level dependency
+  contract for canonical Docker image contents.
+- `tools/ci/run_container_pack.py --print-only` previews the build and smoke
+  commands resolved from `docker/packs/*.toml`.
 
 ## 含めないもの
 

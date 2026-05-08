@@ -5,9 +5,10 @@ responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
 upstream design ../documents/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
+upstream design ../documents/github-copilot-configuration.md defines Copilot configuration and PR-template routing
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
-downstream implementation ../tools/agent_tools/check_tool_convention_drift.py validates PR/tool trace contracts
+downstream implementation ../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
 downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side AgentCanon PRs
 @dependency-end
 -->
@@ -17,6 +18,7 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - AgentCanon surface changed:
 - Why this belongs in AgentCanon instead of one derived repo:
 - Compatibility risk:
+- standalone AgentCanon repository PR / template-derived propagation:
 
 ## Scope
 
@@ -30,11 +32,32 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 
 ## Canon Discipline
 
+- [ ] This PR targets the standalone AgentCanon repository, not a template / derived repo pin PR.
+- [ ] Template / derived repo follow-up, if needed, will use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
 - [ ] The source of truth was edited in AgentCanon, not only through a derived repo root view.
 - [ ] New shared surfaces are listed in `documents/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
 - [ ] `.agents/skills` and `.claude/skills` mirrors are synchronized when skill prompts changed.
 - [ ] Root-copy surfaces are synchronized through `bash tools/sync_agent_canon.sh link-root` when applicable.
 - [ ] No derived-repo project-specific policy leaked into AgentCanon.
+
+## Plan Mode Evidence
+
+- [ ] Plan mode was used before non-trivial AgentCanon, Copilot, PR-template, GitHub Actions, or shared runtime-surface changes.
+- [ ] Written plan is included in the PR body, issue, run bundle, or linked comment when the runtime did not expose an explicit Plan mode.
+- [ ] Trivial-change exception is explained below when Plan mode was not used.
+
+Plan / exception:
+
+## Copilot Configuration Impact
+
+- [ ] `documents/github-copilot-configuration.md` was reviewed.
+- [ ] `.github/copilot-instructions.md` changed / reviewed / not affected.
+- [ ] `.github/instructions/*.instructions.md` changed / reviewed / not affected.
+- [ ] `.github/agents/*.md` changed / reviewed / not affected.
+- [ ] GitHub Copilot MCP, `copilot-setup-steps.yml`, or Copilot environment settings changed / reviewed / not affected.
+- [ ] PR template routing still separates standalone AgentCanon repository PRs from template / derived repo pin PRs.
+
+Impact notes:
 
 ## Validation Evidence
 
@@ -42,8 +65,8 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - [ ] `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
-- [ ] `python3 tools/agent_tools/check_tool_catalog.py`
-- [ ] `python3 tools/agent_tools/check_tool_convention_drift.py`
+- [ ] `python3 tools/agent_tools/tool_catalog.py`
+- [ ] `python3 tools/agent_tools/tool_drift.py`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] `bash tools/ci/run_docs_checks.sh`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`
@@ -62,6 +85,7 @@ paste the key pass lines here
 
 - [ ] AgentCanon GitHub `main` will be updated first.
 - [ ] Template `vendor/agent-canon` pin will be updated after AgentCanon merge.
+- [ ] Template / derived repo will bring the change back with `make agent-canon-ensure-latest` and `bash tools/sync_agent_canon.sh link-root`, not by direct `sync_agent_canon.sh push`.
 - [ ] Template `.gitmodules` impact was reviewed when URL, branch, or checkout behavior is affected.
 - [ ] Local bare mirror, if used, is compatibility-only and not the latest source of truth.
 - [ ] Derived repos that need the update are listed or intentionally deferred.
