@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -186,6 +187,21 @@ def build_env_check_command() -> list[str]:
     return build_shell_invocation("/bin/bash", script)
 
 
+def workspace_setup_command(command: list[str], *, container_workspace: str) -> list[str]:
+    """Return a command that runs workspace setup before the requested command."""
+    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
+    lines = [
+        "set -euo pipefail",
+        (
+            f"if [ -f {shlex.quote(installer)} ]; then "
+            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
+            "fi"
+        ),
+        f"exec {shlex.join(command)}",
+    ]
+    return build_shell_invocation("/bin/bash", join_shell_lines(lines))
+
+
 def main() -> int:
     """Run the CLI."""
     try:
@@ -204,6 +220,7 @@ def main() -> int:
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
+        container_workspace = pack.runtime.workspace_mount
         build_command = build_build_command(builder, pack)
         print_label_and_command("build", build_command)
 
@@ -213,7 +230,10 @@ def main() -> int:
                 builder,
                 pack,
                 workspace_root=workspace_path("."),
-                command=build_env_check_command(),
+                command=workspace_setup_command(
+                    build_env_check_command(),
+                    container_workspace=container_workspace,
+                ),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
             )
@@ -223,7 +243,10 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_path("."),
-            command=resolution.command,
+            command=workspace_setup_command(
+                resolution.command,
+                container_workspace=container_workspace,
+            ),
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=resolution.workdir,

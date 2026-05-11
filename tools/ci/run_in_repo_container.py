@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import subprocess
 import sys
 
@@ -16,6 +17,8 @@ from container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
+    build_shell_invocation,
+    join_shell_lines,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
@@ -110,6 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Open the configured shell instead of running a command.",
     )
     parser.add_argument(
+        "--skip-workspace-setup",
+        action="store_true",
+        help=(
+            "Skip the workspace-mounted setup step. By default, the runner "
+            "runs docker/install_python_dependencies.sh when present."
+        ),
+    )
+    parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
         help=(
@@ -139,6 +150,30 @@ def normalize_command(command: list[str], shell_session: bool) -> list[str]:
     return normalized
 
 
+def workspace_setup_command(
+    command: list[str],
+    *,
+    shell: str,
+    container_workspace: str,
+    skip_setup: bool,
+) -> list[str]:
+    """Return a command that runs workspace setup before the requested command."""
+    if skip_setup:
+        return command
+
+    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
+    lines = [
+        "set -euo pipefail",
+        (
+            f"if [ -f {shlex.quote(installer)} ]; then "
+            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
+            "fi"
+        ),
+        f"exec {shlex.join(command)}",
+    ]
+    return build_shell_invocation(shell, join_shell_lines(lines))
+
+
 def main() -> int:
     """Run the CLI."""
     try:
@@ -153,6 +188,15 @@ def main() -> int:
         builder = resolve_builder(args.builder, print_only=args.print_only)
         workspace_root = workspace_path(args.workspace_root)
         command = normalize_command(args.command, shell_session=args.shell_session)
+        container_workspace = args.container_workspace or pack.runtime.workspace_mount
+        shell = args.shell or pack.runtime.shell
+        run_payload = command if command else [shell]
+        run_payload = workspace_setup_command(
+            run_payload,
+            shell=shell,
+            container_workspace=container_workspace,
+            skip_setup=args.skip_workspace_setup,
+        )
 
         build_command = build_build_command(
             builder, pack, pull=args.pull, no_cache=args.no_cache
@@ -161,7 +205,7 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_root,
-            command=command if command else [args.shell or pack.runtime.shell],
+            command=run_payload,
             shell=args.shell,
             workdir=args.workdir,
             container_workspace=args.container_workspace,
