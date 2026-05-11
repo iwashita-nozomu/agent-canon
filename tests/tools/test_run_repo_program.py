@@ -57,6 +57,7 @@ def test_print_only_python_file_uses_python_runner_and_env_check() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "env-check:" in result.stdout
+    assert "docker/install_python_dependencies.sh" in result.stdout
     assert "python3 /workspace/tools/ci/check_jax_export_stack.py" in result.stdout
 
 
@@ -84,6 +85,7 @@ def test_print_only_command_without_workspace_file_runs_directly() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "run:" in result.stdout
+    assert "docker/install_python_dependencies.sh" in result.stdout
     assert "python3 --version" in result.stdout
 
 
@@ -101,3 +103,4 @@ def test_run_in_repo_container_print_only_publishes_ports() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "-p 8888:8888" in result.stdout
+    assert "docker/install_python_dependencies.sh" in result.stdout
