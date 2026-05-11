@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 try:
@@ -37,7 +36,7 @@ DERIVED_REPO_STALE_STRINGS = (
 
 
 def is_shared_template_bootstrap_doc(relative_path: Path, path: Path) -> bool:
-    """Return whether ``path`` is the shared template bootstrap document view."""
+    """Return whether ``path`` is still a legacy shared bootstrap symlink view."""
     if relative_path != Path("documents/template-bootstrap.md") or not path.is_symlink():
         return False
     try:

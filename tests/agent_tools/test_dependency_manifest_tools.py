@@ -570,6 +570,66 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
+    def test_graph_lists_related_dependency_surfaces_for_focus_path(self) -> None:
+        """Focused graph output should list declared and incoming dependency edges."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.py"
+            dependent = root / "tests" / "test_source.py"
+            design = root / "design.md"
+            dependent.parent.mkdir(parents=True)
+            design.write_text("# Design\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Exercises focused dependency graph listing.",
+                        "# upstream design design.md source design",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            dependent.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Tests focused dependency graph listing.",
+                        "# upstream implementation ../source.py source behavior",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--list-related",
+                "--focus",
+                "source.py",
+                "source.py",
+                "tests/test_source.py",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_RELATED_SURFACE=source.py", result.stdout)
+            self.assertIn(
+                "DEPENDENCY_RELATED_EDGE role=declared_upstream "
+                "kind=design source=source.py target=design.md",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEPENDENCY_RELATED_EDGE role=incoming_upstream "
+                "kind=implementation source=tests/test_source.py target=source.py",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_RELATED_SURFACES=1", result.stdout)
+
     def test_symlink_root_views_are_skipped_without_breaking_scan(self) -> None:
         """Root symlink views are owned by link-root and do not fail header scans."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -263,8 +263,8 @@ Responsibilities:
 - fail manifest files that are isolated from the edge graph
 - validate self reference
 - detect cycles separately in upstream and downstream graphs
-- print upstream closure for changed files
-- print downstream closure for changed files
+- list every manifest edge declared by, or pointing at, focused changed files
+- print upstream and downstream related surfaces for changed files
 - emit machine-readable TSV for future visualization
 - with `--check-bidirectional`, validate bidirectional consistency and kind match on reverse edges
 
@@ -284,6 +284,7 @@ Responsibilities:
 - offer `--explain-missing` for owner-classified missing-header repair output
 - accept `--allow-frontmatter` and pass it to the manifest tools for policy-explicit CI callers
 - pass `--check-bidirectional` through to graph validation when strict reverse-edge review is requested
+- offer `--list-changed-dependencies` so checkpoint review can hand reviewers every surface that changed files declare or are referenced by
 
 Template repos expose `make dependency-review-surfaces` to run strict review against both the parent root view and `vendor/agent-canon` source tree.
 

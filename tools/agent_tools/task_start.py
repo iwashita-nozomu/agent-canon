@@ -285,6 +285,8 @@ def main() -> int:
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
     print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
+    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST={preflight.checklist_path}")
+    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS={preflight.checklist_status}")
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
     print(f"WORKSPACE_ROOT={workspace_root}")

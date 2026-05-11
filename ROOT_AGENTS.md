@@ -79,6 +79,7 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - Missing shared-surface files must be checked in the template root, `vendor/agent-canon/`, the standalone AgentCanon checkout, `.gitmodules`, and `documents/SHARED_RUNTIME_SURFACES.md` before recreating files.
 - AgentCanon changes found while working on a template PR must first be evaluated against the standalone AgentCanon PR/checklist path. Do not hide shared-canon changes inside a template-only diff unless the scope explicitly says the change is template-local.
 - Root shared-surface edits must be made in `vendor/agent-canon/` unless the file is intentionally template-local. Root symlink/copy views should be repaired with `bash tools/sync_agent_canon.sh link-root` instead of edited as a separate truth surface.
+- In submodule repos, unrelated parent dirty state does not block `make agent-canon-ensure-latest`. The required clean surface is `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views that `link-root` may mutate.
 - `goal.md` is always repo-local state. It must not be restored as a shared symlink and must not be copied from AgentCanon during `link-root` repair.
 - For shared-canon tasks, closeout evidence must include `git submodule status vendor/agent-canon`, the AgentCanon GitHub `main` SHA or PR head SHA, and the template submodule pin SHA.
 - Local bare mirror status is required only when the user request, goal, or workflow scope mentions `/mnt/git` or local mirror propagation.
@@ -87,8 +88,8 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 
 ## Required Before Implementation
 
-- task 開始時、repo が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。
-- task 開始時に repo が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、commit / stash 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
+- task 開始時、AgentCanon update surface が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
+- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、AgentCanon PR / proposal / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。

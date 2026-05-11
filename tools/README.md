@@ -52,6 +52,7 @@ retired legacy tool reintroduction.
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
+  - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
@@ -203,6 +204,9 @@ After evidence is verified, `workflow_monitor.py --closeout-token-preset` record
 `bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 `compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
+When a run uses skills, prompt eval evidence is required. Run
+`evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
+`EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -309,17 +313,31 @@ Do not mark criteria done from intent alone; each checked item needs a report, c
 ## Skill And Workflow Prompt Evals
 
 `evaluate_skill_workflow_prompts.py` runs frozen checklist evals for skill and workflow prompt surfaces.
-Use it before and after prompt repair when changing agent-facing skills or workflows.
+Use it whenever a skill is used, and before and after prompt repair when changing
+agent-facing skills or workflows.
 
 ```bash
 python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --manifest agents/evals/skill_workflow_prompt_eval.toml \
-  --report-out reports/skill-workflow-prompt-eval.md
+  --accumulate \
+  --run-id <run-id> \
+  --skill-used agent-orchestration
 ```
 
 The runner also audits the manifest itself. Do not close prompt-improvement work unless
 `EVAL_STATUS=pass`, `EVAL_AUDIT_STATUS=pass`, and `EVAL_GROWTH_CANDIDATES=0` all appear in the
 machine-readable output.
+Detailed reports accumulate under
+`agents/evals/results/skill-workflow-prompt/` with this naming convention:
+
+```text
+<eval_run_id>-<status>-<skill-slug>.md
+```
+
+`eval_run_id` is assigned as
+`skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>`. The runner does
+not overwrite existing reports; if an explicit `--report-out` path already
+exists, it writes a sibling file with the unique `eval_run_id` appended.
 Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
 When one prompt surface needs more coverage, consolidate the checks into that surface's existing
 eval entry instead of adding a parallel duplicate-target eval.
@@ -333,7 +351,9 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
+- `check_dependency_graph.sh --list-related --focus <path>` lists every manifest edge declared by, or pointing at, a changed code/doc path so reviewers can see all dependent surfaces before implementation review.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
+- `run_repo_dependency_review.sh --list-changed-dependencies` adds the same related-surface listing for current changed files.
 - `tool_catalog.py` validates the structured AgentCanon tool catalog, per-entry summaries, default wiring, docs/tests, retired legacy paths, and one-to-one tool docs.
 - `tool_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
 

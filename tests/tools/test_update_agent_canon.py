@@ -1170,6 +1170,56 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         (work_dir / "README.md").write_text("# AgentCanon\n", encoding="utf-8")
         (work_dir / "ROOT_AGENTS.md").write_text("# Root agents\n", encoding="utf-8")
         (work_dir / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
+        (work_dir / "tools" / "agent_tools").mkdir(parents=True)
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
+            work_dir / "tools" / "agent_tools" / "surface_manifest.py",
+        )
+        (work_dir / "documents").mkdir()
+        (work_dir / "documents" / "shared-runtime-surfaces.toml").write_text(
+            "\n".join(
+                [
+                    'version = 1',
+                    'prefix = "vendor/agent-canon"',
+                    '',
+                    '[[surface]]',
+                    'path = "AGENTS.md"',
+                    'mode = "symlink"',
+                    'source = "ROOT_AGENTS.md"',
+                    'owner = "agent-canon"',
+                    'class = "runtime_surface"',
+                    '',
+                    '[[group]]',
+                    'mode = "symlink"',
+                    'owner = "agent-canon"',
+                    'class = "runtime_surface"',
+                    'paths = [',
+                    '  "CLAUDE.md",',
+                    '  ".github/AGENTS.md",',
+                    '  ".github/copilot-instructions.md",',
+                    ']',
+                    '',
+                    '[[group]]',
+                    'mode = "copy"',
+                    'owner = "github-path-constraint"',
+                    'class = "github_copy"',
+                    'local_override_allowed = false',
+                    'paths = [',
+                    '  ".github/workflows/agent-coordination.yml",',
+                    '  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",',
+                    ']',
+                    '',
+                    '[[surface]]',
+                    'path = "goal.md"',
+                    'mode = "repo_state"',
+                    'owner = "project"',
+                    'class = "durable_state"',
+                    'local_override_allowed = true',
+                    '',
+                ]
+            ),
+            encoding="utf-8",
+        )
         (work_dir / ".github" / "workflows").mkdir(parents=True)
         (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
         (work_dir / ".github" / "AGENTS.md").write_text(
@@ -1189,7 +1239,16 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             encoding="utf-8",
         )
         subprocess.run(
-            ["git", "add", "README.md", "ROOT_AGENTS.md", "CLAUDE.md", ".github"],
+            [
+                "git",
+                "add",
+                "README.md",
+                "ROOT_AGENTS.md",
+                "CLAUDE.md",
+                ".github",
+                "documents",
+                "tools",
+            ],
             cwd=work_dir,
             check=True,
         )

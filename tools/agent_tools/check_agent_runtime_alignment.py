@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
+# upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -35,6 +36,7 @@ from agent_team import (
     task_ids,
     workflow_spawn_budget,
 )
+from vendor_skill_adapters import VendorSkillValidator
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
@@ -137,6 +139,7 @@ def validate_project_hooks() -> None:
         "pre_tool_guard.py",
         "agent_canon_read_warning.py",
         "goal_completion_guard.py",
+        "oop_readability_guard.py",
     ):
         ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")
         ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
@@ -376,6 +379,16 @@ def validate_public_skill_shims() -> None:
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
 
 
+def validate_vendor_skill_adapters() -> None:
+    """Check that third-party skill vendor adapters are manifest-backed."""
+    findings = VendorSkillValidator(ROOT).validate(require_adapters=True)
+    ensure(
+        not findings,
+        "vendor skill adapter findings: "
+        + "; ".join(finding.render() for finding in findings[:8]),
+    )
+
+
 def validate_bundle_outputs() -> None:
     """Create temporary bundles for every catalog task and full-team run."""
     config = load_team_config()
@@ -507,6 +520,7 @@ def main() -> int:
     validate_team_config_references()
     validate_task_catalog_references()
     validate_public_skill_shims()
+    validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0

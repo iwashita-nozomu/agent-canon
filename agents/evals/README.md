@@ -24,6 +24,32 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --manifest agents/evals/skill_workflow_prompt_eval.toml
 ```
 
+When a run uses skills, run the same prompt eval with accumulated evidence.
+Detailed reports are stored in
+`agents/evals/results/skill-workflow-prompt/` and are never overwritten during
+normal agent work:
+
+```bash
+python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
+  --manifest agents/evals/skill_workflow_prompt_eval.toml \
+  --accumulate \
+  --run-id <run-id> \
+  --skill-used agent-orchestration
+```
+
+The file name convention is:
+
+```text
+<eval_run_id>-<status>-<skill-slug>.md
+```
+
+`eval_run_id` is assigned by the tool as
+`skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>`.
+The machine-readable output includes `EVAL_RUN_ID=<eval_run_id>` and
+`EVAL_ACCUMULATED_REPORT=<path>` for accumulated runs.
+If an explicitly requested `--report-out` path already exists, the tool writes a
+sibling path with the same `eval_run_id` appended instead of overwriting it.
+
 An eval passes only when every critical checklist item passes and the manifest audit passes.
 The manifest audit fails closed on duplicate eval IDs, duplicate explicit targets, and duplicate
 checklist IDs within an eval.
@@ -46,7 +72,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
 closeout evidence, and validation logs. They require observable events such as skill invocation,
-subagent routing, tool gates, prompt eval runs, feedback resolution, subagent lifecycle closeout,
+subagent routing, tool gates, accumulated prompt eval runs, feedback resolution, subagent lifecycle closeout,
 static-analysis feedback, execution path comparison, token footprint comparison, and diff-check decisions.
 When two runs can choose different paths, compare them with
 `tools/agent_tools/compare_agent_run_paths.py` and record its

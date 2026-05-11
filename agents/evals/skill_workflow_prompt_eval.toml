@@ -815,6 +815,12 @@ critical = true
 description = "Documents prompt eval manifest duplicate and growth-candidate audit gates."
 required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
 
+[[evals.checklist]]
+id = "EVALS-README-ACCUMULATE-1"
+critical = true
+description = "Documents accumulated prompt eval results for skill use."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "agents/evals/results/skill-workflow-prompt/"]
+
 [[evals]]
 id = "tools-readme-prompt-eval-audit"
 target = "tools/README.md"
@@ -827,6 +833,12 @@ critical = true
 description = "Requires prompt eval audit status and growth-candidate zero closeout condition."
 required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate explicit targets"]
 
+[[evals.checklist]]
+id = "TOOLS-README-EVAL-ACCUMULATE-1"
+critical = true
+description = "Requires unique accumulated prompt eval report naming."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "<eval_run_id>-<status>-<skill-slug>\\.md"]
+
 [[evals]]
 id = "documents-tools-readme-prompt-eval-audit"
 target = "documents/tools/README.md"
@@ -838,3 +850,9 @@ id = "DOCS-TOOLS-EVAL-AUDIT-1"
 critical = true
 description = "Requires prompt eval audit status and duplicate-growth candidate wording."
 required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs"]
+
+[[evals.checklist]]
+id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
+critical = true
+description = "Requires unique accumulated prompt eval report naming."
+required_regex = ["--accumulate", "agents/evals/results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]

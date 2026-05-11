@@ -2,7 +2,7 @@
 @dependency-start
 responsibility Documents オブジェクト指向設計方針 for this repository.
 upstream design ./README.md documents index and discovery path
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror ownership
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./design/protocols.md Protocol and type-boundary placement contract

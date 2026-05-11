@@ -24,6 +24,7 @@ PRE_TOOL_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "pre_tool_guard.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 AGENT_CANON_READ_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "agent_canon_read_warning.py"
+OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -48,6 +49,8 @@ class CodexHooksTest(unittest.TestCase):
         prompt_commands = [hook["command"] for hook in prompt_hooks]
         pre_tool = hooks["hooks"]["PreToolUse"][0]
         pre_tool_commands = [hook["command"] for hook in pre_tool["hooks"]]
+        post_tool = hooks["hooks"]["PostToolUse"][0]
+        post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
 
@@ -57,7 +60,10 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(pre_tool["matcher"], "Bash")
         self.assertTrue(any("pre_tool_guard.py" in command for command in pre_tool_commands))
         self.assertTrue(any("agent_canon_read_warning.py" in command for command in pre_tool_commands))
+        self.assertIn("apply_patch", post_tool["matcher"])
+        self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
         self.assertIn("SessionStart", session_start["command"])
         self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
 
@@ -176,3 +182,52 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])
+
+    def test_oop_readability_guard_blocks_changed_python_findings(self) -> None:
+        """OOP guard should block after source edits when changed Python fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('OOP_READABILITY=fail')\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("OOP readability hook", payload["reason"])

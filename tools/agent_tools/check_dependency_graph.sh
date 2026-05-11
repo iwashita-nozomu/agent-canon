@@ -12,13 +12,16 @@ PRINT_EDGES=0
 CHANGED=0
 CHECK_BIDIRECTIONAL=0
 ALLOW_FRONTMATTER=0
+LIST_RELATED=0
+FOCUS_CHANGED=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
+declare -a FOCUS_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [--allow-frontmatter] [paths...]
+  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--list-related] [--focus PATH] [--focus-changed] [--check-bidirectional] [--allow-frontmatter] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
   - isolated manifest files with no graph edge
@@ -28,6 +31,10 @@ Builds separate upstream/downstream dependency graphs and validates:
 With --check-bidirectional it also validates:
   - bidirectional consistency
   - reverse-edge kind matches
+
+With --list-related it prints every manifest edge declared by, or pointing at,
+the focused path set. Use --focus PATH for explicit paths or --focus-changed
+to list the dependency surfaces for current changed files.
 EOF
 }
 
@@ -43,6 +50,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --print-edges)
       PRINT_EDGES=1
+      shift
+      ;;
+    --list-related)
+      LIST_RELATED=1
+      shift
+      ;;
+    --focus)
+      FOCUS_PATHS+=("$2")
+      shift 2
+      ;;
+    --focus-changed)
+      FOCUS_CHANGED=1
       shift
       ;;
     --check-bidirectional)
@@ -72,13 +91,36 @@ collect_paths() {
     return
   fi
   if [[ "$CHANGED" -eq 1 ]]; then
-    {
-      git diff --name-only --diff-filter=ACMRT HEAD -- 2>/dev/null || true
-      git ls-files --others --exclude-standard 2>/dev/null || true
-    } | awk 'NF'
+    collect_changed_paths
     return
   fi
   git ls-files
+}
+
+collect_changed_paths() {
+  {
+    git diff --name-only --diff-filter=ACMRT HEAD -- 2>/dev/null || true
+    git ls-files --others --exclude-standard 2>/dev/null || true
+  } | awk 'NF'
+}
+
+collect_focus_paths() {
+  if [[ ${#FOCUS_PATHS[@]} -gt 0 ]]; then
+    printf '%s\n' "${FOCUS_PATHS[@]}"
+    return
+  fi
+  if [[ "$FOCUS_CHANGED" -eq 1 ]]; then
+    collect_changed_paths
+  fi
+}
+
+normalize_input_path() {
+  local raw_path="$1"
+  if [[ "$raw_path" = /* ]]; then
+    realpath -m --relative-to="$ROOT_DIR" "$raw_path"
+  else
+    realpath -m --relative-to="$ROOT_DIR" "$ROOT_DIR/$raw_path"
+  fi
 }
 
 strip_manifest_line() {
@@ -169,6 +211,32 @@ mv "$manifest_files.sorted" "$manifest_files"
 
 if [[ "$PRINT_EDGES" -eq 1 ]]; then
   cat "$edges_file"
+fi
+
+if [[ "$LIST_RELATED" -eq 1 ]]; then
+  related_count=0
+  while IFS= read -r raw_focus; do
+    [[ -n "$raw_focus" ]] || continue
+    focus="$(normalize_input_path "$raw_focus")"
+    related_count=$((related_count + 1))
+    echo "DEPENDENCY_RELATED_SURFACE=$focus"
+    awk -F '\t' -v file="$focus" '
+      $3 == file {
+        printf "DEPENDENCY_RELATED_EDGE role=declared_%s kind=%s source=%s target=%s\n", $1, $2, $3, $4
+        found = 1
+      }
+      $4 == file {
+        printf "DEPENDENCY_RELATED_EDGE role=incoming_%s kind=%s source=%s target=%s\n", $1, $2, $3, $4
+        found = 1
+      }
+      END {
+        if (!found) {
+          printf "DEPENDENCY_RELATED_EDGE role=none path=%s\n", file
+        }
+      }
+    ' "$edges_file"
+  done < <(collect_focus_paths | sort -u)
+  echo "DEPENDENCY_RELATED_SURFACES=$related_count"
 fi
 
 failures=0

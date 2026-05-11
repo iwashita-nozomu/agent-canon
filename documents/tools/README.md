@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents ツール入口 for this repository.
-upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
@@ -128,6 +128,13 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
 - `tools/agent_tools/file_surface_inventory.py`
   - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
+- `tools/agent_tools/vendor_skill_adapters.py`
+  - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
+  - `python3 tools/agent_tools/vendor_skill_adapters.py --sync` は missing adapter だけを作成し、unmanaged file は上書きしません。
+- `tools/agent_tools/check_dependency_graph.sh`
+  - `--list-related --focus <path>` は、変更 path が宣言する dependency edge と、その path を指す incoming edge をすべて列挙します。
+- `tools/agent_tools/run_repo_dependency_review.sh`
+  - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
 - `tools/agent_tools/review_backlog_scan.sh`
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
   - 例:
@@ -159,7 +166,9 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `mcp/repo_mcp_server.py` の `goal.loop_status`
   - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
-  - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査し、prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
+  - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`agents/evals/results/skill-workflow-prompt/` に詳細結果を蓄積します。
+  - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
+  - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。
 - `tools/agent_tools/compare_agent_run_paths.py`
   - 2 つの run bundle の `workflow_monitoring.md` から `execution_path`、`route_efficiency`、`static_analysis_feedback` を読み、実行経路差分と非効率経路選択を machine-readable に判定します。

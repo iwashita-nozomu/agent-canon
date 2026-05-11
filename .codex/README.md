@@ -121,7 +121,9 @@ or high-risk review. Profiles do not waive workflow gates.
 - `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `PreToolUse` は `hooks/pre_tool_guard.py` で危険な Bash command を block し、`hooks/agent_canon_read_warning.py` で AgentCanon shared-source path の読み取りに warning を出します。
+- `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行し、失敗があれば中間作業でも block します。実装ミスにつながるため、closeout まで先送りしません。
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を継続させます。
+- `Stop` でも `hooks/oop_readability_guard.py` を再実行し、hook を迂回した変更が残っていれば completion を block します。
 - hook の役割は「MCP をユーザーが明示しなくても repo task の標準 preflight として扱う context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。

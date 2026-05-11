@@ -9,6 +9,7 @@
     "downstream implementation hooks/agent_canon_read_warning.py warns on shared-canon reads",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
+    "downstream implementation hooks/oop_readability_guard.py blocks changed-source OOP readability failures",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
     "@dependency-end"
   ],
@@ -63,6 +64,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|python|python3",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed-source OOP readability"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
@@ -71,6 +85,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/goal_completion_guard.py\"",
             "timeout": 15,
             "statusMessage": "Checking goal-loop completion state"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed-source OOP readability"
           }
         ]
       }

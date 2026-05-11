@@ -96,7 +96,11 @@ def write_ready_run(report_dir: Path) -> None:
                     "route_efficiency=efficient selected_inefficient_route=no"
                 ),
                 "- static_analysis_feedback=applied target=$adaptive-improvement-loop",
-                "- prompt_eval_not_required reason=unit-test-run-bundle",
+                (
+                    "- tool_call=evaluate_skill_workflow_prompts.py prompt_eval=pass "
+                    "EVAL_STATUS=pass EVAL_RUN_ID=skill-eval-test "
+                    "EVAL_ACCUMULATED_REPORT=agents/evals/results/skill-workflow-prompt/test.md"
+                ),
                 (
                     "- runtime_feedback=observed source=user "
                     "target=.agents/skills/agent-learning/SKILL.md "

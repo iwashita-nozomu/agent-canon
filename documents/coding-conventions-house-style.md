@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents ハウススタイル規約 for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 downstream design ./object-oriented-design.md expands OOP policy for class and Protocol decisions
 @dependency-end
 -->

@@ -38,6 +38,9 @@ SHARED_CANON_DIRTY_PATH_PREFIXES = (
     "tools/sync_agent_canon.sh",
     "vendor/agent-canon",
 )
+LATEST_CHECKLIST = Path("documents/agent-canon-parent-repo-latest-checklist.md")
+SURFACE_MANIFEST = Path("tools/agent_tools/surface_manifest.py")
+SURFACE_SPEC_COMMANDS = ("link-specs", "copy-specs", "removed-legacy-paths")
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,8 @@ class AgentCanonPreflightResult:
     status: str
     reason: str
     next_step: str
+    checklist_path: str
+    checklist_status: str
 
 
 def project_root_from_script(script_path: Path) -> Path:
@@ -66,11 +71,14 @@ def run_agent_canon_preflight(
     skip: bool = False,
 ) -> AgentCanonPreflightResult:
     """Ensure the local agent-canon snapshot is current when safe to do so."""
+    checklist_path, checklist_status = latest_checklist_status(project_root)
     if skip:
         return AgentCanonPreflightResult(
             status="skipped_by_flag",
             reason="agent-canon preflight skipped by command-line flag",
             next_step="run make agent-canon-ensure-latest manually before editing shared surfaces",
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
         )
 
     if is_agent_canon_source_repo(project_root):
@@ -78,6 +86,8 @@ def run_agent_canon_preflight(
             status="skipped_source_canon",
             reason="workspace is the shared agent-canon source repository",
             next_step="ensure derived template snapshots after committing canon changes",
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
         )
 
     if not is_git_worktree(project_root):
@@ -85,8 +95,11 @@ def run_agent_canon_preflight(
             status="skipped_non_git_workspace",
             reason="workspace root is not a git worktree; preflight is not applicable",
             next_step="run from a git worktree before editing shared AgentCanon surfaces",
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
         )
 
+    update_surface_status = agent_canon_update_surface_status(project_root)
     status_result = subprocess.run(
         ["git", "status", "--short", "--untracked-files=all"],
         cwd=project_root,
@@ -94,27 +107,22 @@ def run_agent_canon_preflight(
         capture_output=True,
         text=True,
     )
-    if status_result.stdout.strip():
-        if dirty_status_mentions_shared_canon(status_result.stdout):
-            return AgentCanonPreflightResult(
-                status="blocked_shared_canon_workflow",
-                reason=(
-                    "shared AgentCanon surface is dirty; route it through a proposal "
-                    "or AgentCanon PR before refreshing the template pin"
-                ),
-                next_step=(
-                    "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
-                    "run_make_agent-canon-ensure-latest"
-                ),
-            )
+    if update_surface_status.strip():
         return AgentCanonPreflightResult(
-            status="blocked_dirty_worktree",
+            status="blocked_shared_canon_workflow",
             reason=(
-                "worktree is dirty; automatic agent-canon ensure-latest is skipped "
-                "until commit or stash"
+                "AgentCanon update surface is dirty; route it through a proposal "
+                "or AgentCanon PR before refreshing the template pin"
             ),
-            next_step="commit_or_stash_then_run_make_agent-canon-ensure-latest",
+            next_step=(
+                "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
+                "run_make_agent-canon-ensure-latest"
+            ),
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
         )
+    if status_result.stdout.strip():
+        print("AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes")
 
     ensure_result = subprocess.run(
         ["make", "agent-canon-ensure-latest"],
@@ -133,7 +141,78 @@ def run_agent_canon_preflight(
         status="pass",
         reason="agent-canon snapshot is current",
         next_step="none",
+        checklist_path=checklist_path,
+        checklist_status=checklist_status,
     )
+
+
+def latest_checklist_status(project_root: Path) -> tuple[str, str]:
+    """Return the expected latest-state checklist path and availability."""
+    candidates = (
+        project_root / "vendor" / "agent-canon" / LATEST_CHECKLIST,
+        project_root / LATEST_CHECKLIST,
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.relative_to(project_root).as_posix(), "present"
+    return candidates[0].relative_to(project_root).as_posix(), "missing"
+
+
+def agent_canon_update_surface_status(project_root: Path) -> str:
+    """Return dirty status for paths that AgentCanon refresh can mutate."""
+    if not is_git_worktree(project_root):
+        return ""
+    paths = ["vendor/agent-canon", ".gitmodules"]
+    paths.extend(surface_manifest_paths(project_root))
+    parent_status = subprocess.run(
+        ["git", "status", "--short", "--untracked-files=all", "--", *paths],
+        cwd=project_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    submodule_root = project_root / "vendor" / "agent-canon"
+    submodule_status = ""
+    if (submodule_root / ".git").exists() and is_git_worktree(submodule_root):
+        submodule_status = subprocess.run(
+            ["git", "status", "--short", "--untracked-files=all"],
+            cwd=submodule_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    return "\n".join(part.strip() for part in (parent_status, submodule_status) if part.strip())
+
+
+def surface_manifest_paths(project_root: Path) -> list[str]:
+    """Return root paths that link-root may overwrite or remove."""
+    script_path = project_root / "vendor" / "agent-canon" / SURFACE_MANIFEST
+    if not script_path.is_file():
+        script_path = project_root / SURFACE_MANIFEST
+    if not script_path.is_file():
+        return list(SHARED_CANON_DIRTY_PATH_PREFIXES)
+    paths: list[str] = []
+    for command in SURFACE_SPEC_COMMANDS:
+        result = subprocess.run(
+            [
+                "python3",
+                str(script_path),
+                "--root",
+                str(project_root),
+                command,
+            ],
+            cwd=project_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return list(SHARED_CANON_DIRTY_PATH_PREFIXES)
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            paths.append(line.split(":", maxsplit=1)[0])
+    return paths
 
 
 def is_git_worktree(project_root: Path) -> bool:

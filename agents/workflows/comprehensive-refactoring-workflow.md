@@ -7,9 +7,9 @@ upstream design implementation-waterfall-workflow.md staged implementation gate
 upstream design ../skills/behavior-preserving-refactor.md behavior-preserving refactor contract
 upstream design ../../documents/object-oriented-design.md OOP boundary policy
 upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
-upstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
-upstream implementation ../../tools/oop/python/readability.py Python OOP readability analyzer
-upstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability analyzer
+downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
+downstream implementation ../../tools/oop/python/readability.py Python OOP readability analyzer
+downstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability analyzer
 @dependency-end
 -->
 

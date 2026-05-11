@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
+import os
 import re
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -81,6 +85,24 @@ class ManifestAudit:
         return self.growth_candidates == 0
 
 
+@dataclass(frozen=True)
+class EvalRunMetadata:
+    """Metadata recorded with one prompt eval run."""
+
+    created_at: str
+    eval_run_id: str
+    used_skills: tuple[str, ...]
+    run_id: str
+
+
+@dataclass(frozen=True)
+class ReportDependencyPaths:
+    """Dependency paths rendered relative to one Markdown report."""
+
+    tool: str
+    manifest: str
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -99,6 +121,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-out",
         help="Optional Markdown report path.",
+    )
+    parser.add_argument(
+        "--accumulate",
+        action="store_true",
+        help=(
+            "Write a unique durable Markdown report under --results-dir. "
+            "Use this whenever a skill is selected or invoked."
+        ),
+    )
+    parser.add_argument(
+        "--results-dir",
+        default="agents/evals/results/skill-workflow-prompt",
+        help=(
+            "Directory for accumulated detailed reports. Defaults to "
+            "agents/evals/results/skill-workflow-prompt."
+        ),
+    )
+    parser.add_argument(
+        "--skill-used",
+        action="append",
+        default=[],
+        help="Skill id used in the run. Repeat for every selected or invoked skill.",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run bundle id recorded in accumulated reports.",
     )
     return parser
 
@@ -315,6 +364,9 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
 def render_machine_status(
     results: tuple[ChecklistResult, ...],
     audit: ManifestAudit,
+    metadata: EvalRunMetadata,
+    accumulated_report: Path | None = None,
+    report_out: Path | None = None,
 ) -> str:
     """Render machine-readable status."""
     total = len(results)
@@ -333,7 +385,13 @@ def render_machine_status(
         f"EVAL_DUPLICATE_TARGETS={len(audit.duplicate_targets)}",
         f"EVAL_DUPLICATE_CHECKLIST_IDS={len(audit.duplicate_checklist_ids)}",
         f"EVAL_GROWTH_CANDIDATES={audit.growth_candidates}",
+        f"EVAL_RUN_ID={metadata.eval_run_id}",
+        f"EVAL_USED_SKILLS={','.join(metadata.used_skills) or '-'}",
     ]
+    if accumulated_report is not None:
+        lines.append(f"EVAL_ACCUMULATED_REPORT={accumulated_report.as_posix()}")
+    if report_out is not None:
+        lines.append(f"EVAL_REPORT_OUT={report_out.as_posix()}")
     for result in results:
         verdict = "pass" if result.passed else "fail"
         lines.append(
@@ -358,6 +416,8 @@ def render_markdown_report(
     evals: tuple[PromptEval, ...],
     results: tuple[ChecklistResult, ...],
     audit: ManifestAudit,
+    metadata: EvalRunMetadata,
+    dependency_paths: ReportDependencyPaths,
 ) -> str:
     """Render a Markdown eval report."""
     by_eval = {eval_def.eval_id: eval_def for eval_def in evals}
@@ -366,16 +426,20 @@ def render_markdown_report(
         "<!--",
         "@dependency-start",
         "responsibility Records skill/workflow prompt eval results.",
-        "upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py "
+        f"upstream implementation {dependency_paths.tool} "
         "generates this report",
-        f"upstream design ../../{manifest.as_posix()} defines frozen evals",
+        f"upstream design {dependency_paths.manifest} defines frozen evals",
         "@dependency-end",
         "-->",
         "",
         "## Summary",
         "",
+        f"- created_at: `{metadata.created_at}`",
+        f"- eval_run_id: `{metadata.eval_run_id}`",
+        f"- run_id: `{metadata.run_id or '-'}`",
+        f"- used_skills: `{', '.join(metadata.used_skills) or '-'}`",
     ]
-    status_lines = render_machine_status(results, audit).strip().splitlines()
+    status_lines = render_machine_status(results, audit, metadata).strip().splitlines()
     lines.extend(f"- {line}" for line in status_lines[:10])
     lines.extend(["", "## Results", ""])
     for result in results:
@@ -395,17 +459,108 @@ def render_markdown_report(
 
 def write_report(
     path: str,
+    root: Path,
     manifest: Path,
     evals: tuple[PromptEval, ...],
     results: tuple[ChecklistResult, ...],
     audit: ManifestAudit,
-) -> None:
+    metadata: EvalRunMetadata,
+) -> Path:
     """Write a Markdown eval report."""
-    report_path = Path(path)
+    report_path = unique_report_path(Path(path), metadata)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
-        render_markdown_report(manifest, evals, results, audit),
+        render_markdown_report(
+            manifest,
+            evals,
+            results,
+            audit,
+            metadata,
+            dependency_paths=report_dependency_paths(report_path, root, manifest),
+        ),
         encoding="utf-8",
+    )
+    return report_path
+
+
+def relative_posix_path(from_dir: Path, to_path: Path) -> str:
+    """Return a POSIX relative path from one directory to a target."""
+    return os.path.relpath(to_path, from_dir).replace(os.sep, "/")
+
+
+def report_dependency_paths(report_path: Path, root: Path, manifest: Path) -> ReportDependencyPaths:
+    """Return dependency paths that are valid from the generated report."""
+    report_dir = report_path.parent
+    manifest_path = manifest if manifest.is_absolute() else root / manifest
+    tool_path = root / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+    return ReportDependencyPaths(
+        tool=relative_posix_path(report_dir, tool_path),
+        manifest=relative_posix_path(report_dir, manifest_path),
+    )
+
+
+def report_slug(manifest: Path, metadata: EvalRunMetadata, status: str) -> str:
+    """Return a stable filename slug for one accumulated report."""
+    skill_slug = "-".join(skill.replace("_", "-") for skill in metadata.used_skills) or "no-skill"
+    return f"{metadata.eval_run_id}-{status}-{skill_slug}.md"
+
+
+def unique_report_path(path: Path, metadata: EvalRunMetadata) -> Path:
+    """Return a non-existing report path by adding the run id when needed."""
+    if not path.exists():
+        return path
+    candidate = path.with_name(f"{path.stem}-{metadata.eval_run_id}{path.suffix}")
+    if not candidate.exists():
+        return candidate
+    for index in range(2, 1000):
+        indexed = path.with_name(f"{path.stem}-{metadata.eval_run_id}-{index:03d}{path.suffix}")
+        if not indexed.exists():
+            return indexed
+    raise RuntimeError(f"unable to allocate unique eval report path for {path}")
+
+
+def build_eval_run_metadata(
+    manifest: Path,
+    used_skills: Sequence[str],
+    run_id: str,
+) -> EvalRunMetadata:
+    """Build metadata with a unique, filename-safe eval run id."""
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat()
+    timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
+    clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())
+    digest_source = "|".join((manifest.as_posix(), run_id.strip(), ",".join(clean_skills), created_at))
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:10]
+    return EvalRunMetadata(
+        created_at=created_at,
+        eval_run_id=f"skill-eval-{timestamp}-{digest}",
+        used_skills=clean_skills,
+        run_id=run_id.strip(),
+    )
+
+
+def write_accumulated_report(
+    root: Path,
+    results_dir: str,
+    manifest: Path,
+    evals: tuple[PromptEval, ...],
+    results: tuple[ChecklistResult, ...],
+    audit: ManifestAudit,
+    metadata: EvalRunMetadata,
+) -> Path:
+    """Write one non-overwriting accumulated eval report."""
+    status = "pass" if all(result.passed or not result.critical for result in results) else "fail"
+    output_dir = root / results_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / report_slug(manifest, metadata, status)
+    return write_report(
+        str(report_path),
+        root,
+        manifest,
+        evals,
+        results,
+        audit,
+        metadata,
     )
 
 
@@ -415,9 +570,47 @@ def run(args: argparse.Namespace) -> int:
     manifest = (root / str(args.manifest)).resolve()
     evals, audit = load_manifest(manifest, root)
     results = tuple(result for eval_def in evals for result in evaluate_prompt(eval_def))
+    metadata = build_eval_run_metadata(
+        manifest.relative_to(root),
+        tuple(str(skill) for skill in args.skill_used),
+        str(args.run_id),
+    )
+    accumulated_report: Path | None = None
+    report_out: Path | None = None
     if args.report_out:
-        write_report(str(args.report_out), manifest.relative_to(root), evals, results, audit)
-    print(render_machine_status(results, audit), end="")
+        report_out = write_report(
+            str(args.report_out),
+            root,
+            manifest.relative_to(root),
+            evals,
+            results,
+            audit,
+            metadata,
+        )
+    if args.accumulate:
+        accumulated_report = write_accumulated_report(
+            root,
+            str(args.results_dir),
+            manifest.relative_to(root),
+            evals,
+            results,
+            audit,
+            metadata,
+        )
+    print(
+        render_machine_status(
+            results,
+            audit,
+            metadata,
+            accumulated_report=(
+                accumulated_report.relative_to(root)
+                if accumulated_report is not None and accumulated_report.is_relative_to(root)
+                else accumulated_report
+            ),
+            report_out=report_out,
+        ),
+        end="",
+    )
     prompt_checks_passed = all(result.passed or not result.critical for result in results)
     return 0 if audit.passed and prompt_checks_passed else 1
 

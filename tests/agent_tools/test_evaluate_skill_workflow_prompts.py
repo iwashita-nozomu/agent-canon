@@ -57,6 +57,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertIn("EVAL_CRITICAL_FAILED=0", result.stdout)
         self.assertIn("EVAL_AUDIT_STATUS=pass", result.stdout)
         self.assertIn("EVAL_GROWTH_CANDIDATES=0", result.stdout)
+        self.assertIn("EVAL_RUN_ID=skill-eval-", result.stdout)
 
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
@@ -203,7 +204,58 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             text = report.read_text(encoding="utf-8")
             self.assertIn("# Skill Workflow Prompt Eval", text)
+            self.assertIn("eval_run_id:", text)
             self.assertIn("EVAL_STATUS=pass", text)
+
+    def test_existing_report_out_gets_unique_sibling(self) -> None:
+        """An existing report path should not be overwritten."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = Path(tmp_dir) / "report.md"
+            report.write_text("keep me\n", encoding="utf-8")
+
+            result = run_eval(
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--report-out",
+                str(report),
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(report.read_text(encoding="utf-8"), "keep me\n")
+            sibling_reports = sorted(report.parent.glob("report-skill-eval-*.md"))
+            self.assertEqual(len(sibling_reports), 1)
+            self.assertIn("EVAL_REPORT_OUT=", result.stdout)
+            self.assertIn("agent-orchestration", sibling_reports[0].read_text(encoding="utf-8"))
+
+    def test_accumulate_writes_unique_agentcanon_report(self) -> None:
+        """Accumulated prompt evals should create durable unique result files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            result = run_eval(
+                "--root",
+                str(PROJECT_ROOT),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--results-dir",
+                str(root / "results"),
+                "--run-id",
+                "run-123",
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATED_REPORT=", result.stdout)
+            reports = sorted((root / "results").glob("skill-eval-*-pass-agent-orchestration.md"))
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            self.assertIn("run_id: `run-123`", text)
+            self.assertIn("used_skills: `agent-orchestration`", text)
+            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", text)
+            self.assertIn("skill_workflow_prompt_eval.toml", text)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:
         """A target_glob eval applies the same checklist to every matching prompt."""

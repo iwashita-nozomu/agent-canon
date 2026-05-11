@@ -5,8 +5,11 @@
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
 # upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
@@ -146,6 +149,13 @@ TOOL_GATES = {
             "documents/coding-conventions-project.md",
         ),
     ),
+    "surface_manifest": (
+        "tools/agent_tools/surface_manifest.py",
+        (
+            "tools/sync_agent_canon.sh",
+            "documents/SHARED_RUNTIME_SURFACES.md",
+        ),
+    ),
 }
 
 SKILL_ROUTING_PROMPTS = (
@@ -182,6 +192,37 @@ PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
     "CONVENTION-WORKFLOW",
     "CONVENTION-SKILL",
+)
+SURFACE_MANIFEST_FILES = (
+    "documents/SHARED_RUNTIME_SURFACES.md",
+    "documents/shared-runtime-surfaces.toml",
+    "documents/agent-canon-parent-repo-latest-checklist.md",
+    "tools/sync_agent_canon.sh",
+    "tools/agent_tools/surface_manifest.py",
+)
+SURFACE_POLICY_MARKERS = (
+    "documents/shared-runtime-surfaces.toml",
+    "owner class",
+    ".codex/hooks.json",
+    ".codex/hooks",
+    "documents/README.md",
+    "documents/template-bootstrap.md",
+    "memory/USER_PREFERENCES.md",
+    "tests/agent_tools/",
+)
+SURFACE_MANIFEST_MARKERS = (
+    'mode = "regular"',
+    'owner = "template-or-derived-repo"',
+    'path = "goal.md"',
+    '"documents/README.md"',
+    '"documents/template-bootstrap.md"',
+    '".codex/hooks.json"',
+    '"tests/agent_tools/test_check_convention_compliance.py"',
+)
+SURFACE_SYNC_MARKERS = (
+    "surface_manifest.py",
+    "build_regular_specs",
+    "regular_path",
 )
 NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
@@ -349,6 +390,35 @@ def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     return findings
 
 
+def check_surface_manifest_wiring(root: Path) -> list[Finding]:
+    """Verify shared surface ownership has one manifest-backed route."""
+    findings = check_required_files(root, SURFACE_MANIFEST_FILES, "surface_manifest")
+    readable_files = {
+        path: (root / path).read_text(encoding="utf-8")
+        for path in SURFACE_MANIFEST_FILES
+        if (root / path).is_file()
+    }
+    policy_text = readable_files.get("documents/SHARED_RUNTIME_SURFACES.md", "")
+    for marker in SURFACE_POLICY_MARKERS:
+        if marker not in policy_text:
+            findings.append(
+                Finding("surface_manifest", "documents/SHARED_RUNTIME_SURFACES.md", f"missing-marker:{marker}")
+            )
+    manifest_text = readable_files.get("documents/shared-runtime-surfaces.toml", "")
+    for marker in SURFACE_MANIFEST_MARKERS:
+        if marker not in manifest_text:
+            findings.append(
+                Finding("surface_manifest", "documents/shared-runtime-surfaces.toml", f"missing-marker:{marker}")
+            )
+    sync_text = readable_files.get("tools/sync_agent_canon.sh", "")
+    for marker in SURFACE_SYNC_MARKERS:
+        if marker not in sync_text:
+            findings.append(
+                Finding("surface_manifest", "tools/sync_agent_canon.sh", f"missing-marker:{marker}")
+            )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -388,6 +458,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_skill_routing(root))
     findings.extend(check_closeout_prohibitions(root))
     findings.extend(check_prompt_eval_wiring(root))
+    findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_convention_assertions(root))
     return sorted(
         findings,

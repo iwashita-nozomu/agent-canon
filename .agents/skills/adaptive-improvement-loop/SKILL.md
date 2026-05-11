@@ -39,5 +39,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Before moving to a second extension, finish the previous extension's waterfall gate checks, final review, `task-close`, commit, and push.
 1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.
 1. Do not close the loop while MCP `goal.loop_status` or `goal_loop.py status` reports `NEXT_ACTION=run_next_iteration`.
-1. Do not close a skill/workflow improvement loop while prompt eval drift remains.
+1. Whenever this run uses skills, run `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` and record `EVAL_RUN_ID` plus `EVAL_ACCUMULATED_REPORT`.
+1. Do not close a skill/workflow improvement loop while prompt eval drift remains; accumulated reports live under `agents/evals/results/skill-workflow-prompt/` and must not be overwritten.
 1. Do not close an agent behavior improvement loop while behavior eval feedback actions remain open.

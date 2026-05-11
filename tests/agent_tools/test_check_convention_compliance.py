@@ -115,6 +115,22 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["findings"])
 
+    def test_missing_surface_manifest_marker_fails(self) -> None:
+        """Shared surface docs must stay manifest-backed and complete."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
+                "surface_manifest.py documents/shared-runtime-surfaces.toml\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("surface_manifest:documents/SHARED_RUNTIME_SURFACES.md", result.stdout)
+            self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
+
     def test_normative_convention_without_verification_route_fails(self) -> None:
         """A convention source with normative assertions needs a verification route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -181,6 +197,22 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/algorithm-implementation-boundary.md": "algorithm\n",
             "documents/object-oriented-design.md": "readability.py\n",
             "documents/REVIEW_PROCESS.md": "review\n",
+            "documents/SHARED_RUNTIME_SURFACES.md": (
+                "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
+                ".codex/hooks.json .codex/hooks documents/README.md "
+                "documents/template-bootstrap.md memory/USER_PREFERENCES.md "
+                "tests/agent_tools/\n"
+            ),
+            "documents/shared-runtime-surfaces.toml": (
+                'mode = "regular"\n'
+                'owner = "template-or-derived-repo"\n'
+                'path = "goal.md"\n'
+                '"documents/README.md"\n'
+                '"documents/template-bootstrap.md"\n'
+                '".codex/hooks.json"\n'
+                '"tests/agent_tools/test_check_convention_compliance.py"\n'
+            ),
+            "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
             "documents/tools/README.md": (
                 "tool_catalog.py tool_drift.py\n"
             ),
@@ -244,6 +276,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "tool_catalog.py tool_drift.py "
                 "check_github_workflows.py container_config.py\n"
             ),
+            "tools/sync_agent_canon.sh": (
+                "surface_manifest.py build_regular_specs regular_path\n"
+            ),
             "agents/skills/environment-maintenance.md": "container_config.py\n",
         }
         tools = [
@@ -257,6 +292,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "check_convention_compliance.py",
             "tool_catalog.py",
             "tool_drift.py",
+            "surface_manifest.py",
         ]
         for path, text in files.items():
             target = root / path

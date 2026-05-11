@@ -32,14 +32,14 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
 - submodule URL:
   - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。local `/mnt/git` bare repo は mirror / proposal target として明示 opt-in します。
 - root 側の shared runtime surface:
-  - `documents/SHARED_RUNTIME_SURFACES.md` に載っている symlink view または synced copy
+  - `documents/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
 - root 側の template entrypoint:
   - `README.md`
   - `QUICK_START.md`
   - `documents/README.md`
-  - `agents/workflows/README.md`
   - `scripts/README.md`
   - `notes/README.md`
+  - `docker/README.md`
 
 ## 所有境界
 
@@ -61,7 +61,7 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
 
 - shared canon を直すときは `vendor/agent-canon/` 側を編集します。
 - root 側の symlink view や synced copy を直接編集しません。
-- shared surface を増減したら、同じ pass で link spec と ownership 文書を更新します。
+- shared surface を増減したら、同じ pass で `documents/shared-runtime-surfaces.toml` と ownership 文書を更新します。
 - root 側の入口文書を変える場合でも、shared canon の説明は `agent-canon` 側の正本に寄せます。
 
 ## 同期ルール
@@ -154,125 +154,32 @@ canonical remote ではありません。
 
 ## 5. wrapper の考え方
 
-root 側は次のような薄い wrapper と symlink view にします。
+root 側は owner class ごとに薄い wrapper、symlink view、copy surface、regular active contract を分けます。
 
-- `AGENTS.md`
-  - `vendor/agent-canon/ROOT_AGENTS.md` への symlink view
-- `.codex/config.toml`
-  - `vendor/agent-canon/.codex/config.toml` への symlink view
-- `CLAUDE.md`
-  - `vendor/agent-canon/CLAUDE.md` への symlink view
-- `.github/AGENTS.md`
-  - `vendor/agent-canon/.github/AGENTS.md` への symlink view
-- `.github/copilot-instructions.md`
-  - `vendor/agent-canon/.github/copilot-instructions.md` への symlink view
-- `.codex/README.md`
-  - `vendor/agent-canon/.codex/README.md` への symlink view
-- `mcp/`
-  - `vendor/agent-canon/mcp/` への symlink view
-- `documents/` 配下の shared document surface
-  - `documents/SHARED_RUNTIME_SURFACES.md` に載っている各 file は `vendor/agent-canon/documents/` への symlink view
-- `documents/BRANCH_SCOPE.md`
-  - `vendor/agent-canon/documents/BRANCH_SCOPE.md` への symlink view
-- `documents/agent-canon-subtree-migration.md`
-  - `vendor/agent-canon/documents/agent-canon-subtree-migration.md` への symlink view
-- `documents/AGENTS_COORDINATION.md`
-  - `vendor/agent-canon/documents/AGENTS_COORDINATION.md` への symlink view
-- `documents/dependency-manifest-design.md`
-  - `vendor/agent-canon/documents/dependency-manifest-design.md` への symlink view
-- `agents/workflows/academic-writing-workflow.md`
-  - `vendor/agent-canon/agents/workflows/academic-writing-workflow.md` への symlink view
-- `documents/REVIEW_PROCESS.md`
-  - `vendor/agent-canon/documents/REVIEW_PROCESS.md` への symlink view
-- `documents/SHARED_RUNTIME_SURFACES.md`
-  - `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` への symlink view
-- `agents/workflows/README.md`
-  - `vendor/agent-canon/agents/workflows/README.md` への symlink view
-- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
-  - `vendor/agent-canon/documents/SKILL_IMPLEMENTATION_GUIDE.md` への symlink view
-- `documents/WORKTREE_SCOPE_TEMPLATE.md`
-  - `vendor/agent-canon/documents/WORKTREE_SCOPE_TEMPLATE.md` への symlink view
-- `documents/coding-conventions-experiments.md`
-  - `vendor/agent-canon/documents/coding-conventions-experiments.md` への symlink view
-- `documents/experiment-critical-review.md`
-  - `vendor/agent-canon/documents/experiment-critical-review.md` への symlink view
-- `documents/experiment-registry.md`
-  - `vendor/agent-canon/documents/experiment-registry.md` への symlink view
-- `documents/experiment-report-style.md`
-  - `vendor/agent-canon/documents/experiment-report-style.md` への symlink view
-- `agents/workflows/experiment-workflow.md`
-  - `vendor/agent-canon/agents/workflows/experiment-workflow.md` への symlink view
-- `documents/experiment_runner.md`
-  - `vendor/agent-canon/documents/experiment_runner.md` への symlink view
-- `agents/workflows/implementation-waterfall-workflow.md`
-  - `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md` への symlink view
-- `agents/workflows/long-form-writing-workflow.md`
-  - `vendor/agent-canon/agents/workflows/long-form-writing-workflow.md` への symlink view
-- `agents/workflows/research-workflow.md`
-  - `vendor/agent-canon/agents/workflows/research-workflow.md` への symlink view
-- `agents/workflows/workflow-references.md`
-  - `vendor/agent-canon/agents/workflows/workflow-references.md` への symlink view
-- `documents/worktree-lifecycle.md`
-  - `vendor/agent-canon/documents/worktree-lifecycle.md` への symlink view
-- `documents/conventions/python/20_benchmark_policy.md`
-  - `vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md` への symlink view
-- `documents/conventions/python/30_experiment_directory_structure.md`
-  - `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md` への symlink view
-- `memory/README.md`
-  - `vendor/agent-canon/memory/README.md` への symlink view
-- `memory/USER_PREFERENCES.md`
-  - `vendor/agent-canon/memory/USER_PREFERENCES.md` への symlink view
-- `memory/AGENT_PHILOSOPHY.md`
-  - `vendor/agent-canon/memory/AGENT_PHILOSOPHY.md` への symlink view
-- `notes/experiments/README.md`
-  - `vendor/agent-canon/notes/experiments/README.md` への symlink view
-- `notes/experiments/REPORT_TEMPLATE.md`
-  - `vendor/agent-canon/notes/experiments/REPORT_TEMPLATE.md` への symlink view
-- `notes/experiments/results/README.md`
-  - `vendor/agent-canon/notes/experiments/results/README.md` への symlink view
-- `notes/knowledge/benchmark_vs_experiment.md`
-  - `vendor/agent-canon/notes/knowledge/benchmark_vs_experiment.md` への symlink view
-- `notes/knowledge/experiment_directory_planning.md`
-  - `vendor/agent-canon/notes/knowledge/experiment_directory_planning.md` への symlink view
-- `notes/knowledge/experiment_operations.md`
-  - `vendor/agent-canon/notes/knowledge/experiment_operations.md` への symlink view
-- `notes/worktrees/README.md`
-  - `vendor/agent-canon/notes/worktrees/README.md` への symlink view
-- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-  - `vendor/agent-canon/notes/worktrees/WORKTREE_LOG_TEMPLATE.md` への symlink view
-- `notes/themes/from_another_agent.md`
-  - `vendor/agent-canon/notes/themes/from_another_agent.md` への symlink view
-- `agents/`
-  - `vendor/agent-canon/agents/` への symlink view
-- `.agents/`
-  - `vendor/agent-canon/.agents/` への symlink view
-- `.claude/`
-  - `vendor/agent-canon/.claude/` への symlink view
-- `tests/agent_tools/__init__.py`
-  - `vendor/agent-canon/tests/agent_tools/__init__.py` への symlink view
-- `tests/agent_tools/test_check_agent_runtime_alignment.py`
-  - `vendor/agent-canon/tests/agent_tools/test_check_agent_runtime_alignment.py` への symlink view
-- `tests/agent_tools/test_check_mcp_inventory.py`
-  - `vendor/agent-canon/tests/agent_tools/test_check_mcp_inventory.py` への symlink view
-- `tests/agent_tools/test_work_log.py`
-  - `vendor/agent-canon/tests/agent_tools/test_work_log.py` への symlink view
-- `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
-  - `vendor/agent-canon/tests/agent_tools/test_smoke_test_research_perspective_pack.py` への symlink view
-- `tests/tools/test_check_markdown_math.py`
-  - `vendor/agent-canon/tests/tools/test_check_markdown_math.py` への symlink view
-- `tests/tools/test_mirror_skill_shims.py`
-  - `vendor/agent-canon/tests/tools/test_mirror_skill_shims.py` への symlink view
-- `tests/tools/test_run_managed_experiment.py`
-  - `vendor/agent-canon/tests/tools/test_run_managed_experiment.py` への symlink view
-- `tools/`
-  - `vendor/agent-canon/tools/` への symlink view
-- `.github/workflows/agent-coordination.yml`
-  - `vendor/agent-canon/.github/workflows/agent-coordination.yml` から root へ同期する copy surface
+- AgentCanon-owned symlink views:
+  - `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`, `.claude/`, `.codex/`, `mcp/`, `tools/`
+  - AgentCanon-owned shared policy docs listed in `documents/shared-runtime-surfaces.toml`
+  - AgentCanon-owned `tests/agent_tools/` and `tests/tools/` mirror tests
+- GitHub path constraint copy surfaces:
+  - `.github/workflows/agent-coordination.yml`
+  - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
+  - `.github/scripts/checkout_agent_canon_submodule.sh`
+- Template-owned active contracts, regular at root:
+  - `README.md`, `QUICK_START.md`, `documents/README.md`
+  - `documents/template-bootstrap.md`
+  - `documents/template-github-remote.md`
+  - `documents/linux-wsl-host-requirements.md`
+  - `documents/server-host-contract.md`
+  - `documents/remote-execution-repo-contract.md`
+  - `docker/README.md`, `scripts/README.md`, `notes/README.md`, `.gitmodules`
+- Project-owned durable state:
+  - `goal.md`, project-specific notes, experiments, reports, and project-specific design docs
 
 重要:
 - `vendor/agent-canon/AGENTS.md` は standalone AgentCanon repo 用 entrypoint として扱い、template root runtime は root `AGENTS.md` symlink view から入ります
 - root runtime の正面入口は root に固定します
 - shared canon の source of truth は root 側ではなく `vendor/agent-canon/` です
+- authoritative path inventory は Markdown の長大リストではなく `documents/shared-runtime-surfaces.toml` です
 
 ## 6. worktree と submodule pin の関係
 

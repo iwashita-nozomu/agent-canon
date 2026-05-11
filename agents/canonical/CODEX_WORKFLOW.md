@@ -93,7 +93,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
 1. `vendor/agent-canon/` と standalone `agent-canon` で同じ path の有無、rename、移動、sync 対象からの除外理由を確認する
-1. canon-owned surface なら `documents/SHARED_RUNTIME_SURFACES.md` と `tools/sync_agent_canon.sh` の surface list に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
+1. canon-owned surface なら `documents/shared-runtime-surfaces.toml`、`documents/SHARED_RUNTIME_SURFACES.md`、`tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
 
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。

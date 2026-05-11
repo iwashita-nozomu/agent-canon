@@ -26,6 +26,8 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - dependency_headers_complete: no
 - repo_wide_dependency_tools_complete: no
 - repo_wide_static_analysis_complete: no
+- agent_canon_latest_complete: no
+- make_ci_status: pending
 - spec_product_coverage_complete: no
 - review_findings_integrated: no
 - post_fix_full_review_complete: no
@@ -53,6 +55,8 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 - dependency_headers_complete: yes
 - repo_wide_dependency_tools_complete: yes
 - repo_wide_static_analysis_complete: yes
+- agent_canon_latest_complete: yes
+- make_ci_status: pass
 - spec_product_coverage_complete: yes
 - review_findings_integrated: yes
 - post_fix_full_review_complete: yes
@@ -79,6 +83,10 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 ## Repo-Wide Static Analysis Evidence
 
 <!-- Before user-facing completion, run full-repo static analysis. Preferred evidence is `make ci` because it includes pyright and ruff without quick-mode skips. If environment constraints prevent `make ci`, record full-repo `python3 -m pyright` and `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` evidence and the toolchain repair performed. Do not unlock closeout with only `make ci-quick`. -->
+
+## AgentCanon Latest And CI Gate Evidence
+
+<!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; classify it with `bash tools/update_agent_canon.sh review-submodule`, push a proposal or merge AgentCanon main as appropriate, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass` unless the only blocker is a documented environment/toolchain issue and full-repo pyright plus ruff fallback evidence is recorded as `environment_blocked_with_full_static_fallback`. -->
 
 ## Spec-To-Product Coverage Evidence
 

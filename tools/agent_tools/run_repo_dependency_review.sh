@@ -19,16 +19,19 @@ CHECK_BIDIRECTIONAL=0
 FAIL_MISSING=0
 ALLOW_FRONTMATTER=0
 EXPLAIN_MISSING=0
+LIST_CHANGED_DEPENDENCIES=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--report-dir DIR]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
 Missing manifests are report-only by default until the repository-wide migration is complete.
+With --list-changed-dependencies, the graph checker also prints every dependency
+edge declared by, or pointing at, each changed file.
 EOF
 }
 
@@ -52,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --explain-missing)
       EXPLAIN_MISSING=1
+      shift
+      ;;
+    --list-changed-dependencies)
+      LIST_CHANGED_DEPENDENCIES=1
       shift
       ;;
     --report-dir)
@@ -106,6 +113,14 @@ if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
   graph_args+=(--allow-frontmatter)
 fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
+
+if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
+  related_args=(tools/agent_tools/check_dependency_graph.sh --list-related --focus-changed)
+  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
+    related_args+=(--allow-frontmatter)
+  fi
+  bash "${related_args[@]}" "${checkable_paths[@]}"
+fi
 
 echo "REPO_DEPENDENCY_REVIEW=pass"
 

@@ -80,12 +80,15 @@ required_all = [
 [[criteria]]
 name = "prompt_eval_behavior_recorded"
 max_score = 5
-feedback = "Record prompt eval baseline/rerun behavior for skill or workflow prompt changes."
+feedback = "Record accumulated prompt eval behavior whenever a skill is used."
 required_any = [
   "tool_call=evaluate_skill_workflow_prompts.py",
   "prompt_eval=pass",
   "EVAL_STATUS=pass",
-  "prompt_eval_not_required",
+]
+required_all = [
+  "EVAL_RUN_ID=",
+  "EVAL_ACCUMULATED_REPORT=",
 ]
 
 [[criteria]]

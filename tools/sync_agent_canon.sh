@@ -51,6 +51,7 @@ DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
 PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
+SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/shared-runtime-surfaces.toml}"
 
 usage() {
   cat <<EOF
@@ -93,6 +94,30 @@ require_git_repo() {
 require_clean_worktree() {
   if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
     die "worktree is dirty; commit or stash changes before AgentCanon operations"
+  fi
+}
+
+agent_canon_update_surface_status() {
+  local -a paths=("$PREFIX" ".gitmodules")
+  local spec=""
+
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    paths+=("${spec%%:*}")
+  done < <(
+    {
+      build_link_specs
+      build_copy_specs
+    }
+  )
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    paths+=("$spec")
+  done < <(build_removed_legacy_paths)
+
+  git -C "$ROOT_DIR" status --short --untracked-files=all -- "${paths[@]}"
+  if is_submodule_prefix && git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all
   fi
 }
 
@@ -158,168 +183,13 @@ ensure_submodule_checkout() {
 }
 
 build_link_specs() {
-  cat <<EOF
-AGENTS.md:${PREFIX}/ROOT_AGENTS.md
-agents:${PREFIX}/agents
-.agents:${PREFIX}/.agents
-.claude:${PREFIX}/.claude
-CLAUDE.md:${PREFIX}/CLAUDE.md
-.codex/config.toml:../${PREFIX}/.codex/config.toml
-.codex/README.md:../${PREFIX}/.codex/README.md
-.codex/agents:../${PREFIX}/.codex/agents
-.codex/hooks.json:../${PREFIX}/.codex/hooks.json
-.codex/hooks:../${PREFIX}/.codex/hooks
-.github/AGENTS.md:../${PREFIX}/.github/AGENTS.md
-.github/copilot-instructions.md:../${PREFIX}/.github/copilot-instructions.md
-.github/instructions:../${PREFIX}/.github/instructions
-.github/agents:../${PREFIX}/.github/agents
-documents/BRANCH_SCOPE.md:../${PREFIX}/documents/BRANCH_SCOPE.md
-documents/AGENTS_COORDINATION.md:../${PREFIX}/documents/AGENTS_COORDINATION.md
-documents/DOCSTRING_GUIDE.md:../${PREFIX}/documents/DOCSTRING_GUIDE.md
-documents/FILE_CHECKLIST_OPERATIONS.md:../${PREFIX}/documents/FILE_CHECKLIST_OPERATIONS.md
-documents/README.md:../${PREFIX}/documents/README.md
-documents/codex-configuration-reference.md:../${PREFIX}/documents/codex-configuration-reference.md
-documents/codex-configuration-slides.md:../${PREFIX}/documents/codex-configuration-slides.md
-documents/project-template-overview-slides.md:../${PREFIX}/documents/project-template-overview-slides.md
-documents/algorithm-implementation-boundary.md:../${PREFIX}/documents/algorithm-implementation-boundary.md
-documents/object-oriented-design.md:../${PREFIX}/documents/object-oriented-design.md
-documents/result-log-retention-and-visualization.md:../${PREFIX}/documents/result-log-retention-and-visualization.md
-documents/repo-local-tool-imports.md:../${PREFIX}/documents/repo-local-tool-imports.md
-documents/agent-canon-github-remote.md:../${PREFIX}/documents/agent-canon-github-remote.md
-documents/github-copilot-configuration.md:../${PREFIX}/documents/github-copilot-configuration.md
-documents/template-github-remote.md:../${PREFIX}/documents/template-github-remote.md
-documents/dependency-manifest-design.md:../${PREFIX}/documents/dependency-manifest-design.md
-documents/notes-lifecycle.md:../${PREFIX}/documents/notes-lifecycle.md
-documents/REVIEW_PROCESS.md:../${PREFIX}/documents/REVIEW_PROCESS.md
-documents/SHARED_RUNTIME_SURFACES.md:../${PREFIX}/documents/SHARED_RUNTIME_SURFACES.md
-documents/SKILL_IMPLEMENTATION_GUIDE.md:../${PREFIX}/documents/SKILL_IMPLEMENTATION_GUIDE.md
-documents/TROUBLESHOOTING.md:../${PREFIX}/documents/TROUBLESHOOTING.md
-documents/WORKTREE_SCOPE_TEMPLATE.md:../${PREFIX}/documents/WORKTREE_SCOPE_TEMPLATE.md
-documents/agent-canon-subtree-migration.md:../${PREFIX}/documents/agent-canon-subtree-migration.md
-documents/coding-conventions-cpp.md:../${PREFIX}/documents/coding-conventions-cpp.md
-documents/coding-conventions-experiments.md:../${PREFIX}/documents/coding-conventions-experiments.md
-documents/coding-conventions-house-style.md:../${PREFIX}/documents/coding-conventions-house-style.md
-documents/coding-conventions-logging.md:../${PREFIX}/documents/coding-conventions-logging.md
-documents/coding-conventions-project.md:../${PREFIX}/documents/coding-conventions-project.md
-documents/coding-conventions-python.md:../${PREFIX}/documents/coding-conventions-python.md
-documents/coding-conventions-reviews.md:../${PREFIX}/documents/coding-conventions-reviews.md
-documents/coding-conventions-testing.md:../${PREFIX}/documents/coding-conventions-testing.md
-documents/experiment-critical-review.md:../${PREFIX}/documents/experiment-critical-review.md
-documents/experiment-registry.md:../${PREFIX}/documents/experiment-registry.md
-documents/experiment-report-style.md:../${PREFIX}/documents/experiment-report-style.md
-documents/experiment_runner.md:../${PREFIX}/documents/experiment_runner.md
-documents/cpp-build-layout.md:../${PREFIX}/documents/cpp-build-layout.md
-documents/linux-wsl-host-requirements.md:../${PREFIX}/documents/linux-wsl-host-requirements.md
-documents/remote-execution-repo-contract.md:../${PREFIX}/documents/remote-execution-repo-contract.md
-documents/server-host-contract.md:../${PREFIX}/documents/server-host-contract.md
-documents/template-bootstrap.md:../${PREFIX}/documents/template-bootstrap.md
-documents/worktree-lifecycle.md:../${PREFIX}/documents/worktree-lifecycle.md
-documents/conventions/README.md:../../${PREFIX}/documents/conventions/README.md
-documents/conventions/common/01_principles.md:../../../${PREFIX}/documents/conventions/common/01_principles.md
-documents/conventions/common/02_naming.md:../../../${PREFIX}/documents/conventions/common/02_naming.md
-documents/conventions/common/03_comments.md:../../../${PREFIX}/documents/conventions/common/03_comments.md
-documents/conventions/common/04_operators.md:../../../${PREFIX}/documents/conventions/common/04_operators.md
-documents/conventions/common/05_docs.md:../../../${PREFIX}/documents/conventions/common/05_docs.md
-documents/conventions/python/01_scope.md:../../../${PREFIX}/documents/conventions/python/01_scope.md
-documents/conventions/python/04_type_annotations.md:../../../${PREFIX}/documents/conventions/python/04_type_annotations.md
-documents/conventions/python/06_comments.md:../../../${PREFIX}/documents/conventions/python/06_comments.md
-documents/conventions/python/07_type_checker.md:../../../${PREFIX}/documents/conventions/python/07_type_checker.md
-documents/conventions/python/09_file_roles.md:../../../${PREFIX}/documents/conventions/python/09_file_roles.md
-documents/conventions/python/11_naming.md:../../../${PREFIX}/documents/conventions/python/11_naming.md
-documents/conventions/python/15_jax_rules.md:../../../${PREFIX}/documents/conventions/python/15_jax_rules.md
-documents/conventions/python/20_benchmark_policy.md:../../../${PREFIX}/documents/conventions/python/20_benchmark_policy.md
-documents/conventions/python/30_experiment_directory_structure.md:../../../${PREFIX}/documents/conventions/python/30_experiment_directory_structure.md
-documents/design/README.md:../../${PREFIX}/documents/design/README.md
-documents/design/protocols.md:../../${PREFIX}/documents/design/protocols.md
-documents/templates/README.md:../../${PREFIX}/documents/templates/README.md
-documents/templates/remote_execution_repo.template.toml:../../${PREFIX}/documents/templates/remote_execution_repo.template.toml
-documents/templates/remote_execution_target.template.toml:../../${PREFIX}/documents/templates/remote_execution_target.template.toml
-documents/templates/server_host_inventory.template.md:../../${PREFIX}/documents/templates/server_host_inventory.template.md
-documents/templates/server_runtime_layout.template.toml:../../${PREFIX}/documents/templates/server_runtime_layout.template.toml
-documents/tools/README.md:../../${PREFIX}/documents/tools/README.md
-documents/tools/tool-docs.toml:../../${PREFIX}/documents/tools/tool-docs.toml
-documents/tools/oop/python/readability.md:../../../../${PREFIX}/documents/tools/oop/python/readability.md
-documents/tools/oop/python/rule_inventory.md:../../../../${PREFIX}/documents/tools/oop/python/rule_inventory.md
-documents/tools/oop/cpp/readability.md:../../../../${PREFIX}/documents/tools/oop/cpp/readability.md
-documents/tools/oop/cpp/rule_inventory.md:../../../../${PREFIX}/documents/tools/oop/cpp/rule_inventory.md
-memory/README.md:../${PREFIX}/memory/README.md
-memory/USER_PREFERENCES.md:../${PREFIX}/memory/USER_PREFERENCES.md
-memory/AGENT_PHILOSOPHY.md:../${PREFIX}/memory/AGENT_PHILOSOPHY.md
-mcp:${PREFIX}/mcp
-notes/experiments/README.md:../../${PREFIX}/notes/experiments/README.md
-notes/experiments/REPORT_TEMPLATE.md:../../${PREFIX}/notes/experiments/REPORT_TEMPLATE.md
-notes/experiments/results/README.md:../../../${PREFIX}/notes/experiments/results/README.md
-notes/branches/README.md:../../${PREFIX}/notes/branches/README.md
-notes/branches/BRANCH_NOTE_TEMPLATE.md:../../${PREFIX}/notes/branches/BRANCH_NOTE_TEMPLATE.md
-notes/failures/README.md:../../${PREFIX}/notes/failures/README.md
-notes/failures/FAILURE_NOTE_TEMPLATE.md:../../${PREFIX}/notes/failures/FAILURE_NOTE_TEMPLATE.md
-notes/github-mirror-procedure.md:../${PREFIX}/notes/github-mirror-procedure.md
-notes/guardrails/README.md:../../${PREFIX}/notes/guardrails/README.md
-notes/guardrails/engineering_avoidances.md:../../${PREFIX}/notes/guardrails/engineering_avoidances.md
-notes/knowledge/README.md:../../${PREFIX}/notes/knowledge/README.md
-notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md:../../${PREFIX}/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md
-notes/knowledge/benchmark_levels_analysis.md:../../${PREFIX}/notes/knowledge/benchmark_levels_analysis.md
-notes/knowledge/benchmark_vs_experiment.md:../../${PREFIX}/notes/knowledge/benchmark_vs_experiment.md
-notes/knowledge/coding_decision_methods.md:../../${PREFIX}/notes/knowledge/coding_decision_methods.md
-notes/knowledge/environment_setup.md:../../${PREFIX}/notes/knowledge/environment_setup.md
-notes/knowledge/experiment_directory_planning.md:../../${PREFIX}/notes/knowledge/experiment_directory_planning.md
-notes/knowledge/experiment_operations.md:../../${PREFIX}/notes/knowledge/experiment_operations.md
-notes/knowledge/git_mirroring.md:../../${PREFIX}/notes/knowledge/git_mirroring.md
-notes/knowledge/literature_intake.md:../../${PREFIX}/notes/knowledge/literature_intake.md
-notes/knowledge/path_resolution.md:../../${PREFIX}/notes/knowledge/path_resolution.md
-notes/knowledge/pyright_operations.md:../../${PREFIX}/notes/knowledge/pyright_operations.md
-notes/themes/README.md:../../${PREFIX}/notes/themes/README.md
-notes/themes/THEME_NOTE_TEMPLATE.md:../../${PREFIX}/notes/themes/THEME_NOTE_TEMPLATE.md
-notes/themes/from_another_agent.md:../../${PREFIX}/notes/themes/from_another_agent.md
-notes/worktrees/README.md:../../${PREFIX}/notes/worktrees/README.md
-notes/worktrees/WORKTREE_LOG_TEMPLATE.md:../../${PREFIX}/notes/worktrees/WORKTREE_LOG_TEMPLATE.md
-tests/agent_tools/__init__.py:../../${PREFIX}/tests/agent_tools/__init__.py
-tests/agent_tools/test_check_agent_runtime_alignment.py:../../${PREFIX}/tests/agent_tools/test_check_agent_runtime_alignment.py
-tests/agent_tools/test_tool_catalog.py:../../${PREFIX}/tests/agent_tools/test_tool_catalog.py
-tests/agent_tools/test_tool_drift.py:../../${PREFIX}/tests/agent_tools/test_tool_drift.py
-tests/agent_tools/test_oop_rule_inventory.py:../../${PREFIX}/tests/agent_tools/test_oop_rule_inventory.py
-tests/agent_tools/test_check_algorithm_module_public_surface.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_public_surface.py
-tests/agent_tools/test_check_convention_compliance.py:../../${PREFIX}/tests/agent_tools/test_check_convention_compliance.py
-tests/agent_tools/test_check_hardcoded_numbers.py:../../${PREFIX}/tests/agent_tools/test_check_hardcoded_numbers.py
-tests/agent_tools/test_check_static_any.py:../../${PREFIX}/tests/agent_tools/test_check_static_any.py
-tests/agent_tools/test_check_algorithm_module_nested_contract.py:../../${PREFIX}/tests/agent_tools/test_check_algorithm_module_nested_contract.py
-tests/agent_tools/test_check_log_helper_names.py:../../${PREFIX}/tests/agent_tools/test_check_log_helper_names.py
-tests/agent_tools/test_compare_codex_token_footprints.py:../../${PREFIX}/tests/agent_tools/test_compare_codex_token_footprints.py
-tests/agent_tools/test_analyze_refactor_surface.py:../../${PREFIX}/tests/agent_tools/test_analyze_refactor_surface.py
-tests/agent_tools/test_analyze_oop_readability.py:../../${PREFIX}/tests/agent_tools/test_analyze_oop_readability.py
-tests/agent_tools/test_doc_start.py:../../${PREFIX}/tests/agent_tools/test_doc_start.py
-tests/agent_tools/test_log_user_preference.py:../../${PREFIX}/tests/agent_tools/test_log_user_preference.py
-tests/agent_tools/test_log_agent_learning.py:../../${PREFIX}/tests/agent_tools/test_log_agent_learning.py
-tests/agent_tools/test_persist_agent_memory.py:../../${PREFIX}/tests/agent_tools/test_persist_agent_memory.py
-tests/agent_tools/test_check_mcp_inventory.py:../../${PREFIX}/tests/agent_tools/test_check_mcp_inventory.py
-tests/agent_tools/test_codex_hooks.py:../../${PREFIX}/tests/agent_tools/test_codex_hooks.py
-tests/agent_tools/test_repo_mcp_server.py:../../${PREFIX}/tests/agent_tools/test_repo_mcp_server.py
-tests/agent_tools/test_check_dependency_headers.py:../../${PREFIX}/tests/agent_tools/test_check_dependency_headers.py
-tests/agent_tools/test_dependency_manifest_tools.py:../../${PREFIX}/tests/agent_tools/test_dependency_manifest_tools.py
-tests/agent_tools/test_compare_agent_run_paths.py:../../${PREFIX}/tests/agent_tools/test_compare_agent_run_paths.py
-tests/agent_tools/test_evaluate_agent_run.py:../../${PREFIX}/tests/agent_tools/test_evaluate_agent_run.py
-tests/agent_tools/test_evaluate_skill_workflow_prompts.py:../../${PREFIX}/tests/agent_tools/test_evaluate_skill_workflow_prompts.py
-tests/agent_tools/test_goal_loop.py:../../${PREFIX}/tests/agent_tools/test_goal_loop.py
-tests/agent_tools/test_smoke_test_research_perspective_pack.py:../../${PREFIX}/tests/agent_tools/test_smoke_test_research_perspective_pack.py
-tests/agent_tools/test_task_start_and_close.py:../../${PREFIX}/tests/agent_tools/test_task_start_and_close.py
-tests/agent_tools/test_waterfall_gate_check.py:../../${PREFIX}/tests/agent_tools/test_waterfall_gate_check.py
-tests/agent_tools/test_workflow_monitor.py:../../${PREFIX}/tests/agent_tools/test_workflow_monitor.py
-tests/agent_tools/test_work_log.py:../../${PREFIX}/tests/agent_tools/test_work_log.py
-tests/agent_tools/test_worktree_scope_lint.py:../../${PREFIX}/tests/agent_tools/test_worktree_scope_lint.py
-tests/tools/test_check_merge_structure.py:../../${PREFIX}/tests/tools/test_check_merge_structure.py
-tests/tools/test_check_markdown_math.py:../../${PREFIX}/tests/tools/test_check_markdown_math.py
-tests/tools/test_container_config.py:../../${PREFIX}/tests/tools/test_container_config.py
-tests/tools/test_check_bootstrap_docs.py:../../${PREFIX}/tests/tools/test_check_bootstrap_docs.py
-tests/tools/test_check_github_workflows.py:../../${PREFIX}/tests/tools/test_check_github_workflows.py
-tests/tools/test_mirror_skill_shims.py:../../${PREFIX}/tests/tools/test_mirror_skill_shims.py
-tests/tools/test_python_env_policy.py:../../${PREFIX}/tests/tools/test_python_env_policy.py
-tests/tools/test_run_managed_experiment.py:../../${PREFIX}/tests/tools/test_run_managed_experiment.py
-tests/tools/test_run_repo_program.py:../../${PREFIX}/tests/tools/test_run_repo_program.py
-tests/tools/test_update_agent_canon.py:../../${PREFIX}/tests/tools/test_update_agent_canon.py
-tests/tools/test_result_log_tools.py:../../${PREFIX}/tests/tools/test_result_log_tools.py
-tests/tools/test_update_latest_result.py:../../${PREFIX}/tests/tools/test_update_latest_result.py
-tools:${PREFIX}/tools
-EOF
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" link-specs
+}
+
+build_regular_specs() {
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" regular-specs
 }
 
 repo_local_goal_template() {
@@ -389,34 +259,13 @@ goal_is_shared_symlink() {
 }
 
 build_removed_legacy_paths() {
-  cat <<EOF
-documents/WORKFLOW_GUIDE.md
-documents/academic-writing-workflow.md
-documents/adaptive-improvement-workflow.md
-documents/agent-canon-pr-workflow.md
-documents/agent-learning-workflow.md
-documents/experiment-workflow.md
-documents/implementation-waterfall-workflow.md
-documents/long-form-writing-workflow.md
-documents/main-integration-workflow.md
-documents/paper-writing-workflow.md
-documents/research-workflow.md
-documents/workflow-references.md
-notes/themes/AGENT_PHILOSOPHY.md
-notes/themes/USER_PREFERENCES.md
-memory/global
-memory/methods
-memory/candidates
-memory/subagent_loadouts.yaml
-EOF
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" removed-legacy-paths
 }
 
 build_copy_specs() {
-  cat <<EOF
-.github/workflows/agent-coordination.yml:${PREFIX}/.github/workflows/agent-coordination.yml
-.github/PULL_REQUEST_TEMPLATE/agent_canon.md:${PREFIX}/.github/PULL_REQUEST_TEMPLATE/agent_canon.md
-.github/scripts/checkout_agent_canon_submodule.sh:${PREFIX}/tools/ci/checkout_agent_canon_submodule.sh
-EOF
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
 }
 
 link_path() {
@@ -441,6 +290,22 @@ copy_path() {
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
   cp "$abs_source" "$abs_path"
+}
+
+regular_path() {
+  local path="$1"
+  local source="${2:-}"
+  local abs_path="$ROOT_DIR/$path"
+  local abs_source=""
+  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+    return
+  fi
+  [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
+  abs_source="$ROOT_DIR/$source"
+  [ -e "$abs_source" ] || die "regular seed source '$source' does not exist"
+  rm -rf "$abs_path"
+  mkdir -p "$(dirname "$abs_path")"
+  cp -a "$abs_source" "$abs_path"
 }
 
 copy_source_is_optional_missing() {
@@ -500,6 +365,12 @@ cmd_link_root() {
     copy_path "$path" "$source"
   done < <(build_copy_specs)
 
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    regular_path "$path" "$source"
+  done < <(build_regular_specs)
+
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     rm -rf "$ROOT_DIR/$path"
@@ -557,6 +428,25 @@ cmd_check() {
     failed=1
   done < <(build_copy_specs)
 
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      continue
+    fi
+    if [ -L "$abs_path" ]; then
+      echo "regular[$path]=symlink" >&2
+    else
+      echo "regular[$path]=missing" >&2
+    fi
+    failed=1
+  done < <(build_regular_specs)
+
+  if ! python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" check-doc >&2; then
+    failed=1
+  fi
+
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     local abs_path="$ROOT_DIR/$path"
@@ -593,6 +483,7 @@ stage_sync_paths() {
     {
       build_link_specs
       build_copy_specs
+      build_regular_specs
     }
   )
 }
@@ -781,6 +672,7 @@ print_plan_summary() {
   local dirty="${10}"
   local requires_clean="${11}"
   local prefix_mode="${12:-tree}"
+  local dirty_update_surface="${13:-$dirty}"
 
   echo "agent_canon_plan_branch=$branch"
   if [ -n "$remote_url" ]; then
@@ -805,6 +697,7 @@ print_plan_summary() {
   echo "agent_canon_plan_has_subtree_metadata=$subtree_metadata"
   echo "agent_canon_plan_prefix_mode=$prefix_mode"
   echo "agent_canon_plan_dirty_worktree=$dirty"
+  echo "agent_canon_plan_dirty_update_surface=$dirty_update_surface"
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
   echo "agent_canon_plan_apply_command=bash tools/sync_agent_canon.sh ensure-latest $branch"
@@ -823,6 +716,7 @@ cmd_plan() {
   local route="remote_unconfigured"
   local requires_clean="no"
   local dirty="no"
+  local dirty_update_surface="no"
 
   ensure_prefix_exists
   if is_submodule_prefix; then
@@ -843,6 +737,9 @@ cmd_plan() {
   if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
     dirty="yes"
   fi
+  if [ -n "$(agent_canon_update_surface_status)" ]; then
+    dirty_update_surface="yes"
+  fi
 
   if [ -n "$PLAN_REMOTE_OVERRIDE_URL" ]; then
     remote_url="$PLAN_REMOTE_OVERRIDE_URL"
@@ -862,7 +759,7 @@ cmd_plan() {
   if [ -z "$remote_url" ]; then
     print_plan_summary \
       "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
-      "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode"
+      "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
     return
   fi
 
@@ -917,7 +814,7 @@ cmd_plan() {
 
   print_plan_summary \
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
-    "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode"
+    "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
 }
 
 cmd_submodule_review() {
@@ -1182,35 +1079,24 @@ cmd_ensure_latest() {
     echo "agent_canon_remote=$remote_sha"
     if [ "$local_commit" = "$remote_sha" ]; then
       echo "agent_canon_latest=already_current_submodule"
-      if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
-        cmd_check
-      else
-        cmd_link_root 1
-      fi
+      cmd_link_root
       return
     fi
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
       echo "agent_canon_latest=local_contains_remote"
-      if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
-        cmd_check
-      else
-        cmd_link_root 1
-      fi
+      cmd_link_root
       return
     fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
     if [ "$worktree_commit" != "$remote_sha" ] && [ -n "$submodule_status" ]; then
       die "submodule '$PREFIX' is dirty; commit or clean it before updating"
     fi
+    ensure_surface_sync_safe
     echo "agent_canon_latest=updating_submodule"
     if [ "$worktree_commit" != "$remote_sha" ]; then
       git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha"
     fi
-    if [ -n "$(git -C "$ROOT_DIR" status --short -- "$PREFIX" .gitmodules)" ]; then
-      AGENT_CANON_FORCE_RELINK=1 cmd_link_root 1
-    else
-      cmd_link_root 1
-    fi
+    cmd_link_root
     commit_sync_paths_if_needed "$remote_sha" "submodule_update"
     return
   fi
@@ -1360,6 +1246,18 @@ cmd_status() {
       echo "copy[$path]=missing"
     fi
   done < <(build_copy_specs)
+
+  while IFS= read -r spec; do
+    local path="${spec%%:*}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      echo "regular[$path]=ok"
+    elif [ -L "$abs_path" ]; then
+      echo "regular[$path]=symlink"
+    else
+      echo "regular[$path]=missing"
+    fi
+  done < <(build_regular_specs)
 }
 
 main() {

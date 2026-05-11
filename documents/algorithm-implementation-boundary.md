@@ -7,7 +7,7 @@ upstream design ./experiment-critical-review.md mathematical validity review
 upstream design ../agents/workflows/research-workflow.md research workflow equation-to-code mapping
 upstream design ./coding-conventions-python.md Python implementation policy entrypoint
 upstream design ./coding-conventions-cpp.md C++ implementation policy entrypoint
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror ownership
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream implementation ../tools/sync_agent_canon.sh root symlink view generation
 @dependency-end
 -->
