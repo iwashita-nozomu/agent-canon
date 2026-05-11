@@ -410,8 +410,6 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - vendor/README.md
-      - vendor/skills/README.md
     tests:
       - tests/agent_tools/test_vendor_skill_adapters.py
 
