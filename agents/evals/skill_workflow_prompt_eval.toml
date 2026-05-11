@@ -554,13 +554,14 @@ required_regex = ["layout drift", "layout review", "reference visibility", "clos
 id = "codex-config-shared-features"
 target = ".codex/config.toml"
 kind = "config"
-description = "Shared Codex config must expose token-saving profiles and goals."
+description = "Shared Codex config must expose supported hook and goal feature flags without project-local profiles."
 
 [[evals.checklist]]
 id = "CODEX-CONFIG-TOKEN-1"
 critical = true
-description = "Defines token-lite, token-standard, and token-deep profiles."
-required_regex = ["\\[profiles\\.token-lite\\]", "\\[profiles\\.token-standard\\]", "\\[profiles\\.token-deep\\]", "tool_output_token_limit"]
+description = "Keeps reusable token profiles out of project-local config."
+required_regex = ["\\[features\\]", "hooks\\s*=\\s*true", "goals\\s*=\\s*true"]
+forbidden_regex = ["\\[profiles\\.", "codex_hooks\\s*="]
 
 [[evals.checklist]]
 id = "CODEX-CONFIG-GOALS-1"

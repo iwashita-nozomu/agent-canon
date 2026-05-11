@@ -195,7 +195,6 @@ CONTRACTS = (
             LinkCheck("agents/skills/environment-maintenance.md"),
             LinkCheck("tools/docker_dependency_validator.sh"),
             LinkCheck("tools/ci/container_runtime.py"),
-            LinkCheck("tools/ci/render_devcontainer_compose.py"),
             LinkCheck("tools/ci/run_container_pack.py"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tests/tools/test_container_config.py"),

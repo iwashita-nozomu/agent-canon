@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Provides a ready-to-use pull request description for adding the split Codex CLI guide.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design source/codex_cli_guide_config_deepdive.full.md preserved generated guide body with runtime hook flag normalization.
 @dependency-end
 -->
 
@@ -11,7 +10,7 @@ downstream documentation codex-cli-guide/README.md links this file from the spli
 ## Summary
 
 - Adds `codex-cli-guide/` at the repository root.
-- Preserves the complete single-file Markdown source under `codex-cli-guide/source/`.
+- Preserves the complete single-file Markdown source under `codex-cli-guide/source/` with current hook flag spelling.
 - Splits the guide into chapter-sized files under `codex-cli-guide/sections/`.
 - Adds `codex-cli-guide/MANIFEST.md` with source ranges and hashes.
 - Adds `codex-cli-guide/tools/validate_split.py` to verify that the split sections reconstruct the full source without omissions.

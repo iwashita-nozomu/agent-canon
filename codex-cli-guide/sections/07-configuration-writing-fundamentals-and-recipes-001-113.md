@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: 設定の書き方完全増補とレシピ001-113.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -296,7 +295,7 @@ web_search = "cached"
 
 [profiles.lab.features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 fast_mode = false
 goals = true
 ```
@@ -1741,7 +1740,7 @@ hookが誤判定すると承認flowが壊れる。段階導入する。
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 
 [hooks]
 managed_dir = "/enterprise/hooks"
@@ -1776,7 +1775,7 @@ requirementsはscriptを配布しない。MDMなどで別途配る必要があ�
 
 ```
 [features]
-codex_hooks = false
+hooks = false
 ```
 
 
@@ -2860,7 +2859,7 @@ log_dir = "/Users/me/.codex/logs"
 [features]
 fast_mode = true
 multi_agent = true
-codex_hooks = true
+hooks = true
 shell_snapshot = true
 unified_exec = true
 
@@ -3057,7 +3056,7 @@ log_dir = "/Users/me/.codex/logs"
 [features]
 fast_mode = true
 multi_agent = true
-codex_hooks = true
+hooks = true
 shell_snapshot = true
 unified_exec = true
 undo = false
@@ -3114,7 +3113,7 @@ project_doc_max_bytes = 200000
 web_search = "disabled"
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 
 [agents]
@@ -3162,7 +3161,7 @@ model_reasoning_effort = "medium"
 
 [profiles.ci_review.features]
 multi_agent = false
-codex_hooks = false
+hooks = false
 ```
 
 
@@ -3183,7 +3182,7 @@ browser_use = false
 computer_use = false
 in_app_browser = false
 apps = false
-codex_hooks = true
+hooks = true
 
 [hooks]
 managed_dir = "/enterprise/hooks"

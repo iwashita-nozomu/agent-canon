@@ -2,16 +2,27 @@
 <!--
 @dependency-start
 responsibility Indexes the completion-first AgentCanon improvement review.
-upstream design AGENTS.md AgentCanon runtime and closeout expectations
-upstream design agents/workflows/agent-learning-workflow.md agent self-growth workflow
-upstream design agents/workflows/adaptive-improvement-workflow.md adaptive improvement loop
-upstream implementation tools/agent_tools/task_close.py current closeout evaluator
-upstream implementation tools/agent_tools/evaluate_agent_run.py current run evaluator
+upstream design ../AGENTS.md AgentCanon runtime and closeout expectations
+upstream design ../agents/workflows/agent-learning-workflow.md agent self-growth workflow
+upstream design ../agents/workflows/adaptive-improvement-workflow.md adaptive improvement loop
+upstream implementation ../tools/agent_tools/task_close.py current closeout evaluator
+upstream implementation ../tools/agent_tools/evaluate_agent_run.py current run evaluator
 @dependency-end
 -->
 
 This directory contains a chapterized review of the proposed AgentCanon improvement plan.
 The key correction is that **completion judgment rules and completion-verifier tooling must come before agent settings, tools, MCP, workflow, skill, and documentation changes**.
+
+## Current status
+
+This directory is a design and backlog review surface. It is not currently an
+active closeout verifier, hook, CI gate, or task-close input. The checklist
+chapters intentionally name future target surfaces such as
+`agents/canonical/closeout_profiles.yaml`,
+`tools/agent_tools/completion_verifier.py`, and
+`tools/agent_tools/generate_completion_report.py`; those files must exist and
+be wired into validation before this review can be treated as a runtime
+completion gate.
 
 The previous framing placed agent settings at the top. This review changes the order:
 

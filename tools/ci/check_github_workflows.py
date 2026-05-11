@@ -32,6 +32,9 @@ HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
 )
+AGENT_CANON_INDEPENDENT_WORKFLOWS = {
+    "docker-build.yml",
+}
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
@@ -198,6 +201,7 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
     workflow = load_workflow(path)
     workflow_text = read_text(path)
     findings: list[Finding] = []
+    requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if not has_permissions(workflow):
         findings.append(Finding("error", path, "missing_permissions"))
     if "concurrency" not in workflow:
@@ -205,10 +209,15 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
 
     checkouts = checkout_steps(workflow)
     helpers = helper_steps(workflow)
-    if checkouts and not helpers:
+    if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
+    if requires_agent_canon_checkout and checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
         findings.append(Finding("error", path, "missing_agent_canon_repo_credential_env"))
+    if not requires_agent_canon_checkout:
+        if helpers:
+            findings.append(Finding("error", path, "agent_canon_checkout_helper_not_allowed"))
+        if any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
+            findings.append(Finding("error", path, "agent_canon_credentials_not_allowed"))
     if helpers and not referenced_helper_exists(root, workflow_text):
         findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
     for helper_index, context in enumerate(helpers, start=1):

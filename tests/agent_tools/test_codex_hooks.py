@@ -2,7 +2,7 @@
 
 # @dependency-start
 # responsibility Tests test codex hooks behavior.
-# upstream implementation ../../.codex/config.toml enables codex_hooks
+# upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
 # @dependency-end
@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,6 +20,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
+PRE_TOOL_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "pre_tool_guard.py"
+PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
+GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
+AGENT_CANON_READ_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "agent_canon_read_warning.py"
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -28,7 +34,8 @@ class CodexHooksTest(unittest.TestCase):
         config_text = CONFIG.read_text(encoding="utf-8")
 
         self.assertIn("[features]", config_text)
-        self.assertIn("codex_hooks = true", config_text)
+        self.assertIn("hooks = true", config_text)
+        self.assertNotIn("codex_hooks", config_text)
         self.assertTrue(HOOKS_JSON.exists())
         self.assertTrue(HOOK_SCRIPT.exists())
 
@@ -37,12 +44,22 @@ class CodexHooksTest(unittest.TestCase):
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
 
         session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
-        prompt_submit = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]
+        prompt_hooks = hooks["hooks"]["UserPromptSubmit"][0]["hooks"]
+        prompt_commands = [hook["command"] for hook in prompt_hooks]
+        pre_tool = hooks["hooks"]["PreToolUse"][0]
+        pre_tool_commands = [hook["command"] for hook in pre_tool["hooks"]]
+        stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
+        stop_commands = [hook["command"] for hook in stop_hooks]
 
         self.assertIn("mcp_session_context.sh", session_start["command"])
-        self.assertIn("mcp_session_context.sh", prompt_submit["command"])
+        self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
+        self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
+        self.assertEqual(pre_tool["matcher"], "Bash")
+        self.assertTrue(any("pre_tool_guard.py" in command for command in pre_tool_commands))
+        self.assertTrue(any("agent_canon_read_warning.py" in command for command in pre_tool_commands))
+        self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertIn("SessionStart", session_start["command"])
-        self.assertIn("UserPromptSubmit", prompt_submit["command"])
+        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
 
     def test_mcp_context_hook_outputs_valid_additional_context(self) -> None:
         """The hook script should emit JSON Codex can add to model context."""
@@ -65,3 +82,97 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])
         self.assertIn("context/loop-status only", hook_output["additionalContext"])
         self.assertIn("do not repeat that limitation", hook_output["additionalContext"])
+
+    def test_pre_tool_guard_blocks_destructive_git_reset(self) -> None:
+        """The pre-tool guard should deny clearly destructive Bash commands."""
+        result = subprocess.run(
+            [sys.executable, str(PRE_TOOL_GUARD)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "git reset --hard HEAD"},
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        hook_output = payload["hookSpecificOutput"]
+
+        self.assertEqual(hook_output["hookEventName"], "PreToolUse")
+        self.assertEqual(hook_output["permissionDecision"], "deny")
+        self.assertIn("git reset --hard", hook_output["permissionDecisionReason"])
+
+    def test_agent_canon_read_warning_warns_without_blocking(self) -> None:
+        """The read-warning hook should warn when reading shared AgentCanon paths."""
+        result = subprocess.run(
+            [sys.executable, str(AGENT_CANON_READ_WARNING)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "sed -n '1,40p' vendor/agent-canon/codex-cli-guide/README.md"},
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertIn("systemMessage", payload)
+        self.assertIn("shared canon", payload["systemMessage"])
+        self.assertIn("do not make Docker/devcontainer build logic depend", payload["systemMessage"])
+
+    def test_prompt_secret_guard_blocks_obvious_api_key(self) -> None:
+        """The prompt guard should block high-confidence secret patterns."""
+        result = subprocess.run(
+            [sys.executable, str(PROMPT_SECRET_GUARD)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "UserPromptSubmit",
+                    "prompt": "please use sk-abcdefghijklmnopqrstuvwxyz1234567890",
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("API key", payload["reason"])
+
+    def test_goal_completion_guard_blocks_active_goal_completion(self) -> None:
+        """Stop hook should continue when a completion-like answer races active goal state."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            goal_loop = temp_root / "tools" / "agent_tools" / "goal_loop.py"
+            goal_loop.parent.mkdir(parents=True)
+            (temp_root / "goal.md").write_text("# Goal\n", encoding="utf-8")
+            goal_loop.write_text(
+                "print('NEXT_ACTION=run_next_iteration')\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(GOAL_COMPLETION_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "修正しました。完了です。",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])

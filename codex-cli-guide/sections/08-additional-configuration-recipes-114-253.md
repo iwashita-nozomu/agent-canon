@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: 追加設定レシピ114-253.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -2154,18 +2153,18 @@ multi_agent = true
 **戻し方**  feature行を削除し既定へ戻す。
 
 
-### 追加設定レシピ 219: Feature codex_hooks
+### 追加設定レシピ 219: Feature hooks
 
 **目的**  hooksを有効化する。
 
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 
-**確認**  `codex features list` で `codex_hooks` の状態を確認する。
+**確認**  `codex features list` で `hooks` の状態を確認する。
 
 **戻し方**  feature行を削除し既定へ戻す。
 
@@ -2571,7 +2570,7 @@ allowed_sandbox_modes = ["read-only"]
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 

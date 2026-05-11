@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Preserves the complete single-file Markdown source for the split Codex CLI guide.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+downstream implementation ../tools/validate_split.py validates split guide reconstruction.
 @dependency-end
 -->
 
@@ -11,12 +10,12 @@ downstream documentation codex-cli-guide/README.md links this file from the spli
 このファイルは、分割前の `codex_cli_guide_config_deepdive.md` を完全収録したものです。
 `<!-- split-content-start -->` 以降が原本本文です。
 
-- original sha256: `3162bba298864e43fe175b85c52cbd4735d93b37479a7d6a847fd5e737bbc157`
-- original lines: 12,386
-- original bytes: 365,270
+- normalized runtime note: hook flag examples use current `features.hooks` / `hooks` spelling.
+- source sha256: `67405e3d88280008c71e01d2cb3403d3842734bfb4ce9e27474a8a87e3988510`
+- source lines: 12,386
+- source bytes: 365,144
 
 <!-- split-content-start -->
-
 ---
 title: "OpenAI Codex CLI 実用ガイド 設定実践完全版"
 generated: "2026-05-08"
@@ -709,7 +708,7 @@ features  |  `features.chronicle`  |  boolean / object  |  機能フラグ。バ
 features  |  `features.code_mode`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.code_mode_only`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.codex_git_commit`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
-features  |  `features.codex_hooks`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
+features  |  `features.hooks`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.collab`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.collaboration_modes`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.computer_use`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
@@ -1571,7 +1570,7 @@ include_only = ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]
 exclude = ["OPENAI_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY"]
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 fast_mode = true
 
@@ -2186,7 +2185,7 @@ Hooksは、`hooks.json`または`config.toml`内のinline `[hooks]`として書�
 ```
 # .codex/config.toml
 [features]
-codex_hooks = true
+hooks = true
 
 [[hooks.PreToolUse]]
 matcher = "^Bash$"
@@ -2404,7 +2403,7 @@ web_search = "cached"
 
 [features]
 multi_agent = true
-codex_hooks = false
+hooks = false
 
 [agents]
 max_threads = 4
@@ -2504,7 +2503,7 @@ L{0.34} X}
 MCPが出ない  |  serverがdisabled、認証環境変数がない、allowlistにない。  |  `codex mcp list`、TUIの`/mcp`。
 agentが選ばれない  |  `description`が曖昧、promptで明示していない。  |  agent名をプロンプトで直接指定する。
 agentが編集してしまう  |  `sandbox_mode`未指定で親を継承。  |  調査agentに`sandbox_mode = "read-only"`を固定。
-Hooksが走らない  |  feature flag無効、未信頼プロジェクト、matcher不一致。  |  `features.codex_hooks`、trust、hookログ。
+Hooksが走らない  |  feature flag無効、未信頼プロジェクト、matcher不一致。  |  `features.hooks`、trust、hookログ。
 Rulesが効かない  |  rulesフォルダの場所違い、prefixが一致しない。  |  inline unit testの`match`と`not_match`を追加。
 ```
 
@@ -2587,7 +2586,7 @@ exclude_tmpdir_env_var = true
 
 [features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 
 [agents]
 max_threads = 6
@@ -2756,7 +2755,7 @@ web_search = "cached"
 
 [profiles.lab.features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 fast_mode = false
 
 [profiles.readonly]
@@ -3911,7 +3910,7 @@ sandbox_mode = "workspace-write"
 web_search = "cached"
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 fast_mode = false
 
@@ -5932,7 +5931,7 @@ web_search = "cached"
 
 [profiles.lab.features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 fast_mode = false
 goals = true
 ```
@@ -7377,7 +7376,7 @@ hookが誤判定すると承認flowが壊れる。段階導入する。
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 
 [hooks]
 managed_dir = "/enterprise/hooks"
@@ -7412,7 +7411,7 @@ requirementsはscriptを配布しない。MDMなどで別途配る必要があ�
 
 ```
 [features]
-codex_hooks = false
+hooks = false
 ```
 
 
@@ -8496,7 +8495,7 @@ log_dir = "/Users/me/.codex/logs"
 [features]
 fast_mode = true
 multi_agent = true
-codex_hooks = true
+hooks = true
 shell_snapshot = true
 unified_exec = true
 
@@ -8693,7 +8692,7 @@ log_dir = "/Users/me/.codex/logs"
 [features]
 fast_mode = true
 multi_agent = true
-codex_hooks = true
+hooks = true
 shell_snapshot = true
 unified_exec = true
 undo = false
@@ -8750,7 +8749,7 @@ project_doc_max_bytes = 200000
 web_search = "disabled"
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 
 [agents]
@@ -8798,7 +8797,7 @@ model_reasoning_effort = "medium"
 
 [profiles.ci_review.features]
 multi_agent = false
-codex_hooks = false
+hooks = false
 ```
 
 
@@ -8819,7 +8818,7 @@ browser_use = false
 computer_use = false
 in_app_browser = false
 apps = false
-codex_hooks = true
+hooks = true
 
 [hooks]
 managed_dir = "/enterprise/hooks"
@@ -11121,18 +11120,18 @@ multi_agent = true
 **戻し方**  feature行を削除し既定へ戻す。
 
 
-### 追加設定レシピ 219: Feature codex_hooks
+### 追加設定レシピ 219: Feature hooks
 
 **目的**  hooksを有効化する。
 
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 
-**確認**  `codex features list` で `codex_hooks` の状態を確認する。
+**確認**  `codex features list` で `hooks` の状態を確認する。
 
 **戻し方**  feature行を削除し既定へ戻す。
 
@@ -11538,7 +11537,7 @@ allowed_sandbox_modes = ["read-only"]
 
 ```
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 
@@ -12340,7 +12339,7 @@ Owner:
 # enabled = false
 # 2. Disable hooks
 # [features]
-# codex_hooks = false
+# hooks = false
 # 3. Revert .codex config PR
 ```
 

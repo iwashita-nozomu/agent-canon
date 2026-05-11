@@ -5,7 +5,6 @@
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
-# upstream implementation ./render_devcontainer_compose.py renders devcontainer compose
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
@@ -36,7 +35,6 @@ REQUIRED_APT_PACKAGES = (
     "python3-venv",
 )
 REQUIRED_DOCKERFILE_SNIPPETS = (
-    ("requirements.txt", "must-reference-requirements"),
     ("cli.github.com/packages", "must-use-github-cli-apt-repository"),
     ("gh --version", "must-smoke-check-gh"),
     ("docker/register_safe_directories.sh", "must-install-safe-directory-helper"),
@@ -280,13 +278,78 @@ def validate_dockerfile(root: Path) -> list[Finding]:
             findings.append(
                 Finding("dependency_contract_violation", relative, f"missing-apt:{package}")
             )
-    if not re.search(r"pip\s+install\b.*-r\s+\S*requirements\.txt", text, re.DOTALL):
+    if re.search(r"pip\s+install\b.*-r\s+\S*requirements\.txt", text, re.DOTALL):
         findings.append(
-            Finding("dependency_contract_violation", relative, "missing-pip-requirements-install")
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "docker-build-must-not-install-python-requirements",
+            )
+        )
+    if "COPY docker/requirements.txt" in text or "requirements.txt /tmp" in text:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "docker-build-must-not-copy-python-requirements",
+            )
         )
     for snippet, detail in REQUIRED_DOCKERFILE_SNIPPETS:
         if snippet not in text:
             findings.append(Finding("dependency_contract_violation", relative, detail))
+    return findings
+
+
+def validate_dockerignore(root: Path) -> list[Finding]:
+    """Validate Docker build context exclusions."""
+    path = root / ".dockerignore"
+    relative = ".dockerignore"
+    if not path.is_file():
+        return [Finding("missing_file", relative, "missing")]
+    text = path.read_text(encoding="utf-8")
+    findings: list[Finding] = []
+    for ignored_path in (".git", "vendor/agent-canon"):
+        if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
+            findings.append(
+                Finding("dependency_contract_violation", relative, f"missing-ignore:{ignored_path}")
+            )
+    return findings
+
+
+def validate_post_create(root: Path) -> list[Finding]:
+    """Validate devcontainer post-create setup centralizes Python dependency installs."""
+    path = root / ".devcontainer" / "post-create.sh"
+    relative = ".devcontainer/post-create.sh"
+    if not path.is_file():
+        return [Finding("missing_file", relative, "missing")]
+    text = path.read_text(encoding="utf-8")
+    findings: list[Finding] = []
+    for snippet in (
+        "docker/register_safe_directories.sh",
+        "docker/install_python_dependencies.sh",
+    ):
+        if snippet not in text:
+            findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
+    return findings
+
+
+def validate_python_dependency_installer(root: Path) -> list[Finding]:
+    """Validate the central Python dependency installer script."""
+    path = root / "docker" / "install_python_dependencies.sh"
+    relative = "docker/install_python_dependencies.sh"
+    if not path.is_file():
+        return [Finding("missing_file", relative, "missing")]
+    text = path.read_text(encoding="utf-8")
+    findings: list[Finding] = []
+    for snippet in (
+        "docker/requirements.txt",
+        "python3 -m pip install --upgrade pip",
+        'python3 -m pip install --no-cache-dir -r "$requirements"',
+        "sha256sum",
+        "python3 -m pip check",
+    ):
+        if snippet not in text:
+            findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
     return findings
 
 
@@ -321,7 +384,7 @@ def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[F
         "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "docker-compose.generated.yml",
         "service": "workspace",
-        "postCreateCommand": "bash docker/register_safe_directories.sh /workspace",
+        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
     }
     for key, expected in expected_json.items():
         if config.get(key) != expected:
@@ -343,14 +406,21 @@ def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[F
         return findings
     script = script_path.read_text(encoding="utf-8")
     for snippet in (
-        "tools/ci/render_devcontainer_compose.py",
-        "--pack docker/packs/default.toml",
-        "--output .devcontainer/docker-compose.generated.yml",
+        "docker/packs/default.toml",
+        ".devcontainer/docker-compose.generated.yml",
+        "vendor/agent-canon",
     ):
+        if snippet == "vendor/agent-canon":
+            if snippet in script:
+                findings.append(
+                    Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
+                )
+            continue
         if snippet not in script:
             findings.append(
                 Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"missing:{snippet}")
             )
+    findings.extend(validate_post_create(root))
 
     compose_path = devcontainer_dir / "docker-compose.generated.yml"
     if compose_path.exists() and default_pack is not None:
@@ -383,8 +453,10 @@ def validate(root: Path) -> ValidationReport:
     checked: list[str] = []
     packs: list[PackConfig] = []
     if docker_dir.exists():
-        checked.extend(("docker/Dockerfile", "docker/requirements.txt", "docker/packs"))
+        checked.extend((".dockerignore", "docker/Dockerfile", "docker/requirements.txt", "docker/packs"))
+        findings.extend(validate_dockerignore(root))
         findings.extend(validate_dockerfile(root))
+        findings.extend(validate_python_dependency_installer(root))
         findings.extend(validate_requirements(root))
         packs_dir = docker_dir / "packs"
         if not packs_dir.is_dir():

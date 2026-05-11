@@ -1,8 +1,8 @@
 <!--
 @dependency-start
 responsibility Provides the root index and navigation for the split OpenAI Codex CLI Japanese guide.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design source/codex_cli_guide_config_deepdive.full.md preserved generated guide body with runtime hook flag normalization.
+downstream implementation tools/validate_split.py validates split guide reconstruction.
 @dependency-end
 -->
 
@@ -13,18 +13,26 @@ downstream documentation codex-cli-guide/README.md links this file from the spli
 
 ## 収録方針
 
-- 元のMarkdown本文は `source/codex_cli_guide_config_deepdive.full.md` に完全収録しています。
+- 元のMarkdown本文は `source/codex_cli_guide_config_deepdive.full.md` に収録し、hook flag 表記だけ current runtime に合わせて正規化しています。
 - 章別の本文は `sections/` に分割しています。
 - `tools/validate_split.py` で、`sections/` を連結した本文が `source/` の完全版と一致することを検証できます。
 - このREADMEや各ファイル冒頭の dependency manifest は、AgentCanon の文書運用に合わせて追加したメタ情報です。検証スクリプトは `<!-- split-content-start -->` 以降だけを本文として扱います。
+
+## Runtime compatibility note
+
+This split guide normalizes hook flag examples for the current template runtime.
+`codex-cli 0.130.0` reports `features.hooks` as the supported lifecycle hook
+flag and warns that project-local `profiles` are ignored. Keep reusable
+profiles in user-level Codex config and use `[features] hooks = true` in
+project-local config.
 
 ## 原本情報
 
 - title: OpenAI Codex CLI 実用ガイド 設定実践完全版
 - generated: 2026-05-08
 - source line count: 12,386
-- source byte count: 365,270
-- source sha256: `3162bba298864e43fe175b85c52cbd4735d93b37479a7d6a847fd5e737bbc157`
+- source byte count: 365,144
+- source sha256: `67405e3d88280008c71e01d2cb3403d3842734bfb4ce9e27474a8a87e3988510`
 
 ## 章別ファイル
 

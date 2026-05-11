@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: 最終追加テンプレート集と参考文献.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -590,7 +589,7 @@ Owner:
 # enabled = false
 # 2. Disable hooks
 # [features]
-# codex_hooks = false
+# hooks = false
 # 3. Revert .codex config PR
 ```
 

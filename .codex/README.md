@@ -48,29 +48,37 @@ downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP invent
 - pre-goal subagent fan-out は active runtime の authorization に従います。明示許可がある場合は read-only wave を起動し、無い場合は `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` と handoff packet を artifact に残します。
 - 上記が揃うまで implementation、subagent write handoff、closeout は開始しません。
 
-## Token Profiles
+## User-Level Token Profiles
 
-- `token-lite`
-  - `model_reasoning_effort = "minimal"`
-  - `plan_mode_reasoning_effort = "minimal"`
-  - `model_verbosity = "low"`
-  - `tool_output_token_limit = 2000`
-- `token-standard`
-  - `model_reasoning_effort = "medium"`
-  - `plan_mode_reasoning_effort = "medium"`
-  - `model_verbosity = "medium"`
-  - `tool_output_token_limit = 3000`
-- `token-deep`
-  - `model_reasoning_effort = "high"`
-  - `plan_mode_reasoning_effort = "high"`
-  - `model_verbosity = "medium"`
-  - `tool_output_token_limit = 6000`
+`codex -p <profile>` uses profiles from the user-level Codex config, not this
+project-local config. Keep reusable operator profiles in `~/.codex/config.toml`
+or `$CODEX_HOME/config.toml`:
 
-- `review`
-  - `model = "gpt-5.5"`
-  - `model_reasoning_effort = "high"`
-  - `sandbox_mode = "read-only"`
-  - `approval_policy = "never"`
+```toml
+[profiles.token-lite]
+model_reasoning_effort = "minimal"
+plan_mode_reasoning_effort = "minimal"
+model_verbosity = "low"
+tool_output_token_limit = 2000
+
+[profiles.token-standard]
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "medium"
+model_verbosity = "medium"
+tool_output_token_limit = 3000
+
+[profiles.token-deep]
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+model_verbosity = "medium"
+tool_output_token_limit = 6000
+
+[profiles.review]
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+approval_policy = "never"
+```
 
 Use `codex -p token-lite` for narrow diagnosis, `codex -p token-standard` for
 normal staged repo work, and `codex -p token-deep` for architecture, research,
@@ -109,8 +117,11 @@ or high-risk review. Profiles do not waive workflow gates.
 
 ## MCP Hook Context
 
-- `config.toml` の `[features].codex_hooks = true` で project-local hook を有効にします。
+- `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
 - `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
+- `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
+- `PreToolUse` は `hooks/pre_tool_guard.py` で危険な Bash command を block し、`hooks/agent_canon_read_warning.py` で AgentCanon shared-source path の読み取りに warning を出します。
+- `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を継続させます。
 - hook の役割は「MCP をユーザーが明示しなくても repo task の標準 preflight として扱う context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。

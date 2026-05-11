@@ -58,10 +58,12 @@ check_dockerfile_coherence() {
     return
   fi
 
-  grep -q 'requirements.txt' "$dockerfile" \
-    || report_warning "Dockerfile does not reference requirements.txt"
-  grep -Eiq 'pip[[:space:]]+install.*-r[[:space:]]+[^[:space:]]*requirements\.txt' "$dockerfile" \
-    || report_warning "Dockerfile does not install docker/requirements.txt through pip -r"
+  if grep -Eiq 'pip[[:space:]]+install.*-r[[:space:]]+[^[:space:]]*requirements\.txt' "$dockerfile"; then
+    report_issue "docker/Dockerfile must not install Python requirements; use devcontainer post-create setup"
+  fi
+  if grep -q 'COPY docker/requirements.txt' "$dockerfile"; then
+    report_issue "docker/Dockerfile must not copy docker/requirements.txt into the image build"
+  fi
   grep -Eq '(^|[[:space:]])rsync([[:space:]]|\\|$)' "$dockerfile" \
     || report_issue "docker/Dockerfile must install rsync so fresh-clone overlay works in the canonical container"
   grep -q 'openssh-client' "$dockerfile" \
@@ -76,12 +78,63 @@ check_dockerfile_coherence() {
     || report_issue "docker/Dockerfile must smoke-check gh --version"
 }
 
+check_post_create_python_install() {
+  local post_create=".devcontainer/post-create.sh"
+  local installer="docker/install_python_dependencies.sh"
+  local devcontainer=".devcontainer/devcontainer.json"
+
+  printf '\n3. Checking post-create Python dependency setup...\n'
+  if [ ! -f "$post_create" ]; then
+    report_issue ".devcontainer/post-create.sh not found"
+  else
+    grep -q 'docker/register_safe_directories.sh' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must register safe directories"
+    grep -q 'docker/install_python_dependencies.sh' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must run the Python dependency installer"
+  fi
+
+  if [ ! -f "$installer" ]; then
+    report_issue "docker/install_python_dependencies.sh not found"
+  else
+    grep -q 'docker/requirements.txt' "$installer" \
+      || report_issue "docker/install_python_dependencies.sh must read docker/requirements.txt"
+    grep -Eiq 'python3[[:space:]]+-m[[:space:]]+pip[[:space:]]+install[[:space:]]+--no-cache-dir[[:space:]]+-r' "$installer" \
+      || report_issue "docker/install_python_dependencies.sh must install docker/requirements.txt with pip -r"
+    grep -q 'sha256sum' "$installer" \
+      || report_issue "docker/install_python_dependencies.sh must be idempotent with a requirements hash"
+    grep -q 'python3 -m pip check' "$installer" \
+      || report_issue "docker/install_python_dependencies.sh must run pip check"
+  fi
+
+  if [ ! -f "$devcontainer" ]; then
+    report_issue ".devcontainer/devcontainer.json not found"
+  else
+    grep -q '"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"' "$devcontainer" \
+      || report_issue "devcontainer postCreateCommand must call .devcontainer/post-create.sh"
+  fi
+}
+
+check_docker_build_context_isolation() {
+  local dockerignore=".dockerignore"
+
+  printf '\n4. Checking Docker build context isolation...\n'
+  if [ ! -f "$dockerignore" ]; then
+    report_issue ".dockerignore not found"
+    return
+  fi
+
+  grep -Fxq 'vendor/agent-canon' "$dockerignore" \
+    || report_issue ".dockerignore must exclude vendor/agent-canon from template Docker build context"
+  grep -Fxq '.git' "$dockerignore" \
+    || report_issue ".dockerignore must exclude .git from template Docker build context"
+}
+
 check_result_visualization_requirements() {
   local req_file="docker/requirements.txt"
   local requirement=""
   local missing=0
 
-  printf '\n3. Checking result-log and visualization requirements...\n'
+  printf '\n5. Checking result-log and visualization requirements...\n'
   if [ ! -f "$req_file" ]; then
     report_issue "docker/requirements.txt not found"
     return
@@ -110,7 +163,7 @@ check_repo_local_venv_policy() {
   local pattern='python3?[[:space:]]+-m[[:space:]]+venv|virtualenv|conda[[:space:]]+create|uv[[:space:]]+venv|pipenv|poetry[[:space:]]+env'
   local canonical_tool="tools/ci/python_env_policy.py"
 
-  printf '\n4. Checking repo-local virtual-environment policy...\n'
+  printf '\n6. Checking repo-local virtual-environment policy...\n'
 
   for path in venv env .conda conda-env .venv-*; do
     if [ -e "$path" ]; then
@@ -164,7 +217,7 @@ check_pythonpath_documentation() {
   local docker_documented=0
   local file=""
 
-  printf '\n5. Checking PYTHONPATH and Docker documentation...\n'
+  printf '\n7. Checking PYTHONPATH and Docker documentation...\n'
   for file in README.md QUICK_START.md documents/coding-conventions-project.md; do
     [ -f "$file" ] || continue
     if grep -q 'PYTHONPATH' "$file" && grep -q '=/workspace/python' "$file"; then
@@ -184,6 +237,8 @@ check_pythonpath_documentation() {
 printf 'Checking Docker environment consistency without Python-dependent tooling...\n\n'
 check_requirements_format
 check_dockerfile_coherence
+check_post_create_python_install
+check_docker_build_context_isolation
 check_result_visualization_requirements
 check_repo_local_venv_policy
 check_pythonpath_documentation

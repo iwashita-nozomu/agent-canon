@@ -69,6 +69,42 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
             self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
 
+    def test_docker_build_workflow_does_not_require_agent_canon_checkout(self) -> None:
+        """Docker build workflow should stay independent from the AgentCanon submodule."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow_dir = root / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / "docker-build.yml").write_text(
+                "name: Docker Build\n"
+                "on: [push]\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "concurrency:\n"
+                "  group: docker-${{ github.ref }}\n"
+                "jobs:\n"
+                "  docker-build:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - uses: actions/checkout@v4\n"
+                "        with:\n"
+                "          submodules: false\n"
+                "          persist-credentials: false\n"
+                "      - run: bash docker/check_build.sh --pack docker/packs/default.toml\n",
+                encoding="utf-8",
+            )
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
     def test_missing_pr_template_evidence_fails(self) -> None:
         """PR templates must retain validation and submodule evidence fields."""
         with tempfile.TemporaryDirectory() as tmp_dir:
