@@ -114,6 +114,9 @@ mode = "regular"
 owner = "template-or-derived-repo"
 class = "active_contract"
 local_override_allowed = true
+# Same-path AgentCanon files are seed sources for first materialization and
+# legacy symlink repair only; existing root regular files are never resynced.
+source_prefix = ""
 paths = [
   "documents/README.md",
   "documents/template-bootstrap.md",

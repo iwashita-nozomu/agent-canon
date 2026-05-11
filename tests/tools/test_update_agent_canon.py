@@ -1209,6 +1209,16 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     '  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",',
                     ']',
                     '',
+                    '[[group]]',
+                    'mode = "regular"',
+                    'owner = "template-or-derived-repo"',
+                    'class = "active_contract"',
+                    'local_override_allowed = true',
+                    'source_prefix = ""',
+                    'paths = [',
+                    '  "documents/README.md",',
+                    ']',
+                    '',
                     '[[surface]]',
                     'path = "goal.md"',
                     'mode = "repo_state"',
@@ -1222,6 +1232,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / ".github" / "workflows").mkdir(parents=True)
         (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
+        (work_dir / "documents" / "README.md").write_text(
+            "# Derived Documents Seed\n",
+            encoding="utf-8",
+        )
         (work_dir / ".github" / "AGENTS.md").write_text(
             "# GitHub agents\n",
             encoding="utf-8",
@@ -1428,6 +1442,54 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
+    def test_link_root_materializes_missing_and_legacy_regular_active_contracts(self) -> None:
+        """Link-root should seed active-contract docs without keeping legacy symlinks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            documents_dir = repo / "documents"
+            documents_dir.mkdir()
+            readme_path = documents_dir / "README.md"
+
+            result_missing = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result_missing.returncode, 0, result_missing.stderr)
+            self.assertFalse(readme_path.is_symlink())
+            self.assertIn(
+                "Derived Documents Seed",
+                readme_path.read_text(encoding="utf-8"),
+            )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            documents_dir = repo / "documents"
+            documents_dir.mkdir()
+            readme_path = documents_dir / "README.md"
+            os.symlink("../vendor/agent-canon/documents/README.md", readme_path)
+            result_symlink = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result_symlink.returncode, 0, result_symlink.stderr)
+            self.assertFalse(readme_path.is_symlink())
+            self.assertIn(
+                "Derived Documents Seed",
+                readme_path.read_text(encoding="utf-8"),
+            )
+
     def test_plan_reports_submodule_update_without_root_commit_lookup_errors(self) -> None:
         """Plan should compare submodule commits inside the submodule repo."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1483,6 +1545,62 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout
             self.assertIn("?? UNTRACKED_ROOT_FILE", status)
+
+    def test_ensure_latest_does_not_commit_dirty_regular_active_contract(self) -> None:
+        """Submodule updates should not sweep template-owned active contracts into sync commits."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            link_root = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(link_root.returncode, 0, link_root.stderr)
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "add generated root views"],
+                cwd=repo,
+                check=True,
+            )
+            (repo / "documents" / "README.md").write_text(
+                "# Locally Edited Documents\n",
+                encoding="utf-8",
+            )
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            result = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "ensure-latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            status = subprocess.run(
+                ["git", "status", "--porcelain=v1", "--", "documents/README.md"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            committed_paths = subprocess.run(
+                ["git", "show", "--name-only", "--format=", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("agent_canon_latest=updating_submodule", result.stdout)
+            self.assertEqual(status, " M documents/README.md\n")
+            self.assertNotIn("documents/README.md", committed_paths)
 
     def test_ensure_latest_refuses_unpinned_local_submodule_commits(self) -> None:
         """Ensure-latest should not overwrite local submodule commits silently."""

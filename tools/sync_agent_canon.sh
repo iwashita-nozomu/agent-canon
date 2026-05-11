@@ -483,7 +483,6 @@ stage_sync_paths() {
     {
       build_link_specs
       build_copy_specs
-      build_regular_specs
     }
   )
 }

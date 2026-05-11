@@ -101,7 +101,10 @@ regular files, not symlink views:
 when a path is missing or is still a legacy symlink. Once a derived repo has a
 regular file at that path, AgentCanon must not overwrite it. A derived repo may
 then make its server contract, bootstrap contract, host requirements, and
-template remote policy repo-specific.
+template remote policy repo-specific. `ensure-latest` may repair missing or
+legacy active-contract files, but its automated sync commit must not stage those
+regular files; they are reviewed and committed as template or derived-repo
+content.
 
 AgentCanon may provide generic templates under `documents/templates/`, such as
 `server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
