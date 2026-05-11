@@ -70,8 +70,11 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
+review_model = "gpt-5.5"
+
 [features]
-codex_hooks = true
+hooks = true
+goals = true
 
 [agents]
 max_threads = 24
@@ -100,10 +103,11 @@ tool_timeout_sec = 300
 
 # Template に入っていないもの
 
-現在の `.codex/config.toml` に入っている top-level key は 5 つだけです。
+現在の `.codex/config.toml` に入っている top-level key は 6 つだけです。
 
 - `approval_policy`
 - `sandbox_mode`
+- `review_model`
 - `features`
 - `agents`
 - `mcp_servers`
@@ -141,7 +145,7 @@ tool_timeout_sec = 300
 
 # Feature flags
 
-この template で有効なのは `codex_hooks` のみです。
+この template で有効なのは `hooks` と `goals` です。
 
 schema には他にも多くの flag があります。
 例:
@@ -177,7 +181,7 @@ schema には他にも多くの flag があります。
 ```bash
 codex -c model='"gpt-5.5"'
 codex -c model_reasoning_effort='"high"'
-codex --enable codex_hooks
+codex --enable hooks
 codex --disable some_feature
 codex --search
 codex exec --json "run review"
@@ -210,7 +214,7 @@ CLI override は一時操作に使います。repo の正本へ残すのは、�
 - `model_verbosity`
 - `approval_policy`
 - `sandbox_mode`
-- `profiles`
+- `profiles`（user-level config に置く）
 - `mcp_servers`
 - `agents`
 - `skills`
@@ -409,9 +413,10 @@ enabled = true
 
 ---
 
-# Profiles
+# User-Level Profiles
 
 Profiles は operator mode を切り替えるための機構です。
+current Codex では project-local `.codex/config.toml` の `profiles` は warning 対象なので、`~/.codex/config.toml` か `$CODEX_HOME/config.toml` に置きます。
 
 ```toml
 [profiles.review]

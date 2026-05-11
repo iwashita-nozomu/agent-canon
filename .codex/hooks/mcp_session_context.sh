@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Runs mcp session context shell automation.
 # upstream implementation ../hooks.json invokes this hook for SessionStart and UserPromptSubmit
-# upstream implementation ../config.toml enables codex_hooks
+# upstream implementation ../config.toml enables hooks
 # upstream design ../README.md documents MCP inventory preflight
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates output JSON
 # @dependency-end

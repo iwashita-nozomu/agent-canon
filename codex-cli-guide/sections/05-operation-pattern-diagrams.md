@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: MCPと実験機能の運用パターン図解.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 

@@ -49,7 +49,7 @@ Codex combines settings from persistent config, project config, profiles, custom
 
 - Put durable repo policy in `.codex/config.toml`.
 - Put human-readable task and coding rules in `AGENTS.md`, not in model/provider settings.
-- Use `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
+- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
 - Use CLI `-c` for temporary one-off changes; do not commit temporary operator overrides.
 - Treat `experimental_*` and realtime websocket overrides as unstable unless a task explicitly targets those features.
 
@@ -57,7 +57,7 @@ Example temporary overrides:
 
 ```bash
 codex -c model='"gpt-5.5"' -c model_reasoning_effort='"high"'
-codex --enable codex_hooks --search
+codex --enable hooks --search
 codex exec --json -c sandbox_mode='"read-only"' "review this repo"
 ```
 
@@ -72,32 +72,8 @@ sandbox_mode = "danger-full-access"
 review_model = "gpt-5.5"
 
 [features]
-codex_hooks = true
+hooks = true
 goals = true
-
-[profiles.token-lite]
-model_reasoning_effort = "minimal"
-plan_mode_reasoning_effort = "minimal"
-model_verbosity = "low"
-tool_output_token_limit = 2000
-
-[profiles.token-standard]
-model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
-model_verbosity = "medium"
-tool_output_token_limit = 3000
-
-[profiles.token-deep]
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-model_verbosity = "medium"
-tool_output_token_limit = 6000
-
-[profiles.review]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
 
 [agents]
 max_threads = 24
@@ -115,9 +91,9 @@ tool_timeout_sec = 300
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
-- `features.codex_hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
+- `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
 - `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `repo_mcp_server.goal_loop_status`.
-- `token-lite`, `token-standard`, and `token-deep` are reusable runtime profiles. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
+- Reusable runtime profiles such as `token-lite`, `token-standard`, and `token-deep` belong in user-level Codex config. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
 - `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
@@ -133,8 +109,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | --- | ------------------------- |
 | `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
-| `features` | `features.codex_hooks=true` and `features.goals=true` are configured. |
-| `profiles` | `token-lite`, `token-standard`, and `token-deep` are configured for operator-selected token budgets. |
+| `features` | `features.hooks=true` and `features.goals=true` are configured. |
 | `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
 | `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
 
@@ -164,7 +139,7 @@ Interpretation for this template:
 ### Feature Flags Not Currently Enabled Here
 
 The schema currently exposes many feature flags under `[features]`.
-This template enables `codex_hooks` and `goals`.
+This template enables `hooks` and `goals`.
 All other schema-listed flags are currently absent from the shared repo config:
 
 ```text
@@ -596,9 +571,11 @@ Policy boundary:
 - hooks should enforce deterministic startup/tool behavior.
 - run bundles should preserve task-specific evidence.
 
-## Profiles
+## User-Level Profiles
 
-`[profiles.<name>]` can override many of the same keys as the root config:
+`[profiles.<name>]` can override many of the same keys as the root config, but
+current Codex warns when project-local `.codex/config.toml` defines profiles.
+Keep reusable profiles in `~/.codex/config.toml` or `$CODEX_HOME/config.toml`:
 
 - `model`, `model_provider`, `model_reasoning_effort`, `plan_mode_reasoning_effort`, `model_verbosity`
 - `approval_policy`, `approvals_reviewer`, `sandbox_mode`
@@ -610,7 +587,7 @@ Policy boundary:
 - `zsh_path`
 - selected prompt/context toggles
 
-Use profiles for operator modes:
+Use user-level profiles for operator modes:
 
 ```toml
 [profiles.token-lite]
@@ -734,7 +711,8 @@ Before changing Codex config in this repo:
 
 ## Field Stability Notes
 
-- Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `profiles`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
+- Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
+- User-level operator keys: `profiles`, UI preferences, local model/provider experiments, and other machine-specific defaults.
 - Repo-policy keys: project doc discovery, hooks, MCP, subagent limits, skill instructions, shared defaults.
 - Machine-local keys: audio, TUI, credentials stores, notifications, logs, SQLite home, notices, Windows onboarding state.
 - Experimental keys: names beginning with `experimental_`, realtime websocket overrides, app-server/thread endpoints, and other fields documented as experimental.

@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: 最新・実験的機能の徹底解説.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -116,7 +115,7 @@ web_search = "cached"
 
 [profiles.lab.features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 fast_mode = false
 
 [profiles.readonly]

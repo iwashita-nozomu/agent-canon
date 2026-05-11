@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: MCPの基礎から定義・運用・デバッグまで.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -932,7 +931,7 @@ sandbox_mode = "workspace-write"
 web_search = "cached"
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 fast_mode = false
 

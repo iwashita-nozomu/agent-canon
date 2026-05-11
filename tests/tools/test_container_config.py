@@ -3,7 +3,6 @@
 # @dependency-start
 # responsibility Tests Dockerfile, runtime pack, and devcontainer config validation.
 # upstream implementation ../../tools/ci/container_config.py validates container config
-# upstream implementation ../../tools/ci/render_devcontainer_compose.py renders devcontainer compose
 # upstream implementation ../../tools/ci/container_runtime.py defines runtime pack fields
 # @dependency-end
 
@@ -50,15 +49,39 @@ def write_valid_runtime(root: Path) -> None:
                 "RUN apt-get update && apt-get install -y \\",
                 "    rsync openssh-client graphviz python3-venv gh",
                 "RUN echo https://cli.github.com/packages",
-                "COPY docker/requirements.txt /tmp/requirements.txt",
-                "RUN python3 -m pip install -r /tmp/requirements.txt",
                 "COPY docker/register_safe_directories.sh /usr/local/bin/register_safe_directories",
                 "RUN gh --version",
                 "",
             ]
         ),
     )
+    write_file(
+        root,
+        ".dockerignore",
+        "\n".join(
+            [
+                ".git",
+                "vendor/agent-canon",
+                "",
+            ]
+        ),
+    )
     write_file(root, "docker/register_safe_directories.sh", "#!/usr/bin/env bash\n")
+    write_file(
+        root,
+        "docker/install_python_dependencies.sh",
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                'requirements="${1:-/workspace}/docker/requirements.txt"',
+                'sha256sum "$requirements"',
+                "python3 -m pip install --upgrade pip",
+                'python3 -m pip install --no-cache-dir -r "$requirements"',
+                "python3 -m pip check",
+                "",
+            ]
+        ),
+    )
     write_file(
         root,
         "docker/requirements.txt",
@@ -91,7 +114,7 @@ def write_valid_runtime(root: Path) -> None:
                 "",
                 "[smoke]",
                 'shell = "/bin/bash"',
-                'commands = ["python3 --version"]',
+                'commands = ["bash .devcontainer/post-create.sh /workspace", "python3 --version"]',
                 "",
                 "[runtime]",
                 'shell = "/bin/bash"',
@@ -111,8 +134,20 @@ def write_valid_runtime(root: Path) -> None:
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
-                '  "postCreateCommand": "bash docker/register_safe_directories.sh /workspace"',
+                '  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace"',
                 "}",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
+        ".devcontainer/post-create.sh",
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "bash /workspace/docker/register_safe_directories.sh /workspace",
+                "bash /workspace/docker/install_python_dependencies.sh /workspace",
                 "",
             ]
         ),
@@ -123,9 +158,9 @@ def write_valid_runtime(root: Path) -> None:
         "\n".join(
             [
                 "#!/usr/bin/env bash",
-                "python3 tools/ci/render_devcontainer_compose.py "
-                "--pack docker/packs/default.toml "
-                "--output .devcontainer/docker-compose.generated.yml",
+                "pack=docker/packs/default.toml",
+                "output=.devcontainer/docker-compose.generated.yml",
+                "printf '%s\\n' \"$pack\" \"$output\"",
                 "",
             ]
         ),
@@ -211,3 +246,32 @@ def test_invalid_requirements_fail(tmp_path: Path) -> None:
     assert "CONTAINER_CONFIG=fail" in result.stdout
     assert "dependency_contract_violation:docker/requirements.txt:invalid-line:1" in result.stdout
     assert "dependency_contract_violation:docker/requirements.txt:missing:jupyterlab" in result.stdout
+
+
+def test_dockerfile_python_install_fails(tmp_path: Path) -> None:
+    """Python dependencies should be installed after workspace mount, not during image build."""
+    write_valid_runtime(tmp_path)
+    dockerfile = tmp_path / "docker" / "Dockerfile"
+    dockerfile.write_text(
+        dockerfile.read_text(encoding="utf-8")
+        + "\nCOPY docker/requirements.txt /tmp/requirements.txt\n"
+        + "RUN python3 -m pip install -r /tmp/requirements.txt\n",
+        encoding="utf-8",
+    )
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "docker-build-must-not-install-python-requirements" in result.stdout
+    assert "docker-build-must-not-copy-python-requirements" in result.stdout
+
+
+def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:
+    """Docker build context should not include the AgentCanon submodule."""
+    write_valid_runtime(tmp_path)
+    (tmp_path / ".dockerignore").write_text(".git\n", encoding="utf-8")
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "dependency_contract_violation:.dockerignore:missing-ignore:vendor/agent-canon" in result.stdout

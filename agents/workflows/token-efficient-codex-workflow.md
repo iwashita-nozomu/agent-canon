@@ -3,7 +3,7 @@
 responsibility Documents token-efficient Codex workflow and agent modes.
 upstream design ../canonical/CODEX_WORKFLOW.md Codex runtime workflow contract
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent routing contract
-upstream implementation ../../.codex/config.toml defines token profiles
+upstream implementation ../../.codex/config.toml defines shared runtime limits
 downstream design README.md workflow catalog references this overlay
 @dependency-end
 -->
@@ -23,7 +23,9 @@ be considered.
 
 ## Runtime Profiles
 
-Use Codex profiles as parent-session modes:
+Use Codex profiles as parent-session modes. For current Codex CLI behavior,
+define these profiles in user-level config (`~/.codex/config.toml` or
+`$CODEX_HOME/config.toml`), not in the project-local `.codex/config.toml`.
 
 - `token-lite`: narrow tasks, small docs edits, targeted diagnosis, and
   low-risk follow-up fixes.

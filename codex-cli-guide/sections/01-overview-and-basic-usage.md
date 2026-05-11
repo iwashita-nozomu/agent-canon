@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: 概要・基本操作・設定リファレンス導入.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -706,7 +705,7 @@ features  |  `features.chronicle`  |  boolean / object  |  機能フラグ。バ
 features  |  `features.code_mode`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.code_mode_only`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.codex_git_commit`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
-features  |  `features.codex_hooks`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
+features  |  `features.hooks`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.collab`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.collaboration_modes`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。
 features  |  `features.computer_use`  |  boolean / object  |  機能フラグ。バージョンにより実験的・非公開・非推奨のものを含む。

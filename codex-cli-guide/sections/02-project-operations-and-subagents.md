@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Houses the split guide section: プロジェクト内運用とサブエージェント設計.
-upstream content codex_cli_guide_config_deepdive.md generated from prior TeX/PDF artifact in this ChatGPT session.
-downstream documentation codex-cli-guide/README.md links this file from the split guide index.
+upstream design ../source/codex_cli_guide_config_deepdive.full.md preserved generated guide body.
 @dependency-end
 -->
 
@@ -559,7 +558,7 @@ include_only = ["PATH", "HOME", "LANG", "LC_ALL", "NODE_ENV"]
 exclude = ["OPENAI_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY"]
 
 [features]
-codex_hooks = true
+hooks = true
 multi_agent = true
 fast_mode = true
 
@@ -1174,7 +1173,7 @@ Hooksは、`hooks.json`または`config.toml`内のinline `[hooks]`として書�
 ```
 # .codex/config.toml
 [features]
-codex_hooks = true
+hooks = true
 
 [[hooks.PreToolUse]]
 matcher = "^Bash$"
@@ -1392,7 +1391,7 @@ web_search = "cached"
 
 [features]
 multi_agent = true
-codex_hooks = false
+hooks = false
 
 [agents]
 max_threads = 4
@@ -1492,7 +1491,7 @@ L{0.34} X}
 MCPが出ない  |  serverがdisabled、認証環境変数がない、allowlistにない。  |  `codex mcp list`、TUIの`/mcp`。
 agentが選ばれない  |  `description`が曖昧、promptで明示していない。  |  agent名をプロンプトで直接指定する。
 agentが編集してしまう  |  `sandbox_mode`未指定で親を継承。  |  調査agentに`sandbox_mode = "read-only"`を固定。
-Hooksが走らない  |  feature flag無効、未信頼プロジェクト、matcher不一致。  |  `features.codex_hooks`、trust、hookログ。
+Hooksが走らない  |  feature flag無効、未信頼プロジェクト、matcher不一致。  |  `features.hooks`、trust、hookログ。
 Rulesが効かない  |  rulesフォルダの場所違い、prefixが一致しない。  |  inline unit testの`match`と`not_match`を追加。
 ```
 
@@ -1575,7 +1574,7 @@ exclude_tmpdir_env_var = true
 
 [features]
 multi_agent = true
-codex_hooks = true
+hooks = true
 
 [agents]
 max_threads = 6

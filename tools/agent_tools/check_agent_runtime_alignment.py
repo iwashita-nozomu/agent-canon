@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,11 +37,13 @@ from agent_team import (
 )
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
+HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTIER_MODEL = "gpt-5.5"
 SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
 SPARK_REASONING_EFFORT = "low"
+FRONTMATTER_OPEN_MARKER = "---\n"
 WRITING_AND_REVIEW_ROLE_IDS = {
     "requirements_organizer",
     "manager_reviewer",
@@ -109,26 +112,34 @@ def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
     ensure(config.get("review_model") == FRONTIER_MODEL, f"review_model must be {FRONTIER_MODEL}")
-    profiles = config.get("profiles", {})
-    ensure(isinstance(profiles, dict), "profiles must be a mapping")
-    review_profile = profiles.get("review", {})
-    ensure(isinstance(review_profile, dict), "review profile must be a mapping")
-    ensure(
-        review_profile.get("model") == FRONTIER_MODEL,
-        f"review profile model must be {FRONTIER_MODEL}",
-    )
-    ensure(
-        review_profile.get("model_reasoning_effort") == "high",
-        "review profile model_reasoning_effort must be high",
-    )
-    ensure(
-        review_profile.get("sandbox_mode") == "read-only",
-        "review profile sandbox_mode must be read-only",
-    )
-    ensure(
-        review_profile.get("approval_policy") == "never",
-        "review profile approval_policy must be never",
-    )
+    features = config.get("features", {})
+    ensure(isinstance(features, dict), "features must be a mapping")
+    ensure(features.get("hooks") is True, "features.hooks must be true")
+    ensure(features.get("goals") is True, "features.goals must be true")
+    ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
+    ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+
+
+def validate_project_hooks() -> None:
+    """Check that project hooks cover context, safety, and goal completion guardrails."""
+    hooks_payload = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
+    hooks = hooks_payload.get("hooks", {})
+    ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
+
+    for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"):
+        entries = hooks.get(event, [])
+        ensure(isinstance(entries, list) and entries, f"{event} hook must be configured")
+
+    hooks_text = HOOKS_JSON_PATH.read_text(encoding="utf-8")
+    for hook_script in (
+        "mcp_session_context.sh",
+        "prompt_secret_guard.py",
+        "pre_tool_guard.py",
+        "agent_canon_read_warning.py",
+        "goal_completion_guard.py",
+    ):
+        ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")
+        ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
 
 
 def validate_codex_agent_settings() -> None:
@@ -357,8 +368,11 @@ def validate_public_skill_shims() -> None:
             f"{skill_id} shim is outside the Codex skill root: {shim}",
         )
         text = shim.read_text(encoding="utf-8")
-        ensure(text.startswith("---\n"), f"{skill_id} shim must start with YAML frontmatter")
-        ensure("\n---\n" in text[4:], f"{skill_id} shim YAML frontmatter must close")
+        ensure(text.startswith(FRONTMATTER_OPEN_MARKER), f"{skill_id} shim must start with YAML frontmatter")
+        ensure(
+            "\n---\n" in text[len(FRONTMATTER_OPEN_MARKER) :],
+            f"{skill_id} shim YAML frontmatter must close",
+        )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
 
 
@@ -488,6 +502,7 @@ def validate_bundle_outputs() -> None:
 def main() -> int:
     """Run all runtime-alignment checks."""
     validate_project_config()
+    validate_project_hooks()
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()
