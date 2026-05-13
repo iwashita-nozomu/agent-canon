@@ -325,12 +325,20 @@ when `NEXT_ACTION=run_next_iteration` remains.
 Those catalog entries are non-default: they are visible for humans and agents,
 but they do not block closeout or become `GW*` work units until copied into
 `Exit Criteria` or `Backlog` for the current objective.
+Goal setup also records `pr_mutation_authority`. The default is
+`inspect_and_prepare_only`; use `github_copilot_merge_when_green` when the user
+wants GitHub-hosted Copilot / PR automation to merge after checks pass. This
+mode does not authorize local Codex to bypass checks, dismiss reviews, or hide
+merge evidence.
 
 ```bash
 python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
 python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
   --report-out reports/agents/<run-id>/goal_work_breakdown.md
 python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
+python3 tools/agent_tools/goal_loop.py init --goal-file goal.md \
+  --objective "<objective>" \
+  --pr-mutation-authority github_copilot_merge_when_green
 python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
 ```
 
@@ -340,6 +348,12 @@ Do not shrink the first iteration to one micro-fix when the objective names mult
 Select a coherent slice that can move the checklist, survey, implementation, and validation backlog items together.
 For efficiency, follow `agents/workflows/goal-plan-implementation-loop.md`: plan only the next implementation-ready slice, implement it, record evidence, refresh `NEXT_ACTION`, and continue immediately when the loop still has open work.
 Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
+When the next open item is blocked by an external event, such as an unmerged
+upstream PR, set `goal_status: blocked` and record the blocker in the Loop Log.
+`goal_loop.py status` then reports `NEXT_ACTION=wait_for_unblock` instead of
+asking the agent to rerun the same iteration. Use `goal_status: stopped` only
+when the goal is intentionally abandoned without achievement; it reports
+`NEXT_ACTION=stop_goal_loop`.
 
 ## Skill And Workflow Prompt Evals
 

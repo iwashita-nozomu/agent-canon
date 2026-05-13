@@ -87,6 +87,17 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - Root `AGENTS.md` is an allowed edit target during workflow-wide reviews, but the edit must be applied to its AgentCanon source file when `AGENTS.md` is a shared root view.
 - Before judging AgentCanon submodule drift by parent-tree diff, run `bash tools/update_agent_canon.sh review-submodule`. If it reports local-only submodule changes, push them with `bash tools/update_agent_canon.sh push-proposal` and request AgentCanon PR merge. If it reports a clean remote merge, merge remote main inside `vendor/agent-canon/` before pushing the proposal. If it reports the previous proposal is already included in main by ancestry, tree match, or git-cherry equivalence, `bash tools/update_agent_canon.sh align-main` may align the submodule pin to main.
 
+## PR Mutation Authority
+
+- Agents may inspect PR state, checks, reviews, branches, and mergeability with `gh` or GitHub MCP tools when those tools are available.
+- Agents may create PRs, push owned branches, update PR titles/bodies, add evidence comments, convert a PR to draft, or keep a PR in draft when that action is part of the active workflow or user request.
+- Agents must not merge PRs, close PRs/issues, mark draft PRs ready for review, dismiss reviews, delete branches, enable auto-merge, request reviewers, or bypass failing/missing checks unless the user explicitly authorizes that mutation in the current task or a repository-maintainer policy in tracked docs grants that exact action.
+- A generic statement that `gh` is available is permission to inspect and prepare PR operations, not permission to merge or close. If merge/close/readiness is the next required step but authority is absent, record the blocker in the PR body, run bundle, issue, or `goal.md` instead of guessing.
+- `goal.md` may record `pr_mutation_authority`. Default `inspect_and_prepare_only` means local agents inspect, push owned branches, create/update PRs, and publish evidence only.
+- `github_copilot_merge_when_green` delegates merge authority to GitHub-hosted Copilot / PR automation after required checks and reviews are green. It does not authorize local Codex to merge from `gh`, dismiss reviews, bypass checks, or rely on chat-only evidence.
+- Copilot / PR automation decisions must be visible in the PR through `COPILOT_PR_AUTHORITY`, `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, `COPILOT_VISIBLE_EVIDENCE`, and `COPILOT_BLOCKER` lines before readiness or merge mutation.
+- After an authorized PR merge or close, immediately update the downstream template/submodule pin evidence and rerun the relevant freshness, sync, dependency, and CI gates.
+
 ## Required Before Implementation
 
 - task 開始時、AgentCanon update surface が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。

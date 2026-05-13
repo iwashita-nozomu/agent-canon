@@ -82,6 +82,11 @@ Rules:
    `goal_loop.py init --goal-file goal.md --objective "<draft objective>"` or an
    equivalent checked-in contract containing Objective, Exit Criteria, Backlog,
    and Loop Log.
+   If the user grants PR-processing authority at goal setup, record it with
+   `--pr-mutation-authority`. Use `github_copilot_merge_when_green` only when
+   merge is delegated to GitHub-hosted Copilot / PR automation after required
+   checks and reviews pass; local Codex remains limited to branch/PR/evidence
+   preparation unless separately authorized.
 1. Put uncertain scope in non-goals, constraints, or backlog review items. Do
    not hide uncertainty inside a vague objective.
 1. Mirror the same draft into Codex goals with `/goal <draft objective>` or the
@@ -134,6 +139,7 @@ Forbidden before `/goal` is mirrored and `goal.md` is parseable:
 - write-capable implementation subagents;
 - marking goal items done;
 - user-facing completion;
+- local PR merge or close based only on `github_copilot_merge_when_green`;
 - treating a chat-only goal summary as durable state.
 
 Every pre-goal subagent handoff must include `goal.md` or the candidate goal

@@ -96,6 +96,37 @@ Use this routing when building or reviewing pull request templates:
 | Template / derived PR that changes `vendor/agent-canon/` or the pin | `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` in the template root | AgentCanon source PR/commit, template PR URL, `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`, `bash tools/sync_agent_canon.sh check`, template submodule SHA |
 | Template / derived project-local PR | template root `.github/PULL_REQUEST_TEMPLATE.md` | project validation, dependency review, AgentCanon Evidence only if shared surfaces or pins changed |
 
+PR template routing is not PR mutation authority. Agents may inspect PR state,
+create/update PRs, push owned branches, and add evidence comments as part of
+the workflow. Merge, close, ready-for-review, reviewer request, review
+dismissal, auto-merge, branch deletion, and check bypass require explicit
+current-task user authorization or a tracked maintainer policy granting that
+exact action.
+
+## Visible PR Automation Output
+
+Codex and reviewers can inspect GitHub-visible PR state, check runs, reviews,
+review comments, issue comments, and PR bodies with `gh pr view`, `gh pr
+checks`, or GitHub MCP tools. They cannot inspect hidden Copilot reasoning.
+Therefore GitHub Copilot / PR automation must publish any readiness, merge, or
+blocked decision into a visible PR surface before acting.
+
+Every Copilot-maintained PR decision uses this machine-readable block:
+
+```text
+COPILOT_PR_AUTHORITY=<inspect_and_prepare_only|ready_for_review_when_green|merge_when_green|github_copilot_merge_when_green>
+COPILOT_PR_DECISION=<inspect_only|ready_for_review|merge|blocked|needs_human>
+COPILOT_PR_CHECKS=<pass|fail|missing|not_run>
+COPILOT_VISIBLE_EVIDENCE=<pr-comment|review|pr-body|check-run>:<url-or-id>
+COPILOT_BLOCKER=<none|short blocker>
+```
+
+`pr_mutation_authority: github_copilot_merge_when_green` is a goal-level mode
+for GitHub-hosted Copilot / PR automation. It lets the GitHub-side maintainer
+merge after required checks and reviews are green, but it does not grant local
+Codex permission to merge from `gh`, dismiss reviews, bypass checks, or omit
+the visible evidence block.
+
 ## Validation
 
 Run the GitHub/Copilot convention checker after changing any surface listed in

@@ -78,6 +78,10 @@ Use this exact decision:
 - `NEXT_ACTION=run_next_iteration`: start the next planning checkpoint
   immediately.
 - `NEXT_ACTION=repair_goal_md`: repair the contract before implementation.
+- `NEXT_ACTION=wait_for_unblock`: stop the active iteration and keep the
+  blocker in `goal.md`, PR body, issue, or run bundle until the external event
+  changes.
+- `NEXT_ACTION=stop_goal_loop`: stop without claiming goal achievement.
 - `NEXT_ACTION=close_goal_loop`: enter normal closeout gates.
 
 Goal-driven work is slow when the agent returns to broad planning after every

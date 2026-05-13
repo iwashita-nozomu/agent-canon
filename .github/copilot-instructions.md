@@ -52,6 +52,16 @@ upstream design ../documents/github-copilot-configuration.md Copilot configurati
 - Use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` when a template PR changes `vendor/agent-canon/`.
 - In the standalone AgentCanon repository, use its `.github/PULL_REQUEST_TEMPLATE.md`.
 - Keep validation evidence explicit; do not mark commands complete if Copilot could not run them.
+- When acting on a PR, write a visible PR comment, review body, or PR body
+  update before any readiness or merge decision. The visible output must include
+  `COPILOT_PR_AUTHORITY`, `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, and
+  `COPILOT_VISIBLE_EVIDENCE` lines so Codex and reviewers can inspect the same
+  result with `gh pr view` or `gh pr checks`.
+- If `goal.md` or the PR body declares
+  `pr_mutation_authority: github_copilot_merge_when_green`, GitHub-hosted
+  Copilot / PR automation may merge only after required checks and reviews are
+  green and after publishing the visible evidence block. Local Codex must not
+  treat that mode as permission to merge from the terminal.
 - If PR checks fail before tests with `repository ... agent-canon.git not found`,
   treat it as private submodule authentication. The repository needs
   `AGENT_CANON_REPO_TOKEN` with read-only Contents access to AgentCanon, or

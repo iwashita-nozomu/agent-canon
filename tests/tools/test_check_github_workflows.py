@@ -259,6 +259,31 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Plan mode", result.stdout)
 
+    def test_missing_visible_copilot_output_contract_fails(self) -> None:
+        """Copilot PR surfaces must expose machine-readable decisions."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            path = root / ".github" / "instructions" / "pr-processing.instructions.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "COPILOT_PR_DECISION",
+                    "COPILOT_DECISION",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:COPILOT_PR_DECISION", result.stdout)
+
     def test_job_level_permissions_are_accepted(self) -> None:
         """Workflow permissions may be declared on every job."""
         with tempfile.TemporaryDirectory() as tmp_dir:
