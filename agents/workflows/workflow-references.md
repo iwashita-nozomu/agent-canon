@@ -172,7 +172,7 @@ upstream design README.md workflow catalog
   - 研究・実験改造の正本です。
 - [agents/workflows/implementation-waterfall-workflow.md](../../../../agents/workflows/implementation-waterfall-workflow.md)
   - 実装パスのウォーターフォール正本です。
-- [documents/experiment-critical-review.md](../../../../documents/experiment-critical-review.md)
+- [documents/experiment-critical-review.md](../../documents/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
 - [references/workflow/implementation-waterfall.md](../../references/workflow/implementation-waterfall.md)
   - 実装ウォーターフォール化の文献メモです。

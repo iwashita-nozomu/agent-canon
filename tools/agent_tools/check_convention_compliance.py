@@ -213,8 +213,8 @@ SURFACE_POLICY_MARKERS = (
     "tests/agent_tools/",
 )
 SURFACE_MANIFEST_MARKERS = (
-    'mode = "regular"',
-    'owner = "template-or-derived-repo"',
+    'mode = "standalone_only"',
+    'owner = "agent-canon-standalone"',
     'path = "goal.md"',
     '"documents/README.md"',
     '"documents/template-bootstrap.md"',
@@ -269,16 +269,28 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def readable_path(root: Path, relative_path: str) -> Path | None:
+    """Return the readable root path, falling back to vendored AgentCanon docs."""
+    candidates = (root / relative_path, root / "vendor" / "agent-canon" / relative_path)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def read_text(root: Path, relative_path: str) -> str:
     """Read a UTF-8 text file relative to root."""
-    return (root / relative_path).read_text(encoding="utf-8")
+    resolved = readable_path(root, relative_path)
+    if resolved is None:
+        return (root / relative_path).read_text(encoding="utf-8")
+    return resolved.read_text(encoding="utf-8")
 
 
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
     """Return findings for missing required files."""
     findings: list[Finding] = []
     for path in paths:
-        if not (root / path).is_file():
+        if readable_path(root, path) is None:
             findings.append(Finding(check, path, "missing-required-file"))
     return findings
 
@@ -293,8 +305,8 @@ def check_tool_gates(root: Path) -> list[Finding]:
             )
             continue
         for reference in references:
-            reference_path = root / reference
-            if not reference_path.is_file():
+            reference_path = readable_path(root, reference)
+            if reference_path is None:
                 findings.append(
                     Finding("tool_gate", reference, f"{gate_name}:missing-reference")
                 )
@@ -398,9 +410,9 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
     """Verify shared surface ownership has one manifest-backed route."""
     findings = check_required_files(root, SURFACE_MANIFEST_FILES, "surface_manifest")
     readable_files = {
-        path: (root / path).read_text(encoding="utf-8")
+        path: resolved.read_text(encoding="utf-8")
         for path in SURFACE_MANIFEST_FILES
-        if (root / path).is_file()
+        if (resolved := readable_path(root, path)) is not None
     }
     policy_text = readable_files.get("documents/SHARED_RUNTIME_SURFACES.md", "")
     for marker in SURFACE_POLICY_MARKERS:
@@ -427,8 +439,8 @@ def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
     for path in CONVENTION_SOURCES:
-        full_path = root / path
-        if not full_path.is_file():
+        full_path = readable_path(root, path)
+        if full_path is None:
             continue
         text = full_path.read_text(encoding="utf-8")
         normative_lines = NORMATIVE_RE.findall(text)
