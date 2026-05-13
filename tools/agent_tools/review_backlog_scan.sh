@@ -187,8 +187,20 @@ run_stale_search() {
       NONZERO_COMMANDS=$((NONZERO_COMMANDS + 1))
     fi
   else
-    printf '%s\n' "STALE_WORDING_SEARCH=skipped rg-not-found" >"$output"
-    printf '%s\t0\t%s\n' "stale" "$output" >>"$COMMAND_STATUS"
+    set +e
+    grep -RInE --exclude-dir=.git --exclude-dir=reports --exclude-dir=vendor \
+      "subtree|snapshot copy|TODO|FIXME|old format|legacy format" \
+      "$ROOT_DIR" >"$output" 2>&1
+    local status=$?
+    set -e
+    if [[ "$status" -eq 1 ]]; then
+      status=0
+      printf '%s\n' "STALE_WORDING_SEARCH=no-matches" >>"$output"
+    fi
+    printf '%s\t%s\t%s\n' "stale" "$status" "$output" >>"$COMMAND_STATUS"
+    if [[ "$status" -ne 0 ]]; then
+      NONZERO_COMMANDS=$((NONZERO_COMMANDS + 1))
+    fi
   fi
 }
 
