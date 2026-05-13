@@ -96,6 +96,13 @@ Use this routing when building or reviewing pull request templates:
 | Template / derived PR that changes `vendor/agent-canon/` or the pin | `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` in the template root | AgentCanon source PR/commit, template PR URL, `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`, `bash tools/sync_agent_canon.sh check`, template submodule SHA |
 | Template / derived project-local PR | template root `.github/PULL_REQUEST_TEMPLATE.md` | project validation, dependency review, AgentCanon Evidence only if shared surfaces or pins changed |
 
+PR template routing is not PR mutation authority. Agents may inspect PR state,
+create/update PRs, push owned branches, and add evidence comments as part of
+the workflow. Merge, close, ready-for-review, reviewer request, review
+dismissal, auto-merge, branch deletion, and check bypass require explicit
+current-task user authorization or a tracked maintainer policy granting that
+exact action.
+
 ## Validation
 
 Run the GitHub/Copilot convention checker after changing any surface listed in

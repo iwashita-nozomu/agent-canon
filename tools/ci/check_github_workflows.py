@@ -312,6 +312,8 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "PR Mutation Authority",
+                "Authority / blocker notes",
                 "Operational Findings / Issues",
                 "vendor/agent-canon/issues/README.md",
                 "run_repo_dependency_review.sh --search-hits-file",
@@ -327,6 +329,8 @@ def check_pr_templates(root: Path) -> list[Finding]:
                 "make agent-canon-pr-check",
                 "make agent-canon-ensure-latest",
                 "Plan Mode Evidence",
+                "PR Mutation Authority",
+                "Authority / blocker notes",
                 "Branch And Change Route",
                 "Operational Findings / Issues",
                 "vendor/agent-canon/issues/README.md",
@@ -344,6 +348,8 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "PR Mutation Authority",
+                "Authority / blocker notes",
                 "Branch And Change Route",
                 "Operational Findings / Issues",
                 "issues/README.md",
@@ -362,6 +368,8 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "PR Mutation Authority",
+                "Authority / blocker notes",
                 "Branch And Change Route",
                 "Operational Findings / Issues",
                 "issues/README.md",

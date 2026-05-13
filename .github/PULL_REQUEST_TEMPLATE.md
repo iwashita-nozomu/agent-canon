@@ -41,6 +41,14 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 
 Route notes:
 
+## PR Mutation Authority
+
+- [ ] This PR only required inspection, branch push, PR creation, title/body update, evidence comments, or draft-state preservation.
+- [ ] Merge / close / ready-for-review / reviewer request / review dismissal / auto-merge / branch deletion was explicitly authorized by the user for this task, or was not performed.
+- [ ] If merge or close is still required, the blocker and required human/maintainer action are recorded below instead of being guessed from `gh` availability.
+
+Authority / blocker notes:
+
 ## Canon Discipline
 
 - [ ] This PR targets the standalone AgentCanon repository, not a template / derived repo pin PR.

@@ -46,6 +46,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
+- PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
 
@@ -189,6 +190,8 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 
 7. merge する
 
+- `gh` / GitHub MCP が使えることは、PR 状態確認と PR body / evidence 更新の許可です。merge / close / ready-for-review / reviewer request / auto-merge は、current task で user がその mutation を明示した場合だけ実行します。
+- 明示許可が無い場合は、merge 可能でも PR body、run bundle、または `goal.md` に "blocked on PR mutation authority" と残して止めます。
 - file 構成変更がある場合は integration worktree で merge します。
 - `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 
@@ -353,6 +356,7 @@ gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
 - workflow defect を run bundle だけに残して durable `issues/`、`memory/`、または `notes/failures/` に昇格しないまま close してはいけません。
 - raw text search hit だけを根拠に edit scope を決め、dependency-expanded edit scope を省略してはいけません。
 - standalone AgentCanon repo では explicit validation commands、template / derived repo では `make agent-canon-pr-check` を省略して PR を close してはいけません。
+- `gh` が使えるだけで PR merge、close、ready-for-review、reviewer request、auto-merge、review dismissal、branch deletion を実行してはいけません。
 - `vendor/agent-canon/` の構成変更を file 単位の拾い直しで `main` に戻してはいけません。
 - template `main` merge 後に AgentCanon PR / merge と template pin 更新の対応を曖昧なままにしてはいけません。
 

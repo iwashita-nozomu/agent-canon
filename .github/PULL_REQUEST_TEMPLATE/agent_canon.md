@@ -38,6 +38,14 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/too
 
 Route notes:
 
+## PR Mutation Authority
+
+- [ ] This PR only required inspection, branch push, PR creation, title/body update, evidence comments, draft-state preservation, or conversion to draft.
+- [ ] Merge / close / ready-for-review / reviewer request / review dismissal / auto-merge / branch deletion was explicitly authorized by the user for this task, or was not performed.
+- [ ] If merge, close, or ready-for-review is still required, the blocker and required human/maintainer action are recorded below instead of being guessed from `gh` availability.
+
+Authority / blocker notes:
+
 ## Plan Mode Evidence
 
 - [ ] Plan mode was used before non-trivial AgentCanon sync, Copilot, PR-template, GitHub Actions, or shared runtime-surface changes.
