@@ -69,8 +69,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
             self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
 
-    def test_docker_build_workflow_does_not_require_agent_canon_checkout(self) -> None:
-        """Docker build workflow should stay independent from the AgentCanon submodule."""
+    def test_docker_build_workflow_requires_agent_canon_checkout(self) -> None:
+        """Docker build workflow consumes shared devcontainer files from AgentCanon."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             workflow_dir = root / ".github" / "workflows"
@@ -90,6 +90,48 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "        with:\n"
                 "          submodules: false\n"
                 "          persist-credentials: false\n"
+                "      - run: bash docker/check_build.sh --pack docker/packs/default.toml\n",
+                encoding="utf-8",
+            )
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+            self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
+
+    def test_docker_build_workflow_with_agent_canon_checkout_passes(self) -> None:
+        """Docker build workflow should be explicit about the AgentCanon checkout."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow_dir = root / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / "docker-build.yml").write_text(
+                "name: Docker Build\n"
+                "on: [push]\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "concurrency:\n"
+                "  group: docker-${{ github.ref }}\n"
+                "jobs:\n"
+                "  docker-build:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - uses: actions/checkout@v4\n"
+                "        with:\n"
+                "          submodules: false\n"
+                "          persist-credentials: false\n"
+                "      - name: Checkout AgentCanon submodule\n"
+                "        env:\n"
+                "          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}\n"
+                "          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}\n"
+                "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
                 "      - run: bash docker/check_build.sh --pack docker/packs/default.toml\n",
                 encoding="utf-8",
             )

@@ -34,9 +34,7 @@ HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
 )
-AGENT_CANON_INDEPENDENT_WORKFLOWS = {
-    "docker-build.yml",
-}
+AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = set()
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
