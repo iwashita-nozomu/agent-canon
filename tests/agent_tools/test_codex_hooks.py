@@ -5,11 +5,14 @@
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
+# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
+# upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -25,6 +28,7 @@ PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.p
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 AGENT_CANON_READ_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "agent_canon_read_warning.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
+SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -57,6 +61,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("mcp_session_context.sh", session_start["command"])
         self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
+        self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
         self.assertEqual(pre_tool["matcher"], "Bash")
         self.assertTrue(any("pre_tool_guard.py" in command for command in pre_tool_commands))
         self.assertTrue(any("agent_canon_read_warning.py" in command for command in pre_tool_commands))
@@ -64,6 +69,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
         self.assertIn("SessionStart", session_start["command"])
         self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
 
@@ -204,6 +210,9 @@ class CodexHooksTest(unittest.TestCase):
             analyzer.parent.mkdir(parents=True)
             analyzer.write_text(
                 "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "if sys.argv[sys.argv.index('--min-score') + 1] != '95':\n"
+                "    raise SystemExit(0)\n"
                 "print('OOP_READABILITY=fail')\n"
                 "raise SystemExit(1)\n",
                 encoding="utf-8",
@@ -213,6 +222,7 @@ class CodexHooksTest(unittest.TestCase):
             subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
             source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
 
             result = subprocess.run(
                 [sys.executable, str(OOP_READABILITY_GUARD)],
@@ -226,8 +236,83 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
             )
+
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["decision"], "block")
         self.assertIn("OOP readability hook", payload["reason"])
+        self.assertIn("--min-score 95", payload["reason"])
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["failed_count"], 1)
+
+    def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:
+        """Skill usage hook should append local JSONL records when skills are observed."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
+
+            prompt = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration and skills=$python-review,$dependency-analysis",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            stop = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "workflow=Scoped Change skills=$change-review",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            shell_text = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Check $PATH but use $skill-creator only if needed.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            entries = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(prompt.stdout, "")
+        self.assertEqual(stop.stdout, "")
+        self.assertEqual(shell_text.stdout, "")
+        self.assertEqual(entries[0]["event"], "UserPromptSubmit")
+        self.assertEqual(
+            entries[0]["skills"],
+            ["agent-orchestration", "dependency-analysis", "python-review"],
+        )
+        self.assertEqual(entries[1]["event"], "Stop")
+        self.assertEqual(entries[1]["skills"], ["change-review"])
+        self.assertEqual(entries[2]["skills"], ["skill-creator"])

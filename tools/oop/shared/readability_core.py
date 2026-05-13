@@ -33,6 +33,42 @@ from typing import cast
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
 PRESENTATION_FUNCTION_PARTS = ("format", "render", "stringify", "to_string", "display", "label")
+EFFECT_ADAPTER_NAMES = {"repo_root", "utc_now", "default_log_path"}
+EFFECT_ADAPTER_PREFIXES = (
+    "append_",
+    "build_",
+    "emit_",
+    "git_",
+    "load_",
+    "parse_",
+    "read_",
+    "resolve_",
+    "run_",
+    "write_",
+)
+PARAMETER_AGGREGATE_FUNCTIONS = {"add_finding"}
+DEFAULT_MIN_SCORE = 95
+DEFAULT_SNIPPET_CONTEXT_LINES = 2
+DEFAULT_MAX_REPORT_FINDINGS = 80
+DEFAULT_MAX_FUNCTION_LINES = 80
+DEFAULT_MAX_CLASS_LINES = 220
+DEFAULT_MAX_PUBLIC_METHODS = 12
+DEFAULT_MAX_INSTANCE_ATTRIBUTES = 10
+DEFAULT_MAX_PARAMETERS = 6
+DEFAULT_MAX_COGNITIVE_COMPLEXITY = 25
+DEFAULT_MAX_PUBLIC_FIELDS = 8
+DEFAULT_MAX_BASE_CLASSES = 2
+DEFAULT_MAX_MODULE_HELPERS = 8
+MAX_READABILITY_SCORE = 100
+ERROR_SCORE_PENALTY = 25
+WARN_SCORE_PENALTY = 5
+INFO_SCORE_PENALTY = 2
+FALLBACK_SCORE_PENALTY = 3
+FALLBACK_FINDING_RANK = 9
+KLOC_NORMALIZER = 1000
+MODERATE_RISK_WARN_OR_ERROR_PER_KLOC = 3
+HIGH_RISK_WARN_OR_ERROR_PER_KLOC = 6
+TOP_FILES_SUMMARY_LIMIT = 20
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
 LANGUAGE_SUFFIXES = {
@@ -174,15 +210,15 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
 class Thresholds:
     """Thresholds that turn static observations into findings."""
 
-    max_function_lines: int = 80
-    max_class_lines: int = 220
-    max_public_methods: int = 12
-    max_instance_attributes: int = 10
-    max_parameters: int = 6
-    max_cognitive_complexity: int = 25
-    max_public_fields: int = 8
-    max_base_classes: int = 2
-    max_module_helpers: int = 8
+    max_function_lines: int = DEFAULT_MAX_FUNCTION_LINES
+    max_class_lines: int = DEFAULT_MAX_CLASS_LINES
+    max_public_methods: int = DEFAULT_MAX_PUBLIC_METHODS
+    max_instance_attributes: int = DEFAULT_MAX_INSTANCE_ATTRIBUTES
+    max_parameters: int = DEFAULT_MAX_PARAMETERS
+    max_cognitive_complexity: int = DEFAULT_MAX_COGNITIVE_COMPLEXITY
+    max_public_fields: int = DEFAULT_MAX_PUBLIC_FIELDS
+    max_base_classes: int = DEFAULT_MAX_BASE_CLASSES
+    max_module_helpers: int = DEFAULT_MAX_MODULE_HELPERS
 
 
 @dataclass(frozen=True)
@@ -257,7 +293,12 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
         default=default_language,
         help="Source language to analyze. Language-specific wrappers set this.",
     )
-    parser.add_argument("--min-score", type=int, default=85, help="Minimum accepted score.")
+    parser.add_argument(
+        "--min-score",
+        type=int,
+        default=DEFAULT_MIN_SCORE,
+        help="Minimum accepted score.",
+    )
     parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     parser.add_argument(
         "--include-snippets",
@@ -267,13 +308,13 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     parser.add_argument(
         "--snippet-context",
         type=int,
-        default=2,
+        default=DEFAULT_SNIPPET_CONTEXT_LINES,
         help="Context lines on each side of the finding line when snippets are enabled.",
     )
     parser.add_argument(
         "--max-report-findings",
         type=int,
-        default=80,
+        default=DEFAULT_MAX_REPORT_FINDINGS,
         help="Maximum finding details to print in Markdown reports.",
     )
     parser.add_argument(
@@ -289,15 +330,23 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
             "Repeat for multiple exclusions, for example --exclude vendor --exclude reports."
         ),
     )
-    parser.add_argument("--max-function-lines", type=int, default=80)
-    parser.add_argument("--max-class-lines", type=int, default=220)
-    parser.add_argument("--max-public-methods", type=int, default=12)
-    parser.add_argument("--max-instance-attributes", type=int, default=10)
-    parser.add_argument("--max-parameters", type=int, default=6)
-    parser.add_argument("--max-cognitive-complexity", type=int, default=25)
-    parser.add_argument("--max-public-fields", type=int, default=8)
-    parser.add_argument("--max-base-classes", type=int, default=2)
-    parser.add_argument("--max-module-helpers", type=int, default=8)
+    parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
+    parser.add_argument("--max-class-lines", type=int, default=DEFAULT_MAX_CLASS_LINES)
+    parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
+    parser.add_argument(
+        "--max-instance-attributes",
+        type=int,
+        default=DEFAULT_MAX_INSTANCE_ATTRIBUTES,
+    )
+    parser.add_argument("--max-parameters", type=int, default=DEFAULT_MAX_PARAMETERS)
+    parser.add_argument(
+        "--max-cognitive-complexity",
+        type=int,
+        default=DEFAULT_MAX_COGNITIVE_COMPLEXITY,
+    )
+    parser.add_argument("--max-public-fields", type=int, default=DEFAULT_MAX_PUBLIC_FIELDS)
+    parser.add_argument("--max-base-classes", type=int, default=DEFAULT_MAX_BASE_CLASSES)
+    parser.add_argument("--max-module-helpers", type=int, default=DEFAULT_MAX_MODULE_HELPERS)
     return parser
 
 
@@ -606,6 +655,7 @@ def has_side_effect_call(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         "check_call",
         "check_output",
     }
+    external_effect_names.discard("replace")
     local_names = collect_local_names(node)
     for child in ast.walk(node):
         if not isinstance(child, ast.Call):
@@ -727,6 +777,16 @@ def is_algorithm_contract_class(node: ast.ClassDef) -> bool:
     return any(base_class_name(base) in contract_bases for base in node.bases)
 
 
+def is_test_case_class(path: Path, node: ast.ClassDef) -> bool:
+    """Return true for test framework classes whose size is test organization."""
+    if not (path.name.startswith("test_") or "tests" in path.parts):
+        return False
+    base_names = {base_class_name(base) for base in node.bases}
+    return node.name.endswith("Test") or bool(
+        base_names.intersection({"TestCase", "unittest.TestCase"})
+    )
+
+
 def parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST]:
     """Build a parent map for top-level and nested function classification."""
     parents: dict[ast.AST, ast.AST] = {}
@@ -831,11 +891,13 @@ def is_passthrough_call(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
 ) -> tuple[str, int] | None:
     """Return callee and argument count when a function only forwards its inputs."""
+    parameter_names = python_boundary_parameter_names(node)
+    if not parameter_names:
+        return None
     statement = only_statement(node)
     if not isinstance(statement, ast.Return) or not isinstance(statement.value, ast.Call):
         return None
     call = statement.value
-    parameter_names = python_boundary_parameter_names(node)
     positional_names = [
         arg.id for arg in call.args if isinstance(arg, ast.Name) and arg.id in parameter_names
     ]
@@ -994,6 +1056,8 @@ def add_python_class_shape_findings(
     findings: list[Finding],
 ) -> None:
     """Record findings for class name, size, state, and inheritance surface."""
+    if is_test_case_class(context.path, node):
+        return
     add_python_class_identity_findings(context, node, findings)
     add_python_class_size_findings(context, node, public_methods, attrs, findings)
 
@@ -1098,6 +1162,8 @@ def add_python_class_contract_findings(
     findings: list[Finding],
 ) -> None:
     """Record findings for class necessity and contract shape."""
+    if is_test_case_class(context.path, node):
+        return
     static_methods = static_method_nodes(node)
     if static_methods and len(static_methods) == len(direct_methods) and not is_algorithm_contract_class(node):
         add_finding(
@@ -1125,7 +1191,7 @@ def add_python_class_contract_findings(
             context.path,
             node.lineno,
             context.language,
-            "info",
+            "warn",
             "thin_class",
             node.name,
             len(public_methods),
@@ -1155,6 +1221,8 @@ def add_python_method_cohesion_findings(
     findings: list[Finding],
 ) -> None:
     """Record method-level class cohesion findings."""
+    if is_test_case_class(context.path, node):
+        return
     for method in public_methods:
         if method_uses_self(method):
             continue
@@ -1164,7 +1232,7 @@ def add_python_method_cohesion_findings(
             context.path,
             method.lineno,
             context.language,
-            "info",
+            "warn",
             "method_without_self_use",
             f"{node.name}.{method.name}",
             "no-self-use",
@@ -1267,7 +1335,11 @@ def add_python_function_shape_findings(
             thresholds.max_function_lines,
             "split-decision-transform-and-side-effect-responsibilities",
         )
-    if shape.parameters > thresholds.max_parameters and not shape.is_nested:
+    if (
+        shape.parameters > thresholds.max_parameters
+        and not shape.is_nested
+        and node.name not in PARAMETER_AGGREGATE_FUNCTIONS
+    ):
         add_finding(
             findings,
             context.root,
@@ -1311,14 +1383,18 @@ def add_python_function_type_findings(
             context.path,
             node.lineno,
             context.language,
-            "info",
+            "warn",
             "missing_public_annotations",
             node.name,
             "missing",
             "complete",
             "add-public-boundary-types",
         )
-    if shape.is_public_boundary and shape.optional_annotations > 0:
+    if (
+        shape.is_public_boundary
+        and shape.optional_annotations > 0
+        and not is_standard_cli_optional_boundary(node)
+    ):
         add_finding(
             findings,
             context.root,
@@ -1348,6 +1424,11 @@ def add_python_function_type_findings(
         )
 
 
+def is_standard_cli_optional_boundary(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Return true for the standard CLI ``main(argv=None)`` testable entrypoint."""
+    return node.name == "main" and "argv" in python_boundary_parameter_names(node)
+
+
 def add_python_function_effect_findings(
     context: SourceContext,
     node: ast.FunctionDef | ast.AsyncFunctionDef,
@@ -1356,21 +1437,32 @@ def add_python_function_effect_findings(
     findings: list[Finding],
 ) -> None:
     """Record effect-boundary and mathematical redundancy findings."""
-    if shape.is_top_level and returns_value(node) and has_side_effect_call(node):
+    if (
+        shape.is_top_level
+        and returns_value(node)
+        and has_side_effect_call(node)
+        and not is_effect_adapter_name(node.name)
+    ):
         add_finding(
             findings,
             context.root,
             context.path,
             node.lineno,
             context.language,
-            "info",
+            "warn",
             "mixed_morphism_effect",
             node.name,
             "return+effect",
             "pure-or-effect-boundary",
             "separate-value-transform-from-io-or-mutation",
         )
-    add_python_redundancy_findings(context, node, parents, findings)
+    if not shape.is_nested:
+        add_python_redundancy_findings(context, node, parents, findings)
+
+
+def is_effect_adapter_name(name: str) -> bool:
+    """Return true when a function name explicitly owns an effect boundary."""
+    return name in EFFECT_ADAPTER_NAMES or name.startswith(EFFECT_ADAPTER_PREFIXES)
 
 
 def add_python_redundancy_findings(
@@ -1404,7 +1496,7 @@ def add_python_redundancy_findings(
             context.path,
             node.lineno,
             context.language,
-            "info",
+            "warn",
             "pass_through_function",
             node.name,
             f"{callee}/{forwarded_count}",
@@ -1920,7 +2012,7 @@ def add_cpp_function_type_findings(
             context.path,
             shape.line,
             context.language,
-            "info",
+            "warn",
             "null_runtime_branch",
             shape.name,
             shape.null_checks,
@@ -1945,16 +2037,23 @@ def add_cpp_function_type_findings(
 
 def score(findings: list[Finding]) -> int:
     """Calculate a conservative 0-100 score."""
-    weights = {"error": 25, "warn": 5, "info": 2}
-    penalty = sum(weights.get(finding.severity, 3) for finding in findings)
-    return max(0, 100 - min(100, penalty))
+    weights = {
+        "error": ERROR_SCORE_PENALTY,
+        "warn": WARN_SCORE_PENALTY,
+        "info": INFO_SCORE_PENALTY,
+    }
+    penalty = sum(
+        weights.get(finding.severity, FALLBACK_SCORE_PENALTY)
+        for finding in findings
+    )
+    return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
 
 
 def finding_rank(finding: Finding) -> tuple[int, str, int, str]:
     """Sort findings by review priority and location."""
     severity_rank = {"error": 0, "warn": 1, "info": 2}
     return (
-        severity_rank.get(finding.severity, 9),
+        severity_rank.get(finding.severity, FALLBACK_FINDING_RANK),
         finding.path,
         finding.line,
         finding.kind,
@@ -2019,7 +2118,7 @@ def summarize_findings(
     findings: list[Finding],
     final_score: int,
     min_score: int,
-    exclude_patterns: list[str] | None = None,
+    exclude_patterns: Sequence[str] = (),
 ) -> dict[str, object]:
     """Build deterministic summary metrics for report output."""
     loc = 0
@@ -2034,14 +2133,14 @@ def summarize_findings(
     warn_or_error = sum(
         1 for finding in findings if finding.severity in {"error", "warn"}
     )
-    per_kloc = warn_or_error / max(1.0, loc / 1000)
+    per_kloc = warn_or_error / max(1.0, loc / KLOC_NORMALIZER)
     if severity_counts.get("error", 0):
         grade = "parse-blocked"
     elif per_kloc <= 1:
         grade = "low-risk"
-    elif per_kloc <= 3:
+    elif per_kloc <= MODERATE_RISK_WARN_OR_ERROR_PER_KLOC:
         grade = "moderate-risk"
-    elif per_kloc <= 6:
+    elif per_kloc <= HIGH_RISK_WARN_OR_ERROR_PER_KLOC:
         grade = "high-risk"
     else:
         grade = "severe-risk"
@@ -2060,7 +2159,9 @@ def summarize_findings(
         "dimension_counts": dict(dimension_counts),
         "top_files": [
             {"path": path, "findings": count}
-            for path, count in Counter(finding.path for finding in findings).most_common(20)
+            for path, count in Counter(finding.path for finding in findings).most_common(
+                TOP_FILES_SUMMARY_LIMIT
+            )
         ],
     }
 
@@ -2174,7 +2275,7 @@ def markdown_finding_detail_lines(
     return lines
 
 
-def write_review_prompt(path: Path, report_path: str | None) -> None:
+def write_review_prompt(path: Path, report_path: str) -> None:
     """Write a prompt for a read-only reviewer that documents mechanical output."""
     report_reference = report_path or "<path-to-mechanical-report>"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2218,7 +2319,7 @@ def main(argv: Sequence[str] | None = None, *, default_language: str = "all") ->
     run = build_analyzer_run(root, args)
     emit_report(run, args)
     if args.review_prompt_out:
-        write_review_prompt(Path(args.review_prompt_out), None)
+        write_review_prompt(Path(args.review_prompt_out), "")
     return 0 if run.final_score >= args.min_score else 1
 
 

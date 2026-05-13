@@ -106,7 +106,7 @@ python3 tools/oop/python/readability.py \
   --exclude vendor \
   --exclude reports \
   python tools tests \
-  --min-score 85
+  --min-score 95
 ```
 
 Python tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method 過多、instance state 過多、static method namespace、引数過多、`None` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。
@@ -117,7 +117,7 @@ python3 tools/oop/cpp/readability.py \
   --exclude vendor \
   --exclude reports \
   include src tests/cpp \
-  --min-score 85
+  --min-score 95
 ```
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。

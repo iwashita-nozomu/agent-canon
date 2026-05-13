@@ -519,10 +519,18 @@ Use hooks for deterministic runtime checks, not for replacing workflow policy:
 - Start or verify repo-local MCP surfaces early.
 - Inject stable environment/context hints.
 - Block known-bad tool use before it runs.
-- Record tool-use summaries for later audit.
+- Record hook invocations, OOP guard results, and skill usage signals for later audit.
 - Avoid long-running logic in hooks unless timeouts are explicit.
 
 Hook output may include hook-specific structured results. Treat hook failures as runtime evidence to fix, not as optional noise.
+
+Template-specific hook behavior:
+
+- `UserPromptSubmit` runs MCP context injection, prompt secret scanning, and `skill_usage_logger.py`.
+- `PostToolUse` runs `oop_readability_guard.py` for source-editing tool calls.
+- `Stop` reruns `oop_readability_guard.py` and records a final skill usage observation.
+- OOP hook logs append to `reports/hooks/oop_readability_guard.jsonl`; skill hook logs append to `reports/hooks/skill_usage.jsonl`.
+- Local log paths can be overridden with `AGENT_CANON_OOP_HOOK_LOG_PATH` and `AGENT_CANON_SKILL_LOG_PATH`.
 
 ## Skills
 

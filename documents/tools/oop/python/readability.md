@@ -35,4 +35,4 @@ Python source に対して、OOP 境界が「責務、状態、契約、公開�
 python3 tools/oop/python/readability.py --format markdown --include-snippets python tools tests
 ```
 
-`--min-score` 未満の場合は fail します。finding は design review の補助であり、score を人間の判断で上書きせず、必要なら false positive と改善方針を review artifact に残します。
+既定は `--min-score 95` で、単発の軽い adapter signal は review 補助に残しつつ、複合 smell が残る状態を pass にしません。finding は design review の補助であり、score を人間の判断で上書きせず、必要なら false positive と改善方針を review artifact に残します。

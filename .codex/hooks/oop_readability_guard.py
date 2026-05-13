@@ -12,10 +12,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 PYTHON_SUFFIXES = {".py"}
@@ -26,6 +28,14 @@ EDIT_COMMAND_PATTERN = re.compile(
     r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
+OOP_HOOK_MIN_SCORE = "95"
+LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
+DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+GIT_ROOT_TIMEOUT_SECONDS = 5
+GIT_CHANGED_PATHS_TIMEOUT_SECONDS = 10
+ANALYZER_TIMEOUT_SECONDS = 30
+MAX_BLOCKED_ANALYZER_SNIPPETS = 3
+MAX_ANALYZER_OUTPUT_LINES = 12
 
 
 @dataclass(frozen=True)
@@ -58,7 +68,7 @@ def repo_root() -> Path:
         check=False,
         capture_output=True,
         text=True,
-        timeout=5,
+        timeout=GIT_ROOT_TIMEOUT_SECONDS,
     )
     if result.returncode == 0 and result.stdout.strip():
         return Path(result.stdout.strip())
@@ -98,7 +108,7 @@ def git_lines(root: Path, args: list[str]) -> list[str]:
         check=False,
         capture_output=True,
         text=True,
-        timeout=10,
+        timeout=GIT_CHANGED_PATHS_TIMEOUT_SECONDS,
     )
     if result.returncode != 0:
         return []
@@ -142,7 +152,7 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
         "--root",
         str(root),
         "--min-score",
-        "85",
+        OOP_HOOK_MIN_SCORE,
         *relative_paths,
     )
     result = subprocess.run(
@@ -151,7 +161,7 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
         check=False,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=ANALYZER_TIMEOUT_SECONDS,
     )
     return AnalyzerResult(
         command=command,
@@ -205,8 +215,8 @@ def emit_block(results: list[AnalyzerResult]) -> None:
     """Emit a blocking hook result with OOP remediation details."""
     failed = [result for result in results if result.returncode != 0]
     snippets = []
-    for result in failed[:3]:
-        first_lines = "\n".join(result.output.splitlines()[:12])
+    for result in failed[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
+        first_lines = "\n".join(result.output.splitlines()[:MAX_ANALYZER_OUTPUT_LINES])
         snippets.append(f"$ {' '.join(result.command)}\n{first_lines}")
     json.dump(
         {
@@ -223,12 +233,78 @@ def emit_block(results: list[AnalyzerResult]) -> None:
     sys.stdout.write("\n")
 
 
+def utc_now() -> str:
+    """Return a compact UTC timestamp for hook logs."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def default_log_path(root: Path) -> Path:
+    """Return the default local hook log path."""
+    override = os.environ.get(LOG_PATH_ENV, "").strip()
+    if override:
+        return Path(override)
+    return root / "reports" / "hooks" / "oop_readability_guard.jsonl"
+
+
+def analyzer_log_payload(
+    payload: dict[str, object],
+    root: Path,
+    *,
+    checked: bool,
+    results: list[AnalyzerResult],
+) -> dict[str, object]:
+    """Build one OOP hook invocation log payload."""
+    failed = [result for result in results if result.returncode != 0]
+    return {
+        "timestamp": utc_now(),
+        "event": hook_event_name(payload),
+        "tool_name": tool_name(payload),
+        "checked": checked,
+        "min_score": int(OOP_HOOK_MIN_SCORE),
+        "result_count": len(results),
+        "failed_count": len(failed),
+        "status": "fail" if failed else "pass",
+        "root": str(root),
+        "commands": [
+            {
+                "command": list(result.command),
+                "returncode": result.returncode,
+            }
+            for result in results
+        ],
+    }
+
+
+def _log_append_hook_log(root: Path, entry: dict[str, object]) -> None:
+    """Append one JSONL hook log entry without blocking the hook on logging errors."""
+    if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
+        return
+    try:
+        path = default_log_path(root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            json.dump(entry, stream, sort_keys=True)
+            stream.write("\n")
+    except OSError:
+        return
+
+
 def main() -> int:
     """Block source-editing continuations when changed source files fail OOP checks."""
     payload = load_payload()
-    if not should_check(payload):
+    root = repo_root()
+    checked = should_check(payload)
+    if not checked:
+        _log_append_hook_log(
+            root,
+            analyzer_log_payload(payload, root, checked=False, results=[]),
+        )
         return 0
-    results = run_oop_checks(repo_root())
+    results = run_oop_checks(root)
+    _log_append_hook_log(
+        root,
+        analyzer_log_payload(payload, root, checked=True, results=results),
+    )
     if any(result.returncode != 0 for result in results):
         emit_block(results)
     return 0

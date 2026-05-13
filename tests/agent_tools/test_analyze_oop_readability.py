@@ -232,6 +232,30 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("static_method_namespace:DataHelper", result.stdout)
             self.assertIn("missing_public_annotations:calculate", result.stdout)
 
+    def test_python_vague_static_namespace_fails_default_gate(self) -> None:
+        """The default OOP score gate should not pass namespace-class findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "helpers.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "class DataHelper:",
+                        "    @staticmethod",
+                        "    def calculate(value):",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("OOP_READABILITY_SCORE=", result.stdout)
+            self.assertIn("OOP_READABILITY=fail", result.stdout)
+
     def test_python_optional_none_boundary_is_flagged(self) -> None:
         """Optional public boundaries and None routing are reported."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -387,7 +411,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "cpp:info:null_runtime_branch:route:1>typed-reference-or-variant-boundary",
+                "cpp:warn:null_runtime_branch:route:1>typed-reference-or-variant-boundary",
                 result.stdout,
             )
 

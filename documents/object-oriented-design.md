@@ -144,14 +144,14 @@ OOP 的な可読性は reviewer の判断を必要としますが、危険な形
 Python surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/python/readability.py python tools tests --min-score 85
+python3 tools/oop/python/readability.py python tools tests --min-score 95
 python3 tools/oop/python/rule_inventory.py
 ```
 
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py include src tests/cpp --min-score 85
+python3 tools/oop/cpp/readability.py include src tests/cpp --min-score 95
 python3 tools/oop/cpp/rule_inventory.py
 ```
 

@@ -145,7 +145,6 @@ docker context ls
 ## Related
 
 - [README.md](../README.md)
-- [QUICK_START.md](../QUICK_START.md)
-- [docker/README.md](../docker/README.md)
+- Template-derived repositories may add root-local `QUICK_START.md` and `docker/README.md`.
 - [server-host-contract.md](server-host-contract.md)
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md)

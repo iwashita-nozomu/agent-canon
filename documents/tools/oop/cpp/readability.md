@@ -33,3 +33,4 @@ python3 tools/oop/cpp/readability.py --format markdown --include-snippets includ
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
+既定は `--min-score 95` で、単発の軽い adapter signal は review 補助に残しつつ、複合 smell が残る状態を pass にしません。

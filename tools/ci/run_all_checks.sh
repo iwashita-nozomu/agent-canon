@@ -92,6 +92,13 @@ export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-agent-canon-ci@example.invalid}"
 export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-AgentCanon CI}"
 export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-agent-canon-ci@example.invalid}"
 
+PYTHON_SOURCE_PATHS=()
+for candidate_path in python tests; do
+  if [ -e "${candidate_path}" ]; then
+    PYTHON_SOURCE_PATHS+=("${candidate_path}")
+  fi
+done
+
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 統合 CI セッション開始"
 echo "════════════════════════════════════════════════════════════════"
@@ -248,7 +255,10 @@ echo ""
 
 # 5. pydocstyle 実行（Docstring 検証）
 echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
-if "$PYTHON_BIN" -m pydocstyle python tests 2>&1; then
+if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
+  echo "PYDOCSTYLE=skip"
+  echo "python/tests source roots are absent in this checkout; skipping pydocstyle"
+elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pydocstyle 成功"
 else
   echo "❌ pydocstyle 失敗（詳細: documents/DOCSTRING_GUIDE.md を参照）"
@@ -265,7 +275,10 @@ if [ $QUICK_MODE -eq 0 ]; then
   echo "   - UP: Python 最新構文チェック"
   echo ""
   
-  if "$PYTHON_BIN" -m ruff check python tests --select D,E,F,I,UP --ignore E501 2>&1; then
+  if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
+    echo "RUFF=skip"
+    echo "python/tests source roots are absent in this checkout; skipping ruff"
+  elif "$PYTHON_BIN" -m ruff check "${PYTHON_SOURCE_PATHS[@]}" --select D,E,F,I,UP --ignore E501 2>&1; then
     echo "✅ ruff 成功"
   else
     echo "❌ ruff 失敗"

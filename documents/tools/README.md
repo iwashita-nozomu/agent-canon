@@ -222,5 +222,6 @@ closeout では raw log だけでなく、summary/report path と可視化 path�
 
 ## 参照先
 
-- [scripts/README.md](../../scripts/README.md)
+- Template-derived repositories may add a root-local `scripts/README.md` for
+  repo bootstrap scripts that are not AgentCanon-owned tools.
 - [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md)

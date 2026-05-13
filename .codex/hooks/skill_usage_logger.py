@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+# @dependency-start
+# responsibility Logs Codex skill usage signals from hook payloads.
+# upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
+# upstream design ../../agents/evals/README.md requires skill-use eval evidence.
+# downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook logging.
+# @dependency-end
+
+"""Append local JSONL records for skill usage observed by Codex hooks."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+LOG_PATH_ENV = "AGENT_CANON_SKILL_LOG_PATH"
+DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
+SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
+SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+GIT_ROOT_TIMEOUT_SECONDS = 5
+
+
+def load_payload() -> dict[str, object]:
+    """Read one JSON hook payload from stdin."""
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}
+    try:
+        loaded = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def repo_root() -> Path:
+    """Resolve the active repository root for hook logs."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=GIT_ROOT_TIMEOUT_SECONDS,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return Path(result.stdout.strip())
+    return Path.cwd()
+
+
+def hook_event_name(payload: dict[str, object]) -> str:
+    """Return the hook event name."""
+    value = payload.get("hookEventName")
+    return value if isinstance(value, str) else ""
+
+
+def text_values(value: object) -> list[str]:
+    """Return text leaves from nested hook payload data."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        values: list[str] = []
+        for child in value.values():
+            values.extend(text_values(child))
+        return values
+    if isinstance(value, list):
+        values: list[str] = []
+        for child in value:
+            values.extend(text_values(child))
+        return values
+    return []
+
+
+def extract_skill_ids(text: str) -> set[str]:
+    """Extract normalized skill ids from one text payload."""
+    skills = {match.group(1).strip("-_") for match in SKILL_TOKEN_RE.finditer(text)}
+    for match in SKILLS_FIELD_RE.finditer(text):
+        raw_values = match.group(1).split(",")
+        for raw_value in raw_values:
+            value = raw_value.strip().strip("`'\"[](){}")
+            value = value.removeprefix("$").strip("-_")
+            if value and value != "-":
+                skills.add(value)
+    return {skill for skill in skills if SKILL_ID_RE.fullmatch(skill)}
+
+
+def observed_text(payload: dict[str, object]) -> list[str]:
+    """Return hook payload text fields relevant for skill-use discovery."""
+    texts: list[str] = []
+    for key in ("prompt", "last_assistant_message", "message", "tool_input"):
+        if key in payload:
+            texts.extend(text_values(payload[key]))
+    return texts
+
+
+def observed_skills(payload: dict[str, object]) -> list[str]:
+    """Return sorted unique skill ids observed in a hook payload."""
+    skills: set[str] = set()
+    for text in observed_text(payload):
+        skills.update(extract_skill_ids(text))
+    return sorted(skills)
+
+
+def utc_now() -> str:
+    """Return one UTC timestamp for log entries."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def default_log_path(root: Path) -> Path:
+    """Return the default local skill usage log path."""
+    override = os.environ.get(LOG_PATH_ENV, "").strip()
+    if override:
+        return Path(override)
+    return root / "reports" / "hooks" / "skill_usage.jsonl"
+
+
+def _log_append_log(root: Path, entry: dict[str, object]) -> None:
+    """Append one skill usage JSONL entry without blocking runtime progress."""
+    if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
+        return
+    try:
+        path = default_log_path(root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            json.dump(entry, stream, sort_keys=True)
+            stream.write("\n")
+    except OSError:
+        return
+
+
+def main() -> int:
+    """Append one skill usage hook log entry."""
+    payload = load_payload()
+    root = repo_root()
+    skills = observed_skills(payload)
+    _log_append_log(
+        root,
+        {
+            "timestamp": utc_now(),
+            "event": hook_event_name(payload),
+            "skills": skills,
+            "skill_count": len(skills),
+            "root": str(root),
+        },
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -8,6 +8,7 @@
     "downstream implementation hooks/pre_tool_guard.py blocks high-risk Bash commands",
     "downstream implementation hooks/agent_canon_read_warning.py warns on shared-canon reads",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
+    "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks changed-source OOP readability failures",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
@@ -41,6 +42,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/prompt_secret_guard.py\"",
             "timeout": 10,
             "statusMessage": "Checking prompt for obvious secrets"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
+            "timeout": 10,
+            "statusMessage": "Logging observed skill usage"
           }
         ]
       }
@@ -91,6 +98,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed-source OOP readability"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
+            "timeout": 10,
+            "statusMessage": "Logging observed skill usage"
           }
         ]
       }
