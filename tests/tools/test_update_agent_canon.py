@@ -1514,6 +1514,45 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("agent_canon_plan_prefix_mode=submodule", plan.stdout)
             self.assertIn("agent_canon_plan_route=submodule_update", plan.stdout)
 
+    def test_latest_check_allows_clean_submodule_worktree_at_remote_with_dirty_parent(
+        self,
+    ) -> None:
+        """Latest gate should pass when only the parent gitlink commit is pending."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (repo / "tools" / "ci").mkdir()
+            shutil.copy2(
+                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                repo / "tools" / "ci" / "check_agent_canon_latest.sh",
+            )
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(["git", "fetch", "origin", "main"], cwd=submodule, check=True)
+            subprocess.run(["git", "checkout", "FETCH_HEAD"], cwd=submodule, check=True)
+            (repo / "UNRELATED_ROOT_FILE").write_text("dirty parent\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["bash", "tools/ci/check_agent_canon_latest.sh"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_LATEST=pass", result.stdout)
+            self.assertIn("AGENT_CANON_LATEST_ROUTE=submodule_update", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_REMOTE_MATCH=yes",
+                result.stdout,
+            )
+            self.assertIn("AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes", result.stdout)
+
     def test_apply_updates_submodule_pin_with_untracked_root_file(self) -> None:
         """Apply should update the gitlink without requiring unrelated root cleanup."""
         with tempfile.TemporaryDirectory() as tmp_dir:

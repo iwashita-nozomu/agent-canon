@@ -18,12 +18,40 @@ route="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_route=/{prin
 dirty_worktree="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_dirty_worktree=/{print $2}')"
 dirty_update_surface="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_dirty_update_surface=/{print $2}')"
 prefix_mode="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_prefix_mode=/{print $2}')"
+remote_sha="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_remote_sha=/{print $2}')"
+submodule_path="vendor/agent-canon"
+submodule_worktree_head="<unavailable>"
+submodule_worktree_clean="not_applicable"
+submodule_worktree_remote_match="no"
+
+if [[ "${prefix_mode:-}" == "submodule" && ( -d "${submodule_path}/.git" || -f "${submodule_path}/.git" ) ]]; then
+  if submodule_worktree_head="$(git -C "${submodule_path}" rev-parse HEAD 2>/dev/null)"; then
+    if [[ -z "$(git -C "${submodule_path}" status --short --untracked-files=all)" ]]; then
+      submodule_worktree_clean="yes"
+    else
+      submodule_worktree_clean="no"
+    fi
+    if [[ "${submodule_worktree_clean}" == "yes" && -n "${remote_sha:-}" && "${remote_sha}" != "<unavailable>" && "${submodule_worktree_head}" == "${remote_sha}" ]]; then
+      submodule_worktree_remote_match="yes"
+    fi
+  fi
+fi
+
+emit_submodule_worktree_evidence() {
+  if [[ "${prefix_mode:-}" != "submodule" ]]; then
+    return
+  fi
+  echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_HEAD=${submodule_worktree_head}"
+  echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_CLEAN=${submodule_worktree_clean}"
+  echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_REMOTE_MATCH=${submodule_worktree_remote_match}"
+}
 
 case "$route" in
   already_current_tree|already_current_split|already_current_submodule|local_contains_remote)
-    if [[ "${dirty_update_surface:-}" == "yes" ]]; then
+    if [[ "${dirty_update_surface:-}" == "yes" && "${submodule_worktree_remote_match}" != "yes" ]]; then
       echo "AGENT_CANON_LATEST=fail"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+      emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
       echo "AGENT_CANON_LATEST_PROPOSAL_COMMAND=bash tools/update_agent_canon.sh push-proposal"
@@ -31,10 +59,22 @@ case "$route" in
       exit 1
     fi
     echo "AGENT_CANON_LATEST=pass"
+    echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+    emit_submodule_worktree_evidence
     ;;
   *)
+    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" ]]; then
+      echo "AGENT_CANON_LATEST=pass"
+      echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+      emit_submodule_worktree_evidence
+      echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_updated_submodule_pin"
+      echo "AgentCanon submodule worktree is clean and already at remote main; commit the parent gitlink pin before pushing the parent repository." >&2
+      exit 0
+    fi
     echo "AGENT_CANON_LATEST=fail"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+    emit_submodule_worktree_evidence
     if [[ "${dirty_update_surface:-${dirty_worktree:-}}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
