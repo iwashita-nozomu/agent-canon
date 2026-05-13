@@ -8,6 +8,15 @@
 set -euo pipefail
 
 issues=0
+has_docker_surface=0
+has_devcontainer_surface=0
+
+if [ -d docker ]; then
+  has_docker_surface=1
+fi
+if [ -d .devcontainer ]; then
+  has_devcontainer_surface=1
+fi
 
 report_issue() {
   printf '   \342\235\214 %s\n' "$1"
@@ -34,6 +43,10 @@ check_requirements_format() {
   local trimmed=""
 
   printf '1. Checking requirements.txt format...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local requirements format\n'
+    return
+  fi
   if [ ! -f "$req_file" ]; then
     report_issue "docker/requirements.txt not found"
     return
@@ -53,6 +66,10 @@ check_dockerfile_coherence() {
   local dockerfile="docker/Dockerfile"
 
   printf '\n2. Checking Dockerfile coherence...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local Dockerfile coherence\n'
+    return
+  fi
   if [ ! -f "$dockerfile" ]; then
     report_issue "docker/Dockerfile not found"
     return
@@ -70,27 +87,78 @@ check_dockerfile_coherence() {
     || report_issue "docker/Dockerfile must install openssh-client so GitHub SSH and agent forwarding work"
   grep -Eq '(^|[[:space:]])graphviz([[:space:]]|\\|$)' "$dockerfile" \
     || report_issue "docker/Dockerfile must install graphviz so result/dependency graphs can render"
-  grep -q 'cli.github.com/packages' "$dockerfile" \
-    || report_issue "docker/Dockerfile must install GitHub CLI from the official GitHub CLI apt repository"
-  grep -Eq '(^|[[:space:]])gh([[:space:]]|\\|$)' "$dockerfile" \
-    || report_issue "docker/Dockerfile must install gh for GitHub PR and release operations"
-  grep -q 'gh --version' "$dockerfile" \
-    || report_issue "docker/Dockerfile must smoke-check gh --version"
+  ! grep -q 'cli.github.com/packages' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not configure GitHub CLI; shared devcontainer post-create owns gh setup"
+  ! grep -Eq '(^|[[:space:]])gh([[:space:]]|\\|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not install gh; shared devcontainer post-create owns gh setup"
+  ! grep -q 'gh --version' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not smoke-check gh; shared devcontainer post-create owns gh setup"
+  ! grep -q '@openai/codex' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not install Codex CLI; shared devcontainer post-create owns Codex setup"
+  ! grep -q 'codex --version' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not smoke-check Codex CLI; shared devcontainer post-create owns Codex setup"
 }
 
 check_post_create_python_install() {
   local post_create=".devcontainer/post-create.sh"
+  local generate_compose=".devcontainer/generate-runtime-compose.sh"
   local installer="docker/install_python_dependencies.sh"
   local devcontainer=".devcontainer/devcontainer.json"
+  local post_attach=".devcontainer/post-attach.sh"
 
   printf '\n3. Checking post-create Python dependency setup...\n'
+  if [ "$has_devcontainer_surface" -eq 0 ]; then
+    printf '   .devcontainer/ absent; skipping shared devcontainer checks\n'
+    return
+  elif [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; checking shared devcontainer source only\n'
+  fi
   if [ ! -f "$post_create" ]; then
     report_issue ".devcontainer/post-create.sh not found"
   else
+    grep -q 'run_as_root' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must route privileged setup through run_as_root"
     grep -q 'docker/register_safe_directories.sh' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must register safe directories"
     grep -q 'docker/install_python_dependencies.sh' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must run the Python dependency installer"
+    grep -q 'git config --global --add safe.directory "$workspace"' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must provide standalone safe.directory fallback"
+    grep -q 'repo-local Python dependency installer absent' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must skip missing repo-local Python installer"
+    grep -q 'cli.github.com/packages' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must configure the GitHub CLI apt repository"
+    grep -q 'apt_install gh' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install gh"
+    grep -q 'npm install -g @openai/codex' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install the Codex CLI"
+    grep -q 'gh --version' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must smoke-check gh"
+    grep -q 'codex --version' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must smoke-check Codex CLI"
+  fi
+
+  if [ "$has_docker_surface" -eq 0 ]; then
+    if [ ! -f "$devcontainer" ]; then
+      report_issue ".devcontainer/devcontainer.json not found"
+    else
+      grep -q '"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"' "$devcontainer" \
+        || report_issue "devcontainer postCreateCommand must call .devcontainer/post-create.sh"
+      grep -q '"postAttachCommand": "bash .devcontainer/post-attach.sh"' "$devcontainer" \
+        || report_issue "devcontainer postAttachCommand must call .devcontainer/post-attach.sh"
+    fi
+    if [ ! -f "$generate_compose" ]; then
+      report_issue ".devcontainer/generate-runtime-compose.sh not found"
+    else
+      grep -q 'agent-canon-source-only' "$generate_compose" \
+        || report_issue ".devcontainer/generate-runtime-compose.sh must support standalone AgentCanon source-only mode"
+      grep -q 'mcr.microsoft.com/devcontainers/base:ubuntu-22.04' "$generate_compose" \
+        || report_issue ".devcontainer/generate-runtime-compose.sh must provide a standalone base image"
+    fi
+    if [ ! -f "$post_attach" ]; then
+      report_issue ".devcontainer/post-attach.sh not found"
+    fi
+    return
   fi
 
   if [ ! -f "$installer" ]; then
@@ -118,6 +186,10 @@ check_docker_build_context_isolation() {
   local dockerignore=".dockerignore"
 
   printf '\n4. Checking Docker build context isolation...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local build context isolation\n'
+    return
+  fi
   if [ ! -f "$dockerignore" ]; then
     report_issue ".dockerignore not found"
     return
@@ -135,6 +207,10 @@ check_result_visualization_requirements() {
   local missing=0
 
   printf '\n5. Checking result-log and visualization requirements...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local result-log requirements\n'
+    return
+  fi
   if [ ! -f "$req_file" ]; then
     report_issue "docker/requirements.txt not found"
     return
@@ -218,6 +294,10 @@ check_pythonpath_documentation() {
   local file=""
 
   printf '\n7. Checking PYTHONPATH and Docker documentation...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local Docker documentation checks\n'
+    return
+  fi
   for file in README.md QUICK_START.md documents/coding-conventions-project.md; do
     [ -f "$file" ] || continue
     if grep -q 'PYTHONPATH' "$file" && grep -q '=/workspace/python' "$file"; then

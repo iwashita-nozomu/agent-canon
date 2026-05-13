@@ -205,8 +205,10 @@ SURFACE_POLICY_MARKERS = (
     "owner class",
     ".codex/hooks.json",
     ".codex/hooks",
+    ".devcontainer/",
     "documents/README.md",
     "documents/template-bootstrap.md",
+    "documents/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
 )
@@ -216,6 +218,8 @@ SURFACE_MANIFEST_MARKERS = (
     'path = "goal.md"',
     '"documents/README.md"',
     '"documents/template-bootstrap.md"',
+    '".devcontainer"',
+    '"documents/github-first-module-and-devcontainer-policy.md"',
     '".codex/hooks.json"',
     '"tests/agent_tools/test_check_convention_compliance.py"',
 )

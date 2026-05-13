@@ -35,7 +35,8 @@ SKIP_PREFIXES = (
     ".ruff_cache/",
     "reports/agents/",
 )
-HEADER_SCAN_LINES = 40
+HEADER_SCAN_LINES = 80
+BINARY_SNIFF_BYTES = 4096
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,7 +102,7 @@ def repo_relative(root: Path, path: Path) -> str:
 def is_binary(path: Path) -> bool:
     """Return whether a file appears to be binary."""
     try:
-        return b"\0" in path.read_bytes()[:4096]
+        return b"\0" in path.read_bytes()[:BINARY_SNIFF_BYTES]
     except OSError:
         return True
 

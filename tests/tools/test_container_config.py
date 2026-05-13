@@ -47,10 +47,8 @@ def write_valid_runtime(root: Path) -> None:
                 "# @dependency-end",
                 "FROM ubuntu:22.04",
                 "RUN apt-get update && apt-get install -y \\",
-                "    rsync openssh-client graphviz python3-venv gh",
-                "RUN echo https://cli.github.com/packages",
+                "    rsync openssh-client graphviz python3-venv",
                 "COPY docker/register_safe_directories.sh /usr/local/bin/register_safe_directories",
-                "RUN gh --version",
                 "",
             ]
         ),
@@ -134,7 +132,8 @@ def write_valid_runtime(root: Path) -> None:
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
                 '  "workspaceFolder": "/workspace",',
-                '  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace"',
+                '  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",',
+                '  "postAttachCommand": "bash .devcontainer/post-attach.sh"',
                 "}",
                 "",
             ]
@@ -146,8 +145,16 @@ def write_valid_runtime(root: Path) -> None:
         "\n".join(
             [
                 "#!/usr/bin/env bash",
+                "run_as_root",
+                "apt_install gh",
                 "bash /workspace/docker/register_safe_directories.sh /workspace",
                 "bash /workspace/docker/install_python_dependencies.sh /workspace",
+                'git config --global --add safe.directory "$workspace"',
+                "repo-local Python dependency installer absent",
+                "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg",
+                "npm install -g @openai/codex",
+                "gh --version",
+                "codex --version",
                 "",
             ]
         ),
@@ -160,11 +167,71 @@ def write_valid_runtime(root: Path) -> None:
                 "#!/usr/bin/env bash",
                 "pack=docker/packs/default.toml",
                 "output=.devcontainer/docker-compose.generated.yml",
+                "compose_mode=agent-canon-source-only",
+                "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
                 "printf '%s\\n' \"$pack\" \"$output\"",
                 "",
             ]
         ),
     )
+    write_file(root, ".devcontainer/post-attach.sh", "#!/usr/bin/env bash\n")
+
+
+def write_valid_devcontainer_only(root: Path) -> None:
+    """Write a valid standalone AgentCanon devcontainer-only fixture."""
+    write_file(
+        root,
+        ".devcontainer/devcontainer.json",
+        "\n".join(
+            [
+                "{",
+                '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
+                '  "dockerComposeFile": "docker-compose.generated.yml",',
+                '  "service": "workspace",',
+                '  "workspaceFolder": "/workspace",',
+                '  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",',
+                '  "postAttachCommand": "bash .devcontainer/post-attach.sh"',
+                "}",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
+        ".devcontainer/post-create.sh",
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "run_as_root",
+                "apt_install gh",
+                "docker/register_safe_directories.sh",
+                "docker/install_python_dependencies.sh",
+                'git config --global --add safe.directory "$workspace"',
+                "repo-local Python dependency installer absent",
+                "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg",
+                "npm install -g @openai/codex",
+                "gh --version",
+                "codex --version",
+                "",
+            ]
+        ),
+    )
+    write_file(
+        root,
+        ".devcontainer/generate-runtime-compose.sh",
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "pack=docker/packs/default.toml",
+                "output=.devcontainer/docker-compose.generated.yml",
+                "compose_mode=agent-canon-source-only",
+                "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+                "printf '%s\\n' \"$pack\" \"$output\" \"$compose_mode\" \"$image\"",
+                "",
+            ]
+        ),
+    )
+    write_file(root, ".devcontainer/post-attach.sh", "#!/usr/bin/env bash\n")
 
 
 def test_missing_runtime_config_is_skipped(tmp_path: Path) -> None:
@@ -174,6 +241,35 @@ def test_missing_runtime_config_is_skipped(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "CONTAINER_CONFIG=skip" in result.stdout
     assert "CONTAINER_CONFIG_CHECKED=none" in result.stdout
+
+
+def test_devcontainer_only_source_checkout_passes(tmp_path: Path) -> None:
+    """Standalone AgentCanon source can validate shared devcontainer without docker/."""
+    write_valid_devcontainer_only(tmp_path)
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG=pass" in result.stdout
+    assert "CONTAINER_CONFIG_CHECKED=.devcontainer" in result.stdout
+
+
+def test_devcontainer_only_requires_source_fallback(tmp_path: Path) -> None:
+    """Devcontainer source must not require repo-local docker/ when docker/ is absent."""
+    write_valid_devcontainer_only(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.write_text(
+        script.read_text(encoding="utf-8").replace(
+            "compose_mode=agent-canon-source-only",
+            "compose_mode=repo-docker-pack",
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "missing:agent-canon-source-only" in result.stdout
 
 
 def test_valid_runtime_config_passes(tmp_path: Path) -> None:
@@ -264,6 +360,27 @@ def test_dockerfile_python_install_fails(tmp_path: Path) -> None:
     assert result.returncode == 1, result.stdout + result.stderr
     assert "docker-build-must-not-install-python-requirements" in result.stdout
     assert "docker-build-must-not-copy-python-requirements" in result.stdout
+
+
+def test_dockerfile_agent_tooling_fails(tmp_path: Path) -> None:
+    """Agent convenience tools belong in shared devcontainer post-create setup."""
+    write_valid_runtime(tmp_path)
+    dockerfile = tmp_path / "docker" / "Dockerfile"
+    dockerfile.write_text(
+        dockerfile.read_text(encoding="utf-8")
+        + "\nRUN echo https://cli.github.com/packages\n"
+        + "RUN apt-get install -y gh\n"
+        + "RUN npm install -g @openai/codex\n"
+        + "RUN gh --version && codex --version\n",
+        encoding="utf-8",
+    )
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "dockerfile-must-not-configure-github-cli" in result.stdout
+    assert "dockerfile-must-not-install-gh" in result.stdout
+    assert "dockerfile-must-not-install-codex-cli" in result.stdout
 
 
 def test_missing_agent_canon_dockerignore_fails(tmp_path: Path) -> None:

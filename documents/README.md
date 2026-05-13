@@ -7,6 +7,7 @@ downstream design ./algorithm-implementation-boundary.md algorithm math-to-code 
 downstream design ./codex-configuration-reference.md Codex configuration reference
 downstream design ./object-oriented-design.md general OOP coding policy
 downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 @dependency-end
 -->
 
@@ -38,6 +39,9 @@ contract, edit the root regular file.
   machine-readable surface ownership list.
 - [AgentCanon Parent Repository Latest-State Checklist](./agent-canon-parent-repo-latest-checklist.md):
   task-start checklist for repos that vendor AgentCanon.
+- [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
+  reusable module distribution, local Git compatibility, Dockerfile ownership,
+  and shared devcontainer ownership.
 - [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI
   / config schema / hooks / MCP / skills / subagents reference.
 - [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical

@@ -25,6 +25,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `.codex/agents/`
 - `tools/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
+- `documents/github-first-module-and-devcontainer-policy.md`
 - `documents/agent-canon-github-remote.md`
 - `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
@@ -49,6 +50,7 @@ root の入口は symlink view または明示的な synced copy にします。
 - `.claude -> vendor/agent-canon/.claude`: Claude skill / agent mirror の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
+- `.devcontainer -> vendor/agent-canon/.devcontainer`: VS Code devcontainer / post-create / attach-status runtime の共有 view。
 - `mcp -> vendor/agent-canon/mcp`: repo MCP launcher / server の共有 view。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
 - `documents/*`: `documents/SHARED_RUNTIME_SURFACES.md` に列挙された canon-owned docs だけを symlink view にします。
@@ -62,7 +64,7 @@ root の入口は symlink view または明示的な synced copy にします。
 
 repo-local の正本として残すもの:
 
-- `docker/`: Template / project の開発環境。AgentCanon や Template の remote 名は Dockerfile に焼かず、文書で管理します。
+- `docker/`: Template / project の runtime image と dependency pack。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth、mount 方針は Dockerfile に焼かず、shared `.devcontainer/` の post-create と host mount convention で管理します。
 - `scripts/`: Template / project 固有の bootstrap と slug 置換。
 - `python/`、`src/`、`include/`、`lib/`: project implementation。
 - `experiments/`、`reports/`、`goal.md`: repo-local state。shared symlink には戻しません。
@@ -80,6 +82,7 @@ remote の正本:
 - AgentCanon canonical remote は `documents/agent-canon-github-remote.md` を見ます。
 - Template canonical remote は `documents/template-github-remote.md` を見ます。
 - local `/mnt/git/*.git` は compatibility mirror であり、source of truth ではありません。
+- reusable module distribution は GitHub PR / main SHA を正本にします。local Git / bare mirror の問題は repo-specific repair として扱い、shared module architecture を曲げません。
 
 ## 検索導線
 

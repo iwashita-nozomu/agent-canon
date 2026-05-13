@@ -18,6 +18,7 @@ reports/hooks/
 reports/*.json
 reports/*.txt
 reports/*.patch
+.devcontainer/docker-compose.generated.yml
 
 # Local environments
 .venv/

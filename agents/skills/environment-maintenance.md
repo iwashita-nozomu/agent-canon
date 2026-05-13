@@ -22,6 +22,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 ## Core References
 
 - `documents/coding-conventions-project.md`
+- `documents/github-first-module-and-devcontainer-policy.md`
 - `documents/tools/README.md`
 - `docker/README.md`
 - `docker/packs/`
@@ -30,6 +31,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - `documents/server-host-contract.md`
 - `documents/templates/server_runtime_layout.template.toml`
 - `docker/`
+- `.devcontainer/`
 - `README.md`
 - `agents/templates/environment_change_proposal.md`
 
@@ -40,7 +42,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 導入理由
 - 影響範囲
 - host / Docker / CI のどこを正本にするか
-- `docker/Dockerfile` と `docker/requirements.txt` の更新要否
+- `docker/Dockerfile`、`docker/requirements.txt`、`.devcontainer/` の更新要否
 - devcontainer / runtime pack / compose 相当面の更新要否
 - validation plan
 - rollback plan
@@ -51,12 +53,13 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- repo-wide に必要な Python tool は `docker/requirements.txt` と `docker/Dockerfile` の両方に載せます。
+- repo-wide に必要な Python tool は `docker/requirements.txt` と post-create installer contract に載せます。Dockerfile には Python requirements を copy / install しません。
+- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は AgentCanon-owned `.devcontainer/` の責務です。Dockerfile に入れてはいけません。
 - environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
 - repo の canonical image では `python3-venv` を同梱し、container runtime 内の canonical `.venv` だけを `tools/ci/python_env_policy.py --runtime container --create` で許可します。host runtime では repo-local `.venv` を作らず、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を既定手順にしません。
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
-- Docker 変更では `docker/Dockerfile` だけで閉じず、`docker/requirements.txt`、runtime pack、devcontainer、関連 README の要否を同じ pass で判定します。
+- Docker 変更では `docker/Dockerfile` だけで閉じず、`docker/requirements.txt`、runtime pack、AgentCanon-owned devcontainer、関連 README の要否を同じ pass で判定します。
 - `host / docker image / CI / shared script` のどこが source of truth かを曖昧にしたまま実装へ進めません。
 - 依存追加の提案だけで終わらせず、validate と rollback まで記録します。
 - canonical container の `safe.directory` 方針は run-time entrypoint や ad hoc env に逃がさず、Docker image 側の明示設定として管理します。
