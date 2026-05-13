@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from textwrap import dedent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = PROJECT_ROOT / "tools" / "agent_tools" / "helper_function_inventory.py"
@@ -249,74 +250,37 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["records"], [])
 
-    def test_class_helpers_are_reported_with_domain_specific_rules(self) -> None:
-        """Class candidates should use the same deterministic rule surface."""
+    def test_main_class_helpers_are_reported_with_domain_specific_rules(self) -> None:
+        """Main-code class candidates should use deterministic rule surfaces."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "model.py").write_text(
-                "\n".join(
-                    [
-                        "from dataclasses import dataclass",
-                        "",
-                        "@dataclass",
-                        "class PublicInfo:",
-                        "    value: int",
-                        "",
-                        "@dataclass",
-                        "class LocalMetrics:",
-                        "    value: int",
-                        "",
-                        "def public_api() -> LocalMetrics:",
-                        "    return LocalMetrics(1)",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            tests_dir = root / "tests"
-            tests_dir.mkdir()
-            (tests_dir / "test_sample.py").write_text(
-                "\n".join(
-                    [
-                        "import pytest",
-                        "",
-                        "class TestWorkflow:",
-                        "    def test_case(self) -> None:",
-                        "        assert True",
-                        "",
-                        "class Session:",
-                        "    pass",
-                        "",
-                        "@pytest.fixture",
-                        "def session() -> Session:",
-                        "    return Session()",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            experiments_dir = root / "experiments"
-            experiments_dir.mkdir()
-            (experiments_dir / "run_exp.py").write_text(
-                "\n".join(
-                    [
-                        "import json",
-                        "from pathlib import Path",
-                        "",
-                        "def parse_config(path: Path) -> dict[str, str]:",
-                        "    return json.loads(path.read_text())",
-                        "",
-                        "def normalize_unused(value: object) -> object:",
-                        "    return value",
-                        "",
-                        "def run() -> dict[str, str]:",
-                        "    return parse_config(Path('config.json'))",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
+                dedent(
+                    """
+                    from dataclasses import dataclass
 
+                    class ExternalConfig:
+                        pass
+
+                    @dataclass
+                    class PublicInfo:
+                        value: int
+
+                    class _InternalInfo(ExternalConfig):
+                        pass
+
+                    @dataclass
+                    class LocalMetrics:
+                        value: int
+
+                    def public_api() -> LocalMetrics:
+                        _InternalInfo()
+                        return LocalMetrics(1)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
             result = subprocess.run(
                 [
                     sys.executable,
@@ -340,10 +304,169 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertFalse(records["LocalMetrics"]["helper_candidate"])
             self.assertTrue(records["LocalMetrics"]["needs_user_judgment"])
             self.assertEqual(records["LocalMetrics"]["judgment_rule"], "main:public-local-data_container")
+            self.assertEqual(records["_InternalInfo"]["role"], "data_container")
+            self.assertIn("candidate-rule:main:private-local-data_container", records["_InternalInfo"]["evidence"])
             self.assertNotIn("PublicInfo", records)
+
+    def test_protocol_interfaces_are_not_reported_as_helpers(self) -> None:
+        """Protocol classes are type boundaries, not helper classes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "interfaces.py").write_text(
+                dedent(
+                    """
+                    from abc import ABC
+                    from typing import Protocol
+
+                    class PublicPort(Protocol):
+                        def run(self) -> None: ...
+
+                    class _PrivatePort(Protocol):
+                        pass
+
+                    class _ThinBase(ABC):
+                        pass
+
+                    def use() -> object:
+                        return _PrivatePort(), _ThinBase()
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            default_result = subprocess.run(
+                [sys.executable, str(INVENTORY), "--root", str(root), "--format", "json"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            all_result = subprocess.run(
+                [sys.executable, str(INVENTORY), "--root", str(root), "--all-functions", "--format", "json"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(default_result.returncode, 0, default_result.stderr)
+            self.assertEqual(all_result.returncode, 0, all_result.stderr)
+            default_records = {
+                record["qualname"]: record for record in json.loads(default_result.stdout)["records"]
+            }
+            self.assertNotIn("PublicPort", default_records)
+            self.assertNotIn("_PrivatePort", default_records)
+            records = {record["qualname"]: record for record in json.loads(all_result.stdout)["records"]}
+            self.assertEqual(records["PublicPort"]["role"], "protocol_interface")
+            self.assertEqual(records["_PrivatePort"]["role"], "protocol_interface")
+            self.assertNotEqual(records["_ThinBase"]["role"], "protocol_interface")
+            self.assertFalse(records["PublicPort"]["helper_candidate"])
+            self.assertFalse(records["_PrivatePort"]["needs_user_judgment"])
+
+    def test_test_directory_rules_exclude_test_cases_and_keep_support(self) -> None:
+        """Test files should treat support symbols differently from test bodies."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            tests_dir = root / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "test_sample.py").write_text(
+                dedent(
+                    """
+                    import math
+                    import pytest
+
+                    class TestWorkflow:
+                        def test_case(self) -> None:
+                            assert True
+
+                    class Session:
+                        pass
+
+                    @pytest.fixture
+                    def session() -> Session:
+                        return Session()
+
+                    def _reference(value: float) -> float:
+                        return math.sqrt(value)
+
+                    def test_numeric() -> None:
+                        assert _reference(4.0) == 2.0
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
             self.assertIn("candidate-rule:test:local-test-class", records["Session"]["evidence"])
             self.assertIn("candidate-rule:test:fixture-function", records["session"]["evidence"])
             self.assertNotIn("TestWorkflow", records)
+            self.assertNotIn("TestWorkflow.test_case", records)
+            self.assertNotIn("test_numeric", records)
+            self.assertIn("candidate-rule:test:private-local-numeric_kernel", records["_reference"]["evidence"])
+
+    def test_experiment_directory_local_parser_rules(self) -> None:
+        """Experiment files can keep local parser helpers without flagging unused names."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            experiments_dir = root / "experiments"
+            experiments_dir.mkdir()
+            (experiments_dir / "run_exp.py").write_text(
+                dedent(
+                    """
+                    import json
+                    from pathlib import Path
+
+                    def parse_config(path: Path) -> dict[str, str]:
+                        return json.loads(path.read_text())
+
+                    def normalize_unused(value: object) -> object:
+                        return value
+
+                    def run() -> dict[str, str]:
+                        return parse_config(Path('config.json'))
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
             self.assertIn("candidate-rule:experiment:local-parser_loader", records["parse_config"]["evidence"])
             self.assertNotIn("normalize_unused", records)
 
@@ -352,44 +475,44 @@ class HelperFunctionInventoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "opaque.py").write_text(
-                "\n".join(
-                    [
-                        "import sys",
-                        "from pathlib import Path",
-                        "",
-                        "class LocalFailure(Exception):",
-                        "    pass",
-                        "",
-                        "def _a(raw: str) -> Path:",
-                        "    return Path(raw).expanduser().resolve()",
-                        "",
-                        "def _b(handle: object) -> None:",
-                        "    handle.close()",
-                        "",
-                        "def _c(box: object, payload: bytes) -> object:",
-                        "    return box.encrypt(payload)",
-                        "",
-                        "def _d(root: Path, key: str) -> Path:",
-                        "    return root / 'artifacts' / key",
-                        "",
-                        "def _e(buffer: object) -> object | None:",
-                        "    return None if len(buffer) == 0 else buffer",
-                        "",
-                        "def _f() -> str:",
-                        "    if sys.platform == 'win32':",
-                        "        return '.dll'",
-                        "    return '.so'",
-                        "",
-                        "def public_api(raw: str, handle: object, box: object, payload: bytes) -> tuple[Path, object]:",
-                        "    path = _a(raw)",
-                        "    _b(handle)",
-                        "    _d(path, 'payload')",
-                        "    _e(payload)",
-                        "    _f()",
-                        "    return path, _c(box, payload)",
-                        "",
-                    ]
-                ),
+                dedent(
+                    """
+                    import sys
+                    from pathlib import Path
+
+                    class LocalFailure(Exception):
+                        pass
+
+                    def _a(raw: str) -> Path:
+                        return Path(raw).expanduser().resolve()
+
+                    def _b(handle: object) -> None:
+                        handle.close()
+
+                    def _c(box: object, payload: bytes) -> object:
+                        return box.encrypt(payload)
+
+                    def _d(root: Path, key: str) -> Path:
+                        return root / 'artifacts' / key
+
+                    def _e(buffer: object) -> object | None:
+                        return None if len(buffer) == 0 else buffer
+
+                    def _f() -> str:
+                        if sys.platform == 'win32':
+                            return '.dll'
+                        return '.so'
+
+                    def public_api(raw: str, handle: object, box: object, payload: bytes) -> tuple[Path, object]:
+                        path = _a(raw)
+                        _b(handle)
+                        _d(path, 'payload')
+                        _e(payload)
+                        _f()
+                        return path, _c(box, payload)
+                    """
+                ).strip()
+                + "\n",
                 encoding="utf-8",
             )
 
@@ -424,6 +547,74 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(records["_f"]["role"], "converter_normalizer")
             self.assertIn("environment", records["_f"]["features"])
             self.assertNotIn("LocalFailure", records)
+
+    def test_opaque_text_factory_and_callback_features(self) -> None:
+        """Text, encoding, factory, and callback roles should come from AST facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "opaque.py").write_text(
+                dedent(
+                    """
+                    import base64
+                    import re
+
+                    def _g(text: str) -> str:
+                        return re.sub(r'[^a-z]+', '-', text.strip().lower())
+
+                    def _h(payload: bytes) -> bytes:
+                        return base64.b64encode(payload)
+
+                    def _i(name: str) -> str:
+                        return f'value={name}'.strip()
+
+                    def _j(prefix: str):
+                        def inner(value: str) -> str:
+                            return f'{prefix}:{value}'
+                        return inner
+
+                    def _k(progress_callback) -> None:
+                        progress_callback('done')
+
+                    def public_api(raw: str, payload: bytes) -> None:
+                        _g(raw)
+                        _h(payload)
+                        _i(raw)
+                        _j(raw)
+                        _k(lambda message: None)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
+            self.assertEqual(records["_g"]["role"], "converter_normalizer")
+            self.assertIn("text_transform", records["_g"]["features"])
+            self.assertEqual(records["_h"]["role"], "converter_normalizer")
+            self.assertIn("encoding_transform", records["_h"]["features"])
+            self.assertEqual(records["_i"]["role"], "converter_normalizer")
+            self.assertIn("text_transform", records["_i"]["features"])
+            self.assertEqual(records["_j"]["role"], "factory_builder")
+            self.assertIn("nested_function_definition", records["_j"]["features"])
+            self.assertEqual(records["_k"]["role"], "formatter_reporter")
+            self.assertIn("callback_emission", records["_k"]["features"])
 
     def test_text_output_includes_pass_token(self) -> None:
         """Text output should provide machine-readable summary tokens."""

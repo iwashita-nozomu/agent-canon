@@ -33,7 +33,7 @@ from typing import cast
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
 PRESENTATION_FUNCTION_PARTS = ("format", "render", "stringify", "to_string", "display", "label")
-EFFECT_ADAPTER_NAMES = {"repo_root", "utc_now", "default_log_path"}
+EFFECT_ADAPTER_NAMES = {"default_log_path", "main", "repo_root", "utc_now"}
 EFFECT_ADAPTER_PREFIXES = (
     "append_",
     "build_",
@@ -505,6 +505,12 @@ def python_cognitive_complexity(node: ast.AST) -> int:
 
 def public_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Return directly declared public Python methods."""
+    if is_python_ast_visitor_class(node):
+        return [
+            item
+            for item in direct_method_nodes(node)
+            if not item.name.startswith("_") and not item.name.startswith("visit_")
+        ]
     return [
         item
         for item in node.body
@@ -775,6 +781,16 @@ def is_algorithm_contract_class(node: ast.ClassDef) -> bool:
         "amp.Algorithm",
     }
     return any(base_class_name(base) in contract_bases for base in node.bases)
+
+
+def is_protocol_class(node: ast.ClassDef) -> bool:
+    """Return true for classes whose primary responsibility is a typing Protocol."""
+    return any(base_class_name(base) in {"Protocol", "typing.Protocol"} for base in node.bases)
+
+
+def is_python_ast_visitor_class(node: ast.ClassDef) -> bool:
+    """Return true for Python AST visitor hook classes."""
+    return any(base_class_name(base) in {"NodeVisitor", "ast.NodeVisitor"} for base in node.bases)
 
 
 def is_test_case_class(path: Path, node: ast.ClassDef) -> bool:
@@ -1184,6 +1200,7 @@ def add_python_class_contract_findings(
         and not attrs
         and not is_dataclass(node)
         and not is_algorithm_contract_class(node)
+        and not is_protocol_class(node)
     ):
         add_finding(
             findings,
@@ -1221,7 +1238,7 @@ def add_python_method_cohesion_findings(
     findings: list[Finding],
 ) -> None:
     """Record method-level class cohesion findings."""
-    if is_test_case_class(context.path, node):
+    if is_test_case_class(context.path, node) or is_protocol_class(node):
         return
     for method in public_methods:
         if method_uses_self(method):
