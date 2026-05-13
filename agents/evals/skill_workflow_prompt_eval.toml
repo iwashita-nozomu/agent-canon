@@ -54,7 +54,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-workflow-docs"
 target_glob = "agents/workflows/*.md"
-expected_count = 21
+expected_count = 22
 kind = "workflow"
 description = "Every workflow document must be dependency-linked and reader-addressable."
 

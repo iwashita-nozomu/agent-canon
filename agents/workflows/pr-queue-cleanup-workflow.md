@@ -102,3 +102,7 @@ When `goal.md` was blocked on the source PR, update it after each queue step:
 - after dependent validation passes, mark the validation items complete;
 - only set `goal_status: achieved` when `goal_loop.py status` and repo MCP
   `goal.loop_status` report `NEXT_ACTION=close_goal_loop`.
+
+## Convention Compliance Gate
+
+Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

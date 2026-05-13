@@ -22,7 +22,9 @@
 # downstream implementation ../tests/agent_tools/test_compare_agent_run_paths.py root symlink view for run path comparison tests
 # downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
 # downstream implementation ../tests/agent_tools/test_evaluate_skill_workflow_prompts.py root symlink view for prompt eval tests
+# downstream implementation ../tests/agent_tools/test_file_surface_inventory.py root symlink view for file surface inventory tests
 # downstream implementation ../tests/agent_tools/test_goal_loop.py root symlink view for goal loop tests
+# downstream implementation ../tests/agent_tools/test_review_backlog_scan.py root symlink view for repo-cross inspection tests
 # downstream implementation ../tests/agent_tools/test_check_static_any.py root symlink view for explicit Any tests
 # downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
 # downstream implementation ../tests/agent_tools/test_check_algorithm_module_nested_contract.py root symlink view
