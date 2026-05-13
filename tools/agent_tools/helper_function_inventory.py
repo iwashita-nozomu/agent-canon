@@ -132,6 +132,7 @@ class FunctionRecord:
     specialized_helper: bool
     specialization: str
     side_effects: list[str]
+    features: list[str]
     calls: list[str]
     args: list[str]
     bases: list[str]
@@ -347,6 +348,11 @@ def dotted_name(node: ast.AST) -> str:
     return ""
 
 
+def contains_string_literal(node: ast.AST) -> bool:
+    """Return whether one expression subtree contains a string literal."""
+    return any(isinstance(child, ast.Constant) and isinstance(child.value, str) for child in ast.walk(node))
+
+
 class FunctionBodyVisitor(ast.NodeVisitor):
     """Collect calls and role features from one function body."""
 
@@ -381,6 +387,8 @@ class FunctionBodyVisitor(ast.NodeVisitor):
             leaf = name.rsplit(".", maxsplit=1)[-1]
             if leaf in MUTATING_METHODS:
                 self.features.add("mutation_call")
+            if leaf in {"close", "cleanup", "release", "shutdown"}:
+                self.features.add("resource_lifecycle")
             if name.startswith("subprocess.") or leaf in {"Popen", "run"}:
                 self.features.add("subprocess")
             if name in {"print", "sys.stdout.write", "sys.stderr.write"}:
@@ -397,14 +405,53 @@ class FunctionBodyVisitor(ast.NodeVisitor):
                 self.features.add("environment")
             if name.startswith(("json.", "tomllib.", "tomli.", "yaml.")):
                 self.features.add("serialization")
+            if name == "Path" or name.startswith(("pathlib.", "os.path.")):
+                self.features.add("path_operation")
+            if leaf in {"absolute", "expanduser", "joinpath", "relative_to", "resolve", "with_name", "with_suffix"}:
+                self.features.add("path_operation")
+            if name.startswith(("hashlib.", "hmac.")) or leaf in {"digest", "hexdigest"}:
+                self.features.add("digest_transform")
+            if leaf in {"decrypt", "encrypt"}:
+                self.features.add("security_transform")
+            if name.startswith(("ctypes.", "cffi.")) or leaf in {"byref", "cast", "c_void_p"}:
+                self.features.add("pointer_interop")
             if name.startswith(("ast.", "libcst.")):
                 self.features.add("static_analysis")
             if name.startswith(("jax.", "jnp.", "np.", "numpy.", "math.", "lax.")):
                 self.features.add("numeric")
+            if leaf in {
+                "array",
+                "asarray",
+                "ascontiguousarray",
+                "flatten",
+                "ravel",
+                "reshape",
+                "tolist",
+                "tree_flatten",
+                "tree_leaves",
+                "tree_map",
+                "tree_unflatten",
+            }:
+                self.features.add("data_shape_transform")
             if name.startswith(("argparse.",)) or leaf == "ArgumentParser":
                 self.features.add("cli_parser")
             if name.startswith(("requests.", "urllib.")):
                 self.features.add("network")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        """Record attribute-only feature references."""
+        name = dotted_name(node)
+        if name == "sys.platform":
+            self.features.add("environment")
+        self.generic_visit(node)
+
+    def visit_BinOp(self, node: ast.BinOp) -> None:
+        """Record operator-based path composition."""
+        if isinstance(node.op, ast.Div) and (
+            contains_string_literal(node.left) or contains_string_literal(node.right)
+        ):
+            self.features.add("path_operation")
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:
@@ -412,12 +459,24 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         value = node.value
         if isinstance(value, ast.Call):
             self.features.add("call_return")
+        if isinstance(value, ast.IfExp):
+            self.features.add("conditional_return")
         if isinstance(value, (ast.Dict, ast.DictComp)):
             self.features.add("mapping_return")
         if isinstance(value, (ast.List, ast.ListComp, ast.Set, ast.SetComp, ast.Tuple)):
             self.features.add("collection_return")
         if isinstance(value, (ast.BoolOp, ast.Compare, ast.UnaryOp)):
             self.features.add("predicate_return")
+        self.generic_visit(node)
+
+    def visit_With(self, node: ast.With) -> None:
+        """Record context-manager resource lifecycle behavior."""
+        self.features.add("resource_lifecycle")
+        self.generic_visit(node)
+
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+        """Record async context-manager resource lifecycle behavior."""
+        self.features.add("resource_lifecycle")
         self.generic_visit(node)
 
     def visit_For(self, node: ast.For) -> None:
@@ -555,12 +614,22 @@ def role_scores(
         add("formatter_reporter", 2, "serialization-transform")
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
         add("static_analyzer", 5, "ast-call")
+    if "path_operation" in features:
+        add("converter_normalizer", 3, "path-operation")
+    if "conditional_return" in features or "environment" in features:
+        add("converter_normalizer", 2, "conditional-or-environment-normalization")
+    if "digest_transform" in features or "security_transform" in features:
+        add("converter_normalizer", 3, "digest-or-security-transform")
+    if "pointer_interop" in features or "data_shape_transform" in features:
+        add("converter_normalizer", 4, "interop-or-shape-transform")
     if "numeric" in features:
         add("numeric_kernel", 3, "numeric-call")
     if "read" in features:
         add("parser_loader", 2, "read-call")
     if "write" in features or "filesystem_mutation" in features:
         add("writer_mutator", 2, "write-or-filesystem-call")
+    if "resource_lifecycle" in features:
+        add("writer_mutator", 3, "resource-lifecycle")
     if "state_mutation" in features or "mutation_call" in features:
         add("writer_mutator", 1, "mutation-call")
     if "mapping_return" in features:
@@ -603,6 +672,8 @@ def class_role_scores(
         add("workflow_tooling", 1, "tool-path")
     if any(base.endswith(("Protocol", "ABC")) or base in {"Protocol", "ABC"} for base in bases):
         add("protocol_interface", 4, "protocol-or-abc-base")
+    if any(base.endswith(("Exception", "Error")) or base in {"BaseException", "Exception"} for base in bases):
+        add("exception_type", 5, "exception-base")
     if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
         add("data_container", 4, "data-class-decorator")
     if annotated_field_count:
@@ -618,10 +689,20 @@ def class_role_scores(
         add("formatter_reporter", 2, "serialization-transform")
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
         add("static_analyzer", 5, "ast-call")
+    if "path_operation" in features:
+        add("converter_normalizer", 3, "path-operation")
+    if "conditional_return" in features or "environment" in features:
+        add("converter_normalizer", 2, "conditional-or-environment-normalization")
+    if "digest_transform" in features or "security_transform" in features:
+        add("converter_normalizer", 3, "digest-or-security-transform")
+    if "pointer_interop" in features or "data_shape_transform" in features:
+        add("converter_normalizer", 4, "interop-or-shape-transform")
     if "numeric" in features:
         add("numeric_kernel", 3, "numeric-call")
     if "write" in features or "filesystem_mutation" in features:
         add("writer_mutator", 2, "write-or-filesystem-call")
+    if "resource_lifecycle" in features:
+        add("writer_mutator", 3, "resource-lifecycle")
     if "state_mutation" in features or "mutation_call" in features:
         add("state_holder", 1, "state-mutation")
     if "mapping_return" in features:
@@ -767,6 +848,7 @@ class DefinitionCollector(ast.NodeVisitor):
                 specialized_helper=False,
                 specialization="not_evaluated",
                 side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
+                features=sorted(facts.features),
                 calls=sorted(set(facts.calls)),
                 args=[arg.arg for arg in node.args.args],
                 bases=[],
@@ -848,6 +930,7 @@ class DefinitionCollector(ast.NodeVisitor):
                 specialized_helper=False,
                 specialization="not_evaluated",
                 side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
+                features=sorted(facts.features),
                 calls=sorted(set(facts.calls)),
                 args=[],
                 bases=list(bases),
@@ -1217,6 +1300,7 @@ def render_text(inventory: Inventory) -> str:
     lines: list[str] = []
     for record in inventory.records:
         side_effects = ",".join(record.side_effects) if record.side_effects else "none"
+        features = ",".join(record.features) if record.features else "none"
         outgoing = ",".join(record.outgoing_internal) if record.outgoing_internal else "none"
         evidence = ",".join(record.evidence[:6]) if record.evidence else "none"
         lines.append(
@@ -1231,7 +1315,7 @@ def render_text(inventory: Inventory) -> str:
             f"incoming={record.incoming_count} outgoing={outgoing} "
             f"specialization={record.specialization} "
             f"callers={';'.join(record.incoming_callers) or 'none'} "
-            f"side_effects={side_effects} evidence={evidence}"
+            f"side_effects={side_effects} features={features} evidence={evidence}"
         )
     role_summary = ",".join(f"{role}:{count}" for role, count in inventory.role_counts.items())
     verdict_summary = ",".join(
@@ -1272,8 +1356,8 @@ def render_markdown(inventory: Inventory) -> str:
         f"- auto helpers reported: {inventory.helpers_reported}",
         f"- user judgment required: {inventory.judgment_required_reported}",
         "",
-        "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Evidence |",
-        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+        "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
+        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
     ]
     for record in inventory.records:
         lines.append(
@@ -1293,6 +1377,7 @@ def render_markdown(inventory: Inventory) -> str:
                     str(record.incoming_count),
                     markdown_cell(record.specialization),
                     markdown_cell(", ".join(record.side_effects) or "none"),
+                    markdown_cell(", ".join(record.features) or "none"),
                     markdown_cell(", ".join(record.evidence[:4]) or "none"),
                 ]
             )

@@ -222,15 +222,16 @@ class HelperFunctionInventoryTest(unittest.TestCase):
                 "\n".join(
                     [
                         "import json",
+                        "from pathlib import Path",
                         "",
-                        "def parse_config() -> dict[str, str]:",
-                        "    return json.loads('{}')",
+                        "def parse_config(path: Path) -> dict[str, str]:",
+                        "    return json.loads(path.read_text())",
                         "",
                         "def normalize_unused(value: object) -> object:",
                         "    return value",
                         "",
                         "def run() -> dict[str, str]:",
-                        "    return parse_config()",
+                        "    return parse_config(Path('config.json'))",
                         "",
                     ]
                 ),
@@ -266,6 +267,84 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertNotIn("TestWorkflow", records)
             self.assertIn("candidate-rule:experiment:local-parser_loader", records["parse_config"]["evidence"])
             self.assertNotIn("normalize_unused", records)
+
+    def test_functional_features_do_not_depend_on_informative_names(self) -> None:
+        """Opaque names should still be classified from behavior."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "opaque.py").write_text(
+                "\n".join(
+                    [
+                        "import sys",
+                        "from pathlib import Path",
+                        "",
+                        "class LocalFailure(Exception):",
+                        "    pass",
+                        "",
+                        "def _a(raw: str) -> Path:",
+                        "    return Path(raw).expanduser().resolve()",
+                        "",
+                        "def _b(handle: object) -> None:",
+                        "    handle.close()",
+                        "",
+                        "def _c(box: object, payload: bytes) -> object:",
+                        "    return box.encrypt(payload)",
+                        "",
+                        "def _d(root: Path, key: str) -> Path:",
+                        "    return root / 'artifacts' / key",
+                        "",
+                        "def _e(buffer: object) -> object | None:",
+                        "    return None if len(buffer) == 0 else buffer",
+                        "",
+                        "def _f() -> str:",
+                        "    if sys.platform == 'win32':",
+                        "        return '.dll'",
+                        "    return '.so'",
+                        "",
+                        "def public_api(raw: str, handle: object, box: object, payload: bytes) -> tuple[Path, object]:",
+                        "    path = _a(raw)",
+                        "    _b(handle)",
+                        "    _d(path, 'payload')",
+                        "    _e(payload)",
+                        "    _f()",
+                        "    return path, _c(box, payload)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
+            self.assertEqual(records["_a"]["role"], "converter_normalizer")
+            self.assertIn("path_operation", records["_a"]["features"])
+            self.assertEqual(records["_b"]["role"], "writer_mutator")
+            self.assertIn("resource_lifecycle", records["_b"]["features"])
+            self.assertEqual(records["_c"]["role"], "converter_normalizer")
+            self.assertIn("security_transform", records["_c"]["features"])
+            self.assertEqual(records["_d"]["role"], "converter_normalizer")
+            self.assertIn("path_operation", records["_d"]["features"])
+            self.assertEqual(records["_e"]["role"], "converter_normalizer")
+            self.assertIn("conditional_return", records["_e"]["features"])
+            self.assertEqual(records["_f"]["role"], "converter_normalizer")
+            self.assertIn("environment", records["_f"]["features"])
+            self.assertNotIn("LocalFailure", records)
 
     def test_text_output_includes_pass_token(self) -> None:
         """Text output should provide machine-readable summary tokens."""
