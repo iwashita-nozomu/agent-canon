@@ -688,6 +688,24 @@ entries:
     tests: []
     test_exempt_reason: Inventory is consumed through review_backlog_scan evidence.
 
+  - id: helper-function-inventory
+    summary: Inventories Python helper functions and infers roles from AST facts.
+    path: tools/agent_tools/helper_function_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/helper_function_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/coding-conventions-python.md
+    tests:
+      - tests/agent_tools/test_helper_function_inventory.py
+
   - id: goal-loop
     summary: Manages goal.md exit criteria, backlog, and loop status.
     path: tools/agent_tools/goal_loop.py
