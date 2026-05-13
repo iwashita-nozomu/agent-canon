@@ -7,6 +7,8 @@ upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implement
 upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
 upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
 upstream design ../../tools/catalog.yaml structured tool catalog
+upstream design ../../issues/README.md durable operational finding storage
+upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
 downstream design ../../documents/agent-canon-subtree-migration.md submodule migration and legacy compatibility consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
@@ -44,6 +46,8 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` を省略しません。
 - AgentCanon source commit / PR と template parent gitlink commit / PR は別 step です。AgentCanon main を先に更新し、その後 template 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、template pin commit を作ります。
 - push が自然な次手なら、許可待ちの提案に戻らずそのまま実行します。止めるのは user stop か external block だけです。
+- tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
+- user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
 
 ## Freshness Gate Route
 
@@ -60,6 +64,49 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 
 pre-merge の AgentCanon source PR では、standalone validation command を正本にします。
 post-merge の template / derived pin PR では、`make agent-canon-pr-check` が pass することを正本にします。
+
+## Issues / Findings Gate
+
+AgentCanon PR の前に、運用 finding を durable storage に残すかを必ず判断します。
+この gate は「今から思い出して書く」作業ではなく、PR 作成時に機械的に確認する source-of-truth check です。
+
+1. Durable surfaces を検索する
+
+```bash
+rg -n "topic keywords" \
+  issues memory notes/failures documents agents \
+  2>/dev/null || true
+```
+
+template / derived repo から作業している場合は、`vendor/agent-canon/` prefix 付きで同じ surface を検索します。
+run bundle は補助 evidence であり、durable storage の代替ではありません。
+
+2. Raw search hit を dependency edit scope に展開する
+
+```bash
+rg -l "topic keywords" > reports/search_hits.txt
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --search-hits-file reports/search_hits.txt
+```
+
+`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を、issue または PR body の edit-scope evidence に残します。
+raw `rg` hit だけで「どの file を編集・確認するか」を決めません。
+
+3. 新しい workflow defect がある場合は issue file を作る
+
+```text
+issues/open/AC-YYYYMMDD-short-slug.md
+```
+
+issue file は `issues/README.md` の required fields を持ちます。
+finding の粒度は、affected surfaces と dependency-expanded edit scope を書ける大きさまで分割します。
+
+4. PR template に issue status を書く
+
+- standalone AgentCanon repo では `.github/PULL_REQUEST_TEMPLATE.md` の `Operational Findings / Issues` に記入します。
+- template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
+- 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
 
 ## Branch ルール
 
@@ -82,6 +129,7 @@ git merge --no-ff FETCH_HEAD
 
 - workflow doc、skill、subagent、script は standalone AgentCanon repo、または template 内の `vendor/agent-canon/` submodule worktree を編集します。
 - root 側の symlink view は編集しません。
+- tool addition、memory addition、skill eval result、feedback loop change はこの source worktree 側で commit し、template pin PR だけには閉じ込めません。
 
 3. shared surface を再同期する
 
@@ -134,6 +182,7 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - standalone AgentCanon repo へ shared canon source change を出す PR では `.github/PULL_REQUEST_TEMPLATE.md` を使います。
 - template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
+- issue file または durable finding 不要判断、dependency-expanded edit scope、tool / memory / eval route を PR 本文に書きます。
 - standalone AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
 - template / derived repo の AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - default template / repo-local PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
@@ -275,6 +324,8 @@ Validation:
 - standalone AgentCanon repo では explicit validation commands が pass、template / derived repo では `make agent-canon-pr-check` が pass
 - root shared surface が `bash tools/sync_agent_canon.sh check` で clean
 - PR 本文に changed surface と validation が記録されている
+- PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
+- PR 本文に search-to-edit-scope evidence、または search-to-edit-scope 不要判断が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、local bare mirror SHA、security check 状態が記録されている
 - file 構成変更がある場合は integration worktree merge と tree check が完了
 - AgentCanon main へ merge 後、template 側で `make agent-canon-ensure-latest` と parent gitlink commit / push の実行結果、または external block / user stop による未実行理由が残っている
@@ -298,6 +349,9 @@ gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
 
 - root 側の symlink view を直接編集して shared canon 変更を close してはいけません。
 - shared canon 変更を repo-local implementation change と同じ PR に混ぜてはいけません。
+- tool addition、memory addition、skill eval result、feedback-loop change を template pin PR だけに閉じ込めてはいけません。
+- workflow defect を run bundle だけに残して durable `issues/`、`memory/`、または `notes/failures/` に昇格しないまま close してはいけません。
+- raw text search hit だけを根拠に edit scope を決め、dependency-expanded edit scope を省略してはいけません。
 - standalone AgentCanon repo では explicit validation commands、template / derived repo では `make agent-canon-pr-check` を省略して PR を close してはいけません。
 - `vendor/agent-canon/` の構成変更を file 単位の拾い直しで `main` に戻してはいけません。
 - template `main` merge 後に AgentCanon PR / merge と template pin 更新の対応を曖昧なままにしてはいけません。
@@ -306,6 +360,8 @@ gh api repos/iwashita-nozomu/agent-canon/dependabot/alerts --jq length
 
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
+- `issues/README.md`
+- `documents/dependency-manifest-design.md`
 - `agents/workflows/main-integration-workflow.md`
 - `tools/sync_agent_canon.sh`
 - `tools/ci/check_agent_canon_pr.sh`

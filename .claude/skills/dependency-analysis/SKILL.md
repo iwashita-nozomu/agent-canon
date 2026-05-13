@@ -25,6 +25,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
    - explicit file review: pass file paths explicitly
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
+   - repo-wide text search triage: save `rg -l` hits and run search-to-edit-scope expansion
 1. For code dependency evidence, run:
 
 ```bash
@@ -45,6 +46,17 @@ bash tools/agent_tools/check_dependency_header_format.sh --changed --require-hea
 ```bash
 bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
 ```
+
+1. When a repo-wide text search determines a fix surface, write the hit paths and expand them through dependency headers before editing:
+
+```bash
+rg -l "search phrase" > reports/search_hits.txt
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --search-hits-file reports/search_hits.txt
+```
+
+1. Use `dependency_graph.tsv` and `dependency_edit_scope.txt` to list files that need edits or review. Do not close an issue or PR with only raw search hits when dependency-expanded edit scope is available.
 
 1. When reverse-edge migration is the task, add strict bidirectional validation:
 

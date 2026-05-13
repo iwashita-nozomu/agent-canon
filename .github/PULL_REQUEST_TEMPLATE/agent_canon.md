@@ -3,6 +3,7 @@
 responsibility Upstream sync note:.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 upstream design ../../documents/github-copilot-configuration.md Copilot configuration and PR-template routing
+upstream design ../../issues/README.md durable operational issue storage
 upstream design ../../tools/catalog.yaml structured tool catalog
 downstream implementation ../../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
@@ -28,6 +29,15 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/too
 - [ ] Standalone AgentCanon PR checklist was considered when the change should land in `iwashita-nozomu/agent-canon` first.
 - [ ] Template / derived repo PR routing is separated from standalone AgentCanon repository PR routing.
 
+## Branch And Change Route
+
+- [ ] AgentCanon source change was pushed to a dedicated `canon/<topic>-YYYYMMDD` branch or proposal branch before this template / derived PR.
+- [ ] Tool additions or tool behavior changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
+- [ ] Memory additions, agent-learning updates, skill eval results, or feedback-loop changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
+- [ ] This PR is a pin/root-view update after the AgentCanon source PR, or the deferred upstream-sync reason is documented below.
+
+Route notes:
+
 ## Plan Mode Evidence
 
 - [ ] Plan mode was used before non-trivial AgentCanon sync, Copilot, PR-template, GitHub Actions, or shared runtime-surface changes.
@@ -35,6 +45,16 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/too
 - [ ] Trivial-change exception is explained below when Plan mode was not used.
 
 Plan / exception:
+
+## Operational Findings / Issues
+
+- [ ] `vendor/agent-canon/issues/README.md` was reviewed.
+- [ ] Existing durable findings were searched in `vendor/agent-canon/issues/open/`, `vendor/agent-canon/memory/`, `vendor/agent-canon/notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
+- [ ] New user / reviewer / runtime / CI workflow defect findings were written to `vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md`, `vendor/agent-canon/memory/`, or `vendor/agent-canon/notes/failures/` before closeout.
+- [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
+- [ ] No new durable operational finding is required, and the reason is stated below.
+
+Issue / edit-scope evidence:
 
 ## Copilot Configuration Impact
 

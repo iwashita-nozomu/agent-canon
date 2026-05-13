@@ -8,6 +8,7 @@
 # upstream design ../../.github/instructions/pr-processing.instructions.md PR processing surface
 # upstream design ../../.github/agents/pr-maintainer.md PR maintainer surface
 # upstream design ../../documents/github-copilot-configuration.md Copilot configuration catalog
+# upstream design ../../issues/README.md durable operational issue conventions
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
@@ -44,6 +45,13 @@ AGENT_CANON_CREDENTIALS = (
 def is_template_or_derived_repo(root: Path) -> bool:
     """Return whether root is a template or derived repo with AgentCanon vendored."""
     return (root / "vendor" / "agent-canon").exists() and (root / ".gitmodules").is_file()
+
+
+def agent_canon_root(root: Path) -> Path:
+    """Return the AgentCanon source root for standalone or template mode checks."""
+    if is_template_or_derived_repo(root):
+        return root / "vendor" / "agent-canon"
+    return root
 
 
 @dataclass(frozen=True)
@@ -304,6 +312,9 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "Operational Findings / Issues",
+                "vendor/agent-canon/issues/README.md",
+                "run_repo_dependency_review.sh --search-hits-file",
                 "Copilot Configuration Impact",
                 "documents/github-copilot-configuration.md",
                 "Template / derived project PR",
@@ -316,6 +327,11 @@ def check_pr_templates(root: Path) -> list[Finding]:
                 "make agent-canon-pr-check",
                 "make agent-canon-ensure-latest",
                 "Plan Mode Evidence",
+                "Branch And Change Route",
+                "Operational Findings / Issues",
+                "vendor/agent-canon/issues/README.md",
+                "vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md",
+                "run_repo_dependency_review.sh --search-hits-file",
                 "Copilot Configuration Impact",
                 "documents/github-copilot-configuration.md",
                 "AgentCanon source PR / proposal",
@@ -328,6 +344,11 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "Branch And Change Route",
+                "Operational Findings / Issues",
+                "issues/README.md",
+                "issues/open/AC-YYYYMMDD-<slug>.md",
+                "run_repo_dependency_review.sh --search-hits-file",
                 "Copilot Configuration Impact",
                 "documents/github-copilot-configuration.md",
                 "standalone AgentCanon repository",
@@ -341,6 +362,11 @@ def check_pr_templates(root: Path) -> list[Finding]:
             root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
                 "Validation Evidence",
                 "Plan Mode Evidence",
+                "Branch And Change Route",
+                "Operational Findings / Issues",
+                "issues/README.md",
+                "issues/open/AC-YYYYMMDD-<slug>.md",
+                "run_repo_dependency_review.sh --search-hits-file",
                 "Copilot Configuration Impact",
                 "documents/github-copilot-configuration.md",
                 "standalone AgentCanon repository",
@@ -463,17 +489,9 @@ def check_copilot_surfaces(root: Path) -> list[Finding]:
 
 def check_pr_flow_docs(root: Path) -> list[Finding]:
     """Check that PR flow docs route standalone and template PRs separately."""
-    workflow_path = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
-    template_mode = is_template_or_derived_repo(root)
-    if template_mode:
-        workflow_path = (
-            root
-            / "vendor"
-            / "agent-canon"
-            / "agents"
-            / "workflows"
-            / "agent-canon-pr-workflow.md"
-        )
+    workflow_path = (
+        agent_canon_root(root) / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+    )
     return require_text(
         workflow_path,
         [
@@ -482,9 +500,53 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
             "template / derived repo",
             "`.github/PULL_REQUEST_TEMPLATE/agent_canon.md`",
             "Freshness Gate Route",
+            "Issues / Findings Gate",
+            "issues/open/AC-YYYYMMDD-short-slug.md",
+            "run_repo_dependency_review.sh",
+            "--search-hits-file",
+            "tool addition",
+            "memory addition",
             "AgentCanon PR / proposal merge 後にこの check を再実行します",
         ],
     )
+
+
+def check_agentcanon_issues(root: Path) -> list[Finding]:
+    """Check AgentCanon durable operational issue conventions."""
+    canon_root = agent_canon_root(root)
+    findings = require_text(
+        canon_root / "issues" / "README.md",
+        [
+            "AgentCanon Operational Issues",
+            "issues/open/AC-YYYYMMDD-short-slug.md",
+            "Required Fields",
+            "affected_surfaces:",
+            "edit_scope:",
+            "run_repo_dependency_review.sh",
+            "--search-hits-file",
+            "DEPENDENCY_EDIT_SCOPE_PATH",
+        ],
+    )
+    for issue_path in sorted((canon_root / "issues").glob("*/*.md")):
+        if issue_path.name == "README.md":
+            continue
+        findings.extend(
+            require_text(
+                issue_path,
+                [
+                    "issue_id:",
+                    "status:",
+                    "source:",
+                    "severity:",
+                    "evidence:",
+                    "affected_surfaces:",
+                    "edit_scope:",
+                    "required_action:",
+                    "close_condition:",
+                ],
+            )
+        )
+    return findings
 
 
 def run(root: Path) -> int:
@@ -498,6 +560,7 @@ def run(root: Path) -> int:
     findings.extend(check_pr_templates(root))
     findings.extend(check_copilot_surfaces(root))
     findings.extend(check_pr_flow_docs(root))
+    findings.extend(check_agentcanon_issues(root))
 
     errors = [finding for finding in findings if finding.severity == "error"]
     warnings = [finding for finding in findings if finding.severity == "warning"]
