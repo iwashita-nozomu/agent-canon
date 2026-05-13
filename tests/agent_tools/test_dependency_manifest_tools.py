@@ -570,6 +570,71 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
+    def test_root_copy_headers_resolve_in_agentcanon_source_context(self) -> None:
+        """GitHub root-copy headers should keep valid AgentCanon-source paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            root_copy = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+            source_copy = (
+                root
+                / "vendor"
+                / "agent-canon"
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE"
+                / "agent_canon.md"
+            )
+            issue_readme = root / "vendor" / "agent-canon" / "issues" / "README.md"
+            root_copy.parent.mkdir(parents=True)
+            source_copy.parent.mkdir(parents=True)
+            issue_readme.parent.mkdir(parents=True)
+            issue_readme.write_text("# Issues\n", encoding="utf-8")
+            content = "\n".join(
+                [
+                    "<!--",
+                    "@dependency-start",
+                    "responsibility Defines a template AgentCanon PR checklist copy.",
+                    "upstream design ../../issues/README.md durable issue storage",
+                    "@dependency-end",
+                    "-->",
+                    "",
+                ]
+            )
+            root_copy.write_text(content, encoding="utf-8")
+            source_copy.write_text(content, encoding="utf-8")
+
+            format_result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                str(root_copy),
+                root=root,
+            )
+            graph_result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--print-edges",
+                str(root_copy),
+                root=root,
+            )
+
+            self.assertEqual(
+                format_result.returncode,
+                0,
+                format_result.stdout + format_result.stderr,
+            )
+            self.assertEqual(
+                graph_result.returncode,
+                0,
+                graph_result.stdout + graph_result.stderr,
+            )
+            self.assertIn(
+                "upstream\tdesign\t.github/PULL_REQUEST_TEMPLATE/agent_canon.md\t"
+                "vendor/agent-canon/issues/README.md",
+                graph_result.stdout,
+            )
+            self.assertNotIn("\tissues/README.md", graph_result.stdout)
+
     def test_graph_lists_related_dependency_surfaces_for_focus_path(self) -> None:
         """Focused graph output should list declared and incoming dependency edges."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -629,6 +694,209 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("DEPENDENCY_RELATED_SURFACES=1", result.stdout)
+
+    def test_graph_writes_machine_readable_tsv_artifact(self) -> None:
+        """Graph checks can emit a stable TSV artifact for issue and PR evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.py"
+            dependent = root / "tests" / "test_source.py"
+            design = root / "design.md"
+            graph_tsv = root / "reports" / "dependency_graph.tsv"
+            dependent.parent.mkdir(parents=True)
+            design.write_text("# Design\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Exercises TSV dependency graph output.",
+                        "# upstream design design.md source design",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            dependent.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Tests TSV dependency graph output.",
+                        "# upstream implementation ../source.py source behavior",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph_tsv),
+                "source.py",
+                "tests/test_source.py",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(f"DEPENDENCY_GRAPH_TSV={graph_tsv}", result.stdout)
+            self.assertEqual(
+                graph_tsv.read_text(encoding="utf-8").splitlines(),
+                [
+                    "direction\tkind\tsource\ttarget",
+                    "upstream\tdesign\tsource.py\tdesign.md",
+                    "upstream\timplementation\ttests/test_source.py\tsource.py",
+                ],
+            )
+
+    def test_graph_expands_search_hits_to_edit_scope(self) -> None:
+        """Search hit files should expand to declared and incoming dependency scope."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.py"
+            dependent = root / "tests" / "test_source.py"
+            design = root / "design.md"
+            hits = root / "search_hits.txt"
+            dependent.parent.mkdir(parents=True)
+            design.write_text("# Design\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Exercises search edit-scope expansion.",
+                        "# upstream design design.md source design",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            dependent.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Tests search edit-scope expansion.",
+                        "# upstream implementation ../source.py source behavior",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            hits.write_text("source.py:1:needle\n", encoding="utf-8")
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--search-hits-file",
+                str(hits),
+                "source.py",
+                "tests/test_source.py",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=source.py",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEPENDENCY_EDIT_SCOPE_PATH role=declared_upstream "
+                "kind=design path=design.md source=source.py target=design.md",
+                result.stdout,
+            )
+            self.assertIn(
+                "DEPENDENCY_EDIT_SCOPE_PATH role=incoming_upstream "
+                "kind=implementation path=tests/test_source.py "
+                "source=tests/test_source.py target=source.py",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_EDIT_SCOPE_PATHS=3", result.stdout)
+
+    def test_repo_review_report_dir_generates_graph_and_edit_scope(self) -> None:
+        """Repo dependency review should persist graph and edit-scope artifacts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
+            target = root / "target.md"
+            source = root / "source.md"
+            hits = root / "search_hits.txt"
+            report_dir = root / "reports" / "dependency-review"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines target fixture for report artifacts.",
+                        "downstream design source.md source consumes target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines source fixture for report artifacts.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            hits.write_text("source.md:1:Source\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "target.md", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--report-dir",
+                str(report_dir),
+                "--search-hits-file",
+                str(hits),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((report_dir / "dependency_graph.tsv").is_file())
+            self.assertTrue((report_dir / "dependency_edit_scope.txt").is_file())
+            self.assertIn("direction\tkind\tsource\ttarget", (report_dir / "dependency_graph.tsv").read_text(encoding="utf-8"))
+            self.assertIn(
+                "DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=source.md",
+                (report_dir / "dependency_edit_scope.txt").read_text(encoding="utf-8"),
+            )
 
     def test_symlink_root_views_are_skipped_without_breaking_scan(self) -> None:
         """Root symlink views are owned by link-root and do not fail header scans."""

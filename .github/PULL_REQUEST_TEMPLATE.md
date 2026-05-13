@@ -6,6 +6,7 @@ upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
 upstream design ../documents/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
 upstream design ../documents/github-copilot-configuration.md defines Copilot configuration and PR-template routing
+upstream design ../issues/README.md defines durable operational issue storage
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
@@ -27,8 +28,18 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - [ ] Tooling or validation command
 - [ ] Dependency manifest or graph policy
 - [ ] Memory / eval / feedback loop
+- [ ] Operational issue / durable finding
 - [ ] GitHub Actions / PR checklist
 - [ ] Documentation only
+
+## Branch And Change Route
+
+- [ ] Tool additions or tool behavior changes are on a dedicated `canon/<topic>-YYYYMMDD` branch and standalone AgentCanon PR.
+- [ ] Memory additions, agent-learning updates, skill eval results, or feedback-loop changes are on a dedicated AgentCanon branch / PR and are not hidden inside a template-only pin update.
+- [ ] Template / derived repo pin update will be a separate PR after the AgentCanon source PR lands.
+- [ ] No direct `sync_agent_canon.sh push` or template-only bypass was used for shared-canon source changes.
+
+Route notes:
 
 ## Canon Discipline
 
@@ -47,6 +58,16 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 - [ ] Trivial-change exception is explained below when Plan mode was not used.
 
 Plan / exception:
+
+## Operational Findings / Issues
+
+- [ ] `issues/README.md` was reviewed.
+- [ ] Existing durable findings were searched in `issues/open/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
+- [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
+- [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
+- [ ] No new durable operational finding is required, and the reason is stated below.
+
+Issue / edit-scope evidence:
 
 ## Copilot Configuration Impact
 

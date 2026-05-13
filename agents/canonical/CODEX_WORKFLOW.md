@@ -4,6 +4,7 @@ responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
+upstream design ../../issues/README.md durable AgentCanon operational finding storage
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
@@ -73,6 +74,7 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 次を topic keyword で探索し、該当 file を読んでから着手します。
 
 - `documents/`
+- `issues/`
 - `memory/`
 - `notes/knowledge/`
 - `notes/guardrails/`
@@ -85,6 +87,18 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 
 user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
+
+raw text search の hit だけで編集対象を決めません。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。
+
+```bash
+rg -l "topic keywords" > reports/search_hits.txt
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --search-hits-file reports/search_hits.txt
+```
+
+`dependency_edit_scope.txt` を issue、PR body、または run bundle に残し、編集した file、確認した file、意図的に外した candidate を説明します。
 
 ### Missing File Or Path Triage
 

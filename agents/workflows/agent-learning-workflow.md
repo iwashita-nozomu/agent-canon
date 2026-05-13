@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents Agent Learning Workflow for this repository.
 upstream design README.md workflow catalog
+upstream design ../../issues/README.md durable operational finding storage
 upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
 upstream implementation ../../tools/agent_tools/workflow_monitor.py appends monitoring evidence
 @dependency-end
@@ -19,6 +20,7 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
 - 毎 task の closeout で、run bundle を評価し、agent feedback action を明示する
 - stable になった項目だけを `AGENTS.md`、workflow、review rule へ昇格する
 - 自己学習と対話記録の追記を template local artifact ではなく shared canon workflow の責務として扱う
+- workflow defect は run bundle だけに残さず、`issues/`、`memory/`、または `notes/failures/` へ durable record として昇格する
 
 ## Literature Basis
 
@@ -44,6 +46,8 @@ upstream implementation ../../tools/agent_tools/workflow_monitor.py appends moni
   - agent の作業哲学、判断原則、対話から得た再発防止、task retrospective
 - `notes/guardrails/engineering_avoidances.md`
   - 既に失敗ログから確定した禁止事項
+- `issues/`
+  - workflow、tool、PR gate、closeout、search、memory persistence の運用 defect backlog
 
 `memory/` は shared canon 側の正本です。template root では runtime view を使いますが、closeout では canon update として扱います。
 
@@ -130,6 +134,26 @@ agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Ev
 
 closeout では `skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` を `applied`、`recorded`、`not_applicable` のいずれかにします。
 `pending` のまま Eval を通してはいけません。
+
+## Operational Issue Capture
+
+user、reviewer、runtime、CI が workflow defect を指摘した場合は、run bundle への記録だけでは未完了です。
+次のどれかに durable record を残します。
+
+- `issues/open/AC-YYYYMMDD-<slug>.md`: workflow/tool/PR gate/search/closeout など、修正 action と affected surface を持つ運用 finding
+- `memory/AGENT_PHILOSOPHY.md`: agent の作業原則として再利用する短い observation
+- `notes/failures/`: 再発防止の failure analysis
+
+workflow defect の affected surface を探すときは、raw search hit を dependency graph に通します。
+
+```bash
+rg -l "topic keywords" > reports/search_hits.txt
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --search-hits-file reports/search_hits.txt
+```
+
+`issues/` に入れる finding は `issues/README.md` の required fields を満たし、`edit_scope` に `dependency_edit_scope.txt` または主要 `DEPENDENCY_EDIT_SCOPE_PATH` を残します。
 
 ## Kind Definitions
 

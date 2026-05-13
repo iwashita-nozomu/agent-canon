@@ -21,17 +21,23 @@ ALLOW_FRONTMATTER=0
 EXPLAIN_MISSING=0
 LIST_CHANGED_DEPENDENCIES=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
+GRAPH_TSV_OUTPUT=""
+SEARCH_HITS_FILE=""
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
 Missing manifests are report-only by default until the repository-wide migration is complete.
 With --list-changed-dependencies, the graph checker also prints every dependency
 edge declared by, or pointing at, each changed file.
+When --report-dir is set, a stable dependency_graph.tsv artifact is generated
+from dependency headers. With --search-hits-file, text-search hit paths are
+expanded into dependency edit-scope candidates and saved beside the graph when
+--report-dir is set.
 EOF
 }
 
@@ -65,6 +71,14 @@ while [[ $# -gt 0 ]]; do
       REPORT_DIR="$2"
       shift 2
       ;;
+    --graph-tsv)
+      GRAPH_TSV_OUTPUT="$2"
+      shift 2
+      ;;
+    --search-hits-file)
+      SEARCH_HITS_FILE="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -77,6 +91,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+ROOT_DIR="$(realpath -m "$ROOT_DIR")"
 cd "$ROOT_DIR"
 
 mapfile -t checkable_paths < <(
@@ -105,12 +120,22 @@ fi
 bash "${scan_args[@]}" "${checkable_paths[@]}"
 bash "${format_args[@]}" "${checkable_paths[@]}"
 
+if [[ -n "$REPORT_DIR" ]]; then
+  mkdir -p "$REPORT_DIR"
+fi
+if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then
+  GRAPH_TSV_OUTPUT="$REPORT_DIR/dependency_graph.tsv"
+fi
+
 graph_args=(tools/agent_tools/check_dependency_graph.sh)
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
 fi
 if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
   graph_args+=(--allow-frontmatter)
+fi
+if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
+  graph_args+=(--graph-tsv "$GRAPH_TSV_OUTPUT")
 fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
 
@@ -120,6 +145,18 @@ if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
     related_args+=(--allow-frontmatter)
   fi
   bash "${related_args[@]}" "${checkable_paths[@]}"
+fi
+
+if [[ -n "$SEARCH_HITS_FILE" ]]; then
+  edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --search-hits-file "$SEARCH_HITS_FILE")
+  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
+    edit_scope_args+=(--allow-frontmatter)
+  fi
+  if [[ -n "$REPORT_DIR" ]]; then
+    bash "${edit_scope_args[@]}" "${checkable_paths[@]}" | tee "$REPORT_DIR/dependency_edit_scope.txt"
+  else
+    bash "${edit_scope_args[@]}" "${checkable_paths[@]}"
+  fi
 fi
 
 echo "REPO_DEPENDENCY_REVIEW=pass"

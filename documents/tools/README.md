@@ -135,15 +135,21 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
   - `python3 tools/agent_tools/vendor_skill_adapters.py --sync` は missing adapter だけを作成し、unmanaged file は上書きしません。
 - `tools/agent_tools/check_dependency_graph.sh`
   - `--list-related --focus <path>` は、変更 path が宣言する dependency edge と、その path を指す incoming edge をすべて列挙します。
+  - GitHub path-constraint root copy は、`vendor/agent-canon` がある場合に AgentCanon source context で dependency path を解決します。
 - `tools/agent_tools/run_repo_dependency_review.sh`
   - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
 - `tools/agent_tools/review_backlog_scan.sh`
+  - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
+  - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。
+  - PR readiness 前に、出力された inventory と dependency graph から、AgentCanon-owned source、template/root local state、synced copy、symlink view、GitHub path-constraint copy、project-owned artifact のどれを編集 / 検証するかを明示します。
   - 例:
 
 ```bash
-make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>"
-bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id> --submodule-aware
+make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware"
+bash tools/agent_tools/review_backlog_scan.sh \
+  --report-dir reports/agents/<run-id>/cross_repo_inspection \
+  --submodule-aware
 ```
 
 - `tools/oop/python/readability.py`

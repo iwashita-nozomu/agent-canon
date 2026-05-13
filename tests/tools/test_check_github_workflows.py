@@ -130,6 +130,71 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_missing_pr_template_issue_gate_fails(self) -> None:
+        """PR templates must require durable operational issue evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            path = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "Operational Findings / Issues",
+                    "Findings",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:Operational Findings / Issues", result.stdout)
+
+    def test_missing_agentcanon_issues_readme_fails(self) -> None:
+        """Durable AgentCanon issue conventions must remain present."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            (root / "issues" / "README.md").unlink()
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("path=issues/README.md", result.stdout)
+
+    def test_issue_file_requires_edit_scope_field(self) -> None:
+        """Operational issue files must include dependency-expanded edit scope."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            issue = next((root / "issues" / "open").glob("*.md"))
+            issue.write_text(
+                issue.read_text(encoding="utf-8").replace("edit_scope:", "scope:"),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:edit_scope:", result.stdout)
+
     def test_missing_copilot_pr_instruction_fails(self) -> None:
         """Copilot PR triage instructions are required surfaces."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -386,6 +451,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "documents/github-copilot-configuration.md",
+            "issues/README.md",
+            "issues/open/AC-20260513-durable-finding-auto-promotion.md",
             "README.md",
         ]:
             source = REPO_ROOT / relative
@@ -407,6 +474,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
+            "issues/README.md",
+            "issues/open/AC-20260513-durable-finding-auto-promotion.md",
         ]:
             source = REPO_ROOT / relative
             destination = root / "vendor" / "agent-canon" / relative
