@@ -5,6 +5,7 @@
 responsibility Documents accumulated AgentCanon eval result storage.
 upstream design ../README.md eval directory contract
 downstream design skill-workflow-prompt/README.md skill prompt eval result naming convention
+downstream design hook-runs/README.md hook result naming convention
 @dependency-end
 -->
 
@@ -20,3 +21,6 @@ Current result families:
 
 - `skill-workflow-prompt/`: prompt evals produced when a skill or workflow
   prompt is used, changed, or repaired.
+- `hook-runs/`: Codex hook outcomes accumulated with unique `hook_run_id`
+  values so PR / push guide generation can group repeated failures without
+  overwriting raw events.

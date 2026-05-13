@@ -1115,12 +1115,6 @@ cmd_ensure_latest() {
     local_commit="$(submodule_commit)"
     if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-      if [ "$worktree_commit" != "$local_commit" ]; then
-        echo "agent_canon_local_submodule=$local_commit"
-        echo "agent_canon_worktree_submodule=$worktree_commit"
-        echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
-        die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin, align main, or push a proposal before ensure-latest"
-      fi
     else
       git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
       worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
@@ -1130,6 +1124,17 @@ cmd_ensure_latest() {
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
+    if [ "$worktree_commit" != "$local_commit" ]; then
+      submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
+      if [ "$worktree_commit" = "$remote_sha" ] && [ -z "$submodule_status" ]; then
+        echo "agent_canon_latest=parent_pin_pending"
+        cmd_link_root 1
+        commit_sync_paths_if_needed "$remote_sha" "submodule_parent_pin"
+        return
+      fi
+      echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
+      die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin, align main, or push a proposal before ensure-latest"
+    fi
     if [ "$local_commit" = "$remote_sha" ]; then
       echo "agent_canon_latest=already_current_submodule"
       cmd_link_root

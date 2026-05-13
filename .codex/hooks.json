@@ -5,8 +5,6 @@
     "upstream implementation config.toml enables project-local Codex hooks",
     "upstream design README.md documents MCP inventory preflight",
     "downstream implementation hooks/mcp_session_context.sh emits MCP hook context",
-    "downstream implementation hooks/pre_tool_guard.py blocks high-risk Bash commands",
-    "downstream implementation hooks/agent_canon_read_warning.py warns on shared-canon reads",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
     "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
@@ -48,25 +46,6 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
             "statusMessage": "Logging observed skill usage"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/pre_tool_guard.py\"",
-            "timeout": 10,
-            "statusMessage": "Checking shell command safety"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/agent_canon_read_warning.py\"",
-            "timeout": 10,
-            "statusMessage": "Checking shared-canon read context"
           }
         ]
       }

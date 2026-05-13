@@ -68,10 +68,11 @@ Plan / exception:
 ## Operational Findings / Issues
 
 - [ ] `vendor/agent-canon/issues/README.md` was reviewed.
-- [ ] Existing durable findings were searched in `vendor/agent-canon/issues/open/`, `vendor/agent-canon/memory/`, `vendor/agent-canon/notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
+- [ ] Existing durable findings were searched in `vendor/agent-canon/issues/open/`, `vendor/agent-canon/issues/closed/`, `vendor/agent-canon/memory/`, `vendor/agent-canon/notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md`, `vendor/agent-canon/memory/`, or `vendor/agent-canon/notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
 - [ ] No new durable operational finding is required, and the reason is stated below.
+- [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
 
 Issue / edit-scope evidence:
 

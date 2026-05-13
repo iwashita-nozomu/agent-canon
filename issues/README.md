@@ -7,6 +7,7 @@ upstream design ../ROOT_AGENTS.md requires durable learning and closeout evidenc
 upstream design ../agents/workflows/agent-canon-pr-workflow.md requires issue checks in AgentCanon PR flow
 upstream design ../documents/dependency-manifest-design.md defines dependency graph and search-to-edit-scope evidence
 downstream design open/AC-20260513-durable-finding-auto-promotion.md records the initial workflow defect
+downstream design closed/README.md defines closed finding storage
 downstream implementation ../tools/ci/check_github_workflows.py validates issue conventions
 @dependency-end
 -->
@@ -18,7 +19,7 @@ Use it when a user, reviewer, runtime check, CI failure, or agent retrospective 
 ## Directory Contract
 
 - `issues/open/`: active operational findings that still need workflow, tool, documentation, or policy changes.
-- `issues/resolved/`: findings that have an implemented and validated fix. Moving a file here requires updating `status`, `resolved_by`, and `close_condition`.
+- `issues/closed/`: findings that have an implemented and validated fix. Moving a file here requires updating `status`, `resolved_by`, and `close_condition`.
 - Run-local details stay in `reports/agents/<run-id>/`. This directory keeps only the durable summary, evidence pointers, affected surfaces, and required action.
 
 ## File Naming
@@ -33,6 +34,7 @@ issues/open/AC-YYYYMMDD-short-slug.md
 - `YYYYMMDD` is the date the finding was created.
 - `short-slug` is lowercase ASCII with hyphens.
 - Do not reuse IDs. If a later finding is related, link to the older issue instead of appending unrelated scope.
+- Closed files keep the same file name under `issues/closed/`.
 
 ## Required Fields
 
@@ -52,6 +54,11 @@ close_condition: <one sentence>
 
 Issue text must summarize the behavior and cite evidence.
 Do not paste raw chat logs or long run-bundle transcripts.
+Closed issue files must additionally include:
+
+```text
+resolved_by: <commit SHA, PR URL, or report path>
+```
 
 ## Search And Edit-Scope Rule
 
@@ -81,3 +88,4 @@ AgentCanon PRs that change workflow, tooling, memory, evaluation, search behavio
 - state that durable issue search found no existing finding and no new durable operational finding is required.
 
 If a run bundle exposes a workflow defect, the defect is not considered captured until this directory, `memory/`, or `notes/failures/` contains the durable record.
+Do not delete closed findings during ordinary cleanup; archive or compact only during an explicit issue-retention pass.

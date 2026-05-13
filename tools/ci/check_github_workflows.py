@@ -12,6 +12,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
+# upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
@@ -22,7 +23,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -39,6 +40,146 @@ AGENT_CANON_INDEPENDENT_WORKFLOWS = {
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
+)
+TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
+    "Validation Evidence",
+    "Plan Mode Evidence",
+    "PR Mutation Authority",
+    "Authority / blocker notes",
+    "Copilot / Automation Output",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "Operational Findings / Issues",
+    "vendor/agent-canon/issues/README.md",
+    "vendor/agent-canon/issues/closed/",
+    "Agent Improvement Guide artifact",
+    "run_repo_dependency_review.sh --search-hits-file",
+    "Copilot Configuration Impact",
+    "documents/github-copilot-configuration.md",
+    "Template / derived project PR",
+    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+    "make ci",
+    "AgentCanon Evidence",
+    "template submodule SHA:",
+)
+TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
+    "make agent-canon-pr-check",
+    "make agent-canon-ensure-latest",
+    "Plan Mode Evidence",
+    "PR Mutation Authority",
+    "Authority / blocker notes",
+    "Copilot / Automation Output",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "Branch And Change Route",
+    "Operational Findings / Issues",
+    "vendor/agent-canon/issues/README.md",
+    "vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md",
+    "vendor/agent-canon/issues/closed/",
+    "Agent Improvement Guide artifact",
+    "run_repo_dependency_review.sh --search-hits-file",
+    "Copilot Configuration Impact",
+    "documents/github-copilot-configuration.md",
+    "AgentCanon source PR / proposal",
+    "Direct `bash tools/sync_agent_canon.sh push` was not used",
+    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+    "Submodule Pin Change",
+    "GitHub Mirror / Submodule Evidence",
+    "template submodule SHA:",
+)
+STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
+    "Validation Evidence",
+    "Plan Mode Evidence",
+    "PR Mutation Authority",
+    "Authority / blocker notes",
+    "Copilot / Automation Output",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "Branch And Change Route",
+    "Operational Findings / Issues",
+    "issues/README.md",
+    "issues/open/AC-YYYYMMDD-<slug>.md",
+    "issues/closed/",
+    "Agent Improvement Guide artifact",
+    "run_repo_dependency_review.sh --search-hits-file",
+    "Copilot Configuration Impact",
+    "documents/github-copilot-configuration.md",
+    "standalone AgentCanon repository",
+    "make agent-canon-ensure-latest",
+    "Submodule Pin Impact",
+    "expected template submodule SHA:",
+)
+COPILOT_INSTRUCTIONS_REQUIREMENTS = (
+    "agents/workflows/github-copilot-workflow.md",
+    "documents/github-copilot-configuration.md",
+    ".github/instructions/pr-processing.instructions.md",
+    ".github/agents/pr-maintainer.md",
+    "Plan mode",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+)
+PR_PROCESSING_INSTRUCTIONS_REQUIREMENTS = (
+    'applyTo: "**"',
+    "documents/github-copilot-configuration.md",
+    "Plan mode",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "AGENT_CANON_SUBMODULE_AUTH=missing",
+    "private submodule authentication",
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+)
+PR_MAINTAINER_REQUIREMENTS = (
+    "description:",
+    "documents/github-copilot-configuration.md",
+    "Plan mode",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "AGENT_CANON_SUBMODULE_AUTH=missing",
+    "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
+    "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+    "Do not delete the AgentCanon submodule",
+)
+GITHUB_AGENTS_REQUIREMENTS = (
+    "/.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+    "documents/github-copilot-configuration.md",
+    "Plan mode",
+)
+COPILOT_CONFIG_REQUIREMENTS = (
+    "GitHub Copilot Configuration",
+    ".github/copilot-instructions.md",
+    ".github/instructions/**/*.instructions.md",
+    "AGENTS.md",
+    ".github/agents/*.md",
+    "tools:",
+    "mcp-servers:",
+    ".github/workflows/copilot-setup-steps.yml",
+    "standalone AgentCanon repository",
+    "Template / derived",
+    "Plan mode",
+    "COPILOT_PR_DECISION",
+    "github_copilot_merge_when_green",
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+    "COPILOT_MCP_",
+    "MCP",
+)
+SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
+    "AGENT_CANON_SUBMODULE_AUTH=missing",
+    "AGENT_CANON_SUBMODULE_AUTH=denied",
+    "AGENT_CANON_SUBMODULE_AUTH=ssh_denied",
+    "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
+    "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
+    "AGENT_CANON_REPO_TOKEN",
+    "AGENT_CANON_REPO_SSH_KEY",
+    "GITHUB_ENV",
+    "url.${ssh_submodule_url}.insteadOf",
+    "untrusted PR context",
+    "exit 86",
 )
 
 
@@ -189,7 +330,7 @@ def has_credential_env(
     return any(name in env_values for name in AGENT_CANON_CREDENTIALS)
 
 
-def helper_steps(workflow: dict[str, object]) -> list[StepContext]:
+def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[StepContext]:
     """Return steps that invoke the AgentCanon checkout helper."""
     steps: list[StepContext] = []
     for context in step_contexts(workflow):
@@ -199,24 +340,32 @@ def helper_steps(workflow: dict[str, object]) -> list[StepContext]:
     return steps
 
 
-def referenced_helper_exists(root: Path, workflow_text: str) -> bool:
+def referenced_agent_canon_checkout_script_available(root: Path, workflow_text: str) -> bool:
     """Return whether at least one helper path referenced by the workflow exists."""
     return any(path in workflow_text and (root / path).is_file() for path in HELPER_PATHS)
 
 
-def check_workflow(root: Path, path: Path) -> list[Finding]:
-    """Check one GitHub Actions workflow."""
-    workflow = load_workflow(path)
-    workflow_text = read_text(path)
+def workflow_declared_findings(path: Path, workflow: dict[str, object]) -> list[Finding]:
+    """Return findings for workflow-level required declarations."""
     findings: list[Finding] = []
-    requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if not has_permissions(workflow):
         findings.append(Finding("error", path, "missing_permissions"))
     if "concurrency" not in workflow:
         findings.append(Finding("warning", path, "missing_top_level_concurrency"))
+    return findings
 
+
+def agent_canon_checkout_policy_findings(
+    root: Path,
+    path: Path,
+    workflow: dict[str, object],
+    workflow_text: str,
+) -> list[Finding]:
+    """Return findings for AgentCanon checkout-helper policy."""
+    findings: list[Finding] = []
     checkouts = checkout_steps(workflow)
-    helpers = helper_steps(workflow)
+    helpers = agent_canon_checkout_command_steps(workflow)
+    requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
     if requires_agent_canon_checkout and checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
@@ -226,7 +375,7 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             findings.append(Finding("error", path, "agent_canon_checkout_helper_not_allowed"))
         if any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
             findings.append(Finding("error", path, "agent_canon_credentials_not_allowed"))
-    if helpers and not referenced_helper_exists(root, workflow_text):
+    if helpers and not referenced_agent_canon_checkout_script_available(root, workflow_text):
         findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
     for helper_index, context in enumerate(helpers, start=1):
         if not has_credential_env(workflow, context):
@@ -237,7 +386,13 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
                     f"checkout_helper_{helper_index}_missing_agent_canon_repo_credential_env",
                 )
             )
+    return findings
 
+
+def checkout_step_findings(path: Path, workflow: dict[str, object]) -> list[Finding]:
+    """Return findings for actions/checkout safety settings."""
+    findings: list[Finding] = []
+    checkouts = checkout_steps(workflow)
     for index, context in enumerate(checkouts, start=1):
         with_block = as_string_dict(context.step.get("with"))
         if with_block is None:
@@ -260,7 +415,18 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
     return findings
 
 
-def require_text(path: Path, required: list[str]) -> list[Finding]:
+def check_workflow(root: Path, path: Path) -> list[Finding]:
+    """Check one GitHub Actions workflow."""
+    workflow = load_workflow(path)
+    workflow_text = read_text(path)
+    return [
+        *workflow_declared_findings(path, workflow),
+        *agent_canon_checkout_policy_findings(root, path, workflow, workflow_text),
+        *checkout_step_findings(path, workflow),
+    ]
+
+
+def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     """Check that a file contains all required snippets."""
     if not path.exists():
         return [Finding("error", path, "missing_file")]
@@ -286,6 +452,18 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
                 ],
             )
         )
+    root_guide_workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+    if root_guide_workflow.exists():
+        findings.extend(
+            require_text(
+                root_guide_workflow,
+                [
+                    "Synced to /.github/workflows/agent-improvement-guide.yml",
+                    "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
+                    "generate_agent_improvement_guide.py",
+                ],
+            )
+        )
     vendor_workflow = (
         root
         / "vendor"
@@ -301,217 +479,107 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
                 ["agents/workflows/agent-canon-pr-workflow.md"],
             )
         )
+    vendor_guide_workflow = (
+        root
+        / "vendor"
+        / "agent-canon"
+        / ".github"
+        / "workflows"
+        / "agent-improvement-guide.yml"
+    )
+    if vendor_guide_workflow.exists():
+        findings.extend(
+            require_text(
+                vendor_guide_workflow,
+                [
+                    "pull_request:",
+                    "push:",
+                    "generate_agent_improvement_guide.py",
+                    "GITHUB_STEP_SUMMARY",
+                    "actions/upload-artifact@v4",
+                ],
+            )
+        )
     return findings
+
+
+def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
+    """Return PR-template requirement checks for the active repository mode."""
+    if is_template_or_derived_repo(root):
+        return [
+            (
+                root / ".github" / "PULL_REQUEST_TEMPLATE.md",
+                TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS,
+            ),
+            (
+                root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+                TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+            ),
+            (
+                root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md",
+                STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+            ),
+        ]
+    return [
+        (
+            root / ".github" / "PULL_REQUEST_TEMPLATE.md",
+            STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+        )
+    ]
 
 
 def check_pr_templates(root: Path) -> list[Finding]:
     """Check PR template evidence fields."""
-    template_mode = is_template_or_derived_repo(root)
-    if template_mode:
-        checks = {
-            root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
-                "Validation Evidence",
-                "Plan Mode Evidence",
-                "PR Mutation Authority",
-                "Authority / blocker notes",
-                "Copilot / Automation Output",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "Operational Findings / Issues",
-                "vendor/agent-canon/issues/README.md",
-                "run_repo_dependency_review.sh --search-hits-file",
-                "Copilot Configuration Impact",
-                "documents/github-copilot-configuration.md",
-                "Template / derived project PR",
-                "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
-                "make ci",
-                "AgentCanon Evidence",
-                "template submodule SHA:",
-            ],
-            root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md": [
-                "make agent-canon-pr-check",
-                "make agent-canon-ensure-latest",
-                "Plan Mode Evidence",
-                "PR Mutation Authority",
-                "Authority / blocker notes",
-                "Copilot / Automation Output",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "Branch And Change Route",
-                "Operational Findings / Issues",
-                "vendor/agent-canon/issues/README.md",
-                "vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md",
-                "run_repo_dependency_review.sh --search-hits-file",
-                "Copilot Configuration Impact",
-                "documents/github-copilot-configuration.md",
-                "AgentCanon source PR / proposal",
-                "Direct `bash tools/sync_agent_canon.sh push` was not used",
-                "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
-                "Submodule Pin Change",
-                "GitHub Mirror / Submodule Evidence",
-                "template submodule SHA:",
-            ],
-            root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md": [
-                "Validation Evidence",
-                "Plan Mode Evidence",
-                "PR Mutation Authority",
-                "Authority / blocker notes",
-                "Copilot / Automation Output",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "Branch And Change Route",
-                "Operational Findings / Issues",
-                "issues/README.md",
-                "issues/open/AC-YYYYMMDD-<slug>.md",
-                "run_repo_dependency_review.sh --search-hits-file",
-                "Copilot Configuration Impact",
-                "documents/github-copilot-configuration.md",
-                "standalone AgentCanon repository",
-                "make agent-canon-ensure-latest",
-                "Submodule Pin Impact",
-                "expected template submodule SHA:",
-            ],
-        }
-    else:
-        checks = {
-            root / ".github" / "PULL_REQUEST_TEMPLATE.md": [
-                "Validation Evidence",
-                "Plan Mode Evidence",
-                "PR Mutation Authority",
-                "Authority / blocker notes",
-                "Copilot / Automation Output",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "Branch And Change Route",
-                "Operational Findings / Issues",
-                "issues/README.md",
-                "issues/open/AC-YYYYMMDD-<slug>.md",
-                "run_repo_dependency_review.sh --search-hits-file",
-                "Copilot Configuration Impact",
-                "documents/github-copilot-configuration.md",
-                "standalone AgentCanon repository",
-                "make agent-canon-ensure-latest",
-                "Submodule Pin Impact",
-                "expected template submodule SHA:",
-            ],
-        }
     findings: list[Finding] = []
-    for path, required in checks.items():
+    for path, required in pr_template_requirement_specs(root):
         findings.extend(require_text(path, required))
     return findings
 
 
-def check_copilot_surfaces(root: Path) -> list[Finding]:
-    """Check Copilot and PR-template discovery surfaces."""
-    readme_path = root / "README.md"
-    template_mode = is_template_or_derived_repo(root)
-    if template_mode:
-        readme_path = root / "vendor" / "agent-canon" / "README.md"
-    findings = [
-        *require_text(
-            root / ".github" / "copilot-instructions.md",
-            [
-                "agents/workflows/github-copilot-workflow.md",
-                "documents/github-copilot-configuration.md",
-                ".github/instructions/pr-processing.instructions.md",
-                ".github/agents/pr-maintainer.md",
-                "Plan mode",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "AGENT_CANON_REPO_TOKEN",
-                "AGENT_CANON_REPO_SSH_KEY",
-            ],
+def copilot_readme_path(root: Path) -> Path:
+    """Return the README path that should mention Copilot routing."""
+    if is_template_or_derived_repo(root):
+        return root / "vendor" / "agent-canon" / "README.md"
+    return root / "README.md"
+
+
+def copilot_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
+    """Return Copilot discovery surface requirement checks."""
+    return [
+        (root / ".github" / "copilot-instructions.md", COPILOT_INSTRUCTIONS_REQUIREMENTS),
+        (
+            root / ".github" / "instructions" / "pr-processing.instructions.md",
+            PR_PROCESSING_INSTRUCTIONS_REQUIREMENTS,
         ),
-        *require_text(
-            root
-            / ".github"
-            / "instructions"
-            / "pr-processing.instructions.md",
-            [
-                'applyTo: "**"',
-                "documents/github-copilot-configuration.md",
-                "Plan mode",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "AGENT_CANON_SUBMODULE_AUTH=missing",
-                "private submodule authentication",
-                "AGENT_CANON_REPO_TOKEN",
-                "AGENT_CANON_REPO_SSH_KEY",
-            ],
+        (root / ".github" / "agents" / "pr-maintainer.md", PR_MAINTAINER_REQUIREMENTS),
+        (
+            copilot_readme_path(root),
+            (".github/PULL_REQUEST_TEMPLATE.md", "documents/github-copilot-configuration.md"),
         ),
-        *require_text(
-            root / ".github" / "agents" / "pr-maintainer.md",
-            [
-                "description:",
-                "documents/github-copilot-configuration.md",
-                "Plan mode",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "AGENT_CANON_SUBMODULE_AUTH=missing",
-                "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
-                "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
-                "AGENT_CANON_REPO_TOKEN",
-                "AGENT_CANON_REPO_SSH_KEY",
-                "Do not delete the AgentCanon submodule",
-            ],
-        ),
-        *require_text(
-            readme_path,
-            [
-                ".github/PULL_REQUEST_TEMPLATE.md",
-                "documents/github-copilot-configuration.md",
-            ],
-        ),
-        *require_text(
-            root / ".github" / "AGENTS.md",
-            [
-                "/.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-                "documents/github-copilot-configuration.md",
-                "Plan mode",
-            ],
-        ),
-        *require_text(
+        (root / ".github" / "AGENTS.md", GITHUB_AGENTS_REQUIREMENTS),
+        (
             root / "documents" / "github-copilot-configuration.md",
-            [
-                "GitHub Copilot Configuration",
-                ".github/copilot-instructions.md",
-                ".github/instructions/**/*.instructions.md",
-                "AGENTS.md",
-                ".github/agents/*.md",
-                "tools:",
-                "mcp-servers:",
-                ".github/workflows/copilot-setup-steps.yml",
-                "standalone AgentCanon repository",
-                "Template / derived",
-                "Plan mode",
-                "COPILOT_PR_DECISION",
-                "github_copilot_merge_when_green",
-                "AGENT_CANON_REPO_TOKEN",
-                "AGENT_CANON_REPO_SSH_KEY",
-                "COPILOT_MCP_",
-                "MCP",
-            ],
+            COPILOT_CONFIG_REQUIREMENTS,
         ),
     ]
-    if template_mode:
-        findings.extend(
-            require_text(
-                root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
-                [
-                    "AGENT_CANON_SUBMODULE_AUTH=missing",
-                    "AGENT_CANON_SUBMODULE_AUTH=denied",
-                    "AGENT_CANON_SUBMODULE_AUTH=ssh_denied",
-                    "AGENT_CANON_SUBMODULE_AUTH=token_persisted",
-                    "AGENT_CANON_SUBMODULE_AUTH=ssh_persisted",
-                    "AGENT_CANON_REPO_TOKEN",
-                    "AGENT_CANON_REPO_SSH_KEY",
-                    "GITHUB_ENV",
-                    "url.${ssh_submodule_url}.insteadOf",
-                    "untrusted PR context",
-                    "exit 86",
-                ],
-            )
-        )
+
+
+def submodule_checkout_script_findings(root: Path) -> list[Finding]:
+    """Return findings for template-mode private submodule checkout script docs."""
+    if not is_template_or_derived_repo(root):
+        return []
+    return require_text(
+        root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
+        SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
+    )
+
+
+def check_copilot_surfaces(root: Path) -> list[Finding]:
+    """Check Copilot and PR-template discovery surfaces."""
+    findings: list[Finding] = []
+    for path, required in copilot_requirement_specs(root):
+        findings.extend(require_text(path, required))
+    findings.extend(submodule_checkout_script_findings(root))
     return findings
 
 
@@ -530,6 +598,8 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
             "Freshness Gate Route",
             "Issues / Findings Gate",
             "issues/open/AC-YYYYMMDD-short-slug.md",
+            "issues/closed",
+            "Agent Improvement Guide",
             "run_repo_dependency_review.sh",
             "--search-hits-file",
             "tool addition",
@@ -547,6 +617,7 @@ def check_agentcanon_issues(root: Path) -> list[Finding]:
         [
             "AgentCanon Operational Issues",
             "issues/open/AC-YYYYMMDD-short-slug.md",
+            "issues/closed/",
             "Required Fields",
             "affected_surfaces:",
             "edit_scope:",
@@ -577,11 +648,10 @@ def check_agentcanon_issues(root: Path) -> list[Finding]:
     return findings
 
 
-def run(root: Path) -> int:
-    """Run all checks and print a compact status report."""
-    root = root.resolve()
-    findings: list[Finding] = []
+def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
+    """Return all workflow and PR-surface findings."""
     workflows = workflow_paths(root)
+    findings: list[Finding] = []
     for path in workflows:
         findings.extend(check_workflow(root, path))
     findings.extend(check_root_copy_headers(root))
@@ -589,7 +659,15 @@ def run(root: Path) -> int:
     findings.extend(check_copilot_surfaces(root))
     findings.extend(check_pr_flow_docs(root))
     findings.extend(check_agentcanon_issues(root))
+    return findings, workflows
 
+
+def print_github_workflow_report(
+    root: Path,
+    findings: list[Finding],
+    workflows: list[Path],
+) -> None:
+    """Print a compact GitHub workflow convention report."""
     errors = [finding for finding in findings if finding.severity == "error"]
     warnings = [finding for finding in findings if finding.severity == "warning"]
     for finding in findings:
@@ -597,11 +675,22 @@ def run(root: Path) -> int:
     print(f"GITHUB_WORKFLOWS_CHECKED={len(workflows)}")
     print(f"GITHUB_WORKFLOW_ERRORS={len(errors)}")
     print(f"GITHUB_WORKFLOW_WARNINGS={len(warnings)}")
-    if errors:
-        print("GITHUB_WORKFLOWS=fail")
+    print("GITHUB_WORKFLOWS=fail" if errors else "GITHUB_WORKFLOWS=pass")
+
+
+def github_workflow_exit_code(findings: list[Finding]) -> int:
+    """Return a process exit code for GitHub workflow convention findings."""
+    if any(finding.severity == "error" for finding in findings):
         return 1
-    print("GITHUB_WORKFLOWS=pass")
     return 0
+
+
+def run_github_workflow_checks(root: Path) -> int:
+    """Run all checks and print a compact status report."""
+    root = root.resolve()
+    findings, workflows = github_workflow_findings(root)
+    print_github_workflow_report(root, findings, workflows)
+    return github_workflow_exit_code(findings)
 
 
 def main() -> int:
@@ -614,7 +703,7 @@ def main() -> int:
         help="repository root to check",
     )
     args = parser.parse_args()
-    return run(args.root)
+    return run_github_workflow_checks(args.root)
 
 
 if __name__ == "__main__":

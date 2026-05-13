@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,7 +24,10 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
 
 from agent_team import (
     ROOT,
+    Role,
     RunBundleSpec,
+    TaskCatalog,
+    TeamConfig,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
@@ -83,6 +87,15 @@ FRONTIER_IMPLEMENTATION_ROLE_IDS = {
 SPARK_CODING_ROLE_IDS = {
     "spark_worker",
 }
+MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
+
+
+@dataclass(frozen=True)
+class AlignmentWorkspace:
+    """Temporary workspace used for runtime bundle smoke checks."""
+
+    workspace_root: Path
+    report_root: Path
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -128,7 +141,7 @@ def validate_project_hooks() -> None:
     hooks = hooks_payload.get("hooks", {})
     ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
 
-    for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "Stop"):
+    for event in ("SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"):
         entries = hooks.get(event, [])
         ensure(isinstance(entries, list) and entries, f"{event} hook must be configured")
 
@@ -136,10 +149,9 @@ def validate_project_hooks() -> None:
     for hook_script in (
         "mcp_session_context.sh",
         "prompt_secret_guard.py",
-        "pre_tool_guard.py",
-        "agent_canon_read_warning.py",
         "goal_completion_guard.py",
         "oop_readability_guard.py",
+        "skill_usage_logger.py",
     ):
         ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")
         ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
@@ -385,130 +397,191 @@ def validate_vendor_skill_adapters() -> None:
     ensure(
         not findings,
         "vendor skill adapter findings: "
-        + "; ".join(finding.render() for finding in findings[:8]),
+        + "; ".join(
+            finding.render()
+            for finding in findings[:MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE]
+        ),
     )
+
+
+def alignment_workspace(tmp_root: Path) -> AlignmentWorkspace:
+    """Return the temporary workspace layout for bundle smoke checks."""
+    return AlignmentWorkspace(
+        workspace_root=tmp_root / "workspace",
+        report_root=tmp_root / "reports",
+    )
+
+
+def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
+    """Create the directories and scope file required by bundle smoke checks."""
+    workspace.workspace_root.mkdir(parents=True, exist_ok=True)
+    workspace.report_root.mkdir(parents=True, exist_ok=True)
+    (workspace.workspace_root / "python").mkdir()
+    (workspace.workspace_root / "documents").mkdir()
+    (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
+    (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
+        "\n".join(
+            [
+                "# Worktree Scope",
+                "",
+                "## Editable Directories",
+                "- `python`",
+                "- `documents`",
+                "",
+                "## Runtime Output Directories",
+                "- `reports/runtime`",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def current_utc_iso() -> str:
+    """Return a second-granularity UTC timestamp."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00",
+        "Z",
+    )
+
+
+def task_by_id(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
+    """Return one task-catalog row by id."""
+    return next(task for task in catalog.tasks if task["id"] == task_id)
+
+
+def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tuple[Role, ...]:
+    """Return always-on plus default specialist roles for one task."""
+    enabled = default_specialists_for_task(
+        config=config,
+        catalog=catalog,
+        task_id=task_id,
+        include_default_review_packs=True,
+    )
+    return tuple(config.always_on_roles) + tuple(
+        resolve_role(config, role_id) for role_id in enabled
+    )
+
+
+def missing_required_outputs(report_dir: Path, roles: tuple[Role, ...]) -> list[str]:
+    """Return required role outputs not created in one report directory."""
+    return [
+        output
+        for role in roles
+        for output in role.required_outputs
+        if not (report_dir / output).is_file()
+    ]
+
+
+def ensure_required_outputs(report_dir: Path, roles: tuple[Role, ...], label: str) -> None:
+    """Ensure all role-required outputs exist in one report directory."""
+    missing_outputs = missing_required_outputs(report_dir, roles)
+    ensure(
+        not missing_outputs,
+        f"{label} bundle did not generate required outputs: "
+        + ", ".join(sorted(set(missing_outputs))),
+    )
+
+
+def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> None:
+    """Ensure one generated task manifest preserves subagent handoff contracts."""
+    manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
+        encoding="utf-8",
+    )
+    ensure(
+        "subagent_prompt_packet:" in manifest_text,
+        f"task {task_id} manifest missing subagent_prompt_packet",
+    )
+    ensure(
+        "subagent_lifecycle_policy:" in manifest_text,
+        f"task {task_id} manifest missing subagent_lifecycle_policy",
+    )
+    ensure(
+        "fresh_subagents_required: true" in manifest_text
+        and "reuse_for_new_task: forbidden" in manifest_text,
+        f"task {task_id} manifest missing fresh subagent lifecycle policy",
+    )
+    ensure(
+        "prompt_contract:" in manifest_text,
+        f"task {task_id} manifest missing role prompt_contract",
+    )
+
+
+def validate_task_bundle_output(
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    workspace: AlignmentWorkspace,
+    task_id: str,
+    created_at_iso: str,
+) -> None:
+    """Create and validate one catalog task bundle."""
+    task = task_by_id(catalog, task_id)
+    roles = roles_for_task(config, catalog, task_id)
+    report_dir = workspace.report_root / task_id
+    create_run_bundle(
+        RunBundleSpec(
+            config=config,
+            report_dir=report_dir,
+            run_id=task_id,
+            task=f"alignment smoke for {task_id}",
+            owner="codex",
+            created_at_iso=created_at_iso,
+            roles=roles,
+            workspace_root=workspace.workspace_root,
+            workflow_family_id=str(task["family"]),
+        )
+    )
+    ensure_required_outputs(report_dir, roles, f"task {task_id}")
+    ensure_task_manifest(config, report_dir, task_id)
+
+
+def validate_full_team_bundle_output(
+    config: TeamConfig,
+    workspace: AlignmentWorkspace,
+    created_at_iso: str,
+) -> None:
+    """Create and validate a full specialist-team bundle."""
+    full_team_roles = config.always_on_roles + config.specialist_roles
+    full_team_dir = workspace.report_root / "full-team"
+    create_run_bundle(
+        RunBundleSpec(
+            config=config,
+            report_dir=full_team_dir,
+            run_id="full-team",
+            task="alignment smoke full team",
+            owner="codex",
+            created_at_iso=created_at_iso,
+            roles=full_team_roles,
+            workspace_root=workspace.workspace_root,
+            workflow_family_id="comprehensive_development",
+        )
+    )
+    ensure_required_outputs(full_team_dir, full_team_roles, "full-team")
 
 
 def validate_bundle_outputs() -> None:
     """Create temporary bundles for every catalog task and full-team run."""
     config = load_team_config()
     catalog = load_task_catalog(config)
-    created_at_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-        "+00:00",
-        "Z",
-    )
+    created_at_iso = current_utc_iso()
 
     with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as tmp_dir:
-        tmp_root = Path(tmp_dir)
-        workspace_root = tmp_root / "workspace"
-        report_root = tmp_root / "reports"
-        workspace_root.mkdir(parents=True, exist_ok=True)
-        report_root.mkdir(parents=True, exist_ok=True)
-        (workspace_root / "python").mkdir()
-        (workspace_root / "documents").mkdir()
-        (workspace_root / "reports" / "runtime").mkdir(parents=True)
-        (workspace_root / "WORKTREE_SCOPE.md").write_text(
-            "\n".join(
-                [
-                    "# Worktree Scope",
-                    "",
-                    "## Editable Directories",
-                    "- `python`",
-                    "- `documents`",
-                    "",
-                    "## Runtime Output Directories",
-                    "- `reports/runtime`",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
-        )
+        workspace = alignment_workspace(Path(tmp_dir))
+        initialize_alignment_workspace(workspace)
 
         for task_id in task_ids(catalog):
-            task = next(task for task in catalog.tasks if task["id"] == task_id)
-            enabled = list(
-                default_specialists_for_task(
-                    config=config,
-                    catalog=catalog,
-                    task_id=task_id,
-                    include_default_review_packs=True,
-                )
-            )
-            roles = tuple(config.always_on_roles) + tuple(
-                resolve_role(config, role_id) for role_id in enabled
-            )
-            report_dir = report_root / task_id
-            create_run_bundle(
-                RunBundleSpec(
-                    config=config,
-                    report_dir=report_dir,
-                    run_id=task_id,
-                    task=f"alignment smoke for {task_id}",
-                    owner="codex",
-                    created_at_iso=created_at_iso,
-                    roles=roles,
-                    workspace_root=workspace_root,
-                    workflow_family_id=str(task["family"]),
-                )
-            )
-            missing_outputs = [
-                output
-                for role in roles
-                for output in role.required_outputs
-                if not (report_dir / output).is_file()
-            ]
-            ensure(
-                not missing_outputs,
-                "task "
-                f"{task_id} did not generate required outputs: "
-                f"{', '.join(sorted(set(missing_outputs)))}",
-            )
-            manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
-                encoding="utf-8",
-            )
-            ensure(
-                "subagent_prompt_packet:" in manifest_text,
-                f"task {task_id} manifest missing subagent_prompt_packet",
-            )
-            ensure(
-                "subagent_lifecycle_policy:" in manifest_text,
-                f"task {task_id} manifest missing subagent_lifecycle_policy",
-            )
-            ensure(
-                "fresh_subagents_required: true" in manifest_text
-                and "reuse_for_new_task: forbidden" in manifest_text,
-                f"task {task_id} manifest missing fresh subagent lifecycle policy",
-            )
-            ensure(
-                "prompt_contract:" in manifest_text,
-                f"task {task_id} manifest missing role prompt_contract",
+            validate_task_bundle_output(
+                config=config,
+                catalog=catalog,
+                workspace=workspace,
+                task_id=task_id,
+                created_at_iso=created_at_iso,
             )
 
-        full_team_roles = config.always_on_roles + config.specialist_roles
-        full_team_dir = report_root / "full-team"
-        create_run_bundle(
-            RunBundleSpec(
-                config=config,
-                report_dir=full_team_dir,
-                run_id="full-team",
-                task="alignment smoke full team",
-                owner="codex",
-                created_at_iso=created_at_iso,
-                roles=full_team_roles,
-                workspace_root=workspace_root,
-                workflow_family_id="comprehensive_development",
-            )
-        )
-        missing_outputs = [
-            output
-            for role in full_team_roles
-            for output in role.required_outputs
-            if not (full_team_dir / output).is_file()
-        ]
-        ensure(
-            not missing_outputs,
-            "full-team bundle did not generate required outputs: "
-            + ", ".join(sorted(set(missing_outputs))),
+        validate_full_team_bundle_output(
+            config=config,
+            workspace=workspace,
+            created_at_iso=created_at_iso,
         )
 
 

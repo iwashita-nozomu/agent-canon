@@ -20,7 +20,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 ## Start Here
 
 1. `AGENTS.md` を読む
-1. clean worktree なら `make agent-canon-ensure-latest` を実行し、dirty shared-canon 差分なら PR-first route、repo-local dirty なら未実行理由を最初の作業 update に書く
+1. AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。親 repo の無関係な dirty state だけを理由に skip しない
 1. Base Runtime Packet を読む
 1. Cross-Cutting Packet を読む
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
@@ -58,11 +58,11 @@ Cross-Cutting Packet:
 
 task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submodule worktree を upstream `agent-canon` に合わせます。
 
-- clean worktree では `make agent-canon-ensure-latest` を実行します。
-- dirty worktree では `make agent-canon-ensure-latest` が parent pin update を作れないため、まず dirty path を shared-canon 差分と repo-local 差分に分けます。
-- repo-local dirty だけなら、未実行理由を最初の作業 update に書き、commit / stash 後に `make agent-canon-ensure-latest` を再実行します。
-- `vendor/agent-canon/`、root shared surface、workflow / skill / subagent / shared tool に属する dirty 差分がある場合は、`make agent-canon-ensure-latest` で上書き解消しません。`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal branch に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
-- submodule repo に local commit や dirty state がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh review-submodule` で proposal 要否、merge conflict、safe align 可否を確認します。
+- submodule repo では、親 repo の無関係な dirty state は `make agent-canon-ensure-latest` を block しません。判断対象は AgentCanon update surface です。
+- AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
+- clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、gate / preflight が parent gitlink を stage または commit して検査を続行します。
+- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh review-submodule` で proposal 要否、merge conflict、safe align 可否を確認します。
+- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal branch に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
 - `ensure-latest` は `.gitmodules` の URL と submodule `origin/main` を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定します。remote main が進んでいれば submodule を fast-forward し、parent repo の gitlink commit と root shared surface を同期します。
 - local submodule commit が remote main に ancestry、tree match、または git-cherry equivalence で含まれている場合だけ、`bash tools/update_agent_canon.sh align-main` で parent pin を remote main へ揃えます。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。

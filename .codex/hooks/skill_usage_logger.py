@@ -3,6 +3,7 @@
 # responsibility Logs Codex skill usage signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
 # upstream design ../../agents/evals/README.md requires skill-use eval evidence.
+# upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook logging.
 # @dependency-end
 
@@ -15,8 +16,9 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
+
+from hook_event_log import HookLogContext, fingerprint_json, utc_now
 
 LOG_PATH_ENV = "AGENT_CANON_SKILL_LOG_PATH"
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
@@ -56,7 +58,7 @@ def repo_root() -> Path:
 def hook_event_name(payload: dict[str, object]) -> str:
     """Return the hook event name."""
     value = payload.get("hookEventName")
-    return value if isinstance(value, str) else ""
+    return value if isinstance(value, str) and value else "UnknownHookEvent"
 
 
 def text_values(value: object) -> list[str]:
@@ -106,17 +108,10 @@ def observed_skills(payload: dict[str, object]) -> list[str]:
     return sorted(skills)
 
 
-def utc_now() -> str:
-    """Return one UTC timestamp for log entries."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
 def default_log_path(root: Path) -> Path:
-    """Return the default local skill usage log path."""
+    """Return the skill usage log path."""
     override = os.environ.get(LOG_PATH_ENV, "").strip()
-    if override:
-        return Path(override)
-    return root / "reports" / "hooks" / "skill_usage.jsonl"
+    return HookLogContext(root, "skill_usage", override).result_path()
 
 
 def _log_append_log(root: Path, entry: dict[str, object]) -> None:
@@ -176,13 +171,19 @@ def main() -> int:
     root = repo_root()
     skills = observed_skills(payload)
     workflow_event_count = append_workflow_monitor_events(root, skills)
+    timestamp = utc_now()
+    payload_fingerprint = fingerprint_json(payload)
+    context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
     _log_append_log(
         root,
         {
-            "timestamp": utc_now(),
+            "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+            "timestamp": timestamp,
             "event": hook_event_name(payload),
             "skills": skills,
             "skill_count": len(skills),
+            "payload_fingerprint": payload_fingerprint,
+            "status": "pass",
             "workflow_monitor_event_count": workflow_event_count,
             "workflow_monitor_report_dir": workflow_monitor_report_dir(),
             "root": str(root),

@@ -81,10 +81,11 @@ Plan / exception:
 ## Operational Findings / Issues
 
 - [ ] `issues/README.md` was reviewed.
-- [ ] Existing durable findings were searched in `issues/open/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
+- [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
 - [ ] No new durable operational finding is required, and the reason is stated below.
+- [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
 
 Issue / edit-scope evidence:
 

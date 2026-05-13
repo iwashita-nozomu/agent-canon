@@ -1557,10 +1557,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn(f"agent_canon_plan_remote_url={new_work_dir}", plan.stdout)
             self.assertIn("agent_canon_plan_route=submodule_update", plan.stdout)
 
-    def test_latest_check_fails_clean_submodule_worktree_at_remote_with_stale_parent_pin(
+    def test_latest_check_stages_clean_submodule_worktree_at_remote_with_stale_parent_pin(
         self,
     ) -> None:
-        """Latest gate should not pass until the parent gitlink is committed."""
+        """Latest gate should repair a stale parent gitlink when the submodule is clean."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -1587,15 +1587,30 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_CANON_LATEST=fail", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_LATEST=pass", result.stdout)
             self.assertIn("AGENT_CANON_LATEST_ROUTE=submodule_update", result.stdout)
             self.assertIn(
                 "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_REMOTE_MATCH=yes",
                 result.stdout,
             )
             self.assertIn("AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes", result.stdout)
-            self.assertIn("AGENT_CANON_LATEST_NEXT_ACTION=commit_updated_submodule_pin", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_LATEST_AUTO_REPAIR=staged_updated_submodule_pin",
+                result.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_LATEST_NEXT_ACTION=continue_checks_then_commit_updated_submodule_pin",
+                result.stdout,
+            )
+            staged = subprocess.run(
+                ["git", "diff", "--cached", "--name-only", "--", "vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(staged.stdout.strip(), "vendor/agent-canon")
 
     def test_latest_check_fails_local_ahead_submodule_pin_as_proposal_required(self) -> None:
         """A parent pin ahead of shared canon main is proposal work, not latest."""

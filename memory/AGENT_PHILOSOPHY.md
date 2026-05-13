@@ -37,11 +37,11 @@ upstream design README.md memory surface index
   - confidence: likely
   - evidence: 2026-04-10 request about whether variable names can be decided freely
 
-- 2026-04-10 | work-principle | task 開始時に clean worktree なら agent-canon ensure-latest を実行し、dirty で止まる場合は理由を明示して commit / stash 後に再実行する
+- 2026-05-13 | work-principle | task 開始時の agent-canon ensure-latest は親 repo 全体の clean/dirty ではなく AgentCanon update surface で判断し、無関係な parent dirty state では止めない
   - source: chat
   - scope: repo-wide
-  - confidence: likely
-  - evidence: 2026-04-10 request to keep agent-canon updated every time
+  - confidence: stable
+  - evidence: 2026-05-13 user corrected stale clean-repo freshness wording for submodule-based AgentCanon updates
 
 - 2026-04-10 | work-principle | waterfall workflow は最終 closeout だけでなく、requirements、plan、design、test、implementation、final の中間 gate を機械チェックで fail closed にする
   - source: chat
@@ -78,6 +78,12 @@ upstream design README.md memory surface index
   - scope: repo-wide
   - confidence: likely
   - evidence: 2026-04-10 request to fix the habit of stopping after work-unit decomposition
+
+- 2026-05-13 | work-principle | GitHub Actions は memory/eval/hook/issues から read-only improvement guide を生成し、実際の skill/workflow/tool 修正は branch を取り込んだ local Agent または Copilot PR が行う
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: User asked whether Actions or local Agent should inspect evidence and accepted the hybrid PR/push guide policy
 
 ## Interaction Observations
 
@@ -122,6 +128,12 @@ upstream design README.md memory surface index
   - scope: repo-wide
   - confidence: tentative
   - evidence: User requested AGENTS.md explicitly state reuse because the agent is weak at cross-file coding and tends to self-implement.
+
+- 2026-05-13 | interaction-observation | Hook、skill eval、memory、issues の観測は root-local artifact で終わらせず、AgentCanon-owned accumulation surface に残して PR/push guide の入力にする
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: User reported hook logs, memory, and skill results were not accumulating and asked for PR/push-time guide generation
 
 ## Task Retrospectives
 
