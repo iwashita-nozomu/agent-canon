@@ -53,8 +53,16 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("GOAL_LOOP_STATUS=continue", status.stdout)
             self.assertIn("GOAL_EXIT_CRITERIA_TOTAL=6", status.stdout)
             self.assertIn("GOAL_OPTIONAL_ITEMS_TOTAL=5", status.stdout)
+            self.assertIn(
+                "GOAL_PR_MUTATION_AUTHORITY=inspect_and_prepare_only",
+                status.stdout,
+            )
             self.assertIn("GOAL_NEXT_OPEN_ITEM=backlog:B1", status.stdout)
             text = goal.read_text(encoding="utf-8")
+            self.assertIn(
+                "pr_mutation_authority: inspect_and_prepare_only",
+                text,
+            )
             self.assertIn("run_repo_dependency_review.sh --fail-missing", text)
             self.assertIn("scan_code_dependencies.sh", text)
             self.assertIn("tools/oop/python/readability.py", text)
@@ -129,6 +137,124 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("GOAL_LOOP_STATUS=achieved", status.stdout)
             self.assertIn("GOAL_NEXT_OPEN_ITEM=none", status.stdout)
             self.assertIn("NEXT_ACTION=close_goal_loop", status.stdout)
+
+    def test_init_can_record_github_copilot_merge_authority(self) -> None:
+        """Goal setup can pre-authorize GitHub Copilot merge when green."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            goal = Path(tmp_dir) / "goal.md"
+
+            init = run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Let Copilot merge after checks.",
+                "--pr-mutation-authority",
+                "github_copilot_merge_when_green",
+            )
+            status = run_goal_loop("status", "--goal-file", str(goal))
+
+            self.assertEqual(init.returncode, 0, init.stderr)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn(
+                "GOAL_PR_MUTATION_AUTHORITY=github_copilot_merge_when_green",
+                status.stdout,
+            )
+            self.assertIn(
+                "pr_mutation_authority: github_copilot_merge_when_green",
+                goal.read_text(encoding="utf-8"),
+            )
+
+    def test_mark_can_update_pr_mutation_authority(self) -> None:
+        """Existing goals can update PR mutation authority explicitly."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            goal = Path(tmp_dir) / "goal.md"
+            run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Update authority.",
+            )
+
+            result = run_goal_loop(
+                "mark",
+                "--goal-file",
+                str(goal),
+                "--backlog",
+                "B1",
+                "--open",
+                "--pr-mutation-authority",
+                "merge_when_green",
+            )
+            status = run_goal_loop("status", "--goal-file", str(goal))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "GOAL_PR_MUTATION_AUTHORITY=merge_when_green",
+                status.stdout,
+            )
+
+    def test_blocked_status_waits_instead_of_running_next_iteration(self) -> None:
+        """A blocked goal should not keep asking for immediate iterations."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            goal = Path(tmp_dir) / "goal.md"
+            run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Wait on an external blocker.",
+            )
+
+            result = run_goal_loop(
+                "mark",
+                "--goal-file",
+                str(goal),
+                "--backlog",
+                "B1",
+                "--open",
+                "--goal-status",
+                "blocked",
+            )
+            status = run_goal_loop("status", "--goal-file", str(goal))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn("GOAL_STATUS_FIELD=blocked", status.stdout)
+            self.assertIn("GOAL_LOOP_STATUS=blocked", status.stdout)
+            self.assertIn("GOAL_NEXT_OPEN_ITEM=backlog:B1", status.stdout)
+            self.assertIn("NEXT_ACTION=wait_for_unblock", status.stdout)
+
+    def test_stopped_status_stops_without_marking_achieved(self) -> None:
+        """A stopped goal should produce a non-completion stop action."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            goal = Path(tmp_dir) / "goal.md"
+            run_goal_loop(
+                "init",
+                "--goal-file",
+                str(goal),
+                "--objective",
+                "Stop without achievement.",
+            )
+
+            result = run_goal_loop(
+                "mark",
+                "--goal-file",
+                str(goal),
+                "--backlog",
+                "B1",
+                "--open",
+                "--goal-status",
+                "stopped",
+            )
+            status = run_goal_loop("status", "--goal-file", str(goal))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn("GOAL_STATUS_FIELD=stopped", status.stdout)
+            self.assertIn("GOAL_LOOP_STATUS=stopped", status.stdout)
+            self.assertIn("NEXT_ACTION=stop_goal_loop", status.stdout)
 
     def test_status_report_is_written(self) -> None:
         """Status can write a Markdown artifact."""

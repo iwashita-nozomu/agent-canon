@@ -93,6 +93,9 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - Agents may create PRs, push owned branches, update PR titles/bodies, add evidence comments, convert a PR to draft, or keep a PR in draft when that action is part of the active workflow or user request.
 - Agents must not merge PRs, close PRs/issues, mark draft PRs ready for review, dismiss reviews, delete branches, enable auto-merge, request reviewers, or bypass failing/missing checks unless the user explicitly authorizes that mutation in the current task or a repository-maintainer policy in tracked docs grants that exact action.
 - A generic statement that `gh` is available is permission to inspect and prepare PR operations, not permission to merge or close. If merge/close/readiness is the next required step but authority is absent, record the blocker in the PR body, run bundle, issue, or `goal.md` instead of guessing.
+- `goal.md` may record `pr_mutation_authority`. Default `inspect_and_prepare_only` means local agents inspect, push owned branches, create/update PRs, and publish evidence only.
+- `github_copilot_merge_when_green` delegates merge authority to GitHub-hosted Copilot / PR automation after required checks and reviews are green. It does not authorize local Codex to merge from `gh`, dismiss reviews, bypass checks, or rely on chat-only evidence.
+- Copilot / PR automation decisions must be visible in the PR through `COPILOT_PR_AUTHORITY`, `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, `COPILOT_VISIBLE_EVIDENCE`, and `COPILOT_BLOCKER` lines before readiness or merge mutation.
 - After an authorized PR merge or close, immediately update the downstream template/submodule pin evidence and rerun the relevant freshness, sync, dependency, and CI gates.
 
 ## Required Before Implementation

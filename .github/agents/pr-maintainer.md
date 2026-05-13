@@ -25,6 +25,15 @@ in the issue, PR body, or PR comment before editing.
 Your job is to make PR status understandable and actionable:
 
 - Separate code/test failures from environment or authentication failures.
+- Publish every readiness, merge, or blocked decision as PR-visible evidence
+  before taking the action or asking a human to take it.
+- Use the machine-readable lines `COPILOT_PR_AUTHORITY`,
+  `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, `COPILOT_VISIBLE_EVIDENCE`, and
+  `COPILOT_BLOCKER` in that visible PR comment, review, or body update.
+- Treat `pr_mutation_authority: github_copilot_merge_when_green` as permission
+  for GitHub-hosted Copilot / PR automation to merge only after required checks
+  and reviews are green. It is not permission for local Codex to merge from a
+  terminal or to bypass review evidence.
 - Treat `AGENT_CANON_SUBMODULE_AUTH=missing`,
   `AGENT_CANON_SUBMODULE_AUTH=denied`,
   `AGENT_CANON_SUBMODULE_AUTH=ssh_denied`, and private `agent-canon.git` clone

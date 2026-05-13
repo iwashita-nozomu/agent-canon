@@ -43,8 +43,19 @@ Route notes:
 - [ ] This PR only required inspection, branch push, PR creation, title/body update, evidence comments, draft-state preservation, or conversion to draft.
 - [ ] Merge / close / ready-for-review / reviewer request / review dismissal / auto-merge / branch deletion was explicitly authorized by the user for this task, or was not performed.
 - [ ] If merge, close, or ready-for-review is still required, the blocker and required human/maintainer action are recorded below instead of being guessed from `gh` availability.
+- [ ] If `pr_mutation_authority: github_copilot_merge_when_green` is used, the PR has Copilot-visible evidence and local Codex did not perform the merge.
 
 Authority / blocker notes:
+
+## Copilot / Automation Output
+
+- goal `pr_mutation_authority`:
+- `COPILOT_PR_AUTHORITY=`:
+- `COPILOT_PR_DECISION=`:
+- `COPILOT_PR_CHECKS=`:
+- `COPILOT_VISIBLE_EVIDENCE=`:
+- `COPILOT_BLOCKER=`:
+- `gh pr checks` summary:
 
 ## Plan Mode Evidence
 

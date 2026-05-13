@@ -187,10 +187,19 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - standalone AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
 - template / derived repo の AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - default template / repo-local PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
+- `goal.md` が `pr_mutation_authority: github_copilot_merge_when_green`
+  を持つ場合、PR body の `Copilot / Automation Output` に authority と
+  `gh pr checks` summary を残し、merge は GitHub-hosted Copilot / PR
+  automation の visible evidence に委譲します。
 
 7. merge する
 
 - `gh` / GitHub MCP が使えることは、PR 状態確認と PR body / evidence 更新の許可です。merge / close / ready-for-review / reviewer request / auto-merge は、current task で user がその mutation を明示した場合だけ実行します。
+- `github_copilot_merge_when_green` は GitHub-hosted Copilot / PR automation
+  にだけ merge authority を渡します。local Codex は
+  `COPILOT_PR_AUTHORITY`、`COPILOT_PR_DECISION`、`COPILOT_PR_CHECKS`、
+  `COPILOT_VISIBLE_EVIDENCE`、`COPILOT_BLOCKER` が PR-visible surface に
+  出るまで merge 完了扱いにせず、自分では merge しません。
 - 明示許可が無い場合は、merge 可能でも PR body、run bundle、または `goal.md` に "blocked on PR mutation authority" と残して止めます。
 - file 構成変更がある場合は integration worktree で merge します。
 - `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。

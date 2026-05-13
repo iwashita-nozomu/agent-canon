@@ -103,6 +103,30 @@ dismissal, auto-merge, branch deletion, and check bypass require explicit
 current-task user authorization or a tracked maintainer policy granting that
 exact action.
 
+## Visible PR Automation Output
+
+Codex and reviewers can inspect GitHub-visible PR state, check runs, reviews,
+review comments, issue comments, and PR bodies with `gh pr view`, `gh pr
+checks`, or GitHub MCP tools. They cannot inspect hidden Copilot reasoning.
+Therefore GitHub Copilot / PR automation must publish any readiness, merge, or
+blocked decision into a visible PR surface before acting.
+
+Every Copilot-maintained PR decision uses this machine-readable block:
+
+```text
+COPILOT_PR_AUTHORITY=<inspect_and_prepare_only|ready_for_review_when_green|merge_when_green|github_copilot_merge_when_green>
+COPILOT_PR_DECISION=<inspect_only|ready_for_review|merge|blocked|needs_human>
+COPILOT_PR_CHECKS=<pass|fail|missing|not_run>
+COPILOT_VISIBLE_EVIDENCE=<pr-comment|review|pr-body|check-run>:<url-or-id>
+COPILOT_BLOCKER=<none|short blocker>
+```
+
+`pr_mutation_authority: github_copilot_merge_when_green` is a goal-level mode
+for GitHub-hosted Copilot / PR automation. It lets the GitHub-side maintainer
+merge after required checks and reviews are green, but it does not grant local
+Codex permission to merge from `gh`, dismiss reviews, bypass checks, or omit
+the visible evidence block.
+
 ## Validation
 
 Run the GitHub/Copilot convention checker after changing any surface listed in

@@ -59,3 +59,26 @@ pull request.
 - If the run is from a fork or another context where secrets are unavailable,
   state that explicitly and ask for a trusted maintainer rerun after reviewing
   the workflow diff.
+
+## Visible Copilot Output
+
+Before marking a PR ready, merging, enabling auto-merge, closing, or asking a
+human to take one of those actions, publish a PR-visible evidence block in a PR
+comment, review body, or PR body update:
+
+```text
+COPILOT_PR_AUTHORITY=<inspect_and_prepare_only|ready_for_review_when_green|merge_when_green|github_copilot_merge_when_green>
+COPILOT_PR_DECISION=<inspect_only|ready_for_review|merge|blocked|needs_human>
+COPILOT_PR_CHECKS=<pass|fail|missing|not_run>
+COPILOT_VISIBLE_EVIDENCE=<pr-comment|review|pr-body|check-run>:<url-or-id>
+COPILOT_BLOCKER=<none|short blocker>
+```
+
+- `github_copilot_merge_when_green` authorizes only GitHub-hosted Copilot / PR
+  automation to merge after required checks and reviews are green. It does not
+  authorize local Codex to merge, dismiss reviews, bypass checks, or hide the
+  decision in chat-only output.
+- If the platform cannot write a visible comment, review, check run, or PR body
+  update, set `COPILOT_PR_DECISION=blocked` and leave the PR unmerged.
+- If required checks are absent, unavailable, or still running, set
+  `COPILOT_PR_CHECKS=missing` or `not_run` and do not merge.
