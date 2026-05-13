@@ -221,6 +221,7 @@ paths = [
   "tests/tools/test_check_github_workflows.py",
   "tests/tools/test_mirror_skill_shims.py",
   "tests/tools/test_python_env_policy.py",
+  "tests/tools/test_run_codex_in_repo_container.py",
   "tests/tools/test_run_managed_experiment.py",
   "tests/tools/test_run_repo_program.py",
   "tests/tools/test_update_agent_canon.py",

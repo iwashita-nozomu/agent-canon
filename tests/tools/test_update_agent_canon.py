@@ -1519,19 +1519,36 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             old_bare_repo, _old_work_dir = self.make_agent_canon_remote(root / "old")
-            _new_bare_repo, new_work_dir = self.make_agent_canon_remote(root / "new")
+            new_work_dir = root / "new" / "agent-canon-work"
+            subprocess.run(
+                ["git", "clone", str(old_bare_repo), str(new_work_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=new_work_dir, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "submodule-test@example.invalid"],
+                cwd=new_work_dir,
+                check=True,
+            )
             repo = self.make_superproject(root, old_bare_repo)
             (new_work_dir / "source-marker.txt").write_text("source\n", encoding="utf-8")
             subprocess.run(["git", "add", "source-marker.txt"], cwd=new_work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance source"], cwd=new_work_dir, check=True)
 
+            env = {
+                **os.environ,
+                "AGENT_CANON_SOURCE_REPO": str(new_work_dir),
+                "AGENT_CANON_REMOTE_URL": str(old_bare_repo),
+            }
             plan = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "plan"],
                 cwd=repo,
                 check=False,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_SOURCE_REPO": str(new_work_dir)},
+                env=env,
             )
 
             self.assertEqual(plan.returncode, 0, plan.stderr)

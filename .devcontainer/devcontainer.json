@@ -3,8 +3,9 @@
     "@dependency-start",
     "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
     "upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
-    "upstream implementation post-create.sh runs workspace-mounted setup and agent CLI setup",
-    "upstream implementation generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
+    "downstream implementation post-create.sh runs workspace-mounted setup and agent CLI setup",
+    "downstream implementation post-attach.sh reports attach-time runtime status",
+    "downstream implementation generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
     "@dependency-end"
   ],
   "name": "agent-canon-workspace",
