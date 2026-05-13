@@ -207,9 +207,18 @@ def normalize_command(command: list[str]) -> list[str]:
     return ["codex"]
 
 
-def build_nested_codex_script(command: list[str], *, seed_host_codex: bool, mount_host_ssh_dir: bool) -> str:
-    """Return the shell prelude that seeds HOME before starting Codex."""
+def build_nested_codex_script(
+    command: list[str],
+    *,
+    seed_host_codex: bool,
+    mount_host_ssh_dir: bool,
+    workspace: str,
+    run_uid: int | None,
+    run_gid: int | None,
+) -> str:
+    """Return the shell prelude that prepares the mounted workspace before Codex."""
     quoted_command = shlex.join(command)
+    post_create = shlex.quote(f"{workspace.rstrip('/')}/.devcontainer/post-create.sh")
     lines = [
         "set -euo pipefail",
         'mkdir -p "$HOME"',
@@ -235,6 +244,29 @@ def build_nested_codex_script(command: list[str], *, seed_host_codex: bool, moun
     )
     if mount_host_ssh_dir:
         lines.append('if [ -d /tmp/host-ssh-dir ] && [ ! -e "$HOME/.ssh" ]; then ln -s /tmp/host-ssh-dir "$HOME/.ssh"; fi')
+    lines.extend(
+        [
+            f"if [ -f {post_create} ]; then",
+            f"  bash {post_create} {shlex.quote(workspace)}",
+            "else",
+            f"  echo 'missing shared devcontainer post-create entrypoint: {post_create}' >&2",
+            "  exit 1",
+            "fi",
+        ]
+    )
+    if run_uid is not None and run_gid is not None:
+        lines.extend(
+            [
+                'if [ "$(id -u)" -eq 0 ]; then',
+                f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
+                "  if command -v setpriv >/dev/null 2>&1; then",
+                f"    exec setpriv --reuid {run_uid} --regid {run_gid} --clear-groups {quoted_command}",
+                "  fi",
+                "  echo 'setpriv is required to drop from setup root to the host uid/gid' >&2",
+                "  exit 1",
+                "fi",
+            ]
+        )
     lines.append(f"exec {quoted_command}")
     return join_shell_lines(lines)
 
@@ -294,14 +326,13 @@ def main() -> int:
             if value:
                 envs.append(f"{env_name}={value}")
 
-        user = None
-        if use_host_user:
-            user = f"{os.getuid()}:{os.getgid()}"
-
         shell_script = build_nested_codex_script(
             normalize_command(args.command),
             seed_host_codex=seed_host_codex,
             mount_host_ssh_dir=mount_host_ssh_dir,
+            workspace=pack.runtime.workspace_mount,
+            run_uid=os.getuid() if use_host_user else None,
+            run_gid=os.getgid() if use_host_user else None,
         )
         build_command = build_build_command(builder, pack)
         run_command = build_run_command(
@@ -311,7 +342,6 @@ def main() -> int:
             command=build_shell_invocation(pack.runtime.shell, shell_script),
             env=tuple(envs),
             mounts=tuple(mounts),
-            user=user,
             tty=tty,
             auto_mount_host_codex_home=False,
         )
