@@ -60,6 +60,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - `agents/workflows/main-integration-workflow.md`
 - shared canon 自体を更新して PR / upstream sync する
   - `agents/workflows/agent-canon-pr-workflow.md`
+- open AgentCanon source PR と dependent template pin PR を順番に片付ける
+  - `agents/workflows/pr-queue-cleanup-workflow.md`
 - 派生 repo の `vendor/agent-canon/` 差分を proposal / shared canon main / 派生 repo snapshot の順で閉じる
   - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - task から agent philosophy や durable observation を昇格する
@@ -117,6 +119,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 
 - `agent-canon-pr-workflow.md`
   - shared canon change の branch、PR、upstream sync
+- `pr-queue-cleanup-workflow.md`
+  - AgentCanon source PR と template / derived pin PR が同時に開いているとき、source merge、template pin realignment、dependent PR validation、ready / merge 判断を順番に閉じる手順
 - `derived-agent-canon-diff-workflow.md`
   - 派生 repo の agent-canon 差分を proposal branch、shared canon main、派生 repo snapshot へ順に反映する手順
 - `agent-learning-workflow.md`
@@ -134,6 +138,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
+- `agents/workflows/pr-queue-cleanup-workflow.md`
 - `agents/workflows/derived-agent-canon-diff-workflow.md`
 
 基本手順:
