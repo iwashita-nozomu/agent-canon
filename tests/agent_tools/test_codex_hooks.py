@@ -247,6 +247,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("--min-score 95", payload["reason"])
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["min_score"], 95)
         self.assertEqual(log_entry["failed_count"], 1)
 
     def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:
@@ -316,3 +317,39 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["event"], "Stop")
         self.assertEqual(entries[1]["skills"], ["change-review"])
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
+
+    def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(self) -> None:
+        """Skill usage hook should reuse workflow_monitor.py for run-bundle evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_dir = root / "reports" / "agents" / "run-1"
+            log_path = root / "reports" / "hooks" / "skills.jsonl"
+            env = {
+                **os.environ,
+                "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report_dir),
+            }
+
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["workflow_monitor_event_count"], 1)
+        self.assertIn(
+            "skill_invocation=$agent-orchestration status=observed source=codex_hook",
+            monitoring,
+        )

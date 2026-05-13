@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 LOG_PATH_ENV = "AGENT_CANON_SKILL_LOG_PATH"
+WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
@@ -132,11 +133,49 @@ def _log_append_log(root: Path, entry: dict[str, object]) -> None:
         return
 
 
+def workflow_monitor_path(root: Path) -> Path:
+    """Return the canonical workflow monitor tool path."""
+    return root / "tools" / "agent_tools" / "workflow_monitor.py"
+
+
+def workflow_monitor_report_dir() -> str:
+    """Return the optional run-bundle report dir for behavior evidence."""
+    return os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
+
+
+def append_workflow_monitor_events(root: Path, skills: list[str]) -> int:
+    """Append skill invocation behavior events when a run bundle is active."""
+    report_dir = workflow_monitor_report_dir()
+    monitor = workflow_monitor_path(root)
+    if not report_dir or not monitor.is_file() or not skills:
+        return 0
+    event_count = 0
+    for skill in skills:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(monitor),
+                "--report-dir",
+                report_dir,
+                "--behavior-event",
+                f"skill_invocation=${skill} status=observed source=codex_hook",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_ROOT_TIMEOUT_SECONDS,
+        )
+        if result.returncode == 0:
+            event_count += 1
+    return event_count
+
+
 def main() -> int:
     """Append one skill usage hook log entry."""
     payload = load_payload()
     root = repo_root()
     skills = observed_skills(payload)
+    workflow_event_count = append_workflow_monitor_events(root, skills)
     _log_append_log(
         root,
         {
@@ -144,6 +183,8 @@ def main() -> int:
             "event": hook_event_name(payload),
             "skills": skills,
             "skill_count": len(skills),
+            "workflow_monitor_event_count": workflow_event_count,
+            "workflow_monitor_report_dir": workflow_monitor_report_dir(),
             "root": str(root),
         },
     )

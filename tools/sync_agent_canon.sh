@@ -702,6 +702,32 @@ print_plan_summary() {
   echo "agent_canon_plan_apply_command=bash tools/sync_agent_canon.sh ensure-latest $branch"
 }
 
+print_submodule_plan_details() {
+  local parent_pin="$1"
+  local worktree_head="$2"
+  local worktree_status="$3"
+  local remote_sha="$4"
+
+  echo "agent_canon_plan_submodule_parent_pin=$parent_pin"
+  echo "agent_canon_plan_submodule_worktree_head=${worktree_head:-<unavailable>}"
+  echo "agent_canon_plan_submodule_worktree_status=$worktree_status"
+  if [ -n "$remote_sha" ]; then
+    if [ "$parent_pin" = "$remote_sha" ]; then
+      echo "agent_canon_plan_submodule_parent_pin_remote_match=yes"
+    else
+      echo "agent_canon_plan_submodule_parent_pin_remote_match=no"
+    fi
+    if [ -n "$worktree_head" ] && [ "$worktree_head" = "$remote_sha" ]; then
+      echo "agent_canon_plan_submodule_worktree_remote_match=yes"
+    else
+      echo "agent_canon_plan_submodule_worktree_remote_match=no"
+    fi
+  else
+    echo "agent_canon_plan_submodule_parent_pin_remote_match=unavailable"
+    echo "agent_canon_plan_submodule_worktree_remote_match=unavailable"
+  fi
+}
+
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local local_tree=""
@@ -716,6 +742,8 @@ cmd_plan() {
   local requires_clean="no"
   local dirty="no"
   local dirty_update_surface="no"
+  local submodule_worktree_head=""
+  local submodule_worktree_status="not_applicable"
 
   ensure_prefix_exists
   if is_submodule_prefix; then
@@ -723,6 +751,13 @@ cmd_plan() {
     local_tree="$(submodule_commit)"
     local_split=""
     remote_url="$(submodule_remote_url)"
+    ensure_submodule_checkout
+    submodule_worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
+    if [ -n "$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)" ]; then
+      submodule_worktree_status="dirty"
+    else
+      submodule_worktree_status="clean"
+    fi
     if [ -n "$remote_url" ]; then
       remote_source="submodule"
     fi
@@ -759,11 +794,14 @@ cmd_plan() {
     print_plan_summary \
       "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
       "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
+    if [ "$prefix_mode" = "submodule" ]; then
+      print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha"
+    fi
     return
   fi
 
   if [ "$prefix_mode" = "submodule" ]; then
-    git -C "$ROOT_DIR/$PREFIX" fetch origin "$branch"
+    git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
     remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
   else
@@ -814,6 +852,9 @@ cmd_plan() {
   print_plan_summary \
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
     "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
+  if [ "$prefix_mode" = "submodule" ]; then
+    print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha"
+  fi
 }
 
 cmd_submodule_review() {
@@ -938,8 +979,17 @@ cmd_align_main() {
   [ -z "$status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before aligning to main"
 
   if [ "$worktree_head" = "$remote_sha" ]; then
-    echo "agent_canon_align_main=already_current"
+    echo "agent_canon_align_main_allowed=yes"
+    echo "agent_canon_submodule_parent_pin=$parent_pin"
+    echo "agent_canon_submodule_worktree_head=$worktree_head"
+    echo "agent_canon_submodule_remote_sha=$remote_sha"
     cmd_link_root 1
+    if [ "$parent_pin" != "$remote_sha" ]; then
+      commit_sync_paths_if_needed "$remote_sha" "submodule_align_main"
+      echo "agent_canon_align_main=updated_to_remote"
+      return
+    fi
+    echo "agent_canon_align_main=already_current"
     return
   fi
 
@@ -1083,8 +1133,8 @@ cmd_ensure_latest() {
     fi
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
       echo "agent_canon_latest=local_contains_remote"
-      cmd_link_root
-      return
+      echo "agent_canon_latest_next=push_proposal_or_open_agent-canon_PR_then_rerun_ensure-latest"
+      die "submodule '$PREFIX' parent pin contains commits not in remote main; push a proposal or open an AgentCanon PR before treating it as latest"
     fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
     if [ "$worktree_commit" != "$remote_sha" ] && [ -n "$submodule_status" ]; then

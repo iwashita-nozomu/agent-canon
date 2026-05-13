@@ -109,8 +109,11 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
+- AgentCanon owns the server implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and the repo MCP tool contract documented by `mcp/README.md`.
+- Codex owns the registration and runtime plane: `.codex/config.toml`, project trust, hook context, apps, external connectors, and available session tools.
 - MCP inventory が pass した場合は、repo state、repo root、goal loop status、goal plan、dependency surface、workflow artifact の確認で repo MCP tools を優先候補にします。shell だけで済ませる場合も、MCP を使わない理由を run bundle または work update に残します。
 - current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / MCP-covered context check 用です。file editing capability は持ちません。
+- Do not add file edit, GitHub connector, shell runner, web access, or Codex app replacement behavior to `repo_mcp_server`; use the Codex-provided tool or connector surface when that capability is needed.
 - MCP が pass したあと、毎回「MCP は編集できないので patch で編集する」と user update に書いてはいけません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
 - `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは「MCP をユーザーが明示しなくても思い出す」ための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。

@@ -4,6 +4,9 @@
 # responsibility Tests test check mcp inventory behavior.
 # upstream implementation ../../tools/agent_tools/check_mcp_inventory.py checks inventory  # noqa: E501
 # upstream implementation ../../.codex/config.toml declares repo_mcp_server
+# upstream design ../../mcp/README.md documents AgentCanon repo MCP ownership
+# upstream design ../../.codex/README.md documents Codex MCP registration ownership
+# upstream design ../../agents/skills/codex-task-workflow.md routes MCP preflight
 # @dependency-end
 
 from __future__ import annotations
@@ -19,6 +22,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_mcp_inventory.py"
+MCP_README = PROJECT_ROOT / "mcp" / "README.md"
+CODEX_README = PROJECT_ROOT / ".codex" / "README.md"
+CODEX_WORKFLOW = PROJECT_ROOT / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+CODEX_CONFIG_REFERENCE = PROJECT_ROOT / "documents" / "codex-configuration-reference.md"
+CODEX_CONFIG_SLIDES = PROJECT_ROOT / "documents" / "codex-configuration-slides.md"
+CODEX_TASK_SKILL = PROJECT_ROOT / "agents" / "skills" / "codex-task-workflow.md"
 
 
 class McpInventoryCheckTest(unittest.TestCase):
@@ -299,6 +308,34 @@ class McpInventoryCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("MCP_INVENTORY_EMPTY=yes", result.stdout)
+
+    def test_mcp_role_docs_separate_agentcanon_and_codex_surfaces(self) -> None:
+        """Docs must keep repo MCP implementation separate from Codex runtime tools."""
+        mcp_readme = MCP_README.read_text(encoding="utf-8")
+        codex_readme = CODEX_README.read_text(encoding="utf-8")
+        codex_workflow = CODEX_WORKFLOW.read_text(encoding="utf-8")
+        codex_config_reference = CODEX_CONFIG_REFERENCE.read_text(encoding="utf-8")
+        codex_config_slides = CODEX_CONFIG_SLIDES.read_text(encoding="utf-8")
+        codex_task_skill = CODEX_TASK_SKILL.read_text(encoding="utf-8")
+
+        for content in (mcp_readme, codex_readme, codex_workflow, codex_task_skill):
+            self.assertIn("AgentCanon", content)
+            self.assertIn("mcp/repo_mcp_server.sh", content)
+            self.assertIn("mcp/repo_mcp_server.py", content)
+            self.assertIn("Codex", content)
+
+        self.assertIn("not the file-edit surface", mcp_readme)
+        self.assertIn("Codex-provided apps", mcp_readme)
+        self.assertIn("apps / external connectors / tool availability", codex_readme)
+        self.assertIn("file edit、GitHub 操作、shell 実行、web access", codex_readme)
+        self.assertIn("apps, external connectors, and available session tools", codex_workflow)
+        self.assertIn("Do not add file edit, GitHub connector", codex_workflow)
+        self.assertIn("AgentCanon-owned repo MCP implementation", codex_config_reference)
+        self.assertIn("Codex-owned registration and runtime plane", codex_config_reference)
+        self.assertIn("Do not reimplement file edit, GitHub, shell, web", codex_config_reference)
+        self.assertIn("Codex-provided tool / connector surface", codex_task_skill)
+        self.assertIn("apps / external connectors / session tool availability", codex_config_slides)
+        self.assertIn("repo context / goal loop 専用", codex_config_slides)
 
 
 if __name__ == "__main__":

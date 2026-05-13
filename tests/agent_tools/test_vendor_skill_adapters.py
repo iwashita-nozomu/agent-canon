@@ -56,6 +56,32 @@ class VendorSkillAdaptersTest(unittest.TestCase):
         """Write a manifest body with the required version."""
         self.write_file(root, "vendor/skills/manifest.toml", "version = 1\n\n" + body)
 
+    def write_prompt_eval_manifest(self, root: Path, expected_count: int) -> None:
+        """Write a minimal prompt eval manifest for runtime skill shims."""
+        self.write_file(
+            root,
+            "agents/evals/skill_workflow_prompt_eval.toml",
+            "\n".join(
+                [
+                    "version = 1",
+                    "",
+                    "[[evals]]",
+                    'id = "runtime-skill-shims"',
+                    'target_glob = ".agents/skills/*/SKILL.md"',
+                    f"expected_count = {expected_count}",
+                    'kind = "skill"',
+                    'description = "runtime skill shims"',
+                    "",
+                    "[[evals.checklist]]",
+                    'id = "S1"',
+                    "critical = true",
+                    'description = "has skill name"',
+                    'required_regex = ["name:"]',
+                    "",
+                ]
+            ),
+        )
+
     def test_empty_manifest_passes(self) -> None:
         """An empty vendor manifest is valid before any third-party import."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -157,6 +183,43 @@ class VendorSkillAdaptersTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("conflicts-with-canonical-skill", result.stdout)
+
+    def test_enabled_adapter_requires_prompt_eval_count_coverage(self) -> None:
+        """Vendored runtime adapters should not bypass prompt eval growth checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(
+                root,
+                "vendor/skills/external/example-skill/SKILL.md",
+                skill_text("example-skill"),
+            )
+            self.write_manifest(
+                root,
+                "\n".join(
+                    [
+                        "[[skills]]",
+                        'id = "example-skill"',
+                        'provider = "external"',
+                        'source = "vendor/skills/external/example-skill"',
+                        'adapter = ".agents/skills/example-skill"',
+                        "enabled = true",
+                        'license = "MIT"',
+                        'upstream = "https://example.invalid/external/example-skill"',
+                        'revision = "abc123"',
+                        "",
+                    ]
+                ),
+            )
+            self.write_prompt_eval_manifest(root, expected_count=0)
+
+            sync_result = self.run_cli(root, "--sync")
+            self.assertEqual(sync_result.returncode, 1)
+            self.assertIn("prompt-eval-expected-count-mismatch", sync_result.stdout)
+            self.assertIn("expected=0 actual=1", sync_result.stdout)
+
+            self.write_prompt_eval_manifest(root, expected_count=1)
+            final_result = self.run_cli(root)
+            self.assertEqual(final_result.returncode, 0, final_result.stdout + final_result.stderr)
 
 
 if __name__ == "__main__":

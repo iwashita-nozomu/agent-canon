@@ -49,6 +49,7 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --skill-used codex-task-workflow
 ```
 
-Then copy the emitted `EVAL_RUN_ID`, `EVAL_STATUS`, and
-`EVAL_ACCUMULATED_REPORT` lines into `workflow_monitoring.md` with
-`workflow_monitor.py --behavior-event`.
+Then copy the emitted `EVAL_RUN_ID`, `EVAL_STATUS`, `EVAL_USED_SKILLS`,
+and `EVAL_ACCUMULATED_REPORT` lines into `workflow_monitoring.md` with
+`workflow_monitor.py --behavior-event`. The referenced report path must
+exist; behavior evals reject missing paths or mismatched run ids.

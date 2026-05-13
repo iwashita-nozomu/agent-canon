@@ -132,8 +132,9 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("static_analysis_feedback=recorded", text)
             self.assertIn("execution_path_comparison_not_required", text)
             self.assertIn("token_efficiency_not_required", text)
-            self.assertIn("EVAL_RUN_ID=recorded", text)
-            self.assertIn("EVAL_ACCUMULATED_REPORT=recorded", text)
+            self.assertIn("prompt_eval_required", text)
+            self.assertNotIn("EVAL_RUN_ID=recorded", text)
+            self.assertNotIn("EVAL_ACCUMULATED_REPORT=recorded", text)
             self.assertIn("runtime_feedback_not_observed", text)
             self.assertIn("diff_check_agent_decision=approve", text)
 

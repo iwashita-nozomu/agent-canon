@@ -88,6 +88,7 @@ required_any = [
 ]
 required_all = [
   "EVAL_RUN_ID=",
+  "EVAL_USED_SKILLS=",
   "EVAL_ACCUMULATED_REPORT=",
 ]
 

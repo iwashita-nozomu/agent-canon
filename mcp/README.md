@@ -25,6 +25,31 @@ The Codex server config pins `cwd = "."`, and the launcher exports
 This keeps goal/resume cycles from restarting the stdio server against a stale
 or non-root working directory.
 
+## Ownership Boundary
+
+AgentCanon owns the repo MCP implementation:
+
+- `mcp/repo_mcp_server.sh`
+- `mcp/repo_mcp_server.py`
+- the tool contract listed in this document
+
+Template and derived repositories expose that implementation as the root
+`mcp/` runtime view. Fix the implementation in `vendor/agent-canon/mcp/` and
+repair the root view with `bash tools/sync_agent_canon.sh link-root`.
+
+Codex owns registration and runtime wiring:
+
+- `.codex/config.toml` registers `[mcp_servers.repo_mcp_server]`
+- `.codex/hooks.json` and `.codex/hooks/` inject MCP preflight context
+- user-level Codex trust, profiles, apps, and external connectors decide which
+  runtime tools are available in a session
+
+Do not merge these owner surfaces. The AgentCanon repo MCP server provides
+repo context and goal-loop checks only. It is not the file-edit surface, GitHub
+connector, shell runner, web browser, or a replacement for Codex-provided apps.
+If Codex already provides a runtime tool or connector, do not reimplement that
+capability in `repo_mcp_server`.
+
 ## Tools
 
 - `repo.root`: returns the repository root.

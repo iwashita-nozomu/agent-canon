@@ -485,7 +485,7 @@ def write_report(
 
 def relative_posix_path(from_dir: Path, to_path: Path) -> str:
     """Return a POSIX relative path from one directory to a target."""
-    return os.path.relpath(to_path, from_dir).replace(os.sep, "/")
+    return os.path.relpath(to_path.resolve(), from_dir.resolve()).replace(os.sep, "/")
 
 
 def report_dependency_paths(report_path: Path, root: Path, manifest: Path) -> ReportDependencyPaths:
@@ -567,11 +567,13 @@ def write_accumulated_report(
 def run(args: argparse.Namespace) -> int:
     """Run prompt evals."""
     root = Path(str(args.root)).resolve()
-    manifest = (root / str(args.manifest)).resolve()
+    manifest_arg = Path(str(args.manifest))
+    manifest = manifest_arg if manifest_arg.is_absolute() else root / manifest_arg
+    manifest_for_report = manifest_arg if not manifest_arg.is_absolute() else manifest
     evals, audit = load_manifest(manifest, root)
     results = tuple(result for eval_def in evals for result in evaluate_prompt(eval_def))
     metadata = build_eval_run_metadata(
-        manifest.relative_to(root),
+        manifest_for_report,
         tuple(str(skill) for skill in args.skill_used),
         str(args.run_id),
     )
@@ -581,7 +583,7 @@ def run(args: argparse.Namespace) -> int:
         report_out = write_report(
             str(args.report_out),
             root,
-            manifest.relative_to(root),
+            manifest_for_report,
             evals,
             results,
             audit,
@@ -591,7 +593,7 @@ def run(args: argparse.Namespace) -> int:
         accumulated_report = write_accumulated_report(
             root,
             str(args.results_dir),
-            manifest.relative_to(root),
+            manifest_for_report,
             evals,
             results,
             audit,

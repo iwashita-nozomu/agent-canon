@@ -31,6 +31,8 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = Path("vendor/skills/manifest.toml")
 SKILL_ROOT = Path(".agents/skills")
 VENDOR_SKILL_ROOT = Path("vendor/skills")
+PROMPT_EVAL_MANIFEST = Path("agents/evals/skill_workflow_prompt_eval.toml")
+RUNTIME_SKILL_TARGET_GLOB = ".agents/skills/*/SKILL.md"
 FRONTMATTER_SCAN_LINES = 24
 SKILL_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -355,6 +357,8 @@ class VendorSkillValidator:
 
         for entry in parsed.entries:
             findings.extend(self.validate_entry(entry, canonical_ids, require_adapters))
+        if require_adapters:
+            findings.extend(self.validate_prompt_eval_coverage())
         return sorted(findings, key=lambda finding: (finding.check, finding.path, finding.detail))
 
     def validate_entry(
@@ -441,6 +445,45 @@ class VendorSkillValidator:
             entry.adapter.symlink_to(target, target_is_directory=True)
             actions.append(SyncAction("create-symlink", entry.adapter))
         return self.validate(require_adapters=True), actions
+
+    def validate_prompt_eval_coverage(self) -> list[Finding]:
+        """Return findings when runtime skill eval coverage drifts."""
+        manifest_path = self.root / PROMPT_EVAL_MANIFEST
+        if not manifest_path.is_file():
+            return []
+        raw = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        data = as_mapping(raw)
+        if data is None:
+            return [Finding("eval", PROMPT_EVAL_MANIFEST.as_posix(), "must-be-mapping")]
+        eval_entries = as_sequence(data.get("evals")) or ()
+        for raw_entry in eval_entries:
+            entry = as_mapping(raw_entry)
+            if entry is None or entry.get("target_glob") != RUNTIME_SKILL_TARGET_GLOB:
+                continue
+            expected = entry.get("expected_count")
+            actual = len(
+                [
+                    path
+                    for path in self.root.glob(RUNTIME_SKILL_TARGET_GLOB)
+                    if path.is_file()
+                ]
+            )
+            if expected == actual:
+                return []
+            return [
+                Finding(
+                    "eval",
+                    PROMPT_EVAL_MANIFEST.as_posix(),
+                    f"prompt-eval-expected-count-mismatch:{RUNTIME_SKILL_TARGET_GLOB}:expected={expected} actual={actual}",
+                )
+            ]
+        return [
+            Finding(
+                "eval",
+                PROMPT_EVAL_MANIFEST.as_posix(),
+                f"missing-runtime-skill-target-glob:{RUNTIME_SKILL_TARGET_GLOB}",
+            )
+        ]
 
 
 def render_json(findings: Sequence[Finding], actions: Sequence[SyncAction], root: Path) -> str:

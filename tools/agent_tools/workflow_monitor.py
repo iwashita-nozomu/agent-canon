@@ -33,11 +33,7 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "static_analysis_feedback=recorded target=review-backlog-scan",
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
-    (
-        "tool_call=evaluate_skill_workflow_prompts.py prompt_eval=pass "
-        "EVAL_STATUS=pass EVAL_RUN_ID=recorded "
-        "EVAL_ACCUMULATED_REPORT=recorded"
-    ),
+    "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",
     "runtime_feedback_not_observed",
     "review_decision=approve review_findings_integrated=yes",
     "diff_check_agent_decision=approve diff_check_agent_complete=yes",

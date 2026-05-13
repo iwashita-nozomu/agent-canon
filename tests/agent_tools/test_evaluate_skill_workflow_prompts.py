@@ -257,6 +257,81 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", text)
             self.assertIn("skill_workflow_prompt_eval.toml", text)
 
+    def test_accumulated_report_dependencies_resolve_through_root_symlinks(
+        self,
+    ) -> None:
+        """Reports written through a wrapper root should reference canon paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            canon_root = tmp_root / "canon"
+            wrapper_root = tmp_root / "wrapper"
+            eval_dir = canon_root / "agents" / "evals"
+            tools_dir = canon_root / "tools" / "agent_tools"
+            eval_dir.mkdir(parents=True)
+            tools_dir.mkdir(parents=True)
+            wrapper_root.mkdir()
+            (wrapper_root / "agents").symlink_to(canon_root / "agents")
+            (wrapper_root / "tools").symlink_to(canon_root / "tools")
+            (tools_dir / "evaluate_skill_workflow_prompts.py").write_text(
+                "# placeholder for dependency header validation\n",
+                encoding="utf-8",
+            )
+            (eval_dir / "prompt.md").write_text("required-marker\n", encoding="utf-8")
+            (eval_dir / "skill_workflow_prompt_eval.toml").write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines prompt evals for symlink wrapper tests.
+                    # upstream design prompt.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "sample"
+                    target = "agents/evals/prompt.md"
+                    kind = "workflow"
+                    description = "sample"
+
+                    [[evals.checklist]]
+                    id = "S1"
+                    critical = true
+                    description = "requires marker"
+                    required_regex = ["required-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval(
+                "--root",
+                str(wrapper_root),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--run-id",
+                "run-symlink",
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            reports = sorted(
+                (canon_root / "agents" / "evals" / "results" / "skill-workflow-prompt").glob(
+                    "skill-eval-*-pass-agent-orchestration.md"
+                )
+            )
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            header = text.split("-->", 1)[0]
+            self.assertIn(
+                "upstream implementation ../../../../tools/agent_tools/"
+                "evaluate_skill_workflow_prompts.py",
+                header,
+            )
+            self.assertIn("upstream design ../../skill_workflow_prompt_eval.toml", header)
+            self.assertNotIn("wrapper", header)
+
     def test_target_glob_expands_to_each_matching_file(self) -> None:
         """A target_glob eval applies the same checklist to every matching prompt."""
         with tempfile.TemporaryDirectory() as tmp_dir:

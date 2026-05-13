@@ -502,6 +502,9 @@ Template guidance for local repo MCP:
 - Keep `required=false` for optional local-process MCP so the agent can still boot and report a startup problem.
 - Put deterministic repo-local startup in `mcp/repo_mcp_server.sh`.
 - Use hooks and validation scripts to detect missing MCP inventory; do not hide startup failures.
+- Treat `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md` as the AgentCanon-owned repo MCP implementation and tool contract.
+- Treat `.codex/config.toml`, hook registration, project trust, user profiles, apps, and external connectors as the Codex-owned registration and runtime plane.
+- Keep `repo_mcp_server` limited to repo context and goal-loop checks. Do not reimplement file edit, GitHub, shell, web, or Codex app connector behavior inside AgentCanon MCP.
 
 ## Hooks
 

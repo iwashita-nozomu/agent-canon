@@ -98,6 +98,9 @@ tool_timeout_sec = 300
 - hooks を有効化し、MCP 起動や context 注入を runtime に組み込む
 - subagent は最大 24 thread、job timeout 3600 秒
 - repo MCP は optional startup にして、失敗時も起動後に検出・報告する
+- AgentCanon は `mcp/repo_mcp_server.sh` / `mcp/repo_mcp_server.py` の実装と repo MCP tool contract を所有する
+- Codex は `.codex/config.toml` registration、project trust、hook context、apps / external connectors / session tool availability を所有する
+- `repo_mcp_server` は repo context / goal loop 専用で、file edit、GitHub、shell、web、Codex app connector の代替を実装しない
 
 ---
 

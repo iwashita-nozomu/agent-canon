@@ -45,8 +45,11 @@ The file name convention is:
 
 `eval_run_id` is assigned by the tool as
 `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>`.
-The machine-readable output includes `EVAL_RUN_ID=<eval_run_id>` and
+The machine-readable output includes `EVAL_RUN_ID=<eval_run_id>`,
+`EVAL_USED_SKILLS=<comma-separated-skills>`, and
 `EVAL_ACCUMULATED_REPORT=<path>` for accumulated runs.
+Run-bundle behavior evals reject placeholder values; the accumulated report
+path must exist and contain the matching eval run id.
 If an explicitly requested `--report-out` path already exists, the tool writes a
 sibling path with the same `eval_run_id` appended instead of overwriting it.
 

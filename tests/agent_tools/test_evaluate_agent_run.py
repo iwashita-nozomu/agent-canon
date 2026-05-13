@@ -22,6 +22,22 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
 def write_ready_run(report_dir: Path) -> None:
     """Write a minimal passing run bundle."""
     report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "prompt-eval-report.md").write_text(
+        "\n".join(
+            [
+                "# Skill Workflow Prompt Eval",
+                "",
+                "## Summary",
+                "",
+                "- eval_run_id: `skill-eval-test`",
+                "- run_id: `unit-run`",
+                "- used_skills: `agent-orchestration, codex-task-workflow`",
+                "- EVAL_STATUS=pass",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     (report_dir / "user_request_contract.md").write_text(
         "\n".join(
             [
@@ -99,7 +115,8 @@ def write_ready_run(report_dir: Path) -> None:
                 (
                     "- tool_call=evaluate_skill_workflow_prompts.py prompt_eval=pass "
                     "EVAL_STATUS=pass EVAL_RUN_ID=skill-eval-test "
-                    "EVAL_ACCUMULATED_REPORT=agents/evals/results/skill-workflow-prompt/test.md"
+                    "EVAL_USED_SKILLS=agent-orchestration,codex-task-workflow "
+                    "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md"
                 ),
                 (
                     "- runtime_feedback=observed source=user "
@@ -356,6 +373,69 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
             self.assertIn("Record the selected skills", result.stdout)
+
+    def test_evaluate_missing_accumulated_prompt_eval_report_fails(self) -> None:
+        """Prompt eval evidence must point to a real accumulated report."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md",
+                    "EVAL_ACCUMULATED_REPORT=missing-prompt-eval-report.md",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("accumulated prompt eval report missing", result.stdout)
+
+    def test_evaluate_mismatched_accumulated_prompt_eval_run_id_fails(self) -> None:
+        """Prompt eval report run ids must match the monitoring event."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            report_path = report_dir / "prompt-eval-report.md"
+            report_path.write_text(
+                report_path.read_text(encoding="utf-8").replace(
+                    "skill-eval-test",
+                    "skill-eval-other",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("accumulated prompt eval run-id mismatch", result.stdout)
 
     def test_evaluate_inefficient_execution_path_fails(self) -> None:
         """Known inefficient route selection should trigger behavior eval feedback."""

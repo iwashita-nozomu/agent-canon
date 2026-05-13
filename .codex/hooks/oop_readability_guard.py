@@ -28,7 +28,6 @@ EDIT_COMMAND_PATTERN = re.compile(
     r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
-OOP_HOOK_MIN_SCORE = "95"
 LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 GIT_ROOT_TIMEOUT_SECONDS = 5
@@ -45,6 +44,7 @@ class AnalyzerResult:
     command: tuple[str, ...]
     returncode: int
     output: str
+    min_score: int | None
 
 
 def load_payload() -> dict[str, object]:
@@ -141,20 +141,41 @@ def source_paths(root: Path, suffixes: set[str]) -> list[Path]:
     return [path for path in changed_paths(root) if is_source_path(path, suffixes)]
 
 
+def default_oop_min_score(root: Path) -> int | None:
+    """Return the analyzer-owned default min score."""
+    candidate_roots = (Path(__file__).resolve().parents[2], root)
+    for candidate in candidate_roots:
+        sys.path.insert(0, str(candidate))
+        try:
+            from tools.oop.shared.readability_core import DEFAULT_MIN_SCORE
+
+            return int(DEFAULT_MIN_SCORE)
+        except (ImportError, ValueError, TypeError):
+            continue
+        finally:
+            try:
+                sys.path.remove(str(candidate))
+            except ValueError:
+                pass
+    return None
+
+
 def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResult | None:
     """Run one OOP analyzer for changed files."""
     if not analyzer.is_file() or not paths:
         return None
     relative_paths = [path.relative_to(root).as_posix() for path in paths]
-    command = (
+    min_score = default_oop_min_score(root)
+    command_parts = [
         "python3",
         str(analyzer),
         "--root",
         str(root),
-        "--min-score",
-        OOP_HOOK_MIN_SCORE,
-        *relative_paths,
-    )
+    ]
+    if min_score is not None:
+        command_parts.extend(("--min-score", str(min_score)))
+    command_parts.extend(relative_paths)
+    command = tuple(command_parts)
     result = subprocess.run(
         list(command),
         cwd=root,
@@ -167,6 +188,7 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
         command=command,
         returncode=result.returncode,
         output=(result.stdout + result.stderr).strip(),
+        min_score=min_score,
     )
 
 
@@ -255,12 +277,13 @@ def analyzer_log_payload(
 ) -> dict[str, object]:
     """Build one OOP hook invocation log payload."""
     failed = [result for result in results if result.returncode != 0]
+    min_score = next((result.min_score for result in results if result.min_score is not None), None)
     return {
         "timestamp": utc_now(),
         "event": hook_event_name(payload),
         "tool_name": tool_name(payload),
         "checked": checked,
-        "min_score": int(OOP_HOOK_MIN_SCORE),
+        "min_score": min_score,
         "result_count": len(results),
         "failed_count": len(failed),
         "status": "fail" if failed else "pass",
