@@ -130,6 +130,7 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
 - `tools/agent_tools/helper_function_inventory.py`
   - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
+  - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
 - `tools/agent_tools/vendor_skill_adapters.py`
   - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
   - `python3 tools/agent_tools/vendor_skill_adapters.py --sync` は missing adapter だけを作成し、unmanaged file は上書きしません。
