@@ -53,6 +53,10 @@ class HelperFunctionInventoryTest(unittest.TestCase):
                         "    parser.add_argument('--x')",
                         "    return parser",
                         "",
+                        "def main() -> int:",
+                        "    build_parser()",
+                        "    return execute(['true'])",
+                        "",
                     ]
                 ),
                 encoding="utf-8",
@@ -77,6 +81,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             records = {record["qualname"]: record for record in payload["records"]}
             self.assertNotIn("public_api", records)
+            self.assertNotIn("load_config", records)
             self.assertEqual(records["_parse_config"]["role"], "static_analyzer")
             self.assertIn("ast-call", ",".join(records["_parse_config"]["evidence"]))
             self.assertEqual(records["_parse_config"]["incoming_count"], 1)
@@ -91,6 +96,12 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
             self.assertEqual(records["execute"]["role"], "command_runner")
             self.assertEqual(records["build_parser"]["role"], "cli_parser")
+            self.assertFalse(records["execute"]["helper_candidate"])
+            self.assertTrue(records["execute"]["needs_user_judgment"])
+            self.assertEqual(records["execute"]["judgment_rule"], "main:public-local-command_runner")
+            self.assertFalse(records["build_parser"]["helper_candidate"])
+            self.assertTrue(records["build_parser"]["needs_user_judgment"])
+            self.assertEqual(records["build_parser"]["judgment_rule"], "main:public-local-cli_parser")
 
     def test_all_functions_reports_public_api(self) -> None:
         """The all-functions mode should include non-helper public functions."""
@@ -122,12 +133,144 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(payload["records"][0]["qualname"], "public_api")
             self.assertFalse(payload["records"][0]["helper_candidate"])
 
+    def test_public_prefix_without_internal_callers_is_not_default_helper(self) -> None:
+        """Names and roles alone should not make public main-code helpers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "main_code.py").write_text(
+                "\n".join(
+                    [
+                        "def normalize_callable(value: object) -> object:",
+                        "    return value",
+                        "",
+                        "def load_callable(path: str) -> str:",
+                        "    return path",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["records"], [])
+
+    def test_class_helpers_are_reported_with_domain_specific_rules(self) -> None:
+        """Class candidates should use the same deterministic rule surface."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "model.py").write_text(
+                "\n".join(
+                    [
+                        "from dataclasses import dataclass",
+                        "",
+                        "@dataclass",
+                        "class PublicInfo:",
+                        "    value: int",
+                        "",
+                        "@dataclass",
+                        "class LocalMetrics:",
+                        "    value: int",
+                        "",
+                        "def public_api() -> LocalMetrics:",
+                        "    return LocalMetrics(1)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            tests_dir = root / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "test_sample.py").write_text(
+                "\n".join(
+                    [
+                        "import pytest",
+                        "",
+                        "class TestWorkflow:",
+                        "    def test_case(self) -> None:",
+                        "        assert True",
+                        "",
+                        "class FakeSession:",
+                        "    pass",
+                        "",
+                        "@pytest.fixture",
+                        "def session() -> FakeSession:",
+                        "    return FakeSession()",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            experiments_dir = root / "experiments"
+            experiments_dir.mkdir()
+            (experiments_dir / "run_exp.py").write_text(
+                "\n".join(
+                    [
+                        "def parse_config() -> dict[str, str]:",
+                        "    return {}",
+                        "",
+                        "def normalize_unused(value: object) -> object:",
+                        "    return value",
+                        "",
+                        "def run() -> dict[str, str]:",
+                        "    return parse_config()",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            records = {record["qualname"]: record for record in payload["records"]}
+            self.assertEqual(records["LocalMetrics"]["kind"], "class")
+            self.assertEqual(records["LocalMetrics"]["domain"], "main")
+            self.assertFalse(records["LocalMetrics"]["helper_candidate"])
+            self.assertTrue(records["LocalMetrics"]["needs_user_judgment"])
+            self.assertEqual(records["LocalMetrics"]["judgment_rule"], "main:public-local-data_container")
+            self.assertNotIn("PublicInfo", records)
+            self.assertIn("candidate-rule:test:test-double-class", records["FakeSession"]["evidence"])
+            self.assertIn("candidate-rule:test:fixture-function", records["session"]["evidence"])
+            self.assertNotIn("TestWorkflow", records)
+            self.assertIn("candidate-rule:experiment:local-parser_loader", records["parse_config"]["evidence"])
+            self.assertNotIn("normalize_unused", records)
+
     def test_text_output_includes_pass_token(self) -> None:
         """Text output should provide machine-readable summary tokens."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "helpers.py").write_text(
-                "def _is_ready(value: object) -> bool:\n    return value is not None\n",
+                "def _is_ready_helper(value: object) -> bool:\n    return value is not None\n",
                 encoding="utf-8",
             )
 
@@ -140,7 +283,8 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("HELPER=helpers.py:1:_is_ready", result.stdout)
+            self.assertIn("SYMBOL=helpers.py:1:_is_ready_helper", result.stdout)
+            self.assertIn("verdict=auto_helper", result.stdout)
             self.assertIn("role=predicate", result.stdout)
             self.assertIn("HELPER_INVENTORY=pass", result.stdout)
 
@@ -170,6 +314,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
                     str(INVENTORY),
                     "--root",
                     str(root),
+                    "--all-functions",
                     "--format",
                     "json",
                 ],
@@ -183,7 +328,8 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             records = {record["qualname"]: record for record in payload["records"]}
             self.assertEqual(records["add"]["incoming_count"], 0)
-            self.assertEqual(records["add"]["specialization"], "no_internal_call_sites")
+            self.assertFalse(records["add"]["helper_candidate"])
+            self.assertEqual(records["add"]["specialization"], "not_helper_candidate")
 
 
 if __name__ == "__main__":

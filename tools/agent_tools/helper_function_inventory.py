@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Inventories Python helper functions with static role analysis.
+# responsibility Inventories Python helper symbols with deterministic static role analysis.
 # upstream design ../../documents/tools/README.md AgentCanon tool entrypoint policy
 # upstream design ../../documents/coding-conventions-python.md helper and role naming policy
 # downstream implementation ../../tests/agent_tools/test_helper_function_inventory.py tests inventory behavior
 # @dependency-end
-"""Inventory Python helper functions and infer their static roles."""
+"""Inventory Python helper functions/classes and infer their static roles."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import argparse
 import ast
 import json
 import os
+import re
 import subprocess
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -71,6 +72,48 @@ HELPER_NAME_PREFIXES = (
     "walk",
     "write",
 )
+PUBLIC_LOCAL_HELPER_ROLES = frozenset(
+    {
+        "adapter_bridge",
+        "collector_inventory",
+        "converter_normalizer",
+        "cli_parser",
+        "command_runner",
+        "factory_builder",
+        "formatter_reporter",
+        "parser_loader",
+        "predicate",
+        "static_analyzer",
+        "validator_checker",
+        "writer_mutator",
+    }
+)
+CLASS_LOCAL_HELPER_ROLES = frozenset(
+    {
+        "adapter_bridge",
+        "collector_inventory",
+        "command_runner",
+        "converter_normalizer",
+        "data_container",
+        "factory_builder",
+        "formatter_reporter",
+        "parser_loader",
+        "state_holder",
+        "static_analyzer",
+        "validator_checker",
+        "writer_mutator",
+    }
+)
+LOCAL_SPECIALIZATIONS = frozenset({"single_caller_helper", "file_local_helper_cluster"})
+LOW_SIGNAL_HELPER_ROLES = frozenset(
+    {
+        "general_helper",
+        "numeric_kernel",
+        "protocol_interface",
+        "test_support",
+        "workflow_tooling",
+    }
+)
 MUTATING_METHODS = frozenset(
     {
         "add",
@@ -106,6 +149,8 @@ class FunctionRecord:
     path: str
     line: int
     end_line: int
+    kind: str
+    domain: str
     name: str
     qualname: str
     scope: str
@@ -114,6 +159,9 @@ class FunctionRecord:
     secondary_roles: list[str]
     confidence: float
     helper_candidate: bool
+    candidate_rule: str
+    needs_user_judgment: bool
+    judgment_rule: str
     incoming_count: int
     incoming_callers: list[str]
     incoming_call_sites: list[str]
@@ -124,6 +172,9 @@ class FunctionRecord:
     side_effects: list[str]
     calls: list[str]
     args: list[str]
+    bases: list[str]
+    method_count: int
+    public_method_count: int
     decorators: list[str]
     returns_annotation: str
     doc_summary: str
@@ -136,9 +187,14 @@ class Inventory:
 
     root: str
     files_scanned: int
+    symbols_seen: int
     functions_seen: int
+    classes_seen: int
+    symbols_reported: int
     helpers_reported: int
+    judgment_required_reported: int
     role_counts: dict[str, int]
+    verdict_counts: dict[str, int]
     records: list[FunctionRecord]
 
 
@@ -157,6 +213,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--all-functions",
         action="store_true",
         help="Report every function, not only helper candidates.",
+    )
+    parser.add_argument(
+        "--only-auto-helpers",
+        action="store_true",
+        help="Report only high-confidence helper verdicts.",
+    )
+    parser.add_argument(
+        "--only-user-judgment",
+        action="store_true",
+        help="Report only symbols that need user design judgment.",
     )
     parser.add_argument(
         "--include-vendor",
@@ -280,6 +346,22 @@ def stable_relative(root: Path, path: Path) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return path.as_posix()
+
+
+def path_domain(path: str) -> str:
+    """Classify repository area for deterministic helper rules."""
+    parts = tuple(Path(path).parts)
+    if any(part in {"tests", "test"} or part.startswith("test_") for part in parts):
+        return "test"
+    if any(
+        part in {"benchmarks", "experiments", "notebooks"}
+        or part.startswith(("bench", "experiment"))
+        for part in parts
+    ):
+        return "experiment"
+    if any(part in {"agent_tools", "scripts", "tools"} for part in parts):
+        return "tooling"
+    return "main"
 
 
 def unparse(node: ast.AST | None) -> str:
@@ -410,6 +492,40 @@ def body_facts(node: ast.AST) -> BodyFacts:
     return visitor.facts()
 
 
+def class_body_facts(node: ast.ClassDef) -> BodyFacts:
+    """Collect aggregate static facts from direct class methods and class body."""
+    calls: Counter[str] = Counter()
+    call_locations: list[tuple[str, int]] = []
+    features: set[str] = set()
+
+    class_facts = body_facts(node)
+    calls.update(class_facts.calls)
+    call_locations.extend(class_facts.call_locations)
+    features.update(class_facts.features)
+
+    for item in node.body:
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            method_facts = body_facts(item)
+            calls.update(method_facts.calls)
+            call_locations.extend(method_facts.call_locations)
+            features.update(method_facts.features)
+
+    expanded_calls: list[str] = []
+    for name, count in sorted(calls.items()):
+        expanded_calls.extend([name] * count)
+    return BodyFacts(
+        calls=tuple(expanded_calls),
+        call_locations=tuple(sorted(call_locations)),
+        features=tuple(sorted(features)),
+    )
+
+
+def snake_words(name: str) -> str:
+    """Return a lower-case word form for class role checks."""
+    separated = re.sub(r"(?<!^)(?=[A-Z])", "_", name)
+    return separated.replace("-", "_").lower()
+
+
 def role_scores(
     *,
     path: str,
@@ -418,7 +534,7 @@ def role_scores(
     facts: BodyFacts,
 ) -> tuple[Counter[str], list[str]]:
     """Infer possible roles from name, path, calls, and body features."""
-    lower_name = name.lower()
+    lower_name = name.lower().lstrip("_")
     path_parts = tuple(Path(path).parts)
     calls = set(facts.calls)
     features = set(facts.features)
@@ -429,8 +545,10 @@ def role_scores(
         scores[role] += points
         evidence.append(f"{role}:{reason}")
 
-    if "tests" in path_parts or lower_name.startswith(("fixture", "fake", "stub")):
+    if lower_name.startswith(("fixture", "fake", "stub", "dummy", "mock")):
         add("test_support", 2, "test-path-or-fixture-name")
+    if "tests" in path_parts and lower_name.startswith(("assert", "make", "build")):
+        add("test_support", 1, "test-helper-name")
     if "tools" in path_parts or "agent_tools" in path_parts:
         add("workflow_tooling", 1, "tool-path")
     if lower_name.startswith(("build", "create", "make", "default")):
@@ -445,7 +563,9 @@ def role_scores(
         add("predicate", 3, "predicate-shape")
     if lower_name.startswith(("iter", "collect", "find", "scan", "walk", "gather", "list")):
         add("collector_inventory", 3, "collector-prefix")
-    if lower_name.startswith(("normalize", "convert", "resolve", "relative", "as", "split")):
+    if lower_name.startswith(
+        ("canonicalize", "normalize", "convert", "resolve", "relative", "sanitize", "as", "split")
+    ):
         add("converter_normalizer", 3, "converter-prefix")
     if lower_name.startswith(("write", "copy", "update", "emit", "log", "append", "remove")):
         add("writer_mutator", 3, "writer-prefix")
@@ -455,7 +575,12 @@ def role_scores(
         add("adapter_bridge", 2, "adapter-name")
     if "inventory" in lower_name or "catalog" in lower_name:
         add("collector_inventory", 2, "inventory-name")
-    if "diagnostic" in lower_name or "report" in lower_name:
+    if (
+        "diagnostic" in lower_name
+        or "message" in lower_name
+        or "report" in lower_name
+        or "warning" in lower_name
+    ):
         add("formatter_reporter", 2, "report-name")
     if "subprocess" in features:
         add("command_runner", 3, "subprocess-call")
@@ -465,7 +590,7 @@ def role_scores(
         add("parser_loader", 1, "serialization-call")
         add("formatter_reporter", 1, "serialization-call")
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
-        add("static_analyzer", 4, "ast-call")
+        add("static_analyzer", 5, "ast-call")
     if "numeric" in features:
         add("numeric_kernel", 3, "numeric-call")
     if "read" in features:
@@ -479,18 +604,113 @@ def role_scores(
     return scores, evidence
 
 
+def class_role_scores(
+    *,
+    path: str,
+    name: str,
+    bases: tuple[str, ...],
+    decorators: tuple[str, ...],
+    method_names: tuple[str, ...],
+    facts: BodyFacts,
+) -> tuple[Counter[str], list[str]]:
+    """Infer class roles from name, inheritance, decorators, methods, and bodies."""
+    lower_name = name.lower().lstrip("_")
+    word_name = snake_words(name).lstrip("_")
+    path_parts = tuple(Path(path).parts)
+    calls = set(facts.calls)
+    features = set(facts.features)
+    scores: Counter[str] = Counter()
+    evidence: list[str] = []
+
+    def add(role: str, points: int, reason: str) -> None:
+        scores[role] += points
+        evidence.append(f"{role}:{reason}")
+
+    if lower_name.startswith(("fake", "stub", "dummy", "mock")):
+        add("test_support", 2, "test-path-or-fixture-name")
+    if "tools" in path_parts or "agent_tools" in path_parts:
+        add("workflow_tooling", 1, "tool-path")
+    if any(base.endswith(("Protocol", "ABC")) or base in {"Protocol", "ABC"} for base in bases):
+        add("protocol_interface", 4, "protocol-or-abc-base")
+    if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
+        add("data_container", 4, "data-class-decorator")
+    if lower_name.endswith(
+        (
+            "bundle",
+            "config",
+            "context",
+            "info",
+            "metrics",
+            "options",
+            "record",
+            "result",
+            "settings",
+            "state",
+        )
+    ):
+        add("data_container", 3, "data-container-name")
+    if any(token in word_name for token in ("adapter", "bridge", "wrapper")):
+        add("adapter_bridge", 3, "adapter-class-name")
+    if any(token in word_name for token in ("factory", "builder")):
+        add("factory_builder", 3, "builder-class-name")
+    if any(token in word_name for token in ("parser", "loader", "reader")):
+        add("parser_loader", 3, "parser-loader-class-name")
+    if any(token in word_name for token in ("formatter", "renderer", "reporter")):
+        add("formatter_reporter", 3, "formatter-class-name")
+    if any(token in word_name for token in ("checker", "validator")):
+        add("validator_checker", 3, "validator-class-name")
+    if any(token in word_name for token in ("collector", "inventory", "scanner")):
+        add("collector_inventory", 3, "collector-class-name")
+    if any(token in word_name for token in ("command", "executor", "runner")):
+        add("command_runner", 3, "runner-class-name")
+    if any(token in word_name for token in ("cache", "registry", "store")):
+        add("state_holder", 2, "state-holder-class-name")
+
+    for method_name in method_names:
+        lower_method = method_name.lower()
+        if lower_method.startswith(("build", "create", "make")):
+            add("factory_builder", 1, "builder-method")
+        if lower_method.startswith(("parse", "load", "read")):
+            add("parser_loader", 1, "parser-loader-method")
+        if lower_method.startswith(("format", "render", "dump", "serialize")):
+            add("formatter_reporter", 1, "formatter-method")
+        if lower_method.startswith(("check", "validate", "ensure")):
+            add("validator_checker", 1, "validator-method")
+        if lower_method.startswith(("iter", "collect", "find", "scan", "walk", "gather")):
+            add("collector_inventory", 1, "collector-method")
+        if lower_method.startswith(("normalize", "convert", "resolve", "split")):
+            add("converter_normalizer", 1, "converter-method")
+        if lower_method.startswith(("write", "copy", "update", "emit", "append", "remove")):
+            add("writer_mutator", 1, "writer-method")
+        if lower_method.startswith(("run", "execute", "call")) or lower_method == "__call__":
+            add("command_runner", 1, "runner-method")
+
+    if "subprocess" in features:
+        add("command_runner", 3, "subprocess-call")
+    if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
+        add("static_analyzer", 5, "ast-call")
+    if "numeric" in features:
+        add("numeric_kernel", 3, "numeric-call")
+    if "write" in features or "filesystem_mutation" in features:
+        add("writer_mutator", 2, "write-or-filesystem-call")
+    if not scores:
+        add("general_helper", 1, "fallback")
+    return scores, evidence
+
+
 def helper_candidate(
     *,
+    kind: str,
     name: str,
     scope: str,
     path: str,
     role: str,
 ) -> bool:
-    """Return whether a function looks like a helper rather than primary API."""
+    """Return whether a symbol initially looks helper-like before usage filtering."""
     lower_name = name.lower()
     if lower_name.startswith("test_"):
         return False
-    if lower_name in {"main", "__init__"}:
+    if kind == "function" and lower_name in {"main", "__init__"}:
         return False
     if scope == "nested":
         return True
@@ -498,22 +718,11 @@ def helper_candidate(
         return True
     if lower_name.endswith("_helper") or "helper" in lower_name or "util" in lower_name:
         return True
-    if lower_name.startswith(HELPER_NAME_PREFIXES):
+    if kind == "function" and lower_name.startswith(HELPER_NAME_PREFIXES):
         return True
-    if role in {
-        "adapter_bridge",
-        "collector_inventory",
-        "converter_normalizer",
-        "cli_parser",
-        "command_runner",
-        "factory_builder",
-        "formatter_reporter",
-        "parser_loader",
-        "predicate",
-        "static_analyzer",
-        "validator_checker",
-        "writer_mutator",
-    }:
+    if kind == "function" and role in PUBLIC_LOCAL_HELPER_ROLES:
+        return True
+    if kind == "class" and role in CLASS_LOCAL_HELPER_ROLES:
         return True
     return "helper" in path or "utils" in path
 
@@ -558,6 +767,7 @@ class DefinitionCollector(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Collect methods under class-qualified names."""
+        self._record_class(node)
         self.stack.append(node.name)
         self.generic_visit(node)
         self.stack.pop()
@@ -584,6 +794,7 @@ class DefinitionCollector(ast.NodeVisitor):
         elif parent_stack:
             scope = "nested"
         facts = body_facts(node)
+        domain = path_domain(self.relative_path)
         returns_annotation = unparse(node.returns)
         scores, evidence = role_scores(
             path=self.relative_path,
@@ -594,6 +805,7 @@ class DefinitionCollector(ast.NodeVisitor):
         ordered_roles = [role for role, _count in scores.most_common()]
         role = ordered_roles[0]
         candidate = helper_candidate(
+            kind="function",
             name=node.name,
             scope=scope,
             path=self.relative_path,
@@ -607,6 +819,8 @@ class DefinitionCollector(ast.NodeVisitor):
                 path=self.relative_path,
                 line=node.lineno,
                 end_line=getattr(node, "end_lineno", node.lineno),
+                kind="function",
+                domain=domain,
                 name=node.name,
                 qualname=qualname,
                 scope=scope,
@@ -615,6 +829,9 @@ class DefinitionCollector(ast.NodeVisitor):
                 secondary_roles=ordered_roles[1:4],
                 confidence=0.0,
                 helper_candidate=candidate,
+                candidate_rule="",
+                needs_user_judgment=False,
+                judgment_rule="",
                 incoming_count=0,
                 incoming_callers=[],
                 incoming_call_sites=[],
@@ -627,6 +844,9 @@ class DefinitionCollector(ast.NodeVisitor):
                 side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
                 calls=sorted(set(facts.calls)),
                 args=[arg.arg for arg in node.args.args],
+                bases=[],
+                method_count=0,
+                public_method_count=0,
                 decorators=list(decorators),
                 returns_annotation=returns_annotation,
                 doc_summary=doc_summary(ast.get_docstring(node)),
@@ -644,6 +864,83 @@ class DefinitionCollector(ast.NodeVisitor):
         self.stack.append(node.name)
         self.generic_visit(node)
         self.stack.pop()
+
+    def _record_class(self, node: ast.ClassDef) -> None:
+        """Collect one class as a possible helper symbol."""
+        parent_stack = tuple(self.stack)
+        qualname = ".".join((*parent_stack, node.name)) if parent_stack else node.name
+        scope = "module" if not parent_stack else "nested"
+        domain = path_domain(self.relative_path)
+        facts = class_body_facts(node)
+        bases = tuple(filter(None, (dotted_name(item) for item in node.bases)))
+        decorators = tuple(filter(None, (dotted_name(item) for item in node.decorator_list)))
+        method_names = tuple(
+            item.name for item in node.body if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+        )
+        scores, evidence = class_role_scores(
+            path=self.relative_path,
+            name=node.name,
+            bases=bases,
+            decorators=decorators,
+            method_names=method_names,
+            facts=facts,
+        )
+        ordered_roles = [role for role, _count in scores.most_common()]
+        role = ordered_roles[0]
+        candidate = helper_candidate(
+            kind="class",
+            name=node.name,
+            scope=scope,
+            path=self.relative_path,
+            role=role,
+        )
+        self.records.append(
+            FunctionRecord(
+                path=self.relative_path,
+                line=node.lineno,
+                end_line=getattr(node, "end_lineno", node.lineno),
+                kind="class",
+                domain=domain,
+                name=node.name,
+                qualname=qualname,
+                scope=scope,
+                visibility="private" if node.name.startswith("_") else "public",
+                role=role,
+                secondary_roles=ordered_roles[1:4],
+                confidence=0.0,
+                helper_candidate=candidate,
+                candidate_rule="",
+                needs_user_judgment=False,
+                judgment_rule="",
+                incoming_count=0,
+                incoming_callers=[],
+                incoming_call_sites=[],
+                outgoing_internal=[],
+                outgoing_call_sites=[
+                    f"{call}@{line}" for call, line in facts.call_locations
+                ],
+                specialized_helper=False,
+                specialization="not_evaluated",
+                side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
+                calls=sorted(set(facts.calls)),
+                args=[],
+                bases=list(bases),
+                method_count=len(method_names),
+                public_method_count=sum(1 for name in method_names if not name.startswith("_")),
+                decorators=list(decorators),
+                returns_annotation="",
+                doc_summary=doc_summary(ast.get_docstring(node)),
+                evidence=evidence,
+            )
+        )
+        record = self.records[-1]
+        record.confidence = confidence(
+            name=node.name,
+            scope=scope,
+            scores=scores,
+            facts=facts,
+            candidate=candidate,
+        )
 
 
 def is_side_effect(feature: str) -> bool:
@@ -684,6 +981,180 @@ def analyze_file(root: Path, path: Path) -> list[FunctionRecord]:
     return collector.records
 
 
+def candidate_rule(record: FunctionRecord) -> str:
+    """Return the deterministic rule that keeps a helper candidate."""
+    lower_name = record.name.lower()
+    if record.kind == "function" and lower_name.startswith("test_"):
+        return ""
+    if record.kind == "class" and record.domain == "test" and record.name.startswith("Test"):
+        return ""
+    if record.kind == "function" and lower_name in {"main", "__init__"}:
+        return ""
+    if record.name.startswith("__") and record.name.endswith("__"):
+        return ""
+
+    if record.scope == "nested":
+        return nested_candidate_rule(record)
+    if lower_name.endswith("_helper") or "helper" in lower_name or "util" in lower_name:
+        return f"{record.domain}:explicit-helper-name"
+
+    local_symbol = record.specialization in LOCAL_SPECIALIZATIONS and record.incoming_count > 0
+    if record.domain == "test":
+        return test_candidate_rule(record, local_symbol)
+    if record.domain == "experiment":
+        return experiment_candidate_rule(record, local_symbol)
+    if record.domain == "tooling":
+        return tooling_candidate_rule(record, local_symbol)
+    return main_candidate_rule(record, local_symbol)
+
+
+def nested_candidate_rule(record: FunctionRecord) -> str:
+    """Return a deterministic nested-symbol helper rule."""
+    lower_name = record.name.lower()
+    if lower_name in {"decorator", "wrapper", "callback", "closure"}:
+        return f"{record.domain}:nested-{lower_name}"
+    if record.kind == "function" and (
+        lower_name.startswith(HELPER_NAME_PREFIXES)
+        or record.role in PUBLIC_LOCAL_HELPER_ROLES
+    ) and record.role not in LOW_SIGNAL_HELPER_ROLES:
+        return f"{record.domain}:nested-{record.role}"
+    if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
+        return f"{record.domain}:nested-{record.role}"
+    return ""
+
+
+def test_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return a deterministic test-directory helper rule."""
+    lower_name = record.name.lower()
+    word_name = snake_words(record.name)
+    decorator_names = {decorator.rsplit(".", maxsplit=1)[-1] for decorator in record.decorators}
+    if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
+        return f"test:private-local-{record.role}"
+    if record.kind == "function":
+        if "fixture" in decorator_names:
+            return "test:fixture-function"
+        if lower_name.startswith(("fixture", "fake", "stub", "dummy", "mock", "make", "build", "assert")):
+            return "test:test-support-function-name"
+        if local_symbol and record.role in PUBLIC_LOCAL_HELPER_ROLES:
+            return f"test:local-{record.role}"
+        return ""
+    if any(token in word_name for token in ("fake", "stub", "dummy", "mock")):
+        return "test:test-double-class"
+    if local_symbol and record.role in CLASS_LOCAL_HELPER_ROLES:
+        return f"test:local-{record.role}"
+    return ""
+
+
+def experiment_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return a deterministic experiment-directory helper rule."""
+    if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
+        return f"experiment:private-local-{record.role}"
+    if not local_symbol:
+        return ""
+    if record.kind == "function" and (
+        record.name.lower().startswith(HELPER_NAME_PREFIXES)
+        or record.role in PUBLIC_LOCAL_HELPER_ROLES
+    ):
+        return f"experiment:local-{record.role}"
+    if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
+        return f"experiment:local-{record.role}"
+    return ""
+
+
+def tooling_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return a deterministic tooling-directory helper rule."""
+    if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
+        return f"tooling:private-local-{record.role}"
+    if not local_symbol:
+        return ""
+    if record.kind == "function" and (
+        record.name.lower().startswith(HELPER_NAME_PREFIXES)
+        or record.role in PUBLIC_LOCAL_HELPER_ROLES
+    ):
+        return f"tooling:local-{record.role}"
+    if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
+        return f"tooling:local-{record.role}"
+    return ""
+
+
+def main_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return a deterministic main-code helper rule."""
+    if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
+        return f"main:private-local-{record.role}"
+    return ""
+
+
+def design_judgment_rule(record: FunctionRecord) -> str:
+    """Return the deterministic reason a symbol needs human design judgment."""
+    lower_name = record.name.lower()
+    if record.kind == "function" and lower_name.startswith("test_"):
+        return ""
+    if record.kind == "function" and lower_name in {"main", "__init__"}:
+        return ""
+    if record.kind == "class" and record.domain == "test" and record.name.startswith("Test"):
+        return ""
+    if record.name.startswith("__") and record.name.endswith("__"):
+        return ""
+
+    local_symbol = record.specialization in LOCAL_SPECIALIZATIONS and record.incoming_count > 0
+    if record.domain == "main":
+        return main_design_judgment_rule(record, local_symbol)
+    if record.domain == "experiment":
+        return experiment_design_judgment_rule(record, local_symbol)
+    if record.domain == "test":
+        return test_design_judgment_rule(record, local_symbol)
+    if record.domain == "tooling":
+        return tooling_design_judgment_rule(record, local_symbol)
+    return ""
+
+
+def main_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return main-code symbols that look helper-like but need semantics."""
+    if local_symbol and record.visibility == "public":
+        if record.kind == "function" and (
+            record.name.lower().startswith(HELPER_NAME_PREFIXES)
+            or record.role in PUBLIC_LOCAL_HELPER_ROLES
+        ):
+            return f"main:public-local-{record.role}"
+        if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
+            return f"main:public-local-{record.role}"
+    if local_symbol and record.role in LOW_SIGNAL_HELPER_ROLES:
+        return f"main:low-signal-local-{record.role}"
+    if record.visibility == "private" and record.incoming_count > 0:
+        return f"main:shared-private-{record.role}"
+    return ""
+
+
+def experiment_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return experiment symbols that need semantics after static analysis."""
+    if local_symbol and record.role in {"general_helper", "numeric_kernel"}:
+        return f"experiment:low-signal-local-{record.role}"
+    return ""
+
+
+def test_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return test symbols that need human review after static analysis."""
+    if local_symbol and record.role in {"general_helper", "numeric_kernel"}:
+        return f"test:low-signal-local-{record.role}"
+    return ""
+
+
+def tooling_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
+    """Return tooling symbols that need human review after static analysis."""
+    if local_symbol and record.role in {"general_helper", "numeric_kernel"}:
+        return f"tooling:low-signal-local-{record.role}"
+    return ""
+
+
+def verdict(record: FunctionRecord) -> str:
+    """Return the final deterministic inventory verdict."""
+    if record.helper_candidate:
+        return "auto_helper"
+    if record.needs_user_judgment:
+        return "needs_user_judgment"
+    return "not_helper"
+
+
 def apply_call_graph(records: list[FunctionRecord]) -> None:
     """Attach simple static incoming and outgoing call counts."""
     by_name: dict[str, list[FunctionRecord]] = {}
@@ -720,6 +1191,24 @@ def apply_call_graph(records: list[FunctionRecord]) -> None:
         record.incoming_call_sites = sites
         record.outgoing_internal = sorted(outgoing[index])
         record.specialized_helper, record.specialization = specialization(record)
+        rule = candidate_rule(record)
+        judgment = "" if rule else design_judgment_rule(record)
+        record.helper_candidate = bool(rule)
+        record.candidate_rule = rule
+        record.needs_user_judgment = bool(judgment)
+        record.judgment_rule = judgment
+        if rule:
+            record.evidence.insert(0, f"candidate-rule:{rule}")
+            if record.confidence == 0.0:
+                record.confidence = 0.5
+        elif judgment:
+            record.evidence.insert(0, f"judgment-rule:{judgment}")
+            if record.confidence == 0.0:
+                record.confidence = 0.4
+        else:
+            record.confidence = 0.0
+            record.specialized_helper = False
+            record.specialization = "not_helper_candidate"
         if record.helper_candidate and record.visibility == "private" and record.incoming_count == 0:
             record.evidence.append("usage:no-internal-callers")
         if record.specialized_helper:
@@ -764,8 +1253,6 @@ def enclosing_class(qualname: str) -> str:
 
 def specialization(record: FunctionRecord) -> tuple[bool, str]:
     """Return whether helper usage looks caller-specific."""
-    if not record.helper_candidate:
-        return False, "not_helper_candidate"
     if record.scope == "nested":
         return True, "nested_local_helper"
     if not record.incoming_call_sites:
@@ -783,6 +1270,8 @@ def build_inventory(
     paths: list[str],
     *,
     all_functions: bool,
+    only_auto_helpers: bool,
+    only_user_judgment: bool,
     include_vendor: bool,
     include_hidden: bool,
     include_pyi: bool,
@@ -800,19 +1289,32 @@ def build_inventory(
     for path in files:
         all_records.extend(analyze_file(root, path))
     apply_call_graph(all_records)
+    include_auto_helpers = not only_user_judgment
+    include_user_judgment = not only_auto_helpers
     selected = [
         record
         for record in all_records
-        if (all_functions or record.helper_candidate) and record.confidence >= min_confidence
+        if (
+            all_functions
+            or (include_auto_helpers and record.helper_candidate)
+            or (include_user_judgment and record.needs_user_judgment)
+        )
+        and record.confidence >= min_confidence
     ]
     selected.sort(key=lambda item: (item.path, item.line, item.qualname))
     role_counts = Counter(record.role for record in selected)
+    verdict_counts = Counter(verdict(record) for record in selected)
     return Inventory(
         root=root.as_posix(),
         files_scanned=len(files),
-        functions_seen=len(all_records),
-        helpers_reported=len(selected),
+        symbols_seen=len(all_records),
+        functions_seen=sum(1 for record in all_records if record.kind == "function"),
+        classes_seen=sum(1 for record in all_records if record.kind == "class"),
+        symbols_reported=len(selected),
+        helpers_reported=sum(1 for record in selected if record.helper_candidate),
+        judgment_required_reported=sum(1 for record in selected if record.needs_user_judgment),
         role_counts=dict(sorted(role_counts.items())),
+        verdict_counts=dict(sorted(verdict_counts.items())),
         records=selected,
     )
 
@@ -825,9 +1327,13 @@ def render_text(inventory: Inventory) -> str:
         outgoing = ",".join(record.outgoing_internal) if record.outgoing_internal else "none"
         evidence = ",".join(record.evidence[:6]) if record.evidence else "none"
         lines.append(
-            "HELPER="
+            "SYMBOL="
             f"{record.path}:{record.line}:{record.qualname} "
+            f"kind={record.kind} domain={record.domain} "
+            f"verdict={verdict(record)} "
             f"role={record.role} confidence={record.confidence:.2f} "
+            f"candidate_rule={record.candidate_rule or 'none'} "
+            f"judgment_rule={record.judgment_rule or 'none'} "
             f"scope={record.scope} visibility={record.visibility} "
             f"incoming={record.incoming_count} outgoing={outgoing} "
             f"specialization={record.specialization} "
@@ -835,12 +1341,20 @@ def render_text(inventory: Inventory) -> str:
             f"side_effects={side_effects} evidence={evidence}"
         )
     role_summary = ",".join(f"{role}:{count}" for role, count in inventory.role_counts.items())
+    verdict_summary = ",".join(
+        f"{item}:{count}" for item, count in inventory.verdict_counts.items()
+    )
     lines.extend(
         [
             f"HELPER_INVENTORY_FILES={inventory.files_scanned}",
+            f"HELPER_INVENTORY_SYMBOLS={inventory.symbols_seen}",
             f"HELPER_INVENTORY_FUNCTIONS={inventory.functions_seen}",
+            f"HELPER_INVENTORY_CLASSES={inventory.classes_seen}",
+            f"HELPER_INVENTORY_SYMBOLS_REPORTED={inventory.symbols_reported}",
             f"HELPER_INVENTORY_HELPERS={inventory.helpers_reported}",
+            f"HELPER_INVENTORY_JUDGMENT_REQUIRED={inventory.judgment_required_reported}",
             f"HELPER_INVENTORY_ROLES={role_summary}",
+            f"HELPER_INVENTORY_VERDICTS={verdict_summary}",
             "HELPER_INVENTORY=pass",
         ]
     )
@@ -855,14 +1369,18 @@ def markdown_cell(value: object) -> str:
 def render_markdown(inventory: Inventory) -> str:
     """Render Markdown output."""
     lines = [
-        "# Helper Function Inventory",
+        "# Helper Symbol Inventory",
         "",
         f"- files scanned: {inventory.files_scanned}",
+        f"- symbols seen: {inventory.symbols_seen}",
         f"- functions seen: {inventory.functions_seen}",
-        f"- helpers reported: {inventory.helpers_reported}",
+        f"- classes seen: {inventory.classes_seen}",
+        f"- symbols reported: {inventory.symbols_reported}",
+        f"- auto helpers reported: {inventory.helpers_reported}",
+        f"- user judgment required: {inventory.judgment_required_reported}",
         "",
-        "| Path | Line | Helper | Role | Confidence | Incoming | Specialization | Side effects | Evidence |",
-        "| --- | ---: | --- | --- | ---: | ---: | --- | --- | --- |",
+        "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Evidence |",
+        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
     ]
     for record in inventory.records:
         lines.append(
@@ -871,8 +1389,13 @@ def render_markdown(inventory: Inventory) -> str:
                 [
                     markdown_cell(record.path),
                     str(record.line),
+                    markdown_cell(record.kind),
+                    markdown_cell(record.domain),
+                    markdown_cell(verdict(record)),
                     markdown_cell(record.qualname),
                     markdown_cell(record.role),
+                    markdown_cell(record.candidate_rule or "none"),
+                    markdown_cell(record.judgment_rule or "none"),
                     f"{record.confidence:.2f}",
                     str(record.incoming_count),
                     markdown_cell(record.specialization),
@@ -902,11 +1425,15 @@ def main() -> int:
     """Run the helper inventory."""
     parser = build_parser()
     args = parser.parse_args()
+    if args.only_auto_helpers and args.only_user_judgment:
+        parser.error("--only-auto-helpers and --only-user-judgment are mutually exclusive.")
     root = Path(args.root).resolve()
     inventory = build_inventory(
         root,
         args.paths,
         all_functions=args.all_functions,
+        only_auto_helpers=args.only_auto_helpers,
+        only_user_judgment=args.only_user_judgment,
         include_vendor=args.include_vendor,
         include_hidden=args.include_hidden,
         include_pyi=args.include_pyi,

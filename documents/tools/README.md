@@ -129,7 +129,7 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
   - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
 - `tools/agent_tools/helper_function_inventory.py`
-  - Python helper 関数を AST、呼び出し元、side effect、内部 call graph から列挙し、役割と専用ヘルパ化の疑いを JSON / Markdown / text で出します。
+  - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の決定論的ルールから列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
 - `tools/agent_tools/vendor_skill_adapters.py`
   - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
   - `python3 tools/agent_tools/vendor_skill_adapters.py --sync` は missing adapter だけを作成し、unmanaged file は上書きしません。
