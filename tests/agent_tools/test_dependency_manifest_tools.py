@@ -571,7 +571,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
     def test_root_copy_headers_resolve_in_agentcanon_source_context(self) -> None:
-        """GitHub root-copy headers should keep valid AgentCanon-source paths."""
+        """Root-copy GitHub headers should keep valid AgentCanon-source paths."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             root_copy = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
