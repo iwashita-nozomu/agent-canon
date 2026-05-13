@@ -28,6 +28,12 @@ EDIT_COMMAND_PATTERN = re.compile(
     r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
+PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
+PAYLOAD_STATUS_VALID = "valid"
+PAYLOAD_STATUS_EMPTY = "empty"
+PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
+PAYLOADLESS_FALLBACK_EVENT = "PostToolUse"
+PAYLOADLESS_FALLBACK_TOOL = "Bash"
 LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 GIT_ROOT_TIMEOUT_SECONDS = 5
@@ -51,14 +57,36 @@ def load_payload() -> dict[str, object]:
     """Read the Codex hook payload from stdin."""
     raw = sys.stdin.read()
     if not raw.strip():
-        return {}
+        return {PAYLOAD_STATUS_KEY: PAYLOAD_STATUS_EMPTY}
     try:
         loaded = json.loads(raw)
     except json.JSONDecodeError:
-        return {}
+        return {PAYLOAD_STATUS_KEY: PAYLOAD_STATUS_INVALID_JSON}
     if isinstance(loaded, dict):
+        loaded[PAYLOAD_STATUS_KEY] = PAYLOAD_STATUS_VALID
         return loaded
-    return {}
+    return {PAYLOAD_STATUS_KEY: PAYLOAD_STATUS_INVALID_JSON}
+
+
+def payload_status(payload: dict[str, object]) -> str:
+    """Return how the hook payload was obtained."""
+    value = payload.get(PAYLOAD_STATUS_KEY)
+    return value if isinstance(value, str) else PAYLOAD_STATUS_VALID
+
+
+def has_tool_signal(payload: dict[str, object]) -> bool:
+    """Return whether one payload looks like a tool hook without an event name."""
+    return isinstance(payload.get("tool_name"), str) or bool(tool_command(payload))
+
+
+def uses_event_fallback(payload: dict[str, object]) -> bool:
+    """Return whether the hook should infer a post-tool event name."""
+    if isinstance(payload.get("hookEventName"), str):
+        return False
+    status = payload_status(payload)
+    return status == PAYLOAD_STATUS_EMPTY or (
+        status == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
+    )
 
 
 def repo_root() -> Path:
@@ -78,13 +106,21 @@ def repo_root() -> Path:
 def hook_event_name(payload: dict[str, object]) -> str:
     """Return the hook event name."""
     value = payload.get("hookEventName")
-    return value if isinstance(value, str) else ""
+    if isinstance(value, str):
+        return value
+    if uses_event_fallback(payload):
+        return PAYLOADLESS_FALLBACK_EVENT
+    return ""
 
 
 def tool_name(payload: dict[str, object]) -> str:
     """Return the tool name from one hook payload."""
     value = payload.get("tool_name")
-    return value if isinstance(value, str) else ""
+    if isinstance(value, str):
+        return value
+    if payload_status(payload) == PAYLOAD_STATUS_EMPTY:
+        return PAYLOADLESS_FALLBACK_TOOL
+    return ""
 
 
 def tool_command(payload: dict[str, object]) -> str:
@@ -223,6 +259,8 @@ def run_oop_checks(root: Path) -> list[AnalyzerResult]:
 
 def should_check(payload: dict[str, object]) -> bool:
     """Return whether the hook payload should trigger OOP checks."""
+    if uses_event_fallback(payload) and not has_tool_signal(payload):
+        return True
     event = hook_event_name(payload)
     if event == "Stop":
         return True
@@ -282,6 +320,9 @@ def analyzer_log_payload(
         "timestamp": utc_now(),
         "event": hook_event_name(payload),
         "tool_name": tool_name(payload),
+        "payload_status": payload_status(payload),
+        "payload_fallback": payload_status(payload) == PAYLOAD_STATUS_EMPTY,
+        "event_fallback": uses_event_fallback(payload),
         "checked": checked,
         "min_score": min_score,
         "result_count": len(results),

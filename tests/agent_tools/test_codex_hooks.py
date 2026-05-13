@@ -34,6 +34,58 @@ SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 class CodexHooksTest(unittest.TestCase):
     """Validate the repo-local Codex hooks surface."""
 
+    def _run_oop_guard_with_changed_python(
+        self,
+        hook_input: str,
+        *,
+        analyzer_text: str | None = None,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Run the OOP guard against one changed Python file in a temp repo."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(
+                analyzer_text
+                or "#!/usr/bin/env python3\n"
+                "print('OOP_READABILITY=fail')\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=hook_input,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+            )
+
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            payload = json.loads(result.stdout)
+        return payload, log_entry
+
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
         """Codex hooks must be enabled from the project config layer."""
         config_text = CONFIG.read_text(encoding="utf-8")
@@ -191,63 +243,59 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_oop_readability_guard_blocks_changed_python_findings(self) -> None:
         """OOP guard should block after source edits when changed Python fails."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.invalid"],
-                cwd=temp_root,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Test User"],
-                cwd=temp_root,
-                check=True,
-                capture_output=True,
-            )
-            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
-            analyzer.parent.mkdir(parents=True)
-            analyzer.write_text(
+        payload, log_entry = self._run_oop_guard_with_changed_python(
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+            analyzer_text=(
                 "#!/usr/bin/env python3\n"
                 "import sys\n"
                 "if sys.argv[sys.argv.index('--min-score') + 1] != '95':\n"
                 "    raise SystemExit(0)\n"
                 "print('OOP_READABILITY=fail')\n"
-                "raise SystemExit(1)\n",
-                encoding="utf-8",
-            )
-            source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
-            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
-
-            result = subprocess.run(
-                [sys.executable, str(OOP_READABILITY_GUARD)],
-                cwd=temp_root,
-                input=json.dumps(
-                    {
-                        "hookEventName": "PostToolUse",
-                        "tool_name": "apply_patch",
-                    }
-                ),
-                check=True,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
-            )
-
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-
-        payload = json.loads(result.stdout)
+                "raise SystemExit(1)\n"
+            ),
+        )
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("OOP readability hook", payload["reason"])
-        self.assertIn("--min-score 95", payload["reason"])
+        reason = payload["reason"]
+        if not isinstance(reason, str):
+            self.fail("OOP guard reason must be a string")
+        self.assertIn("OOP readability hook", reason)
+        self.assertIn("--min-score 95", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["min_score"], 95)
+        self.assertEqual(log_entry["failed_count"], 1)
+
+    def test_oop_readability_guard_checks_payloadless_invocations(self) -> None:
+        """OOP guard should still run when a runtime calls the hook without stdin."""
+        payload, log_entry = self._run_oop_guard_with_changed_python("")
+        self.assertEqual(payload["decision"], "block")
+        reason = payload["reason"]
+        if not isinstance(reason, str):
+            self.fail("OOP guard reason must be a string")
+        self.assertIn("OOP readability hook", reason)
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["tool_name"], "Bash")
+        self.assertEqual(log_entry["payload_status"], "empty")
+        self.assertTrue(log_entry["payload_fallback"])
+        self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["failed_count"], 1)
+
+    def test_oop_readability_guard_infers_post_tool_event_when_event_missing(self) -> None:
+        """OOP guard should run when tool payloads omit hookEventName."""
+        payload, log_entry = self._run_oop_guard_with_changed_python(
+            json.dumps({"tool_name": "apply_patch"})
+        )
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["tool_name"], "apply_patch")
+        self.assertEqual(log_entry["payload_status"], "valid")
+        self.assertTrue(log_entry["event_fallback"])
+        self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["failed_count"], 1)
 
     def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:

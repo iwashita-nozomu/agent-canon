@@ -2,12 +2,12 @@
 <!--
 @dependency-start
 responsibility Documents GitHub Copilot configuration surfaces and AgentCanon placement rules.
-upstream design ../.github/copilot-instructions.md Copilot repository instruction entrypoint
 upstream design ../.github/instructions/pr-processing.instructions.md Copilot PR processing instructions
 upstream design ../.github/agents/pr-maintainer.md Copilot PR maintainer custom agent
 upstream design ../agents/workflows/github-copilot-workflow.md Copilot workflow routing
 downstream implementation ../tools/ci/check_github_workflows.py validates Copilot configuration coverage
 downstream implementation ../tools/sync_agent_canon.sh exposes this document as a shared root view
+downstream design ../.github/copilot-instructions.md Copilot repository instruction entrypoint consumes this catalog
 @dependency-end
 -->
 
