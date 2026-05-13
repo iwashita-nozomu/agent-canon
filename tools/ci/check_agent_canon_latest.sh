@@ -10,6 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
+PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 
 plan_output="$(bash tools/update_agent_canon.sh plan)"
 printf '%s\n' "$plan_output"
@@ -69,13 +70,24 @@ case "$route" in
     exit 1
     ;;
   *)
+    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" && "${submodule_worktree_clean}" == "yes" ]]; then
+      git add "$PREFIX"
+      echo "AGENT_CANON_LATEST=pass"
+      echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+      emit_submodule_worktree_evidence
+      echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
+      echo "AGENT_CANON_LATEST_AUTO_REPAIR=staged_updated_submodule_pin"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=continue_checks_then_commit_updated_submodule_pin"
+      echo "AgentCanon submodule worktree is clean and already at remote main; staged the parent gitlink pin and continuing checks." >&2
+      exit 0
+    fi
     if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" ]]; then
       echo "AGENT_CANON_LATEST=fail"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_updated_submodule_pin"
-      echo "AgentCanon submodule worktree is clean and already at remote main; commit the parent gitlink pin before pushing the parent repository." >&2
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=repair_submodule_worktree_then_rerun"
+      echo "AgentCanon submodule worktree points at remote main but has local dirt; repair the submodule worktree before staging the parent gitlink pin." >&2
       exit 1
     fi
     echo "AGENT_CANON_LATEST=fail"

@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Runs OOP readability hook checks after source-editing tool calls.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
+# upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # upstream implementation ../../tools/oop/python/readability.py checks Python OOP readability.
 # upstream implementation ../../tools/oop/cpp/readability.py checks C++ OOP readability.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard output.
@@ -17,15 +18,17 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
+
+from hook_event_log import HookLogContext, fingerprint_json, utc_now
 
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
-EXCLUDED_PARTS = {".git", "__pycache__", "reports", ".pytest_cache", ".ruff_cache"}
-EDIT_TOOL_NAMES = {"apply_patch", "Bash", "bash", "python", "python3"}
+EXCLUDED_PARTS = {".git", "__pycache__", "reports", "tests", ".pytest_cache", ".ruff_cache"}
+EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
 EDIT_COMMAND_PATTERN = re.compile(
-    r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
+    r"(?is)(apply_patch|python3?\s+-m\s+ruff\s+.*--fix|ruff\s+.*--fix|"
+    r"python3?\s+(?:-c\b|-(?:\s|$)|<<)|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
@@ -110,7 +113,7 @@ def hook_event_name(payload: dict[str, object]) -> str:
         return value
     if uses_event_fallback(payload):
         return PAYLOADLESS_FALLBACK_EVENT
-    return ""
+    return "UnknownHookEvent"
 
 
 def tool_name(payload: dict[str, object]) -> str:
@@ -120,7 +123,7 @@ def tool_name(payload: dict[str, object]) -> str:
         return value
     if payload_status(payload) == PAYLOAD_STATUS_EMPTY:
         return PAYLOADLESS_FALLBACK_TOOL
-    return ""
+    return "unknown"
 
 
 def tool_command(payload: dict[str, object]) -> str:
@@ -293,17 +296,58 @@ def emit_block(results: list[AnalyzerResult]) -> None:
     sys.stdout.write("\n")
 
 
-def utc_now() -> str:
-    """Return a compact UTC timestamp for hook logs."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
 def default_log_path(root: Path) -> Path:
-    """Return the default local hook log path."""
+    """Return the OOP hook log path."""
     override = os.environ.get(LOG_PATH_ENV, "").strip()
-    if override:
-        return Path(override)
-    return root / "reports" / "hooks" / "oop_readability_guard.jsonl"
+    return HookLogContext(root, "oop_readability_guard", override).result_path()
+
+
+def analyzer_snippet(result: AnalyzerResult) -> str:
+    """Return a short analyzer output snippet for durable hook logs."""
+    return "\n".join(result.output.splitlines()[:MAX_ANALYZER_OUTPUT_LINES])
+
+
+def skip_reason(payload: dict[str, object]) -> str:
+    """Return why this hook invocation did not run analyzers."""
+    event = hook_event_name(payload)
+    if event == "UnknownHookEvent":
+        return "unsupported_payload_without_event_or_tool_signal"
+    if event not in {"PostToolUse", "Stop"}:
+        return f"event_not_checked:{event}"
+    command = tool_command(payload)
+    name = tool_name(payload)
+    if event == "PostToolUse" and name not in EDIT_TOOL_NAMES and not EDIT_COMMAND_PATTERN.search(command):
+        return "post_tool_without_source_edit_signal"
+    return ""
+
+
+def logged_checked(checked: bool, results: list[AnalyzerResult]) -> bool:
+    """Return whether analyzers actually ran for log semantics."""
+    return checked and bool(results)
+
+
+def _log_skip_reason(
+    payload: dict[str, object],
+    checked: bool,
+    results: list[AnalyzerResult],
+) -> str:
+    """Return the durable skip reason for one hook invocation."""
+    if checked and not results:
+        return "no_changed_source_files"
+    if not checked:
+        return skip_reason(payload)
+    return ""
+
+
+def hook_log_status(
+    checked: bool,
+    results: list[AnalyzerResult],
+    failed: list[AnalyzerResult],
+) -> str:
+    """Return the status value for one OOP hook log entry."""
+    if not logged_checked(checked, results):
+        return "skipped"
+    return "fail" if failed else "pass"
 
 
 def analyzer_log_payload(
@@ -316,23 +360,42 @@ def analyzer_log_payload(
     """Build one OOP hook invocation log payload."""
     failed = [result for result in results if result.returncode != 0]
     min_score = next((result.min_score for result in results if result.min_score is not None), None)
+    timestamp = utc_now()
+    payload_fingerprint = fingerprint_json(payload)
+    failure_fingerprint = fingerprint_json(
+        [
+            {
+                "command": list(result.command),
+                "output": analyzer_snippet(result),
+                "returncode": result.returncode,
+            }
+            for result in failed
+        ]
+    )
+    context = HookLogContext(root, "oop_readability_guard", os.environ.get(LOG_PATH_ENV, "").strip())
     return {
-        "timestamp": utc_now(),
+        "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+        "timestamp": timestamp,
         "event": hook_event_name(payload),
         "tool_name": tool_name(payload),
         "payload_status": payload_status(payload),
+        "payload_fingerprint": payload_fingerprint,
         "payload_fallback": payload_status(payload) == PAYLOAD_STATUS_EMPTY,
         "event_fallback": uses_event_fallback(payload),
-        "checked": checked,
+        "check_requested": checked,
+        "checked": logged_checked(checked, results),
+        "skip_reason": _log_skip_reason(payload, checked, results),
         "min_score": min_score,
         "result_count": len(results),
         "failed_count": len(failed),
-        "status": "fail" if failed else "pass",
+        "failure_fingerprint": failure_fingerprint if failed else "",
+        "status": hook_log_status(checked, results, failed),
         "root": str(root),
         "commands": [
             {
                 "command": list(result.command),
                 "returncode": result.returncode,
+                "output_snippet": analyzer_snippet(result),
             }
             for result in results
         ],
@@ -344,11 +407,9 @@ def _log_append_hook_log(root: Path, entry: dict[str, object]) -> None:
     if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
         return
     try:
-        path = default_log_path(root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as stream:
-            json.dump(entry, stream, sort_keys=True)
-            stream.write("\n")
+        HookLogContext(root, "oop_readability_guard", os.environ.get(LOG_PATH_ENV, "").strip()).append(
+            entry
+        )
     except OSError:
         return
 

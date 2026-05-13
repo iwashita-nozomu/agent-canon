@@ -77,6 +77,9 @@ Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review a
 closeout evidence, and validation logs. They require observable events such as skill invocation,
 subagent routing, tool gates, accumulated prompt eval runs, feedback resolution, subagent lifecycle closeout,
 static-analysis feedback, execution path comparison, token footprint comparison, and diff-check decisions.
+Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
+`hook_run_id` values. GitHub Actions reads these hook results, memory notes,
+skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 When two runs can choose different paths, compare them with
 `tools/agent_tools/compare_agent_run_paths.py` and record its
 `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`,

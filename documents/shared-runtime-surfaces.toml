@@ -203,6 +203,7 @@ paths = [
   "tests/agent_tools/test_compare_agent_run_paths.py",
   "tests/agent_tools/test_evaluate_agent_run.py",
   "tests/agent_tools/test_evaluate_skill_workflow_prompts.py",
+  "tests/agent_tools/test_generate_agent_improvement_guide.py",
   "tests/agent_tools/test_file_surface_inventory.py",
   "tests/agent_tools/test_goal_loop.py",
   "tests/agent_tools/test_helper_function_inventory.py",
@@ -236,6 +237,7 @@ class = "github_copy"
 local_override_allowed = false
 paths = [
   ".github/workflows/agent-coordination.yml",
+  ".github/workflows/agent-improvement-guide.yml",
   ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
 ]
 

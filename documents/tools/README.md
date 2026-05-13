@@ -175,6 +175,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`agents/evals/results/skill-workflow-prompt/` に詳細結果を蓄積します。
+  - `generate_agent_improvement_guide.py` は `memory/`、`agents/evals/results/skill-workflow-prompt/`、`agents/evals/results/hook-runs/`、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、実修正は local Agent / Copilot PR に渡します。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。

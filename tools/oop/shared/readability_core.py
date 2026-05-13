@@ -33,7 +33,17 @@ from typing import cast
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
 PRESENTATION_FUNCTION_PARTS = ("format", "render", "stringify", "to_string", "display", "label")
-EFFECT_ADAPTER_NAMES = {"repo_root", "utc_now", "default_log_path"}
+EFFECT_ADAPTER_NAMES = {
+    "agent_canon_update_surface_status",
+    "default_log_path",
+    "default_oop_min_score",
+    "is_git_worktree",
+    "main",
+    "project_root_from_script",
+    "repo_root",
+    "surface_manifest_paths",
+    "utc_now",
+}
 EFFECT_ADAPTER_PREFIXES = (
     "append_",
     "build_",
