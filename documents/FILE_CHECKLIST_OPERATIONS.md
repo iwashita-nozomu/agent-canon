@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents 作業別チェックリスト for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ./github-first-module-and-devcontainer-policy.md environment ownership boundary
 @dependency-end
 -->
 
@@ -90,7 +91,7 @@ python3 tools/ci/run_codex_in_repo_container.py --profile host-docker --print-on
 
 確認:
 
-- `docker/Dockerfile` と `docker/requirements.txt` が同期している
+- repo-local `docker/Dockerfile`、`docker/requirements.txt`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
 - `agents/templates/environment_change_proposal.md` に proposal が残っている
 

@@ -64,8 +64,10 @@ DOC_REQUIRED_MARKERS = (
     "documents/shared-runtime-surfaces.toml",
     ".codex/hooks.json",
     ".codex/hooks",
+    ".devcontainer/",
     "documents/README.md",
     "documents/template-bootstrap.md",
+    "documents/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
 )

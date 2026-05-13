@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents プロジェクト全体の運用規約 for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 @dependency-end
 -->
 
@@ -21,7 +22,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 - `agents/` はエージェント運用の正本です。
 - `tools/` は shared automation の正本です。agent helper、CI / review / validation、container runner、experiment helper、Markdown helper はここに置かなければなりません。
 - `scripts/` は repo-local bootstrap の入口です。template 固有の初期化、slug 置換、bare remote 初期化だけをここに置かなければなりません。
-- `docker/` は共通開発環境の定義です。
+- `docker/` は template / project の runtime image、build library、dependency pack の定義です。
+- `.devcontainer/` は AgentCanon-owned shared runtime ergonomics です。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth mount、attach status はここで扱います。
 - `experiments/` は実験コードと生成物の置き場です。
 - `python/`, `src/`, `include/`, `lib/` は実装スロットです。全部を使う必要はありません。
 - C++ を使う場合の build layout は `documents/cpp-build-layout.md` を正本にします。
@@ -38,8 +40,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 ## 4. 開発環境
 
-- 共通実行環境が必要な場合は `docker/` を基準にします。
-- Python 依存を追加する場合は `docker/Dockerfile` と `docker/requirements.txt` を同時に更新します。
+- 共通実行環境が必要な場合は、repo-local `docker/` と AgentCanon-owned `.devcontainer/` の責務を分けます。
+- Python 依存を追加する場合は `docker/requirements.txt` と `docker/install_python_dependencies.sh` の契約を基準にします。`docker/Dockerfile` は Python requirements を build 中に install / copy してはいけません。
 - `docker/Dockerfile` または `docker/requirements.txt` を更新した変更では、`make docker-build-check` を必須にします。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口を Python 専用にはしません。
@@ -47,18 +49,19 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 - Template / AgentCanon 固有の local mirror path、たとえば `/mnt/git/template.git` や `/mnt/git/agent-canon.git` は Dockerfile に焼きません。具体の remote / mirror 名は `documents/template-github-remote.md` と `documents/agent-canon-github-remote.md` を正本にし、必要な repo だけ host git config や run profile で opt-in します。
 - Docker container 内から Docker を使う手順を正本にする場合は、同梱するのは CLI だけとし、host socket mount または別 daemon が必要であることを文書へ明記しなければなりません。
 - canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は script の fallback で検証を継続できますが、Dockerfile 側の欠落を放置してはいけません。
+- `docker/Dockerfile` に Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針を入れることを禁止します。これらは AgentCanon-owned `.devcontainer/post-create.sh` と mount convention の責務です。
 
 ## 4.5 環境依存ツール導入提案のルール
 
 - repo-wide に使う環境依存ツールの導入提案では、`agents/templates/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録しなければなりません。
 - host-global install を repo の正本手順として採用することを禁止します。
-- repo-wide に必要な Python tool は、原則として `docker/requirements.txt` と `docker/Dockerfile` に同時反映しなければなりません。
+- repo-wide に必要な Python tool は、原則として `docker/requirements.txt` と post-create installer contract に反映しなければなりません。Dockerfile へ入れるのは OS package、runtime library、build tool、image-level helper だけです。
 - CI でも使う tool を、手元だけの補助 install として導入することを禁止します。
 - 1 回限りの調査や個人補助にとどまる tool は、repo 正本へ追加する前に container 実行、checked-in script、既存依存で代替できないか確認しなければなりません。
 - 導入提案では、少なくとも次を明記しなければなりません。
   - 何の workflow を支えるのか
   - host / Docker / CI のどこを更新するのか
-  - `docker/Dockerfile` と `docker/requirements.txt` の更新要否
+  - `docker/Dockerfile`、`docker/requirements.txt`、`.devcontainer/` の更新要否
   - どのコマンドで validate するのか
   - 不採用または撤回するときの rollback 手順
 
@@ -66,6 +69,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直さなければなりません。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残しなければなりません。
+- Docker 変更で agent convenience tool が必要になった場合は、Dockerfile ではなく AgentCanon-owned `.devcontainer/post-create.sh` を更新しなければなりません。
 - Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、script 側へ path 分岐を埋め込んではなりません。
 - Docker runtime、runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、`docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の整合を確認しなければなりません。
 - main server host の path、mount、builder 前提は `documents/server-host-contract.md` と `documents/templates/server_runtime_layout.template.toml` を正本にし、口頭運用にしてはなりません。
@@ -77,6 +81,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 ## 禁止事項
 
 - Dockerfile に repo 固有の Template / AgentCanon mirror path を焼くことを禁止します。
+- Dockerfile に Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針を焼くことを禁止します。
 - host-global install を repo の正本手順として採用することを禁止します。
 - CI でも使う tool を、手元だけの補助 install として導入することを禁止します。
 - `src/` や `include/` の下に別 CMake root を増やすことを禁止します。

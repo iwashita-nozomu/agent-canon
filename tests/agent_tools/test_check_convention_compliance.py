@@ -199,8 +199,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/REVIEW_PROCESS.md": "review\n",
             "documents/SHARED_RUNTIME_SURFACES.md": (
                 "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
-                ".codex/hooks.json .codex/hooks documents/README.md "
-                "documents/template-bootstrap.md memory/USER_PREFERENCES.md "
+                ".codex/hooks.json .codex/hooks .devcontainer/ documents/README.md "
+                "documents/template-bootstrap.md documents/github-first-module-and-devcontainer-policy.md "
+                "memory/USER_PREFERENCES.md "
                 "tests/agent_tools/\n"
             ),
             "documents/shared-runtime-surfaces.toml": (
@@ -209,6 +210,8 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 'path = "goal.md"\n'
                 '"documents/README.md"\n'
                 '"documents/template-bootstrap.md"\n'
+                '".devcontainer"\n'
+                '"documents/github-first-module-and-devcontainer-policy.md"\n'
                 '".codex/hooks.json"\n'
                 '"tests/agent_tools/test_check_convention_compliance.py"\n'
             ),

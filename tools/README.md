@@ -58,7 +58,7 @@ retired legacy tool reintroduction.
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
   - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence、Copilot discovery surface を検査します。
-  - `container_config.py` は standalone AgentCanon では runtime config absence を skip として扱い、template / derived repo では `docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の静的整合を検査します。
+  - `container_config.py` は standalone AgentCanon では repo-local Docker absence を許容し、template / derived repo では repo-local `docker/Dockerfile` / `docker/packs/*.toml` と AgentCanon-owned `.devcontainer/` の静的整合を検査します。
 - `docs/`
   - Markdown lint、math check、link audit、format、mirror sync、design document consolidation helpers
 - `data/`
@@ -435,10 +435,10 @@ For OOP readability, keep the mechanical report as the source of truth and use `
 
 ## Container Configuration Tools
 
-- `tools/ci/container_config.py` statically validates Dockerfile, runtime pack,
-  and devcontainer configuration without requiring Docker or Podman to run. It
-  returns `CONTAINER_CONFIG=skip` when a standalone AgentCanon source checkout
-  has no `docker/` or `.devcontainer/` surface.
+- `tools/ci/container_config.py` statically validates repo-local Dockerfile,
+  runtime pack, and AgentCanon-owned devcontainer configuration without
+  requiring Docker or Podman to run. It returns `CONTAINER_CONFIG=skip` only
+  when a checkout has neither `docker/` nor `.devcontainer/`.
 - `tools/docker_dependency_validator.sh` remains the shell-level dependency
   contract for canonical Docker image contents.
 - `tools/ci/run_container_pack.py --print-only` previews the build and smoke

@@ -1,0 +1,19 @@
+{
+  "_dependency_manifest": [
+    "@dependency-start",
+    "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
+    "upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
+    "upstream implementation post-create.sh runs workspace-mounted setup and agent CLI setup",
+    "upstream implementation generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
+    "@dependency-end"
+  ],
+  "name": "agent-canon-workspace",
+  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
+  "dockerComposeFile": "docker-compose.generated.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
+  "postAttachCommand": "bash .devcontainer/post-attach.sh",
+  "shutdownAction": "stopCompose",
+  "overrideCommand": false
+}

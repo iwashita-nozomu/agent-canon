@@ -15,7 +15,9 @@
 # downstream implementation ../documents/tools/oop/python/rule_inventory.md root symlink view
 # downstream implementation ../documents/tools/oop/cpp/readability.md root symlink view
 # downstream implementation ../documents/tools/oop/cpp/rule_inventory.md root symlink view
+# downstream implementation ../.devcontainer root symlink view for shared devcontainer runtime
 # downstream implementation ../documents/agent-canon-github-remote.md root symlink view
+# downstream implementation ../documents/github-first-module-and-devcontainer-policy.md root symlink view
 # downstream implementation ../documents/github-copilot-configuration.md root symlink view
 # downstream implementation ../documents/template-github-remote.md root symlink view
 # downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests

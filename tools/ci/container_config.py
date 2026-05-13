@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Validates Dockerfile, runtime pack, and devcontainer configuration.
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
+# upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -35,9 +36,30 @@ REQUIRED_APT_PACKAGES = (
     "python3-venv",
 )
 REQUIRED_DOCKERFILE_SNIPPETS = (
-    ("cli.github.com/packages", "must-use-github-cli-apt-repository"),
-    ("gh --version", "must-smoke-check-gh"),
     ("docker/register_safe_directories.sh", "must-install-safe-directory-helper"),
+)
+FORBIDDEN_DOCKERFILE_PATTERNS = (
+    (re.compile(r"cli\.github\.com/packages"), "dockerfile-must-not-configure-github-cli"),
+    (re.compile(r"(^|[\s\\])gh([\s\\]|$)"), "dockerfile-must-not-install-gh"),
+    (re.compile(r"gh\s+--version"), "dockerfile-must-not-smoke-check-gh"),
+    (re.compile(r"@openai/codex"), "dockerfile-must-not-install-codex-cli"),
+    (re.compile(r"codex\s+--version"), "dockerfile-must-not-smoke-check-codex"),
+    (
+        re.compile(r"npm\s+install\s+-g\s+@openai/codex"),
+        "dockerfile-must-not-install-codex-via-npm",
+    ),
+)
+REQUIRED_POST_CREATE_SNIPPETS = (
+    "run_as_root",
+    "docker/register_safe_directories.sh",
+    "docker/install_python_dependencies.sh",
+    'git config --global --add safe.directory "$workspace"',
+    "repo-local Python dependency installer absent",
+    "cli.github.com/packages",
+    "apt_install gh",
+    "npm install -g @openai/codex",
+    "gh --version",
+    "codex --version",
 )
 REQUIRED_REQUIREMENTS = (
     "jupyterlab",
@@ -297,6 +319,9 @@ def validate_dockerfile(root: Path) -> list[Finding]:
     for snippet, detail in REQUIRED_DOCKERFILE_SNIPPETS:
         if snippet not in text:
             findings.append(Finding("dependency_contract_violation", relative, detail))
+    for pattern, detail in FORBIDDEN_DOCKERFILE_PATTERNS:
+        if pattern.search(text):
+            findings.append(Finding("dependency_contract_violation", relative, detail))
     return findings
 
 
@@ -324,10 +349,7 @@ def validate_post_create(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    for snippet in (
-        "docker/register_safe_directories.sh",
-        "docker/install_python_dependencies.sh",
-    ):
+    for snippet in REQUIRED_POST_CREATE_SNIPPETS:
         if snippet not in text:
             findings.append(Finding("dependency_contract_violation", relative, f"missing:{snippet}"))
     return findings
@@ -385,12 +407,16 @@ def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[F
         "dockerComposeFile": "docker-compose.generated.yml",
         "service": "workspace",
         "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
+        "postAttachCommand": "bash .devcontainer/post-attach.sh",
     }
     for key, expected in expected_json.items():
         if config.get(key) != expected:
             findings.append(
                 Finding("inconsistency", ".devcontainer/devcontainer.json", f"{key}-expected:{expected}")
             )
+    post_attach = devcontainer_dir / "post-attach.sh"
+    if not post_attach.is_file():
+        findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))
     if default_pack is not None and config.get("workspaceFolder") != default_pack.workspace_mount:
         findings.append(
             Finding(
@@ -408,6 +434,8 @@ def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[F
     for snippet in (
         "docker/packs/default.toml",
         ".devcontainer/docker-compose.generated.yml",
+        "agent-canon-source-only",
+        "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
         "vendor/agent-canon",
     ):
         if snippet == "vendor/agent-canon":

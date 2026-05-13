@@ -8,6 +8,7 @@ downstream design ../agents/workflows/derived-agent-canon-diff-workflow.md consu
 upstream implementation ../tools/sync_agent_canon.sh vendoring sync tool
 upstream implementation ../tools/update_agent_canon.sh derived repo update helper
 upstream design ./agent-canon-github-remote.md defines GitHub canonical remote policy
+upstream design ./github-first-module-and-devcontainer-policy.md defines GitHub-first module and devcontainer policy
 downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root
 @dependency-end
 -->
@@ -22,6 +23,7 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
 - shared canon の source of truth を upstream `agent-canon` repo と `vendor/agent-canon/` submodule pin に固定する
 - template root には runtime discovery に必要な surface だけを残す
 - template 利用者向けの入口文書は root regular file として残す
+- reusable module distribution は GitHub PR / GitHub `main` SHA を正本にし、local bare mirror は compatibility-only にする
 
 ## 固定構成
 
@@ -33,6 +35,8 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
   - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。local `/mnt/git` bare repo は mirror / proposal target として明示 opt-in します。
 - root 側の shared runtime surface:
   - `documents/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
+- root 側の shared devcontainer:
+  - `.devcontainer/` は AgentCanon-owned symlink view とし、repo-local Dockerfile / runtime pack を消費する
 - root 側の template entrypoint:
   - `README.md`
   - `QUICK_START.md`
@@ -48,12 +52,13 @@ downstream design ./dependency-manifest-design.md defines dependency manifest su
   - skill canon
   - subagent 定義
   - shared notes template
+  - shared devcontainer post-create / attach runtime ergonomics
   - shared CI / review / runtime helper
   - submodule update / PR / shared surface ownership 文書
 - root 側:
   - template 利用者向けの入口
   - implementation 本体
-  - environment / server / template bootstrap
+  - repo-local Dockerfile / dependency pack / server / template bootstrap
   - repo-local experiment topic
   - repo-local notes
 
@@ -102,6 +107,9 @@ AgentCanon の source of truth は GitHub の
 `https://github.com/iwashita-nozomu/agent-canon.git` です。
 `/mnt/git/agent-canon.git` は高速 validation や offline 作業用の local mirror であり、
 canonical remote ではありません。
+local Git や local bare mirror の不具合は、その repo の compatibility repair として扱います。
+shared module architecture、Dockerfile boundary、devcontainer ownership を local-only
+remote 名や一台の host path に合わせて変えません。
 
 既存 repo が `agent-canon` remote や `.gitmodules` を `/mnt/git/agent-canon.git`
 または `../agent-canon.git` に向けている場合は、repo が clean なタイミングで

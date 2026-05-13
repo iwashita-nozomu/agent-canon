@@ -65,7 +65,7 @@ bash tools/sync_agent_canon.sh link-root
 
 Core runtime surfaces include `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`,
 `.claude/`, `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
-`.codex/hooks.json`, `.codex/hooks/`, `mcp/`, and `tools/`.
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `mcp/`, and `tools/`.
 
 GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`,
 `.github/copilot-instructions.md`, `.github/instructions/`, and
@@ -75,8 +75,16 @@ Shared policy documents under `documents/` include review, workflow, coding
 conventions, OOP guidance, experiment policy, dependency manifest policy,
 worktree lifecycle, conventions subtrees, tool docs, and reusable templates.
 `documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml`,
-and `documents/agent-canon-parent-repo-latest-checklist.md` are themselves
+`documents/agent-canon-parent-repo-latest-checklist.md`, and
+`documents/github-first-module-and-devcontainer-policy.md` are themselves
 AgentCanon-owned policy surfaces.
+
+`.devcontainer/` is a shared AgentCanon runtime ergonomics surface. It may
+generate `.devcontainer/docker-compose.generated.yml` locally, but the source
+scripts, `devcontainer.json`, post-create setup, and attach status reporting are
+edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
+`docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
+does not make `docker/` AgentCanon-owned.
 
 ## Template-Owned Active Contracts
 
@@ -95,7 +103,6 @@ regular files, not symlink views:
 - `scripts/README.md`
 - `notes/README.md`
 - `.gitmodules`
-- `.devcontainer/`
 
 `link-root` materializes the `documents/` active contracts from AgentCanon only
 when a path is missing or is still a legacy symlink. Once a derived repo has a

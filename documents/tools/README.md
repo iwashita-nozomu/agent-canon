@@ -47,7 +47,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/ci/run_container_pack.py`
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
-  - Dockerfile、runtime pack、devcontainer 生成導線の静的整合を検査します。standalone AgentCanon source で `docker/` と `.devcontainer/` が無い場合は skip します。
+  - repo-local Dockerfile / runtime pack と AgentCanon-owned devcontainer 生成導線の静的整合を検査します。`docker/` が無くても `.devcontainer/` があれば shared devcontainer source を検査します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
