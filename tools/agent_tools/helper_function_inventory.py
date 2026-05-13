@@ -149,6 +149,10 @@ class Inventory:
     """Complete helper inventory report."""
 
     root: str
+    changed_only: bool
+    baseline_ref: str
+    baseline_symbols_seen: int
+    baseline_filtered: int
     files_scanned: int
     symbols_seen: int
     functions_seen: int
@@ -186,6 +190,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--only-user-judgment",
         action="store_true",
         help="Report only symbols that need user design judgment.",
+    )
+    parser.add_argument(
+        "--changed",
+        action="store_true",
+        help=(
+            "Report only changed Python files while preserving whole-repo call graph "
+            "context when changed files exist."
+        ),
+    )
+    parser.add_argument(
+        "--baseline-ref",
+        default="",
+        help=(
+            "Only report findings absent from this git ref. Use with --changed for "
+            "hook-friendly new-finding output."
+        ),
     )
     parser.add_argument(
         "--include-vendor",
@@ -301,6 +321,88 @@ def iter_python_files(
                 seen_files.add(resolved)
                 files.append(path)
     return sorted(files, key=lambda path: stable_relative(root, path))
+
+
+def git_lines(root: Path, args: list[str]) -> list[str]:
+    """Return non-empty git output lines for one repository command."""
+    result = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def changed_python_files(
+    root: Path,
+    *,
+    include_vendor: bool,
+    include_hidden: bool,
+    include_pyi: bool,
+) -> list[Path]:
+    """Return changed Python files that pass inventory path filters."""
+    names: set[str] = set()
+    for args in (
+        ["diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--"],
+        ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "--"],
+        ["ls-files", "--others", "--exclude-standard"],
+    ):
+        names.update(git_lines(root, args))
+    suffixes = {".py"}
+    if include_pyi:
+        suffixes.add(".pyi")
+    files: list[Path] = []
+    for name in sorted(names):
+        path = root / name
+        relative = Path(name)
+        if path.suffix not in suffixes:
+            continue
+        if path.suffix in DEFAULT_EXCLUDED_SUFFIXES and not include_pyi:
+            continue
+        if logical_excluded(relative, include_vendor=include_vendor, include_hidden=include_hidden):
+            continue
+        if path.is_file():
+            files.append(path)
+    return files
+
+
+def requested_relative_paths(
+    root: Path,
+    raw_paths: list[str],
+    *,
+    include_vendor: bool,
+    include_hidden: bool,
+    include_pyi: bool,
+) -> set[str]:
+    """Return root-relative Python paths requested by positional paths."""
+    if not raw_paths:
+        return set()
+    return {
+        stable_relative(root, path)
+        for path in iter_python_files(
+            root,
+            raw_paths,
+            include_vendor=include_vendor,
+            include_hidden=include_hidden,
+            include_pyi=include_pyi,
+        )
+    }
+
+
+def git_ref_text(root: Path, ref: str, relative_path: str) -> str | None:
+    """Return one file's text at a git ref, or None when absent."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "show", f"{ref}:{relative_path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout
 
 
 def stable_relative(root: Path, path: Path) -> str:
@@ -982,8 +1084,17 @@ def doc_summary(docstring: str | None) -> str:
 def analyze_file(root: Path, path: Path) -> list[FunctionRecord]:
     """Analyze one Python file."""
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    except (OSError, SyntaxError, UnicodeDecodeError):
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return []
+    return analyze_source(root, path, source)
+
+
+def analyze_source(root: Path, path: Path, source: str) -> list[FunctionRecord]:
+    """Analyze Python source text for one logical path."""
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError:
         return []
     collector = DefinitionCollector(root, path)
     collector.visit(tree)
@@ -1248,40 +1359,97 @@ def build_inventory(
     all_functions: bool,
     only_auto_helpers: bool,
     only_user_judgment: bool,
+    changed_only: bool,
+    baseline_ref: str,
     include_vendor: bool,
     include_hidden: bool,
     include_pyi: bool,
     min_confidence: float,
 ) -> Inventory:
     """Build the helper inventory."""
-    files = iter_python_files(
-        root,
-        paths,
-        include_vendor=include_vendor,
-        include_hidden=include_hidden,
-        include_pyi=include_pyi,
-    )
+    report_paths: set[str] | None = None
+    if changed_only:
+        changed_files = changed_python_files(
+            root,
+            include_vendor=include_vendor,
+            include_hidden=include_hidden,
+            include_pyi=include_pyi,
+        )
+        requested_paths = requested_relative_paths(
+            root,
+            paths,
+            include_vendor=include_vendor,
+            include_hidden=include_hidden,
+            include_pyi=include_pyi,
+        )
+        if requested_paths:
+            changed_files = [
+                path for path in changed_files if stable_relative(root, path) in requested_paths
+            ]
+        report_paths = {stable_relative(root, path) for path in changed_files}
+        files = (
+            iter_python_files(
+                root,
+                [],
+                include_vendor=include_vendor,
+                include_hidden=include_hidden,
+                include_pyi=include_pyi,
+            )
+            if changed_files
+            else []
+        )
+    else:
+        files = iter_python_files(
+            root,
+            paths,
+            include_vendor=include_vendor,
+            include_hidden=include_hidden,
+            include_pyi=include_pyi,
+        )
+    baseline_records: list[FunctionRecord] = []
+    if baseline_ref:
+        for path in files:
+            relative = stable_relative(root, path)
+            source = git_ref_text(root, baseline_ref, relative)
+            if source is None:
+                continue
+            baseline_records.extend(analyze_source(root, path, source))
+        apply_call_graph(baseline_records)
     all_records: list[FunctionRecord] = []
     for path in files:
         all_records.extend(analyze_file(root, path))
     apply_call_graph(all_records)
     include_auto_helpers = not only_user_judgment
     include_user_judgment = not only_auto_helpers
-    selected = [
-        record
-        for record in all_records
-        if (
-            all_functions
-            or (include_auto_helpers and record.helper_candidate)
-            or (include_user_judgment and record.needs_user_judgment)
-        )
-        and record.confidence >= min_confidence
-    ]
+    selected = select_records(
+        all_records,
+        all_functions=all_functions,
+        include_auto_helpers=include_auto_helpers,
+        include_user_judgment=include_user_judgment,
+        min_confidence=min_confidence,
+        report_paths=report_paths,
+    )
+    baseline_selected = select_records(
+        baseline_records,
+        all_functions=all_functions,
+        include_auto_helpers=include_auto_helpers,
+        include_user_judgment=include_user_judgment,
+        min_confidence=min_confidence,
+        report_paths=report_paths,
+    )
+    baseline_keys = {record_key(record) for record in baseline_selected}
+    before_baseline_filter = len(selected)
+    if baseline_ref:
+        selected = [record for record in selected if record_key(record) not in baseline_keys]
     selected.sort(key=lambda item: (item.path, item.line, item.qualname))
     role_counts = Counter(record.role for record in selected)
     verdict_counts = Counter(verdict(record) for record in selected)
     return Inventory(
         root=root.as_posix(),
+        changed_only=changed_only,
+        baseline_ref=baseline_ref,
+        baseline_symbols_seen=len(baseline_records),
+        baseline_filtered=before_baseline_filter - len(selected),
         files_scanned=len(files),
         symbols_seen=len(all_records),
         functions_seen=sum(1 for record in all_records if record.kind == "function"),
@@ -1292,6 +1460,43 @@ def build_inventory(
         role_counts=dict(sorted(role_counts.items())),
         verdict_counts=dict(sorted(verdict_counts.items())),
         records=selected,
+    )
+
+
+def select_records(
+    records: list[FunctionRecord],
+    *,
+    all_functions: bool,
+    include_auto_helpers: bool,
+    include_user_judgment: bool,
+    min_confidence: float,
+    report_paths: set[str] | None,
+) -> list[FunctionRecord]:
+    """Return records matching report filters."""
+    selected = [
+        record
+        for record in records
+        if (
+            all_functions
+            or (include_auto_helpers and record.helper_candidate)
+            or (include_user_judgment and record.needs_user_judgment)
+        )
+        and record.confidence >= min_confidence
+        and (report_paths is None or record.path in report_paths)
+    ]
+    return sorted(selected, key=lambda item: (item.path, item.line, item.qualname))
+
+
+def record_key(record: FunctionRecord) -> tuple[str, str, str, str, str, str, str]:
+    """Return a stable key for baseline finding comparison."""
+    return (
+        record.path,
+        record.kind,
+        record.qualname,
+        verdict(record),
+        record.role,
+        record.candidate_rule,
+        record.judgment_rule,
     )
 
 
@@ -1330,6 +1535,10 @@ def render_text(inventory: Inventory) -> str:
             f"HELPER_INVENTORY_SYMBOLS_REPORTED={inventory.symbols_reported}",
             f"HELPER_INVENTORY_HELPERS={inventory.helpers_reported}",
             f"HELPER_INVENTORY_JUDGMENT_REQUIRED={inventory.judgment_required_reported}",
+            f"HELPER_INVENTORY_CHANGED_ONLY={str(inventory.changed_only).lower()}",
+            f"HELPER_INVENTORY_BASELINE_REF={inventory.baseline_ref or 'none'}",
+            f"HELPER_INVENTORY_BASELINE_SYMBOLS={inventory.baseline_symbols_seen}",
+            f"HELPER_INVENTORY_BASELINE_FILTERED={inventory.baseline_filtered}",
             f"HELPER_INVENTORY_ROLES={role_summary}",
             f"HELPER_INVENTORY_VERDICTS={verdict_summary}",
             "HELPER_INVENTORY=pass",
@@ -1355,6 +1564,10 @@ def render_markdown(inventory: Inventory) -> str:
         f"- symbols reported: {inventory.symbols_reported}",
         f"- auto helpers reported: {inventory.helpers_reported}",
         f"- user judgment required: {inventory.judgment_required_reported}",
+        f"- changed only: {str(inventory.changed_only).lower()}",
+        f"- baseline ref: {inventory.baseline_ref or 'none'}",
+        f"- baseline symbols seen: {inventory.baseline_symbols_seen}",
+        f"- baseline filtered: {inventory.baseline_filtered}",
         "",
         "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
         "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
@@ -1412,6 +1625,8 @@ def main() -> int:
         all_functions=args.all_functions,
         only_auto_helpers=args.only_auto_helpers,
         only_user_judgment=args.only_user_judgment,
+        changed_only=args.changed,
+        baseline_ref=args.baseline_ref,
         include_vendor=args.include_vendor,
         include_hidden=args.include_hidden,
         include_pyi=args.include_pyi,

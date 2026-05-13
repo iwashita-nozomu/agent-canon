@@ -133,6 +133,85 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(payload["records"][0]["qualname"], "public_api")
             self.assertFalse(payload["records"][0]["helper_candidate"])
 
+    def test_changed_baseline_reports_only_new_findings(self) -> None:
+        """Changed baseline mode should hide findings already present at HEAD."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "config", "user.email", "agent@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Agent"],
+                cwd=root,
+                check=True,
+            )
+            source = root / "sample.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "def _ready(value: object) -> bool:",
+                        "    return value is not None",
+                        "",
+                        "def public_api(value: object) -> bool:",
+                        "    return _ready(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "sample.py"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "baseline"], cwd=root, check=True, capture_output=True, text=True)
+            source.write_text(
+                "\n".join(
+                    [
+                        "def _ready(value: object) -> bool:",
+                        "    return value is not None",
+                        "",
+                        "def public_api(value: object) -> bool:",
+                        "    return _ready(value)",
+                        "",
+                        "def _format(value: object) -> dict[str, object]:",
+                        "    return {'value': value}",
+                        "",
+                        "def public_report(value: object) -> dict[str, object]:",
+                        "    return _format(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--changed",
+                    "--baseline-ref",
+                    "HEAD",
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["changed_only"])
+            self.assertEqual(payload["baseline_ref"], "HEAD")
+            self.assertGreaterEqual(payload["baseline_filtered"], 1)
+            records = {record["qualname"]: record for record in payload["records"]}
+            self.assertNotIn("_ready", records)
+            self.assertEqual(records["_format"]["role"], "formatter_reporter")
+            self.assertEqual(records["_format"]["candidate_rule"], "main:private-local-formatter_reporter")
+
     def test_public_names_without_functional_evidence_are_not_default_helpers(self) -> None:
         """Names alone should not make public main-code helpers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
