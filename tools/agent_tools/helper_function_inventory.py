@@ -13,7 +13,6 @@ import argparse
 import ast
 import json
 import os
-import re
 import subprocess
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -35,43 +34,6 @@ DEFAULT_EXCLUDED_PARTS = frozenset(
     }
 )
 DEFAULT_EXCLUDED_SUFFIXES = (".pyi",)
-HELPER_NAME_PREFIXES = (
-    "add",
-    "as",
-    "build",
-    "check",
-    "collect",
-    "convert",
-    "copy",
-    "create",
-    "dump",
-    "emit",
-    "ensure",
-    "extract",
-    "find",
-    "format",
-    "gather",
-    "get",
-    "has",
-    "infer",
-    "is",
-    "iter",
-    "load",
-    "make",
-    "normalize",
-    "parse",
-    "read",
-    "render",
-    "resolve",
-    "scan",
-    "select",
-    "serialize",
-    "split",
-    "update",
-    "validate",
-    "walk",
-    "write",
-)
 PUBLIC_LOCAL_HELPER_ROLES = frozenset(
     {
         "adapter_bridge",
@@ -445,6 +407,44 @@ class FunctionBodyVisitor(ast.NodeVisitor):
                 self.features.add("network")
         self.generic_visit(node)
 
+    def visit_Return(self, node: ast.Return) -> None:
+        """Record return-shape features without using function names."""
+        value = node.value
+        if isinstance(value, ast.Call):
+            self.features.add("call_return")
+        if isinstance(value, (ast.Dict, ast.DictComp)):
+            self.features.add("mapping_return")
+        if isinstance(value, (ast.List, ast.ListComp, ast.Set, ast.SetComp, ast.Tuple)):
+            self.features.add("collection_return")
+        if isinstance(value, (ast.BoolOp, ast.Compare, ast.UnaryOp)):
+            self.features.add("predicate_return")
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        """Record iteration-heavy behavior."""
+        self.features.add("iteration")
+        self.generic_visit(node)
+
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        """Record async iteration-heavy behavior."""
+        self.features.add("iteration")
+        self.generic_visit(node)
+
+    def visit_comprehension(self, node: ast.comprehension) -> None:
+        """Record comprehension iteration."""
+        self.features.add("iteration")
+        self.generic_visit(node)
+
+    def visit_Yield(self, node: ast.Yield) -> None:
+        """Record generator behavior."""
+        self.features.add("generator")
+        self.generic_visit(node)
+
+    def visit_YieldFrom(self, node: ast.YieldFrom) -> None:
+        """Record generator behavior."""
+        self.features.add("generator")
+        self.generic_visit(node)
+
     def visit_Raise(self, node: ast.Raise) -> None:
         """Record validation/error behavior."""
         self.features.add("raises")
@@ -520,21 +520,13 @@ def class_body_facts(node: ast.ClassDef) -> BodyFacts:
     )
 
 
-def snake_words(name: str) -> str:
-    """Return a lower-case word form for class role checks."""
-    separated = re.sub(r"(?<!^)(?=[A-Z])", "_", name)
-    return separated.replace("-", "_").lower()
-
-
 def role_scores(
     *,
     path: str,
-    name: str,
     returns_annotation: str,
     facts: BodyFacts,
 ) -> tuple[Counter[str], list[str]]:
-    """Infer possible roles from name, path, calls, and body features."""
-    lower_name = name.lower().lstrip("_")
+    """Infer possible roles from path, annotations, calls, and body features."""
     path_parts = tuple(Path(path).parts)
     calls = set(facts.calls)
     features = set(facts.features)
@@ -545,60 +537,42 @@ def role_scores(
         scores[role] += points
         evidence.append(f"{role}:{reason}")
 
-    if lower_name.startswith(("fixture", "fake", "stub", "dummy", "mock")):
-        add("test_support", 2, "test-path-or-fixture-name")
-    if "tests" in path_parts and lower_name.startswith(("assert", "make", "build")):
-        add("test_support", 1, "test-helper-name")
     if "tools" in path_parts or "agent_tools" in path_parts:
         add("workflow_tooling", 1, "tool-path")
-    if lower_name.startswith(("build", "create", "make", "default")):
-        add("factory_builder", 3, "builder-prefix")
-    if lower_name.startswith(("parse", "load", "read")):
-        add("parser_loader", 3, "parser-loader-prefix")
-    if lower_name.startswith(("format", "render", "dump", "serialize", "markdown")):
-        add("formatter_reporter", 3, "formatter-prefix")
-    if lower_name.startswith(("check", "validate", "ensure", "assert")):
-        add("validator_checker", 3, "validator-prefix")
-    if lower_name.startswith(("is", "has", "can", "should")) or returns_annotation == "bool":
+    if "tests" in path_parts:
+        add("test_support", 1, "test-path")
+    if returns_annotation == "bool" or "predicate_return" in features:
         add("predicate", 3, "predicate-shape")
-    if lower_name.startswith(("iter", "collect", "find", "scan", "walk", "gather", "list")):
-        add("collector_inventory", 3, "collector-prefix")
-    if lower_name.startswith(
-        ("canonicalize", "normalize", "convert", "resolve", "relative", "sanitize", "as", "split")
-    ):
-        add("converter_normalizer", 3, "converter-prefix")
-    if lower_name.startswith(("write", "copy", "update", "emit", "log", "append", "remove")):
-        add("writer_mutator", 3, "writer-prefix")
-    if lower_name.startswith(("run", "main", "execute", "call")):
-        add("command_runner", 2, "command-prefix")
-    if "bridge" in lower_name or "adapter" in lower_name or "wrapper" in lower_name:
-        add("adapter_bridge", 2, "adapter-name")
-    if "inventory" in lower_name or "catalog" in lower_name:
-        add("collector_inventory", 2, "inventory-name")
-    if (
-        "diagnostic" in lower_name
-        or "message" in lower_name
-        or "report" in lower_name
-        or "warning" in lower_name
-    ):
-        add("formatter_reporter", 2, "report-name")
     if "subprocess" in features:
         add("command_runner", 3, "subprocess-call")
+    if "network" in features:
+        add("command_runner", 1, "network-call")
     if "cli_parser" in features:
         add("cli_parser", 4, "argparse-call")
-    if "serialization" in features:
-        add("parser_loader", 1, "serialization-call")
-        add("formatter_reporter", 1, "serialization-call")
+    if "serialization" in features and "read" in features:
+        add("parser_loader", 2, "serialization-read")
+    elif "serialization" in features:
+        add("formatter_reporter", 2, "serialization-transform")
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
         add("static_analyzer", 5, "ast-call")
     if "numeric" in features:
         add("numeric_kernel", 3, "numeric-call")
     if "read" in features:
-        add("parser_loader", 1, "read-call")
+        add("parser_loader", 2, "read-call")
     if "write" in features or "filesystem_mutation" in features:
         add("writer_mutator", 2, "write-or-filesystem-call")
-    if "raises" in features and not scores:
-        add("validator_checker", 1, "raises")
+    if "state_mutation" in features or "mutation_call" in features:
+        add("writer_mutator", 1, "mutation-call")
+    if "mapping_return" in features:
+        add("formatter_reporter", 2, "mapping-return")
+    if "collection_return" in features or "generator" in features or "iteration" in features:
+        add("collector_inventory", 2, "collection-or-iteration")
+    if "call_return" in features and not ({"read", "write", "numeric", "static_analysis"} & features):
+        add("factory_builder", 1, "call-return")
+    if "raises" in features:
+        add("validator_checker", 2, "raises")
+    if "logging" in features or "stdio" in features:
+        add("formatter_reporter", 1, "human-output")
     if not scores:
         add("general_helper", 1, "fallback")
     return scores, evidence
@@ -607,15 +581,12 @@ def role_scores(
 def class_role_scores(
     *,
     path: str,
-    name: str,
     bases: tuple[str, ...],
     decorators: tuple[str, ...],
-    method_names: tuple[str, ...],
+    annotated_field_count: int,
     facts: BodyFacts,
 ) -> tuple[Counter[str], list[str]]:
-    """Infer class roles from name, inheritance, decorators, methods, and bodies."""
-    lower_name = name.lower().lstrip("_")
-    word_name = snake_words(name).lstrip("_")
+    """Infer class roles from inheritance, decorators, fields, and bodies."""
     path_parts = tuple(Path(path).parts)
     calls = set(facts.calls)
     features = set(facts.features)
@@ -626,73 +597,39 @@ def class_role_scores(
         scores[role] += points
         evidence.append(f"{role}:{reason}")
 
-    if lower_name.startswith(("fake", "stub", "dummy", "mock")):
-        add("test_support", 2, "test-path-or-fixture-name")
+    if "tests" in path_parts:
+        add("test_support", 1, "test-path")
     if "tools" in path_parts or "agent_tools" in path_parts:
         add("workflow_tooling", 1, "tool-path")
     if any(base.endswith(("Protocol", "ABC")) or base in {"Protocol", "ABC"} for base in bases):
         add("protocol_interface", 4, "protocol-or-abc-base")
     if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
         add("data_container", 4, "data-class-decorator")
-    if lower_name.endswith(
-        (
-            "bundle",
-            "config",
-            "context",
-            "info",
-            "metrics",
-            "options",
-            "record",
-            "result",
-            "settings",
-            "state",
-        )
-    ):
-        add("data_container", 3, "data-container-name")
-    if any(token in word_name for token in ("adapter", "bridge", "wrapper")):
-        add("adapter_bridge", 3, "adapter-class-name")
-    if any(token in word_name for token in ("factory", "builder")):
-        add("factory_builder", 3, "builder-class-name")
-    if any(token in word_name for token in ("parser", "loader", "reader")):
-        add("parser_loader", 3, "parser-loader-class-name")
-    if any(token in word_name for token in ("formatter", "renderer", "reporter")):
-        add("formatter_reporter", 3, "formatter-class-name")
-    if any(token in word_name for token in ("checker", "validator")):
-        add("validator_checker", 3, "validator-class-name")
-    if any(token in word_name for token in ("collector", "inventory", "scanner")):
-        add("collector_inventory", 3, "collector-class-name")
-    if any(token in word_name for token in ("command", "executor", "runner")):
-        add("command_runner", 3, "runner-class-name")
-    if any(token in word_name for token in ("cache", "registry", "store")):
-        add("state_holder", 2, "state-holder-class-name")
-
-    for method_name in method_names:
-        lower_method = method_name.lower()
-        if lower_method.startswith(("build", "create", "make")):
-            add("factory_builder", 1, "builder-method")
-        if lower_method.startswith(("parse", "load", "read")):
-            add("parser_loader", 1, "parser-loader-method")
-        if lower_method.startswith(("format", "render", "dump", "serialize")):
-            add("formatter_reporter", 1, "formatter-method")
-        if lower_method.startswith(("check", "validate", "ensure")):
-            add("validator_checker", 1, "validator-method")
-        if lower_method.startswith(("iter", "collect", "find", "scan", "walk", "gather")):
-            add("collector_inventory", 1, "collector-method")
-        if lower_method.startswith(("normalize", "convert", "resolve", "split")):
-            add("converter_normalizer", 1, "converter-method")
-        if lower_method.startswith(("write", "copy", "update", "emit", "append", "remove")):
-            add("writer_mutator", 1, "writer-method")
-        if lower_method.startswith(("run", "execute", "call")) or lower_method == "__call__":
-            add("command_runner", 1, "runner-method")
+    if annotated_field_count:
+        add("data_container", 2, "annotated-fields")
 
     if "subprocess" in features:
         add("command_runner", 3, "subprocess-call")
+    if "cli_parser" in features:
+        add("cli_parser", 4, "argparse-call")
+    if "serialization" in features and "read" in features:
+        add("parser_loader", 2, "serialization-read")
+    elif "serialization" in features:
+        add("formatter_reporter", 2, "serialization-transform")
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
         add("static_analyzer", 5, "ast-call")
     if "numeric" in features:
         add("numeric_kernel", 3, "numeric-call")
     if "write" in features or "filesystem_mutation" in features:
         add("writer_mutator", 2, "write-or-filesystem-call")
+    if "state_mutation" in features or "mutation_call" in features:
+        add("state_holder", 1, "state-mutation")
+    if "mapping_return" in features:
+        add("formatter_reporter", 2, "mapping-return")
+    if "collection_return" in features or "generator" in features or "iteration" in features:
+        add("collector_inventory", 2, "collection-or-iteration")
+    if "raises" in features:
+        add("validator_checker", 2, "raises")
     if not scores:
         add("general_helper", 1, "fallback")
     return scores, evidence
@@ -703,28 +640,20 @@ def helper_candidate(
     kind: str,
     name: str,
     scope: str,
-    path: str,
     role: str,
 ) -> bool:
     """Return whether a symbol initially looks helper-like before usage filtering."""
-    lower_name = name.lower()
-    if lower_name.startswith("test_"):
-        return False
-    if kind == "function" and lower_name in {"main", "__init__"}:
+    if name.startswith("__") and name.endswith("__"):
         return False
     if scope == "nested":
         return True
     if name.startswith("_") and not (name.startswith("__") and name.endswith("__")):
         return True
-    if lower_name.endswith("_helper") or "helper" in lower_name or "util" in lower_name:
-        return True
-    if kind == "function" and lower_name.startswith(HELPER_NAME_PREFIXES):
-        return True
     if kind == "function" and role in PUBLIC_LOCAL_HELPER_ROLES:
         return True
     if kind == "class" and role in CLASS_LOCAL_HELPER_ROLES:
         return True
-    return "helper" in path or "utils" in path
+    return False
 
 
 def confidence(
@@ -743,8 +672,6 @@ def confidence(
         score += 0.25
     if scope == "nested":
         score += 0.2
-    if any(name.lower().startswith(prefix) for prefix in HELPER_NAME_PREFIXES):
-        score += 0.15
     if scores:
         score += min(0.2, max(scores.values()) / 20.0)
     if facts.calls:
@@ -798,7 +725,6 @@ class DefinitionCollector(ast.NodeVisitor):
         returns_annotation = unparse(node.returns)
         scores, evidence = role_scores(
             path=self.relative_path,
-            name=node.name,
             returns_annotation=returns_annotation,
             facts=facts,
         )
@@ -808,7 +734,6 @@ class DefinitionCollector(ast.NodeVisitor):
             kind="function",
             name=node.name,
             scope=scope,
-            path=self.relative_path,
             role=role,
         )
         decorators = tuple(filter(None, (dotted_name(item) for item in node.decorator_list)))
@@ -877,12 +802,14 @@ class DefinitionCollector(ast.NodeVisitor):
         method_names = tuple(
             item.name for item in node.body if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
         )
+        annotated_field_count = sum(
+            1 for item in node.body if isinstance(item, (ast.AnnAssign, ast.Assign))
+        )
         scores, evidence = class_role_scores(
             path=self.relative_path,
-            name=node.name,
             bases=bases,
             decorators=decorators,
-            method_names=method_names,
+            annotated_field_count=annotated_field_count,
             facts=facts,
         )
         ordered_roles = [role for role, _count in scores.most_common()]
@@ -891,7 +818,6 @@ class DefinitionCollector(ast.NodeVisitor):
             kind="class",
             name=node.name,
             scope=scope,
-            path=self.relative_path,
             role=role,
         )
         self.records.append(
@@ -983,20 +909,11 @@ def analyze_file(root: Path, path: Path) -> list[FunctionRecord]:
 
 def candidate_rule(record: FunctionRecord) -> str:
     """Return the deterministic rule that keeps a helper candidate."""
-    lower_name = record.name.lower()
-    if record.kind == "function" and lower_name.startswith("test_"):
-        return ""
-    if record.kind == "class" and record.domain == "test" and record.name.startswith("Test"):
-        return ""
-    if record.kind == "function" and lower_name in {"main", "__init__"}:
-        return ""
     if record.name.startswith("__") and record.name.endswith("__"):
         return ""
 
     if record.scope == "nested":
         return nested_candidate_rule(record)
-    if lower_name.endswith("_helper") or "helper" in lower_name or "util" in lower_name:
-        return f"{record.domain}:explicit-helper-name"
 
     local_symbol = record.specialization in LOCAL_SPECIALIZATIONS and record.incoming_count > 0
     if record.domain == "test":
@@ -1010,13 +927,11 @@ def candidate_rule(record: FunctionRecord) -> str:
 
 def nested_candidate_rule(record: FunctionRecord) -> str:
     """Return a deterministic nested-symbol helper rule."""
-    lower_name = record.name.lower()
-    if lower_name in {"decorator", "wrapper", "callback", "closure"}:
-        return f"{record.domain}:nested-{lower_name}"
-    if record.kind == "function" and (
-        lower_name.startswith(HELPER_NAME_PREFIXES)
-        or record.role in PUBLIC_LOCAL_HELPER_ROLES
-    ) and record.role not in LOW_SIGNAL_HELPER_ROLES:
+    if (
+        record.kind == "function"
+        and record.role in PUBLIC_LOCAL_HELPER_ROLES
+        and record.role not in LOW_SIGNAL_HELPER_ROLES
+    ):
         return f"{record.domain}:nested-{record.role}"
     if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
         return f"{record.domain}:nested-{record.role}"
@@ -1025,23 +940,17 @@ def nested_candidate_rule(record: FunctionRecord) -> str:
 
 def test_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
     """Return a deterministic test-directory helper rule."""
-    lower_name = record.name.lower()
-    word_name = snake_words(record.name)
     decorator_names = {decorator.rsplit(".", maxsplit=1)[-1] for decorator in record.decorators}
     if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
         return f"test:private-local-{record.role}"
     if record.kind == "function":
         if "fixture" in decorator_names:
             return "test:fixture-function"
-        if lower_name.startswith(("fixture", "fake", "stub", "dummy", "mock", "make", "build", "assert")):
-            return "test:test-support-function-name"
         if local_symbol and record.role in PUBLIC_LOCAL_HELPER_ROLES:
             return f"test:local-{record.role}"
         return ""
-    if any(token in word_name for token in ("fake", "stub", "dummy", "mock")):
-        return "test:test-double-class"
-    if local_symbol and record.role in CLASS_LOCAL_HELPER_ROLES:
-        return f"test:local-{record.role}"
+    if local_symbol:
+        return "test:local-test-class"
     return ""
 
 
@@ -1051,10 +960,7 @@ def experiment_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str
         return f"experiment:private-local-{record.role}"
     if not local_symbol:
         return ""
-    if record.kind == "function" and (
-        record.name.lower().startswith(HELPER_NAME_PREFIXES)
-        or record.role in PUBLIC_LOCAL_HELPER_ROLES
-    ):
+    if record.kind == "function" and record.role in PUBLIC_LOCAL_HELPER_ROLES:
         return f"experiment:local-{record.role}"
     if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
         return f"experiment:local-{record.role}"
@@ -1067,10 +973,7 @@ def tooling_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
         return f"tooling:private-local-{record.role}"
     if not local_symbol:
         return ""
-    if record.kind == "function" and (
-        record.name.lower().startswith(HELPER_NAME_PREFIXES)
-        or record.role in PUBLIC_LOCAL_HELPER_ROLES
-    ):
+    if record.kind == "function" and record.role in PUBLIC_LOCAL_HELPER_ROLES:
         return f"tooling:local-{record.role}"
     if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
         return f"tooling:local-{record.role}"
@@ -1086,13 +989,6 @@ def main_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
 
 def design_judgment_rule(record: FunctionRecord) -> str:
     """Return the deterministic reason a symbol needs human design judgment."""
-    lower_name = record.name.lower()
-    if record.kind == "function" and lower_name.startswith("test_"):
-        return ""
-    if record.kind == "function" and lower_name in {"main", "__init__"}:
-        return ""
-    if record.kind == "class" and record.domain == "test" and record.name.startswith("Test"):
-        return ""
     if record.name.startswith("__") and record.name.endswith("__"):
         return ""
 
@@ -1111,10 +1007,7 @@ def design_judgment_rule(record: FunctionRecord) -> str:
 def main_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
     """Return main-code symbols that look helper-like but need semantics."""
     if local_symbol and record.visibility == "public":
-        if record.kind == "function" and (
-            record.name.lower().startswith(HELPER_NAME_PREFIXES)
-            or record.role in PUBLIC_LOCAL_HELPER_ROLES
-        ):
+        if record.kind == "function" and record.role in PUBLIC_LOCAL_HELPER_ROLES:
             return f"main:public-local-{record.role}"
         if record.kind == "class" and record.role in CLASS_LOCAL_HELPER_ROLES:
             return f"main:public-local-{record.role}"

@@ -689,7 +689,7 @@ entries:
     test_exempt_reason: Inventory is consumed through review_backlog_scan evidence.
 
   - id: helper-function-inventory
-    summary: Inventories Python helper functions/classes with deterministic AST rules.
+    summary: Inventories Python helper functions/classes with functional AST facts.
     path: tools/agent_tools/helper_function_inventory.py
     family: agent_tools
     role: inventory

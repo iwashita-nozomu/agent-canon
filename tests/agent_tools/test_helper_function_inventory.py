@@ -133,8 +133,8 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(payload["records"][0]["qualname"], "public_api")
             self.assertFalse(payload["records"][0]["helper_candidate"])
 
-    def test_public_prefix_without_internal_callers_is_not_default_helper(self) -> None:
-        """Names and roles alone should not make public main-code helpers."""
+    def test_public_names_without_functional_evidence_are_not_default_helpers(self) -> None:
+        """Names alone should not make public main-code helpers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "main_code.py").write_text(
@@ -205,12 +205,12 @@ class HelperFunctionInventoryTest(unittest.TestCase):
                         "    def test_case(self) -> None:",
                         "        assert True",
                         "",
-                        "class FakeSession:",
+                        "class Session:",
                         "    pass",
                         "",
                         "@pytest.fixture",
-                        "def session() -> FakeSession:",
-                        "    return FakeSession()",
+                        "def session() -> Session:",
+                        "    return Session()",
                         "",
                     ]
                 ),
@@ -221,8 +221,10 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             (experiments_dir / "run_exp.py").write_text(
                 "\n".join(
                     [
+                        "import json",
+                        "",
                         "def parse_config() -> dict[str, str]:",
-                        "    return {}",
+                        "    return json.loads('{}')",
                         "",
                         "def normalize_unused(value: object) -> object:",
                         "    return value",
@@ -259,7 +261,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertTrue(records["LocalMetrics"]["needs_user_judgment"])
             self.assertEqual(records["LocalMetrics"]["judgment_rule"], "main:public-local-data_container")
             self.assertNotIn("PublicInfo", records)
-            self.assertIn("candidate-rule:test:test-double-class", records["FakeSession"]["evidence"])
+            self.assertIn("candidate-rule:test:local-test-class", records["Session"]["evidence"])
             self.assertIn("candidate-rule:test:fixture-function", records["session"]["evidence"])
             self.assertNotIn("TestWorkflow", records)
             self.assertIn("candidate-rule:experiment:local-parser_loader", records["parse_config"]["evidence"])
@@ -270,7 +272,16 @@ class HelperFunctionInventoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "helpers.py").write_text(
-                "def _is_ready_helper(value: object) -> bool:\n    return value is not None\n",
+                "\n".join(
+                    [
+                        "def _ready(value: object) -> bool:",
+                        "    return value is not None",
+                        "",
+                        "def public_api(value: object) -> bool:",
+                        "    return _ready(value)",
+                        "",
+                    ]
+                ),
                 encoding="utf-8",
             )
 
@@ -283,7 +294,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("SYMBOL=helpers.py:1:_is_ready_helper", result.stdout)
+            self.assertIn("SYMBOL=helpers.py:1:_ready", result.stdout)
             self.assertIn("verdict=auto_helper", result.stdout)
             self.assertIn("role=predicate", result.stdout)
             self.assertIn("HELPER_INVENTORY=pass", result.stdout)
