@@ -51,7 +51,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertIn("| inventory | 0 |", summary)
 
     def test_stale_search_excludes_git_paths(self) -> None:
-        """The rg-based stale search should not read .git object databases."""
+        """The stale search should not read .git object databases."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             git_object = root / ".git" / "objects" / "aa" / "leak.txt"
