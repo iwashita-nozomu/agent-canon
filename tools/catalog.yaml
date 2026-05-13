@@ -637,12 +637,12 @@ entries:
       - tests/agent_tools/test_oop_rule_inventory.py
 
   - id: review-backlog-scan
-    summary: Aggregates review backlog scans into a run-bundle report.
+    summary: Runs root plus AgentCanon cross-repo inspection into a run-bundle report.
     path: tools/agent_tools/review_backlog_scan.sh
     family: agent_tools
     role: runner
     status: canonical
-    command: bash tools/agent_tools/review_backlog_scan.sh
+    command: bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware
     writes: true
     default_wiring:
       ci: false
@@ -650,8 +650,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Integrated report runner; component tools are tested directly.
+    tests:
+      - tests/agent_tools/test_review_backlog_scan.py
 
   - id: vector-search
     summary: Provides dependency-free TF-IDF search across canon text surfaces.
@@ -685,8 +685,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/SHARED_RUNTIME_SURFACES.md
-    tests: []
-    test_exempt_reason: Inventory is consumed through review_backlog_scan evidence.
+    tests:
+      - tests/agent_tools/test_file_surface_inventory.py
 
   - id: goal-loop
     summary: Manages goal.md exit criteria, backlog, and loop status.

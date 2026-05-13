@@ -263,14 +263,17 @@ python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor -
 
 ## Review Backlog Scan
 
-`review_backlog_scan.sh` is the integrated file-by-file review entrypoint for
-large goal iterations. It writes a machine-readable inventory, a Markdown
-inventory, tool logs, and a command-status summary under the run bundle.
+`review_backlog_scan.sh` is the standard repo-cross inspection entrypoint for
+large goal iterations in the standalone AgentCanon repo, this template, and
+derived repos that pin AgentCanon as `vendor/agent-canon`. It inspects the
+parent/root surface and AgentCanon source as separate scopes, then writes a
+machine-readable inventory, a Markdown inventory, tool logs, and a
+command-status summary under the run bundle.
 
 ```bash
-make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>"
+make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware"
 bash tools/agent_tools/review_backlog_scan.sh \
-  --report-dir reports/agents/<run-id> \
+  --report-dir reports/agents/<run-id>/cross_repo_inspection \
   --submodule-aware
 ```
 
@@ -281,6 +284,33 @@ Scope flags:
 - `--root-only`: scan the parent repo surface and exclude submodule internals.
 - `--agentcanon-only`: scan AgentCanon source, using `vendor/agent-canon` in a
   derived repo and `.` in the source repo.
+
+Use the `--submodule-aware` form before marking template / derived-repo PRs
+ready for review when the change touches shared runtime surfaces, PR templates,
+workflow docs, issue storage, tool definitions, dependency manifests, or synced
+root views. The run is not a replacement for `make ci`; it is the inspection
+bundle that tells reviewers which repo-level surfaces still need edit or
+verification.
+
+Minimum evidence to keep with the run bundle:
+
+- `file_surface_inventory.json` and `file_surface_inventory.md` for root,
+  submodule pin, symlink/copy views, and AgentCanon source classification.
+- `dependency_review_root.txt` and `dependency_review_agentcanon.txt` for
+  manifest coverage, format, and dependency graph checks.
+- `code_dependencies_root.txt` and `code_dependencies_agentcanon.txt` for
+  import/include/source reachability.
+- `oop_*_readability_*.md`, `static_any_*.txt`,
+  `hardcoded_numbers_*.txt`, and `log_helper_names_*.txt` for mechanical
+  implementation review signals.
+- `convention_compliance.txt` and `review_backlog_scan_status.tsv` for
+  convention and command-status evidence.
+
+After the run, convert the inventory and dependency graph evidence into an
+explicit edit / verification list. A grep hit alone is not enough: each listed
+surface should say whether it is AgentCanon-owned source, template/root local
+state, a synced copy, a symlink view, a GitHub path-constraint copy, or a
+project-owned artifact.
 
 ## Goal Loop Tool
 
@@ -354,6 +384,11 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `check_dependency_graph.sh --list-related --focus <path>` lists every manifest edge declared by, or pointing at, a changed code/doc path so reviewers can see all dependent surfaces before implementation review.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
 - `run_repo_dependency_review.sh --list-changed-dependencies` adds the same related-surface listing for current changed files.
+- GitHub path-constraint root copies such as
+  `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` keep AgentCanon-source
+  dependency headers. The format and graph checkers resolve those dependency
+  paths against the AgentCanon source file when `vendor/agent-canon` is
+  present, so root-copy review does not require duplicate root-only headers.
 - `tool_catalog.py` validates the structured AgentCanon tool catalog, per-entry summaries, default wiring, docs/tests, retired legacy paths, and one-to-one tool docs.
 - `tool_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
 

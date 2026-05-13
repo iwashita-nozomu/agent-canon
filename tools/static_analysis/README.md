@@ -22,5 +22,7 @@ Use this split for routing:
 The integrated repo entrypoint is:
 
 ```bash
-bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id>
+bash tools/agent_tools/review_backlog_scan.sh \
+  --report-dir reports/agents/<run-id>/cross_repo_inspection \
+  --submodule-aware
 ```

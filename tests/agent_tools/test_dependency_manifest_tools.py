@@ -570,6 +570,71 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertNotIn("upstream\tdesign\tAGENTS.md\t", result.stdout)
 
+    def test_root_copy_headers_resolve_in_agentcanon_source_context(self) -> None:
+        """GitHub root-copy headers should keep valid AgentCanon-source paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            root_copy = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+            source_copy = (
+                root
+                / "vendor"
+                / "agent-canon"
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE"
+                / "agent_canon.md"
+            )
+            issue_readme = root / "vendor" / "agent-canon" / "issues" / "README.md"
+            root_copy.parent.mkdir(parents=True)
+            source_copy.parent.mkdir(parents=True)
+            issue_readme.parent.mkdir(parents=True)
+            issue_readme.write_text("# Issues\n", encoding="utf-8")
+            content = "\n".join(
+                [
+                    "<!--",
+                    "@dependency-start",
+                    "responsibility Defines a template AgentCanon PR checklist copy.",
+                    "upstream design ../../issues/README.md durable issue storage",
+                    "@dependency-end",
+                    "-->",
+                    "",
+                ]
+            )
+            root_copy.write_text(content, encoding="utf-8")
+            source_copy.write_text(content, encoding="utf-8")
+
+            format_result = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                str(root_copy),
+                root=root,
+            )
+            graph_result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--print-edges",
+                str(root_copy),
+                root=root,
+            )
+
+            self.assertEqual(
+                format_result.returncode,
+                0,
+                format_result.stdout + format_result.stderr,
+            )
+            self.assertEqual(
+                graph_result.returncode,
+                0,
+                graph_result.stdout + graph_result.stderr,
+            )
+            self.assertIn(
+                "upstream\tdesign\t.github/PULL_REQUEST_TEMPLATE/agent_canon.md\t"
+                "vendor/agent-canon/issues/README.md",
+                graph_result.stdout,
+            )
+            self.assertNotIn("\tissues/README.md", graph_result.stdout)
+
     def test_graph_lists_related_dependency_surfaces_for_focus_path(self) -> None:
         """Focused graph output should list declared and incoming dependency edges."""
         with tempfile.TemporaryDirectory() as tmp_dir:

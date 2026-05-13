@@ -218,9 +218,30 @@ strip_manifest_line() {
 normalize_path() {
   local source_file="$1"
   local rel_path="$2"
+  local source_context
   local source_dir
-  source_dir="$(dirname "$source_file")"
+  source_context="$(source_context_file "$source_file")"
+  source_dir="$(dirname "$source_context")"
   realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
+}
+
+source_context_file() {
+  local source_file="$1"
+  case "$source_file" in
+    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+      if [[ -f "vendor/agent-canon/$source_file" ]]; then
+        printf 'vendor/agent-canon/%s\n' "$source_file"
+        return
+      fi
+      ;;
+    .github/scripts/checkout_agent_canon_submodule.sh)
+      if [[ -f "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh" ]]; then
+        printf '%s\n' "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh"
+        return
+      fi
+      ;;
+  esac
+  printf '%s\n' "$source_file"
 }
 
 extract_edges() {
@@ -265,7 +286,7 @@ trap 'rm -f "$edges_file" "$edges_file.sorted" "$manifest_files" "$manifest_file
 
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
-  path="${raw_path#./}"
+  path="$(normalize_input_path "$raw_path")"
   extract_edges "$path" >> "$edges_file"
 done < <(collect_paths)
 
