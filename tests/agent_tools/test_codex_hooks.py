@@ -353,6 +353,7 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env={**os.environ, "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container"},
             )
             durable_log = (
                 temp_root
@@ -360,6 +361,7 @@ class CodexHooksTest(unittest.TestCase):
                 / "evals"
                 / "results"
                 / "hook-runs"
+                / "test-container"
                 / "oop_readability_guard.jsonl"
             )
             durable_log_exists = durable_log.exists()
@@ -368,6 +370,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("decision", json.loads(result.stdout))
         self.assertTrue(durable_log_exists)
         self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["hook_log_namespace"], "test-container")
 
     def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
         """OOP guard should not infer PostToolUse from empty stdin."""
@@ -792,6 +795,7 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                env={**os.environ, "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container"},
             )
             log_path = (
                 temp_root
@@ -799,6 +803,7 @@ class CodexHooksTest(unittest.TestCase):
                 / "evals"
                 / "results"
                 / "hook-runs"
+                / "test-container"
                 / "skill_usage.jsonl"
             )
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
@@ -806,6 +811,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
+        self.assertEqual(entries[0]["hook_log_namespace"], "test-container")
 
     def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
         """No-skill hook payloads should not dirty durable AgentCanon logs."""
@@ -856,9 +862,13 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_HOOK_RESULTS_DIR": str(log_dir)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_RESULTS_DIR": str(log_dir),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                },
             )
-            log_path = log_dir / "skill_usage.jsonl"
+            log_path = log_dir / "test-container" / "skill_usage.jsonl"
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(result.stdout, "")

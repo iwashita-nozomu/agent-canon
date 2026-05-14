@@ -32,16 +32,25 @@ in a follow-up change; do not silently hide already-written evidence.
 
 ## File Naming
 
-Each hook writes one JSONL file named after the hook:
+Each hook writes one JSONL file named after the hook inside a runtime namespace:
 
 ```text
-<hook-name>.jsonl
+<runtime-namespace>/<hook-name>.jsonl
 ```
+
+The namespace is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
+`DEVCONTAINER_PROJECT_NAME`, `COMPOSE_PROJECT_NAME`, generated devcontainer
+Compose `name:`, or a host/repo hash fallback. This prevents shared
+AgentCanon-owned hook result files such as `oop_readability_guard.jsonl` from
+becoming one conflicting append target across multiple containers or clones.
+Legacy direct files at `hook-runs/<hook-name>.jsonl` may remain readable, but
+new default hook writes must use a namespace directory.
 
 Each line must include:
 
 ```text
 hook_run_id: hook-<YYYYMMDDTHHMMSSffffffZ>-<10-char-payload-hash>-<10-char-nonce>
+hook_log_namespace: runtime namespace used for the JSONL path
 timestamp: ISO-8601 UTC
 event: hook event name or UnknownHookEvent
 payload_fingerprint: stable payload hash

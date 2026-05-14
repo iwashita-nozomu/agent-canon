@@ -88,7 +88,10 @@ Hook and tool outcomes must also close the protocol feedback loop. Record
 subagent handoff rules, role TOML, evals, or memory changed because of the
 observed results.
 Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
-`hook_run_id` values. GitHub Actions reads these hook results, memory notes,
+`hook_run_id` values. Normal hook writers shard JSONL files by runtime namespace
+under `hook-runs/<runtime-namespace>/<hook-name>.jsonl` so multiple containers
+or template-derived repositories do not append to one conflicting filename.
+GitHub Actions reads these hook results recursively, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 That guide must not stop at raw pass/fail counts: it summarizes skill usage,
 skill/event coverage, hook source files, hook tool names, code-checker target

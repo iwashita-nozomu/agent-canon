@@ -83,6 +83,8 @@ The shared devcontainer owns:
 
 - post-create installation of Codex, npm/Node when needed for Codex, and
   GitHub CLI / `gh`;
+- repository-specific devcontainer and Docker Compose project names, so template
+  clones do not all create the same visible container names;
 - host auth mount conventions for Codex, GitHub CLI, and SSH;
 - optional `/mnt/git` compatibility mounts when the host path exists;
 - Docker socket mount detection and reporting;
@@ -94,6 +96,11 @@ The shared devcontainer consumes repo-local Docker runtime contracts instead of
 owning them. It reads `docker/packs/default.toml`, builds the repo-local
 `docker/Dockerfile`, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
+
+`devcontainer.json` must not use a fixed AgentCanon display name for every
+parent repository. The generated Compose file must also set a top-level project
+`name` derived from the repository path, while allowing an explicit
+`DEVCONTAINER_PROJECT_NAME` override for rare host-level collisions.
 
 ## Validation
 

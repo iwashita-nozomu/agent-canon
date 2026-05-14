@@ -180,6 +180,7 @@ def main() -> int:
         root,
         {
             "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+            "hook_log_namespace": context.runtime_namespace(),
             "timestamp": timestamp,
             "event": hook_event_name(payload),
             "skills": skills,

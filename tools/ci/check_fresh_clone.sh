@@ -65,6 +65,7 @@ import yaml
 
 compose_path = Path(".devcontainer/docker-compose.generated.yml")
 data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+assert data["name"].endswith("-devcontainer"), "compose project name missing"
 assert "services" in data and "workspace" in data["services"], "workspace service missing"
 assert data["services"]["workspace"]["working_dir"] == "/workspace"
 PY

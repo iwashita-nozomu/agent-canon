@@ -98,6 +98,12 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling, and
   post-create bootstrap belong in `.devcontainer/post-create.sh`.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
+- Shared devcontainer names must be repository-specific. Do not use a fixed
+  `name` or Compose project name that makes every template-derived repository
+  create the same visible devcontainer/container names.
+- The generated Docker Compose file must set a top-level project `name` derived
+  from the repository path, with `DEVCONTAINER_PROJECT_NAME` reserved as an
+  explicit override for rare host-level collisions.
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and

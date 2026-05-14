@@ -513,6 +513,7 @@ def analyzer_log_payload(
     context = HookLogContext(root, "oop_readability_guard", os.environ.get(LOG_PATH_ENV, "").strip())
     return {
         "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+        "hook_log_namespace": context.runtime_namespace(),
         "timestamp": timestamp,
         "event": hook_event_name(payload),
         "tool_name": tool_name(payload),

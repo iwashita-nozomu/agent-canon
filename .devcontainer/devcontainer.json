@@ -8,7 +8,7 @@
     "downstream implementation generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
     "@dependency-end"
   ],
-  "name": "agent-canon-workspace",
+  "name": "${localWorkspaceFolderBasename}-devcontainer",
   "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "docker-compose.generated.yml",
   "service": "workspace",

@@ -69,7 +69,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         (root / "issues" / "closed").mkdir(parents=True)
         (root / "memory").mkdir()
         skill_results = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
-        hook_results = root / "agents" / "evals" / "results" / "hook-runs"
+        hook_results = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
         skill_results.mkdir(parents=True)
         hook_results.mkdir(parents=True)
         (root / "issues" / "open" / "AC-20260513-open.md").write_text(
