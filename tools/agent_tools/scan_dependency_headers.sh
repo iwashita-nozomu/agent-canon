@@ -89,10 +89,24 @@ is_binary_file() {
   LC_ALL=C grep -Iq . "$1" 2>/dev/null
 }
 
+has_manifest_marker() {
+  local path="$1"
+  local marker="$2"
+  awk -v max_lines="$HEADER_SCAN_LINES" -v marker="$marker" '
+    NR > max_lines { exit 1 }
+    index($0, marker) { found = 1; exit 0 }
+    END {
+      if (!found) {
+        exit 1
+      }
+    }
+  ' "$path"
+}
+
 has_manifest_markers() {
   local path="$1"
-  head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-start' &&
-    head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-end'
+  has_manifest_marker "$path" '@dependency-start' &&
+    has_manifest_marker "$path" '@dependency-end'
 }
 
 display_path() {
@@ -148,10 +162,10 @@ missing_reason() {
   local path="$1"
   local has_start=0
   local has_end=0
-  if head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-start'; then
+  if has_manifest_marker "$path" '@dependency-start'; then
     has_start=1
   fi
-  if head -n "$HEADER_SCAN_LINES" "$path" | grep -q '@dependency-end'; then
+  if has_manifest_marker "$path" '@dependency-end'; then
     has_end=1
   fi
   if [[ "$has_start" -eq 0 && "$has_end" -eq 0 ]]; then
