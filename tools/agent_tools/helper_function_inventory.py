@@ -141,7 +141,7 @@ class FunctionRecord:
     decorators: list[str]
     returns_annotation: str
     doc_summary: str
-    evidence: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)

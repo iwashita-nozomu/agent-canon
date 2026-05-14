@@ -56,6 +56,7 @@ def _payload_status(payload: dict[str, object]) -> str:
 
 
 def repo_root() -> Path:
+    """Return the active Git repository root for helper inventory checks."""
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         check=False,
@@ -150,6 +151,7 @@ def _load_policy(root: Path) -> dict[str, object]:
 
 
 def git_changed_python_paths(root: Path) -> list[str]:
+    """Return changed Python paths that should be inspected by the hook."""
     names: set[str] = set()
     for args in (
         ["diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--"],
@@ -185,6 +187,7 @@ def _inventory_command(root: Path, policy: dict[str, object]) -> list[str]:
 
 
 def run_inventory(root: Path, policy: dict[str, object]) -> tuple[list[str], int, str]:
+    """Run the helper inventory command and return command, status, and output."""
     command = _inventory_command(root, policy)
     if not Path(command[1]).is_file():
         return command, 0, json.dumps({"records": [], "tool_status": "missing"})
@@ -292,6 +295,7 @@ def _reason(command: list[str], records: list[dict[str, object]], counts: dict[s
 
 
 def main() -> int:
+    """Run the helper inventory hook and block when policy thresholds fail."""
     payload = _load_payload()
     root = repo_root()
     policy = _load_policy(root)
