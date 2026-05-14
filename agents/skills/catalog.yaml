@@ -38,13 +38,9 @@ skill_families:
     canonical_doc: agents/skills/cpp-review.md
     shim: .agents/skills/cpp-review/SKILL.md
   - id: oop-readability-check
-    purpose: Run the OOP readability checker as a narrow mechanical tool check and produce mechanical report tables when requested.
+    purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
-  - id: oop-readability-analysis
-    purpose: Interpret OOP readability results with agent judgment, priority, and false-positive review separate from mechanical output.
-    canonical_doc: agents/skills/oop-readability-analysis.md
-    shim: .agents/skills/oop-readability-analysis/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md
