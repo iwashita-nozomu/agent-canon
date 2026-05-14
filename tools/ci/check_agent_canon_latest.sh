@@ -3,7 +3,7 @@
 # responsibility Checks agent canon latest CI readiness.
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first propagation after dirty shared-canon checks
-# upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines proposal route for derived shared-canon diffs
+# upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines branch route for derived shared-canon diffs
 # @dependency-end
 
 set -euo pipefail
@@ -50,9 +50,9 @@ case "$route" in
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
-      echo "AGENT_CANON_LATEST_PROPOSAL_COMMAND=bash tools/update_agent_canon.sh push-proposal"
-      echo "AgentCanon update surface is dirty; commit/push proposal or merge AgentCanon changes before treating the latest gate as clean." >&2
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
+      echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
+      echo "AgentCanon update surface is dirty; commit the AgentCanon branch, merge GitHub main into it, and open an AgentCanon PR before treating the latest gate as clean." >&2
       exit 1
     fi
     echo "AGENT_CANON_LATEST=pass"
@@ -64,9 +64,9 @@ case "$route" in
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
     emit_submodule_worktree_evidence
     echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-    echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
-    echo "AGENT_CANON_LATEST_PROPOSAL_COMMAND=bash tools/update_agent_canon.sh push-proposal"
-    echo "AgentCanon parent pin contains local shared-canon commits; route them through a proposal or AgentCanon PR before treating the parent repository as latest." >&2
+    echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
+    echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
+    echo "AgentCanon parent pin contains local shared-canon commits; route them through an AgentCanon branch and PR before treating the parent repository as latest." >&2
     exit 1
     ;;
   *)
@@ -95,10 +95,10 @@ case "$route" in
     emit_submodule_worktree_evidence
     if [[ "${dirty_update_surface:-${dirty_worktree:-}}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
-      echo "AGENT_CANON_LATEST_PROPOSAL_COMMAND=bash tools/update_agent_canon.sh push-proposal"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
+      echo "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
       echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
-      echo "Route shared-canon local changes through a proposal or AgentCanon PR, merge upstream first, then rerun 'make agent-canon-ensure-latest' to bring the pin back." >&2
+      echo "Route shared-canon local changes through an AgentCanon branch and PR, merge GitHub main into the branch first, then rerun 'make agent-canon-ensure-latest' to bring the pin back." >&2
     elif [[ "${dirty_worktree:-}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_parent_dirty_outside_update_surface_ok"

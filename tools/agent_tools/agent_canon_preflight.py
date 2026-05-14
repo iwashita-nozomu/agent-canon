@@ -4,7 +4,7 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines task-entry freshness routing
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first shared-canon propagation
-# upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived proposal routing
+# upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived AgentCanon branch routing
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
 # downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
@@ -127,8 +127,8 @@ def run_agent_canon_preflight(
             status="blocked_shared_canon_workflow",
             reason=detail or "make agent-canon-ensure-latest failed",
             next_step=(
-                "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
-                "run_make_agent-canon-ensure-latest"
+                "commit_agentcanon_branch_then_merge-main-into-current_then_open_agent-canon_PR_"
+                "then_after_merge_run_make_agent-canon-ensure-latest"
             ),
             checklist_path=checklist_path,
             checklist_status=checklist_status,

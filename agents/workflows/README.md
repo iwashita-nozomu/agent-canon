@@ -122,7 +122,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `pr-queue-cleanup-workflow.md`
   - AgentCanon source PR と template / derived pin PR が同時に開いているとき、source merge、template pin realignment、dependent PR validation、ready / merge 判断を順番に閉じる手順
 - `derived-agent-canon-diff-workflow.md`
-  - 派生 repo の agent-canon 差分を proposal branch、shared canon main、派生 repo snapshot へ順に反映する手順
+  - 派生 repo の agent-canon 差分を AgentCanon branch / PR、shared canon main、派生 repo submodule pin へ順に反映する手順
 - `agent-learning-workflow.md`
   - `memory/` と guardrail への learning promotion
 - `workflow-references.md`
@@ -162,9 +162,8 @@ derived repo から shared canon だけ更新するときは、必要に応じ�
 
 ```bash
 bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
-bash tools/update_agent_canon.sh proposal-branch
-bash tools/update_agent_canon.sh push-proposal
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
 ```
 
 ## Convention Compliance Gate

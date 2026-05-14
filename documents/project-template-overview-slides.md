@@ -38,7 +38,7 @@ downstream design ./README.md document index links this slide deck
 
 - Template canonical remote: `https://github.com/iwashita-nozomu/project_template.git`.
 - AgentCanon canonical remote: `https://github.com/iwashita-nozomu/agent-canon.git`.
-- `/mnt/git` mirrors are compatibility mirrors or proposal targets, not source of truth.
+- `/mnt/git` mirrors are compatibility mirrors, not source of truth or normal proposal targets.
 - PR evidence should record GitHub SHA, submodule pin SHA, and local mirror SHA only when a local mirror is in scope.
 
 ## 5. GitHub Actions And Copilot

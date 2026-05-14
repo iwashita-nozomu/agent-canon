@@ -78,7 +78,7 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
     "documents/github-copilot-configuration.md",
-    "AgentCanon source PR / proposal",
+    "AgentCanon source PR",
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "Submodule Pin Change",
@@ -602,7 +602,7 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
             "--search-hits-file",
             "tool addition",
             "memory addition",
-            "AgentCanon PR / proposal merge 後にこの check を再実行します",
+            "AgentCanon PR merge 後にこの check を再実行します",
         ],
     )
 

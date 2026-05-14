@@ -85,7 +85,7 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - For shared-canon tasks, closeout evidence must include `git submodule status vendor/agent-canon`, the AgentCanon GitHub `main` SHA or PR head SHA, and the template submodule pin SHA.
 - Local bare mirror status is required only when the user request, goal, or workflow scope mentions `/mnt/git` or local mirror propagation.
 - Root `AGENTS.md` is an allowed edit target during workflow-wide reviews, but the edit must be applied to its AgentCanon source file when `AGENTS.md` is a shared root view.
-- Before judging AgentCanon submodule drift by parent-tree diff, run `bash tools/update_agent_canon.sh review-submodule`. If it reports local-only submodule changes, push them with `bash tools/update_agent_canon.sh push-proposal` and request AgentCanon PR merge. If it reports a clean remote merge, merge remote main inside `vendor/agent-canon/` before pushing the proposal. If it reports the previous proposal is already included in main by ancestry, tree match, or git-cherry equivalence, `bash tools/update_agent_canon.sh align-main` may align the submodule pin to main.
+- Before judging AgentCanon submodule drift by parent-tree diff, inspect `vendor/agent-canon/` directly. If it contains local commits on a branch, run `bash tools/update_agent_canon.sh merge-main-into-current`, validate, push that AgentCanon branch to GitHub, and open or update the AgentCanon PR. If GitHub `main` already contains the work, use `bash tools/update_agent_canon.sh apply` or `make agent-canon-ensure-latest` to update the parent submodule pin. Removed local proposal, local bare, and safe-align compatibility commands are not normal user-facing routes.
 
 ## PR Mutation Authority
 
@@ -101,7 +101,7 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 ## Required Before Implementation
 
 - task 開始時、AgentCanon update surface が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
-- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、AgentCanon PR / proposal / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
+- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`issues/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - raw `rg` hit で編集対象を決めず、必要な場合は `rg -l "<topic>" > reports/search_hits.txt` のあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。
@@ -114,6 +114,9 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 - skill を user-facing に明示する場合の既定表記は `$skill-name` です。
 - durable な user preference を観測したら `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` で `memory/USER_PREFERENCES.md` へ追記し、closeout 前に `python3 tools/agent_tools/persist_agent_memory.py --commit --push` で AgentCanon 側へ永続化します。
 - agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `memory/AGENT_PHILOSOPHY.md` へ追記し、closeout 前に `python3 tools/agent_tools/persist_agent_memory.py --commit --push` で AgentCanon 側へ永続化します。
+- hook、skill eval、OOP/readability guard、workflow monitor が `agents/evals/results/**` または `reports/agents/<run-id>/` に記録を出した場合、その記録は closeout evidence です。append-only / unique-id file として扱い、上書き・削除・未説明の dirty log を残したまま完了報告しません。
+- tool / hook / review / CI の finding は、まず severity と修正先を決めます。S0/S1 または `fix-now` finding は新規機能や追加整理より先に直し、直せない場合は `issues/open/AC-YYYYMMDD-*.md`、PR body、run bundle のすべてに blocker として残します。
+- workflow defect、ログ欠落、hook 誤判定、PR gate 欠陥、検索/依存展開の欠落を見つけた場合は、同じ task 内で durable finding を作るか、既存 issue に追記します。会話上の指摘だけ、または run bundle だけに残して closeout しません。
 - repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
 - repo-changing task では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
 - repo-changing task では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。

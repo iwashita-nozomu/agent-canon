@@ -62,14 +62,14 @@ make agent-canon-ensure-latest
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If the dirty state is inside AgentCanon source, `.gitmodules`, the parent gitlink, or an AgentCanon-owned root view that `link-root` may overwrite, route the change through the AgentCanon PR or derived proposal workflow first.
+1. If the dirty state is inside AgentCanon source, `.gitmodules`, the parent gitlink, or an AgentCanon-owned root view that `link-root` may overwrite, route the change through a normal AgentCanon GitHub branch and PR first.
 
 ```bash
-bash tools/update_agent_canon.sh review-submodule
-bash tools/update_agent_canon.sh push-proposal
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
 ```
 
-1. After AgentCanon update or proposal merge, restore root views from the manifest and verify drift.
+1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 
 ```bash
 bash tools/sync_agent_canon.sh link-root
@@ -101,8 +101,8 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
-- local-ahead parent gitlink: proposal / AgentCanon PR required; do not treat `local_contains_remote` as latest.
-- `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit/push proposal or open an AgentCanon PR.
+- local-ahead parent gitlink: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
+- `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun `bash tools/sync_agent_canon.sh link-root`.
 

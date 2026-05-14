@@ -10,14 +10,14 @@ upstream design ../canonical/skills.md skill canon registry
 ## Purpose
 
 `git clone <template>` 直後に、新しい repo として使い始めるための初期化手順を固定します。
-project slug、display name、project bare repo、project-local `agent-canon` bare repo の登録を同じ入口で扱います。
-AgentCanon の source of truth は GitHub remote で、project-local bare repo は proposal / mirror 用の互換 surface として扱います。
+project slug、display name、project remote の登録を同じ入口で扱います。
+AgentCanon の source of truth は GitHub remote で、project-local bare repo は新規 bootstrap surface として扱いません。
 
 ## Use When
 
 - template clone を新 repo として初期化する
 - `/mnt/git/<project>.git` のような新しい bare repo に向ける
-- clone 直後の `vendor/agent-canon` submodule pin と project-local proposal / mirror bare repo の関係を揃えたい
+- clone 直後の `vendor/agent-canon` submodule pin と GitHub AgentCanon main の関係を揃えたい
 - `make agent-canon-ensure-latest` が別 repo 向け remote で安全判定に止まるのを bootstrap 時点で避けたい
 
 ## Core References
@@ -48,24 +48,6 @@ bash scripts/start_repository.sh \
 bash scripts/start_repository.sh \
   --project-slug your-project \
   --display-name "Your Project"
-```
-
-1. project-local agent-canon bare repo を proposal / mirror 用に使う場合は明示します。
-
-```bash
-bash scripts/start_repository.sh \
-  --project-slug your-project \
-  --display-name "Your Project" \
-  --agent-canon-bare-repo your-project-agent-canon.git
-```
-
-1. GitHub canonical remote だけを使う場合は local bare seed を opt out します。
-
-```bash
-bash scripts/start_repository.sh \
-  --project-slug your-project \
-  --display-name "Your Project" \
-  --skip-agent-canon-bare-repo
 ```
 
 1. 初期化変更を commit したあとに確認します。

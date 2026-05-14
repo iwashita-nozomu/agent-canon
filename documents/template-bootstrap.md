@@ -40,32 +40,27 @@ bash scripts/start_repository.sh \
 
 GitHub-backed template では、`vendor/agent-canon` submodule は
 `https://github.com/iwashita-nozomu/agent-canon.git` を canonical remote として使います。
-必要な repo だけ `/mnt/git/your-project-agent-canon.git` を proposal / local mirror 用に追加します。
-local bare を追加する場合は、proposal branch `canon-proposal/your-project` も bare repo に用意し、clone の git config に既定 branch として記録します。
 `--force` を init に渡すと wrapper は agent-canon preflight を block 扱いで skip し、dirty worktree override を優先します。
-既存の shared `agent-canon` remote を使い続ける場合だけ、`--skip-agent-canon-bare-repo` を付けます。
+AgentCanon は GitHub submodule を正本とし、初期化時に project-local `agent-canon` bare repo は作りません。
 
 派生 repo から `agent-canon` だけ更新したいときは次を使います。
 
 ```bash
 bash tools/update_agent_canon.sh plan
 bash tools/update_agent_canon.sh apply
-bash tools/update_agent_canon.sh proposal-branch
-bash tools/update_agent_canon.sh push-proposal
 ```
 
-source repo が設定されていれば、`apply` は先に remote snapshot を最新化してから local vendored snapshot を取り込みます。project-local bare repo を daily validation の正本にしたい場合は source repo を設定しません。
-
-project-local bare repo を後から登録するときは次です。
+派生 repo 側で shared canon を直した場合は、`vendor/agent-canon/` 内で通常の GitHub branch を作って commit し、main を取り込んでから PR を出します。
 
 ```bash
-bash tools/update_agent_canon.sh register-local-bare \
-  --bare-repo /mnt/git/your-project-agent-canon.git
+git -C vendor/agent-canon switch -c canon-pr/<short-topic>
+git -C vendor/agent-canon add -A
+git -C vendor/agent-canon commit -m "<message>"
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
 ```
 
-shared upstream refresh も使いたいときだけ `--source-repo /mnt/l/workspace/agent-canon` を追加します。
-
-shared canon の変更を maintainer に渡すときは、`push-proposal` で project-local bare repo の proposal branch へ投げます。maintainer はその branch を fetch して整理用 branch に merge します。
+AgentCanon PR merge 後に派生 repo 側へ戻り、`bash tools/update_agent_canon.sh apply` と `bash tools/sync_agent_canon.sh link-root` で pin と root view を更新します。
 
 GitHub 管理では template の canonical remote を
 `https://github.com/iwashita-nozomu/project_template.git` にし、local

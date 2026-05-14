@@ -62,8 +62,6 @@ usage() {
 Usage:
   # Normal submodule-era routes
   bash tools/sync_agent_canon.sh plan [branch]
-  bash tools/sync_agent_canon.sh submodule-review [branch]
-  bash tools/sync_agent_canon.sh align-main [branch]
   bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
   bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
@@ -74,7 +72,7 @@ Usage:
   bash tools/sync_agent_canon.sh snapshot
   bash tools/sync_agent_canon.sh add <remote-url> [branch]
   bash tools/sync_agent_canon.sh pull [branch]
-  bash tools/sync_agent_canon.sh push <proposal-branch>
+  bash tools/sync_agent_canon.sh push <branch>
 
 Environment overrides:
   AGENT_CANON_PREFIX
@@ -598,7 +596,7 @@ import_fast_forward_snapshot() {
 
   if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$local_split" "$remote_sha"; then
     echo "agent_canon_snapshot_import=diverged_history"
-    die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH'; update the proposal branch or merge the shared canon changes before running ensure-latest"
+    die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH'; route the shared canon changes through an AgentCanon PR branch before running ensure-latest"
   fi
 
   if git -C "$ROOT_DIR" diff --quiet "$local_split" "$remote_sha" --; then
@@ -633,7 +631,7 @@ import_snapshot_preferring_tree_match() {
   fi
 
   echo "agent_canon_snapshot_import=diverged_history"
-  die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH' and the current prefix tree is not present in remote history; update the proposal branch or merge the shared canon changes before running ensure-latest"
+  die "snapshot import is unsafe because local shared-canon history diverged from '$REMOTE_NAME/$DEFAULT_BRANCH' and the current prefix tree is not present in remote history; route the shared canon changes through an AgentCanon PR branch before running ensure-latest"
 }
 
 import_snapshot_from_prefix_tree() {
@@ -861,165 +859,6 @@ cmd_plan() {
   fi
 }
 
-cmd_submodule_review() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  local remote_url=""
-  local parent_pin=""
-  local worktree_head=""
-  local remote_sha=""
-  local status=""
-  local history_status=""
-  local merge_conflicts="not_checked"
-  local proposal_required="no"
-  local align_allowed="no"
-  local cherry_equivalent="not_checked"
-  local tree_match_commit=""
-  local next_action="none"
-
-  ensure_prefix_exists
-  is_submodule_prefix || die "submodule-review requires '$PREFIX' to be a git submodule"
-  remote_url="$(submodule_remote_url)"
-  [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
-
-  ensure_submodule_checkout
-  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
-  parent_pin="$(submodule_commit)"
-  worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
-  status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
-
-  echo "agent_canon_submodule_review_prefix=$PREFIX"
-  echo "agent_canon_submodule_review_branch=$branch"
-  echo "agent_canon_submodule_review_remote_url=$remote_url"
-  echo "agent_canon_submodule_parent_pin=$parent_pin"
-  echo "agent_canon_submodule_worktree_head=$worktree_head"
-  echo "agent_canon_submodule_remote_sha=$remote_sha"
-
-  if [ -n "$status" ]; then
-    echo "agent_canon_submodule_worktree_status=dirty"
-    echo "agent_canon_submodule_history_status=dirty_worktree"
-    echo "agent_canon_submodule_merge_conflicts=not_checked"
-    echo "agent_canon_submodule_proposal_required=yes_after_commit"
-    echo "agent_canon_submodule_align_main_allowed=no"
-    echo "agent_canon_submodule_next=commit_submodule_changes_then_run_push_proposal"
-    return
-  fi
-  echo "agent_canon_submodule_worktree_status=clean"
-
-  if [ "$worktree_head" = "$remote_sha" ]; then
-    history_status="already_current"
-    next_action="none"
-    align_allowed="yes"
-  elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$worktree_head" "$remote_sha"; then
-    history_status="behind_remote"
-    merge_conflicts="no"
-    next_action="run_apply"
-    align_allowed="yes"
-  elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$worktree_head"; then
-    history_status="ahead_of_remote"
-    merge_conflicts="no"
-    proposal_required="yes"
-    next_action="push_proposal"
-  else
-    merge_conflicts="$(submodule_merge_conflicts "$worktree_head" "$remote_sha")"
-    cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
-    tree_match_commit="$(find_submodule_commit_by_tree "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$worktree_head^{tree}")" "$remote_sha" || true)"
-    if [ "$cherry_equivalent" = "yes" ] || [ -n "$tree_match_commit" ]; then
-      history_status="local_changes_already_in_remote"
-      align_allowed="yes"
-      next_action="align_main"
-    elif [ "$merge_conflicts" = "no" ]; then
-      history_status="diverged_clean_merge"
-      proposal_required="yes"
-      next_action="merge_remote_then_push_proposal"
-    else
-      history_status="diverged_conflict"
-      proposal_required="yes"
-      next_action="resolve_conflicts_in_agentcanon_pr"
-    fi
-  fi
-
-  if [ "$cherry_equivalent" = "not_checked" ] && [ "$align_allowed" != "yes" ]; then
-    cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
-  fi
-
-  echo "agent_canon_submodule_history_status=$history_status"
-  echo "agent_canon_submodule_merge_conflicts=$merge_conflicts"
-  echo "agent_canon_submodule_cherry_equivalent_in_remote=$cherry_equivalent"
-  if [ -n "$tree_match_commit" ]; then
-    echo "agent_canon_submodule_tree_match_commit=$tree_match_commit"
-  else
-    echo "agent_canon_submodule_tree_match_commit=<unset>"
-  fi
-  echo "agent_canon_submodule_proposal_required=$proposal_required"
-  echo "agent_canon_submodule_align_main_allowed=$align_allowed"
-  echo "agent_canon_submodule_next=$next_action"
-  echo "agent_canon_submodule_apply_command=bash tools/update_agent_canon.sh apply $branch"
-  echo "agent_canon_submodule_proposal_command=bash tools/update_agent_canon.sh push-proposal"
-  echo "agent_canon_submodule_align_command=bash tools/update_agent_canon.sh align-main $branch"
-}
-
-cmd_align_main() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  local remote_url=""
-  local parent_pin=""
-  local worktree_head=""
-  local remote_sha=""
-  local status=""
-  local cherry_equivalent=""
-  local tree_match_commit=""
-
-  ensure_prefix_exists
-  is_submodule_prefix || die "align-main requires '$PREFIX' to be a git submodule"
-  remote_url="$(submodule_remote_url)"
-  [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
-
-  ensure_submodule_checkout
-  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
-  parent_pin="$(submodule_commit)"
-  worktree_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
-  status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
-  [ -z "$status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before aligning to main"
-
-  if [ "$worktree_head" = "$remote_sha" ]; then
-    echo "agent_canon_align_main_allowed=yes"
-    echo "agent_canon_submodule_parent_pin=$parent_pin"
-    echo "agent_canon_submodule_worktree_head=$worktree_head"
-    echo "agent_canon_submodule_remote_sha=$remote_sha"
-    cmd_link_root 1
-    if [ "$parent_pin" != "$remote_sha" ]; then
-      commit_sync_paths_if_needed "$remote_sha" "submodule_align_main"
-      echo "agent_canon_align_main=updated_to_remote"
-      return
-    fi
-    echo "agent_canon_align_main=already_current"
-    return
-  fi
-
-  tree_match_commit="$(find_submodule_commit_by_tree "$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$worktree_head^{tree}")" "$remote_sha" || true)"
-  cherry_equivalent="$(submodule_cherry_equivalent_to_remote "$remote_sha" "$worktree_head")"
-
-  if ! git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$worktree_head" "$remote_sha" \
-    && [ -z "$tree_match_commit" ] \
-    && [ "$cherry_equivalent" != "yes" ]; then
-    echo "agent_canon_align_main_allowed=no"
-    echo "agent_canon_submodule_parent_pin=$parent_pin"
-    echo "agent_canon_submodule_worktree_head=$worktree_head"
-    echo "agent_canon_submodule_remote_sha=$remote_sha"
-    die "local submodule commits are not known to be included in remote main; push a proposal PR or merge remote first"
-  fi
-
-  echo "agent_canon_align_main_allowed=yes"
-  echo "agent_canon_submodule_parent_pin=$parent_pin"
-  echo "agent_canon_submodule_worktree_head=$worktree_head"
-  echo "agent_canon_submodule_remote_sha=$remote_sha"
-  git -C "$ROOT_DIR/$PREFIX" checkout "$remote_sha" >/dev/null
-  cmd_link_root 1
-  commit_sync_paths_if_needed "$remote_sha" "submodule_align_main"
-  echo "agent_canon_align_main=updated_to_remote"
-}
-
 cmd_submodule_add() {
   local remote_url="$1"
   local branch="${2:-$DEFAULT_BRANCH}"
@@ -1133,7 +972,7 @@ cmd_ensure_latest() {
         return
       fi
       echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
-      die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin, align main, or push a proposal before ensure-latest"
+      die "submodule '$PREFIX' worktree HEAD differs from parent gitlink; commit the parent pin or route the AgentCanon branch through a PR before ensure-latest"
     fi
     if [ "$local_commit" = "$remote_sha" ]; then
       echo "agent_canon_latest=already_current_submodule"
@@ -1142,8 +981,8 @@ cmd_ensure_latest() {
     fi
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
       echo "agent_canon_latest=local_contains_remote"
-      echo "agent_canon_latest_next=push_proposal_or_open_agent-canon_PR_then_rerun_ensure-latest"
-      die "submodule '$PREFIX' parent pin contains commits not in remote main; push a proposal or open an AgentCanon PR before treating it as latest"
+      echo "agent_canon_latest_next=push_agentcanon_branch_open_agent-canon_PR_then_rerun_ensure-latest"
+      die "submodule '$PREFIX' parent pin contains commits not in remote main; push an AgentCanon branch and open a PR before treating it as latest"
     fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
     if [ "$worktree_commit" != "$remote_sha" ] && [ -n "$submodule_status" ]; then
@@ -1222,7 +1061,7 @@ cmd_push() {
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     if [ "$branch" = "$DEFAULT_BRANCH" ] && [ "${AGENT_CANON_ALLOW_DIRECT_MAIN_PUSH:-0}" != "1" ]; then
-      die "submodule push to '$DEFAULT_BRANCH' is forbidden; use 'bash tools/update_agent_canon.sh push-proposal <branch>' or set AGENT_CANON_ALLOW_DIRECT_MAIN_PUSH=1 intentionally"
+      die "submodule push to '$DEFAULT_BRANCH' is forbidden; push a normal AgentCanon PR branch or set AGENT_CANON_ALLOW_DIRECT_MAIN_PUSH=1 intentionally"
     fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short)"
     [ -z "$submodule_status" ] || die "submodule '$PREFIX' is dirty; commit or clean it before pushing"
@@ -1329,12 +1168,6 @@ main() {
       ;;
     plan)
       cmd_plan "${2:-$DEFAULT_BRANCH}"
-      ;;
-    submodule-review)
-      cmd_submodule_review "${2:-$DEFAULT_BRANCH}"
-      ;;
-    align-main)
-      cmd_align_main "${2:-$DEFAULT_BRANCH}"
       ;;
     check)
       cmd_check

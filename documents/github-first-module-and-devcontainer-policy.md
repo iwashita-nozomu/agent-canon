@@ -36,7 +36,7 @@ mirror, a host-only path, or a one-machine remote name.
 Allowed compatibility cases:
 
 - an explicitly configured local mirror for faster fetches;
-- a temporary proposal branch for a repo that cannot push directly to GitHub;
+- a temporary GitHub branch prepared from a repo that cannot push directly from its current runtime;
 - migration support for a repo that has not completed submodule conversion.
 
 Required boundaries:
