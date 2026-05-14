@@ -146,6 +146,9 @@ def resolve_workspace_document_path(workspace_root: Path, relative_path: str) ->
     vendor_path = (workspace_root / "vendor" / "agent-canon" / relative_path).resolve()
     if vendor_path.exists():
         return vendor_path
+    canon_path = (ROOT / relative_path).resolve()
+    if canon_path.exists():
+        return canon_path
     return root_path
 
 

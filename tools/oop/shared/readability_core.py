@@ -22,11 +22,13 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from collections import Counter
 from collections.abc import Sequence
@@ -73,6 +75,7 @@ DEFAULT_MAX_COGNITIVE_COMPLEXITY = 25
 DEFAULT_MAX_PUBLIC_FIELDS = 8
 DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
+GIT_BASELINE_TIMEOUT_SECONDS = 20
 MAX_READABILITY_SCORE = 100
 ERROR_SCORE_PENALTY = 25
 WARN_SCORE_PENALTY = 5
@@ -153,6 +156,11 @@ KIND_FACTS: dict[str, tuple[str, str, str]] = {
         "class necessity",
         "The class has little state or behavior, so its boundary may be accidental.",
         "Confirm it is a value object or protocol; otherwise use a function or existing type.",
+    ),
+    "redundant_class_boundary": (
+        "class necessity",
+        "Dependency sources only construct the class and never use it as a type boundary.",
+        "Inline the boundary, use a function, or document the missing lifecycle contract.",
     ),
     "method_without_self_use": (
         "class cohesion",
@@ -271,6 +279,119 @@ class SourceContext:
 
 
 @dataclass(frozen=True)
+class PythonClassDef:
+    """One Python class definition known to the project analyzer."""
+
+    key: str
+    module: str
+    name: str
+    path: Path
+
+
+@dataclass
+class PythonClassUsage:
+    """Dependency-source observations for one Python class."""
+
+    constructor_calls: int = 0
+    annotation_refs: int = 0
+    inheritance_refs: int = 0
+    isinstance_refs: int = 0
+    instance_method_calls: int = 0
+    instance_attribute_refs: int = 0
+    source_files: set[str] | None = None
+
+    def mark_source(self, root: Path, path: Path) -> None:
+        """Record the file that produced one usage observation."""
+        if self.source_files is None:
+            self.source_files = set()
+        resolved_path = path.resolve()
+        try:
+            source_name = str(resolved_path.relative_to(root))
+        except ValueError:
+            source_name = str(resolved_path)
+        self.source_files.add(source_name)
+
+    def boundary_refs(self) -> int:
+        """Return usage count that proves the class is a type boundary."""
+        return self.annotation_refs + self.inheritance_refs + self.isinstance_refs
+
+    def usage_summary(self) -> str:
+        """Return a compact usage summary for findings."""
+        file_count = len(self.source_files or set())
+        return (
+            f"construct={self.constructor_calls},type={self.boundary_refs()},"
+            f"method={self.instance_method_calls},attr={self.instance_attribute_refs},"
+            f"files={file_count}"
+        )
+
+
+@dataclass(frozen=True)
+class PythonUsageIndex:
+    """Project-level Python class definition and dependency-source index."""
+
+    class_defs: dict[str, PythonClassDef]
+    usage_by_key: dict[str, PythonClassUsage]
+    unique_name_to_key: dict[str, str]
+    module_names: dict[Path, str]
+
+    def usage_for(self, path: Path, class_name: str) -> PythonClassUsage | None:
+        """Return dependency-source facts for a class in one source file."""
+        module = self.module_names.get(path.resolve())
+        if module is not None:
+            key = f"{module}.{class_name}"
+            if key in self.usage_by_key:
+                return self.usage_by_key[key]
+        key = self.unique_name_to_key.get(class_name)
+        return self.usage_by_key.get(key) if key is not None else None
+
+
+@dataclass(frozen=True)
+class PythonUsageSourceSet:
+    """Python files and source roots used only for dependency-source context."""
+
+    files: list[Path]
+    source_roots: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class DependencyUsageContext:
+    """Additional source context used for class dependency-source analysis."""
+
+    usage_roots: tuple[str, ...] = ()
+    dependency_modules: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class BaselineComparisonSpec:
+    """Inputs that control baseline finding filtering."""
+
+    language: str
+    baseline_ref: str
+    dependency_context: DependencyUsageContext
+
+
+@dataclass(frozen=True)
+class PythonUsageBuildContext:
+    """Inputs shared while building Python project usage facts."""
+
+    root: Path
+    path: Path
+    module_name: str
+    class_defs: dict[str, PythonClassDef]
+    unique_name_to_key: dict[str, str]
+    usage_by_key: dict[str, PythonClassUsage]
+
+
+@dataclass(frozen=True)
+class PythonClassShape:
+    """Precomputed Python class metrics used by class rules."""
+
+    direct_methods: list[ast.FunctionDef | ast.AsyncFunctionDef]
+    public_methods: list[ast.FunctionDef | ast.AsyncFunctionDef]
+    attrs: set[str]
+
+
+@dataclass(frozen=True)
 class MarkdownReportSpec:
     """Inputs required to render a Markdown analyzer report."""
 
@@ -301,6 +422,15 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Analyze Python and C++ OOP readability risks."
     )
+    add_target_arguments(parser, default_language)
+    add_report_arguments(parser)
+    add_dependency_context_arguments(parser)
+    add_threshold_arguments(parser)
+    return parser
+
+
+def add_target_arguments(parser: argparse.ArgumentParser, default_language: str) -> None:
+    """Add source selection and scoring arguments."""
     parser.add_argument("paths", nargs="*", help="Files or directories to analyze.")
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
     parser.add_argument(
@@ -315,6 +445,10 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
         default=DEFAULT_MIN_SCORE,
         help="Minimum accepted score.",
     )
+
+
+def add_report_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add output formatting arguments."""
     parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     parser.add_argument(
         "--include-snippets",
@@ -346,6 +480,43 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
             "Repeat for multiple exclusions, for example --exclude vendor --exclude reports."
         ),
     )
+
+
+def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add baseline and dependency-source context arguments."""
+    parser.add_argument(
+        "--baseline-ref",
+        default="",
+        help=(
+            "Only report findings absent from this git ref. Intended for changed-file hooks "
+            "that should block new OOP risks without re-blocking existing debt."
+        ),
+    )
+    parser.add_argument(
+        "--usage-root",
+        "--dependency-root",
+        action="append",
+        dest="usage_roots",
+        default=[],
+        help=(
+            "Additional Python source root to include in class dependency-source analysis "
+            "without emitting findings for that root. Repeat for downstream or sibling modules."
+        ),
+    )
+    parser.add_argument(
+        "--dependency-module",
+        action="append",
+        dest="dependency_modules",
+        default=[],
+        help=(
+            "Importable Python module or package to include in class dependency-source "
+            "analysis without emitting findings for that module. Repeat for multiple modules."
+        ),
+    )
+
+
+def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add analyzer threshold arguments."""
     parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
     parser.add_argument("--max-class-lines", type=int, default=DEFAULT_MAX_CLASS_LINES)
     parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
@@ -363,7 +534,6 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     parser.add_argument("--max-public-fields", type=int, default=DEFAULT_MAX_PUBLIC_FIELDS)
     parser.add_argument("--max-base-classes", type=int, default=DEFAULT_MAX_BASE_CLASSES)
     parser.add_argument("--max-module-helpers", type=int, default=DEFAULT_MAX_MODULE_HELPERS)
-    return parser
 
 
 def is_hidden(path: Path) -> bool:
@@ -1004,7 +1174,12 @@ def add_finding(
     )
 
 
-def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[Finding]:
+def analyze_python_file(
+    root: Path,
+    path: Path,
+    thresholds: Thresholds,
+    usage_index: PythonUsageIndex,
+) -> list[Finding]:
     """Analyze one Python source file."""
     findings: list[Finding] = []
     context = SourceContext(root=root, path=path, language="python", thresholds=thresholds)
@@ -1015,7 +1190,7 @@ def analyze_python_file(root: Path, path: Path, thresholds: Thresholds) -> list[
     module_bucket_count = 0
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
-            analyze_python_class(context, node, findings)
+            analyze_python_class(context, node, findings, usage_index)
             continue
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             module_bucket_count += analyze_python_function(context, node, parents, findings)
@@ -1045,6 +1220,451 @@ def parse_python_source(context: SourceContext, findings: list[Finding]) -> ast.
         return None
 
 
+def python_module_name(
+    root: Path,
+    path: Path,
+    source_roots: Sequence[Path] = (),
+) -> str:
+    """Return a dotted module name for a Python file below the analysis root."""
+    resolved = path.resolve()
+    candidate_roots = sorted(
+        {root.resolve(), *(source_root.resolve() for source_root in source_roots)},
+        key=lambda item: len(item.parts),
+        reverse=True,
+    )
+    for source_root in candidate_roots:
+        try:
+            relative = resolved.relative_to(source_root).with_suffix("")
+        except ValueError:
+            continue
+        parts = list(relative.parts)
+        if parts and parts[-1] == "__init__":
+            parts = parts[:-1]
+        return ".".join(parts)
+    try:
+        relative = resolved.relative_to(root.resolve()).with_suffix("")
+    except ValueError:
+        relative = resolved.with_suffix("")
+    parts = list(relative.parts)
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
+def build_python_usage_index(
+    root: Path,
+    source_set: PythonUsageSourceSet,
+) -> PythonUsageIndex:
+    """Build project-level class definitions and dependency-source usage facts."""
+    python_files = [path for path in source_set.files if path.suffix in PYTHON_SUFFIXES]
+    parsed: dict[Path, ast.Module] = {}
+    module_names: dict[Path, str] = {}
+    class_defs: dict[str, PythonClassDef] = {}
+    simple_to_keys: dict[str, list[str]] = {}
+    for path in python_files:
+        text = path.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(text, filename=str(path))
+        except SyntaxError:
+            continue
+        resolved = path.resolve()
+        module = python_module_name(root, resolved, source_set.source_roots)
+        parsed[resolved] = tree
+        module_names[resolved] = module
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            key = f"{module}.{node.name}"
+            class_defs[key] = PythonClassDef(key=key, module=module, name=node.name, path=resolved)
+            simple_to_keys.setdefault(node.name, []).append(key)
+    unique_name_to_key = {
+        name: keys[0] for name, keys in simple_to_keys.items() if len(keys) == 1
+    }
+    usage_by_key = {key: PythonClassUsage() for key in class_defs}
+    for path, tree in parsed.items():
+        build_context = PythonUsageBuildContext(
+            root=root,
+            path=path,
+            module_name=module_names[path],
+            class_defs=class_defs,
+            unique_name_to_key=unique_name_to_key,
+            usage_by_key=usage_by_key,
+        )
+        collect_python_class_usage(
+            build_context,
+            tree,
+        )
+    return PythonUsageIndex(
+        class_defs=class_defs,
+        usage_by_key=usage_by_key,
+        unique_name_to_key=unique_name_to_key,
+        module_names=module_names,
+    )
+
+
+def python_usage_source_files(
+    root: Path,
+    selected_files: list[Path],
+    exclude_patterns: Sequence[str],
+    usage_roots: Sequence[str] = (),
+    dependency_modules: Sequence[str] = (),
+) -> PythonUsageSourceSet:
+    """Return Python files used to resolve dependency-source class usage."""
+    source_roots: set[Path] = {root.resolve()}
+    selected_python_files = [path.resolve() for path in selected_files if path.suffix in PYTHON_SUFFIXES]
+    root_python_files = iter_directory_sources(
+        root,
+        root,
+        list(exclude_patterns),
+        "python",
+    )
+    usage_files: set[Path] = set(selected_python_files) | set(root_python_files)
+    for usage_root in usage_roots:
+        extra_sources = dependency_root_source_set(root, usage_root, exclude_patterns)
+        source_roots.update(extra_sources.source_roots)
+        usage_files.update(extra_sources.files)
+    for module_name in dependency_modules:
+        module_sources = dependency_module_source_set(module_name, exclude_patterns)
+        source_roots.update(module_sources.source_roots)
+        usage_files.update(module_sources.files)
+    return PythonUsageSourceSet(
+        files=sorted(usage_files),
+        source_roots=tuple(sorted(source_roots, key=str)),
+    )
+
+
+def dependency_root_source_set(
+    root: Path,
+    raw_usage_root: str,
+    exclude_patterns: Sequence[str],
+) -> PythonUsageSourceSet:
+    """Return Python source files below one additional usage root."""
+    usage_root = Path(raw_usage_root)
+    if not usage_root.is_absolute():
+        usage_root = root / usage_root
+    resolved = usage_root.resolve()
+    if resolved.is_file():
+        if not visible_source_path(resolved.parent, resolved, list(exclude_patterns), "python"):
+            return PythonUsageSourceSet(files=[], source_roots=())
+        return PythonUsageSourceSet(files=[resolved], source_roots=(resolved.parent,))
+    if not resolved.is_dir():
+        return PythonUsageSourceSet(files=[], source_roots=())
+    return PythonUsageSourceSet(
+        files=iter_directory_sources(resolved, resolved, list(exclude_patterns), "python"),
+        source_roots=(resolved,),
+    )
+
+
+def dependency_module_source_set(
+    module_name: str,
+    exclude_patterns: Sequence[str],
+) -> PythonUsageSourceSet:
+    """Return Python source files for one importable module or package."""
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        return PythonUsageSourceSet(files=[], source_roots=())
+    if spec.submodule_search_locations:
+        package_dirs = [Path(location).resolve() for location in spec.submodule_search_locations]
+        files: set[Path] = set()
+        source_roots: set[Path] = set()
+        for package_dir in package_dirs:
+            source_roots.add(dependency_package_source_root(package_dir, module_name))
+            files.update(iter_directory_sources(package_dir, package_dir, list(exclude_patterns), "python"))
+        return PythonUsageSourceSet(
+            files=sorted(files),
+            source_roots=tuple(sorted(source_roots, key=str)),
+        )
+    if spec.origin is None:
+        return PythonUsageSourceSet(files=[], source_roots=())
+    module_path = Path(spec.origin).resolve()
+    if module_path.suffix not in PYTHON_SUFFIXES or not module_path.is_file():
+        return PythonUsageSourceSet(files=[], source_roots=())
+    source_root = dependency_module_source_root(module_path, module_name)
+    if not visible_source_path(source_root, module_path, list(exclude_patterns), "python"):
+        return PythonUsageSourceSet(files=[], source_roots=())
+    return PythonUsageSourceSet(files=[module_path], source_roots=(source_root,))
+
+
+def dependency_package_source_root(package_dir: Path, module_name: str) -> Path:
+    """Return the source root that gives a package its importable module name."""
+    source_root = package_dir.resolve()
+    for _ in module_name.split("."):
+        source_root = source_root.parent
+    return source_root
+
+
+def dependency_module_source_root(module_path: Path, module_name: str) -> Path:
+    """Return the source root that gives a module file its importable module name."""
+    source_root = module_path.resolve().parent
+    for _ in module_name.split(".")[:-1]:
+        source_root = source_root.parent
+    return source_root
+
+
+def empty_python_usage_index() -> PythonUsageIndex:
+    """Return an empty usage index for runs without Python source files."""
+    return PythonUsageIndex(
+        class_defs={},
+        usage_by_key={},
+        unique_name_to_key={},
+        module_names={},
+    )
+
+
+def collect_python_class_usage(
+    build_context: PythonUsageBuildContext,
+    tree: ast.Module,
+) -> None:
+    """Collect class dependency-source observations from one Python module."""
+    imports = python_import_aliases(
+        tree,
+        build_context.class_defs,
+        build_context.module_name,
+    )
+    resolver = PythonClassResolver(
+        class_defs=build_context.class_defs,
+        unique_name_to_key=build_context.unique_name_to_key,
+        module_name=build_context.module_name,
+        imports=imports,
+    )
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for base in node.bases:
+                key = resolver.resolve_expr(base)
+                if key is not None:
+                    record_python_class_ref(build_context, key, "inheritance_refs")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            collect_python_function_class_usage(build_context, node, resolver)
+            continue
+        if isinstance(node, ast.AnnAssign):
+            collect_python_annotation_refs(build_context, node.annotation, resolver)
+
+
+@dataclass(frozen=True)
+class PythonClassResolver:
+    """Resolve local import and simple-name references to known project classes."""
+
+    class_defs: dict[str, PythonClassDef]
+    unique_name_to_key: dict[str, str]
+    module_name: str
+    imports: dict[str, str]
+
+    def resolve_expr(self, expression: ast.AST) -> str | None:
+        """Resolve an AST expression to a known class key when deterministic."""
+        if isinstance(expression, ast.Name):
+            return self.resolve_name(expression.id)
+        if isinstance(expression, ast.Attribute):
+            dotted = dotted_name(expression)
+            if dotted is None:
+                return None
+            return self.resolve_dotted_name(dotted)
+        if isinstance(expression, ast.Subscript):
+            return self.resolve_expr(expression.value)
+        return None
+
+    def resolve_name(self, name: str) -> str | None:
+        """Resolve a simple name to a known class key."""
+        imported = self.imports.get(name)
+        if imported in self.class_defs:
+            return imported
+        local_key = f"{self.module_name}.{name}"
+        if local_key in self.class_defs:
+            return local_key
+        return self.unique_name_to_key.get(name)
+
+    def resolve_dotted_name(self, dotted: str) -> str | None:
+        """Resolve a dotted reference through import aliases and known modules."""
+        if dotted in self.class_defs:
+            return dotted
+        head, _, tail = dotted.partition(".")
+        imported = self.imports.get(head)
+        if imported is None:
+            return None
+        candidate = f"{imported}.{tail}" if tail else imported
+        return candidate if candidate in self.class_defs else None
+
+
+def dotted_name(expression: ast.AST) -> str | None:
+    """Return a dotted name for a Name/Attribute expression."""
+    if isinstance(expression, ast.Name):
+        return expression.id
+    if isinstance(expression, ast.Attribute):
+        prefix = dotted_name(expression.value)
+        return f"{prefix}.{expression.attr}" if prefix else expression.attr
+    return None
+
+
+def python_import_aliases(
+    tree: ast.Module,
+    class_defs: dict[str, PythonClassDef],
+    module_name: str,
+) -> dict[str, str]:
+    """Return import aliases that can resolve to project classes or modules."""
+    modules = project_module_names(class_defs)
+    aliases: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom):
+            aliases.update(import_from_aliases(node, class_defs, modules, module_name))
+            continue
+        if isinstance(node, ast.Import):
+            aliases.update(import_aliases(node, modules))
+    return aliases
+
+
+def project_module_names(class_defs: dict[str, PythonClassDef]) -> set[str]:
+    """Return dotted module names that define project classes."""
+    return {definition.module for definition in class_defs.values()}
+
+
+def import_from_aliases(
+    node: ast.ImportFrom,
+    class_defs: dict[str, PythonClassDef],
+    modules: set[str],
+    module_name: str,
+) -> dict[str, str]:
+    """Return aliases created by one from-import statement."""
+    import_module = resolved_import_from_module(node, module_name)
+    aliases: dict[str, str] = {}
+    for alias in node.names:
+        imported_name = f"{import_module}.{alias.name}" if import_module else alias.name
+        if imported_name in class_defs or imported_name in modules:
+            aliases[alias.asname or alias.name] = imported_name
+    return aliases
+
+
+def resolved_import_from_module(node: ast.ImportFrom, module_name: str) -> str:
+    """Resolve absolute and relative from-import module names."""
+    if node.level == 0:
+        return node.module or ""
+    package_parts = module_name.split(".")[:-1]
+    prefix_length = max(len(package_parts) - node.level + 1, 0)
+    prefix = ".".join(package_parts[:prefix_length])
+    if node.module is None:
+        return prefix
+    return f"{prefix}.{node.module}" if prefix else node.module
+
+
+def import_aliases(node: ast.Import, modules: set[str]) -> dict[str, str]:
+    """Return aliases created by one import statement."""
+    aliases: dict[str, str] = {}
+    for alias in node.names:
+        if alias.name in modules:
+            aliases[alias.asname or alias.name.split(".", 1)[0]] = alias.name
+    return aliases
+
+
+def collect_python_function_class_usage(
+    build_context: PythonUsageBuildContext,
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    resolver: PythonClassResolver,
+) -> None:
+    """Collect class usage inside one function or method."""
+    variable_classes: dict[str, str] = {}
+    for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
+        if arg.annotation is not None:
+            collect_python_annotation_refs(build_context, arg.annotation, resolver)
+    if node.returns is not None:
+        collect_python_annotation_refs(build_context, node.returns, resolver)
+    for child in ast.walk(node):
+        if isinstance(child, (ast.Assign, ast.AnnAssign)):
+            collect_python_assignment_class_usage(
+                child, resolver, variable_classes
+            )
+            continue
+        if isinstance(child, ast.Call):
+            collect_python_call_class_usage(
+                build_context,
+                child,
+                resolver,
+                variable_classes,
+            )
+        if isinstance(child, ast.Attribute) and isinstance(child.value, ast.Name):
+            key = variable_classes.get(child.value.id)
+            if key is not None:
+                build_context.usage_by_key[key].instance_attribute_refs += 1
+                build_context.usage_by_key[key].mark_source(
+                    build_context.root,
+                    build_context.path,
+                )
+
+
+def collect_python_assignment_class_usage(
+    node: ast.Assign | ast.AnnAssign,
+    resolver: PythonClassResolver,
+    variable_classes: dict[str, str],
+) -> None:
+    """Collect class construction facts from one assignment statement."""
+    value = node.value
+    if not isinstance(value, ast.Call):
+        return
+    key = resolver.resolve_expr(value.func)
+    if key is None:
+        return
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    for target in targets:
+        if isinstance(target, ast.Name):
+            variable_classes[target.id] = key
+
+
+def collect_python_call_class_usage(
+    build_context: PythonUsageBuildContext,
+    call: ast.Call,
+    resolver: PythonClassResolver,
+    variable_classes: dict[str, str],
+) -> None:
+    """Collect class references from one call expression."""
+    call_name = dotted_name(call.func)
+    if call_name in {"isinstance", "issubclass"} and len(call.args) >= 2:
+        for key in class_refs_in_annotation(call.args[1], resolver):
+            record_python_class_ref(build_context, key, "isinstance_refs")
+        return
+    key = resolver.resolve_expr(call.func)
+    if key is not None:
+        record_python_class_ref(build_context, key, "constructor_calls")
+    if isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+        instance_key = variable_classes.get(call.func.value.id)
+        if instance_key in build_context.usage_by_key:
+            build_context.usage_by_key[instance_key].instance_method_calls += 1
+            build_context.usage_by_key[instance_key].mark_source(
+                build_context.root,
+                build_context.path,
+            )
+
+
+def collect_python_annotation_refs(
+    build_context: PythonUsageBuildContext,
+    annotation: ast.AST,
+    resolver: PythonClassResolver,
+) -> None:
+    """Collect class references from one annotation expression."""
+    for key in class_refs_in_annotation(annotation, resolver):
+        record_python_class_ref(build_context, key, "annotation_refs")
+
+
+def class_refs_in_annotation(annotation: ast.AST, resolver: PythonClassResolver) -> set[str]:
+    """Return known project class references contained in an annotation-like expression."""
+    refs: set[str] = set()
+    resolved = resolver.resolve_expr(annotation)
+    if resolved is not None:
+        refs.add(resolved)
+    for child in ast.iter_child_nodes(annotation):
+        refs.update(class_refs_in_annotation(child, resolver))
+    return refs
+
+
+def record_python_class_ref(
+    build_context: PythonUsageBuildContext,
+    key: str,
+    field: str,
+) -> None:
+    """Increment one usage field for a known class key."""
+    if key not in build_context.usage_by_key:
+        return
+    usage = build_context.usage_by_key[key]
+    setattr(usage, field, cast(int, getattr(usage, field)) + 1)
+    usage.mark_source(build_context.root, build_context.path)
+
+
 def static_method_nodes(node: ast.ClassDef) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Return direct static methods declared on a Python class."""
     return [
@@ -1070,14 +1690,23 @@ def analyze_python_class(
     context: SourceContext,
     node: ast.ClassDef,
     findings: list[Finding],
+    usage_index: PythonUsageIndex,
 ) -> None:
     """Record class-level readability findings for one Python class."""
-    public_methods = public_method_nodes(node)
-    attrs = self_attribute_names(node)
-    direct_methods = direct_method_nodes(node)
-    add_python_class_shape_findings(context, node, public_methods, attrs, findings)
-    add_python_class_contract_findings(context, node, direct_methods, public_methods, attrs, findings)
-    add_python_method_cohesion_findings(context, node, public_methods, findings)
+    shape = PythonClassShape(
+        direct_methods=direct_method_nodes(node),
+        public_methods=public_method_nodes(node),
+        attrs=self_attribute_names(node),
+    )
+    add_python_class_shape_findings(context, node, shape.public_methods, shape.attrs, findings)
+    add_python_class_contract_findings(
+        context,
+        node,
+        shape,
+        findings,
+        usage_index,
+    )
+    add_python_method_cohesion_findings(context, node, shape.public_methods, findings)
 
 
 def add_python_class_shape_findings(
@@ -1188,16 +1817,15 @@ def add_python_class_size_findings(
 def add_python_class_contract_findings(
     context: SourceContext,
     node: ast.ClassDef,
-    direct_methods: list[ast.FunctionDef | ast.AsyncFunctionDef],
-    public_methods: list[ast.FunctionDef | ast.AsyncFunctionDef],
-    attrs: set[str],
+    shape: PythonClassShape,
     findings: list[Finding],
+    usage_index: PythonUsageIndex,
 ) -> None:
     """Record findings for class necessity and contract shape."""
     if is_test_case_class(context.path, node):
         return
     static_methods = static_method_nodes(node)
-    if static_methods and len(static_methods) == len(direct_methods) and not is_algorithm_contract_class(node):
+    if static_methods and len(static_methods) == len(shape.direct_methods) and not is_algorithm_contract_class(node):
         add_finding(
             findings,
             context.root,
@@ -1212,8 +1840,8 @@ def add_python_class_contract_findings(
             "replace-namespace-class-with-module-functions",
         )
     if (
-        len(public_methods) <= 1
-        and not attrs
+        len(shape.public_methods) <= 1
+        and not shape.attrs
         and not is_dataclass(node)
         and not is_algorithm_contract_class(node)
         and not is_protocol_class(node)
@@ -1227,11 +1855,16 @@ def add_python_class_contract_findings(
             "warn",
             "thin_class",
             node.name,
-            len(public_methods),
+            len(shape.public_methods),
             "state-or-contract",
             "confirm-class-is-needed-or-use-function-value-object",
         )
-    if len(direct_methods) == 1 and direct_methods[0].name == "__call__" and not attrs and not node.bases:
+    if (
+        len(shape.direct_methods) == 1
+        and shape.direct_methods[0].name == "__call__"
+        and not shape.attrs
+        and not node.bases
+    ):
         add_finding(
             findings,
             context.root,
@@ -1245,6 +1878,60 @@ def add_python_class_contract_findings(
             "owned-state-or-contract",
             "replace-with-function-or-document-required-callable-contract",
         )
+    add_python_dependency_source_class_findings(
+        context,
+        node,
+        shape,
+        findings,
+        usage_index,
+    )
+
+
+def add_python_dependency_source_class_findings(
+    context: SourceContext,
+    node: ast.ClassDef,
+    shape: PythonClassShape,
+    findings: list[Finding],
+    usage_index: PythonUsageIndex,
+) -> None:
+    """Record class redundancy that depends on project-level use sites."""
+    if not is_redundant_class_shape(context.path, node, shape):
+        return
+    usage = usage_index.usage_for(context.path, node.name)
+    if usage is None or usage.constructor_calls == 0 or usage.boundary_refs() > 0:
+        return
+    add_finding(
+        findings,
+        context.root,
+        context.path,
+        node.lineno,
+        context.language,
+        "warn",
+        "redundant_class_boundary",
+        node.name,
+        usage.usage_summary(),
+        "type-boundary-or-owned-lifecycle",
+        "replace-with-function-or-document-class-lifecycle-contract",
+    )
+
+
+def is_redundant_class_shape(
+    path: Path,
+    node: ast.ClassDef,
+    shape: PythonClassShape,
+) -> bool:
+    """Return true for classes whose shape needs dependency-source confirmation."""
+    if (
+        is_test_case_class(path, node)
+        or is_dataclass(node)
+        or is_algorithm_contract_class(node)
+        or is_protocol_class(node)
+        or node.bases
+    ):
+        return False
+    if len(shape.direct_methods) == 1 and shape.direct_methods[0].name == "__call__" and not shape.attrs:
+        return True
+    return len(shape.public_methods) <= 1 and len(shape.attrs) <= 1
 
 
 def add_python_method_cohesion_findings(
@@ -2082,6 +2769,33 @@ def score(findings: list[Finding]) -> int:
     return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
 
 
+def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, str, str]:
+    """Return a line-stable identity for baseline finding comparison."""
+    return (
+        finding.path,
+        finding.language,
+        finding.severity,
+        finding.kind,
+        finding.symbol,
+        str(finding.actual),
+        str(finding.limit),
+        finding.guidance,
+    )
+
+
+def new_findings_since_baseline(
+    current_findings: list[Finding],
+    baseline_findings: list[Finding],
+) -> list[Finding]:
+    """Return findings not already present in the baseline analysis."""
+    baseline_identities = {finding_identity(finding) for finding in baseline_findings}
+    return [
+        finding
+        for finding in current_findings
+        if finding_identity(finding) not in baseline_identities
+    ]
+
+
 def finding_rank(finding: Finding) -> tuple[int, str, int, str]:
     """Sort findings by review priority and location."""
     severity_rank = {"error": 0, "warn": 1, "info": 2}
@@ -2417,7 +3131,32 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
     """Analyze requested files and return output-ready state."""
     thresholds = build_thresholds(args)
     files = iter_source_files(root, args.paths, args.exclude, args.language)
-    findings = collect_findings(root, files, thresholds)
+    dependency_context = DependencyUsageContext(
+        usage_roots=tuple(str(item) for item in args.usage_roots),
+        dependency_modules=tuple(str(item) for item in args.dependency_modules),
+    )
+    findings = collect_findings(
+        root,
+        files,
+        thresholds,
+        args.exclude,
+        dependency_context,
+    )
+    baseline_ref = str(args.baseline_ref or "").strip()
+    if baseline_ref:
+        baseline_findings = collect_baseline_findings(
+            root,
+            files,
+            thresholds,
+            args.exclude,
+            BaselineComparisonSpec(
+                language=args.language,
+                baseline_ref=baseline_ref,
+                dependency_context=dependency_context,
+            ),
+        )
+        if baseline_findings is not None:
+            findings = new_findings_since_baseline(findings, baseline_findings)
     final_score = score(findings)
     summary = summarize_findings(
         root,
@@ -2436,12 +3175,147 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
     )
 
 
-def collect_findings(root: Path, files: list[Path], thresholds: Thresholds) -> list[Finding]:
+def collect_baseline_findings(
+    root: Path,
+    files: list[Path],
+    thresholds: Thresholds,
+    exclude_patterns: Sequence[str],
+    spec: BaselineComparisonSpec,
+) -> list[Finding] | None:
+    """Analyze requested files as they existed at one git baseline ref."""
+    relative_sources = git_baseline_source_paths(
+        root,
+        spec.baseline_ref,
+        spec.language,
+        exclude_patterns,
+    )
+    if relative_sources is None:
+        return None
+    selected_relatives = selected_relative_paths(root, files)
+    materialized_relatives = sorted(set(relative_sources) | set(selected_relatives))
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        baseline_root = Path(tmp_dir)
+        materialize_git_baseline(root, spec.baseline_ref, baseline_root, materialized_relatives)
+        baseline_files = [
+            (baseline_root / relative).resolve()
+            for relative in selected_relatives
+            if (baseline_root / relative).is_file()
+        ]
+        return collect_findings(
+            baseline_root,
+            baseline_files,
+            thresholds,
+            exclude_patterns,
+            spec.dependency_context,
+        )
+
+
+def selected_relative_paths(root: Path, files: list[Path]) -> list[str]:
+    """Return selected files as root-relative POSIX paths."""
+    relatives: list[str] = []
+    for path in files:
+        try:
+            relatives.append(path.resolve().relative_to(root).as_posix())
+        except ValueError:
+            continue
+    return sorted(set(relatives))
+
+
+def git_baseline_source_paths(
+    root: Path,
+    baseline_ref: str,
+    language: str,
+    exclude_patterns: Sequence[str],
+) -> list[str] | None:
+    """Return source paths present in a git baseline tree."""
+    output = git_text(root, ["ls-tree", "-r", "--name-only", baseline_ref, "--"])
+    if output is None:
+        return None
+    relative_paths: list[str] = []
+    for line in output.splitlines():
+        relative = Path(line.strip())
+        if not line.strip() or is_hidden(relative) or "__pycache__" in relative.parts:
+            continue
+        if relative.suffix not in LANGUAGE_SUFFIXES[language]:
+            continue
+        if path_is_excluded(relative, list(exclude_patterns)):
+            continue
+        relative_paths.append(relative.as_posix())
+    return sorted(set(relative_paths))
+
+
+def materialize_git_baseline(
+    root: Path,
+    baseline_ref: str,
+    destination: Path,
+    relative_paths: Sequence[str],
+) -> None:
+    """Write selected files from a git baseline tree into a temporary root."""
+    for relative_path in relative_paths:
+        content = git_blob(root, baseline_ref, relative_path)
+        if content is None:
+            continue
+        target = destination / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+
+def git_text(root: Path, args: Sequence[str]) -> str | None:
+    """Return git command stdout text, or None when unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_BASELINE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def git_blob(root: Path, baseline_ref: str, relative_path: str) -> bytes | None:
+    """Return one file blob from a git baseline tree."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "show", f"{baseline_ref}:{relative_path}"],
+            check=False,
+            capture_output=True,
+            timeout=GIT_BASELINE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def collect_findings(
+    root: Path,
+    files: list[Path],
+    thresholds: Thresholds,
+    exclude_patterns: Sequence[str],
+    dependency_context: DependencyUsageContext = DependencyUsageContext(),
+) -> list[Finding]:
     """Collect findings for every selected source file."""
     findings: list[Finding] = []
+    python_files = [path for path in files if path.suffix in PYTHON_SUFFIXES]
+    python_usage_index = (
+        build_python_usage_index(
+            root,
+            python_usage_source_files(
+                root,
+                python_files,
+                exclude_patterns,
+                usage_roots=dependency_context.usage_roots,
+                dependency_modules=dependency_context.dependency_modules,
+            ),
+        )
+        if python_files
+        else empty_python_usage_index()
+    )
     for path in files:
         if path.suffix in PYTHON_SUFFIXES:
-            findings.extend(analyze_python_file(root, path, thresholds))
+            findings.extend(analyze_python_file(root, path, thresholds, python_usage_index))
         elif path.suffix in CPP_SUFFIXES:
             findings.extend(analyze_cpp_file(root, path, thresholds))
     return findings

@@ -16,17 +16,25 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "python" / "readability.py"
 CPP_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "cpp" / "readability.py"
+EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
 class AnalyzeOopReadabilityTest(unittest.TestCase):
     """Verify analyzer scoring and finding output."""
 
-    def run_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_analyzer(
+        self,
+        root: Path,
+        *args: str,
+        env: Mapping[str, str] = EMPTY_ENV,
+    ) -> subprocess.CompletedProcess[str]:
         """Run the analyzer against a temporary root."""
         return subprocess.run(
             [sys.executable, str(PYTHON_ANALYZER), "--root", str(root), *args],
@@ -34,6 +42,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, **env},
         )
 
     def run_cpp_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -45,6 +54,15 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def git(self, root: Path, *args: str) -> None:
+        """Run a git command in a temporary analyzer fixture."""
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+    def commit_all(self, root: Path) -> None:
+        """Commit the current temporary fixture contents."""
+        self.git(root, "add", ".")
+        self.git(root, "commit", "-m", "baseline")
 
     def test_small_python_value_object_passes(self) -> None:
         """A small dataclass-style value object should pass the default score gate."""
@@ -231,6 +249,84 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
             self.assertEqual(result.stdout.count("module_helper_name"), 1)
+
+    def test_baseline_ref_suppresses_existing_findings_after_line_shift(self) -> None:
+        """Hook-style checks should not re-block debt that only moved lines."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.git(root, "init")
+            self.git(root, "config", "user.email", "test@example.invalid")
+            self.git(root, "config", "user.name", "Test User")
+            source = root / "helpers.py"
+            source.write_text(
+                "def calculate_helper(value: int) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
+            self.commit_all(root)
+            source.write_text(
+                "\n".join(
+                    [
+                        "# shifted by an unrelated edit",
+                        "def calculate_helper(value: int) -> int:",
+                        "    return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--baseline-ref",
+                "HEAD",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("OOP_READABILITY_FINDINGS=0", result.stdout)
+            self.assertIn("OOP_READABILITY=pass", result.stdout)
+
+    def test_baseline_ref_keeps_new_findings(self) -> None:
+        """A baseline filter should still report newly introduced OOP risks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.git(root, "init")
+            self.git(root, "config", "user.email", "test@example.invalid")
+            self.git(root, "config", "user.name", "Test User")
+            source = root / "domain.py"
+            source.write_text(
+                "def domain_value(value: int) -> int:\n    return value + 1\n",
+                encoding="utf-8",
+            )
+            self.commit_all(root)
+            source.write_text(
+                "\n".join(
+                    [
+                        "def domain_value(value: int) -> int:",
+                        "    return value + 1",
+                        "",
+                        "def calculate_helper(value: int) -> int:",
+                        "    return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--baseline-ref",
+                "HEAD",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("module_helper_name:calculate_helper", result.stdout)
+            self.assertIn("OOP_READABILITY=fail", result.stdout)
 
     def test_private_and_nested_functions_are_not_public_boundary_findings(self) -> None:
         """Private helpers and closures do not create public API boundary findings."""
@@ -674,6 +770,145 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("identity_function:identity_value", result.stdout)
             self.assertIn("pass_through_function:forward_value", result.stdout)
             self.assertIn("trivial_format_function:format_value", result.stdout)
+
+    def test_python_redundant_class_uses_dependency_sources(self) -> None:
+        """Class redundancy should use incoming construction and type-boundary facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            package = root / "package"
+            package.mkdir()
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            (package / "model.py").write_text(
+                "\n".join(
+                    [
+                        "class Projection:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                        "class Port:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (package / "service.py").write_text(
+                "\n".join(
+                    [
+                        "from .model import Port, Projection",
+                        "",
+                        "def compute(value: int) -> int:",
+                        "    projection = Projection()",
+                        "    return projection.run(value)",
+                        "",
+                        "def accepts_port(port: Port, value: int) -> int:",
+                        "    return port.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            model = package / "model.py"
+
+            result = self.run_analyzer(root, "--min-score", "100", str(model))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+            self.assertNotIn("redundant_class_boundary:Port", result.stdout)
+
+    def test_python_usage_root_extends_redundant_class_construction_sources(self) -> None:
+        """Explicit usage roots should inform selected-file redundant class analysis."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            library = root / "library"
+            consumer = root / "consumer"
+            library.mkdir()
+            consumer.mkdir()
+            model = library / "model.py"
+            model.write_text(
+                "\n".join(
+                    [
+                        "class Projection:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (consumer / "consumer.py").write_text(
+                "\n".join(
+                    [
+                        "from model import Projection",
+                        "",
+                        "def compute(value: int) -> int:",
+                        "    projection = Projection()",
+                        "    return projection.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                library,
+                "--min-score",
+                "100",
+                "--usage-root",
+                str(consumer),
+                str(model),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+
+    def test_python_dependency_module_extends_type_boundary_sources(self) -> None:
+        """Importable dependency modules should contribute type-boundary evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            library = root / "library"
+            downstream = root / "downstream"
+            library.mkdir()
+            downstream.mkdir()
+            (downstream / "__init__.py").write_text("", encoding="utf-8")
+            model = library / "model.py"
+            model.write_text(
+                "\n".join(
+                    [
+                        "class Port:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (downstream / "consumer.py").write_text(
+                "\n".join(
+                    [
+                        "from model import Port",
+                        "",
+                        "def accepts_port(port: Port, value: int) -> int:",
+                        "    return port.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                library,
+                "--min-score",
+                "100",
+                "--dependency-module",
+                "downstream",
+                str(model),
+                env={"PYTHONPATH": os.pathsep.join([str(library), str(root)])},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("redundant_class_boundary:Port", result.stdout)
 
     def test_cpp_trivial_format_function_is_flagged(self) -> None:
         """C++ format-only wrappers are reported as mathematical redundancy."""
