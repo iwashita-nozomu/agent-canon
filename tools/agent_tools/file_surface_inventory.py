@@ -56,6 +56,9 @@ EXCLUDED_PARTS = frozenset(
     }
 )
 SUBMODULE_PATH = Path("vendor/agent-canon")
+ROOT_TOOLS_PATH = Path("tools")
+AGENTCANON_TOOL_SOURCE_KIND = "agentcanon_tool_source"
+AGENTCANON_TOOL_VIEW_KIND = "agentcanon_tool_view"
 
 
 @dataclass(frozen=True)
@@ -192,6 +195,10 @@ def entry_kind(scope_name: str, relative: Path, full_path: Path, git_mode: str) 
     """Classify one inventory entry for review routing."""
     if git_mode == "160000":
         return "submodule_pin"
+    if scope_name == "root" and relative == ROOT_TOOLS_PATH and full_path.is_symlink():
+        return AGENTCANON_TOOL_VIEW_KIND
+    if scope_name == "agentcanon" and relative.parts[:1] == ROOT_TOOLS_PATH.parts:
+        return AGENTCANON_TOOL_SOURCE_KIND
     if full_path.is_symlink():
         return "symlink_view"
     if scope_name == "agentcanon":
@@ -317,7 +324,10 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
         "<!--",
         "@dependency-start",
         "responsibility Records file surface inventory for review.",
-        "upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/file_surface_inventory.py generates this report",
+        (
+            "upstream implementation ../../../../vendor/agent-canon/tools/"
+            "agent_tools/file_surface_inventory.py generates this report"
+        ),
         "@dependency-end",
         "-->",
         "",

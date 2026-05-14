@@ -211,6 +211,9 @@ SURFACE_POLICY_MARKERS = (
     "documents/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
+    "Root `tools/` is a symlink view",
+    "vendor/agent-canon/tools/",
+    "Project-local automation must stay in project-owned paths",
 )
 SURFACE_MANIFEST_MARKERS = (
     'mode = "standalone_only"',
@@ -418,13 +421,21 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
     for marker in SURFACE_POLICY_MARKERS:
         if marker not in policy_text:
             findings.append(
-                Finding("surface_manifest", "documents/SHARED_RUNTIME_SURFACES.md", f"missing-marker:{marker}")
+                Finding(
+                    "surface_manifest",
+                    "documents/SHARED_RUNTIME_SURFACES.md",
+                    f"missing-marker:{marker}",
+                )
             )
     manifest_text = readable_files.get("documents/shared-runtime-surfaces.toml", "")
     for marker in SURFACE_MANIFEST_MARKERS:
         if marker not in manifest_text:
             findings.append(
-                Finding("surface_manifest", "documents/shared-runtime-surfaces.toml", f"missing-marker:{marker}")
+                Finding(
+                    "surface_manifest",
+                    "documents/shared-runtime-surfaces.toml",
+                    f"missing-marker:{marker}",
+                )
             )
     sync_text = readable_files.get("tools/sync_agent_canon.sh", "")
     for marker in SURFACE_SYNC_MARKERS:
