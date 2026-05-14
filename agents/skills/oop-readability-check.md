@@ -4,6 +4,7 @@
 responsibility Documents oop-readability-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream implementation ../../tools/oop/python/readability.py OOP readability CLI
+upstream implementation ../../tools/oop/shared/readability_core.py defines mechanical finding categories
 upstream implementation ../../tools/agent_tools/workflow_monitor.py optional timing recorder
 downstream design ../../.agents/skills/oop-readability-check/SKILL.md Codex/Copilot discovery shim
 downstream design ../../.claude/skills/oop-readability-check/SKILL.md Claude discovery mirror
@@ -12,9 +13,9 @@ downstream design ../../.claude/skills/oop-readability-check/SKILL.md Claude dis
 
 ## Purpose
 
-Run the OOP readability checker as a narrow mechanical check.
-This skill exists so a user can request the tool without triggering a broader
-workflow, report-writing pass, or agent interpretation pass.
+Run the OOP readability checker and, when requested, interpret its result.
+This skill exists so a user can request OOP checking through one trigger while
+still keeping mechanical tool output separate from agent judgment.
 
 ## Use When
 
@@ -22,6 +23,17 @@ workflow, report-writing pass, or agent interpretation pass.
 - The user asks to run the OOP tool, OOP check, readability check, or mechanical
   OOP report.
 - The user wants tool output, tables, status, counts, or hotspot rows.
+- The user asks to interpret, prioritize, or review false positives in OOP
+  readability output.
+
+## Modes
+
+- `mechanical-only`: run the tool and return command, status, metrics, counts,
+  hotspots, and relevant finding rows.
+- `analyze-existing`: start from an existing Markdown report, JSON output, or
+  pasted summary. Do not rerun the tool unless evidence is missing or stale.
+- `run-and-analyze`: run the tool, then add a clearly separated interpretation
+  pass.
 
 ## Default Command
 
@@ -52,9 +64,10 @@ C++-only. The tool should decide which files are relevant by suffix.
 - Do not run Markdown and JSON variants unless both are needed for the requested
   output.
 
-## Mechanical Report Tables
+## Mechanical Result
 
-When a report is requested, render tables only from one tool result:
+When a report is requested or the mode runs the tool, render tables only from
+one tool result:
 
 - command and exit status
 - summary metrics
@@ -64,8 +77,31 @@ When a report is requested, render tables only from one tool result:
 - hotspot files
 - first relevant finding rows
 
-Do not add prioritization, false-positive calls, or design recommendations.
-Those belong to `$oop-readability-analysis`.
+Do not mix prioritization, false-positive calls, or design recommendations into
+the mechanical result.
+
+## Agent Analysis
+
+Only include this section in `analyze-existing` or `run-and-analyze` mode.
+
+- Keep "tool reported" separate from "agent judgment".
+- Prioritize by design risk and user relevance, not count alone.
+- Treat test-only files, generated files, value objects, protocol contracts,
+  and adapter functions as likely false-positive candidates until code reading
+  says otherwise.
+- For production code, focus first on public API boundaries,
+  ownership/lifetime, broad optional/null-driven routing, and large effectful
+  functions.
+- Read hotspot files and nearby call sites only as needed.
+- Do not broaden into a refactor plan unless the user asks for fixes.
+
+Use this output shape:
+
+- top risks
+- likely false positives
+- recommended next checks
+- user-decision points
+- mechanical evidence cited by path, line, symbol, kind, and count
 
 ## Timing Token
 
@@ -81,7 +117,8 @@ when it is useful.
 ## Boundary
 
 - This skill can say that the tool reported `status=fail`.
-- This skill must not decide whether a finding is a true design problem.
+- This skill can decide whether a finding is likely important only inside a
+  separate `Agent Analysis` section.
 - This skill must not start a refactor or broad validation pass.
 - This skill must not clean unrelated hook logs except to avoid presenting them
   as product changes.

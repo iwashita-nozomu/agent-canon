@@ -7,8 +7,7 @@ upstream design ../README.md defines durable AgentCanon operational issue storag
 upstream implementation ../../.codex/hooks/oop_readability_guard.py appends OOP hook evidence during source edits.
 upstream implementation ../../tools/oop/shared/readability_core.py provides OOP readability report mechanics.
 upstream implementation ../../tools/agent_tools/workflow_monitor.py records workflow behavior events.
-downstream design ../../.agents/skills/oop-readability-check/SKILL.md separates mechanical OOP tool execution from analysis.
-downstream design ../../.agents/skills/oop-readability-analysis/SKILL.md separates agent interpretation from mechanical tool execution.
+downstream design ../../.agents/skills/oop-readability-check/SKILL.md keeps mechanical OOP output and agent analysis in one skill with separate modes.
 @dependency-end
 -->
 
@@ -17,10 +16,10 @@ status: in_progress
 source: user
 severity: S1
 evidence: reports/hooks/oop_readability_guard.jsonl, vendor/agent-canon/agents/evals/results/hook-runs/oop_readability_guard.jsonl, reports/agents/20260514-012429-oop-readability-report/oop_readability_report.md
-affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md, .agents/skills/oop-readability-analysis/SKILL.md
-edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md, .agents/skills/oop-readability-analysis/SKILL.md
-required_action: Split OOP tool execution from agent analysis and prevent hook evidence writes from making simple tool checks look like broad repo-changing work.
-close_condition: A simple user request for OOP checking can invoke a narrow skill, run one language-auto OOP command, produce only requested mechanical tables, record duration tokens when a run bundle exists, and leave no tracked hook-log dirt outside explicit evidence workflows.
+affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
+edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
+required_action: Keep OOP tool execution and agent analysis in one public skill while preventing hook evidence writes from making simple tool checks look like broad repo-changing work.
+close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and leave no tracked hook-log dirt outside explicit evidence workflows.
 
 ## Finding
 
@@ -112,29 +111,26 @@ workflow fix.
 
 ## Required Product Direction
 
-Add two public skills:
+Keep one public skill:
 
 - `$oop-readability-check`
-  - Runs the OOP readability tool only.
+  - Runs the OOP readability tool in `mechanical-only` or `run-and-analyze`
+    mode.
   - Respects user-specified paths exactly.
   - Uses language-auto behavior, preferably through `--language all` until a
     dedicated language-auto wrapper exists.
   - Produces mechanical tables only when requested.
-  - Does not perform agent interpretation.
+  - Performs agent interpretation only in an explicit `analyze-existing` or
+    `run-and-analyze` mode.
+  - Keeps mechanical output and `Agent Analysis` as separate sections.
   - Records timing tokens in workflow monitoring when a run bundle is active.
 
-- `$oop-readability-analysis`
-  - Consumes existing OOP tool output or a mechanical report.
-  - Explains likely false positives, priority, and investigation order.
-  - May read code to support judgments.
-  - Does not rerun the tool unless evidence is missing or stale.
-  - Keeps its conclusions clearly separate from mechanical tool output.
+This lets the user be precise without needing two public triggers:
 
-This split lets the user be precise:
-
-- "Run `$oop-readability-check` on `python/`" means run the tool and return
-  mechanical evidence.
-- "Use `$oop-readability-analysis` on that report" means interpret the findings.
+- "Run `$oop-readability-check` on `python/`" means use `mechanical-only`.
+- "Use `$oop-readability-check` to interpret that report" means use
+  `analyze-existing`.
+- "Check and explain the result" means use `run-and-analyze`.
 
 ## Hook And Evidence Direction
 
@@ -158,16 +154,16 @@ The hook evidence policy should distinguish three modes:
 
 ## Acceptance Criteria
 
-- `$oop-readability-check` and `$oop-readability-analysis` are discoverable in
+- `$oop-readability-check` is discoverable in
   `.agents/skills/`, `.claude/skills/`, `agents/skills/README.md`, and
   `agents/skills/catalog.yaml`.
-- Prompt/eval expected counts are updated for the new public skills.
+- Prompt/eval expected counts are updated for the single public skill surface.
 - A narrow OOP check can be run with one command and no agent-authored report
   unless explicitly requested.
 - A report request produces mechanical tables from one tool output, not an
   expanded full workflow unless the user asks for it.
-- Agent analysis is triggered separately and cites the mechanical evidence it
-  interprets.
+- Agent analysis is triggered by mode and cites the mechanical evidence it
+  interprets without being mixed into the mechanical result.
 - Hook JSONL writes do not dirty tracked AgentCanon files during ordinary
   parent-repo OOP checks.
 - Workflow monitoring can record at least `tool_call`, `duration_ms`, `status`,

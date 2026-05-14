@@ -38,8 +38,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
 | `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
-| `oop-readability-check` | OOP readability tool を narrow mechanical check として走らせ、必要な表だけ出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
-| `oop-readability-analysis` | OOP readability 結果を agent が解釈し、優先度と false positive 候補を分ける | `agents/skills/oop-readability-analysis.md` | `.agents/skills/oop-readability-analysis/SKILL.md` |
+| `oop-readability-check` | OOP readability tool を走らせ、必要なら機械結果と分離して agent 分析も出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `behavior-preserving-refactor` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/behavior-preserving-refactor.md` | `.agents/skills/behavior-preserving-refactor/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
@@ -84,7 +83,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory を確認するときは `dependency-analysis` を使います。
 - 大規模 refactor では `behavior-preserving-refactor` を追加し、semantic delta を別管理にします。
 - C / C++ 差分では `cpp-review` を既定候補にします。
-- OOP readability tool の実行だけが必要なら `oop-readability-check` を使い、結果の解釈や優先度付けは `oop-readability-analysis` に分けます。
+- OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。

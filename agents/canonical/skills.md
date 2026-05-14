@@ -26,9 +26,7 @@ upstream design README.md canonical workflow index
 - `cpp-review`
   - build / header / ownership を前提にした C / C++ review
 - `oop-readability-check`
-  - OOP readability tool の機械実行と表形式 report
-- `oop-readability-analysis`
-  - OOP readability 結果の agent 解釈、優先度、false positive 確認
+  - OOP readability tool の機械実行、表形式 report、分離された agent 分析
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`
