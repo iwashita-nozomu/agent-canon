@@ -49,4 +49,6 @@ upstream design README.md notes lifecycle index
 ## References
 
 - [benchmark_vs_experiment.md](./benchmark_vs_experiment.md)
-- [../../vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md](../../vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md)
+- `documents/conventions/python/30_experiment_directory_structure.md` in standalone
+  AgentCanon; `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md`
+  in template roots

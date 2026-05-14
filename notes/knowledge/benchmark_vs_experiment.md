@@ -39,6 +39,12 @@ Experiment でも canonical な運用は resume ではなく fresh run です。
 
 ## 参照
 
-- [documents/conventions/python/20_benchmark_policy.md](../../vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md)
-- [documents/conventions/python/30_experiment_directory_structure.md](../../vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md)
-- [documents/coding-conventions-experiments.md](../../vendor/agent-canon/documents/coding-conventions-experiments.md)
+- `documents/conventions/python/20_benchmark_policy.md` in standalone
+  AgentCanon; `vendor/agent-canon/documents/conventions/python/20_benchmark_policy.md`
+  in template roots
+- `documents/conventions/python/30_experiment_directory_structure.md` in standalone
+  AgentCanon; `vendor/agent-canon/documents/conventions/python/30_experiment_directory_structure.md`
+  in template roots
+- `documents/coding-conventions-experiments.md` in standalone AgentCanon;
+  `vendor/agent-canon/documents/coding-conventions-experiments.md` in
+  template roots
