@@ -1857,24 +1857,56 @@ def markdown_cell(value: object) -> str:
 
 def render_markdown(inventory: Inventory) -> str:
     """Render Markdown output."""
+    summary_rows = [
+        ["files scanned", inventory.files_scanned],
+        ["symbols seen", inventory.symbols_seen],
+        ["functions seen", inventory.functions_seen],
+        ["classes seen", inventory.classes_seen],
+        ["symbols reported", inventory.symbols_reported],
+        ["auto helpers reported", inventory.helpers_reported],
+        ["user judgment required", inventory.judgment_required_reported],
+        ["changed only", str(inventory.changed_only).lower()],
+        ["baseline ref", inventory.baseline_ref or "none"],
+        ["baseline symbols seen", inventory.baseline_symbols_seen],
+        ["baseline filtered", inventory.baseline_filtered],
+    ]
+    verdict_rows: list[list[object]] = [
+        [name, count] for name, count in sorted(inventory.verdict_counts.items())
+    ] or [["none", 0]]
+    role_rows: list[list[object]] = [
+        [name, count] for name, count in sorted(inventory.role_counts.items())
+    ] or [["none", 0]]
     lines = [
         "# Helper Symbol Inventory",
         "",
-        f"- files scanned: {inventory.files_scanned}",
-        f"- symbols seen: {inventory.symbols_seen}",
-        f"- functions seen: {inventory.functions_seen}",
-        f"- classes seen: {inventory.classes_seen}",
-        f"- symbols reported: {inventory.symbols_reported}",
-        f"- auto helpers reported: {inventory.helpers_reported}",
-        f"- user judgment required: {inventory.judgment_required_reported}",
-        f"- changed only: {str(inventory.changed_only).lower()}",
-        f"- baseline ref: {inventory.baseline_ref or 'none'}",
-        f"- baseline symbols seen: {inventory.baseline_symbols_seen}",
-        f"- baseline filtered: {inventory.baseline_filtered}",
+        "## Summary",
         "",
-        "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
-        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+        "| Metric | Value |",
+        "| --- | --- |",
     ]
+    lines.extend(
+        f"| {markdown_cell(metric)} | {markdown_cell(value)} |"
+        for metric, value in summary_rows
+    )
+    lines.extend(["", "## Verdict Counts", "", "| Verdict | Count |", "| --- | --- |"])
+    lines.extend(
+        f"| {markdown_cell(item)} | {markdown_cell(count)} |"
+        for item, count in verdict_rows
+    )
+    lines.extend(["", "## Role Counts", "", "| Role | Count |", "| --- | --- |"])
+    lines.extend(
+        f"| {markdown_cell(role)} | {markdown_cell(count)} |"
+        for role, count in role_rows
+    )
+    lines.extend(
+        [
+            "",
+            "## Records",
+            "",
+            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
+            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+        ]
+    )
     for record in inventory.records:
         lines.append(
             "| "

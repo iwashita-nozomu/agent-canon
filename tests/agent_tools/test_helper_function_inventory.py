@@ -648,6 +648,53 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertIn("role=predicate", result.stdout)
             self.assertIn("HELPER_INVENTORY=pass", result.stdout)
 
+    def test_markdown_output_contains_machine_readable_result_tables(self) -> None:
+        """Markdown output should expose summary and count tables."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "helpers.py").write_text(
+                "\n".join(
+                    [
+                        "def _ready(value: object) -> bool:",
+                        "    return value is not None",
+                        "",
+                        "def public_api(value: object) -> bool:",
+                        "    return _ready(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "markdown",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("## Summary", result.stdout)
+            self.assertIn("| Metric | Value |", result.stdout)
+            self.assertIn("| files scanned | 1 |", result.stdout)
+            self.assertIn("## Verdict Counts", result.stdout)
+            self.assertIn("| auto_helper | 1 |", result.stdout)
+            self.assertIn("## Role Counts", result.stdout)
+            self.assertIn("| predicate | 1 |", result.stdout)
+            self.assertIn("## Records", result.stdout)
+            self.assertIn(
+                "| helpers.py | 1 | function | main | auto_helper | _ready | predicate |",
+                result.stdout,
+            )
+
     def test_attribute_leaf_call_is_not_local_function_caller(self) -> None:
         """Attribute calls like set.add should not call a local add helper."""
         with tempfile.TemporaryDirectory() as tmp_dir:
