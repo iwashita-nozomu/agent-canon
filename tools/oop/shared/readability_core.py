@@ -24,6 +24,8 @@ import ast
 import fnmatch
 import json
 import re
+import subprocess
+import tempfile
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -69,6 +71,7 @@ DEFAULT_MAX_COGNITIVE_COMPLEXITY = 25
 DEFAULT_MAX_PUBLIC_FIELDS = 8
 DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
+GIT_BASELINE_TIMEOUT_SECONDS = 20
 MAX_READABILITY_SCORE = 100
 ERROR_SCORE_PENALTY = 25
 WARN_SCORE_PENALTY = 5
@@ -426,6 +429,14 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
         help=(
             "Path, path prefix, path part, or glob to exclude from analysis. "
             "Repeat for multiple exclusions, for example --exclude vendor --exclude reports."
+        ),
+    )
+    parser.add_argument(
+        "--baseline-ref",
+        default="",
+        help=(
+            "Only report findings absent from this git ref. Intended for changed-file hooks "
+            "that should block new OOP risks without re-blocking existing debt."
         ),
     )
     parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
@@ -2576,6 +2587,33 @@ def score(findings: list[Finding]) -> int:
     return max(0, MAX_READABILITY_SCORE - min(MAX_READABILITY_SCORE, penalty))
 
 
+def finding_identity(finding: Finding) -> tuple[str, str, str, str, str, str, str, str]:
+    """Return a line-stable identity for baseline finding comparison."""
+    return (
+        finding.path,
+        finding.language,
+        finding.severity,
+        finding.kind,
+        finding.symbol,
+        str(finding.actual),
+        str(finding.limit),
+        finding.guidance,
+    )
+
+
+def new_findings_since_baseline(
+    current_findings: list[Finding],
+    baseline_findings: list[Finding],
+) -> list[Finding]:
+    """Return findings not already present in the baseline analysis."""
+    baseline_identities = {finding_identity(finding) for finding in baseline_findings}
+    return [
+        finding
+        for finding in current_findings
+        if finding_identity(finding) not in baseline_identities
+    ]
+
+
 def finding_rank(finding: Finding) -> tuple[int, str, int, str]:
     """Sort findings by review priority and location."""
     severity_rank = {"error": 0, "warn": 1, "info": 2}
@@ -2870,6 +2908,18 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
     thresholds = build_thresholds(args)
     files = iter_source_files(root, args.paths, args.exclude, args.language)
     findings = collect_findings(root, files, thresholds, args.exclude)
+    baseline_ref = str(args.baseline_ref or "").strip()
+    if baseline_ref:
+        baseline_findings = collect_baseline_findings(
+            root,
+            files,
+            thresholds,
+            args.exclude,
+            args.language,
+            baseline_ref,
+        )
+        if baseline_findings is not None:
+            findings = new_findings_since_baseline(findings, baseline_findings)
     final_score = score(findings)
     summary = summarize_findings(
         root,
@@ -2886,6 +2936,110 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
         final_score=final_score,
         summary=summary,
     )
+
+
+def collect_baseline_findings(
+    root: Path,
+    files: list[Path],
+    thresholds: Thresholds,
+    exclude_patterns: Sequence[str],
+    language: str,
+    baseline_ref: str,
+) -> list[Finding] | None:
+    """Analyze requested files as they existed at one git baseline ref."""
+    relative_sources = git_baseline_source_paths(root, baseline_ref, language, exclude_patterns)
+    if relative_sources is None:
+        return None
+    selected_relatives = selected_relative_paths(root, files)
+    materialized_relatives = sorted(set(relative_sources) | set(selected_relatives))
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        baseline_root = Path(tmp_dir)
+        materialize_git_baseline(root, baseline_ref, baseline_root, materialized_relatives)
+        baseline_files = [
+            (baseline_root / relative).resolve()
+            for relative in selected_relatives
+            if (baseline_root / relative).is_file()
+        ]
+        return collect_findings(baseline_root, baseline_files, thresholds, exclude_patterns)
+
+
+def selected_relative_paths(root: Path, files: list[Path]) -> list[str]:
+    """Return selected files as root-relative POSIX paths."""
+    relatives: list[str] = []
+    for path in files:
+        try:
+            relatives.append(path.resolve().relative_to(root).as_posix())
+        except ValueError:
+            continue
+    return sorted(set(relatives))
+
+
+def git_baseline_source_paths(
+    root: Path,
+    baseline_ref: str,
+    language: str,
+    exclude_patterns: Sequence[str],
+) -> list[str] | None:
+    """Return source paths present in a git baseline tree."""
+    output = git_text(root, ["ls-tree", "-r", "--name-only", baseline_ref, "--"])
+    if output is None:
+        return None
+    relative_paths: list[str] = []
+    for line in output.splitlines():
+        relative = Path(line.strip())
+        if not line.strip() or is_hidden(relative) or "__pycache__" in relative.parts:
+            continue
+        if relative.suffix not in LANGUAGE_SUFFIXES[language]:
+            continue
+        if path_is_excluded(relative, list(exclude_patterns)):
+            continue
+        relative_paths.append(relative.as_posix())
+    return sorted(set(relative_paths))
+
+
+def materialize_git_baseline(
+    root: Path,
+    baseline_ref: str,
+    destination: Path,
+    relative_paths: Sequence[str],
+) -> None:
+    """Write selected files from a git baseline tree into a temporary root."""
+    for relative_path in relative_paths:
+        content = git_blob(root, baseline_ref, relative_path)
+        if content is None:
+            continue
+        target = destination / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+
+def git_text(root: Path, args: Sequence[str]) -> str | None:
+    """Return git command stdout text, or None when unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_BASELINE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def git_blob(root: Path, baseline_ref: str, relative_path: str) -> bytes | None:
+    """Return one file blob from a git baseline tree."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "show", f"{baseline_ref}:{relative_path}"],
+            check=False,
+            capture_output=True,
+            timeout=GIT_BASELINE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
 
 
 def collect_findings(

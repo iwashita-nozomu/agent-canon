@@ -45,6 +45,15 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             text=True,
         )
 
+    def git(self, root: Path, *args: str) -> None:
+        """Run a git command in a temporary analyzer fixture."""
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+    def commit_all(self, root: Path) -> None:
+        """Commit the current temporary fixture contents."""
+        self.git(root, "add", ".")
+        self.git(root, "commit", "-m", "baseline")
+
     def test_small_python_value_object_passes(self) -> None:
         """A small dataclass-style value object should pass the default score gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -230,6 +239,84 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("OOP_READABILITY_FILES=1", result.stdout)
             self.assertEqual(result.stdout.count("module_helper_name"), 1)
+
+    def test_baseline_ref_suppresses_existing_findings_after_line_shift(self) -> None:
+        """Hook-style checks should not re-block debt that only moved lines."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.git(root, "init")
+            self.git(root, "config", "user.email", "test@example.invalid")
+            self.git(root, "config", "user.name", "Test User")
+            source = root / "helpers.py"
+            source.write_text(
+                "def calculate_helper(value: int) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
+            self.commit_all(root)
+            source.write_text(
+                "\n".join(
+                    [
+                        "# shifted by an unrelated edit",
+                        "def calculate_helper(value: int) -> int:",
+                        "    return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--baseline-ref",
+                "HEAD",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("OOP_READABILITY_FINDINGS=0", result.stdout)
+            self.assertIn("OOP_READABILITY=pass", result.stdout)
+
+    def test_baseline_ref_keeps_new_findings(self) -> None:
+        """A baseline filter should still report newly introduced OOP risks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.git(root, "init")
+            self.git(root, "config", "user.email", "test@example.invalid")
+            self.git(root, "config", "user.name", "Test User")
+            source = root / "domain.py"
+            source.write_text(
+                "def domain_value(value: int) -> int:\n    return value + 1\n",
+                encoding="utf-8",
+            )
+            self.commit_all(root)
+            source.write_text(
+                "\n".join(
+                    [
+                        "def domain_value(value: int) -> int:",
+                        "    return value + 1",
+                        "",
+                        "def calculate_helper(value: int) -> int:",
+                        "    return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--baseline-ref",
+                "HEAD",
+                "--min-score",
+                "100",
+                str(source),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("module_helper_name:calculate_helper", result.stdout)
+            self.assertIn("OOP_READABILITY=fail", result.stdout)
 
     def test_private_and_nested_functions_are_not_public_boundary_findings(self) -> None:
         """Private helpers and closures do not create public API boundary findings."""

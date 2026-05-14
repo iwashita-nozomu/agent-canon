@@ -286,6 +286,7 @@ class CodexHooksTest(unittest.TestCase):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
         self.assertIn("--min-score 95", reason)
+        self.assertIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["min_score"], 95)

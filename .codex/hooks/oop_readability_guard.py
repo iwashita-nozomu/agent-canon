@@ -208,6 +208,7 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
     ]
     if min_score is not None:
         command_parts.extend(("--min-score", str(min_score)))
+    command_parts.extend(("--baseline-ref", "HEAD"))
     command_parts.extend(relative_paths)
     command = tuple(command_parts)
     result = subprocess.run(
