@@ -45,11 +45,43 @@ run_make_or_direct() {
 }
 
 run_direct_agent_checks() {
-  bash tools/ci/check_agent_canon_latest.sh
   bash tools/sync_agent_canon.sh check
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+}
+
+run_pr_agent_checks() {
+  local submodule_dirty=""
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    submodule_dirty="$(git -C vendor/agent-canon status --short --untracked-files=all 2>/dev/null || true)"
+    if [[ -n "${submodule_dirty}" ]]; then
+      echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
+      echo "AGENT_CANON_PR_LATEST_NEXT=commit_push_agentcanon_branch_then_after_merge_run_make_agent-canon-ensure-latest"
+      run_direct_agent_checks
+      return
+    fi
+  fi
+  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bagent-checks\\b|^agent-checks:" Makefile; then
+    make agent-checks
+  else
+    bash tools/ci/check_agent_canon_latest.sh
+    run_direct_agent_checks
+  fi
+}
+
+run_pr_quick_ci() {
+  local submodule_dirty=""
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    submodule_dirty="$(git -C vendor/agent-canon status --short --untracked-files=all 2>/dev/null || true)"
+    if [[ -n "${submodule_dirty}" ]]; then
+      echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
+      echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh --quick"
+      bash tools/ci/run_all_checks.sh --quick
+      return
+    fi
+  fi
+  run_make_or_direct ci-quick bash tools/ci/run_all_checks.sh --quick
 }
 
 github_repo_security_status() {
@@ -141,7 +173,7 @@ github_repo_security_status "${TEMPLATE_GITHUB_REPO}" "template_github"
 echo ""
 
 echo "5️⃣  agent runtime checks"
-run_make_or_direct agent-checks run_direct_agent_checks
+run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
@@ -153,7 +185,7 @@ run_make_or_direct docs-check bash tools/ci/run_docs_checks.sh
 echo ""
 
 echo "8️⃣  repository quick CI"
-run_make_or_direct ci-quick bash tools/ci/run_all_checks.sh --quick
+run_pr_quick_ci
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"

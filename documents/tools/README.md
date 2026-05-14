@@ -100,10 +100,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
   - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-update` で適用します。
-  - legacy subtree / snapshot route は移行互換のためだけに残し、submodule 化済み repo の通常 path にはしません。
-  - source repo が設定されている場合は `refresh-remote -> ensure-latest` の順に進みます。source repo が missing / dirty なら fail-closed で止めます。
-  - 派生 repo 側の shared canon 差分を upstream に渡す場合は `make agent-canon-proposal-branch` で branch を確認し、`make agent-canon-push-proposal` で proposal branch へ push します。AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰ります。
-  - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、local bare mirror SHA、submodule pin を PR 本文に残します。
+  - Local bare / proposal / snapshot refresh route は user-facing command から外しています。submodule 化済み repo の通常 path は GitHub branch と AgentCanon PR です。
+  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、`make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
+  - AgentCanon PR merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰ります。
+  - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
 - `tools/sync_agent_canon.sh`
   - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の `make agent-canon-ensure-latest`、root view 修復の `make agent-canon-links`、drift check の `make agent-canon-check` 経由で使います。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。

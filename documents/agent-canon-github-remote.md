@@ -11,8 +11,8 @@ downstream design ./agent-canon-subtree-migration.md consumes GitHub remote poli
 # AgentCanon GitHub Remote
 
 `iwashita-nozomu/agent-canon` on GitHub is the canonical AgentCanon repository.
-Local bare repositories under `/mnt/git` are compatibility mirrors or proposal
-targets, not the source of truth.
+Local bare repositories under `/mnt/git` are compatibility mirrors, not
+proposal targets and not the source of truth.
 
 ## Canonical Defaults
 
@@ -20,9 +20,8 @@ targets, not the source of truth.
 - Canonical branch: `main`
 - Preferred submodule URL for template and derived repos:
   `https://github.com/iwashita-nozomu/agent-canon.git`
-- Optional local mirror: `/mnt/git/agent-canon.git`
-- Optional project-local proposal remote:
-  `/mnt/git/<project>-agent-canon.git`
+- Optional local mirror for read-only speed or offline validation:
+  `/mnt/git/agent-canon.git`
 
 `tools/sync_agent_canon.sh` uses the GitHub URL when `AGENT_CANON_REMOTE_URL`
 is unset. Set `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git` only when a
@@ -51,18 +50,23 @@ bash tools/sync_agent_canon.sh check
 ```
 
 If the repo keeps a local bare remote for fast validation, add it with a clear
-name instead of making it the canonical remote:
+non-canonical name instead of making it the canonical remote:
 
 ```bash
 git remote add agent-canon-local /mnt/git/agent-canon.git
 ```
 
-## Source Repo Configuration
+## Local Branches From Derived Repos
 
-`agent-canon.sourceRepo` is optional. Use it only when a derived repo must
-refresh a local mirror from a checked-out AgentCanon worktree before applying a
-snapshot. GitHub-backed repos should normally leave it unset and fetch directly
-from the submodule origin.
+Derived repos that discover AgentCanon changes should commit them inside
+`vendor/agent-canon/`, merge GitHub `main` into that branch, push the branch to
+`iwashita-nozomu/agent-canon`, and open or update the AgentCanon PR. Do not
+route new work through project-local compatibility remotes.
+
+```bash
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
+```
 
 ## Commit Message Note
 

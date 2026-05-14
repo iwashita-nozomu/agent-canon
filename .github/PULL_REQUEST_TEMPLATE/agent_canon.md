@@ -18,7 +18,7 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/too
 - changed shared canon surfaces:
 - why shared canon needs this change:
 - derived repo or template issue that exposed the need:
-- AgentCanon source PR / proposal:
+- AgentCanon source PR:
 - template PR:
 
 ## Scope
@@ -31,7 +31,7 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/too
 
 ## Branch And Change Route
 
-- [ ] AgentCanon source change was pushed to a dedicated `canon/<topic>-YYYYMMDD` branch or proposal branch before this template / derived PR.
+- [ ] AgentCanon source change was pushed to a dedicated GitHub branch before this template / derived PR.
 - [ ] Tool additions or tool behavior changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] Memory additions, agent-learning updates, skill eval results, or feedback-loop changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] This PR is a pin/root-view update after the AgentCanon source PR, or the deferred upstream-sync reason is documented below.
@@ -125,7 +125,7 @@ Integration notes:
 
 ## Upstream Sync
 
-- [ ] AgentCanon source PR / proposal was opened and merged before this template pin update, or this is a pin-only update to existing AgentCanon `main`.
+- [ ] AgentCanon source PR was opened and merged before this template pin update, or this is a pin-only update to existing AgentCanon `main`.
 - [ ] After AgentCanon merge, ran `make agent-canon-ensure-latest`.
 - [ ] Ran `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check`.
 - [ ] Direct `bash tools/sync_agent_canon.sh push` was not used, or a maintainer direct-push exception is explained below.

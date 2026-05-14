@@ -61,11 +61,11 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - submodule repo では、親 repo の無関係な dirty state は `make agent-canon-ensure-latest` を block しません。判断対象は AgentCanon update surface です。
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、gate / preflight が parent gitlink を stage または commit して検査を続行します。
-- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh review-submodule` で proposal 要否、merge conflict、safe align 可否を確認します。
-- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal branch に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
+- `vendor/agent-canon/` に local commit、dirty state、remote main と diverge した history がある場合は、parent pin を黙って remote main へ戻さず、先に `bash tools/update_agent_canon.sh merge-main-into-current` で current branch に GitHub main を取り込み、AgentCanon PR に出します。
+- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出し、merge 後に template / derived repo 側で `make agent-canon-ensure-latest`、`bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
 - `ensure-latest` は `.gitmodules` の URL と submodule `origin/main` を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定します。remote main が進んでいれば submodule を fast-forward し、parent repo の gitlink commit と root shared surface を同期します。
-- local submodule commit が remote main に ancestry、tree match、または git-cherry equivalence で含まれている場合だけ、`bash tools/update_agent_canon.sh align-main` で parent pin を remote main へ揃えます。
-- local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って proposal branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
+- local submodule commit が remote main に含まれている場合は、`bash tools/update_agent_canon.sh apply` または `make agent-canon-ensure-latest` で parent pin を remote main へ揃えます。
+- local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
 ### Context Sweep
