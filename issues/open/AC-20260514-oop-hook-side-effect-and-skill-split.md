@@ -87,6 +87,21 @@ This is a tool-environment side effect, not a product change. It should be
 visible as evidence when intentionally accumulated, but it should not silently
 turn a narrow check into a dirty submodule state.
 
+## 2026-05-14 Additional Observation
+
+During the standalone-only document surface repair, a small runtime packet path
+resolver touched `tools/agent_tools/agent_team.py`. The OOP hook then blocked on
+whole-file findings that already existed at `HEAD`, even though the edited
+resolver did not introduce those findings. This is a distinct hook failure mode:
+changed-file scope is useful, but blocking must be based on new or worsened
+finding identities when a large legacy file already has recorded debt.
+
+The first mitigation in the repair branch updates
+`.codex/hooks/oop_readability_guard.py` to compare current JSON findings with
+the same files at `HEAD`. The hook still blocks new files, new findings, and
+worsened finding identities. Unchanged pre-existing findings are logged as
+`OOP_READABILITY_BASELINE=preexisting-only` and do not block the current edit.
+
 ## Timing Attribution Gap
 
 AgentCanon has partial observability:

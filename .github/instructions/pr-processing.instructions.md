@@ -21,9 +21,10 @@ pull request.
 - Read `.github/copilot-instructions.md`, `AGENTS.md`, and
   `agents/workflows/github-copilot-workflow.md` before changing PR automation,
   workflow YAML, PR templates, or AgentCanon references.
-- Read `documents/github-copilot-configuration.md` before changing Copilot
-  settings, custom agents, MCP references, setup workflows, or PR-template
-  routing.
+- Read `vendor/agent-canon/documents/github-copilot-configuration.md` in
+  template roots, or `documents/github-copilot-configuration.md` in standalone
+  AgentCanon, before changing Copilot settings, custom agents, MCP references,
+  setup workflows, or PR-template routing.
 - Use Plan mode before non-trivial PR automation, GitHub Actions, Copilot
   settings, PR-template, or AgentCanon sync changes. If the current Copilot
   surface lacks a Plan mode command, write the plan in the issue, PR body, or

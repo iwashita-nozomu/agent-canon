@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,6 +54,18 @@ class AnalyzerResult:
     returncode: int
     output: str
     min_score: int | None
+
+
+FindingKey = tuple[str, str, str, str, str, str, str]
+
+
+@dataclass(frozen=True)
+class HeadSource:
+    """One source file as it existed at HEAD."""
+
+    relative_path: str
+    text: str
+    exists: bool
 
 
 def load_payload() -> dict[str, object]:
@@ -218,11 +231,140 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
         text=True,
         timeout=ANALYZER_TIMEOUT_SECONDS,
     )
-    return AnalyzerResult(
+    result_record = AnalyzerResult(
         command=command,
         returncode=result.returncode,
         output=(result.stdout + result.stderr).strip(),
         min_score=min_score,
+    )
+    if result_record.returncode == 0:
+        return result_record
+    return run_preexisting_finding_filter(root, analyzer, paths, result_record)
+
+
+def build_finding_key(finding: dict[str, object]) -> FindingKey:
+    """Return a line-stable identity for one OOP finding."""
+    return (
+        str(finding.get("path", "")),
+        str(finding.get("language", "")),
+        str(finding.get("severity", "")),
+        str(finding.get("kind", "")),
+        str(finding.get("symbol", "")),
+        str(finding.get("actual", "")),
+        str(finding.get("limit", "")),
+    )
+
+
+def parse_finding_keys(output: str) -> tuple[set[FindingKey], bool]:
+    """Return finding identities from analyzer JSON output."""
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return set(), False
+    findings = payload.get("findings") if isinstance(payload, dict) else None
+    if not isinstance(findings, list):
+        return set(), False
+    return (
+        {
+            build_finding_key(finding)
+            for finding in findings
+            if isinstance(finding, dict)
+        },
+        True,
+    )
+
+
+def run_analyzer_finding_keys(
+    root: Path,
+    analyzer: Path,
+    paths: list[Path],
+) -> tuple[set[FindingKey], bool]:
+    """Run one analyzer in JSON mode and return stable finding identities."""
+    if not paths:
+        return set(), True
+    relative_paths = [path.relative_to(root).as_posix() for path in paths]
+    result = subprocess.run(
+        [
+            "python3",
+            str(analyzer),
+            "--root",
+            str(root),
+            "--format",
+            "json",
+            "--min-score",
+            "0",
+            *relative_paths,
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=ANALYZER_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        return set(), False
+    return parse_finding_keys(result.stdout)
+
+
+def read_head_source(root: Path, relative_path: str) -> HeadSource:
+    """Return one changed file's HEAD content when it exists."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "show", f"HEAD:{relative_path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=GIT_CHANGED_PATHS_TIMEOUT_SECONDS,
+    )
+    return HeadSource(
+        relative_path=relative_path,
+        text=result.stdout,
+        exists=result.returncode == 0,
+    )
+
+
+def run_head_finding_keys(
+    root: Path,
+    analyzer: Path,
+    paths: list[Path],
+) -> tuple[set[FindingKey], bool]:
+    """Run one analyzer against HEAD copies of changed files."""
+    sources = [
+        read_head_source(root, path.relative_to(root).as_posix())
+        for path in paths
+    ]
+    existing_sources = [source for source in sources if source.exists]
+    if not existing_sources:
+        return set(), True
+    with tempfile.TemporaryDirectory() as temp_dir:
+        baseline_root = Path(temp_dir)
+        baseline_paths: list[Path] = []
+        for source in existing_sources:
+            target = baseline_root / source.relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(source.text, encoding="utf-8")
+            baseline_paths.append(target)
+        return run_analyzer_finding_keys(baseline_root, analyzer, baseline_paths)
+
+
+def run_preexisting_finding_filter(
+    root: Path,
+    analyzer: Path,
+    paths: list[Path],
+    result: AnalyzerResult,
+) -> AnalyzerResult:
+    """Allow an analyzer failure only when every finding already existed at HEAD."""
+    current_keys, current_ok = run_analyzer_finding_keys(root, analyzer, paths)
+    baseline_keys, baseline_ok = run_head_finding_keys(root, analyzer, paths)
+    if not current_ok or not baseline_ok:
+        return result
+    new_or_worse_keys = current_keys - baseline_keys
+    if new_or_worse_keys:
+        return result
+    return AnalyzerResult(
+        command=result.command,
+        returncode=0,
+        output=f"{result.output}\nOOP_READABILITY_BASELINE=preexisting-only",
+        min_score=result.min_score,
     )
 
 

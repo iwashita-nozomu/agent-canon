@@ -55,11 +55,11 @@ root の入口は symlink view または明示的な synced copy にします。
 - `.devcontainer -> vendor/agent-canon/.devcontainer`: VS Code devcontainer / post-create / attach-status runtime の共有 view。
 - `mcp -> vendor/agent-canon/mcp`: repo MCP launcher / server の共有 view。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
-- `documents/*`: `documents/SHARED_RUNTIME_SURFACES.md` に列挙された canon-owned docs だけを symlink view にします。
-- `memory/*`、`notes/*`、`tests/*`: `documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
+- `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
+- `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
 - `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
 - `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
-- `documents/github-copilot-configuration.md`: root `documents/github-copilot-configuration.md` から symlink される Copilot configuration catalog。
+- `documents/github-copilot-configuration.md`: standalone AgentCanon の Copilot configuration catalog。template / derived repo root では `vendor/agent-canon/documents/github-copilot-configuration.md` から読み、root `documents/` へ symlink しません。
 - `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
 - `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。

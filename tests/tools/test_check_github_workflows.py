@@ -436,6 +436,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
             )
+            (root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md").unlink()
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--root", str(root)],
@@ -449,6 +450,32 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "path=.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
                 result.stdout,
             )
+
+    def test_template_mode_uses_vendor_copilot_config(self) -> None:
+        """Template roots should not require standalone-only root docs or PR templates."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            (root / ".gitmodules").write_text(
+                "[submodule \"vendor/agent-canon\"]\n"
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+            (root / ".github" / "PULL_REQUEST_TEMPLATE.md").unlink()
+            (root / "documents" / "github-copilot-configuration.md").unlink()
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
     def write_valid_workflow(
         self,
@@ -516,6 +543,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/agents/pr-maintainer.md",
             ".github/scripts/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "documents/github-copilot-configuration.md",
             "issues/README.md",
@@ -539,6 +567,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         for relative in [
             "README.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
+            "documents/github-copilot-configuration.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
             "issues/README.md",

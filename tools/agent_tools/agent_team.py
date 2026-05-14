@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -137,6 +138,17 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
+def resolve_workspace_document_path(workspace_root: Path, relative_path: str) -> Path:
+    """Resolve a document path through the root view or vendored AgentCanon source."""
+    root_path = (workspace_root / relative_path).resolve()
+    if root_path.exists():
+        return root_path
+    vendor_path = (workspace_root / "vendor" / "agent-canon" / relative_path).resolve()
+    if vendor_path.exists():
+        return vendor_path
+    return root_path
+
+
 def resolve_report_root(
     report_root: str | None,
     workspace_root: Path | None = None,
@@ -209,18 +221,18 @@ def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[Documen
     """Resolve the common cross-cutting document packet for one workspace."""
     required_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
     )
     optional_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS
-        if (workspace_root / relative_path).resolve().exists()
+        if resolve_workspace_document_path(workspace_root, relative_path).exists()
     )
     return required_entries + optional_entries
 
@@ -545,7 +557,7 @@ def resolve_role_document_packet(
     for relative_path in workspace_paths:
         add_entry(
             DocumentPacketEntry(
-                path=(workspace_root / relative_path).resolve(),
+                path=resolve_workspace_document_path(workspace_root, relative_path),
                 rationale=f"workspace doc:{relative_path}",
             )
         )

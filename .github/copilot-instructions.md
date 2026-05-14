@@ -14,14 +14,18 @@ upstream design ../documents/github-copilot-configuration.md Copilot configurati
 - `AGENTS.md`
 - `agents/README.md`
 - `documents/README.md`
-- `documents/github-copilot-configuration.md`
+- `vendor/agent-canon/documents/github-copilot-configuration.md` in template or
+  derived repos; `documents/github-copilot-configuration.md` in standalone
+  AgentCanon.
 - `agents/workflows/github-copilot-workflow.md`
 - `.github/instructions/pr-processing.instructions.md`
 
 ## Defaults
 
 - 日本語で対応してください。
-- repo 全体の正本は `documents/` と `agents/` にあります。
+- repo-local active contracts are in `documents/`; shared AgentCanon policy is
+  under `vendor/agent-canon/documents/` when this file is exposed in a template
+  root.
 - 長期に残す agent ルールは `agents/` 側を更新し、このファイルは薄く保ってください。
 
 ## Skills
@@ -31,7 +35,9 @@ upstream design ../documents/github-copilot-configuration.md Copilot configurati
 - CLI/runtime differences are summarized in `agents/canonical/CLI_ENTRYPOINTS.md`.
 - For issue, PR, and IDE tasks, follow `agents/workflows/github-copilot-workflow.md` before adding Copilot-only instructions.
 - For Copilot settings, custom agents, MCP, setup workflows, or PR-template
-  routing, read `documents/github-copilot-configuration.md` first.
+  routing, read `vendor/agent-canon/documents/github-copilot-configuration.md`
+  in template roots, or `documents/github-copilot-configuration.md` in the
+  standalone AgentCanon repository.
 - For PR triage, use `.github/instructions/pr-processing.instructions.md`; if
   custom agents are available, select `.github/agents/pr-maintainer.md`.
 
