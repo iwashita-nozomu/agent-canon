@@ -99,6 +99,12 @@ require_clean_worktree() {
   fi
 }
 
+refresh_git_index_for_paths() {
+  local -a paths=("$@")
+  [ "${#paths[@]}" -gt 0 ] || return
+  git -C "$ROOT_DIR" update-index -q --refresh -- "${paths[@]}" >/dev/null 2>&1 || true
+}
+
 agent_canon_update_surface_status() {
   local -a paths=("$PREFIX" ".gitmodules")
   local spec=""
@@ -117,6 +123,7 @@ agent_canon_update_surface_status() {
     paths+=("$spec")
   done < <(build_removed_legacy_paths)
 
+  refresh_git_index_for_paths "${paths[@]}"
   git -C "$ROOT_DIR" status --short --untracked-files=all -- "${paths[@]}"
   if is_submodule_prefix && git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all
@@ -342,6 +349,7 @@ ensure_surface_sync_safe() {
   done < <(build_removed_legacy_paths)
 
   [ "${#paths[@]}" -gt 0 ] || return
+  refresh_git_index_for_paths "${paths[@]}"
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
   if [ -n "$status" ]; then
     echo "$status" >&2
