@@ -137,6 +137,17 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
+def resolve_workspace_document_path(workspace_root: Path, relative_path: str) -> Path:
+    """Resolve a workspace path, falling back to the AgentCanon source tree."""
+    workspace_candidate = (workspace_root / relative_path).resolve()
+    if workspace_candidate.exists():
+        return workspace_candidate
+    canon_candidate = (ROOT / relative_path).resolve()
+    if canon_candidate.exists():
+        return canon_candidate
+    return workspace_candidate
+
+
 def resolve_report_root(
     report_root: str | None,
     workspace_root: Path | None = None,
@@ -209,18 +220,18 @@ def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[Documen
     """Resolve the common cross-cutting document packet for one workspace."""
     required_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
     )
     optional_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS
-        if (workspace_root / relative_path).resolve().exists()
+        if resolve_workspace_document_path(workspace_root, relative_path).exists()
     )
     return required_entries + optional_entries
 
@@ -545,7 +556,7 @@ def resolve_role_document_packet(
     for relative_path in workspace_paths:
         add_entry(
             DocumentPacketEntry(
-                path=(workspace_root / relative_path).resolve(),
+                path=resolve_workspace_document_path(workspace_root, relative_path),
                 rationale=f"workspace doc:{relative_path}",
             )
         )
