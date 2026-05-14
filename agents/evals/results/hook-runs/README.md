@@ -18,6 +18,18 @@ intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
 hook destination must remain this AgentCanon-owned hook result surface so
 improvement-guide and eval tooling can read one durable chronology.
 
+## Artifact Handling
+
+Tracked JSONL in this directory is an evidence artifact, not disposable generated
+scratch. A dirty AgentCanon submodule that only contains new hook-run JSONL
+lines is still carrying AgentCanon-owned product evidence.
+
+Do not stash, drop, or revert these lines merely to fast-forward the submodule.
+Commit them through the AgentCanon branch / PR path, or run an explicit
+retention/compaction task that preserves the chronology according to the eval
+result policy. If a hook is writing unhelpful no-op events, fix the hook filter
+in a follow-up change; do not silently hide already-written evidence.
+
 ## File Naming
 
 Each hook writes one JSONL file named after the hook:

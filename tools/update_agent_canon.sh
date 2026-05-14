@@ -138,8 +138,8 @@ cmd_merge_main_into_current() {
     echo "agent_canon_merge_worktree_status=dirty"
     echo "agent_canon_merge_result=blocked_dirty"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=commit_or_stash_agentcanon_changes_then_rerun_merge-main-into-current"
-    die "submodule '$PREFIX' has uncommitted changes; commit or stash them before merging main"
+    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_merge-main-into-current"
+    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or explicitly stash non-artifact local changes before merging main"
   fi
   echo "agent_canon_merge_worktree_status=clean"
 

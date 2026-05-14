@@ -77,7 +77,7 @@ agentcanon_pr_branch_pending() {
 run_pr_agent_checks() {
   if agentcanon_pr_branch_dirty; then
     echo "AGENT_CANON_PR_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_LATEST_NEXT=commit_or_stash_agentcanon_changes_then_rerun_agent-canon-pr-check"
+    echo "AGENT_CANON_PR_LATEST_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
     return 1
   fi
   if agentcanon_pr_branch_pending; then
@@ -97,7 +97,7 @@ run_pr_agent_checks() {
 run_pr_quick_ci() {
   if agentcanon_pr_branch_dirty; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_CI_NEXT=commit_or_stash_agentcanon_changes_then_rerun_agent-canon-pr-check"
+    echo "AGENT_CANON_PR_CI_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
     return 1
   fi
   if agentcanon_pr_branch_pending; then

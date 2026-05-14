@@ -186,12 +186,22 @@ uses the submodule-aware checkout pattern in this rulebook.
 
 Hook output is evidence, not a decoration.
 
-- Hook invocation logs belong under AgentCanon-owned eval/log surfaces when the
-  hook is AgentCanon-owned and actually evaluates a source change.
+- Hook invocation logs under `agents/evals/results/hook-runs/*.jsonl` are
+  AgentCanon-owned append-only evidence artifacts. They are part of the
+  AgentCanon product state when an AgentCanon hook writes them during normal
+  repository work.
+- Do not stash, drop, or revert tracked hook-run JSONL as "generated noise" to
+  make a submodule look clean. If the log is too noisy, fix the hook filter or
+  route the observation through an AgentCanon PR; do not hide the evidence.
 - Repeated OOP readability failures must stop the implementation path until the
   changed code or the hook rule is corrected.
-- Read-only, checker-only, and no-source skipped hook invocations must not dirty
-  tracked result logs.
+- Runtime-local `reports/hooks/` output is temporary only when a task explicitly
+  overrides the hook destination. The default AgentCanon hook result surface is
+  durable.
+- Read-only, checker-only, and no-source hook invocations should be filtered by
+  the hook before writing if they are not intended as durable evidence. Once a
+  tracked AgentCanon hook-run line exists, treat it as evidence until a retention
+  pass explicitly compacts it.
 - An empty or fallback hook payload that still evaluates changed source must be
   logged with the payload status, not silently treated as success.
 - Skill and workflow eval results must receive unique IDs and append-only result

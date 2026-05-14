@@ -102,7 +102,7 @@ if git -C "$submodule_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; the
     cat >&2 <<EOF
 AGENT_CANON_SUBMODULE=dirty
 Refusing to update dirty submodule '${submodule_path}'.
-Commit, stash, or clean the AgentCanon worktree before running this checkout helper locally.
+Commit AgentCanon-owned artifacts first; stash or clean only explicitly disposable local scratch before running this checkout helper locally.
 EOF
     exit 87
   fi
