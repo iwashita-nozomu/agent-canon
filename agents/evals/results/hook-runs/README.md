@@ -10,10 +10,13 @@ downstream implementation ../../../../tools/agent_tools/generate_agent_improveme
 -->
 
 This directory stores append-only JSONL hook results owned by AgentCanon.
-Runtime-local `reports/hooks/` output is temporary; durable hook evidence belongs
-here unless a task intentionally overrides the destination with
-`AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
-`AGENT_CANON_SKILL_LOG_PATH`.
+Normal local runtime hook output goes to ignored `reports/hooks/` so ordinary
+tool checks do not dirty tracked AgentCanon files.
+
+Durable hook evidence belongs here only when a task intentionally enables
+accumulation with `AGENT_CANON_DURABLE_HOOK_RESULTS=1`, sets
+`AGENT_CANON_HOOK_RESULTS_DIR`, or sets a hook-specific path such as
+`AGENT_CANON_OOP_HOOK_LOG_PATH` or `AGENT_CANON_SKILL_LOG_PATH`.
 
 ## File Naming
 
