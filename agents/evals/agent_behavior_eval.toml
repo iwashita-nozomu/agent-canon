@@ -66,6 +66,29 @@ forbidden_any = [
 ]
 
 [[criteria]]
+name = "hook_tool_protocol_feedback_recorded"
+max_score = 5
+feedback = "Record how hook and tool results changed or explicitly did not change parent and subagent protocol."
+required_all = [
+  "hook_tool_feedback=",
+  "parent_protocol_update=",
+  "subagent_protocol_update=",
+  "protocol_feedback_reason=",
+]
+required_any = [
+  "hook_tool_feedback=reviewed",
+  "hook_tool_feedback_not_required",
+]
+forbidden_any = [
+  "hook_tool_feedback=pending",
+  "hook_tool_feedback=missing",
+  "parent_protocol_update=pending",
+  "parent_protocol_update=missing",
+  "subagent_protocol_update=pending",
+  "subagent_protocol_update=missing",
+]
+
+[[criteria]]
 name = "execution_path_efficiency_recorded"
 max_score = 5
 feedback = "Compare two run paths when behavior may differ, record the selected route, and prevent known inefficient routes."

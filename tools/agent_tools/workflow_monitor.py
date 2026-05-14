@@ -40,6 +40,11 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     ),
     "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
     "static_analysis_feedback=recorded target=review-backlog-scan",
+    (
+        "hook_tool_feedback=reviewed parent_protocol_update=not_required "
+        "subagent_protocol_update=not_required "
+        "protocol_feedback_reason=standard-closeout-no-new-protocol-change"
+    ),
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
     "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",

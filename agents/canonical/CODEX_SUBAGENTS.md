@@ -59,6 +59,25 @@ role ごとの具体的な禁止事項、handoff 条件、review separation は 
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
 
+## Hook And Tool Feedback To Subagent Protocol
+
+hook、code checker、static analysis、CI、review tool の結果が subagent の責務や handoff に関係する場合、parent は次回の chat で注意するだけで閉じません。
+結果を見て、subagent protocol の更新要否を `workflow_monitoring.md` の behavior event に記録します。
+
+- subagent が読むべき checker result、hook log、dependency scope、review finding が handoff に入っていなかった場合、`team_manifest.yaml` の packet、workflow family prompt、または該当 handoff 手順を更新します。
+- 特定 role が同じ失敗を見逃した場合、`.codex/agents/<role>.toml`、この文書、または role に対応する skill / workflow を更新します。
+- tool / hook の誤検知や task-local noise で protocol 変更が不要な場合でも、`subagent_protocol_update=not_required` と `protocol_feedback_reason=<short-reason>` を記録します。
+- reviewer role は、最新 diff だけでなく、hook / tool feedback が parent protocol と subagent protocol の判断まで閉じているかを確認します。
+
+subagent protocol feedback の最小 token は次です。
+
+```text
+hook_tool_feedback=reviewed
+parent_protocol_update=<applied|recorded|not_required>
+subagent_protocol_update=<applied|recorded|not_required>
+protocol_feedback_reason=<short-reason>
+```
+
 ## Pre-Goal Activation
 
 Goal-driven repo-changing tasks do not wait for the final `/goal` command before

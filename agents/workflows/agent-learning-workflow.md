@@ -103,6 +103,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 - schedule / work log の completeness
 - workflow monitoring: selected skills、stage / subagent routing、MCP preflight、repo dependency intake、web research decision、behavior events、intervention history
 - behavior eval: skill invocation、subagent routing、tool gates、prompt eval baseline/rerun、review feedback resolution、subagent lifecycle closeout、diff-check approval
+- hook / tool feedback routing: hook、code checker、static analysis、CI、review-tool の結果を parent protocol と subagent protocol へ反映するか、理由付きで反映不要にしたか
 - review feedback の resolution
 - validation / commit / push evidence
 - dependency manifest と canonical tree-head evidence
@@ -122,6 +123,33 @@ repo-changing task は `workflow_monitoring.md` を run bundle 内の監視正�
 agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Events` に蓄積します。ここには最終結果の要約ではなく、skill invocation、subagent spawn / close、tool call、prompt eval run、review decision、feedback action、diff-check decision のような観測可能 event を書きます。
 利用中の user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<short-observation>"` で記録します。`prompt_repair` と `eval_update` は対象 prompt / eval の更新と rerun evidence まで同じ run に残し、`memory_record` は `log_agent_learning.py` または preference sync へ接続します。`no_op` は捨てる判断ではなく、なぜ durable prompt に反映しないかを evidence に残す判断です。
 
+### Hook And Tool Protocol Feedback
+
+hook、code checker、static analysis、CI、tool validation の結果は、pass / fail の記録だけで閉じません。
+parent は結果を見た時点で、次の route に分類します。
+
+- product fix: 直接の実装、文書、設定、test を直す
+- tool / eval update: checker、hook、eval rubric、workflow monitor token を直す
+- parent protocol update: `AGENTS.md`、`agents/canonical/CODEX_WORKFLOW.md`、関連 workflow / skill を直す
+- subagent protocol update: `agents/canonical/CODEX_SUBAGENTS.md`、`.codex/agents/*.toml`、handoff packet、role prompt を直す
+- durable issue / memory: `issues/open/`、`memory/AGENT_PHILOSOPHY.md`、`notes/failures/` に昇格する
+- no-op: task-local noise と判断し、理由を evidence として残す
+
+subagent が hook / tool failure の種類を見逃した、または handoff に必要な checker evidence が入っていなかった場合、parent は chat 上の注意だけで済ませません。
+該当 role TOML、`CODEX_SUBAGENTS.md`、workflow family prompt、または handoff packet を更新するか、`subagent_protocol_update=not_required` と理由を記録します。
+
+behavior eval 用の最小 token は次です。
+
+```text
+hook_tool_feedback=reviewed
+parent_protocol_update=<applied|recorded|not_required>
+subagent_protocol_update=<applied|recorded|not_required>
+protocol_feedback_reason=<short-reason>
+```
+
+`not_required` は「何もしない」ではなく、結果を確認したうえで protocol 変更に昇格しない判断です。
+`protocol_feedback_reason=` に、どの hook / tool 結果を見て、なぜ parent / subagent protocol を変えないかを書きます。
+
 必須 signals:
 
 - `skills=` または `$agent-orchestration` など、選択した skill surface
@@ -131,6 +159,7 @@ agent 行動は `workflow_monitor.py --behavior-event "..."` で `## Behavior Ev
 - web research / external research 結果、または `web_research_not_required`
 - behavior event: skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check のいずれか
 - runtime feedback event: `runtime_feedback=observed` または feedback が無い場合の `runtime_feedback_not_observed`
+- hook / tool protocol feedback event: `hook_tool_feedback=reviewed` と parent / subagent protocol update decision
 
 closeout では `skill_improvement_decision`、`config_improvement_decision`、`workflow_improvement_decision`、`memory_learning_decision` を `applied`、`recorded`、`not_applicable` のいずれかにします。
 `pending` のまま Eval を通してはいけません。
