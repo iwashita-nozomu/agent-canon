@@ -49,6 +49,23 @@ forbidden_any = [
 ]
 
 [[criteria]]
+name = "code_checker_results_recorded"
+max_score = 5
+feedback = "Record code checker results as behavior-eval evidence, or explicitly mark code checkers not required for advisory runs."
+required_any = [
+  "code_checker=pass",
+  "code_checker_not_required",
+  "tool_call=pyright",
+  "tool_call=ruff",
+  "tool_call=oop-readability-check",
+]
+forbidden_any = [
+  "code_checker=fail",
+  "code_checker=pending",
+  "code_checker=missing",
+]
+
+[[criteria]]
 name = "execution_path_efficiency_recorded"
 max_score = 5
 feedback = "Compare two run paths when behavior may differ, record the selected route, and prevent known inefficient routes."

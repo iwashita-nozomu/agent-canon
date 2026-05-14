@@ -76,7 +76,11 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
 closeout evidence, and validation logs. They require observable events such as skill invocation,
 subagent routing, tool gates, accumulated prompt eval runs, feedback resolution, subagent lifecycle closeout,
-static-analysis feedback, execution path comparison, token footprint comparison, and diff-check decisions.
+static-analysis feedback, code checker results, execution path comparison, token footprint comparison, and diff-check decisions.
+Record code checkers as behavior events, for example
+`tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`,
+`tool_call=oop-readability-check code_checker=pass`, or
+`code_checker_not_required` for non-changing advisory runs.
 Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
 `hook_run_id` values. GitHub Actions reads these hook results, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
