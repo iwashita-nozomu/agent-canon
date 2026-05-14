@@ -5,6 +5,7 @@
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
+# upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # @dependency-end
@@ -90,6 +91,8 @@ class CodexHooksTest(unittest.TestCase):
         hook_input: str,
         *,
         inventory_text: str,
+        policy_payload: dict[str, object] | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[dict[str, object], dict[str, object]]:
         """Run the helper inventory guard against one changed Python file."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -110,26 +113,24 @@ class CodexHooksTest(unittest.TestCase):
             inventory = temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(inventory_text, encoding="utf-8")
-            policy = temp_root / "helper_inventory_guard_policy.json"
-            policy.write_text(
-                json.dumps(
-                    {
-                        "enabled": True,
-                        "baseline_ref": "HEAD",
-                        "domain_limits": {
-                            "main": {
-                                "max_needs_user_judgment": 0,
-                                "max_tool_rule_gap": 0,
-                            },
-                            "*": {
-                                "max_needs_user_judgment": 0,
-                                "max_tool_rule_gap": 0,
-                            },
+            if policy_payload is None:
+                policy_payload = {
+                    "enabled": True,
+                    "baseline_ref": "HEAD",
+                    "domain_limits": {
+                        "main": {
+                            "max_needs_user_judgment": 0,
+                            "max_tool_rule_gap": 0,
                         },
-                    }
-                ),
-                encoding="utf-8",
-            )
+                        "*": {
+                            "max_needs_user_judgment": 0,
+                            "max_tool_rule_gap": 0,
+                        },
+                    },
+                }
+            if policy_payload:
+                policy = temp_root / "helper_inventory_guard_policy.json"
+                policy.write_text(json.dumps(policy_payload), encoding="utf-8")
             source = temp_root / "changed.py"
             source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
@@ -147,11 +148,12 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                    **(extra_env or {}),
                 },
             )
 
             log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            payload = json.loads(result.stdout)
+            payload = json.loads(result.stdout) if result.stdout.strip() else {}
         return payload, log_entry
 
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
@@ -461,6 +463,62 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_uses_agentcanon_default_policy(self) -> None:
+        """Missing repo-local policy should fall back to the AgentCanon default policy."""
+        payload, log_entry = self._run_helper_guard_with_changed_python(
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+            policy_payload={},
+            inventory_text=(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "print(json.dumps({'records': [{"
+                "'path': 'changed.py', 'line': 1, 'domain': 'main', "
+                "'qualname': 'value', 'needs_user_judgment': True, "
+                "'judgment_rule': 'main:new-helper'}]}))\n"
+            ),
+        )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(log_entry["policy_status"], "agentcanon-default")
+        self.assertTrue(str(log_entry["policy_path"]).endswith("helper_inventory_guard_policy.json"))
+        self.assertEqual(log_entry["mode"], "policy")
+        self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_repo_policy_can_select_report_mode(self) -> None:
+        """Repo-local policy may loosen the default blocking behavior explicitly."""
+        payload, log_entry = self._run_helper_guard_with_changed_python(
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+            policy_payload={
+                "enabled": True,
+                "mode": "report",
+            },
+            inventory_text=(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "print(json.dumps({'records': [{"
+                "'path': 'changed.py', 'line': 1, 'domain': 'main', "
+                "'qualname': 'value', 'needs_user_judgment': True, "
+                "'judgment_rule': 'main:new-helper'}]}))\n"
+            ),
+        )
+
+        self.assertEqual(payload, {})
+        self.assertEqual(log_entry["policy_status"], "repo-local")
+        self.assertEqual(log_entry["mode"], "report")
+        self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["records"], 1)
+        self.assertEqual(log_entry["violations"], 0)
 
     def test_helper_inventory_guard_skips_payloadless_invocations(self) -> None:
         """Helper guard should not infer PostToolUse from empty stdin."""

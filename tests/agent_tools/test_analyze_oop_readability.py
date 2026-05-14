@@ -11,21 +11,30 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "python" / "readability.py"
 CPP_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "cpp" / "readability.py"
+EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
 class AnalyzeOopReadabilityTest(unittest.TestCase):
     """Verify analyzer scoring and finding output."""
 
-    def run_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_analyzer(
+        self,
+        root: Path,
+        *args: str,
+        env: Mapping[str, str] = EMPTY_ENV,
+    ) -> subprocess.CompletedProcess[str]:
         """Run the analyzer against a temporary root."""
         return subprocess.run(
             [sys.executable, str(PYTHON_ANALYZER), "--root", str(root), *args],
@@ -33,6 +42,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, **env},
         )
 
     def run_cpp_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -805,6 +815,99 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("redundant_class_boundary:Projection", result.stdout)
+            self.assertNotIn("redundant_class_boundary:Port", result.stdout)
+
+    def test_python_usage_root_extends_redundant_class_construction_sources(self) -> None:
+        """Explicit usage roots should inform selected-file redundant class analysis."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            library = root / "library"
+            consumer = root / "consumer"
+            library.mkdir()
+            consumer.mkdir()
+            model = library / "model.py"
+            model.write_text(
+                "\n".join(
+                    [
+                        "class Projection:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (consumer / "consumer.py").write_text(
+                "\n".join(
+                    [
+                        "from model import Projection",
+                        "",
+                        "def compute(value: int) -> int:",
+                        "    projection = Projection()",
+                        "    return projection.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                library,
+                "--min-score",
+                "100",
+                "--usage-root",
+                str(consumer),
+                str(model),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+
+    def test_python_dependency_module_extends_type_boundary_sources(self) -> None:
+        """Importable dependency modules should contribute type-boundary evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            library = root / "library"
+            downstream = root / "downstream"
+            library.mkdir()
+            downstream.mkdir()
+            (downstream / "__init__.py").write_text("", encoding="utf-8")
+            model = library / "model.py"
+            model.write_text(
+                "\n".join(
+                    [
+                        "class Port:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (downstream / "consumer.py").write_text(
+                "\n".join(
+                    [
+                        "from model import Port",
+                        "",
+                        "def accepts_port(port: Port, value: int) -> int:",
+                        "    return port.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                library,
+                "--min-score",
+                "100",
+                "--dependency-module",
+                "downstream",
+                str(model),
+                env={"PYTHONPATH": os.pathsep.join([str(library), str(root)])},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("redundant_class_boundary:Port", result.stdout)
 
     def test_cpp_trivial_format_function_is_flagged(self) -> None:

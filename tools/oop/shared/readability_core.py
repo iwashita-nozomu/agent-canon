@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
+import importlib.util
 import json
 import re
 import subprocess
@@ -298,7 +299,12 @@ class PythonClassUsage:
         """Record the file that produced one usage observation."""
         if self.source_files is None:
             self.source_files = set()
-        self.source_files.add(str(path.relative_to(root)))
+        resolved_path = path.resolve()
+        try:
+            source_name = str(resolved_path.relative_to(root))
+        except ValueError:
+            source_name = str(resolved_path)
+        self.source_files.add(source_name)
 
     def boundary_refs(self) -> int:
         """Return usage count that proves the class is a type boundary."""
@@ -332,6 +338,31 @@ class PythonUsageIndex:
                 return self.usage_by_key[key]
         key = self.unique_name_to_key.get(class_name)
         return self.usage_by_key.get(key) if key is not None else None
+
+
+@dataclass(frozen=True)
+class PythonUsageSourceSet:
+    """Python files and source roots used only for dependency-source context."""
+
+    files: list[Path]
+    source_roots: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class DependencyUsageContext:
+    """Additional source context used for class dependency-source analysis."""
+
+    usage_roots: tuple[str, ...] = ()
+    dependency_modules: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class BaselineComparisonSpec:
+    """Inputs that control baseline finding filtering."""
+
+    language: str
+    baseline_ref: str
+    dependency_context: DependencyUsageContext
 
 
 @dataclass(frozen=True)
@@ -386,6 +417,15 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Analyze Python and C++ OOP readability risks."
     )
+    add_target_arguments(parser, default_language)
+    add_report_arguments(parser)
+    add_dependency_context_arguments(parser)
+    add_threshold_arguments(parser)
+    return parser
+
+
+def add_target_arguments(parser: argparse.ArgumentParser, default_language: str) -> None:
+    """Add source selection and scoring arguments."""
     parser.add_argument("paths", nargs="*", help="Files or directories to analyze.")
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
     parser.add_argument(
@@ -400,6 +440,10 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
         default=DEFAULT_MIN_SCORE,
         help="Minimum accepted score.",
     )
+
+
+def add_report_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add output formatting arguments."""
     parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     parser.add_argument(
         "--include-snippets",
@@ -431,6 +475,10 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
             "Repeat for multiple exclusions, for example --exclude vendor --exclude reports."
         ),
     )
+
+
+def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add baseline and dependency-source context arguments."""
     parser.add_argument(
         "--baseline-ref",
         default="",
@@ -439,6 +487,31 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
             "that should block new OOP risks without re-blocking existing debt."
         ),
     )
+    parser.add_argument(
+        "--usage-root",
+        "--dependency-root",
+        action="append",
+        dest="usage_roots",
+        default=[],
+        help=(
+            "Additional Python source root to include in class dependency-source analysis "
+            "without emitting findings for that root. Repeat for downstream or sibling modules."
+        ),
+    )
+    parser.add_argument(
+        "--dependency-module",
+        action="append",
+        dest="dependency_modules",
+        default=[],
+        help=(
+            "Importable Python module or package to include in class dependency-source "
+            "analysis without emitting findings for that module. Repeat for multiple modules."
+        ),
+    )
+
+
+def add_threshold_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add analyzer threshold arguments."""
     parser.add_argument("--max-function-lines", type=int, default=DEFAULT_MAX_FUNCTION_LINES)
     parser.add_argument("--max-class-lines", type=int, default=DEFAULT_MAX_CLASS_LINES)
     parser.add_argument("--max-public-methods", type=int, default=DEFAULT_MAX_PUBLIC_METHODS)
@@ -456,7 +529,6 @@ def build_parser(default_language: str = "all") -> argparse.ArgumentParser:
     parser.add_argument("--max-public-fields", type=int, default=DEFAULT_MAX_PUBLIC_FIELDS)
     parser.add_argument("--max-base-classes", type=int, default=DEFAULT_MAX_BASE_CLASSES)
     parser.add_argument("--max-module-helpers", type=int, default=DEFAULT_MAX_MODULE_HELPERS)
-    return parser
 
 
 def is_hidden(path: Path) -> bool:
@@ -1143,21 +1215,43 @@ def parse_python_source(context: SourceContext, findings: list[Finding]) -> ast.
         return None
 
 
-def python_module_name(root: Path, path: Path) -> str:
+def python_module_name(
+    root: Path,
+    path: Path,
+    source_roots: Sequence[Path] = (),
+) -> str:
     """Return a dotted module name for a Python file below the analysis root."""
+    resolved = path.resolve()
+    candidate_roots = sorted(
+        {root.resolve(), *(source_root.resolve() for source_root in source_roots)},
+        key=lambda item: len(item.parts),
+        reverse=True,
+    )
+    for source_root in candidate_roots:
+        try:
+            relative = resolved.relative_to(source_root).with_suffix("")
+        except ValueError:
+            continue
+        parts = list(relative.parts)
+        if parts and parts[-1] == "__init__":
+            parts = parts[:-1]
+        return ".".join(parts)
     try:
-        relative = path.resolve().relative_to(root.resolve()).with_suffix("")
+        relative = resolved.relative_to(root.resolve()).with_suffix("")
     except ValueError:
-        relative = path.resolve().with_suffix("")
+        relative = resolved.with_suffix("")
     parts = list(relative.parts)
     if parts and parts[-1] == "__init__":
         parts = parts[:-1]
     return ".".join(parts)
 
 
-def build_python_usage_index(root: Path, files: list[Path]) -> PythonUsageIndex:
+def build_python_usage_index(
+    root: Path,
+    source_set: PythonUsageSourceSet,
+) -> PythonUsageIndex:
     """Build project-level class definitions and dependency-source usage facts."""
-    python_files = [path for path in files if path.suffix in PYTHON_SUFFIXES]
+    python_files = [path for path in source_set.files if path.suffix in PYTHON_SUFFIXES]
     parsed: dict[Path, ast.Module] = {}
     module_names: dict[Path, str] = {}
     class_defs: dict[str, PythonClassDef] = {}
@@ -1169,7 +1263,7 @@ def build_python_usage_index(root: Path, files: list[Path]) -> PythonUsageIndex:
         except SyntaxError:
             continue
         resolved = path.resolve()
-        module = python_module_name(root, resolved)
+        module = python_module_name(root, resolved, source_set.source_roots)
         parsed[resolved] = tree
         module_names[resolved] = module
         for node in ast.walk(tree):
@@ -1207,8 +1301,11 @@ def python_usage_source_files(
     root: Path,
     selected_files: list[Path],
     exclude_patterns: Sequence[str],
-) -> list[Path]:
+    usage_roots: Sequence[str] = (),
+    dependency_modules: Sequence[str] = (),
+) -> PythonUsageSourceSet:
     """Return Python files used to resolve dependency-source class usage."""
+    source_roots: set[Path] = {root.resolve()}
     selected_python_files = [path.resolve() for path in selected_files if path.suffix in PYTHON_SUFFIXES]
     root_python_files = iter_directory_sources(
         root,
@@ -1216,7 +1313,87 @@ def python_usage_source_files(
         list(exclude_patterns),
         "python",
     )
-    return sorted(set(selected_python_files) | set(root_python_files))
+    usage_files: set[Path] = set(selected_python_files) | set(root_python_files)
+    for usage_root in usage_roots:
+        extra_sources = dependency_root_source_set(root, usage_root, exclude_patterns)
+        source_roots.update(extra_sources.source_roots)
+        usage_files.update(extra_sources.files)
+    for module_name in dependency_modules:
+        module_sources = dependency_module_source_set(module_name, exclude_patterns)
+        source_roots.update(module_sources.source_roots)
+        usage_files.update(module_sources.files)
+    return PythonUsageSourceSet(
+        files=sorted(usage_files),
+        source_roots=tuple(sorted(source_roots, key=str)),
+    )
+
+
+def dependency_root_source_set(
+    root: Path,
+    raw_usage_root: str,
+    exclude_patterns: Sequence[str],
+) -> PythonUsageSourceSet:
+    """Return Python source files below one additional usage root."""
+    usage_root = Path(raw_usage_root)
+    if not usage_root.is_absolute():
+        usage_root = root / usage_root
+    resolved = usage_root.resolve()
+    if resolved.is_file():
+        if not visible_source_path(resolved.parent, resolved, list(exclude_patterns), "python"):
+            return PythonUsageSourceSet(files=[], source_roots=())
+        return PythonUsageSourceSet(files=[resolved], source_roots=(resolved.parent,))
+    if not resolved.is_dir():
+        return PythonUsageSourceSet(files=[], source_roots=())
+    return PythonUsageSourceSet(
+        files=iter_directory_sources(resolved, resolved, list(exclude_patterns), "python"),
+        source_roots=(resolved,),
+    )
+
+
+def dependency_module_source_set(
+    module_name: str,
+    exclude_patterns: Sequence[str],
+) -> PythonUsageSourceSet:
+    """Return Python source files for one importable module or package."""
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        return PythonUsageSourceSet(files=[], source_roots=())
+    if spec.submodule_search_locations:
+        package_dirs = [Path(location).resolve() for location in spec.submodule_search_locations]
+        files: set[Path] = set()
+        source_roots: set[Path] = set()
+        for package_dir in package_dirs:
+            source_roots.add(dependency_package_source_root(package_dir, module_name))
+            files.update(iter_directory_sources(package_dir, package_dir, list(exclude_patterns), "python"))
+        return PythonUsageSourceSet(
+            files=sorted(files),
+            source_roots=tuple(sorted(source_roots, key=str)),
+        )
+    if spec.origin is None:
+        return PythonUsageSourceSet(files=[], source_roots=())
+    module_path = Path(spec.origin).resolve()
+    if module_path.suffix not in PYTHON_SUFFIXES or not module_path.is_file():
+        return PythonUsageSourceSet(files=[], source_roots=())
+    source_root = dependency_module_source_root(module_path, module_name)
+    if not visible_source_path(source_root, module_path, list(exclude_patterns), "python"):
+        return PythonUsageSourceSet(files=[], source_roots=())
+    return PythonUsageSourceSet(files=[module_path], source_roots=(source_root,))
+
+
+def dependency_package_source_root(package_dir: Path, module_name: str) -> Path:
+    """Return the source root that gives a package its importable module name."""
+    source_root = package_dir.resolve()
+    for _ in module_name.split("."):
+        source_root = source_root.parent
+    return source_root
+
+
+def dependency_module_source_root(module_path: Path, module_name: str) -> Path:
+    """Return the source root that gives a module file its importable module name."""
+    source_root = module_path.resolve().parent
+    for _ in module_name.split(".")[:-1]:
+        source_root = source_root.parent
+    return source_root
 
 
 def empty_python_usage_index() -> PythonUsageIndex:
@@ -2907,7 +3084,17 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
     """Analyze requested files and return output-ready state."""
     thresholds = build_thresholds(args)
     files = iter_source_files(root, args.paths, args.exclude, args.language)
-    findings = collect_findings(root, files, thresholds, args.exclude)
+    dependency_context = DependencyUsageContext(
+        usage_roots=tuple(str(item) for item in args.usage_roots),
+        dependency_modules=tuple(str(item) for item in args.dependency_modules),
+    )
+    findings = collect_findings(
+        root,
+        files,
+        thresholds,
+        args.exclude,
+        dependency_context,
+    )
     baseline_ref = str(args.baseline_ref or "").strip()
     if baseline_ref:
         baseline_findings = collect_baseline_findings(
@@ -2915,8 +3102,11 @@ def build_analyzer_run(root: Path, args: argparse.Namespace) -> AnalyzerRun:
             files,
             thresholds,
             args.exclude,
-            args.language,
-            baseline_ref,
+            BaselineComparisonSpec(
+                language=args.language,
+                baseline_ref=baseline_ref,
+                dependency_context=dependency_context,
+            ),
         )
         if baseline_findings is not None:
             findings = new_findings_since_baseline(findings, baseline_findings)
@@ -2943,24 +3133,34 @@ def collect_baseline_findings(
     files: list[Path],
     thresholds: Thresholds,
     exclude_patterns: Sequence[str],
-    language: str,
-    baseline_ref: str,
+    spec: BaselineComparisonSpec,
 ) -> list[Finding] | None:
     """Analyze requested files as they existed at one git baseline ref."""
-    relative_sources = git_baseline_source_paths(root, baseline_ref, language, exclude_patterns)
+    relative_sources = git_baseline_source_paths(
+        root,
+        spec.baseline_ref,
+        spec.language,
+        exclude_patterns,
+    )
     if relative_sources is None:
         return None
     selected_relatives = selected_relative_paths(root, files)
     materialized_relatives = sorted(set(relative_sources) | set(selected_relatives))
     with tempfile.TemporaryDirectory() as tmp_dir:
         baseline_root = Path(tmp_dir)
-        materialize_git_baseline(root, baseline_ref, baseline_root, materialized_relatives)
+        materialize_git_baseline(root, spec.baseline_ref, baseline_root, materialized_relatives)
         baseline_files = [
             (baseline_root / relative).resolve()
             for relative in selected_relatives
             if (baseline_root / relative).is_file()
         ]
-        return collect_findings(baseline_root, baseline_files, thresholds, exclude_patterns)
+        return collect_findings(
+            baseline_root,
+            baseline_files,
+            thresholds,
+            exclude_patterns,
+            spec.dependency_context,
+        )
 
 
 def selected_relative_paths(root: Path, files: list[Path]) -> list[str]:
@@ -3047,6 +3247,7 @@ def collect_findings(
     files: list[Path],
     thresholds: Thresholds,
     exclude_patterns: Sequence[str],
+    dependency_context: DependencyUsageContext = DependencyUsageContext(),
 ) -> list[Finding]:
     """Collect findings for every selected source file."""
     findings: list[Finding] = []
@@ -3054,7 +3255,13 @@ def collect_findings(
     python_usage_index = (
         build_python_usage_index(
             root,
-            python_usage_source_files(root, python_files, exclude_patterns),
+            python_usage_source_files(
+                root,
+                python_files,
+                exclude_patterns,
+                usage_roots=dependency_context.usage_roots,
+                dependency_modules=dependency_context.dependency_modules,
+            ),
         )
         if python_files
         else empty_python_usage_index()

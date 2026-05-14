@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Runs helper-inventory hook checks using repo-owned policy thresholds.
+# responsibility Runs helper-inventory hook checks using AgentCanon default and repo-local policy thresholds.
 # upstream implementation ../hooks.json invokes this hook for PostToolUse and Stop.
 # upstream implementation ../../tools/agent_tools/helper_function_inventory.py provides changed/baseline helper findings.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard output.
@@ -24,6 +24,7 @@ EDIT_COMMAND_PATTERN = re.compile(
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
 POLICY_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_POLICY"
+MODE_ENV = "AGENT_CANON_HELPER_INVENTORY_GUARD_MODE"
 LOG_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
@@ -32,7 +33,33 @@ PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
 TOOL_EVENT_FALLBACK = "PostToolUse"
 DEFAULT_POLICY_PATH = "helper_inventory_guard_policy.json"
+DEFAULT_GUARD_MODE = "policy"
+GUARD_MODES = {"policy", "block-new", "report", "off"}
 MAX_REASON_RECORDS = 8
+NON_BLOCKING_JUDGMENT_LIMIT = 1_000_000
+DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_DOMAIN_LIMITS = {
+    "main": {
+        "max_needs_user_judgment": 0,
+        "max_tool_rule_gap": 0,
+    },
+    "test": {
+        "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
+        "max_tool_rule_gap": 0,
+    },
+    "experiment": {
+        "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
+        "max_tool_rule_gap": 0,
+    },
+    "tooling": {
+        "max_needs_user_judgment": NON_BLOCKING_JUDGMENT_LIMIT,
+        "max_tool_rule_gap": 0,
+    },
+    "*": {
+        "max_needs_user_judgment": 0,
+        "max_tool_rule_gap": 0,
+    },
+}
 
 
 def _load_payload() -> dict[str, object]:
@@ -121,28 +148,89 @@ def _should_check(payload: dict[str, object]) -> bool:
     )
 
 
-def _policy_path(root: Path) -> Path:
+def _agentcanon_default_policy_path() -> Path:
+    return Path(__file__).resolve().parents[2] / DEFAULT_POLICY_PATH
+
+
+def _policy_candidates(root: Path) -> list[tuple[Path, str]]:
     override = os.environ.get(POLICY_PATH_ENV, "").strip()
-    return Path(override) if override else root / DEFAULT_POLICY_PATH
+    if override:
+        return [(Path(override), "override")]
+    repo_policy = root / DEFAULT_POLICY_PATH
+    agentcanon_policy = _agentcanon_default_policy_path()
+    if repo_policy.resolve() == agentcanon_policy.resolve():
+        return [(agentcanon_policy, "agentcanon-default")]
+    return [(repo_policy, "repo-local"), (agentcanon_policy, "agentcanon-default")]
+
+
+def _default_domain_limits() -> dict[str, dict[str, int]]:
+    return {domain: dict(limits) for domain, limits in DEFAULT_DOMAIN_LIMITS.items()}
+
+
+def _default_policy(path: Path, policy_status: str) -> dict[str, object]:
+    return {
+        "enabled": True,
+        "mode": DEFAULT_GUARD_MODE,
+        "baseline_ref": "HEAD",
+        "timeout_seconds": DEFAULT_TIMEOUT_SECONDS,
+        "domain_limits": _default_domain_limits(),
+        "policy_path": str(path),
+        "policy_status": policy_status,
+    }
+
+
+def _merge_domain_limits(raw_limits: object) -> dict[str, dict[str, int]]:
+    merged = _default_domain_limits()
+    if not isinstance(raw_limits, dict):
+        return merged
+    for domain, raw_domain_limits in raw_limits.items():
+        if not isinstance(domain, str) or not isinstance(raw_domain_limits, dict):
+            continue
+        domain_limits = dict(merged.get(domain, {}))
+        for key in ("max_needs_user_judgment", "max_tool_rule_gap"):
+            value = raw_domain_limits.get(key)
+            if isinstance(value, int):
+                domain_limits[key] = value
+        merged[domain] = domain_limits
+    return merged
+
+
+def _policy_with_defaults(
+    loaded: dict[str, object],
+    path: Path,
+    policy_status: str,
+) -> dict[str, object]:
+    policy = _default_policy(path, policy_status)
+    for key, value in loaded.items():
+        if key != "domain_limits":
+            policy[key] = value
+    policy["domain_limits"] = _merge_domain_limits(loaded.get("domain_limits"))
+    policy["policy_path"] = str(path)
+    policy["policy_status"] = policy_status
+    return policy
 
 
 def _load_policy(root: Path) -> dict[str, object]:
-    path = _policy_path(root)
-    if not path.is_file():
-        return {"enabled": False, "policy_path": str(path), "policy_status": "missing"}
-    try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return {
-            "enabled": True,
-            "policy_path": str(path),
-            "policy_status": f"invalid:{type(exc).__name__}",
-        }
-    if not isinstance(loaded, dict):
-        return {"enabled": True, "policy_path": str(path), "policy_status": "invalid"}
-    loaded["policy_path"] = str(path)
-    loaded["policy_status"] = "loaded"
-    return loaded
+    candidates = _policy_candidates(root)
+    fallback_path = candidates[-1][0]
+    for path, scope in candidates:
+        if not path.is_file():
+            continue
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return _default_policy(path, f"invalid:{type(exc).__name__}")
+        if not isinstance(loaded, dict):
+            return _default_policy(path, "invalid")
+        return _policy_with_defaults(loaded, path, scope)
+    return _default_policy(fallback_path, "missing")
+
+
+def _guard_mode(policy: dict[str, object]) -> str:
+    """Return helper guard behavior mode."""
+    raw_mode = os.environ.get(MODE_ENV, "").strip() or str(policy.get("mode") or DEFAULT_GUARD_MODE)
+    mode = raw_mode.strip().lower().replace("_", "-")
+    return mode if mode in GUARD_MODES else DEFAULT_GUARD_MODE
 
 
 def git_changed_python_paths(root: Path) -> list[str]:
@@ -231,6 +319,7 @@ def _domain_limit(policy: dict[str, object], domain: str, key: str) -> int:
 def _violating_records(
     records: list[dict[str, object]],
     policy: dict[str, object],
+    mode: str,
 ) -> tuple[list[dict[str, object]], dict[str, dict[str, int]]]:
     counts: dict[str, dict[str, int]] = {}
     for record in records:
@@ -241,6 +330,15 @@ def _violating_records(
         if _is_tool_rule_gap(record):
             bucket["tool_rule_gap"] += 1
 
+    if mode == "report":
+        return [], counts
+    if mode == "block-new":
+        return [
+            record
+            for record in records
+            if bool(record.get("needs_user_judgment")) or _is_tool_rule_gap(record)
+        ], counts
+
     violating_domains = {
         domain
         for domain, bucket in counts.items()
@@ -249,6 +347,20 @@ def _violating_records(
         or bucket["tool_rule_gap"] > _domain_limit(policy, domain, "max_tool_rule_gap")
     }
     return [record for record in records if str(record.get("domain") or "unknown") in violating_domains], counts
+
+
+def _should_run_inventory(
+    payload: dict[str, object],
+    policy: dict[str, object],
+    mode: str,
+    changed_paths: list[str],
+) -> bool:
+    """Return whether the hook should invoke helper inventory."""
+    if mode == "off" or not changed_paths or not _should_check(payload):
+        return False
+    if mode in {"block-new", "report"}:
+        return True
+    return bool(policy.get("enabled"))
 
 
 def _default_log_path(root: Path) -> Path:
@@ -296,8 +408,9 @@ def main() -> int:
     if _payload_status(payload) == PAYLOAD_STATUS_EMPTY:
         return 0
     policy = _load_policy(root)
+    mode = _guard_mode(policy)
     changed_paths = git_changed_python_paths(root)
-    checked = _should_check(payload) and bool(policy.get("enabled")) and bool(changed_paths)
+    checked = _should_run_inventory(payload, policy, mode, changed_paths)
     command: list[str] = []
     returncode = 0
     output = ""
@@ -307,7 +420,7 @@ def main() -> int:
     if checked:
         command, returncode, output = run_inventory(root, policy)
         records = _records_from_output(output)
-        violations, counts = _violating_records(records, policy)
+        violations, counts = _violating_records(records, policy, mode)
     _append_log(
         root,
         {
@@ -318,6 +431,7 @@ def main() -> int:
             "checked": checked,
             "policy_status": policy.get("policy_status"),
             "policy_path": policy.get("policy_path"),
+            "mode": mode,
             "changed_python_count": len(changed_paths),
             "inventory_returncode": returncode,
             "records": len(records),
