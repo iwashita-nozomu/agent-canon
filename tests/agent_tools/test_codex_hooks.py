@@ -807,6 +807,37 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
 
+    def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
+        """No-skill hook payloads should not dirty durable AgentCanon logs."""
+        payloads: tuple[dict[str, object], ...] = (
+            {},
+            {
+                "hookEventName": "UserPromptSubmit",
+                "prompt": "plain text without a skill token",
+            },
+            {
+                "hookEventName": "Stop",
+                "last_assistant_message": "finished without skill declaration",
+            },
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+                result = subprocess.run(
+                    [sys.executable, str(SKILL_USAGE_LOGGER)],
+                    cwd=temp_root,
+                    input=json.dumps(payload),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+                )
+
+                self.assertEqual(result.stdout, "")
+                self.assertFalse(log_path.exists())
+
     def test_skill_usage_logger_honors_results_dir_override(self) -> None:
         """Explicit overrides can route hook logs to a temporary local path."""
         with tempfile.TemporaryDirectory() as temp_dir:

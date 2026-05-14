@@ -170,6 +170,8 @@ def main() -> int:
     payload = load_payload()
     root = repo_root()
     skills = observed_skills(payload)
+    if not skills:
+        return 0
     workflow_event_count = append_workflow_monitor_events(root, skills)
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
