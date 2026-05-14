@@ -541,6 +541,13 @@ def copilot_readme_path(root: Path) -> Path:
     return root / "README.md"
 
 
+def copilot_configuration_path(root: Path) -> Path:
+    """Return the Copilot configuration catalog path for this repository mode."""
+    if is_template_or_derived_repo(root):
+        return agent_canon_root(root) / "documents" / "github-copilot-configuration.md"
+    return root / "documents" / "github-copilot-configuration.md"
+
+
 def copilot_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
     """Return Copilot discovery surface requirement checks."""
     return [
@@ -556,7 +563,7 @@ def copilot_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
         ),
         (root / ".github" / "AGENTS.md", GITHUB_AGENTS_REQUIREMENTS),
         (
-            root / "documents" / "github-copilot-configuration.md",
+            copilot_configuration_path(root),
             COPILOT_CONFIG_REQUIREMENTS,
         ),
     ]

@@ -279,6 +279,73 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_template_mode_uses_vendor_copilot_configuration_doc(self) -> None:
+        """Template roots keep the shared Copilot catalog under AgentCanon."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            self.write_template_root_pr_template(root)
+            self.copy_template_agent_canon_template(root)
+            (root / "documents" / "github-copilot-configuration.md").unlink()
+            (root / ".gitmodules").write_text(
+                "[submodule \"vendor/agent-canon\"]\n"
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def write_template_root_pr_template(self, root: Path) -> None:
+        """Write a minimal valid template-root PR template."""
+        path = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(
+                [
+                    "# Template / derived project PR",
+                    "Validation Evidence",
+                    "Plan Mode Evidence",
+                    "PR Mutation Authority",
+                    "Authority / blocker notes",
+                    "Copilot / Automation Output",
+                    "COPILOT_PR_DECISION",
+                    "github_copilot_merge_when_green",
+                    "Operational Findings / Issues",
+                    "vendor/agent-canon/issues/README.md",
+                    "vendor/agent-canon/issues/closed/",
+                    "Agent Improvement Guide artifact",
+                    "run_repo_dependency_review.sh --search-hits-file",
+                    "Copilot Configuration Impact",
+                    "documents/github-copilot-configuration.md",
+                    "Template / derived project PR",
+                    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+                    "make ci",
+                    "AgentCanon Evidence",
+                    "template submodule SHA:",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def copy_template_agent_canon_template(self, root: Path) -> None:
+        """Copy the template-side AgentCanon PR template."""
+        source = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+        destination = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
     def test_missing_plan_mode_guidance_fails(self) -> None:
         """Copilot entrypoints must tell agents when to use Plan mode."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -541,6 +608,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
+            "documents/github-copilot-configuration.md",
             "issues/README.md",
             "issues/open/AC-20260513-durable-finding-auto-promotion.md",
         ]:
