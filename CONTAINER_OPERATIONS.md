@@ -4,13 +4,13 @@
 @dependency-start
 responsibility Documents AgentCanon-owned container, devcontainer, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
-upstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
-upstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
-upstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
-upstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
-upstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
-upstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
+downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
+downstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
 downstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
+downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
+downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
+downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
+downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
 @dependency-end
 -->
 
@@ -34,6 +34,29 @@ Read this file when a task touches any of these surfaces:
 - `tools/ci/container_config.py`
 - `tools/ci/check_github_workflows.py`
 - `documents/github-first-module-and-devcontainer-policy.md`
+
+## Canonical Source Contract
+
+This file is the source of truth for the Docker / devcontainer ownership
+boundary. Other files may summarize the boundary, but they must not become a
+second policy surface.
+
+Use this precedence when wording conflicts:
+
+1. `CONTAINER_OPERATIONS.md`: normative owner boundary, forbidden placements,
+   and required validation.
+2. `tools/docker_dependency_validator.sh`: mechanical enforcement of the
+   boundary for template and derived repos.
+3. `docker/README.md`: repo-local implementation runbook for this template's
+   runtime packs, Dockerfile, Python dependency installer, and Jupyter/nested
+   Codex entrypoints.
+4. `Makefile`: command aliases only. Target comments must not redefine policy.
+5. skill prompts and coding convention docs: routing summaries that point back
+   to this rulebook.
+
+When the boundary changes, update this file first. Then update the validator,
+repo-local Docker runbook, Makefile target comments, and skill prompt summaries
+only as needed to keep them consistent with this rulebook.
 
 ## Ownership Boundary
 

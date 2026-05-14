@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
+# upstream design ../CONTAINER_OPERATIONS.md canonical Docker and devcontainer ownership boundary
 # upstream environment ../documents/linux-wsl-host-requirements.md documents canonical host tool inventory
 # @dependency-end
 
@@ -10,6 +11,11 @@ set -euo pipefail
 issues=0
 has_docker_surface=0
 has_devcontainer_surface=0
+if [ -f "vendor/agent-canon/CONTAINER_OPERATIONS.md" ]; then
+  rulebook="vendor/agent-canon/CONTAINER_OPERATIONS.md"
+else
+  rulebook="CONTAINER_OPERATIONS.md"
+fi
 
 if [ -d docker ]; then
   has_docker_surface=1
@@ -17,6 +23,8 @@ fi
 if [ -d .devcontainer ]; then
   has_devcontainer_surface=1
 fi
+
+printf 'Docker/development-container rulebook: %s\n' "$rulebook"
 
 report_issue() {
   printf '   \342\235\214 %s\n' "$1"

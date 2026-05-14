@@ -4,6 +4,7 @@ responsibility Documents GitHub-first reusable module and devcontainer ownership
 downstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
 downstream design ./agent-canon-subtree-migration.md AgentCanon submodule update policy
 downstream design ./coding-conventions-project.md project environment rules
+upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint
 downstream implementation ../tools/ci/container_config.py validates Dockerfile and devcontainer boundaries
 @dependency-end
@@ -47,6 +48,9 @@ Required boundaries:
 - do not block shared-canon design on one repo's local Git repair.
 
 ## Dockerfile Boundary
+
+`CONTAINER_OPERATIONS.md` is the canonical rulebook for this boundary. This
+section is a GitHub-first architecture summary, not a second source of truth.
 
 `docker/Dockerfile` is owned by the template or derived repo. It defines the
 project runtime and build image.
