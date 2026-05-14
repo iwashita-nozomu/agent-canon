@@ -291,8 +291,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["min_score"], 95)
         self.assertEqual(log_entry["failed_count"], 1)
 
-    def test_oop_readability_guard_default_log_is_local(self) -> None:
-        """OOP guard should not dirty tracked durable hook logs by default."""
+    def test_oop_readability_guard_defaults_to_agentcanon_hook_result(self) -> None:
+        """OOP guard should append to the AgentCanon hook result surface by default."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
@@ -340,7 +340,6 @@ class CodexHooksTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            local_log = temp_root / "reports" / "hooks" / "oop_readability_guard.jsonl"
             durable_log = (
                 temp_root
                 / "agents"
@@ -349,13 +348,11 @@ class CodexHooksTest(unittest.TestCase):
                 / "hook-runs"
                 / "oop_readability_guard.jsonl"
             )
-            local_log_exists = local_log.exists()
             durable_log_exists = durable_log.exists()
-            log_entry = json.loads(local_log.read_text(encoding="utf-8").splitlines()[0])
+            log_entry = json.loads(durable_log.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertIn("decision", json.loads(result.stdout))
-        self.assertTrue(local_log_exists)
-        self.assertFalse(durable_log_exists)
+        self.assertTrue(durable_log_exists)
         self.assertEqual(log_entry["status"], "fail")
 
     def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
@@ -708,8 +705,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
 
-    def test_skill_usage_logger_defaults_to_local_hook_log(self) -> None:
-        """Default skill hook output should live under ignored local hook logs."""
+    def test_skill_usage_logger_defaults_to_agentcanon_hook_result(self) -> None:
+        """Default skill hook output should live under AgentCanon hook results."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
@@ -725,32 +722,6 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-            )
-            log_path = temp_root / "reports" / "hooks" / "skill_usage.jsonl"
-            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
-
-        self.assertEqual(result.stdout, "")
-        self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
-        self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
-
-    def test_skill_usage_logger_can_accumulate_durable_hook_results(self) -> None:
-        """Explicit eval workflows can still write durable AgentCanon hook logs."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            result = subprocess.run(
-                [sys.executable, str(SKILL_USAGE_LOGGER)],
-                cwd=temp_root,
-                input=json.dumps(
-                    {
-                        "hookEventName": "UserPromptSubmit",
-                        "prompt": "Use $agent-orchestration.",
-                    }
-                ),
-                check=True,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "AGENT_CANON_DURABLE_HOOK_RESULTS": "1"},
             )
             log_path = (
                 temp_root
@@ -760,6 +731,33 @@ class CodexHooksTest(unittest.TestCase):
                 / "hook-runs"
                 / "skill_usage.jsonl"
             )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
+        self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
+
+    def test_skill_usage_logger_honors_results_dir_override(self) -> None:
+        """Explicit overrides can route hook logs to a temporary local path."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_dir = temp_root / "reports" / "hooks"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_HOOK_RESULTS_DIR": str(log_dir)},
+            )
+            log_path = log_dir / "skill_usage.jsonl"
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(result.stdout, "")

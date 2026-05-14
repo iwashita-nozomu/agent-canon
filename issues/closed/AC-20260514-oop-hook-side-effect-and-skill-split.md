@@ -19,10 +19,10 @@ evidence: reports/hooks/oop_readability_guard.jsonl, vendor/agent-canon/agents/e
 affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
 edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
 required_action: Keep OOP tool execution and agent analysis in one public skill while preventing hook evidence writes from making simple tool checks look like broad repo-changing work.
-close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and leave no tracked hook-log dirt outside explicit evidence workflows.
+close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and append hook evidence to the AgentCanon-owned hook result chronology.
 resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/31
 resolved_at: 2026-05-14
-resolution_summary: Default hook JSONL output now goes to ignored `reports/hooks/`; durable AgentCanon hook accumulation is opt-in; OOP readability checks append run-bundle timing tokens with tool_call, duration_ms, status, scope, and output_path.
+resolution_summary: OOP readability checks append run-bundle timing tokens with tool_call, duration_ms, status, scope, and output_path. Follow-up correction restores AgentCanon-owned `agents/evals/results/hook-runs/` as the default hook JSONL source of truth; `reports/hooks/` is override-only temporary output.
 
 ## Finding
 
