@@ -244,6 +244,17 @@ def has_dependency_manifest(path: Path) -> bool:
     )
 
 
+def resolve_repo_path(root: Path, relative_path: str) -> Path:
+    """Resolve a path through the root view or vendored AgentCanon source."""
+    root_path = root / relative_path
+    if root_path.exists():
+        return root_path
+    vendor_path = root / "vendor" / "agent-canon" / relative_path
+    if vendor_path.exists():
+        return vendor_path
+    return root_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -287,7 +298,7 @@ def normalize_target(root: Path, source: Path, relative_target: str) -> str:
 
 def manifest_edges(root: Path, relative_path: str) -> tuple[ManifestEdge, ...]:
     """Extract dependency manifest edges from one file."""
-    path = root / relative_path
+    path = resolve_repo_path(root, relative_path)
     if not path.is_file():
         return ()
     lines = path.read_text(encoding="utf-8").splitlines()[:HEADER_SCAN_LINES]
@@ -416,7 +427,7 @@ def check_link(
 
 def check_text(root: Path, contract: ToolContract, text_check: TextCheck) -> list[Finding]:
     """Check one required snippet."""
-    path = root / text_check.path
+    path = resolve_repo_path(root, text_check.path)
     if not path.is_file():
         return [
             Finding("missing-file", contract.name, text_check.path, text_check.detail)
@@ -431,7 +442,7 @@ def check_text(root: Path, contract: ToolContract, text_check: TextCheck) -> lis
 
 def check_catalog_entries(root: Path) -> list[Finding]:
     """Check catalog entries for stale paths and legacy/default confusion."""
-    catalog_path = root / "tools" / "catalog.yaml"
+    catalog_path = resolve_repo_path(root, "tools/catalog.yaml")
     if not catalog_path.is_file():
         return [
             Finding("missing-file", "tool_catalog", "tools/catalog.yaml", "catalog")
@@ -486,7 +497,7 @@ def check_catalog_entries(root: Path) -> list[Finding]:
                 )
             )
             continue
-        if not (root / entry_path).exists():
+        if not resolve_repo_path(root, entry_path).exists():
             findings.append(
                 Finding("stale-catalog-entry", "tool_catalog", entry_path, "missing-path")
             )
@@ -538,13 +549,13 @@ def run_checks(root: Path, names: Sequence[str] | None) -> list[Finding]:
         all_edges.extend(manifest_edges(root, path))
     findings: list[Finding] = []
     for contract in contracts:
-        if not (root / contract.tool).is_file():
+        if not resolve_repo_path(root, contract.tool).is_file():
             findings.append(
                 Finding("missing-tool", contract.name, contract.tool, "missing-file")
             )
             continue
         for link in contract.links:
-            if not (root / link.target).is_file():
+            if not resolve_repo_path(root, link.target).is_file():
                 findings.append(
                     Finding("missing-file", contract.name, link.target, "link-target")
                 )

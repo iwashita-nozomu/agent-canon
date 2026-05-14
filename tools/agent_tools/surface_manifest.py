@@ -122,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
         "copy-specs",
         "regular-specs",
         "removed-legacy-paths",
+        "root-absent-paths",
         "check-doc",
     ):
         subcommands.add_parser(command)
@@ -311,6 +312,16 @@ def render_removed_legacy(entries: Iterable[SurfaceEntry]) -> str:
     return "\n".join(lines)
 
 
+def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
+    """Render paths that must not be materialized in a parent repo root."""
+    lines = [
+        entry.path
+        for entry in entries
+        if entry.mode in {"removed_legacy", "standalone_only"}
+    ]
+    return "\n".join(lines)
+
+
 def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     """Return doc consistency findings."""
     findings: list[str] = []
@@ -331,6 +342,17 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     return findings
 
 
+def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str, str]:
+    """Return output text for manifest rendering commands."""
+    return {
+        "link-specs": render_specs(manifest.entries, root, manifest.prefix),
+        "copy-specs": render_copy_specs(manifest.entries, manifest.prefix),
+        "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
+        "removed-legacy-paths": render_removed_legacy(manifest.entries),
+        "root-absent-paths": render_root_absent_paths(manifest.entries),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the manifest command."""
     args = build_parser().parse_args(argv)
@@ -340,15 +362,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
-    if args.command == "link-specs":
-        print(render_specs(manifest.entries, root, manifest.prefix))
-    elif args.command == "copy-specs":
-        print(render_copy_specs(manifest.entries, manifest.prefix))
-    elif args.command == "regular-specs":
-        print(render_regular_specs(manifest.entries, manifest.prefix))
-    elif args.command == "removed-legacy-paths":
-        print(render_removed_legacy(manifest.entries))
-    elif args.command == "check-doc":
+    outputs = render_command_outputs(manifest, root)
+    if args.command in outputs:
+        print(outputs[args.command])
+        return 0
+    if args.command == "check-doc":
         findings = check_doc(root, manifest.prefix, manifest)
         for finding in findings:
             print(finding)

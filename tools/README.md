@@ -202,10 +202,14 @@ When a run uses skills, prompt eval evidence is required. Run
 `evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
 Hook outcomes accumulate in AgentCanon under
-`agents/evals/results/hook-runs/` by default. `generate_agent_improvement_guide.py`
-reads memory notes, skill eval reports, hook results, and `issues/open|closed/`
-to produce the PR / branch-push improvement guide artifact; it does not mutate
-skills, workflows, tools, or memory.
+`agents/evals/results/hook-runs/` by default. Temporary local hook output belongs
+in `reports/hooks/` only when a task explicitly overrides the destination with
+`AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
+`AGENT_CANON_SKILL_LOG_PATH`.
+`generate_agent_improvement_guide.py` reads memory notes, skill eval reports,
+durable hook results, and `issues/open|closed/` to produce the PR /
+branch-push improvement guide artifact; it does not mutate skills, workflows,
+tools, or memory.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \

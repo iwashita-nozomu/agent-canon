@@ -2,7 +2,6 @@
 @dependency-start
 responsibility Documents GitHub-first reusable module and devcontainer ownership policy.
 downstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
-downstream design ./agent-canon-subtree-migration.md AgentCanon submodule update policy
 downstream design ./coding-conventions-project.md project environment rules
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint

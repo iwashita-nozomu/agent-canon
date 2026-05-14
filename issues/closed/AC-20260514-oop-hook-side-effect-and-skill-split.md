@@ -12,14 +12,17 @@ downstream design ../../.agents/skills/oop-readability-check/SKILL.md keeps mech
 -->
 
 issue_id: AC-20260514-oop-hook-side-effect-and-skill-split
-status: in_progress
+status: resolved
 source: user
 severity: S1
 evidence: reports/hooks/oop_readability_guard.jsonl, vendor/agent-canon/agents/evals/results/hook-runs/oop_readability_guard.jsonl, reports/agents/20260514-012429-oop-readability-report/oop_readability_report.md
 affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md
 edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md
 required_action: Keep OOP tool execution and agent analysis in one public skill while preventing hook evidence writes from making simple tool checks look like broad repo-changing work.
-close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and leave no tracked hook-log dirt outside explicit evidence workflows.
+close_condition: A simple user request for OOP checking can invoke one narrow skill, choose mechanical-only/analyze-existing/run-and-analyze mode, record duration tokens when a run bundle exists, and append hook evidence to the AgentCanon-owned hook result chronology.
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/31
+resolved_at: 2026-05-14
+resolution_summary: OOP readability checks append run-bundle timing tokens with tool_call, duration_ms, status, scope, and output_path. Follow-up correction restores AgentCanon-owned `agents/evals/results/hook-runs/` as the default hook JSONL source of truth; `reports/hooks/` is override-only temporary output.
 
 ## Finding
 
@@ -86,6 +89,21 @@ The practical symptoms were:
 This is a tool-environment side effect, not a product change. It should be
 visible as evidence when intentionally accumulated, but it should not silently
 turn a narrow check into a dirty submodule state.
+
+## 2026-05-14 Additional Observation
+
+During the standalone-only document surface repair, a small runtime packet path
+resolver touched `tools/agent_tools/agent_team.py`. The OOP hook then blocked on
+whole-file findings that already existed at `HEAD`, even though the edited
+resolver did not introduce those findings. This is a distinct hook failure mode:
+changed-file scope is useful, but blocking must be based on new or worsened
+finding identities when a large legacy file already has recorded debt.
+
+The first mitigation in the repair branch updates
+`.codex/hooks/oop_readability_guard.py` to compare current JSON findings with
+the same files at `HEAD`. The hook still blocks new files, new findings, and
+worsened finding identities. Unchanged pre-existing findings are logged as
+`OOP_READABILITY_BASELINE=preexisting-only` and do not block the current edit.
 
 ## Timing Attribution Gap
 

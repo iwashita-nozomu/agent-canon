@@ -789,6 +789,15 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     '  "documents/README.md",',
                     ']',
                     '',
+                    '[[group]]',
+                    'mode = "standalone_only"',
+                    'owner = "agent-canon-standalone"',
+                    'class = "standalone_only"',
+                    'local_override_allowed = false',
+                    'paths = [',
+                    '  "documents/SHARED_RUNTIME_SURFACES.md",',
+                    ']',
+                    '',
                     '[[surface]]',
                     'path = "goal.md"',
                     'mode = "repo_state"',
@@ -804,6 +813,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         (work_dir / ".github" / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
         (work_dir / "documents" / "README.md").write_text(
             "# Derived Documents Seed\n",
+            encoding="utf-8",
+        )
+        (work_dir / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
+            "# Standalone Surface Policy\n",
             encoding="utf-8",
         )
         (work_dir / ".github" / "AGENTS.md").write_text(
@@ -1059,6 +1072,45 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "Derived Documents Seed",
                 readme_path.read_text(encoding="utf-8"),
             )
+
+    def test_link_root_removes_standalone_only_root_views(self) -> None:
+        """Link-root and check should keep standalone-only docs out of parent roots."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            documents_dir = repo / "documents"
+            documents_dir.mkdir()
+            policy_path = documents_dir / "SHARED_RUNTIME_SURFACES.md"
+            os.symlink(
+                "../vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md",
+                policy_path,
+            )
+
+            check_before = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "check"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(check_before.returncode, 0)
+            self.assertIn(
+                "absent[documents/SHARED_RUNTIME_SURFACES.md]=present",
+                check_before.stderr,
+            )
+
+            link_root = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(link_root.returncode, 0, link_root.stderr)
+            self.assertFalse(policy_path.exists())
+            self.assertFalse(policy_path.is_symlink())
 
     def test_plan_reports_submodule_update_without_root_commit_lookup_errors(self) -> None:
         """Plan should compare submodule commits inside the submodule repo."""

@@ -3,13 +3,12 @@
 <!--
 @dependency-start
 responsibility Documents AgentCanon submodule update and legacy subtree migration for this repository.
-upstream design ../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
 downstream design ../agents/workflows/derived-agent-canon-diff-workflow.md consumes the subtree migration contract
-upstream implementation ../tools/sync_agent_canon.sh vendoring sync tool
-upstream implementation ../tools/update_agent_canon.sh derived repo update helper
 upstream design ./agent-canon-github-remote.md defines GitHub canonical remote policy
 upstream design ./github-first-module-and-devcontainer-policy.md defines GitHub-first module and devcontainer policy
 downstream design ./dependency-manifest-design.md defines dependency manifest surface added to root
+downstream implementation ../tools/sync_agent_canon.sh vendoring sync tool
+downstream implementation ../tools/update_agent_canon.sh derived repo update helper
 @dependency-end
 -->
 

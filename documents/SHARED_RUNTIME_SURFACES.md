@@ -3,9 +3,9 @@
 responsibility Documents Shared Runtime Surfaces for this repository.
 upstream design ./agent-canon-subtree-migration.md vendoring ownership model
 upstream design ./github-copilot-configuration.md GitHub Copilot configuration surface
-upstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
-upstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
+downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
+downstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
 downstream implementation ../tools/agent_tools/check_convention_compliance.py verifies manifest/doc wiring
 downstream design ./agent-canon-parent-repo-latest-checklist.md task-start parent repo checklist
 @dependency-end
@@ -32,7 +32,7 @@ whether a derived repository may override it, and where edits must be made.
 | Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
 | Project-owned durable state / content | regular project-local file or directory | project root | yes |
 | GitHub path constraint copy surface | regular root copy from AgentCanon source | AgentCanon source, then `link-root` copy | no |
-| AgentCanon standalone-only surface | not exposed into template root | standalone AgentCanon repo | no |
+| AgentCanon standalone-only surface | absent from template root; `link-root` removes stale root views | standalone AgentCanon repo | no |
 
 ## Manifest Contract
 
@@ -110,6 +110,10 @@ and owns them:
 A derived repo may create its own server contract, bootstrap contract, host
 requirements, template remote policy, or root `documents/README.md`; those files
 are reviewed and committed as template or derived-repo content.
+
+`standalone_only` manifest entries are intentionally absent from template and
+derived repo roots. If a legacy symlink or copy remains at such a path,
+`bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
 
 AgentCanon may provide generic templates under `documents/templates/`, such as
 `server_host_inventory.template.md`, `server_runtime_layout.template.toml`,

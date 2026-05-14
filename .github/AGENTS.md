@@ -15,7 +15,9 @@ GitHub 側の薄い入口です。
 - copilot custom instructions: `/.github/copilot-instructions.md`
 - copilot PR processing instructions: `/.github/instructions/pr-processing.instructions.md`
 - copilot PR maintainer custom agent: `/.github/agents/pr-maintainer.md`
-- copilot configuration catalog: `/documents/github-copilot-configuration.md`
+- copilot configuration catalog: `/vendor/agent-canon/documents/github-copilot-configuration.md`
+  in template roots; `/documents/github-copilot-configuration.md` in standalone
+  AgentCanon
 - curated project skills: `/.agents/skills/`
 - default PR checklist: `/.github/PULL_REQUEST_TEMPLATE.md`
 - AgentCanon-in-template PR checklist: `/.github/PULL_REQUEST_TEMPLATE/agent_canon.md`

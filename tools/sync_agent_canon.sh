@@ -1,43 +1,10 @@
 #!/usr/bin/env bash
 # @dependency-start
 # responsibility Provides sync agent canon repository automation.
-# upstream implementation ./agent_tools/check_dependency_headers.py validates dependency manifests
-# upstream implementation ../tests/agent_tools/test_check_dependency_headers.py tests dependency manifest checker
-# downstream implementation ../documents/codex-configuration-reference.md root symlink view for Codex config docs
-# downstream implementation ../documents/codex-configuration-slides.md root symlink view for Codex config slides
-# downstream implementation ../documents/project-template-overview-slides.md root symlink view for template overview slides
-# downstream implementation ../documents/algorithm-implementation-boundary.md root symlink view for algorithm boundary policy
-# downstream implementation ../documents/object-oriented-design.md root symlink view for OOP policy
-# downstream implementation ../documents/result-log-retention-and-visualization.md root symlink view
-# downstream implementation ../documents/repo-local-tool-imports.md root symlink view
-# downstream implementation ../documents/tools/tool-docs.toml root symlink view
-# downstream implementation ../documents/tools/oop/python/readability.md root symlink view
-# downstream implementation ../documents/tools/oop/python/rule_inventory.md root symlink view
-# downstream implementation ../documents/tools/oop/cpp/readability.md root symlink view
-# downstream implementation ../documents/tools/oop/cpp/rule_inventory.md root symlink view
-# downstream implementation ../.devcontainer root symlink view for shared devcontainer runtime
-# downstream implementation ../documents/agent-canon-github-remote.md root symlink view
-# downstream implementation ../documents/github-first-module-and-devcontainer-policy.md root symlink view
-# downstream implementation ../documents/github-copilot-configuration.md root symlink view
-# downstream implementation ../documents/template-github-remote.md root symlink view
-# downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py root symlink view for manifest tests
-# downstream implementation ../tests/agent_tools/test_compare_agent_run_paths.py root symlink view for run path comparison tests
-# downstream implementation ../tests/agent_tools/test_evaluate_agent_run.py root symlink view for eval tests
-# downstream implementation ../tests/agent_tools/test_evaluate_skill_workflow_prompts.py root symlink view for prompt eval tests
-# downstream implementation ../tests/agent_tools/test_file_surface_inventory.py root symlink view for file surface inventory tests
-# downstream implementation ../tests/agent_tools/test_goal_loop.py root symlink view for goal loop tests
-# downstream implementation ../tests/agent_tools/test_review_backlog_scan.py root symlink view for repo-cross inspection tests
-# downstream implementation ../tests/agent_tools/test_check_static_any.py root symlink view for explicit Any tests
-# downstream implementation ../tests/agent_tools/test_repo_mcp_server.py root symlink view for MCP tests
-# downstream implementation ../tests/agent_tools/test_check_algorithm_module_nested_contract.py root symlink view
-# downstream implementation ../tests/agent_tools/test_check_log_helper_names.py root symlink view
-# downstream implementation ../tests/agent_tools/test_tool_catalog.py root symlink view
-# downstream implementation ../tests/agent_tools/test_tool_drift.py root symlink view
-# downstream implementation ../tests/agent_tools/test_oop_rule_inventory.py root symlink view
-# downstream implementation ../tests/agent_tools/test_compare_codex_token_footprints.py root symlink view
-# downstream implementation ../tests/tools/test_container_config.py root symlink view
-# downstream implementation ../tests/tools/test_result_log_tools.py root symlink view
-# downstream implementation ../tests/tools/test_update_latest_result.py root symlink view
+# upstream design ../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../documents/shared-runtime-surfaces.toml machine-readable surface manifest
+# upstream implementation ./agent_tools/surface_manifest.py renders link, copy, regular, and root-absent specs
+# downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -121,7 +88,7 @@ agent_canon_update_surface_status() {
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
     paths+=("$spec")
-  done < <(build_removed_legacy_paths)
+  done < <(build_root_absent_paths)
 
   refresh_git_index_for_paths "${paths[@]}"
   git -C "$ROOT_DIR" status --short --untracked-files=all -- "${paths[@]}"
@@ -272,6 +239,11 @@ build_removed_legacy_paths() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" removed-legacy-paths
 }
 
+build_root_absent_paths() {
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" root-absent-paths
+}
+
 build_copy_specs() {
   python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
@@ -324,6 +296,11 @@ copy_source_is_optional_missing() {
     && [ ! -e "$ROOT_DIR/$source" ]
 }
 
+path_is_tracked() {
+  local path="$1"
+  git -C "$ROOT_DIR" ls-files --error-unmatch -- "$path" >/dev/null 2>&1
+}
+
 ensure_surface_sync_safe() {
   local force="${1:-0}"
   local -a paths=()
@@ -343,10 +320,6 @@ ensure_surface_sync_safe() {
       build_copy_specs
     }
   )
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    paths+=("$path")
-  done < <(build_removed_legacy_paths)
 
   [ "${#paths[@]}" -gt 0 ] || return
   refresh_git_index_for_paths "${paths[@]}"
@@ -384,7 +357,7 @@ cmd_link_root() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     rm -rf "$ROOT_DIR/$path"
-  done < <(build_removed_legacy_paths)
+  done < <(build_root_absent_paths)
 
   ensure_repo_local_goal
 }
@@ -461,10 +434,10 @@ cmd_check() {
     [ -n "$path" ] || continue
     local abs_path="$ROOT_DIR/$path"
     if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
-      echo "legacy[$path]=present" >&2
+      echo "absent[$path]=present" >&2
       failed=1
     fi
-  done < <(build_removed_legacy_paths)
+  done < <(build_root_absent_paths)
 
   if goal_is_shared_symlink; then
     echo "goal.md=shared-symlink" >&2
@@ -495,6 +468,12 @@ stage_sync_paths() {
       build_copy_specs
     }
   )
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] || path_is_tracked "$spec"; then
+      git -C "$ROOT_DIR" add -A -- "$spec"
+    fi
+  done < <(build_root_absent_paths)
 }
 
 commit_sync_paths_if_needed() {
@@ -1163,6 +1142,16 @@ cmd_status() {
       echo "regular[$path]=missing"
     fi
   done < <(build_regular_specs)
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+      echo "absent[$path]=present"
+    else
+      echo "absent[$path]=ok"
+    fi
+  done < <(build_root_absent_paths)
 }
 
 main() {

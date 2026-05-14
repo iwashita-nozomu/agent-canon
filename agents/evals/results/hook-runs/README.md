@@ -10,10 +10,13 @@ downstream implementation ../../../../tools/agent_tools/generate_agent_improveme
 -->
 
 This directory stores append-only JSONL hook results owned by AgentCanon.
-Runtime-local `reports/hooks/` output is temporary; durable hook evidence belongs
-here unless a task intentionally overrides the destination with
-`AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
-`AGENT_CANON_SKILL_LOG_PATH`.
+It is the canonical hook-result surface for normal Codex hook runs.
+
+Runtime-local `reports/hooks/` output is temporary debug output only when a task
+intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
+`AGENT_CANON_OOP_HOOK_LOG_PATH`, or `AGENT_CANON_SKILL_LOG_PATH`. The default
+hook destination must remain this AgentCanon-owned hook result surface so
+improvement-guide and eval tooling can read one durable chronology.
 
 ## File Naming
 

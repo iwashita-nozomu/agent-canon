@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -138,14 +139,17 @@ OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
 def resolve_workspace_document_path(workspace_root: Path, relative_path: str) -> Path:
-    """Resolve a workspace path, falling back to the AgentCanon source tree."""
-    workspace_candidate = (workspace_root / relative_path).resolve()
-    if workspace_candidate.exists():
-        return workspace_candidate
-    canon_candidate = (ROOT / relative_path).resolve()
-    if canon_candidate.exists():
-        return canon_candidate
-    return workspace_candidate
+    """Resolve a document path through the root view or vendored AgentCanon source."""
+    root_path = (workspace_root / relative_path).resolve()
+    if root_path.exists():
+        return root_path
+    vendor_path = (workspace_root / "vendor" / "agent-canon" / relative_path).resolve()
+    if vendor_path.exists():
+        return vendor_path
+    canon_path = (ROOT / relative_path).resolve()
+    if canon_path.exists():
+        return canon_path
+    return root_path
 
 
 def resolve_report_root(

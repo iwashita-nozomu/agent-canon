@@ -294,6 +294,70 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["min_score"], 95)
         self.assertEqual(log_entry["failed_count"], 1)
 
+    def test_oop_readability_guard_defaults_to_agentcanon_hook_result(self) -> None:
+        """OOP guard should append to the AgentCanon hook result surface by default."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('OOP_READABILITY=fail')\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            durable_log = (
+                temp_root
+                / "agents"
+                / "evals"
+                / "results"
+                / "hook-runs"
+                / "oop_readability_guard.jsonl"
+            )
+            durable_log_exists = durable_log.exists()
+            log_entry = json.loads(durable_log.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertIn("decision", json.loads(result.stdout))
+        self.assertTrue(durable_log_exists)
+        self.assertEqual(log_entry["status"], "fail")
+
     def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
         """OOP guard should not infer PostToolUse from empty stdin."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -378,6 +442,81 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("hook_run_id", log_entry)
         self.assertIn("payload_fingerprint", log_entry)
         self.assertIn("failure_fingerprint", log_entry)
+
+    def test_oop_readability_guard_allows_preexisting_findings(self) -> None:
+        """OOP guard should block new findings, not unchanged file-local debt."""
+        analyzer_text = (
+            "#!/usr/bin/env python3\n"
+            "import json\n"
+            "import sys\n"
+            "finding = {\n"
+            "    'path': 'bad.py',\n"
+            "    'language': 'python',\n"
+            "    'severity': 'warn',\n"
+            "    'kind': 'optional_boundary',\n"
+            "    'symbol': 'helper_value',\n"
+            "    'actual': 1,\n"
+            "    'limit': 0,\n"
+            "}\n"
+            "if '--format' in sys.argv:\n"
+            "    print(json.dumps({'findings': [finding]}))\n"
+            "    raise SystemExit(0)\n"
+            "print('OOP_READABILITY_FINDING=bad.py:1:python:warn:optional_boundary:helper_value:1>0:x')\n"
+            "print('OOP_READABILITY=fail')\n"
+            "raise SystemExit(1)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(analyzer_text, encoding="utf-8")
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+            )
+
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["failed_count"], 0)
+        command = log_entry["commands"][0]
+        self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", command["output_snippet"])
 
     def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
         """Bash tool names alone should not re-run OOP checks for read-only commands."""
@@ -625,8 +764,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
 
-    def test_skill_usage_logger_defaults_to_agentcanon_result_log(self) -> None:
-        """Default skill hook output should live under the AgentCanon result tree."""
+    def test_skill_usage_logger_defaults_to_agentcanon_hook_result(self) -> None:
+        """Default skill hook output should live under AgentCanon hook results."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
@@ -651,6 +790,33 @@ class CodexHooksTest(unittest.TestCase):
                 / "hook-runs"
                 / "skill_usage.jsonl"
             )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
+        self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
+
+    def test_skill_usage_logger_honors_results_dir_override(self) -> None:
+        """Explicit overrides can route hook logs to a temporary local path."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_dir = temp_root / "reports" / "hooks"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_HOOK_RESULTS_DIR": str(log_dir)},
+            )
+            log_path = log_dir / "skill_usage.jsonl"
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(result.stdout, "")

@@ -60,12 +60,16 @@ class HookLogContext:
             return vendored
         return root
 
+    def durable_results_dir(self) -> Path:
+        """Return the AgentCanon-owned durable hook-result directory."""
+        return self.canon_root() / "agents" / "evals" / "results" / "hook-runs"
+
     def results_dir(self) -> Path:
         """Return the hook-result directory."""
         override = os.environ.get(HOOK_RESULTS_DIR_ENV, "").strip()
         if override:
             return Path(override)
-        return self.canon_root() / "agents" / "evals" / "results" / "hook-runs"
+        return self.durable_results_dir()
 
     def result_path(self) -> Path:
         """Return this hook's JSONL log path."""

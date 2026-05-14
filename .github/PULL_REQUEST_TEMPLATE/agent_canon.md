@@ -78,7 +78,9 @@ Issue / edit-scope evidence:
 
 ## Copilot Configuration Impact
 
-- [ ] `documents/github-copilot-configuration.md` was reviewed.
+- [ ] `vendor/agent-canon/documents/github-copilot-configuration.md` was
+  reviewed in template roots, or `documents/github-copilot-configuration.md`
+  was reviewed in standalone AgentCanon.
 - [ ] `.github/copilot-instructions.md` changed / reviewed / not affected.
 - [ ] `.github/instructions/*.instructions.md` changed / reviewed / not affected.
 - [ ] `.github/agents/*.md` changed / reviewed / not affected.

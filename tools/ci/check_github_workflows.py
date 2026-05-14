@@ -53,7 +53,7 @@ TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "Agent Improvement Guide artifact",
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
-    "documents/github-copilot-configuration.md",
+    "vendor/agent-canon/documents/github-copilot-configuration.md",
     "Template / derived project PR",
     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "make ci",
@@ -109,6 +109,7 @@ STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
 )
 COPILOT_INSTRUCTIONS_REQUIREMENTS = (
     "agents/workflows/github-copilot-workflow.md",
+    "vendor/agent-canon/documents/github-copilot-configuration.md",
     "documents/github-copilot-configuration.md",
     ".github/instructions/pr-processing.instructions.md",
     ".github/agents/pr-maintainer.md",
@@ -120,6 +121,7 @@ COPILOT_INSTRUCTIONS_REQUIREMENTS = (
 )
 PR_PROCESSING_INSTRUCTIONS_REQUIREMENTS = (
     'applyTo: "**"',
+    "vendor/agent-canon/documents/github-copilot-configuration.md",
     "documents/github-copilot-configuration.md",
     "Plan mode",
     "COPILOT_PR_DECISION",
@@ -131,6 +133,7 @@ PR_PROCESSING_INSTRUCTIONS_REQUIREMENTS = (
 )
 PR_MAINTAINER_REQUIREMENTS = (
     "description:",
+    "vendor/agent-canon/documents/github-copilot-configuration.md",
     "documents/github-copilot-configuration.md",
     "Plan mode",
     "COPILOT_PR_DECISION",
@@ -144,6 +147,7 @@ PR_MAINTAINER_REQUIREMENTS = (
 )
 GITHUB_AGENTS_REQUIREMENTS = (
     "/.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+    "vendor/agent-canon/documents/github-copilot-configuration.md",
     "documents/github-copilot-configuration.md",
     "Plan mode",
 )
@@ -506,10 +510,6 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
     if is_template_or_derived_repo(root):
         return [
             (
-                root / ".github" / "PULL_REQUEST_TEMPLATE.md",
-                TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS,
-            ),
-            (
                 root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
                 TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
             ),
@@ -537,19 +537,13 @@ def check_pr_templates(root: Path) -> list[Finding]:
 def copilot_readme_path(root: Path) -> Path:
     """Return the README path that should mention Copilot routing."""
     if is_template_or_derived_repo(root):
-        return root / "vendor" / "agent-canon" / "README.md"
+        return root / "README.md"
     return root / "README.md"
-
-
-def copilot_configuration_path(root: Path) -> Path:
-    """Return the Copilot configuration catalog path for this repository mode."""
-    if is_template_or_derived_repo(root):
-        return agent_canon_root(root) / "documents" / "github-copilot-configuration.md"
-    return root / "documents" / "github-copilot-configuration.md"
 
 
 def copilot_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
     """Return Copilot discovery surface requirement checks."""
+    copilot_config_path = agent_canon_root(root) / "documents" / "github-copilot-configuration.md"
     return [
         (root / ".github" / "copilot-instructions.md", COPILOT_INSTRUCTIONS_REQUIREMENTS),
         (
@@ -559,11 +553,18 @@ def copilot_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
         (root / ".github" / "agents" / "pr-maintainer.md", PR_MAINTAINER_REQUIREMENTS),
         (
             copilot_readme_path(root),
-            (".github/PULL_REQUEST_TEMPLATE.md", "documents/github-copilot-configuration.md"),
+            (
+                ".github/PULL_REQUEST_TEMPLATE/agent_canon.md"
+                if is_template_or_derived_repo(root)
+                else ".github/PULL_REQUEST_TEMPLATE.md",
+                "vendor/agent-canon/documents/github-copilot-configuration.md"
+                if is_template_or_derived_repo(root)
+                else "documents/github-copilot-configuration.md",
+            ),
         ),
         (root / ".github" / "AGENTS.md", GITHUB_AGENTS_REQUIREMENTS),
         (
-            copilot_configuration_path(root),
+            copilot_config_path,
             COPILOT_CONFIG_REQUIREMENTS,
         ),
     ]
