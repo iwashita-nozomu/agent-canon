@@ -1561,7 +1561,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertNotEqual(merge.returncode, 0)
             self.assertIn("agent_canon_merge_result=blocked_dirty", merge.stdout)
-            self.assertIn("NEXT_ACTION=commit_or_stash_agentcanon_changes", merge.stdout)
+            self.assertIn("NEXT_ACTION=commit_agentcanon_artifacts", merge.stdout)
             self.assertEqual(after_head, before_head)
 
     def test_merge_main_into_current_blocks_detached_submodule(self) -> None:

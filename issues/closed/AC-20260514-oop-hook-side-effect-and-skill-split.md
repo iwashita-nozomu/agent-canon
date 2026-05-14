@@ -73,22 +73,26 @@ control.
 ## Hook Side Effect
 
 The hook behavior made the situation worse. OOP hook evidence is useful for
-AgentCanon improvement loops, but the default write path can dirty a tracked
-vendored AgentCanon checkout during ordinary parent-repo work.
+AgentCanon improvement loops, and the default tracked write path is intentional:
+`agents/evals/results/hook-runs/*.jsonl` is an AgentCanon-owned evidence
+artifact surface. The failure was not that the tracked JSONL changed; the
+failure was that the surrounding workflow treated hook evidence churn as an
+unclear side effect instead of routing it through the AgentCanon artifact and PR
+path.
 
 The practical symptoms were:
 
 - `vendor/agent-canon` showed modified content after source-edit or report
   operations.
-- The modified paths were hook-result JSONL files rather than product changes.
-- The agent had to restore those files repeatedly before committing or
-  reporting status.
+- The modified paths were hook-result JSONL evidence files.
+- The agent incorrectly considered restoring or stashing those files instead of
+  treating them as append-only AgentCanon artifacts.
 - The user-facing task looked larger because status output mixed the real work
-  with hook evidence churn.
+  with untriaged hook evidence churn.
 
-This is a tool-environment side effect, not a product change. It should be
-visible as evidence when intentionally accumulated, but it should not silently
-turn a narrow check into a dirty submodule state.
+Tracked hook-result JSONL is product evidence. It should be visible as evidence
+when accumulated, committed through AgentCanon when retained, and only compacted
+by an explicit retention pass.
 
 ## 2026-05-14 Additional Observation
 

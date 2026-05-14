@@ -62,7 +62,7 @@ require_git_repo() {
 
 require_clean_worktree() {
   if [ -n "$(git -C "$ROOT_DIR" status --short)" ]; then
-    die "worktree is dirty; commit or stash changes before AgentCanon operations"
+    die "worktree is dirty; commit required artifacts or explicitly stash non-artifact local changes before AgentCanon operations"
   fi
 }
 
@@ -326,7 +326,7 @@ ensure_surface_sync_safe() {
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
   if [ -n "$status" ]; then
     echo "$status" >&2
-    die "shared surface has uncommitted changes; commit or stash them first, or rerun with AGENT_CANON_FORCE_RELINK=1"
+    die "shared surface has uncommitted changes; commit required artifacts or explicitly stash non-artifact local changes first, or rerun with AGENT_CANON_FORCE_RELINK=1"
   fi
 }
 
