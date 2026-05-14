@@ -10,6 +10,23 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pack="${repo_root}/docker/packs/default.toml"
 output="${repo_root}/.devcontainer/docker-compose.generated.yml"
+default_project_name="$(
+  python3 - "$repo_root" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+repo_root = sys.argv[1]
+repo_name = Path(repo_root).name.casefold()
+slug = re.sub(r"[^a-z0-9_-]+", "-", repo_name).strip("-_") or "workspace"
+digest = hashlib.sha1(repo_root.encode("utf-8")).hexdigest()[:8]
+print(f"{slug}-{digest}-devcontainer")
+PY
+)"
+compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
 
 if [ -f "$pack" ]; then
   mapfile -t pack_values < <(
@@ -80,6 +97,7 @@ if [ "$gpu_mode" = "enabled" ]; then
 fi
 
 {
+  printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
   if [ "$compose_mode" = "repo-docker-pack" ]; then
@@ -102,4 +120,4 @@ fi
   printf '%s\n' "${environment_lines[@]}"
 } > "$output"
 
-printf 'devcontainer runtime generated: gpu=%s mode=%s pack=%s\n' "$gpu_mode" "$compose_mode" "$pack"
+printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$pack"

@@ -12,15 +12,25 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
+HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
 FINGERPRINT_HEX_LENGTH = 12
 RUN_ID_DIGEST_LENGTH = 10
 RUN_ID_NONCE_LENGTH = 10
+NAMESPACE_HASH_LENGTH = 8
+MAX_NAMESPACE_LENGTH = 80
+
+
+def safe_slug(value: str) -> str:
+    """Return a filesystem-safe runtime namespace segment."""
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("._-").casefold()
+    return slug[:MAX_NAMESPACE_LENGTH].strip("._-") or "unknown-runtime"
 
 
 def utc_now() -> str:
@@ -42,6 +52,11 @@ def fingerprint_json(value: object) -> str:
     """Return a stable short hash for JSON-compatible hook data."""
     payload = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:FINGERPRINT_HEX_LENGTH]
+
+
+def short_hash(value: str) -> str:
+    """Return a stable short hash for runtime namespace disambiguation."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:NAMESPACE_HASH_LENGTH]
 
 
 @dataclass(frozen=True)
@@ -75,7 +90,41 @@ class HookLogContext:
         """Return this hook's JSONL log path."""
         if self.override_path:
             return Path(self.override_path)
-        return self.results_dir() / f"{self.hook_name}.jsonl"
+        return self.results_dir() / self.runtime_namespace() / f"{self.hook_name}.jsonl"
+
+    def runtime_namespace(self) -> str:
+        """Return the runtime shard name for append-only hook logs."""
+        explicit = os.environ.get(HOOK_RUN_NAMESPACE_ENV, "").strip()
+        if explicit:
+            return safe_slug(explicit)
+        for env_name in ("DEVCONTAINER_PROJECT_NAME", "COMPOSE_PROJECT_NAME"):
+            value = os.environ.get(env_name, "").strip()
+            if value:
+                return safe_slug(value)
+        compose_name = self.compose_project_name()
+        if compose_name:
+            return safe_slug(compose_name)
+        return self.fallback_namespace()
+
+    def compose_project_name(self) -> str:
+        """Return the generated devcontainer Compose project name when available."""
+        compose = self.active_root.resolve() / ".devcontainer" / "docker-compose.generated.yml"
+        if not compose.is_file():
+            return ""
+        try:
+            for line in compose.read_text(encoding="utf-8").splitlines():
+                match = re.match(r"^\s*name:\s*[\"']?([^\"'\s#]+)", line)
+                if match:
+                    return match.group(1)
+        except OSError:
+            return ""
+        return ""
+
+    def fallback_namespace(self) -> str:
+        """Return a stable namespace when the runtime did not provide one."""
+        root = self.active_root.resolve()
+        hostname = os.environ.get("HOSTNAME", "").strip() or "host"
+        return safe_slug(f"{root.name}-{hostname}-{short_hash(str(root))}")
 
     def run_id(self, timestamp: str, payload_fingerprint: str) -> str:
         """Return a unique hook run id."""

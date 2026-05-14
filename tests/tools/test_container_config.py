@@ -36,6 +36,13 @@ def write_file(root: Path, relative: str, text: str) -> None:
 
 def write_valid_runtime(root: Path) -> None:
     """Write a minimal valid Docker/devcontainer runtime fixture."""
+    write_valid_docker_runtime(root)
+    write_valid_runtime_pack(root)
+    write_valid_devcontainer_files(root)
+
+
+def write_valid_docker_runtime(root: Path) -> None:
+    """Write valid Dockerfile and dependency fixture files."""
     write_file(
         root,
         "docker/Dockerfile",
@@ -49,17 +56,6 @@ def write_valid_runtime(root: Path) -> None:
                 "RUN apt-get update && apt-get install -y \\",
                 "    rsync openssh-client graphviz python3-venv",
                 "COPY docker/register_safe_directories.sh /usr/local/bin/register_safe_directories",
-                "",
-            ]
-        ),
-    )
-    write_file(
-        root,
-        ".dockerignore",
-        "\n".join(
-            [
-                ".git",
-                "vendor/agent-canon",
                 "",
             ]
         ),
@@ -97,6 +93,21 @@ def write_valid_runtime(root: Path) -> None:
     )
     write_file(
         root,
+        ".dockerignore",
+        "\n".join(
+            [
+                ".git",
+                "vendor/agent-canon",
+                "",
+            ]
+        ),
+    )
+
+
+def write_valid_runtime_pack(root: Path) -> None:
+    """Write a valid runtime pack fixture."""
+    write_file(
+        root,
         "docker/packs/default.toml",
         "\n".join(
             [
@@ -122,12 +133,17 @@ def write_valid_runtime(root: Path) -> None:
             ]
         ),
     )
+
+
+def write_valid_devcontainer_files(root: Path) -> None:
+    """Write valid shared devcontainer fixture files."""
     write_file(
         root,
         ".devcontainer/devcontainer.json",
         "\n".join(
             [
                 "{",
+                '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
                 '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
@@ -167,9 +183,11 @@ def write_valid_runtime(root: Path) -> None:
                 "#!/usr/bin/env bash",
                 "pack=docker/packs/default.toml",
                 "output=.devcontainer/docker-compose.generated.yml",
+                "default_project_name=fixture-devcontainer",
+                'DEVCONTAINER_PROJECT_NAME="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"',
                 "compose_mode=agent-canon-source-only",
                 "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
-                "printf '%s\\n' \"$pack\" \"$output\"",
+                "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\"",
                 "",
             ]
         ),
@@ -185,6 +203,7 @@ def write_valid_devcontainer_only(root: Path) -> None:
         "\n".join(
             [
                 "{",
+                '  "name": "${localWorkspaceFolderBasename}-devcontainer",',
                 '  "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",',
                 '  "dockerComposeFile": "docker-compose.generated.yml",',
                 '  "service": "workspace",',
@@ -224,9 +243,11 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "#!/usr/bin/env bash",
                 "pack=docker/packs/default.toml",
                 "output=.devcontainer/docker-compose.generated.yml",
+                "default_project_name=fixture-devcontainer",
+                'DEVCONTAINER_PROJECT_NAME="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"',
                 "compose_mode=agent-canon-source-only",
                 "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
-                "printf '%s\\n' \"$pack\" \"$output\" \"$compose_mode\" \"$image\"",
+                "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\" \"$compose_mode\" \"$image\"",
                 "",
             ]
         ),
@@ -310,6 +331,7 @@ def test_generated_compose_mismatch_fails(tmp_path: Path) -> None:
         ".devcontainer/docker-compose.generated.yml",
         "\n".join(
             [
+                "name: fixture-devcontainer",
                 "services:",
                 "  workspace:",
                 "    build:",

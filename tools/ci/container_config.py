@@ -388,8 +388,94 @@ def load_devcontainer_json(path: Path) -> tuple[Mapping[str, object] | None, lis
     return mapping, []
 
 
-def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[Finding]:
-    """Validate devcontainer entrypoint and generated compose alignment."""
+def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
+    """Validate required devcontainer JSON fields."""
+    findings: list[Finding] = []
+    expected_json = {
+        "name": "${localWorkspaceFolderBasename}-devcontainer",
+        "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
+        "dockerComposeFile": "docker-compose.generated.yml",
+        "service": "workspace",
+        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
+        "postAttachCommand": "bash .devcontainer/post-attach.sh",
+    }
+    for key, expected in expected_json.items():
+        if config.get(key) != expected:
+            findings.append(
+                Finding("inconsistency", ".devcontainer/devcontainer.json", f"{key}-expected:{expected}")
+            )
+    return findings
+
+
+def validate_devcontainer_workspace(config: Mapping[str, object], pack: PackConfig) -> list[Finding]:
+    """Validate devcontainer workspace mount alignment with one runtime pack."""
+    if config.get("workspaceFolder") == pack.workspace_mount:
+        return []
+    return [
+        Finding(
+            "inconsistency",
+            ".devcontainer/devcontainer.json",
+            f"workspaceFolder-expected:{pack.workspace_mount}",
+        )
+    ]
+
+
+def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Finding]:
+    """Validate the shared compose generation script."""
+    script_path = devcontainer_dir / "generate-runtime-compose.sh"
+    if not script_path.is_file():
+        return [Finding("missing_file", ".devcontainer/generate-runtime-compose.sh", "missing")]
+    script = script_path.read_text(encoding="utf-8")
+    findings: list[Finding] = []
+    for snippet in (
+        "docker/packs/default.toml",
+        ".devcontainer/docker-compose.generated.yml",
+        "DEVCONTAINER_PROJECT_NAME",
+        "default_project_name",
+        "agent-canon-source-only",
+        "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+        "vendor/agent-canon",
+    ):
+        findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
+    return findings
+
+
+def validate_generate_runtime_compose_snippet(script: str, snippet: str) -> list[Finding]:
+    """Validate one required or forbidden compose-generation snippet."""
+    path = ".devcontainer/generate-runtime-compose.sh"
+    if snippet == "vendor/agent-canon":
+        if snippet in script:
+            return [Finding("inconsistency", path, f"forbidden:{snippet}")]
+        return []
+    if snippet not in script:
+        return [Finding("inconsistency", path, f"missing:{snippet}")]
+    return []
+
+
+def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list[Finding]:
+    """Validate the generated Docker Compose file when present."""
+    compose_path = devcontainer_dir / "docker-compose.generated.yml"
+    if not compose_path.exists():
+        return []
+    compose = compose_path.read_text(encoding="utf-8")
+    expected_snippets = (
+        "name:",
+        "services:",
+        "workspace:",
+        "context: ..",
+        f"dockerfile: {pack.dockerfile}",
+        f"working_dir: {pack.workdir}",
+        f"- ..:{pack.workspace_mount}:cached",
+    )
+    return [
+        Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
+        for snippet in expected_snippets
+        if snippet not in compose
+    ]
+
+
+def validate_devcontainer(root: Path) -> list[Finding]:
+    """Validate shared devcontainer entrypoint configuration."""
     devcontainer_dir = root / ".devcontainer"
     if not devcontainer_dir.exists():
         return []
@@ -402,71 +488,29 @@ def validate_devcontainer(root: Path, default_pack: PackConfig | None) -> list[F
     if config is None:
         return findings
 
-    expected_json = {
-        "initializeCommand": "bash .devcontainer/generate-runtime-compose.sh",
-        "dockerComposeFile": "docker-compose.generated.yml",
-        "service": "workspace",
-        "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
-        "postAttachCommand": "bash .devcontainer/post-attach.sh",
-    }
-    for key, expected in expected_json.items():
-        if config.get(key) != expected:
-            findings.append(
-                Finding("inconsistency", ".devcontainer/devcontainer.json", f"{key}-expected:{expected}")
-            )
+    findings.extend(validate_devcontainer_json(config))
     post_attach = devcontainer_dir / "post-attach.sh"
     if not post_attach.is_file():
         findings.append(Finding("missing_file", ".devcontainer/post-attach.sh", "missing"))
-    if default_pack is not None and config.get("workspaceFolder") != default_pack.workspace_mount:
-        findings.append(
-            Finding(
-                "inconsistency",
-                ".devcontainer/devcontainer.json",
-                f"workspaceFolder-expected:{default_pack.workspace_mount}",
-            )
-        )
-
-    script_path = devcontainer_dir / "generate-runtime-compose.sh"
-    if not script_path.is_file():
-        findings.append(Finding("missing_file", ".devcontainer/generate-runtime-compose.sh", "missing"))
-        return findings
-    script = script_path.read_text(encoding="utf-8")
-    for snippet in (
-        "docker/packs/default.toml",
-        ".devcontainer/docker-compose.generated.yml",
-        "agent-canon-source-only",
-        "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
-        "vendor/agent-canon",
-    ):
-        if snippet == "vendor/agent-canon":
-            if snippet in script:
-                findings.append(
-                    Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
-                )
-            continue
-        if snippet not in script:
-            findings.append(
-                Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"missing:{snippet}")
-            )
+    findings.extend(validate_generate_runtime_compose_script(devcontainer_dir))
     findings.extend(validate_post_create(root))
-
-    compose_path = devcontainer_dir / "docker-compose.generated.yml"
-    if compose_path.exists() and default_pack is not None:
-        compose = compose_path.read_text(encoding="utf-8")
-        expected_snippets = (
-            "services:",
-            "workspace:",
-            "context: ..",
-            f"dockerfile: {default_pack.dockerfile}",
-            f"working_dir: {default_pack.workdir}",
-            f"- ..:{default_pack.workspace_mount}:cached",
-        )
-        for snippet in expected_snippets:
-            if snippet not in compose:
-                findings.append(
-                    Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
-                )
     return findings
+
+
+def validate_devcontainer_pack_alignment(root: Path, pack: PackConfig) -> list[Finding]:
+    """Validate devcontainer paths that depend on the repo-local runtime pack."""
+    devcontainer_dir = root / ".devcontainer"
+    json_path = devcontainer_dir / "devcontainer.json"
+    if not json_path.is_file():
+        return []
+    config, json_findings = load_devcontainer_json(json_path)
+    if config is None:
+        return json_findings
+    return [
+        *json_findings,
+        *validate_devcontainer_workspace(config, pack),
+        *validate_generated_compose(devcontainer_dir, pack),
+    ]
 
 
 def validate(root: Path) -> ValidationReport:
@@ -502,7 +546,9 @@ def validate(root: Path) -> ValidationReport:
     default_pack = next((pack for pack in packs if pack.path == "docker/packs/default.toml"), None)
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
-        findings.extend(validate_devcontainer(root, default_pack))
+        findings.extend(validate_devcontainer(root))
+        if default_pack is not None:
+            findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
 
     sorted_findings = tuple(
         sorted(findings, key=lambda finding: (finding.kind, finding.path, finding.detail))

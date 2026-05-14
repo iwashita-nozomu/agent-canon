@@ -291,10 +291,16 @@ class AgentImprovementGuide:
     def hook_counts(self) -> HookEvidenceCounts:
         """Return hook counters."""
         counter = HookEvidenceCounter()
-        for path in self.paths("agents/evals/results/hook-runs/*.jsonl"):
+        for path in self.hook_result_paths():
             for raw_line in path.read_text(encoding="utf-8").splitlines():
                 counter.add_line(path, raw_line)
         return counter.counts()
+
+    def hook_result_paths(self) -> tuple[Path, ...]:
+        """Return direct and runtime-sharded hook result JSONL paths."""
+        direct = self.paths("agents/evals/results/hook-runs/*.jsonl")
+        sharded = self.paths("agents/evals/results/hook-runs/**/*.jsonl")
+        return tuple(sorted(set(direct + sharded)))
 
     def render(self, summary: EvidenceSummary) -> str:
         """Render the improvement guide as Markdown."""
