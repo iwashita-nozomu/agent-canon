@@ -51,16 +51,23 @@ run_direct_agent_checks() {
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
 }
 
-agentcanon_pr_branch_pending() {
+agentcanon_pr_branch_dirty() {
   local submodule_dirty=""
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
+    return 1
+  fi
+  submodule_dirty="$(git -C vendor/agent-canon status --short --untracked-files=all 2>/dev/null || true)"
+  [[ -n "${submodule_dirty}" ]]
+}
+
+agentcanon_pr_branch_pending() {
   local submodule_head=""
   local parent_pin=""
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 1
   fi
-  submodule_dirty="$(git -C vendor/agent-canon status --short --untracked-files=all 2>/dev/null || true)"
-  if [[ -n "${submodule_dirty}" ]]; then
-    return 0
+  if agentcanon_pr_branch_dirty; then
+    return 1
   fi
   submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
   parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
@@ -68,6 +75,11 @@ agentcanon_pr_branch_pending() {
 }
 
 run_pr_agent_checks() {
+  if agentcanon_pr_branch_dirty; then
+    echo "AGENT_CANON_PR_LATEST_GATE=blocked_dirty_agentcanon_branch"
+    echo "AGENT_CANON_PR_LATEST_NEXT=commit_or_stash_agentcanon_changes_then_rerun_agent-canon-pr-check"
+    return 1
+  fi
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
     echo "AGENT_CANON_PR_LATEST_NEXT=commit_push_agentcanon_branch_then_after_merge_run_make_agent-canon-ensure-latest"
@@ -83,6 +95,11 @@ run_pr_agent_checks() {
 }
 
 run_pr_quick_ci() {
+  if agentcanon_pr_branch_dirty; then
+    echo "AGENT_CANON_PR_CI_LATEST_GATE=blocked_dirty_agentcanon_branch"
+    echo "AGENT_CANON_PR_CI_NEXT=commit_or_stash_agentcanon_changes_then_rerun_agent-canon-pr-check"
+    return 1
+  fi
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
     echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh --quick"
