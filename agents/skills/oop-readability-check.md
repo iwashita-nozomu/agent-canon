@@ -66,8 +66,39 @@ C++-only. The tool should decide which files are relevant by suffix.
 
 ## Mechanical Result
 
-When a report is requested or the mode runs the tool, render tables only from
-one tool result:
+When a report is requested or any tool-running mode runs the tool, create a
+Markdown report artifact by default. Chat-only tables are insufficient unless
+the user explicitly says no file / chat only.
+
+Default artifact path:
+
+```text
+reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md
+```
+
+Use one tool result as the source of truth. Prefer a single Markdown run when a
+report file is needed:
+
+```bash
+python3 tools/oop/python/readability.py \
+  --root . \
+  --language all \
+  --format markdown \
+  --max-report-findings 80 \
+  --exclude vendor \
+  --exclude reports \
+  --exclude .git \
+  --exclude build \
+  --exclude .pytest_cache \
+  --exclude .ruff_cache \
+  <paths> > <artifact-path>
+```
+
+If JSON is needed for post-processing, save it as a sibling implementation
+artifact and derive the Markdown tables from that same JSON result. Do not rerun
+with different flags and merge counts from multiple outputs.
+
+The Markdown report must include mechanical tables for:
 
 - command and exit status
 - summary metrics
@@ -76,6 +107,10 @@ one tool result:
 - finding kind counts
 - hotspot files
 - first relevant finding rows
+
+The user-facing response must include the artifact path, status, and headline
+counts. It may include a short table excerpt, but the durable report is the
+Markdown artifact.
 
 Do not mix prioritization, false-positive calls, or design recommendations into
 the mechanical result.

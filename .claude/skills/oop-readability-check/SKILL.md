@@ -34,6 +34,12 @@ upstream implementation ../../../tools/agent_tools/workflow_monitor.py records o
 1. If the user asks for a report, render the mechanical result as tables:
    command, exit status, summary metrics, dimensions, finding kinds, hotspots,
    and the first relevant finding rows.
+1. In any tool-running mode, create a Markdown report artifact by default at
+   `reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md`.
+   Chat-only tables do not satisfy this skill unless the user explicitly says
+   no file / chat only. Use `--format markdown --max-report-findings 80` for the
+   artifact, or save JSON as a sibling file and derive the Markdown tables from
+   that same JSON result. Include the artifact path in the final response.
 1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
    Keep it under a separate `Agent Analysis` section after the mechanical
    result. Prioritize by risk and leverage, identify likely false positives,
