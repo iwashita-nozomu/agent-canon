@@ -674,6 +674,52 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("pass_through_function:forward_value", result.stdout)
             self.assertIn("trivial_format_function:format_value", result.stdout)
 
+    def test_python_redundant_class_uses_dependency_sources(self) -> None:
+        """Class redundancy should use incoming construction and type-boundary facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            package = root / "package"
+            package.mkdir()
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            (package / "model.py").write_text(
+                "\n".join(
+                    [
+                        "class Projection:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                        "class Port:",
+                        "    def run(self, value: int) -> int:",
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (package / "service.py").write_text(
+                "\n".join(
+                    [
+                        "from .model import Port, Projection",
+                        "",
+                        "def compute(value: int) -> int:",
+                        "    projection = Projection()",
+                        "    return projection.run(value)",
+                        "",
+                        "def accepts_port(port: Port, value: int) -> int:",
+                        "    return port.run(value)",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            model = package / "model.py"
+
+            result = self.run_analyzer(root, "--min-score", "100", str(model))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+            self.assertNotIn("redundant_class_boundary:Port", result.stdout)
+
     def test_cpp_trivial_format_function_is_flagged(self) -> None:
         """C++ format-only wrappers are reported as mathematical redundancy."""
         with tempfile.TemporaryDirectory() as tmp_dir:
