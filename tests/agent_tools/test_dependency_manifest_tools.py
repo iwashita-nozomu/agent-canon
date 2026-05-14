@@ -82,6 +82,39 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
 
+    def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
+        """Early marker matches in large files must not trip pipefail/SIGPIPE."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            doc = root / "large.md"
+            doc.write_text(
+                "\n".join(
+                    [
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises large-file dependency header scanning.",
+                        "upstream design README.md repo overview",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                        *("x" * 4096 for _ in range(120)),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                str(doc),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+
     def test_repo_review_output_is_stable_across_repeated_runs(self) -> None:
         """Strict repo dependency review should be stable across repeated runs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
