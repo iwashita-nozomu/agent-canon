@@ -90,6 +90,11 @@ observed results.
 Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
 `hook_run_id` values. GitHub Actions reads these hook results, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
+That guide must not stop at raw pass/fail counts: it summarizes skill usage,
+skill/event coverage, hook source files, hook tool names, code-checker target
+paths, repeated failure fingerprints, and hook-quality counters such as
+unknown events, empty skill observations, fallback payloads, or skill usage
+entries that did not update workflow monitoring.
 When two runs can choose different paths, compare them with
 `tools/agent_tools/compare_agent_run_paths.py` and record its
 `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`,

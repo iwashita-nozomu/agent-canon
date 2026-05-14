@@ -53,3 +53,10 @@ separate observations. The final nonce makes the run id unique even when two
 hook calls share the same timestamp and payload hash, and `failure_fingerprint`
 is used by guide-generation tools to group repeated failures without losing the
 raw chronology.
+
+Guide-generation tools also mine these JSONL lines for routing evidence:
+`skill_usage.jsonl` contributes skill counts and skill/event coverage, hook
+entries with `tool_name` contribute tool usage counts, and checker command
+arrays contribute target file counts. Do not strip command target paths from
+hook results; they are how the next repair branch can see which skill,
+workflow, tool, or source file needs attention.
