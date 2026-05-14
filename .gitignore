@@ -14,6 +14,7 @@ __pycache__/
 
 # Local run artifacts
 reports/agents/
+reports/agent-improvement-guide/
 reports/hooks/
 reports/*.json
 reports/*.txt

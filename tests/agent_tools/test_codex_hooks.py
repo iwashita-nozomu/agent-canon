@@ -23,10 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
-PRE_TOOL_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "pre_tool_guard.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
-AGENT_CANON_READ_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "agent_canon_read_warning.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
@@ -173,8 +171,6 @@ class CodexHooksTest(unittest.TestCase):
         session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
         prompt_hooks = hooks["hooks"]["UserPromptSubmit"][0]["hooks"]
         prompt_commands = [hook["command"] for hook in prompt_hooks]
-        pre_tool = hooks["hooks"]["PreToolUse"][0]
-        pre_tool_commands = [hook["command"] for hook in pre_tool["hooks"]]
         post_tool = hooks["hooks"]["PostToolUse"][0]
         post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
@@ -184,9 +180,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
-        self.assertEqual(pre_tool["matcher"], "Bash")
-        self.assertTrue(any("pre_tool_guard.py" in command for command in pre_tool_commands))
-        self.assertTrue(any("agent_canon_read_warning.py" in command for command in pre_tool_commands))
+        self.assertNotIn("PreToolUse", hooks["hooks"])
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
@@ -218,51 +212,6 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])
         self.assertIn("context/loop-status only", hook_output["additionalContext"])
         self.assertIn("do not repeat that limitation", hook_output["additionalContext"])
-
-    def test_pre_tool_guard_blocks_destructive_git_reset(self) -> None:
-        """The pre-tool guard should deny clearly destructive Bash commands."""
-        result = subprocess.run(
-            [sys.executable, str(PRE_TOOL_GUARD)],
-            cwd=PROJECT_ROOT,
-            input=json.dumps(
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "Bash",
-                    "tool_input": {"command": "git reset --hard HEAD"},
-                }
-            ),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout)
-        hook_output = payload["hookSpecificOutput"]
-
-        self.assertEqual(hook_output["hookEventName"], "PreToolUse")
-        self.assertEqual(hook_output["permissionDecision"], "deny")
-        self.assertIn("git reset --hard", hook_output["permissionDecisionReason"])
-
-    def test_agent_canon_read_warning_warns_without_blocking(self) -> None:
-        """The read-warning hook should warn when reading shared AgentCanon paths."""
-        result = subprocess.run(
-            [sys.executable, str(AGENT_CANON_READ_WARNING)],
-            cwd=PROJECT_ROOT,
-            input=json.dumps(
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "Bash",
-                    "tool_input": {"command": "sed -n '1,40p' vendor/agent-canon/codex-cli-guide/README.md"},
-                }
-            ),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        payload = json.loads(result.stdout)
-
-        self.assertIn("systemMessage", payload)
-        self.assertIn("shared canon", payload["systemMessage"])
-        self.assertIn("do not make Docker/devcontainer build logic depend", payload["systemMessage"])
 
     def test_prompt_secret_guard_blocks_obvious_api_key(self) -> None:
         """The prompt guard should block high-confidence secret patterns."""
@@ -357,6 +306,32 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["failed_count"], 1)
 
+    def test_oop_readability_guard_logs_payloadless_no_source_as_skipped(self) -> None:
+        """Payloadless OOP invocations with no source changes must not log blank pass."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input="",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+            )
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["tool_name"], "Bash")
+        self.assertEqual(log_entry["status"], "skipped")
+        self.assertTrue(log_entry["check_requested"])
+        self.assertFalse(log_entry["checked"])
+        self.assertEqual(log_entry["result_count"], 0)
+        self.assertEqual(log_entry["skip_reason"], "no_changed_source_files")
+
     def test_oop_readability_guard_infers_post_tool_event_when_event_missing(self) -> None:
         """OOP guard should run when tool payloads omit hookEventName."""
         payload, log_entry = self._run_oop_guard_with_changed_python(
@@ -369,6 +344,82 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["event_fallback"])
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["failed_count"], 1)
+        self.assertIn("hook_run_id", log_entry)
+        self.assertIn("payload_fingerprint", log_entry)
+        self.assertIn("failure_fingerprint", log_entry)
+
+    def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
+        """Bash tool names alone should not re-run OOP checks for read-only commands."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "sed -n '1,20p' README.md"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+            )
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["tool_name"], "Bash")
+        self.assertEqual(log_entry["status"], "skipped")
+        self.assertFalse(log_entry["checked"])
+        self.assertEqual(
+            log_entry["skip_reason"],
+            "post_tool_without_source_edit_signal",
+        )
+
+    def test_oop_readability_guard_skips_bash_checker_invocations(self) -> None:
+        """Bash commands that only run checkers should not recursively trigger OOP."""
+        commands = (
+            (
+                "python3 /workspace/tools/oop/python/readability.py "
+                "--root /workspace --min-score 95 python/pkg/module.py"
+            ),
+            "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+            "python3 -m ruff check .codex/hooks/oop_readability_guard.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+                result = subprocess.run(
+                    [sys.executable, str(OOP_READABILITY_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+                )
+                log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(log_entry["event"], "PostToolUse")
+            self.assertEqual(log_entry["tool_name"], "Bash")
+            self.assertEqual(log_entry["status"], "skipped")
+            self.assertFalse(log_entry["checked"])
+            self.assertEqual(
+                log_entry["skip_reason"],
+                "post_tool_without_source_edit_signal",
+            )
 
     def test_helper_inventory_guard_blocks_repo_policy_findings(self) -> None:
         """Helper inventory guard should use repo-owned policy thresholds."""
@@ -465,6 +516,40 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[1]["event"], "Stop")
         self.assertEqual(entries[1]["skills"], ["change-review"])
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
+        self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
+        self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
+
+    def test_skill_usage_logger_defaults_to_agentcanon_result_log(self) -> None:
+        """Default skill hook output should live under the AgentCanon result tree."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $agent-orchestration.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            log_path = (
+                temp_root
+                / "agents"
+                / "evals"
+                / "results"
+                / "hook-runs"
+                / "skill_usage.jsonl"
+            )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
+        self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
 
     def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(self) -> None:
         """Skill usage hook should reuse workflow_monitor.py for run-bundle evidence."""

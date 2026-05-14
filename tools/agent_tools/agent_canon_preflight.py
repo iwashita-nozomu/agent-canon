@@ -99,7 +99,6 @@ def run_agent_canon_preflight(
             checklist_status=checklist_status,
         )
 
-    update_surface_status = agent_canon_update_surface_status(project_root)
     status_result = subprocess.run(
         ["git", "status", "--short", "--untracked-files=all"],
         cwd=project_root,
@@ -107,20 +106,11 @@ def run_agent_canon_preflight(
         capture_output=True,
         text=True,
     )
+    update_surface_status = agent_canon_update_surface_status(project_root)
     if update_surface_status.strip():
-        return AgentCanonPreflightResult(
-            status="blocked_shared_canon_workflow",
-            reason=(
-                "AgentCanon update surface is dirty; route it through a proposal "
-                "or AgentCanon PR before refreshing the template pin"
-            ),
-            next_step=(
-                "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
-                "run_make_agent-canon-ensure-latest"
-            ),
-            checklist_path=checklist_path,
-            checklist_status=checklist_status,
-        )
+        print("AGENT_CANON_PREFLIGHT_UPDATE_SURFACE_DIRTY=yes")
+    if update_surface_status.strip():
+        print(update_surface_status)
     if status_result.stdout.strip():
         print("AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes")
 
@@ -133,9 +123,16 @@ def run_agent_canon_preflight(
     )
     if ensure_result.returncode != 0:
         detail = (ensure_result.stderr or ensure_result.stdout).strip()
-        if detail:
-            raise RuntimeError(detail)
-        raise RuntimeError("make agent-canon-ensure-latest failed")
+        return AgentCanonPreflightResult(
+            status="blocked_shared_canon_workflow",
+            reason=detail or "make agent-canon-ensure-latest failed",
+            next_step=(
+                "commit_or_push_proposal_then_open_agent-canon_PR_then_after_merge_"
+                "run_make_agent-canon-ensure-latest"
+            ),
+            checklist_path=checklist_path,
+            checklist_status=checklist_status,
+        )
 
     return AgentCanonPreflightResult(
         status="pass",

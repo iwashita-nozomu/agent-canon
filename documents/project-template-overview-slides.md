@@ -91,7 +91,7 @@ downstream design ./README.md document index links this slide deck
 ## 12. Template Use
 
 - Clone with `git clone --recurse-submodules`.
-- Run `make agent-canon-ensure-latest` when the worktree is clean.
+- Run `make agent-canon-ensure-latest` when the AgentCanon update surface is repairable; unrelated parent dirty state does not block submodule updates.
 - Use `bash tools/sync_agent_canon.sh link-root` to repair shared runtime views.
 - Run `make ci`, `make docs-check`, and dependency review before closeout.
 

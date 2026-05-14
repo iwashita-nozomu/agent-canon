@@ -112,7 +112,7 @@ shared module architecture、Dockerfile boundary、devcontainer ownership を lo
 remote 名や一台の host path に合わせて変えません。
 
 既存 repo が `agent-canon` remote や `.gitmodules` を `/mnt/git/agent-canon.git`
-または `../agent-canon.git` に向けている場合は、repo が clean なタイミングで
+または `../agent-canon.git` に向けている場合は、AgentCanon update surface が安全に更新できるタイミングで
 `documents/agent-canon-github-remote.md` の migration runbook に従います。
 
 ## PR ルール
@@ -249,7 +249,8 @@ source repo の優先順位は `AGENT_CANON_SOURCE_REPO`、`git config agent-can
 shared canon の差分を maintainer に渡すときは `proposal-branch` で既定 branch を確認し、`push-proposal` でその branch へ push します。
 
 `ensure-latest` は task 開始時の入口です。
-clean worktree では upstream `agent-canon` と local submodule pin または legacy subtree split を比較し、古い場合だけ更新します。
+submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、upstream `agent-canon` と local submodule pin / worktree を比較します。
+clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合は、parent pin を更新対象として扱います。
 `agent-canon` remote が未設定の場合は、GitHub canonical remote
 `https://github.com/iwashita-nozomu/agent-canon.git` を自動追加します。
 local bare mirror を使う repo は `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git`
@@ -258,7 +259,7 @@ submodule repo では通常 `git subtree pull --squash` を使いません。
 fresh clone などで subtree metadata がなく `git subtree pull --squash` が失敗した場合は、local subtree split が remote の祖先である fast-forward 更新に限って snapshot import へ切り替えます。
 local subtree split が remote と diverge していても、current prefix tree そのものが remote history に存在する場合は `snapshot_import_tree_match` route を使って安全に更新します。これは subtree split commit hash だけが synthetic に diverge している normal update を救済する route です。
 local split も current prefix tree も remote history に無い場合は、shared canon の上書きを避けるため fail-closed で停止します。proposal branch を maintainer が merge するか、shared canon change を upstream へ戻したあとで再実行します。
-dirty worktree で stale が見つかった場合は、作業差分を保護するため停止します。
+unsafe な AgentCanon update surface で stale が見つかった場合は、作業差分を保護するため停止します。
 
 ### 7.4.1 local submodule 差分の分類
 

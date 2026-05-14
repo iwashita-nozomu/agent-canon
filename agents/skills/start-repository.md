@@ -42,7 +42,7 @@ bash scripts/start_repository.sh \
   --dry-run
 ```
 
-1. 初期化します。wrapper は clean clone なら実 init の前に `make agent-canon-ensure-latest` を実行します。dirty state なら preflight の未実行理由を出して init を続行します。
+1. 初期化します。wrapper は AgentCanon update surface が repairable なら実 init の前に `make agent-canon-ensure-latest` を実行します。unsafe な update surface があれば preflight の route を出して init を続行します。
 
 ```bash
 bash scripts/start_repository.sh \

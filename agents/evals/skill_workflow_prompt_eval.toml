@@ -821,6 +821,12 @@ critical = true
 description = "Documents accumulated prompt eval results for skill use."
 required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "agents/evals/results/skill-workflow-prompt/"]
 
+[[evals.checklist]]
+id = "EVALS-README-HOOK-GUIDE-1"
+critical = true
+description = "Documents hook result accumulation and PR/push improvement guide generation."
+required_regex = ["agents/evals/results/hook-runs/", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+
 [[evals]]
 id = "tools-readme-prompt-eval-audit"
 target = "tools/README.md"
@@ -838,6 +844,12 @@ id = "TOOLS-README-EVAL-ACCUMULATE-1"
 critical = true
 description = "Requires unique accumulated prompt eval report naming."
 required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "<eval_run_id>-<status>-<skill-slug>\\.md"]
+
+[[evals.checklist]]
+id = "TOOLS-README-IMPROVEMENT-GUIDE-1"
+critical = true
+description = "Documents the PR and branch-push improvement guide tool."
+required_regex = ["generate_agent_improvement_guide\\.py", "agents/evals/results/hook-runs/", "issues/open\\|closed/", "read-only evidence"]
 
 [[evals]]
 id = "documents-tools-readme-prompt-eval-audit"

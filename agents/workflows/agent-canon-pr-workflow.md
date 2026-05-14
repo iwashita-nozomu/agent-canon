@@ -49,6 +49,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
+- PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Agent または Copilot PR が別 branch で行います。
 
 ## Freshness Gate Route
 
@@ -75,7 +76,7 @@ AgentCanon PR の前に、運用 finding を durable storage に残すかを必�
 
 ```bash
 rg -n "topic keywords" \
-  issues memory notes/failures documents agents \
+  issues/open issues/closed memory notes/failures documents agents \
   2>/dev/null || true
 ```
 
@@ -108,6 +109,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - standalone AgentCanon repo では `.github/PULL_REQUEST_TEMPLATE.md` の `Operational Findings / Issues` に記入します。
 - template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
 - 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
+- GitHub Actions の Agent Improvement Guide がある場合は、その artifact / step summary を確認し、memory、eval、hook、issues 由来の改善候補を PR body に反映します。
 
 ## Branch ルール
 

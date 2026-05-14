@@ -46,7 +46,7 @@ retired legacy tool reintroduction.
 
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
-  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。worktree が dirty の場合は fail-open で理由を machine-readable に出力し、clean なら fail-closed で最新化を通します。
+  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
@@ -208,6 +208,11 @@ After evidence is verified, `workflow_monitor.py --closeout-token-preset` record
 When a run uses skills, prompt eval evidence is required. Run
 `evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
+Hook outcomes accumulate in AgentCanon under
+`agents/evals/results/hook-runs/` by default. `generate_agent_improvement_guide.py`
+reads memory notes, skill eval reports, hook results, and `issues/open|closed/`
+to produce the PR / branch-push improvement guide artifact; it does not mutate
+skills, workflows, tools, or memory.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -383,6 +388,22 @@ Detailed reports accumulate under
 `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>`. The runner does
 not overwrite existing reports; if an explicit `--report-out` path already
 exists, it writes a sibling file with the unique `eval_run_id` appended.
+
+## Agent Improvement Guide
+
+`generate_agent_improvement_guide.py` reads AgentCanon-owned evidence and
+generates a deterministic guide for PR and branch-push review:
+
+```bash
+python3 tools/agent_tools/generate_agent_improvement_guide.py \
+  --root . \
+  --out reports/agent-improvement-guide/agent-improvement-guide.md
+```
+
+The guide summarizes `memory/`, `agents/evals/results/skill-workflow-prompt/`,
+`agents/evals/results/hook-runs/`, `issues/open/`, and `issues/closed/`.
+It is read-only evidence. Local Agent or Copilot PR work applies the actual
+skill, workflow, and tool changes.
 Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
 When one prompt surface needs more coverage, consolidate the checks into that surface's existing
 eval entry instead of adding a parallel duplicate-target eval.
