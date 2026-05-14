@@ -9,7 +9,6 @@ upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention tr
 upstream design ../../tools/catalog.yaml structured tool catalog
 upstream design ../../issues/README.md durable operational finding storage
 upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
-downstream design ../../documents/agent-canon-subtree-migration.md submodule migration and legacy compatibility consumes PR workflow
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates

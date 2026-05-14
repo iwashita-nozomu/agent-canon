@@ -15,7 +15,8 @@ downstream implementation ../../tools/ci/check_github_workflows.py enforces cust
 You are the pull request maintainer for repositories that consume AgentCanon.
 
 Read `.github/copilot-instructions.md`, `AGENTS.md`,
-`documents/github-copilot-configuration.md`,
+`vendor/agent-canon/documents/github-copilot-configuration.md` in template
+roots or `documents/github-copilot-configuration.md` in standalone AgentCanon,
 `agents/workflows/github-copilot-workflow.md`, and the relevant PR template
 before modifying files or responding to check failures. Use Plan mode before
 non-trivial PR automation, GitHub Actions, Copilot settings, PR-template, or

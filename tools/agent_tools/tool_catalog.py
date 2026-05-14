@@ -140,6 +140,17 @@ def has_dependency_manifest(path: Path) -> bool:
     )
 
 
+def resolve_repo_path(root: Path, relative_path: str) -> Path:
+    """Resolve a path through the root view or vendored AgentCanon source."""
+    root_path = root / relative_path
+    if root_path.exists():
+        return root_path
+    vendor_path = root / "vendor" / "agent-canon" / relative_path
+    if vendor_path.exists():
+        return vendor_path
+    return root_path
+
+
 def load_catalog(path: Path) -> tuple[Mapping[str, object] | None, list[Finding]]:
     """Load the catalog YAML."""
     if not path.is_file():
@@ -208,7 +219,7 @@ def check_entry(
     family = entry.get("family")
     status = entry.get("status")
     role = entry.get("role")
-    target = root / path
+    target = resolve_repo_path(root, path)
 
     if not isinstance(entry_id, str) or not ID_RE.fullmatch(entry_id):
         findings.append(Finding("entry", path, "invalid-id"))
@@ -230,9 +241,10 @@ def check_entry(
     if not docs:
         findings.append(Finding("entry", path, "missing-docs"))
     for doc in docs:
-        if not (root / doc).is_file():
+        doc_path = resolve_repo_path(root, doc)
+        if not doc_path.is_file():
             findings.append(Finding("entry", path, f"missing-doc:{doc}"))
-        elif not has_dependency_manifest(root / doc):
+        elif not has_dependency_manifest(doc_path):
             findings.append(Finding("entry", path, f"doc-missing-dependency-header:{doc}"))
 
     tests = string_list(entry.get("tests"))
@@ -241,9 +253,10 @@ def check_entry(
         if not isinstance(exempt_reason, str) or not exempt_reason.strip():
             findings.append(Finding("entry", path, "missing-tests-or-exemption"))
     for test in tests:
-        if not (root / test).is_file():
+        test_path = resolve_repo_path(root, test)
+        if not test_path.is_file():
             findings.append(Finding("entry", path, f"missing-test:{test}"))
-        elif not has_dependency_manifest(root / test):
+        elif not has_dependency_manifest(test_path):
             findings.append(Finding("entry", path, f"test-missing-dependency-header:{test}"))
 
     return findings
@@ -253,7 +266,7 @@ def read_existing_text(root: Path, paths: Iterable[str]) -> str:
     """Read and concatenate existing text files."""
     chunks: list[str] = []
     for path in paths:
-        target = root / path
+        target = resolve_repo_path(root, path)
         if target.is_file():
             chunks.append(target.read_text(encoding="utf-8"))
     return "\n".join(chunks)
@@ -291,7 +304,7 @@ def check_catalog_docs(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     required = ("tools/catalog.yaml", "tool_catalog.py")
     for path in CATALOG_DOCS:
-        target = root / path
+        target = resolve_repo_path(root, path)
         if not target.is_file():
             findings.append(Finding("catalog_docs", path, "missing-file"))
             continue
@@ -304,7 +317,7 @@ def check_catalog_docs(root: Path) -> list[Finding]:
 
 def load_tool_docs(root: Path) -> tuple[list[Mapping[str, object]], list[Finding]]:
     """Load one-to-one tool documentation manifest."""
-    path = root / TOOL_DOCS_PATH
+    path = resolve_repo_path(root, TOOL_DOCS_PATH)
     if not path.is_file():
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "missing-file")]
     if not has_dependency_manifest(path):
@@ -357,11 +370,13 @@ def check_tool_docs_manifest(
             continue
         if catalog_entry.get("path") != tool:
             findings.append(Finding("tool_docs", tool, "catalog-path-mismatch"))
-        if not (root / tool).is_file():
+        tool_path = resolve_repo_path(root, tool)
+        doc_path = resolve_repo_path(root, doc)
+        if not tool_path.is_file():
             findings.append(Finding("tool_docs", tool, "missing-tool"))
-        if not (root / doc).is_file():
+        if not doc_path.is_file():
             findings.append(Finding("tool_docs", doc, "missing-doc"))
-        elif not has_dependency_manifest(root / doc):
+        elif not has_dependency_manifest(doc_path):
             findings.append(Finding("tool_docs", doc, "doc-missing-dependency-header"))
         if Path(tool).stem != Path(doc).stem:
             findings.append(Finding("tool_docs", doc, "tool-doc-name-mismatch"))

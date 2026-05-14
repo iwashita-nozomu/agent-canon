@@ -112,11 +112,10 @@ paths = [
 ]
 
 [[group]]
-mode = "standalone_only"
-owner = "agent-canon-standalone"
-class = "standalone_only"
-local_override_allowed = false
-source_prefix = ""
+mode = "regular"
+owner = "template-or-derived-repo"
+class = "active_contract"
+local_override_allowed = true
 paths = [
   "documents/README.md",
   "documents/template-bootstrap.md",
