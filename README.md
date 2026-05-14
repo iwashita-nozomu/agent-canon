@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents agent-canon for this repository.
 upstream design AGENTS.md shared canon runtime contract
+downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer operation rulebook.
 @dependency-end
 -->
 
@@ -25,6 +26,7 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `.codex/agents/`
 - `tools/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
+- `CONTAINER_OPERATIONS.md`
 - `documents/github-first-module-and-devcontainer-policy.md`
 - `documents/agent-canon-github-remote.md`
 - `documents/github-copilot-configuration.md`

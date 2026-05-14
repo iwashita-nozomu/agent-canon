@@ -406,6 +406,8 @@ def _log_append_hook_log(root: Path, entry: dict[str, object]) -> None:
     """Append one JSONL hook log entry without blocking the hook on logging errors."""
     if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
         return
+    if not entry.get("checked"):
+        return
     try:
         HookLogContext(root, "oop_readability_guard", os.environ.get(LOG_PATH_ENV, "").strip()).append(
             entry
