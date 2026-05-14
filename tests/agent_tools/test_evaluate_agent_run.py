@@ -123,6 +123,11 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             ),
             "- static_analysis_feedback=applied target=$adaptive-improvement-loop",
             (
+                "- hook_tool_feedback=reviewed parent_protocol_update=applied "
+                "subagent_protocol_update=applied "
+                "protocol_feedback_reason=unit-test-protocol-routing"
+            ),
+            (
                 "- tool_call=evaluate_skill_workflow_prompts.py prompt_eval=pass "
                 "EVAL_STATUS=pass EVAL_RUN_ID=skill-eval-test "
                 "EVAL_USED_SKILLS=agent-orchestration,codex-task-workflow "
@@ -518,6 +523,42 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("runtime feedback", result.stdout.lower())
+
+    def test_evaluate_missing_hook_tool_protocol_feedback_fails(self) -> None:
+        """Hook and tool outcomes must route into protocol feedback decisions."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            monitoring = monitoring_path.read_text(encoding="utf-8")
+            monitoring_path.write_text(
+                monitoring.replace(
+                    (
+                        "- hook_tool_feedback=reviewed parent_protocol_update=applied "
+                        "subagent_protocol_update=applied "
+                        "protocol_feedback_reason=unit-test-protocol-routing\n"
+                    ),
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+            self.assertIn("hook and tool results", result.stdout.lower())
 
     def test_evaluate_missing_code_checker_results_fail(self) -> None:
         """Run evaluation should require code checker behavior evidence."""

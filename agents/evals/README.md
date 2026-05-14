@@ -81,6 +81,12 @@ Record code checkers as behavior events, for example
 `tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`,
 `tool_call=oop-readability-check code_checker=pass`, or
 `code_checker_not_required` for non-changing advisory runs.
+Hook and tool outcomes must also close the protocol feedback loop. Record
+`hook_tool_feedback=reviewed`, `parent_protocol_update=<applied|recorded|not_required>`,
+`subagent_protocol_update=<applied|recorded|not_required>`, and
+`protocol_feedback_reason=...` so the run shows whether parent workflow rules,
+subagent handoff rules, role TOML, evals, or memory changed because of the
+observed results.
 Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
 `hook_run_id` values. GitHub Actions reads these hook results, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
