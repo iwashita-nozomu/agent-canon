@@ -67,6 +67,25 @@ Core runtime surfaces include `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`,
 `.claude/`, `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
 `.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `mcp/`, and `tools/`.
 
+### Tools Directory Boundary
+
+Root `tools/` is a symlink view, not a project-local implementation directory.
+Its source is `vendor/agent-canon/tools/`, which owns shared agent tooling,
+workflow automation, CI helpers, container runners, document maintenance tools,
+and static-analysis utilities.
+
+Parent repositories call shared tooling through the stable root command path,
+such as `python3 tools/agent_tools/check_convention_compliance.py`, while edits
+to those tools are made in `vendor/agent-canon/tools/...` and routed through
+AgentCanon. Project-local automation must stay in project-owned paths, such as
+`scripts/`, package-local modules, project-specific CI files, or another
+repo-owned path. A derived repository must not turn root `tools/` into a mixed
+directory or add project-specific files under that symlink view.
+
+Inventory and review tooling should distinguish these roles: `tools/` at the
+root is the AgentCanon tool view, and `vendor/agent-canon/tools/` is the
+AgentCanon tool source.
+
 GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`,
 `.github/copilot-instructions.md`, `.github/instructions/`, and
 `.github/agents/`.
@@ -183,9 +202,11 @@ project-local note.
 - `tests/project/` or package-specific test directories: project-local
   implementation tests owned by the derived repo.
 
-Failures in `tests/agent_tools/` or `tests/tools/` usually indicate AgentCanon
-tooling or root-view drift. Failures in project-local test namespaces usually
-belong to the derived repo implementation.
+Failures in root `tests/agent_tools/` or `tests/tools/` usually indicate
+AgentCanon tooling or root-view drift; their canonical source files live under
+`vendor/agent-canon/tests/agent_tools/` and `vendor/agent-canon/tests/tools/`.
+Failures in project-local test namespaces usually belong to the derived repo
+implementation.
 
 ## Editing Rule
 
