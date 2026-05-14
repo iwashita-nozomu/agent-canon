@@ -688,6 +688,24 @@ entries:
     tests:
       - tests/agent_tools/test_file_surface_inventory.py
 
+  - id: noncanonical-document-inventory
+    summary: Finds non-canonical document candidates and likely canonical sources.
+    path: tools/agent_tools/noncanonical_document_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/noncanonical_document_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/document-canon-cleanup.md
+    tests:
+      - tests/agent_tools/test_noncanonical_document_inventory.py
+
   - id: helper-function-inventory
     summary: Inventories Python helper functions/classes with functional AST facts.
     path: tools/agent_tools/helper_function_inventory.py

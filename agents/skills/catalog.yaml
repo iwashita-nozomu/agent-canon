@@ -65,6 +65,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+  - id: document-canon-cleanup
+    purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
+    canonical_doc: agents/skills/document-canon-cleanup.md
+    shim: .agents/skills/document-canon-cleanup/SKILL.md
   - id: dependency-analysis
     purpose: Run dependency manifest header, scan, format, and graph tools for changed-file gates or migration inventory.
     canonical_doc: agents/skills/dependency-analysis.md
