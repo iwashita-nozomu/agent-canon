@@ -30,8 +30,7 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-PAYLOADLESS_FALLBACK_EVENT = "PostToolUse"
-PAYLOADLESS_FALLBACK_TOOL = "Bash"
+TOOL_EVENT_FALLBACK = "PostToolUse"
 DEFAULT_POLICY_PATH = "helper_inventory_guard_policy.json"
 MAX_REASON_RECORDS = 8
 
@@ -90,9 +89,7 @@ def _uses_event_fallback(payload: dict[str, object]) -> bool:
     if isinstance(payload.get("hookEventName"), str):
         return False
     status = _payload_status(payload)
-    return status == PAYLOAD_STATUS_EMPTY or (
-        status == PAYLOAD_STATUS_VALID and _has_tool_signal(payload)
-    )
+    return status == PAYLOAD_STATUS_VALID and _has_tool_signal(payload)
 
 
 def _hook_event_name(payload: dict[str, object]) -> str:
@@ -100,7 +97,7 @@ def _hook_event_name(payload: dict[str, object]) -> str:
     if isinstance(value, str):
         return value
     if _uses_event_fallback(payload):
-        return PAYLOADLESS_FALLBACK_EVENT
+        return TOOL_EVENT_FALLBACK
     return ""
 
 
@@ -108,8 +105,6 @@ def _tool_name(payload: dict[str, object]) -> str:
     value = payload.get("tool_name")
     if isinstance(value, str):
         return value
-    if _payload_status(payload) == PAYLOAD_STATUS_EMPTY:
-        return PAYLOADLESS_FALLBACK_TOOL
     return ""
 
 
@@ -298,6 +293,8 @@ def main() -> int:
     """Run the helper inventory hook and block when policy thresholds fail."""
     payload = _load_payload()
     root = repo_root()
+    if _payload_status(payload) == PAYLOAD_STATUS_EMPTY:
+        return 0
     policy = _load_policy(root)
     changed_paths = git_changed_python_paths(root)
     checked = _should_check(payload) and bool(policy.get("enabled")) and bool(changed_paths)

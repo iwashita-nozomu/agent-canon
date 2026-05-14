@@ -35,8 +35,7 @@ PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
-PAYLOADLESS_FALLBACK_EVENT = "PostToolUse"
-PAYLOADLESS_FALLBACK_TOOL = "Bash"
+TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 GIT_ROOT_TIMEOUT_SECONDS = 5
@@ -87,9 +86,7 @@ def uses_event_fallback(payload: dict[str, object]) -> bool:
     if isinstance(payload.get("hookEventName"), str):
         return False
     status = payload_status(payload)
-    return status == PAYLOAD_STATUS_EMPTY or (
-        status == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
-    )
+    return status == PAYLOAD_STATUS_VALID and has_tool_signal(payload)
 
 
 def repo_root() -> Path:
@@ -112,7 +109,7 @@ def hook_event_name(payload: dict[str, object]) -> str:
     if isinstance(value, str):
         return value
     if uses_event_fallback(payload):
-        return PAYLOADLESS_FALLBACK_EVENT
+        return TOOL_EVENT_FALLBACK
     return "UnknownHookEvent"
 
 
@@ -121,8 +118,6 @@ def tool_name(payload: dict[str, object]) -> str:
     value = payload.get("tool_name")
     if isinstance(value, str):
         return value
-    if payload_status(payload) == PAYLOAD_STATUS_EMPTY:
-        return PAYLOADLESS_FALLBACK_TOOL
     return "unknown"
 
 

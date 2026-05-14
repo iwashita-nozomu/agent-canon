@@ -291,20 +291,55 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["min_score"], 95)
         self.assertEqual(log_entry["failed_count"], 1)
 
-    def test_oop_readability_guard_checks_payloadless_invocations(self) -> None:
-        """OOP guard should still run when a runtime calls the hook without stdin."""
-        payload, log_entry = self._run_oop_guard_with_changed_python("")
-        self.assertEqual(payload["decision"], "block")
-        reason = payload["reason"]
-        if not isinstance(reason, str):
-            self.fail("OOP guard reason must be a string")
-        self.assertIn("OOP readability hook", reason)
-        self.assertEqual(log_entry["event"], "PostToolUse")
-        self.assertEqual(log_entry["tool_name"], "Bash")
-        self.assertEqual(log_entry["payload_status"], "empty")
-        self.assertTrue(log_entry["payload_fallback"])
-        self.assertTrue(log_entry["checked"])
-        self.assertEqual(log_entry["failed_count"], 1)
+    def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
+        """OOP guard should not infer PostToolUse from empty stdin."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('OOP_READABILITY=fail')\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input="",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
 
     def test_oop_readability_guard_ignores_payloadless_no_source_skip(self) -> None:
         """Payloadless OOP invocations with no source changes must not dirty logs."""
@@ -425,6 +460,41 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_skips_payloadless_invocations(self) -> None:
+        """Helper guard should not infer PostToolUse from empty stdin."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            policy = temp_root / "helper_inventory_guard_policy.json"
+            policy.write_text(json.dumps({"enabled": True}), encoding="utf-8")
+            source = temp_root / "changed.py"
+            source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(HELPER_INVENTORY_GUARD)],
+                cwd=temp_root,
+                input="",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
 
     def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:
         """Skill usage hook should append local JSONL records when skills are observed."""
