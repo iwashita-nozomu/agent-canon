@@ -17,6 +17,12 @@ downstream implementation tools/agent_tools/task_close.py validates run-bundle c
 This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
 The shared agent canon lives in `vendor/agent-canon/`. In this template and migrated derived repositories, that path is the AgentCanon Git submodule pin, and the root discovery paths are runtime views into that pin.
 
+Path note: `documents/...` entries in AgentCanon-owned packets are logical
+AgentCanon source paths. In standalone AgentCanon they resolve under root
+`documents/`; in template or derived repo roots they resolve under
+`vendor/agent-canon/documents/` unless the path is a template-owned active
+contract listed in `documents/README.md`.
+
 ## Subagent Usage
 
 - repo-changing task では、requirements / planning / detailed design / review / implementation を parent 1 人で抱え込まず、stage ごとに適切な subagent を明示して進めます。例外は trivial な単発編集だけで、その場合も run bundle に parent 直処理の理由を残します。
@@ -77,7 +83,7 @@ The shared agent canon lives in `vendor/agent-canon/`. In this template and migr
 
 - Default AgentCanon routing is submodule-first: update the standalone AgentCanon repository, push AgentCanon `main` or open the AgentCanon PR, update the template `vendor/agent-canon` submodule pin, run `bash tools/sync_agent_canon.sh link-root`, validate, commit the template pin/root-view changes, then push the template.
 - Legacy subtree or committed-snapshot wording is compatibility-only for repositories not yet migrated. It must not be presented as the normal path in this template or in newly migrated repositories.
-- Missing shared-surface files must be checked in the template root, `vendor/agent-canon/`, the standalone AgentCanon checkout, `.gitmodules`, and `documents/SHARED_RUNTIME_SURFACES.md` before recreating files.
+- Missing shared-surface files must be checked in the template root, `vendor/agent-canon/`, the standalone AgentCanon checkout, `.gitmodules`, and the shared surface manifest before recreating files. In template roots, read that manifest at `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md`; in standalone AgentCanon, read `documents/SHARED_RUNTIME_SURFACES.md`.
 - AgentCanon changes found while working on a template PR must first be evaluated against the standalone AgentCanon PR/checklist path. Do not hide shared-canon changes inside a template-only diff unless the scope explicitly says the change is template-local.
 - Root shared-surface edits must be made in `vendor/agent-canon/` unless the file is intentionally template-local. Root symlink/copy views should be repaired with `bash tools/sync_agent_canon.sh link-root` instead of edited as a separate truth surface.
 - In submodule repos, unrelated parent dirty state does not block `make agent-canon-ensure-latest`. The required clean surface is `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views that `link-root` may mutate.
@@ -162,7 +168,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - worktree では `Editable Directories` 外と `Read-Only Or Avoid Directories` 内を編集してはいけません。scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に残します。
 - Python 差分では `python-review`、C / C++ 差分では `cpp-review` を既定候補にし、bootstrap は changed path から reviewer を自動で足します。
 - file 構成変更を含む branch を `main` に戻すときは `agents/workflows/main-integration-workflow.md` に従い、integration worktree 上で `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
-- closeout 前に `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。
+- closeout 前に AgentCanon の `documents/notes-lifecycle.md` を見て、worktree log から `notes/knowledge/`、`notes/themes/`、`notes/failures/`、`memory/` への昇格先を決めます。template roots では `vendor/agent-canon/documents/notes-lifecycle.md` を読む。
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - closeout 前に、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目があれば実装または該当 stage へ戻ります。
 - closeout 前に `python3 tools/agent_tools/task_close.py ...` の結果を mechanical closeout authority として扱い、chat 上の自己申告だけで完了扱いにしてはいけません。
