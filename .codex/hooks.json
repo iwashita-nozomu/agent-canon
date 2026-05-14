@@ -9,6 +9,7 @@
     "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks changed-source OOP readability failures",
+    "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
     "@dependency-end"
   ],
@@ -59,6 +60,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed-source OOP readability"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed helper inventory"
           }
         ]
       }
@@ -77,6 +84,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed-source OOP readability"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed helper inventory"
           },
           {
             "type": "command",

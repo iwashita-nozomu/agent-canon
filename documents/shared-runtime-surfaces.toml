@@ -39,9 +39,9 @@ paths = [
 ]
 
 [[group]]
-mode = "symlink"
-owner = "agent-canon"
-class = "shared_policy"
+mode = "standalone_only"
+owner = "agent-canon-standalone"
+class = "standalone_only"
 paths = [
   "documents/BRANCH_SCOPE.md",
   "documents/AGENTS_COORDINATION.md",
@@ -112,12 +112,10 @@ paths = [
 ]
 
 [[group]]
-mode = "regular"
-owner = "template-or-derived-repo"
-class = "active_contract"
-local_override_allowed = true
-# Same-path AgentCanon files are seed sources for first materialization and
-# legacy symlink repair only; existing root regular files are never resynced.
+mode = "standalone_only"
+owner = "agent-canon-standalone"
+class = "standalone_only"
+local_override_allowed = false
 source_prefix = ""
 paths = [
   "documents/README.md",

@@ -113,6 +113,64 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("thin_class", result.stdout)
 
+    def test_typing_protocol_is_not_a_thin_class_smell(self) -> None:
+        """A typing Protocol is a contract boundary even before implementations exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "ports.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from abc import ABC",
+                        "from typing import Protocol",
+                        "",
+                        "class SolverPort(Protocol):",
+                        "    def solve(self) -> object: ...",
+                        "",
+                        "class EmptyBase(ABC):",
+                        "    pass",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("thin_class:SolverPort", result.stdout)
+            self.assertNotIn("method_without_self_use:SolverPort.solve", result.stdout)
+            self.assertIn("thin_class:EmptyBase", result.stdout)
+
+    def test_ast_visitor_hooks_are_not_public_surface_width(self) -> None:
+        """AST visitor methods are framework hooks rather than an owned public API."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "visitor.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "import ast",
+                        "",
+                        "class Collector(ast.NodeVisitor):",
+                        "    def __init__(self) -> None:",
+                        "        self.count = 0",
+                        "",
+                        *[
+                            f"    def visit_Node{index}(self, node: ast.AST) -> None: self.count += 1"
+                            for index in range(14)
+                        ],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("public_methods:Collector", result.stdout)
+
     def test_algorithm_config_factories_are_not_namespace_smells(self) -> None:
         """Named algorithm config constructors are the module contract DSL."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -131,6 +131,23 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("surface_manifest:documents/SHARED_RUNTIME_SURFACES.md", result.stdout)
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
 
+    def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
+        """A parent repo may keep AgentCanon docs out of root documents."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            for source in sorted((root / "documents").rglob("*")):
+                if not source.is_file():
+                    continue
+                target = root / "vendor" / "agent-canon" / source.relative_to(root)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.rename(target)
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
+
     def test_normative_convention_without_verification_route_fails(self) -> None:
         """A convention source with normative assertions needs a verification route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -205,8 +222,8 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "tests/agent_tools/\n"
             ),
             "documents/shared-runtime-surfaces.toml": (
-                'mode = "regular"\n'
-                'owner = "template-or-derived-repo"\n'
+                'mode = "standalone_only"\n'
+                'owner = "agent-canon-standalone"\n'
                 'path = "goal.md"\n'
                 '"documents/README.md"\n'
                 '"documents/template-bootstrap.md"\n'
@@ -249,7 +266,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL\n"
                 "evaluate_skill_workflow_prompts.py\n"
             ),
-            "agents/evals/agent_behavior_eval.toml": "behavior\n",
+            "agents/evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
             "agents/templates/closeout_gate.md": (
                 "evaluate_agent_run.py run_repo_dependency_review.sh\n"
             ),

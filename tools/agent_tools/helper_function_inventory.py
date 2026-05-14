@@ -141,7 +141,7 @@ class FunctionRecord:
     decorators: list[str]
     returns_annotation: str
     doc_summary: str
-    evidence: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list[str])
 
 
 @dataclass(frozen=True)
@@ -163,6 +163,22 @@ class Inventory:
     role_counts: dict[str, int]
     verdict_counts: dict[str, int]
     records: list[FunctionRecord]
+
+
+@dataclass(frozen=True)
+class InventoryBuildOptions:
+    """Options controlling inventory construction."""
+
+    paths: list[str]
+    all_functions: bool
+    only_auto_helpers: bool
+    only_user_judgment: bool
+    changed_only: bool
+    baseline_ref: str
+    include_vendor: bool
+    include_hidden: bool
+    include_pyi: bool
+    min_confidence: float
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -260,67 +276,126 @@ def iter_python_files(
     include_pyi: bool,
 ) -> list[Path]:
     """Return Python source files, following root symlink views once."""
+    suffixes = source_suffixes(include_pyi)
+    targets = [root / raw_path for raw_path in raw_paths] if raw_paths else [root]
+    walk_state = FileWalkState(
+        root=root,
+        files=[],
+        seen_dirs=set(),
+        seen_files=set(),
+        suffixes=suffixes,
+        include_vendor=include_vendor,
+        include_hidden=include_hidden,
+    )
+    for target in targets:
+        if target.is_file():
+            append_source_once(walk_state.files, walk_state.seen_files, target, suffixes)
+            continue
+        for current_root, dirnames, filenames in os.walk(target, followlinks=True):
+            append_walk_sources(
+                walk_state,
+                Path(current_root),
+                dirnames,
+                filenames,
+            )
+    return sorted(walk_state.files, key=lambda path: stable_relative(root, path))
+
+
+@dataclass
+class FileWalkState:
+    """Mutable state for a Python source tree walk."""
+
+    root: Path
+    files: list[Path]
+    seen_dirs: set[Path]
+    seen_files: set[Path]
+    suffixes: set[str]
+    include_vendor: bool
+    include_hidden: bool
+
+
+def source_suffixes(include_pyi: bool) -> set[str]:
+    """Return source suffixes included in the scan."""
     suffixes = {".py"}
     if include_pyi:
         suffixes.add(".pyi")
-    targets = [root / raw_path for raw_path in raw_paths] if raw_paths else [root]
-    files: list[Path] = []
-    seen_dirs: set[Path] = set()
-    seen_files: set[Path] = set()
-    for target in targets:
-        if target.is_file() and target.suffix in suffixes:
-            resolved = target.resolve()
-            if resolved not in seen_files:
-                files.append(target)
-                seen_files.add(resolved)
+    return suffixes
+
+
+def append_source_once(
+    files: list[Path],
+    seen_files: set[Path],
+    path: Path,
+    suffixes: set[str],
+) -> None:
+    """Append one source file if its resolved path was not already seen."""
+    if path.suffix not in suffixes:
+        return
+    resolved = path.resolve()
+    if resolved in seen_files:
+        return
+    seen_files.add(resolved)
+    files.append(path)
+
+
+def root_relative_or_self(root: Path, path: Path) -> Path:
+    """Return root-relative path when possible."""
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return path
+
+
+def append_walk_sources(
+    state: FileWalkState,
+    current: Path,
+    dirnames: list[str],
+    filenames: list[str],
+) -> None:
+    """Append source files from one os.walk directory step."""
+    real_current = current.resolve()
+    if real_current in state.seen_dirs:
+        dirnames[:] = []
+        return
+    state.seen_dirs.add(real_current)
+    dirnames[:] = retained_dirnames(
+        state.root,
+        current,
+        dirnames,
+        include_vendor=state.include_vendor,
+        include_hidden=state.include_hidden,
+    )
+    if logical_excluded(
+        root_relative_or_self(state.root, current),
+        include_vendor=state.include_vendor,
+        include_hidden=state.include_hidden,
+    ):
+        dirnames[:] = []
+        return
+    for filename in filenames:
+        append_source_once(state.files, state.seen_files, current / filename, state.suffixes)
+
+
+def retained_dirnames(
+    root: Path,
+    current: Path,
+    dirnames: list[str],
+    *,
+    include_vendor: bool,
+    include_hidden: bool,
+) -> list[str]:
+    """Return child directory names that should remain in an os.walk traversal."""
+    kept: list[str] = []
+    for dirname in dirnames:
+        relative_child = root_relative_or_self(root, current / dirname)
+        if logical_excluded(
+            relative_child,
+            include_vendor=include_vendor,
+            include_hidden=include_hidden,
+        ):
             continue
-        if not target.is_dir():
-            continue
-        for current_root, dirnames, filenames in os.walk(target, followlinks=True):
-            current = Path(current_root)
-            try:
-                relative_current = current.relative_to(root)
-            except ValueError:
-                relative_current = current
-            real_current = current.resolve()
-            if real_current in seen_dirs:
-                dirnames[:] = []
-                continue
-            seen_dirs.add(real_current)
-            kept_dirnames: list[str] = []
-            for dirname in dirnames:
-                child = current / dirname
-                try:
-                    relative_child = child.relative_to(root)
-                except ValueError:
-                    relative_child = child
-                if logical_excluded(
-                    relative_child,
-                    include_vendor=include_vendor,
-                    include_hidden=include_hidden,
-                ):
-                    continue
-                kept_dirnames.append(dirname)
-            dirnames[:] = kept_dirnames
-            if logical_excluded(
-                relative_current,
-                include_vendor=include_vendor,
-                include_hidden=include_hidden,
-            ):
-                dirnames[:] = []
-                continue
-            for filename in filenames:
-                path = current / filename
-                if path.suffix not in suffixes:
-                    continue
-                if path.suffix in DEFAULT_EXCLUDED_SUFFIXES and not include_pyi:
-                    continue
-                resolved = path.resolve()
-                if resolved in seen_files:
-                    continue
-                seen_files.add(resolved)
-                files.append(path)
-    return sorted(files, key=lambda path: stable_relative(root, path))
+        kept.append(dirname)
+    return kept
 
 
 def git_lines(root: Path, args: list[str]) -> list[str]:
@@ -429,7 +504,7 @@ def path_domain(path: str) -> str:
     return "main"
 
 
-def unparse(node: ast.AST | None) -> str:
+def _annotation_text(node: ast.AST | None) -> str:
     """Return a compact source rendering for one annotation node."""
     if node is None:
         return ""
@@ -469,11 +544,15 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         """Skip nested function bodies while analyzing the outer function."""
         if node is self.root:
             self.generic_visit(node)
+        else:
+            self.features.add("nested_function_definition")
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         """Skip nested async function bodies while analyzing the outer function."""
         if node is self.root:
             self.generic_visit(node)
+        else:
+            self.features.add("nested_function_definition")
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Do not mix class-local method calls into an enclosing function."""
@@ -484,62 +563,17 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         """Record calls and side-effect-like features."""
         name = dotted_name(node.func)
         if name:
-            self.calls[name] += 1
-            self.call_locations.append((name, node.lineno))
-            leaf = name.rsplit(".", maxsplit=1)[-1]
-            if leaf in MUTATING_METHODS:
-                self.features.add("mutation_call")
-            if leaf in {"close", "cleanup", "release", "shutdown"}:
-                self.features.add("resource_lifecycle")
-            if name.startswith("subprocess.") or leaf in {"Popen", "run"}:
-                self.features.add("subprocess")
-            if name in {"print", "sys.stdout.write", "sys.stderr.write"}:
-                self.features.add("stdio")
-            if name.startswith("logging.") or leaf in {"debug", "info", "warning", "error"}:
-                self.features.add("logging")
-            if leaf in {"read", "read_text", "read_bytes", "load", "loads"}:
-                self.features.add("read")
-            if leaf in {"write", "write_text", "write_bytes", "dump", "dumps"}:
-                self.features.add("write")
-            if leaf in {"mkdir", "unlink", "rename", "replace", "copy", "copy2", "rmtree"}:
-                self.features.add("filesystem_mutation")
-            if name.startswith("os.environ") or name in {"os.getenv", "getenv"}:
-                self.features.add("environment")
-            if name.startswith(("json.", "tomllib.", "tomli.", "yaml.")):
-                self.features.add("serialization")
-            if name == "Path" or name.startswith(("pathlib.", "os.path.")):
-                self.features.add("path_operation")
-            if leaf in {"absolute", "expanduser", "joinpath", "relative_to", "resolve", "with_name", "with_suffix"}:
-                self.features.add("path_operation")
-            if name.startswith(("hashlib.", "hmac.")) or leaf in {"digest", "hexdigest"}:
-                self.features.add("digest_transform")
-            if leaf in {"decrypt", "encrypt"}:
-                self.features.add("security_transform")
-            if name.startswith(("ctypes.", "cffi.")) or leaf in {"byref", "cast", "c_void_p"}:
-                self.features.add("pointer_interop")
-            if name.startswith(("ast.", "libcst.")):
-                self.features.add("static_analysis")
-            if name.startswith(("jax.", "jnp.", "np.", "numpy.", "math.", "lax.")):
-                self.features.add("numeric")
-            if leaf in {
-                "array",
-                "asarray",
-                "ascontiguousarray",
-                "flatten",
-                "ravel",
-                "reshape",
-                "tolist",
-                "tree_flatten",
-                "tree_leaves",
-                "tree_map",
-                "tree_unflatten",
-            }:
-                self.features.add("data_shape_transform")
-            if name.startswith(("argparse.",)) or leaf == "ArgumentParser":
-                self.features.add("cli_parser")
-            if name.startswith(("requests.", "urllib.")):
-                self.features.add("network")
+            self._record_call(name, node.lineno)
         self.generic_visit(node)
+
+    def _record_call(self, name: str, line: int) -> None:
+        """Record one call and dispatch feature classifiers."""
+        self.calls[name] += 1
+        self.call_locations.append((name, line))
+        leaf = name.rsplit(".", maxsplit=1)[-1]
+        record_effect_call_features(self.features, name, leaf)
+        record_transform_call_features(self.features, name, leaf)
+        record_analysis_call_features(self.features, name, leaf)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Record attribute-only feature references."""
@@ -550,17 +584,29 @@ class FunctionBodyVisitor(ast.NodeVisitor):
 
     def visit_BinOp(self, node: ast.BinOp) -> None:
         """Record operator-based path composition."""
-        if isinstance(node.op, ast.Div) and (
-            contains_string_literal(node.left) or contains_string_literal(node.right)
-        ):
+        if isinstance(node.op, ast.Div):
             self.features.add("path_operation")
+        if isinstance(node.op, (ast.Add, ast.MatMult, ast.Mult, ast.Pow, ast.Sub)):
+            self.features.add("operator_expression")
+        self.generic_visit(node)
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
+        """Record f-string text formatting."""
+        self.features.add("text_transform")
+        self.generic_visit(node)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        """Record callable construction."""
+        self.features.add("nested_function_definition")
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:
         """Record return-shape features without using function names."""
         value = node.value
-        if isinstance(value, ast.Call):
+        if value is not None and any(isinstance(child, ast.Call) for child in ast.walk(value)):
             self.features.add("call_return")
+        if value is not None and returned_parameter_name(self.root, value):
+            self.features.add("identity_return")
         if isinstance(value, ast.IfExp):
             self.features.add("conditional_return")
         if isinstance(value, (ast.Dict, ast.DictComp)):
@@ -569,6 +615,18 @@ class FunctionBodyVisitor(ast.NodeVisitor):
             self.features.add("collection_return")
         if isinstance(value, (ast.BoolOp, ast.Compare, ast.UnaryOp)):
             self.features.add("predicate_return")
+        self.generic_visit(node)
+
+    def visit_Expr(self, node: ast.Expr) -> None:
+        """Record expression-level call delegation."""
+        if isinstance(node.value, ast.Call):
+            self.features.add("call_statement")
+        self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        """Record conditional return behavior."""
+        if any(isinstance(child, ast.Return) for child in ast.walk(node)):
+            self.features.add("conditional_return")
         self.generic_visit(node)
 
     def visit_With(self, node: ast.With) -> None:
@@ -621,6 +679,11 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         self.features.add("local_import")
         self.generic_visit(node)
 
+    def visit_Global(self, node: ast.Global) -> None:
+        """Record module-global mutation intent."""
+        self.features.add("state_mutation")
+        self.generic_visit(node)
+
     def visit_Assign(self, node: ast.Assign) -> None:
         """Record attribute or subscript mutation."""
         for target in node.targets:
@@ -644,6 +707,94 @@ class FunctionBodyVisitor(ast.NodeVisitor):
             call_locations=tuple(sorted(self.call_locations)),
             features=tuple(sorted(self.features)),
         )
+
+
+def record_effect_call_features(features: set[str], name: str, leaf: str) -> None:
+    """Record effect-oriented call features."""
+    if leaf in MUTATING_METHODS:
+        features.add("mutation_call")
+    if leaf in {"close", "cleanup", "release", "shutdown"}:
+        features.add("resource_lifecycle")
+    if name.startswith("subprocess.") or leaf in {"Popen", "run"}:
+        features.add("subprocess")
+    if name in {"print", "sys.stdout.write", "sys.stderr.write"}:
+        features.add("stdio")
+    if name.startswith("logging.") or leaf in {"debug", "info", "warning", "error"}:
+        features.add("logging")
+    if leaf in {"write", "write_text", "write_bytes", "dump", "dumps"}:
+        features.add("write")
+    if leaf in {"mkdir", "unlink", "rename", "replace", "copy", "copy2", "rmtree"}:
+        features.add("filesystem_mutation")
+    if name == "progress_callback":
+        features.add("callback_emission")
+
+
+def record_transform_call_features(features: set[str], name: str, leaf: str) -> None:
+    """Record transform, parsing, and normalization call features."""
+    if leaf in {"read", "read_text", "read_bytes", "load", "loads"}:
+        features.add("read")
+    if name.startswith(("json.", "tomllib.", "tomli.", "yaml.")):
+        features.add("serialization")
+    if name.startswith("base64."):
+        features.add("encoding_transform")
+    if name.startswith("re."):
+        features.add("text_transform")
+    if name == "Path" or name.startswith(("pathlib.", "os.path.")):
+        features.add("path_operation")
+    if leaf in {"absolute", "expanduser", "joinpath", "relative_to", "resolve", "with_name", "with_suffix"}:
+        features.add("path_operation")
+    if leaf in {"format", "join", "lower", "removeprefix", "removesuffix", "replace", "rstrip", "split", "strip", "upper"}:
+        features.add("text_transform")
+    if name.startswith(("hashlib.", "hmac.")) or leaf in {"digest", "hexdigest"}:
+        features.add("digest_transform")
+    if leaf in {"decrypt", "encrypt"}:
+        features.add("security_transform")
+
+
+def record_analysis_call_features(features: set[str], name: str, leaf: str) -> None:
+    """Record static-analysis, numeric, interop, and environment call features."""
+    if name.startswith("os.environ") or name in {"os.getenv", "getenv"}:
+        features.add("environment")
+    if name.startswith("platform."):
+        features.add("environment")
+    if name.startswith(("ctypes.", "cffi.")) or leaf in {"byref", "cast", "c_void_p"}:
+        features.add("pointer_interop")
+    if leaf in {"getattr", "hasattr", "isinstance", "issubclass", "type"}:
+        features.add("type_introspection")
+    if name.startswith(("ast.", "libcst.")):
+        features.add("static_analysis")
+    if name.startswith(("jax.", "jnp.", "np.", "numpy.", "math.", "lax.")):
+        features.add("numeric")
+    if leaf in {
+        "array",
+        "asarray",
+        "ascontiguousarray",
+        "flatten",
+        "ravel",
+        "reshape",
+        "tolist",
+        "tree_flatten",
+        "tree_leaves",
+        "tree_map",
+        "tree_unflatten",
+    }:
+        features.add("data_shape_transform")
+    if name.startswith(("argparse.",)) or leaf == "ArgumentParser":
+        features.add("cli_parser")
+    if name.startswith(("requests.", "urllib.")):
+        features.add("network")
+
+
+def returned_parameter_name(root: ast.AST, value: ast.AST) -> str:
+    """Return a parameter name when a function returns it unchanged."""
+    if not isinstance(root, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return ""
+    if not isinstance(value, ast.Name):
+        return ""
+    parameter_names = {
+        arg.arg for arg in [*root.args.posonlyargs, *root.args.args, *root.args.kwonlyargs]
+    }
+    return value.id if value.id in parameter_names else ""
 
 
 def body_facts(node: ast.AST) -> BodyFacts:
@@ -694,59 +845,145 @@ def role_scores(
     scores: Counter[str] = Counter()
     evidence: list[str] = []
 
-    def add(role: str, points: int, reason: str) -> None:
-        scores[role] += points
-        evidence.append(f"{role}:{reason}")
-
-    if "tools" in path_parts or "agent_tools" in path_parts:
-        add("workflow_tooling", 1, "tool-path")
-    if "tests" in path_parts:
-        add("test_support", 1, "test-path")
+    add_path_role_scores(scores, evidence, path_parts)
     if returns_annotation == "bool" or "predicate_return" in features:
-        add("predicate", 3, "predicate-shape")
-    if "subprocess" in features:
-        add("command_runner", 3, "subprocess-call")
-    if "network" in features:
-        add("command_runner", 1, "network-call")
-    if "cli_parser" in features:
-        add("cli_parser", 4, "argparse-call")
-    if "serialization" in features and "read" in features:
-        add("parser_loader", 2, "serialization-read")
-    elif "serialization" in features:
-        add("formatter_reporter", 2, "serialization-transform")
-    if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
-        add("static_analyzer", 5, "ast-call")
-    if "path_operation" in features:
-        add("converter_normalizer", 3, "path-operation")
-    if "conditional_return" in features or "environment" in features:
-        add("converter_normalizer", 2, "conditional-or-environment-normalization")
-    if "digest_transform" in features or "security_transform" in features:
-        add("converter_normalizer", 3, "digest-or-security-transform")
-    if "pointer_interop" in features or "data_shape_transform" in features:
-        add("converter_normalizer", 4, "interop-or-shape-transform")
-    if "numeric" in features:
-        add("numeric_kernel", 3, "numeric-call")
-    if "read" in features:
-        add("parser_loader", 2, "read-call")
-    if "write" in features or "filesystem_mutation" in features:
-        add("writer_mutator", 2, "write-or-filesystem-call")
-    if "resource_lifecycle" in features:
-        add("writer_mutator", 3, "resource-lifecycle")
-    if "state_mutation" in features or "mutation_call" in features:
-        add("writer_mutator", 1, "mutation-call")
-    if "mapping_return" in features:
-        add("formatter_reporter", 2, "mapping-return")
-    if "collection_return" in features or "generator" in features or "iteration" in features:
-        add("collector_inventory", 2, "collection-or-iteration")
-    if "call_return" in features and not ({"read", "write", "numeric", "static_analysis"} & features):
-        add("factory_builder", 1, "call-return")
-    if "raises" in features:
-        add("validator_checker", 2, "raises")
-    if "logging" in features or "stdio" in features:
-        add("formatter_reporter", 1, "human-output")
+        add_role_score(scores, evidence, "predicate", 3, "predicate-shape")
+    if collection_annotation(returns_annotation):
+        add_role_score(scores, evidence, "collector_inventory", 2, "collection-annotation")
+    add_common_body_role_scores(scores, evidence, calls, features)
+    add_function_body_role_scores(scores, evidence, features)
     if not scores:
-        add("general_helper", 1, "fallback")
+        add_role_score(scores, evidence, "general_helper", 1, "fallback")
     return scores, evidence
+
+
+def add_role_score(
+    scores: Counter[str],
+    evidence: list[str],
+    role: str,
+    points: int,
+    reason: str,
+) -> None:
+    """Add one role score and evidence token."""
+    scores[role] += points
+    evidence.append(f"{role}:{reason}")
+
+
+def add_path_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    path_parts: tuple[str, ...],
+) -> None:
+    """Add role scores implied by repository path domain."""
+    if "tools" in path_parts or "agent_tools" in path_parts:
+        add_role_score(scores, evidence, "workflow_tooling", 1, "tool-path")
+    if "tests" in path_parts:
+        add_role_score(scores, evidence, "test_support", 1, "test-path")
+
+
+def add_common_body_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    calls: set[str],
+    features: set[str],
+) -> None:
+    """Add role scores shared by function and class body facts."""
+    add_effect_role_scores(scores, evidence, features)
+    add_transform_role_scores(scores, evidence, features)
+    add_structure_role_scores(scores, evidence, calls, features)
+
+
+def add_effect_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    features: set[str],
+) -> None:
+    """Add role scores for effect and reporting behavior."""
+    if "subprocess" in features:
+        add_role_score(scores, evidence, "command_runner", 3, "subprocess-call")
+    if "network" in features:
+        add_role_score(scores, evidence, "command_runner", 1, "network-call")
+    if "cli_parser" in features:
+        add_role_score(scores, evidence, "cli_parser", 4, "argparse-call")
+    if "write" in features or "filesystem_mutation" in features:
+        add_role_score(scores, evidence, "writer_mutator", 2, "write-or-filesystem-call")
+    if "resource_lifecycle" in features:
+        add_role_score(scores, evidence, "writer_mutator", 3, "resource-lifecycle")
+    if "callback_emission" in features:
+        add_role_score(scores, evidence, "formatter_reporter", 3, "callback-emission")
+    if "call_statement" in features:
+        add_role_score(scores, evidence, "adapter_bridge", 2, "call-statement")
+    if "logging" in features or "stdio" in features:
+        add_role_score(scores, evidence, "formatter_reporter", 1, "human-output")
+
+
+def add_transform_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    features: set[str],
+) -> None:
+    """Add role scores for conversion and parsing behavior."""
+    if "serialization" in features and "read" in features:
+        add_role_score(scores, evidence, "parser_loader", 2, "serialization-read")
+    elif "serialization" in features:
+        add_role_score(scores, evidence, "formatter_reporter", 2, "serialization-transform")
+    if "path_operation" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 3, "path-operation")
+    if "text_transform" in features or "encoding_transform" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 2, "text-or-encoding-transform")
+    if "type_introspection" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 2, "type-introspection")
+    if "conditional_return" in features or "environment" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 2, "conditional-or-environment-normalization")
+    if "identity_return" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 2, "identity-return")
+    if "digest_transform" in features or "security_transform" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 3, "digest-or-security-transform")
+    if "pointer_interop" in features or "data_shape_transform" in features:
+        add_role_score(scores, evidence, "converter_normalizer", 4, "interop-or-shape-transform")
+    if "read" in features:
+        add_role_score(scores, evidence, "parser_loader", 2, "read-call")
+
+
+def add_structure_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    calls: set[str],
+    features: set[str],
+) -> None:
+    """Add role scores for static, numeric, and return-shape behavior."""
+    if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
+        add_role_score(scores, evidence, "static_analyzer", 5, "ast-call")
+    if "numeric" in features:
+        add_role_score(scores, evidence, "numeric_kernel", 3, "numeric-call")
+    if "operator_expression" in features:
+        add_role_score(scores, evidence, "numeric_kernel", 2, "operator-expression")
+    if "mapping_return" in features:
+        add_role_score(scores, evidence, "formatter_reporter", 2, "mapping-return")
+    if "collection_return" in features or "generator" in features or "iteration" in features:
+        add_role_score(scores, evidence, "collector_inventory", 2, "collection-or-iteration")
+    if "nested_function_definition" in features:
+        add_role_score(scores, evidence, "factory_builder", 4, "nested-callable-definition")
+    if "raises" in features:
+        add_role_score(scores, evidence, "validator_checker", 2, "raises")
+
+
+def add_function_body_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    features: set[str],
+) -> None:
+    """Add function-only role scores."""
+    if "state_mutation" in features or "mutation_call" in features:
+        add_role_score(scores, evidence, "writer_mutator", 1, "mutation-call")
+    if "call_return" in features and not ({"read", "write", "numeric", "static_analysis"} & features):
+        add_role_score(scores, evidence, "factory_builder", 1, "call-return")
+
+
+def collection_annotation(annotation: str) -> bool:
+    """Return whether an annotation describes a collection-like return."""
+    lowered = annotation.lower()
+    return lowered.startswith(("tuple", "list", "set", "frozenset")) or "sequence" in lowered
 
 
 def class_role_scores(
@@ -764,61 +1001,46 @@ def class_role_scores(
     scores: Counter[str] = Counter()
     evidence: list[str] = []
 
-    def add(role: str, points: int, reason: str) -> None:
-        scores[role] += points
-        evidence.append(f"{role}:{reason}")
-
-    if "tests" in path_parts:
-        add("test_support", 1, "test-path")
-    if "tools" in path_parts or "agent_tools" in path_parts:
-        add("workflow_tooling", 1, "tool-path")
-    if any(base.endswith(("Protocol", "ABC")) or base in {"Protocol", "ABC"} for base in bases):
-        add("protocol_interface", 4, "protocol-or-abc-base")
-    if any(base.endswith(("Exception", "Error")) or base in {"BaseException", "Exception"} for base in bases):
-        add("exception_type", 5, "exception-base")
-    if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
-        add("data_container", 4, "data-class-decorator")
-    if annotated_field_count:
-        add("data_container", 2, "annotated-fields")
-
-    if "subprocess" in features:
-        add("command_runner", 3, "subprocess-call")
-    if "cli_parser" in features:
-        add("cli_parser", 4, "argparse-call")
-    if "serialization" in features and "read" in features:
-        add("parser_loader", 2, "serialization-read")
-    elif "serialization" in features:
-        add("formatter_reporter", 2, "serialization-transform")
-    if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
-        add("static_analyzer", 5, "ast-call")
-    if "path_operation" in features:
-        add("converter_normalizer", 3, "path-operation")
-    if "conditional_return" in features or "environment" in features:
-        add("converter_normalizer", 2, "conditional-or-environment-normalization")
-    if "digest_transform" in features or "security_transform" in features:
-        add("converter_normalizer", 3, "digest-or-security-transform")
-    if "pointer_interop" in features or "data_shape_transform" in features:
-        add("converter_normalizer", 4, "interop-or-shape-transform")
-    if "numeric" in features:
-        add("numeric_kernel", 3, "numeric-call")
-    if "write" in features or "filesystem_mutation" in features:
-        add("writer_mutator", 2, "write-or-filesystem-call")
-    if "resource_lifecycle" in features:
-        add("writer_mutator", 3, "resource-lifecycle")
-    if "state_mutation" in features or "mutation_call" in features:
-        add("state_holder", 1, "state-mutation")
-    if "mapping_return" in features:
-        add("formatter_reporter", 2, "mapping-return")
-    if "collection_return" in features or "generator" in features or "iteration" in features:
-        add("collector_inventory", 2, "collection-or-iteration")
-    if "raises" in features:
-        add("validator_checker", 2, "raises")
+    add_path_role_scores(scores, evidence, path_parts)
+    add_class_boundary_role_scores(scores, evidence, bases, decorators, annotated_field_count)
+    add_common_body_role_scores(scores, evidence, calls, features)
+    add_class_body_role_scores(scores, evidence, features)
     if not scores:
-        add("general_helper", 1, "fallback")
+        add_role_score(scores, evidence, "general_helper", 1, "fallback")
     return scores, evidence
 
 
-def helper_candidate(
+def add_class_boundary_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    bases: tuple[str, ...],
+    decorators: tuple[str, ...],
+    annotated_field_count: int,
+) -> None:
+    """Add class role scores from inheritance, decorators, and fields."""
+    if any(base == "Protocol" or base.endswith(".Protocol") for base in bases):
+        add_role_score(scores, evidence, "protocol_interface", 4, "protocol-base")
+    if any(base.endswith(("Exception", "Error")) or base in {"BaseException", "Exception"} for base in bases):
+        add_role_score(scores, evidence, "exception_type", 5, "exception-base")
+    if any(base.endswith(("Answer", "Config", "Info", "Problem", "SolveConfig", "State")) for base in bases):
+        add_role_score(scores, evidence, "data_container", 4, "algorithm-data-container-base")
+    if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
+        add_role_score(scores, evidence, "data_container", 4, "data-class-decorator")
+    if annotated_field_count:
+        add_role_score(scores, evidence, "data_container", 2, "annotated-fields")
+
+
+def add_class_body_role_scores(
+    scores: Counter[str],
+    evidence: list[str],
+    features: set[str],
+) -> None:
+    """Add class-only role scores from body facts."""
+    if "state_mutation" in features or "mutation_call" in features:
+        add_role_score(scores, evidence, "state_holder", 1, "state-mutation")
+
+
+def is_candidate_symbol(
     *,
     kind: str,
     name: str,
@@ -897,15 +1119,10 @@ class DefinitionCollector(ast.NodeVisitor):
         is_async: bool,
     ) -> None:
         parent_stack = tuple(self.stack)
-        qualname = ".".join((*parent_stack, node.name)) if parent_stack else node.name
-        scope = "module"
-        if parent_stack and parent_stack[-1][0].isupper():
-            scope = "method"
-        elif parent_stack:
-            scope = "nested"
+        qualname, scope = function_qualname_and_scope(parent_stack, node.name)
         facts = body_facts(node)
         domain = path_domain(self.relative_path)
-        returns_annotation = unparse(node.returns)
+        returns_annotation = _annotation_text(node.returns)
         scores, evidence = role_scores(
             path=self.relative_path,
             returns_annotation=returns_annotation,
@@ -913,7 +1130,7 @@ class DefinitionCollector(ast.NodeVisitor):
         )
         ordered_roles = [role for role, _count in scores.most_common()]
         role = ordered_roles[0]
-        candidate = helper_candidate(
+        candidate = is_candidate_symbol(
             kind="function",
             name=node.name,
             scope=scope,
@@ -958,7 +1175,7 @@ class DefinitionCollector(ast.NodeVisitor):
                 public_method_count=0,
                 decorators=list(decorators),
                 returns_annotation=returns_annotation,
-                doc_summary=doc_summary(ast.get_docstring(node)),
+                doc_summary=_doc_summary(ast.get_docstring(node)),
                 evidence=evidence,
             )
         )
@@ -998,7 +1215,7 @@ class DefinitionCollector(ast.NodeVisitor):
         )
         ordered_roles = [role for role, _count in scores.most_common()]
         role = ordered_roles[0]
-        candidate = helper_candidate(
+        candidate = is_candidate_symbol(
             kind="class",
             name=node.name,
             scope=scope,
@@ -1040,7 +1257,7 @@ class DefinitionCollector(ast.NodeVisitor):
                 public_method_count=sum(1 for name in method_names if not name.startswith("_")),
                 decorators=list(decorators),
                 returns_annotation="",
-                doc_summary=doc_summary(ast.get_docstring(node)),
+                doc_summary=_doc_summary(ast.get_docstring(node)),
                 evidence=evidence,
             )
         )
@@ -1052,6 +1269,16 @@ class DefinitionCollector(ast.NodeVisitor):
             facts=facts,
             candidate=candidate,
         )
+
+
+def function_qualname_and_scope(parent_stack: tuple[str, ...], name: str) -> tuple[str, str]:
+    """Return a function qualname and module/method/nested scope."""
+    qualname = ".".join((*parent_stack, name)) if parent_stack else name
+    if parent_stack and parent_stack[-1][0].isupper():
+        return qualname, "method"
+    if parent_stack:
+        return qualname, "nested"
+    return qualname, "module"
 
 
 def is_side_effect(feature: str) -> bool:
@@ -1070,7 +1297,7 @@ def is_side_effect(feature: str) -> bool:
     }
 
 
-def doc_summary(docstring: str | None) -> str:
+def _doc_summary(docstring: str | None) -> str:
     """Return the first sentence-ish fragment from a docstring."""
     if not docstring:
         return ""
@@ -1105,6 +1332,8 @@ def candidate_rule(record: FunctionRecord) -> str:
     """Return the deterministic rule that keeps a helper candidate."""
     if record.name.startswith("__") and record.name.endswith("__"):
         return ""
+    if is_interface_boundary(record):
+        return ""
 
     if record.scope == "nested":
         return nested_candidate_rule(record)
@@ -1135,7 +1364,9 @@ def nested_candidate_rule(record: FunctionRecord) -> str:
 def test_candidate_rule(record: FunctionRecord, local_symbol: bool) -> str:
     """Return a deterministic test-directory helper rule."""
     decorator_names = {decorator.rsplit(".", maxsplit=1)[-1] for decorator in record.decorators}
-    if record.visibility == "private" and local_symbol and record.role not in LOW_SIGNAL_HELPER_ROLES:
+    if record.kind == "function" and record.name.startswith("test_"):
+        return ""
+    if record.visibility == "private" and local_symbol:
         return f"test:private-local-{record.role}"
     if record.kind == "function":
         if "fixture" in decorator_names:
@@ -1185,6 +1416,8 @@ def design_judgment_rule(record: FunctionRecord) -> str:
     """Return the deterministic reason a symbol needs human design judgment."""
     if record.name.startswith("__") and record.name.endswith("__"):
         return ""
+    if is_interface_boundary(record):
+        return ""
 
     local_symbol = record.specialization in LOCAL_SPECIALIZATIONS and record.incoming_count > 0
     if record.domain == "main":
@@ -1221,6 +1454,8 @@ def experiment_design_judgment_rule(record: FunctionRecord, local_symbol: bool) 
 
 def test_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:
     """Return test symbols that need human review after static analysis."""
+    if record.kind == "function" and record.name.startswith("test_"):
+        return ""
     if local_symbol and record.role in {"general_helper", "numeric_kernel"}:
         return f"test:low-signal-local-{record.role}"
     return ""
@@ -1231,6 +1466,11 @@ def tooling_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> 
     if local_symbol and record.role in {"general_helper", "numeric_kernel"}:
         return f"tooling:low-signal-local-{record.role}"
     return ""
+
+
+def is_interface_boundary(record: FunctionRecord) -> bool:
+    """Return whether a class is a type/interface boundary rather than a helper."""
+    return record.kind == "class" and record.role == "protocol_interface"
 
 
 def verdict(record: FunctionRecord) -> str:
@@ -1244,62 +1484,120 @@ def verdict(record: FunctionRecord) -> str:
 
 def apply_call_graph(records: list[FunctionRecord]) -> None:
     """Attach simple static incoming and outgoing call counts."""
+    maps = call_graph_maps(records)
+    edges = collect_call_edges(records, maps)
+    for index, record in enumerate(records):
+        attach_call_edges(record, index, edges)
+        attach_verdict(record)
+
+
+@dataclass
+class CallGraphMaps:
+    """Internal call lookup maps."""
+
+    by_name: dict[str, list[FunctionRecord]]
+    by_qualname: dict[str, FunctionRecord]
+
+
+@dataclass
+class CallGraphEdges:
+    """Internal call graph edge accumulator."""
+
+    incoming_sites: dict[int, set[str]]
+    incoming_callers: dict[int, set[str]]
+    outgoing: dict[int, set[str]]
+
+
+def call_graph_maps(records: list[FunctionRecord]) -> CallGraphMaps:
+    """Return name and qualname lookup maps for records."""
     by_name: dict[str, list[FunctionRecord]] = {}
     by_qualname: dict[str, FunctionRecord] = {}
     for record in records:
-        by_name.setdefault(record.name, []).append(record)
+        bucket = by_name.setdefault(record.name, [])
+        bucket.append(record)
         by_qualname[record.qualname] = record
-    incoming_sites: dict[int, set[str]] = {}
-    incoming_callers: dict[int, set[str]] = {}
-    outgoing: dict[int, set[str]] = {}
+    return CallGraphMaps(by_name=by_name, by_qualname=by_qualname)
+
+
+def collect_call_edges(records: list[FunctionRecord], maps: CallGraphMaps) -> CallGraphEdges:
+    """Return internal call graph edges for all records."""
+    edges = CallGraphEdges(incoming_sites={}, incoming_callers={}, outgoing={})
     for index, record in enumerate(records):
         matches: set[str] = set()
         for call_site in record.outgoing_call_sites:
-            call, _separator, line_text = call_site.partition("@")
-            line = int(line_text) if line_text.isdigit() else record.line
-            candidates = internal_call_candidates(by_name, by_qualname, record, call)
-            for candidate in candidates:
-                if candidate is record:
-                    continue
-                if candidate.path == record.path or len(candidates) == 1:
-                    matches.add(candidate.qualname)
-                    incoming_sites.setdefault(id(candidate), set()).add(
-                        f"{record.path}:{line}:{record.qualname}"
-                    )
-                    incoming_callers.setdefault(id(candidate), set()).add(
-                        f"{record.path}:{record.qualname}"
-                    )
-        outgoing[index] = matches
-    for index, record in enumerate(records):
-        sites = sorted(incoming_sites.get(id(record), set()))
-        callers = sorted(incoming_callers.get(id(record), set()))
-        record.incoming_count = len(sites)
-        record.incoming_callers = callers
-        record.incoming_call_sites = sites
-        record.outgoing_internal = sorted(outgoing[index])
-        record.specialized_helper, record.specialization = specialization(record)
-        rule = candidate_rule(record)
-        judgment = "" if rule else design_judgment_rule(record)
-        record.helper_candidate = bool(rule)
-        record.candidate_rule = rule
-        record.needs_user_judgment = bool(judgment)
-        record.judgment_rule = judgment
-        if rule:
-            record.evidence.insert(0, f"candidate-rule:{rule}")
-            if record.confidence == 0.0:
-                record.confidence = 0.5
-        elif judgment:
-            record.evidence.insert(0, f"judgment-rule:{judgment}")
-            if record.confidence == 0.0:
-                record.confidence = 0.4
-        else:
-            record.confidence = 0.0
-            record.specialized_helper = False
-            record.specialization = "not_helper_candidate"
-        if record.helper_candidate and record.visibility == "private" and record.incoming_count == 0:
-            record.evidence.append("usage:no-internal-callers")
-        if record.specialized_helper:
-            record.evidence.append(f"usage:{record.specialization}")
+            add_call_site_edges(record, call_site, maps, matches, edges)
+        edges.outgoing[index] = matches
+    return edges
+
+
+def add_call_site_edges(
+    record: FunctionRecord,
+    call_site: str,
+    maps: CallGraphMaps,
+    matches: set[str],
+    edges: CallGraphEdges,
+) -> None:
+    """Record internal edges produced by one outgoing call site."""
+    call, _separator, line_text = call_site.partition("@")
+    line = int(line_text) if line_text.isdigit() else record.line
+    candidates = internal_call_candidates(maps.by_name, maps.by_qualname, record, call)
+    for candidate in candidates:
+        if accepts_internal_candidate(record, candidate, candidates):
+            matches.add(candidate.qualname)
+            edges.incoming_sites.setdefault(id(candidate), set()).add(
+                f"{record.path}:{line}:{record.qualname}"
+            )
+            edges.incoming_callers.setdefault(id(candidate), set()).add(
+                f"{record.path}:{record.qualname}"
+            )
+
+
+def accepts_internal_candidate(
+    record: FunctionRecord,
+    candidate: FunctionRecord,
+    candidates: list[FunctionRecord],
+) -> bool:
+    """Return whether one candidate should count as an internal call target."""
+    if candidate is record:
+        return False
+    return candidate.path == record.path or len(candidates) == 1
+
+
+def attach_call_edges(record: FunctionRecord, index: int, edges: CallGraphEdges) -> None:
+    """Attach incoming and outgoing edge facts to one record."""
+    sites = sorted(edges.incoming_sites.get(id(record), set()))
+    callers = sorted(edges.incoming_callers.get(id(record), set()))
+    record.incoming_count = len(sites)
+    record.incoming_callers = callers
+    record.incoming_call_sites = sites
+    record.outgoing_internal = sorted(edges.outgoing[index])
+    record.specialized_helper, record.specialization = specialization(record)
+
+
+def attach_verdict(record: FunctionRecord) -> None:
+    """Attach final candidate and judgment facts to one record."""
+    rule = candidate_rule(record)
+    judgment = "" if rule else design_judgment_rule(record)
+    record.helper_candidate = bool(rule)
+    record.candidate_rule = rule
+    record.needs_user_judgment = bool(judgment)
+    record.judgment_rule = judgment
+    if rule:
+        record.evidence.insert(0, f"candidate-rule:{rule}")
+        if record.confidence == 0.0:
+            record.confidence = 0.5
+    elif judgment:
+        record.evidence.insert(0, f"judgment-rule:{judgment}")
+        if record.confidence == 0.0:
+            record.confidence = 0.4
+    else:
+        record.confidence = 0.0
+        record.specialized_helper = False
+        record.specialization = "not_helper_candidate"
+    if record.helper_candidate and record.visibility == "private" and record.incoming_count == 0:
+        record.evidence.append("usage:no-internal-callers")
+    if record.specialized_helper:
+        record.evidence.append(f"usage:{record.specialization}")
 
 
 def internal_call_candidates(
@@ -1352,102 +1650,43 @@ def specialization(record: FunctionRecord) -> tuple[bool, str]:
     return False, "shared_helper"
 
 
-def build_inventory(
-    root: Path,
-    paths: list[str],
-    *,
-    all_functions: bool,
-    only_auto_helpers: bool,
-    only_user_judgment: bool,
-    changed_only: bool,
-    baseline_ref: str,
-    include_vendor: bool,
-    include_hidden: bool,
-    include_pyi: bool,
-    min_confidence: float,
-) -> Inventory:
+def build_inventory(root: Path, options: InventoryBuildOptions) -> Inventory:
     """Build the helper inventory."""
-    report_paths: set[str] | None = None
-    if changed_only:
-        changed_files = changed_python_files(
-            root,
-            include_vendor=include_vendor,
-            include_hidden=include_hidden,
-            include_pyi=include_pyi,
-        )
-        requested_paths = requested_relative_paths(
-            root,
-            paths,
-            include_vendor=include_vendor,
-            include_hidden=include_hidden,
-            include_pyi=include_pyi,
-        )
-        if requested_paths:
-            changed_files = [
-                path for path in changed_files if stable_relative(root, path) in requested_paths
-            ]
-        report_paths = {stable_relative(root, path) for path in changed_files}
-        files = (
-            iter_python_files(
-                root,
-                [],
-                include_vendor=include_vendor,
-                include_hidden=include_hidden,
-                include_pyi=include_pyi,
-            )
-            if changed_files
-            else []
-        )
-    else:
-        files = iter_python_files(
-            root,
-            paths,
-            include_vendor=include_vendor,
-            include_hidden=include_hidden,
-            include_pyi=include_pyi,
-        )
-    baseline_records: list[FunctionRecord] = []
-    if baseline_ref:
-        for path in files:
-            relative = stable_relative(root, path)
-            source = git_ref_text(root, baseline_ref, relative)
-            if source is None:
-                continue
-            baseline_records.extend(analyze_source(root, path, source))
-        apply_call_graph(baseline_records)
+    files, report_paths = inventory_files(root, options)
+    baseline_records = baseline_inventory_records(root, files, options.baseline_ref)
     all_records: list[FunctionRecord] = []
     for path in files:
         all_records.extend(analyze_file(root, path))
     apply_call_graph(all_records)
-    include_auto_helpers = not only_user_judgment
-    include_user_judgment = not only_auto_helpers
+    include_auto_symbols = not options.only_user_judgment
+    include_judgment_symbols = not options.only_auto_helpers
     selected = select_records(
         all_records,
-        all_functions=all_functions,
-        include_auto_helpers=include_auto_helpers,
-        include_user_judgment=include_user_judgment,
-        min_confidence=min_confidence,
+        all_functions=options.all_functions,
+        include_auto_helpers=include_auto_symbols,
+        include_user_judgment=include_judgment_symbols,
+        min_confidence=options.min_confidence,
         report_paths=report_paths,
     )
     baseline_selected = select_records(
         baseline_records,
-        all_functions=all_functions,
-        include_auto_helpers=include_auto_helpers,
-        include_user_judgment=include_user_judgment,
-        min_confidence=min_confidence,
+        all_functions=options.all_functions,
+        include_auto_helpers=include_auto_symbols,
+        include_user_judgment=include_judgment_symbols,
+        min_confidence=options.min_confidence,
         report_paths=report_paths,
     )
     baseline_keys = {record_key(record) for record in baseline_selected}
     before_baseline_filter = len(selected)
-    if baseline_ref:
+    if options.baseline_ref:
         selected = [record for record in selected if record_key(record) not in baseline_keys]
     selected.sort(key=lambda item: (item.path, item.line, item.qualname))
     role_counts = Counter(record.role for record in selected)
     verdict_counts = Counter(verdict(record) for record in selected)
     return Inventory(
         root=root.as_posix(),
-        changed_only=changed_only,
-        baseline_ref=baseline_ref,
+        changed_only=options.changed_only,
+        baseline_ref=options.baseline_ref,
         baseline_symbols_seen=len(baseline_records),
         baseline_filtered=before_baseline_filter - len(selected),
         files_scanned=len(files),
@@ -1463,6 +1702,70 @@ def build_inventory(
     )
 
 
+def inventory_files(root: Path, options: InventoryBuildOptions) -> tuple[list[Path], set[str]]:
+    """Return files to analyze and changed-only report path filter."""
+    if not options.changed_only:
+        files = iter_python_files(
+            root,
+            options.paths,
+            include_vendor=options.include_vendor,
+            include_hidden=options.include_hidden,
+            include_pyi=options.include_pyi,
+        )
+        return files, set()
+    changed_files = filtered_changed_python_files(root, options)
+    report_paths = {stable_relative(root, path) for path in changed_files}
+    if not changed_files:
+        return [], report_paths
+    files = iter_python_files(
+        root,
+        [],
+        include_vendor=options.include_vendor,
+        include_hidden=options.include_hidden,
+        include_pyi=options.include_pyi,
+    )
+    return files, report_paths
+
+
+def filtered_changed_python_files(root: Path, options: InventoryBuildOptions) -> list[Path]:
+    """Return changed Python files constrained by requested paths."""
+    changed_files = changed_python_files(
+        root,
+        include_vendor=options.include_vendor,
+        include_hidden=options.include_hidden,
+        include_pyi=options.include_pyi,
+    )
+    requested_paths = requested_relative_paths(
+        root,
+        options.paths,
+        include_vendor=options.include_vendor,
+        include_hidden=options.include_hidden,
+        include_pyi=options.include_pyi,
+    )
+    if not requested_paths:
+        return changed_files
+    return [path for path in changed_files if stable_relative(root, path) in requested_paths]
+
+
+def baseline_inventory_records(
+    root: Path,
+    files: list[Path],
+    baseline_ref: str,
+) -> list[FunctionRecord]:
+    """Return baseline records for the same logical files."""
+    records: list[FunctionRecord] = []
+    if not baseline_ref:
+        return records
+    for path in files:
+        relative = stable_relative(root, path)
+        source = git_ref_text(root, baseline_ref, relative)
+        if source is None:
+            continue
+        records.extend(analyze_source(root, path, source))
+    apply_call_graph(records)
+    return records
+
+
 def select_records(
     records: list[FunctionRecord],
     *,
@@ -1470,7 +1773,7 @@ def select_records(
     include_auto_helpers: bool,
     include_user_judgment: bool,
     min_confidence: float,
-    report_paths: set[str] | None,
+    report_paths: set[str],
 ) -> list[FunctionRecord]:
     """Return records matching report filters."""
     selected = [
@@ -1482,7 +1785,7 @@ def select_records(
             or (include_user_judgment and record.needs_user_judgment)
         )
         and record.confidence >= min_confidence
-        and (report_paths is None or record.path in report_paths)
+        and (not report_paths or record.path in report_paths)
     ]
     return sorted(selected, key=lambda item: (item.path, item.line, item.qualname))
 
@@ -1554,24 +1857,56 @@ def markdown_cell(value: object) -> str:
 
 def render_markdown(inventory: Inventory) -> str:
     """Render Markdown output."""
+    summary_rows = [
+        ["files scanned", inventory.files_scanned],
+        ["symbols seen", inventory.symbols_seen],
+        ["functions seen", inventory.functions_seen],
+        ["classes seen", inventory.classes_seen],
+        ["symbols reported", inventory.symbols_reported],
+        ["auto helpers reported", inventory.helpers_reported],
+        ["user judgment required", inventory.judgment_required_reported],
+        ["changed only", str(inventory.changed_only).lower()],
+        ["baseline ref", inventory.baseline_ref or "none"],
+        ["baseline symbols seen", inventory.baseline_symbols_seen],
+        ["baseline filtered", inventory.baseline_filtered],
+    ]
+    verdict_rows: list[list[object]] = [
+        [name, count] for name, count in sorted(inventory.verdict_counts.items())
+    ] or [["none", 0]]
+    role_rows: list[list[object]] = [
+        [name, count] for name, count in sorted(inventory.role_counts.items())
+    ] or [["none", 0]]
     lines = [
         "# Helper Symbol Inventory",
         "",
-        f"- files scanned: {inventory.files_scanned}",
-        f"- symbols seen: {inventory.symbols_seen}",
-        f"- functions seen: {inventory.functions_seen}",
-        f"- classes seen: {inventory.classes_seen}",
-        f"- symbols reported: {inventory.symbols_reported}",
-        f"- auto helpers reported: {inventory.helpers_reported}",
-        f"- user judgment required: {inventory.judgment_required_reported}",
-        f"- changed only: {str(inventory.changed_only).lower()}",
-        f"- baseline ref: {inventory.baseline_ref or 'none'}",
-        f"- baseline symbols seen: {inventory.baseline_symbols_seen}",
-        f"- baseline filtered: {inventory.baseline_filtered}",
+        "## Summary",
         "",
-        "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
-        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+        "| Metric | Value |",
+        "| --- | --- |",
     ]
+    lines.extend(
+        f"| {markdown_cell(metric)} | {markdown_cell(value)} |"
+        for metric, value in summary_rows
+    )
+    lines.extend(["", "## Verdict Counts", "", "| Verdict | Count |", "| --- | --- |"])
+    lines.extend(
+        f"| {markdown_cell(item)} | {markdown_cell(count)} |"
+        for item, count in verdict_rows
+    )
+    lines.extend(["", "## Role Counts", "", "| Role | Count |", "| --- | --- |"])
+    lines.extend(
+        f"| {markdown_cell(role)} | {markdown_cell(count)} |"
+        for role, count in role_rows
+    )
+    lines.extend(
+        [
+            "",
+            "## Records",
+            "",
+            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
+            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+        ]
+    )
     for record in inventory.records:
         lines.append(
             "| "
@@ -1621,16 +1956,18 @@ def main() -> int:
     root = Path(args.root).resolve()
     inventory = build_inventory(
         root,
-        args.paths,
-        all_functions=args.all_functions,
-        only_auto_helpers=args.only_auto_helpers,
-        only_user_judgment=args.only_user_judgment,
-        changed_only=args.changed,
-        baseline_ref=args.baseline_ref,
-        include_vendor=args.include_vendor,
-        include_hidden=args.include_hidden,
-        include_pyi=args.include_pyi,
-        min_confidence=args.min_confidence,
+        InventoryBuildOptions(
+            paths=args.paths,
+            all_functions=args.all_functions,
+            only_auto_helpers=args.only_auto_helpers,
+            only_user_judgment=args.only_user_judgment,
+            changed_only=args.changed,
+            baseline_ref=args.baseline_ref,
+            include_vendor=args.include_vendor,
+            include_hidden=args.include_hidden,
+            include_pyi=args.include_pyi,
+            min_confidence=args.min_confidence,
+        ),
     )
     if args.format == "json":
         payload = asdict(inventory)

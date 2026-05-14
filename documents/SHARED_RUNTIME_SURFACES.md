@@ -28,8 +28,8 @@ whether a derived repository may override it, and where edits must be made.
 | Owner class | Root behavior | Edit source | Local override |
 | --- | --- | --- | --- |
 | AgentCanon-owned runtime surface | symlink view into `vendor/agent-canon/` | AgentCanon source | no |
-| AgentCanon-owned shared policy | symlink view into `vendor/agent-canon/` | AgentCanon source | no |
-| Template-owned active contract | regular root file, seeded only when missing or still a symlink | template or derived repo root | yes |
+| AgentCanon-owned shared policy | standalone under `vendor/agent-canon/documents/` | AgentCanon source | no |
+| Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
 | Project-owned durable state / content | regular project-local file or directory | project root | yes |
 | GitHub path constraint copy surface | regular root copy from AgentCanon source | AgentCanon source, then `link-root` copy | no |
 | AgentCanon standalone-only surface | not exposed into template root | standalone AgentCanon repo | no |
@@ -71,13 +71,14 @@ GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`,
 `.github/copilot-instructions.md`, `.github/instructions/`, and
 `.github/agents/`.
 
-Shared policy documents under `documents/` include review, workflow, coding
-conventions, OOP guidance, experiment policy, dependency manifest policy,
-worktree lifecycle, conventions subtrees, tool docs, and reusable templates.
-`documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml`,
-`documents/agent-canon-parent-repo-latest-checklist.md`, and
-`documents/github-first-module-and-devcontainer-policy.md` are themselves
-AgentCanon-owned policy surfaces.
+Shared policy documents are not exposed as root `documents/` symlink views in
+template or derived repositories. They remain available under
+`vendor/agent-canon/documents/`, including review, workflow, coding conventions,
+OOP guidance, experiment policy, dependency manifest policy, worktree lifecycle,
+conventions subtrees, tool docs, reusable templates, `documents/README.md`,
+`documents/template-bootstrap.md`, and
+`documents/github-first-module-and-devcontainer-policy.md`. Parent repositories
+decide which repo-specific documents appear in root `documents/`.
 
 `.devcontainer/` is a shared AgentCanon runtime ergonomics surface. It may
 generate `.devcontainer/docker-compose.generated.yml` locally, but the source
@@ -88,8 +89,9 @@ does not make `docker/` AgentCanon-owned.
 
 ## Template-Owned Active Contracts
 
-These root files describe the current template or derived repository. They are
-regular files, not symlink views:
+These root files may describe the current template or derived repository. They
+are regular files, not symlink views, only when the parent repository creates
+and owns them:
 
 - `README.md`
 - `QUICK_START.md`
@@ -104,14 +106,10 @@ regular files, not symlink views:
 - `notes/README.md`
 - `.gitmodules`
 
-`link-root` materializes the `documents/` active contracts from AgentCanon only
-when a path is missing or is still a legacy symlink. Once a derived repo has a
-regular file at that path, AgentCanon must not overwrite it. A derived repo may
-then make its server contract, bootstrap contract, host requirements, and
-template remote policy repo-specific. `ensure-latest` may repair missing or
-legacy active-contract files, but its automated sync commit must not stage those
-regular files; they are reviewed and committed as template or derived-repo
-content.
+`link-root` no longer materializes AgentCanon documents into root `documents/`.
+A derived repo may create its own server contract, bootstrap contract, host
+requirements, template remote policy, or root `documents/README.md`; those files
+are reviewed and committed as template or derived-repo content.
 
 AgentCanon may provide generic templates under `documents/templates/`, such as
 `server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
@@ -150,21 +148,12 @@ AgentCanon source, then run `bash tools/sync_agent_canon.sh link-root`.
 
 ## Documents Directory Ownership
 
-`documents/` is a mixed directory:
-
-- AgentCanon-owned shared policy symlinks: coding conventions, review process,
-  workflow support, shared templates, tool docs, and surface policy.
-- Template-owned active contracts: bootstrap, host requirements, server
-  contract, remote execution contract, template remote policy, and the local
-  `documents/README.md`.
-- Project-owned docs: project architecture, design, contracts, and
-  implementation-specific specs.
-- Generated or experiment artifacts: keep them under `reports/` or
-  `experiments/`; do not promote them into `documents/` unless they become a
-  durable design or policy surface.
-
-The local `documents/README.md` is a repo-local index. It may link to shared
-policy symlinks, but it is not itself an AgentCanon symlink view.
+Root `documents/` is parent-repo owned. It should contain repo-specific
+architecture, design, contracts, and implementation-specific specs. Shared
+AgentCanon documents stay under `vendor/agent-canon/documents/`; root docs may
+link there when readers need shared conventions or workflow policy. Generated or
+experiment artifacts stay under `reports/` or `experiments/` unless they become
+a durable repo-local design or policy surface.
 
 ## Memory And Notes Boundary
 

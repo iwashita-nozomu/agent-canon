@@ -26,6 +26,7 @@ HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
+HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
@@ -84,6 +85,75 @@ class CodexHooksTest(unittest.TestCase):
             payload = json.loads(result.stdout)
         return payload, log_entry
 
+    def _run_helper_guard_with_changed_python(
+        self,
+        hook_input: str,
+        *,
+        inventory_text: str,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Run the helper inventory guard against one changed Python file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            inventory = temp_root / "tools" / "agent_tools" / "helper_function_inventory.py"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(inventory_text, encoding="utf-8")
+            policy = temp_root / "helper_inventory_guard_policy.json"
+            policy.write_text(
+                json.dumps(
+                    {
+                        "enabled": True,
+                        "baseline_ref": "HEAD",
+                        "domain_limits": {
+                            "main": {
+                                "max_needs_user_judgment": 0,
+                                "max_tool_rule_gap": 0,
+                            },
+                            "*": {
+                                "max_needs_user_judgment": 0,
+                                "max_tool_rule_gap": 0,
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            source = temp_root / "changed.py"
+            source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(HELPER_INVENTORY_GUARD)],
+                cwd=temp_root,
+                input=hook_input,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            payload = json.loads(result.stdout)
+        return payload, log_entry
+
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
         """Codex hooks must be enabled from the project config layer."""
         config_text = CONFIG.read_text(encoding="utf-8")
@@ -115,6 +185,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
         self.assertIn("SessionStart", session_start["command"])
         self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
@@ -325,6 +397,34 @@ class CodexHooksTest(unittest.TestCase):
 
             self.assertEqual(result.stdout, "")
             self.assertFalse(log_path.exists())
+
+    def test_helper_inventory_guard_blocks_repo_policy_findings(self) -> None:
+        """Helper inventory guard should use repo-owned policy thresholds."""
+        payload, log_entry = self._run_helper_guard_with_changed_python(
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+            inventory_text=(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "print(json.dumps({'records': [{"
+                "'path': 'changed.py', 'line': 1, 'domain': 'main', "
+                "'qualname': 'value', 'needs_user_judgment': True, "
+                "'judgment_rule': 'main:new-helper'}]}))\n"
+            ),
+        )
+
+        self.assertEqual(payload["decision"], "block")
+        reason = payload["reason"]
+        if not isinstance(reason, str):
+            self.fail("helper inventory guard reason must be a string")
+        self.assertIn("Helper inventory hook", reason)
+        self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["records"], 1)
+        self.assertEqual(log_entry["violations"], 1)
 
     def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:
         """Skill usage hook should append local JSONL records when skills are observed."""
