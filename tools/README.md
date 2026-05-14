@@ -11,8 +11,24 @@ downstream implementation agent_tools/tool_drift.py validates tool/convention tr
 -->
 
 
-`tools/` は shared automation の正本です。
-agent helper、CI/check、container runner、experiment helper、Markdown 整備、validation はここに置きます。
+Root `tools/` is a symlink view into `vendor/agent-canon/tools/`. The root path
+is the stable command surface for template and derived repositories; the
+vendored AgentCanon path is the canonical implementation source. These two
+paths must not become separate ownership surfaces.
+
+Shared agent helper, CI/check, container runner, experiment helper, Markdown
+maintenance, and validation tools live in `vendor/agent-canon/tools/` and are
+called through `tools/...` from parent repositories. Project-local automation
+that is not reusable AgentCanon capability belongs in project-owned paths such
+as `scripts/`, package-local modules, or repo-specific CI files. Do not add
+project-specific files under root `tools/`; it is an AgentCanon-owned runtime
+view.
+
+When a change is generic, edit `vendor/agent-canon/tools/...`, open or merge an
+AgentCanon change, update the parent repo submodule pin, and repair the root
+view with `bash tools/sync_agent_canon.sh link-root`. When a command or test log
+mentions `tools/...`, read it as the root execution path for AgentCanon-owned
+tooling unless the path is explicitly project-owned elsewhere.
 
 ## Tool Catalog
 

@@ -65,8 +65,8 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                 entry["path"]: entry["kind"]
                 for entry in scopes["agentcanon"]["entries"]
             }
-            self.assertEqual(root_kinds["tools"], "symlink_view")
-            self.assertEqual(canon_kinds["tools/tool.py"], "canon_source")
+            self.assertEqual(root_kinds["tools"], "agentcanon_tool_view")
+            self.assertEqual(canon_kinds["tools/tool.py"], "agentcanon_tool_source")
             self.assertIn("## Scope Summary", markdown_out.read_text(encoding="utf-8"))
 
     def test_agentcanon_only_uses_vendor_source_when_present(self) -> None:
