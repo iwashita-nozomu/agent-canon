@@ -1,0 +1,174 @@
+# OOP Hook Side Effect And Skill Split
+
+<!--
+@dependency-start
+responsibility Records the workflow defect where a simple OOP tool run expanded into hook side effects, report overproduction, and unclear timing attribution.
+upstream design ../README.md defines durable AgentCanon operational issue storage.
+upstream implementation ../../.codex/hooks/oop_readability_guard.py appends OOP hook evidence during source edits.
+upstream implementation ../../tools/oop/shared/readability_core.py provides OOP readability report mechanics.
+upstream implementation ../../tools/agent_tools/workflow_monitor.py records workflow behavior events.
+downstream design ../../.agents/skills/oop-readability-check/SKILL.md separates mechanical OOP tool execution from analysis.
+downstream design ../../.agents/skills/oop-readability-analysis/SKILL.md separates agent interpretation from mechanical tool execution.
+@dependency-end
+-->
+
+issue_id: AC-20260514-oop-hook-side-effect-and-skill-split
+status: in_progress
+source: user
+severity: S1
+evidence: reports/hooks/oop_readability_guard.jsonl, vendor/agent-canon/agents/evals/results/hook-runs/oop_readability_guard.jsonl, reports/agents/20260514-012429-oop-readability-report/oop_readability_report.md
+affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, .agents/skills/oop-readability-check/SKILL.md, .agents/skills/oop-readability-analysis/SKILL.md
+edit_scope: .codex/hooks/oop_readability_guard.py, .codex/hooks/hook_event_log.py, agents/evals/results/hook-runs/README.md, tools/agent_tools/workflow_monitor.py, tools/agent_tools/review_backlog_scan.sh, agents/templates/workflow_monitoring.md, agents/skills/catalog.yaml, agents/skills/README.md, .agents/skills/oop-readability-check/SKILL.md, .agents/skills/oop-readability-analysis/SKILL.md
+required_action: Split OOP tool execution from agent analysis and prevent hook evidence writes from making simple tool checks look like broad repo-changing work.
+close_condition: A simple user request for OOP checking can invoke a narrow skill, run one language-auto OOP command, produce only requested mechanical tables, record duration tokens when a run bundle exists, and leave no tracked hook-log dirt outside explicit evidence workflows.
+
+## Finding
+
+A user asked for an OOP tool check and report, but the agent response expanded
+the work into a broad workflow-shaped action:
+
+- MCP and goal-loop preflight were run as required by runtime policy.
+- Agent orchestration material was loaded even though the requested operation was
+  a narrow tool invocation.
+- The OOP readability tool was run against both AgentCanon full tree and PR
+  source-diff scopes, and in both Markdown and JSON forms.
+- A Markdown report was hand-built from the mechanical output.
+- Runtime hooks appended JSONL evidence under the vendored AgentCanon tree,
+  making `vendor/agent-canon` dirty after otherwise read-only commands.
+- The dirty hook evidence then required repeated status checks and restore
+  commands before the next operation.
+
+The user's follow-up correctly identified that the elapsed time was not caused
+by OOP tool performance. It was caused by surrounding workflow expansion,
+report overproduction, and hook-log side effects.
+
+## Observed Failure Mode
+
+The core failure was a boundary collapse between three distinct activities:
+
+1. **Mechanical OOP check**
+   - Run the OOP readability tool on the requested paths.
+   - Let the tool decide the language when possible.
+   - Return deterministic status, counts, hotspot rows, and command evidence.
+   - Do not interpret whether findings are true design problems.
+
+2. **Mechanical report rendering**
+   - Convert tool output into tables only when the user asks for a report.
+   - Preserve raw metrics and findings without adding agent judgment.
+   - Avoid running extra formats unless needed for the requested artifact.
+
+3. **Agent analysis**
+   - Read an existing mechanical report or raw tool output.
+   - Explain likely false positives, priority, and next investigation targets.
+   - Decide whether additional code reading is needed.
+   - Keep judgments separate from the mechanical check result.
+
+Because there was no explicit skill for the first two operations, the agent
+treated a simple tool request as a small repository task. The result was more
+careful than necessary, slower than necessary, and harder for the user to
+control.
+
+## Hook Side Effect
+
+The hook behavior made the situation worse. OOP hook evidence is useful for
+AgentCanon improvement loops, but the default write path can dirty a tracked
+vendored AgentCanon checkout during ordinary parent-repo work.
+
+The practical symptoms were:
+
+- `vendor/agent-canon` showed modified content after source-edit or report
+  operations.
+- The modified paths were hook-result JSONL files rather than product changes.
+- The agent had to restore those files repeatedly before committing or
+  reporting status.
+- The user-facing task looked larger because status output mixed the real work
+  with hook evidence churn.
+
+This is a tool-environment side effect, not a product change. It should be
+visible as evidence when intentionally accumulated, but it should not silently
+turn a narrow check into a dirty submodule state.
+
+## Timing Attribution Gap
+
+AgentCanon has partial observability:
+
+- `tools/agent_tools/workflow_monitor.py` can append timestamped behavior
+  events to `workflow_monitoring.md`.
+- `tools/agent_tools/review_backlog_scan.sh` records command name, status, and
+  output path in `review_backlog_scan_status.tsv`.
+- hook JSONL files record hook timestamps and result status.
+
+What is missing is a standard duration contract. There is no consistent
+machine-readable token such as:
+
+```text
+tool_call=oop-readability-check command=tools/oop/python/readability.py duration_ms=742 status=fail scope=python
+```
+
+Without this token, the system cannot easily distinguish time spent in the tool
+from time spent in orchestration, formatting, hook cleanup, or agent analysis.
+That makes user feedback about latency harder to convert into an actionable
+workflow fix.
+
+## Required Product Direction
+
+Add two public skills:
+
+- `$oop-readability-check`
+  - Runs the OOP readability tool only.
+  - Respects user-specified paths exactly.
+  - Uses language-auto behavior, preferably through `--language all` until a
+    dedicated language-auto wrapper exists.
+  - Produces mechanical tables only when requested.
+  - Does not perform agent interpretation.
+  - Records timing tokens in workflow monitoring when a run bundle is active.
+
+- `$oop-readability-analysis`
+  - Consumes existing OOP tool output or a mechanical report.
+  - Explains likely false positives, priority, and investigation order.
+  - May read code to support judgments.
+  - Does not rerun the tool unless evidence is missing or stale.
+  - Keeps its conclusions clearly separate from mechanical tool output.
+
+This split lets the user be precise:
+
+- "Run `$oop-readability-check` on `python/`" means run the tool and return
+  mechanical evidence.
+- "Use `$oop-readability-analysis` on that report" means interpret the findings.
+
+## Hook And Evidence Direction
+
+The hook evidence policy should distinguish three modes:
+
+1. **Local runtime observation**
+   - Default for ordinary agent work.
+   - Writes to ignored local paths or a run bundle.
+   - Must not dirty tracked AgentCanon files.
+
+2. **Run-bundle evidence**
+   - Used when `AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` or a run bundle is
+     active.
+   - Appends behavior and tool timing tokens to `workflow_monitoring.md`.
+
+3. **Durable AgentCanon accumulation**
+   - Used only during explicit eval / improvement workflows.
+   - May write under `agents/evals/results/hook-runs/`.
+   - Must be intentional and documented as a product artifact, not a hidden
+     side effect of a normal tool check.
+
+## Acceptance Criteria
+
+- `$oop-readability-check` and `$oop-readability-analysis` are discoverable in
+  `.agents/skills/`, `.claude/skills/`, `agents/skills/README.md`, and
+  `agents/skills/catalog.yaml`.
+- Prompt/eval expected counts are updated for the new public skills.
+- A narrow OOP check can be run with one command and no agent-authored report
+  unless explicitly requested.
+- A report request produces mechanical tables from one tool output, not an
+  expanded full workflow unless the user asks for it.
+- Agent analysis is triggered separately and cites the mechanical evidence it
+  interprets.
+- Hook JSONL writes do not dirty tracked AgentCanon files during ordinary
+  parent-repo OOP checks.
+- Workflow monitoring can record at least `tool_call`, `duration_ms`, `status`,
+  `scope`, and `output_path` for OOP checks when a run bundle exists.
