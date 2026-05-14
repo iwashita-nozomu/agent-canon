@@ -49,6 +49,16 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("open_issues: `1`", guide)
         self.assertIn("closed_issues: `1`", guide)
         self.assertIn("failed_skill_eval_reports: `1`", guide)
+        self.assertIn("skill_usage_counts:", guide)
+        self.assertIn("agent-orchestration", guide)
+        self.assertIn("agent-orchestration@UserPromptSubmit", guide)
+        self.assertIn("hook_tool_counts:", guide)
+        self.assertIn("apply_patch", guide)
+        self.assertIn("tools/agent_tools/task_start.py", guide)
+        self.assertIn("hook_quality_counts:", guide)
+        self.assertIn("unknown_event", guide)
+        self.assertIn("Protocol Feedback Coverage", guide)
+        self.assertIn("hook_tool_feedback=reviewed", guide)
         self.assertIn("failure-a", guide)
         self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
         self.assertIn("Local Agent or Copilot PR", guide)
@@ -86,8 +96,48 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             json.dumps(
                 {
                     "hook_run_id": "hook-test",
+                    "event": "PostToolUse",
                     "status": "fail",
                     "failure_fingerprint": "failure-a",
+                    "tool_name": "apply_patch",
+                    "commands": [
+                        {
+                            "command": [
+                                "python3",
+                                "tools/oop/python/readability.py",
+                                "--root",
+                                str(root),
+                                "--min-score",
+                                "95",
+                                "tools/agent_tools/task_start.py",
+                            ],
+                            "returncode": 1,
+                        }
+                    ],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (hook_results / "skill_usage.jsonl").write_text(
+            json.dumps(
+                {
+                    "hook_run_id": "skill-hook-test",
+                    "event": "UserPromptSubmit",
+                    "status": "pass",
+                    "skills": ["agent-orchestration", "codex-task-workflow"],
+                    "skill_count": 2,
+                    "workflow_monitor_event_count": 0,
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "skill-hook-empty",
+                    "event": "UnknownHookEvent",
+                    "status": "pass",
+                    "skills": [],
+                    "skill_count": 0,
                 }
             )
             + "\n",
