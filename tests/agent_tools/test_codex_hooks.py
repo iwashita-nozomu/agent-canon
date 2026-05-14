@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
@@ -82,8 +83,11 @@ class CodexHooksTest(unittest.TestCase):
                 env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
             )
 
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            payload = json.loads(result.stdout)
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
         return payload, log_entry
 
     def _run_helper_guard_with_changed_python(
@@ -152,8 +156,15 @@ class CodexHooksTest(unittest.TestCase):
                 },
             )
 
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-            payload = json.loads(result.stdout) if result.stdout.strip() else {}
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            payload = (
+                cast("dict[str, object]", json.loads(result.stdout))
+                if result.stdout.strip()
+                else {}
+            )
         return payload, log_entry
 
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
