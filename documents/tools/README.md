@@ -128,6 +128,9 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
 - `tools/agent_tools/file_surface_inventory.py`
   - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
+- `tools/agent_tools/noncanonical_document_inventory.py`
+  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。
+  - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
 - `tools/agent_tools/helper_function_inventory.py`
   - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
   - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
