@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
+DURABLE_HOOK_RESULTS_ENV = "AGENT_CANON_DURABLE_HOOK_RESULTS"
 FINGERPRINT_HEX_LENGTH = 12
 RUN_ID_DIGEST_LENGTH = 10
 RUN_ID_NONCE_LENGTH = 10
@@ -44,6 +45,11 @@ def fingerprint_json(value: object) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:FINGERPRINT_HEX_LENGTH]
 
 
+def uses_durable_results() -> bool:
+    """Return whether this hook invocation intentionally accumulates durable evidence."""
+    return os.environ.get(DURABLE_HOOK_RESULTS_ENV, "").strip() == "1"
+
+
 @dataclass(frozen=True)
 class HookLogContext:
     """Resolve one hook's Canon-owned append-only log destination."""
@@ -60,12 +66,22 @@ class HookLogContext:
             return vendored
         return root
 
+    def durable_results_dir(self) -> Path:
+        """Return the AgentCanon-owned durable hook-result directory."""
+        return self.canon_root() / "agents" / "evals" / "results" / "hook-runs"
+
+    def local_results_dir(self) -> Path:
+        """Return the ignored local hook-result directory for normal runtime use."""
+        return self.active_root.resolve() / "reports" / "hooks"
+
     def results_dir(self) -> Path:
         """Return the hook-result directory."""
         override = os.environ.get(HOOK_RESULTS_DIR_ENV, "").strip()
         if override:
             return Path(override)
-        return self.canon_root() / "agents" / "evals" / "results" / "hook-runs"
+        if uses_durable_results():
+            return self.durable_results_dir()
+        return self.local_results_dir()
 
     def result_path(self) -> Path:
         """Return this hook's JSONL log path."""

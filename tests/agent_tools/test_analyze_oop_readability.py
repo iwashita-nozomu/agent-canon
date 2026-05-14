@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -842,6 +843,73 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "Do not invent new findings",
                 prompt.read_text(encoding="utf-8"),
             )
+
+    def test_run_bundle_timing_event_is_recorded_when_monitor_is_available(self) -> None:
+        """Analyzer should append timing tokens when run-bundle monitoring is active."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report_dir = root / "reports" / "agents" / "run-1"
+            monitor = root / "tools" / "agent_tools" / "workflow_monitor.py"
+            monitor.parent.mkdir(parents=True)
+            monitor.write_text(
+                "\n".join(
+                    [
+                        "import argparse",
+                        "from pathlib import Path",
+                        "parser = argparse.ArgumentParser()",
+                        "parser.add_argument('--report-dir', required=True)",
+                        "parser.add_argument('--behavior-event', required=True)",
+                        "args = parser.parse_args()",
+                        "path = Path(args.report_dir) / 'workflow_monitoring.md'",
+                        "path.parent.mkdir(parents=True, exist_ok=True)",
+                        "with path.open('a', encoding='utf-8') as stream:",
+                        "    stream.write(args.behavior_event + '\\n')",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source = root / "model.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "from dataclasses import dataclass",
+                        "",
+                        "@dataclass(frozen=True)",
+                        "class Result:",
+                        "    value: int",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(PYTHON_ANALYZER),
+                    "--root",
+                    str(root),
+                    "model.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report_dir),
+                },
+            )
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("tool_call=oop-readability-check", monitoring)
+        self.assertIn("duration_ms=", monitoring)
+        self.assertIn("status=pass", monitoring)
+        self.assertIn("scope=model.py", monitoring)
+        self.assertIn("output_path=stdout", monitoring)
 
 
 if __name__ == "__main__":
