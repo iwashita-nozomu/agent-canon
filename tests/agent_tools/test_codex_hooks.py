@@ -306,8 +306,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["failed_count"], 1)
 
-    def test_oop_readability_guard_logs_payloadless_no_source_as_skipped(self) -> None:
-        """Payloadless OOP invocations with no source changes must not log blank pass."""
+    def test_oop_readability_guard_ignores_payloadless_no_source_skip(self) -> None:
+        """Payloadless OOP invocations with no source changes must not dirty logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
@@ -321,16 +321,9 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
             )
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(result.stdout, "")
-        self.assertEqual(log_entry["event"], "PostToolUse")
-        self.assertEqual(log_entry["tool_name"], "Bash")
-        self.assertEqual(log_entry["status"], "skipped")
-        self.assertTrue(log_entry["check_requested"])
-        self.assertFalse(log_entry["checked"])
-        self.assertEqual(log_entry["result_count"], 0)
-        self.assertEqual(log_entry["skip_reason"], "no_changed_source_files")
+        self.assertFalse(log_path.exists())
 
     def test_oop_readability_guard_infers_post_tool_event_when_event_missing(self) -> None:
         """OOP guard should run when tool payloads omit hookEventName."""
@@ -368,17 +361,9 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
             )
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(result.stdout, "")
-        self.assertEqual(log_entry["event"], "PostToolUse")
-        self.assertEqual(log_entry["tool_name"], "Bash")
-        self.assertEqual(log_entry["status"], "skipped")
-        self.assertFalse(log_entry["checked"])
-        self.assertEqual(
-            log_entry["skip_reason"],
-            "post_tool_without_source_edit_signal",
-        )
+        self.assertFalse(log_path.exists())
 
     def test_oop_readability_guard_skips_bash_checker_invocations(self) -> None:
         """Bash commands that only run checkers should not recursively trigger OOP."""
@@ -409,17 +394,9 @@ class CodexHooksTest(unittest.TestCase):
                     text=True,
                     env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
                 )
-                log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
 
             self.assertEqual(result.stdout, "")
-            self.assertEqual(log_entry["event"], "PostToolUse")
-            self.assertEqual(log_entry["tool_name"], "Bash")
-            self.assertEqual(log_entry["status"], "skipped")
-            self.assertFalse(log_entry["checked"])
-            self.assertEqual(
-                log_entry["skip_reason"],
-                "post_tool_without_source_edit_signal",
-            )
+            self.assertFalse(log_path.exists())
 
     def test_helper_inventory_guard_blocks_repo_policy_findings(self) -> None:
         """Helper inventory guard should use repo-owned policy thresholds."""
