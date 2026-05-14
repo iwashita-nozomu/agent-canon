@@ -70,6 +70,9 @@ DOC_REQUIRED_MARKERS = (
     "documents/github-first-module-and-devcontainer-policy.md",
     "memory/USER_PREFERENCES.md",
     "tests/agent_tools/",
+    "Root `tools/` is a symlink view",
+    "vendor/agent-canon/tools/",
+    "Project-local automation must stay in project-owned paths",
 )
 
 

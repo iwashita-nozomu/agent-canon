@@ -217,9 +217,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/SHARED_RUNTIME_SURFACES.md": (
                 "surface_manifest.py documents/shared-runtime-surfaces.toml owner class\n"
                 ".codex/hooks.json .codex/hooks .devcontainer/ documents/README.md "
-                "documents/template-bootstrap.md documents/github-first-module-and-devcontainer-policy.md "
+                "documents/template-bootstrap.md "
+                "documents/github-first-module-and-devcontainer-policy.md "
                 "memory/USER_PREFERENCES.md "
-                "tests/agent_tools/\n"
+                "tests/agent_tools/ Root `tools/` is a symlink view "
+                "vendor/agent-canon/tools/ "
+                "Project-local automation must stay in project-owned paths\n"
             ),
             "documents/shared-runtime-surfaces.toml": (
                 'mode = "standalone_only"\n'
