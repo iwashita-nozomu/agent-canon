@@ -10,7 +10,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 27
+expected_count = 28
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -35,7 +35,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 49
+expected_count = 50
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -86,7 +86,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 27
+expected_count = 28
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -640,6 +640,60 @@ id = "OOP-ROUTE-3"
 critical = true
 description = "Separates survey execution from closeout score-gate execution."
 required_regex = ["--min-score 0", "target score", "pass / fail"]
+
+[[evals]]
+id = "oop-readability-skill-artifact"
+target = ".agents/skills/oop-readability-check/SKILL.md"
+kind = "skill"
+description = "The OOP readability runtime skill must create Markdown report artifacts by default."
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-1"
+critical = true
+description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
+required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-2"
+critical = true
+description = "Requires the final response to include the artifact path."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
+
+[[evals]]
+id = "oop-readability-claude-skill-artifact"
+target = ".claude/skills/oop-readability-check/SKILL.md"
+kind = "skill"
+description = "The Claude OOP readability runtime skill mirror must create Markdown report artifacts by default."
+
+[[evals.checklist]]
+id = "OOP-CLAUDE-SKILL-1"
+critical = true
+description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
+required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
+
+[[evals.checklist]]
+id = "OOP-CLAUDE-SKILL-2"
+critical = true
+description = "Requires the final response to include the artifact path."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
+
+[[evals]]
+id = "oop-readability-canonical-artifact"
+target = "agents/skills/oop-readability-check.md"
+kind = "skill"
+description = "The canonical OOP readability skill must define durable Markdown report artifacts."
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-1"
+critical = true
+description = "Requires Markdown artifacts by default and a single tool result as the source of truth."
+required_regex = ["Markdown report artifact by default", "Chat-only tables are insufficient", "Use one tool result as the source of truth"]
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-2"
+critical = true
+description = "Requires the durable report path and user-facing artifact path evidence."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "user-facing response must include the artifact path"]
 
 [[evals]]
 id = "oop-readability-tool-docs"
