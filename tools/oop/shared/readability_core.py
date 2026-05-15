@@ -109,6 +109,13 @@ WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
+CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES = (
+    "Comparison",
+    "Config",
+    "Info",
+    "Metrics",
+    "Set",
+)
 LANGUAGE_SUFFIXES = {
     "all": PYTHON_SUFFIXES | CPP_SUFFIXES,
     "python": PYTHON_SUFFIXES,
@@ -2425,17 +2432,59 @@ def cpp_public_section(class_kind: str, body: str) -> str:
     return "\n".join(lines)
 
 
+def cpp_brace_delta(line: str) -> int:
+    """Return the net brace nesting change for one C++ source line."""
+    return line.count("{") - line.count("}")
+
+
+def cpp_skippable_public_line(line: str) -> bool:
+    """Return whether a public-section line cannot declare a member."""
+    return not line or line.startswith("//") or line.startswith("#")
+
+
+def cpp_member_candidate_start(line: str) -> bool:
+    """Return whether a top-level line can start a C++ member declaration."""
+    if line.startswith(("using ", "typedef ")):
+        return False
+    return "(" in line or line.endswith(";")
+
+
+def cpp_member_candidate_text(pending: str, line: str) -> str:
+    """Return the current accumulated top-level member candidate."""
+    if pending:
+        return f"{pending} {line}"
+    if cpp_member_candidate_start(line):
+        return line
+    return ""
+
+
+def cpp_member_candidate_complete(candidate: str, line: str) -> bool:
+    """Return whether the current line terminates a member candidate."""
+    return bool(candidate) and (";" in line or "{" in line)
+
+
+def cpp_member_candidate_is_member(candidate: str) -> bool:
+    """Return whether an accumulated candidate looks like a field or method."""
+    return ("(" in candidate and ")" in candidate) or candidate.endswith(";")
+
+
 def cpp_member_candidates(public_body: str) -> list[str]:
-    """Return rough public member declarations."""
+    """Return rough top-level public member declarations."""
     members: list[str] = []
+    pending = ""
+    depth = 0
     for line in public_body.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("//") or stripped.startswith("#"):
+        if cpp_skippable_public_line(stripped):
+            depth = max(0, depth + cpp_brace_delta(stripped))
             continue
-        if "(" in stripped and ")" in stripped:
-            members.append(stripped)
-        elif stripped.endswith(";") and not stripped.startswith(("using ", "typedef ")):
-            members.append(stripped)
+        if depth == 0:
+            pending = cpp_member_candidate_text(pending, stripped)
+            if cpp_member_candidate_complete(pending, stripped):
+                if cpp_member_candidate_is_member(pending):
+                    members.append(pending)
+                pending = ""
+        depth = max(0, depth + cpp_brace_delta(stripped))
     return members
 
 
@@ -2704,6 +2753,7 @@ class CppClassShape:
     public_methods: int
     public_fields: int
     base_count: int
+    aggregate_value_object: bool
 
 
 @dataclass(frozen=True)
@@ -2745,6 +2795,9 @@ def cpp_class_shape(analysis_text: str, match: re.Match[str]) -> CppClassShape:
     public_members = cpp_member_candidates(public_body)
     public_methods = [item for item in public_members if "(" in item and ")" in item]
     public_fields = [item for item in public_members if item not in public_methods]
+    aggregate_value_object = bool(public_fields) and not public_methods and match.group(
+        "name"
+    ).endswith(CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES)
     return CppClassShape(
         name=match.group("name"),
         line=line_at(analysis_text, match.start()),
@@ -2752,6 +2805,7 @@ def cpp_class_shape(analysis_text: str, match: re.Match[str]) -> CppClassShape:
         public_methods=len(public_methods),
         public_fields=len(public_fields),
         base_count=len([part for part in bases.split(",") if part.strip()]),
+        aggregate_value_object=aggregate_value_object,
     )
 
 
@@ -2826,7 +2880,10 @@ def add_cpp_class_surface_findings(
             thresholds.max_public_methods,
             "narrow-public-api-or-split-responsibilities",
         )
-    if shape.public_fields > thresholds.max_public_fields:
+    if (
+        not shape.aggregate_value_object
+        and shape.public_fields > thresholds.max_public_fields
+    ):
         add_finding(
             findings,
             context.root,
@@ -2840,7 +2897,11 @@ def add_cpp_class_surface_findings(
             thresholds.max_public_fields,
             "hide-mutable-state-behind-explicit-boundary",
         )
-    if shape.public_fields and shape.public_fields > shape.public_methods:
+    if (
+        not shape.aggregate_value_object
+        and shape.public_fields
+        and shape.public_fields > shape.public_methods
+    ):
         add_finding(
             findings,
             context.root,
