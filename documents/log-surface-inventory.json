@@ -5067,168 +5067,8 @@
     {
       "certainty": "static",
       "emitter": "json_object",
-      "field": "entries",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "missing",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "entries",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "missing",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "status",
-      "line": 128,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_CPP_RULE_INVENTORY",
-      "line": 98,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_CPP_RULE_INVENTORY_ENTRIES",
-      "line": 99,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_CPP_RULE_INVENTORY_MISSING",
-      "line": 100,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_CPP_RULE_SOURCE",
-      "line": 103,
-      "path": "tools/oop/cpp/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "entries",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "missing",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "entries",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "missing",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "status",
-      "line": 128,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_PYTHON_RULE_INVENTORY",
-      "line": 98,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_PYTHON_RULE_INVENTORY_ENTRIES",
-      "line": 99,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_PYTHON_RULE_INVENTORY_MISSING",
-      "line": 100,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "OOP_PYTHON_RULE_SOURCE",
-      "line": 103,
-      "path": "tools/oop/python/rule_inventory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
       "field": "findings",
-      "line": 3667,
+      "line": 3707,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5236,7 +5076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 3667,
+      "line": 3707,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5244,7 +5084,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 3667,
+      "line": 3707,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5252,7 +5092,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 3667,
+      "line": 3707,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5260,7 +5100,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 3699,
+      "line": 3739,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5268,7 +5108,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 3694,
+      "line": 3734,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5276,7 +5116,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 3695,
+      "line": 3735,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5284,7 +5124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 3697,
+      "line": 3737,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5292,7 +5132,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 3696,
+      "line": 3736,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5300,8 +5140,56 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 3698,
+      "line": 3738,
       "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 123,
+      "path": "tools/oop/shared/rule_inventory_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 123,
+      "path": "tools/oop/shared/rule_inventory_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 87,
+      "path": "tools/oop/shared/rule_inventory_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 88,
+      "path": "tools/oop/shared/rule_inventory_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 89,
+      "path": "tools/oop/shared/rule_inventory_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 93,
+      "path": "tools/oop/shared/rule_inventory_core.py",
       "surface": "tool"
     },
     {
@@ -6584,6 +6472,7 @@
     "tools/oop/python/rule_inventory.py",
     "tools/oop/shared/__init__.py",
     "tools/oop/shared/readability_core.py",
+    "tools/oop/shared/rule_inventory_core.py",
     "tools/push_origin.sh",
     "tools/requirement_sync_validator.py",
     "tools/run_comprehensive_review.sh",
