@@ -3,7 +3,9 @@
 @dependency-start
 responsibility Documents latest-state checklist for parent repositories that vendor AgentCanon.
 upstream design ./agent-canon-subtree-migration.md submodule and legacy subtree update policy
+upstream design ./agent-canon-update-tasks.toml shared parent-repo update TODO manifest
 upstream implementation ../tools/agent_tools/agent_canon_preflight.py emits checklist evidence at task start
+upstream implementation ../tools/agent_tools/agent_canon_update_todos.py manages parent update TODO state
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py prints checklist evidence
 downstream implementation ../tools/agent_tools/task_start.py prints checklist evidence
 @dependency-end
@@ -25,6 +27,7 @@ agent entrypoint は `tools/agent_tools/agent_canon_preflight.py` 経由でこ�
 | `.github/AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/`, `.github/agents/` | GitHub agent root views | AgentCanon | `bash tools/sync_agent_canon.sh check` |
 | `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
 | `documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
+| `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
 | `documents/README.md`, template bootstrap / host / server contract docs | parent repo active contracts | template or derived repo | regular file, not root symlink |
 | `goal.md`, project notes, experiments, reports | repo-local durable state and generated evidence | parent repo | must not be restored from AgentCanon |
 
@@ -76,12 +79,87 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+1. Generate and apply AgentCanon update TODOs before unrelated repo work.
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py status
+python3 tools/agent_tools/agent_canon_update_todos.py plan --write
+```
+
+`AGENT_CANON_UPDATE_TODO_STATUS=pending` is not a stop-only gate. It means the
+parent repo agent must make those TODOs the first work for the current run.
+After each TODO is applied, record it:
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py complete <task-id> \
+  --note "what changed"
+```
+
+If the TODO requires a human or repo-owner decision, do not delete it silently.
+Record an explicit deferral with owner and reason:
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py defer <task-id> \
+  --owner "<owner>" \
+  --reason "<why this repo cannot apply it now>"
+```
+
+When no open TODO remains, advance the parent-local boundary:
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py acknowledge
+```
+
 1. Record closeout evidence for parent repo runs.
 
 ```bash
 git submodule status vendor/agent-canon 2>/dev/null || git rev-parse HEAD:vendor/agent-canon
 python3 tools/agent_tools/check_convention_compliance.py
 ```
+
+## Parent Repo Update TODO State
+
+AgentCanon may introduce tasks that every parent repo should consider after
+updating `vendor/agent-canon/`. Examples are container policy changes,
+task-start protocol changes, new required state files, or workflow evidence
+format changes. The shared task list is AgentCanon-owned:
+
+- `vendor/agent-canon/documents/agent-canon-update-tasks.toml`
+
+The per-repo progress is parent-owned:
+
+- `.agent-canon/update-state.toml`
+
+Generated views are intentionally not parent state:
+
+- `.agent-canon/update-todos.generated.md`
+- `.agent-canon/update-todos.pending.json`
+
+Initialize a parent repo once after the tool is available:
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py init
+git add .agent-canon/.gitignore .agent-canon/update-state.toml
+```
+
+The generated `.agent-canon/.gitignore` keeps generated TODO views out of git
+while allowing only the durable state file to be tracked. This lets different
+parent repos advance at different speeds without editing AgentCanon's shared
+manifest.
+
+Task manifest entries use `introduced_after`, not a self-referential commit
+field. A Git commit cannot contain its own SHA. Add a task in the first commit
+after the boundary where the new parent action becomes required, and set
+`introduced_after` to the last AgentCanon commit that did not require it.
+
+Task-start behavior:
+
+- `tasks_applied_through` older than the current submodule pin plus pending
+  manifest tasks yields `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos`.
+- The agent should apply those tasks first, then continue the user's requested
+  work in the same repo run when safe.
+- This is deliberately not a pre-tool stop hook. Hooks may log evidence, but the
+  task-start/preflight protocol owns routing and repair.
 
 ## GitHub Changelog TODO: 2026-05-05 Through 2026-05-13
 
@@ -220,6 +298,11 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `AGENT_CANON_PREFLIGHT_NEXT`
 - `AGENT_CANON_PREFLIGHT_CHECKLIST`
 - `AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS`
+- `AGENT_CANON_UPDATE_TODO_STATUS`
+- `AGENT_CANON_UPDATE_TODO_NEXT`
+- `AGENT_CANON_UPDATE_TODO_PENDING_COUNT`
+- `AGENT_CANON_UPDATE_TODO_STATE`
+- `AGENT_CANON_UPDATE_TODO_MANIFEST`
 
 `AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present` means this checklist was found in the parent repo's vendored AgentCanon surface.
 `missing` means the parent repo is stale or malformed; the agent must repair AgentCanon checkout/sync before treating repo-changing work as started.

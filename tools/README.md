@@ -63,6 +63,7 @@ retired legacy tool reintroduction.
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
+  - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
@@ -115,6 +116,8 @@ retired legacy tool reintroduction.
 1. submodule 内に local branch commit がある場合は `make agent-canon-merge-main` で GitHub `main` を current branch に取り込みます。
 1. dirty shared-canon 差分がある場合は `make agent-canon-ensure-latest` で消さず、AgentCanon branch と PR に出します。
 1. AgentCanon PR が merge された後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。
+1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば親 repo の agent が先に適用し、完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
+1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` で GitHub `main` の submodule pin を適用します。
 1. root view が drift した場合だけ `make agent-canon-links` を使います。
 1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`vendor/agent-canon/` branch を GitHub に push して AgentCanon PR を使います。

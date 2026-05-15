@@ -104,6 +104,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、`make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
   - AgentCanon PR merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰ります。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
+- `tools/agent_tools/agent_canon_update_todos.py`
+  - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon-update-tasks.toml` から抽出します。
+  - 親 repo の進捗は `.agent-canon/update-state.toml` にだけ残し、生成された pending view は `.agent-canon/.gitignore` で ignored にします。
+  - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
 - `tools/sync_agent_canon.sh`
   - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の `make agent-canon-ensure-latest`、root view 修復の `make agent-canon-links`、drift check の `make agent-canon-check` 経由で使います。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
