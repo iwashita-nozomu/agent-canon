@@ -7,6 +7,7 @@
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
+# upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # @dependency-end
 
@@ -29,6 +30,7 @@ PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.p
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
+LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
@@ -275,7 +277,9 @@ class CodexHooksTest(unittest.TestCase):
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
 
+        self.assertIn("SessionStart", session_start["command"])
         self.assertIn("mcp_session_context.sh", session_start["command"])
+        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
         self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
@@ -286,9 +290,22 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
-        self.assertIn("SessionStart", session_start["command"])
-        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
+
+    def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
+        """Log surface guard should not consume tokens on a passing inventory check."""
+        result = subprocess.run(
+            [sys.executable, str(LOG_SURFACE_INVENTORY_GUARD)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps({"hookEventName": "Stop"}),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.stdout, "")
 
     def test_mcp_context_hook_outputs_valid_additional_context(self) -> None:
         """The hook script should emit JSON Codex can add to model context."""

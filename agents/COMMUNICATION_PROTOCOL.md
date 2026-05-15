@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents Agent Communication Protocol for this repository.
 upstream design README.md agent canon overview
+downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
 
@@ -34,8 +35,26 @@ run 固有のやり取りは report bundle に残し、repo-wide の正本には
 - `requested_action`
 - `artifacts`
 - `repo_changes`
+- `pre_edit_rejection_prediction`
+- `predicted_tool_rejection_gates`
+- `rejection_preflight_command`
+- `gate_specific_repair_plan`
 - `open_questions`
 - `status`
+
+Before a write-capable subagent starts repository edits, the parent runs or
+cites:
+
+```bash
+python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+```
+
+The handoff includes the resulting `TOOL_REJECTION_PREDICTED_GATE` lines or an
+explicit `TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names
+OOP readability, helper inventory, dependency headers, GitHub workflow checks,
+or log-surface inventory, the subagent receives the gate-specific command and a
+repair plan before it edits. This prevents spending implementation tokens on
+changes that the hook/tool layer can already predict will be rejected.
 
 ## Review Packet
 

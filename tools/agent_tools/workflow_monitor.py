@@ -45,6 +45,10 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
         "subagent_protocol_update=not_required "
         "protocol_feedback_reason=standard-closeout-no-new-protocol-change"
     ),
+    (
+        "pre_edit_rejection_prediction=reviewed "
+        "predicted_tool_rejection_gates=recorded"
+    ),
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
     "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",

@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
 @dependency-end
 -->
 
@@ -85,6 +86,7 @@ repo inventory、tool drift survey、static validation triage、diff-local Pytho
 実装 slice は 1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を `model="gpt-5.3-codex-spark"`、`reasoning_effort="low"` で再起動します。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
+write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
