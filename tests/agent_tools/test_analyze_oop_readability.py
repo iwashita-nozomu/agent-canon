@@ -542,6 +542,64 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("cpp:warn:public_fields:SolverManager:9>8", result.stdout)
             self.assertIn("cpp:warn:parameters:run:7>6", result.stdout)
 
+    def test_cpp_inline_method_body_statements_are_not_public_fields(self) -> None:
+        """Statements inside inline methods should not inflate public state counts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "model.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "class Model {",
+                        "public:",
+                        "  Model() = default;",
+                        "  int evaluate(int value) const {",
+                        "    int doubled = value + value;",
+                        "    return doubled;",
+                        "  }",
+                        " private:",
+                        "  int state_ = 0;",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("public_fields:Model", result.stdout)
+
+    def test_cpp_schema_aggregates_are_value_objects(self) -> None:
+        """Named schema aggregate DTOs are accepted as value-object boundaries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "schema.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "struct RunConfig {",
+                        *[f"  int field_{index};" for index in range(12)],
+                        "};",
+                        "struct StepMetrics {",
+                        *[f"  double value_{index};" for index in range(12)],
+                        "};",
+                        "struct LayerInfo {",
+                        *[f"  double metric_{index};" for index in range(12)],
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("public_fields:RunConfig", result.stdout)
+            self.assertNotIn("state_heavy_public_surface:StepMetrics", result.stdout)
+
     def test_cpp_null_runtime_branch_is_flagged(self) -> None:
         """Null-driven C++ routing is reported as a readability risk."""
         with tempfile.TemporaryDirectory() as tmp_dir:
