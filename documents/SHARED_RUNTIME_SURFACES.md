@@ -146,6 +146,7 @@ Project state remains regular root content. AgentCanon must not restore these as
 shared symlinks or shared copies:
 
 - `goal.md`
+- `.agent-canon/update-state.toml`
 - `experiments/README.md`
 - `experiments/registry.toml`
 - `experiments/<topic>/`

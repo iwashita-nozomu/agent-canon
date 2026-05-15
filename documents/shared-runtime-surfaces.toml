@@ -62,6 +62,7 @@ paths = [
   "documents/SHARED_RUNTIME_SURFACES.md",
   "documents/shared-runtime-surfaces.toml",
   "documents/agent-canon-parent-repo-latest-checklist.md",
+  "documents/agent-canon-update-tasks.toml",
   "documents/github-first-module-and-devcontainer-policy.md",
   "documents/SKILL_IMPLEMENTATION_GUIDE.md",
   "documents/TROUBLESHOOTING.md",
@@ -256,6 +257,13 @@ local_override_allowed = false
 
 [[surface]]
 path = "goal.md"
+mode = "repo_state"
+owner = "project"
+class = "durable_state"
+local_override_allowed = true
+
+[[surface]]
+path = ".agent-canon/update-state.toml"
 mode = "repo_state"
 owner = "project"
 class = "durable_state"

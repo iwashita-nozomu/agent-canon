@@ -5,6 +5,8 @@
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines task-entry freshness routing
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first shared-canon propagation
 # upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived AgentCanon branch routing
+# upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md defines parent update TODO routing
+# upstream implementation agent_canon_update_todos.py reports AgentCanon update TODO state
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
 # downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
@@ -39,6 +41,7 @@ SHARED_CANON_DIRTY_PATH_PREFIXES = (
     "vendor/agent-canon",
 )
 LATEST_CHECKLIST = Path("documents/agent-canon-parent-repo-latest-checklist.md")
+UPDATE_TODO_TOOL = Path("tools/agent_tools/agent_canon_update_todos.py")
 SURFACE_MANIFEST = Path("tools/agent_tools/surface_manifest.py")
 SURFACE_SPEC_COMMANDS = ("link-specs", "copy-specs", "removed-legacy-paths")
 
@@ -52,6 +55,43 @@ class AgentCanonPreflightResult:
     next_step: str
     checklist_path: str
     checklist_status: str
+    update_todo_status: str = "not_checked"
+    update_todo_reason: str = "not checked"
+    update_todo_next: str = "not_checked"
+    update_todo_pending_count: str = "0"
+    update_todo_resolved_count: str = "0"
+    update_todo_tasks: str = ""
+    update_todo_state: str = ".agent-canon/update-state.toml"
+    update_todo_manifest: str = "vendor/agent-canon/documents/agent-canon-update-tasks.toml"
+
+
+@dataclass(frozen=True)
+class UpdateTodoStatusReader:
+    """Reads AgentCanon update TODO status from the parent root view."""
+
+    project_root: Path
+
+    def read(self) -> dict[str, str]:
+        """Return update TODO routing fields without blocking task start."""
+        tool_path = resolve_update_todo_tool(self.project_root)
+        if tool_path is None:
+            fields = {
+                "AGENT_CANON_UPDATE_TODO_STATUS": "tool_missing",
+                "AGENT_CANON_UPDATE_TODO_REASON": "agent_canon_update_todos.py not found",
+                "AGENT_CANON_UPDATE_TODO_NEXT": "repair_agent_canon_checkout",
+            }
+            print_update_todo_fields(fields)
+            return fields
+        result = subprocess.run(
+            ["python3", str(tool_path), "--root", str(self.project_root), "status"],
+            cwd=self.project_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        fields = update_todo_fields_from_result(result)
+        print_update_todo_fields(fields)
+        return fields
 
 
 def project_root_from_script(script_path: Path) -> Path:
@@ -73,7 +113,7 @@ def run_agent_canon_preflight(
     """Ensure the local agent-canon snapshot is current when safe to do so."""
     checklist_path, checklist_status = latest_checklist_status(project_root)
     if skip:
-        return AgentCanonPreflightResult(
+        return base_preflight_result(
             status="skipped_by_flag",
             reason="agent-canon preflight skipped by command-line flag",
             next_step="run make agent-canon-ensure-latest manually before editing shared surfaces",
@@ -82,7 +122,7 @@ def run_agent_canon_preflight(
         )
 
     if is_agent_canon_source_repo(project_root):
-        return AgentCanonPreflightResult(
+        return base_preflight_result(
             status="skipped_source_canon",
             reason="workspace is the shared agent-canon source repository",
             next_step="ensure derived template snapshots after committing canon changes",
@@ -91,7 +131,7 @@ def run_agent_canon_preflight(
         )
 
     if not is_git_worktree(project_root):
-        return AgentCanonPreflightResult(
+        return base_preflight_result(
             status="skipped_non_git_workspace",
             reason="workspace root is not a git worktree; preflight is not applicable",
             next_step="run from a git worktree before editing shared AgentCanon surfaces",
@@ -123,7 +163,7 @@ def run_agent_canon_preflight(
     )
     if ensure_result.returncode != 0:
         detail = (ensure_result.stderr or ensure_result.stdout).strip()
-        return AgentCanonPreflightResult(
+        return base_preflight_result(
             status="blocked_shared_canon_workflow",
             reason=detail or "make agent-canon-ensure-latest failed",
             next_step=(
@@ -134,12 +174,57 @@ def run_agent_canon_preflight(
             checklist_status=checklist_status,
         )
 
+    todo_result = UpdateTodoStatusReader(project_root).read()
+    return successful_preflight_result(checklist_path, checklist_status, todo_result)
+
+
+def base_preflight_result(
+    *,
+    status: str,
+    reason: str,
+    next_step: str,
+    checklist_path: str,
+    checklist_status: str,
+) -> AgentCanonPreflightResult:
+    """Create a preflight result without update TODO fields."""
+    return AgentCanonPreflightResult(
+        status=status,
+        reason=reason,
+        next_step=next_step,
+        checklist_path=checklist_path,
+        checklist_status=checklist_status,
+    )
+
+
+def successful_preflight_result(
+    checklist_path: str,
+    checklist_status: str,
+    todo_result: dict[str, str],
+) -> AgentCanonPreflightResult:
+    """Create a passing preflight result with update TODO routing fields."""
     return AgentCanonPreflightResult(
         status="pass",
         reason="agent-canon snapshot is current",
-        next_step="none",
+        next_step=todo_result.get("AGENT_CANON_UPDATE_TODO_NEXT", "none"),
         checklist_path=checklist_path,
         checklist_status=checklist_status,
+        update_todo_status=todo_result.get("AGENT_CANON_UPDATE_TODO_STATUS", "not_checked"),
+        update_todo_reason=todo_result.get("AGENT_CANON_UPDATE_TODO_REASON", "not checked"),
+        update_todo_next=todo_result.get("AGENT_CANON_UPDATE_TODO_NEXT", "not_checked"),
+        update_todo_pending_count=todo_result.get("AGENT_CANON_UPDATE_TODO_PENDING_COUNT", "0"),
+        update_todo_resolved_count=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_RESOLVED_UNACKED_COUNT",
+            "0",
+        ),
+        update_todo_tasks=todo_result.get("AGENT_CANON_UPDATE_TODO_TASKS", ""),
+        update_todo_state=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_STATE",
+            ".agent-canon/update-state.toml",
+        ),
+        update_todo_manifest=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_MANIFEST",
+            "vendor/agent-canon/documents/agent-canon-update-tasks.toml",
+        ),
     )
 
 
@@ -153,6 +238,49 @@ def latest_checklist_status(project_root: Path) -> tuple[str, str]:
         if candidate.is_file():
             return candidate.relative_to(project_root).as_posix(), "present"
     return candidates[0].relative_to(project_root).as_posix(), "missing"
+
+
+def update_todo_fields_from_result(result: subprocess.CompletedProcess[str]) -> dict[str, str]:
+    """Convert the update TODO tool result into preflight fields."""
+    fields = parse_machine_fields(result.stdout)
+    if result.returncode != 0:
+        fields.setdefault("AGENT_CANON_UPDATE_TODO_STATUS", "error")
+        fields.setdefault(
+            "AGENT_CANON_UPDATE_TODO_REASON",
+            (result.stderr or result.stdout).strip() or "update TODO status failed",
+        )
+        fields.setdefault("AGENT_CANON_UPDATE_TODO_NEXT", "repair_update_todo_state")
+    return fields
+
+
+def resolve_update_todo_tool(project_root: Path) -> Path | None:
+    """Return the update TODO tool path from root view or vendor source."""
+    candidates = (
+        project_root / UPDATE_TODO_TOOL,
+        project_root / "vendor" / "agent-canon" / UPDATE_TODO_TOOL,
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def parse_machine_fields(text: str) -> dict[str, str]:
+    """Parse KEY=value status lines."""
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", maxsplit=1)
+        if key.startswith("AGENT_CANON_UPDATE_TODO_"):
+            fields[key] = value
+    return fields
+
+
+def print_update_todo_fields(fields: dict[str, str]) -> None:
+    """Emit update TODO status fields for task-start logs."""
+    for key in sorted(fields):
+        print(f"{key}={fields[key]}")
 
 
 def agent_canon_update_surface_status(project_root: Path) -> str:
