@@ -936,6 +936,95 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_cpp_identity_and_pass_through_functions_are_flagged(self) -> None:
+        """C++ identity and forwarding wrappers are reported as redundant boundaries."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "redundant.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "int project_value(int value) {",
+                        "  return value;",
+                        "}",
+                        "",
+                        "int compute_sum(int left, int right) {",
+                        "  return left + right;",
+                        "}",
+                        "",
+                        "int forward_sum(int left, int right) {",
+                        "  return compute_sum(left, right);",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "cpp:warn:identity_function:project_value:returns value",
+                result.stdout,
+            )
+            self.assertIn(
+                "cpp:warn:pass_through_function:forward_sum:compute_sum/2",
+                result.stdout,
+            )
+
+    def test_cpp_boundary_mutation_is_mixed_effect(self) -> None:
+        """Mutating caller-owned C++ objects while returning a value is reported."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "mutation.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "#include <vector>",
+                        "std::vector<int> collect(std::vector<int>& values, int value) {",
+                        "  values.push_back(value);",
+                        "  return values;",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "cpp:warn:mixed_morphism_effect:collect:return+effect",
+                result.stdout,
+            )
+
+    def test_cpp_local_aggregation_is_not_mixed_effect(self) -> None:
+        """Mutating a function-owned C++ accumulator is not an external effect."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "aggregation.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "#include <vector>",
+                        "std::vector<int> collect_value(int value) {",
+                        "  std::vector<int> values;",
+                        "  values.push_back(value);",
+                        "  return values;",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("mixed_morphism_effect:collect_value", result.stdout)
+
     def test_json_report_adds_mechanical_interpretation(self) -> None:
         """JSON output includes deterministic summary and explanation fields."""
         with tempfile.TemporaryDirectory() as tmp_dir:
