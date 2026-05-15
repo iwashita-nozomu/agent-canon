@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents agent-canon PR ワークフロー for this repository.
 upstream implementation ../../tools/sync_agent_canon.sh sync implementation
+upstream implementation ../../tools/update_agent_canon.sh tool-first latest update and conflict handoff
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
 upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
@@ -53,6 +54,22 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 ## Freshness Gate Route
 
 `check_agent_canon_latest.sh` や `make agent-canon-pr-check` が dirty shared-canon 差分を理由に止まった場合、その失敗は「pin を更新して消す」合図ではなく、PR-first route へ入る合図です。
+
+通常の parent repo 最新化は、まず tool に任せます。
+
+```bash
+make agent-canon-update-plan
+make agent-canon-latest
+```
+
+`make agent-canon-latest` は safe な AgentCanon `main` 更新、root view check、
+親 repo update TODO acknowledge まで進めます。local shared-canon branch、dirty
+submodule、diverged history、merge conflict がある場合は、その場で破壊的に直さず
+`AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md`、
+`AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current`、
+`NEXT_ACTION=run_agentcanon_conflict_workflow` を出します。この出力を見た parent agent は
+AgentCanon conflict workflow に入り、branch commit、merge-main、PR、post-merge latest を
+順に処理します。
 
 扱いは次の順に固定します。
 

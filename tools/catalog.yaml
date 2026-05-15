@@ -343,7 +343,7 @@ entries:
       - tests/tools/test_update_agent_canon.py
 
   - id: update-agent-canon
-    summary: Provides user-facing AgentCanon update, branch merge, and PR routes.
+    summary: Provides user-facing AgentCanon latest update, branch merge, and PR routes.
     path: tools/update_agent_canon.sh
     family: root
     role: sync
