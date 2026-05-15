@@ -542,6 +542,77 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("cpp:warn:public_fields:SolverManager:9>8", result.stdout)
             self.assertIn("cpp:warn:parameters:run:7>6", result.stdout)
 
+    def test_language_all_analyzes_python_and_cpp_by_suffix(self) -> None:
+        """The shared analyzer should select Python and C++ files by suffix."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            python_source = root / "helpers.py"
+            python_source.write_text(
+                "def helper_value(value: int) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
+            cpp_source = root / "route.cpp"
+            cpp_source.write_text(
+                "\n".join(
+                    [
+                        "int route(int* value) {",
+                        "  if (value == nullptr) {",
+                        "    return 0;",
+                        "  }",
+                        "  return *value;",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_analyzer(
+                root,
+                "--language",
+                "all",
+                "--min-score",
+                "0",
+                str(python_source),
+                str(cpp_source),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(":python:warn:", result.stdout)
+            self.assertIn(":cpp:warn:null_runtime_branch:route", result.stdout)
+
+    def test_cpp_unmatched_braces_are_syntax_errors(self) -> None:
+        """Unmatched C++ class and function bodies should fail parseability."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "broken.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "class Broken {",
+                        "public:",
+                        "  int value;",
+                        "",
+                        "int route(int value) {",
+                        "  return value;",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "cpp:error:syntax_error:Broken:unmatched-brace>parseable-cpp",
+                result.stdout,
+            )
+            self.assertIn(
+                "cpp:error:syntax_error:route:unmatched-brace>parseable-cpp",
+                result.stdout,
+            )
+
     def test_cpp_inline_method_body_statements_are_not_public_fields(self) -> None:
         """Statements inside inline methods should not inflate public state counts."""
         with tempfile.TemporaryDirectory() as tmp_dir:
