@@ -33,6 +33,7 @@ upstream design ../../../agents/skills/codex-task-workflow.md documents the huma
 1. Before implementation, read the approved `Dependency Manifest Plan`; load upstream dependency targets before editing and downstream targets after editing.
 1. For new or edited human-authored text files, use only the `@dependency-start` / `@dependency-end` manifest format, not legacy `Dependency Files:` blocks.
 1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
+1. Before parent-direct edits or write-capable subagent edits, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and put predicted OOP, helper, dependency, hook runtime, skill mirror, tool catalog, protocol, and log-surface gates plus repair commands into the work log or handoff.
 1. For fully design-traced, low-risk implementation slices, use `spark_worker` first and `worker` as fallback; keep requirements, design, review, and scope judgment off Spark.
 1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, final review, validation, closeout gate, commit, and push are complete.
 1. Validate dependency manifests with `python3 tools/agent_tools/check_dependency_headers.py --changed`, `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`, and `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header` before closeout.

@@ -3388,7 +3388,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 252,
+      "line": 319,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -3396,7 +3396,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 252,
+      "line": 319,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -3404,7 +3404,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 252,
+      "line": 319,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },

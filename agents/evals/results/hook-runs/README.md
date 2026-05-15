@@ -74,3 +74,11 @@ entries with `tool_name` contribute tool usage counts, and checker command
 arrays contribute target file counts. Do not strip command target paths from
 hook results; they are how the next repair branch can see which skill,
 workflow, tool, or source file needs attention.
+
+Before editing `.codex/hooks.json` or `.codex/hooks/*`, run
+`python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`.
+The predicted `codex_hook_runtime_alignment` and `log_surface_inventory_guard`
+gates are part of the hook change contract: update hook wiring, quiet-pass
+tests, durable JSONL fields, and `documents/log-surface-inventory.json` together
+instead of letting the PostToolUse/Stop hook discover the mismatch after the
+edit.

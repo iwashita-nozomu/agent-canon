@@ -760,7 +760,7 @@ entries:
       - tests/agent_tools/test_log_surface_inventory.py
 
   - id: tool-rejection-preflight
-    summary: Predicts edit-time hook and tool rejection gates for handoff packets.
+    summary: Predicts edit-time hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
     path: tools/agent_tools/tool_rejection_preflight.py
     family: agent_tools
     role: workflow

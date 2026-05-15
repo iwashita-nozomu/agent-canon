@@ -66,6 +66,72 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("github_workflow_check", gates)
         self.assertIn("dependency_review", gates)
 
+    def test_hook_config_path_predicts_hook_runtime_alignment(self) -> None:
+        """Hook wiring edits should carry hook runtime and log-surface gates."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                ".codex/hooks.json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("codex_hook_runtime_alignment", gates)
+        self.assertIn("dependency_review", gates)
+
+    def test_skill_path_predicts_mirror_and_log_surface_gates(self) -> None:
+        """Skill edits should require mirror and log-surface validation."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                ".agents/skills/subagent-bootstrap/SKILL.md",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("skill_mirror_sync", gates)
+        self.assertIn("log_surface_inventory_guard", gates)
+
+    def test_protocol_path_predicts_convention_gate(self) -> None:
+        """Protocol docs should route to convention compliance checks."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "agents/COMMUNICATION_PROTOCOL.md",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("agent_protocol_convention", gates)
+        self.assertIn("dependency_review", gates)
+
     def test_changed_mode_uses_git_status_when_no_paths_are_given(self) -> None:
         """Changed mode should produce pass when a new repo has no changed files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
