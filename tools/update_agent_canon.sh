@@ -96,6 +96,20 @@ parent_pin_pending() {
   fi
 }
 
+emit_remote_main_ancestor_evidence() {
+  local remote_sha="$1"
+  local post_head="$2"
+
+  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$post_head"; then
+    echo "agent_canon_merge_remote_main_in_post_head=yes"
+    echo "agent_canon_merge_remote_main_verified=yes"
+    return
+  fi
+  echo "agent_canon_merge_remote_main_in_post_head=no"
+  echo "agent_canon_merge_remote_main_verified=no"
+  die "current AgentCanon branch does not contain fetched remote main after merge-main-into-current"
+}
+
 plan_value() {
   local key="$1"
   local text="$2"
@@ -283,6 +297,7 @@ cmd_merge_main_into_current() {
 
   if [ "$pre_head" = "$remote_sha" ]; then
     echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
     echo "agent_canon_merge_result=already_current"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
     echo "NEXT_ACTION=continue_parent_workflow"
@@ -297,6 +312,7 @@ cmd_merge_main_into_current() {
 
   if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
     echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
     echo "agent_canon_merge_result=already_contains_main"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
     echo "NEXT_ACTION=push_current_agentcanon_branch_and_open_or_update_PR"
@@ -313,6 +329,7 @@ cmd_merge_main_into_current() {
     fi
     rm -f "$merge_log"
     echo "agent_canon_merge_post_head=$post_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
     echo "agent_canon_merge_result=$result"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$post_head")"
     echo "NEXT_ACTION=run_validation_then_push_current_agentcanon_branch_and_open_or_update_PR"

@@ -116,6 +116,20 @@ class UpdateTask:
         """Return whether this task is meant for AgentCanon parent repositories."""
         return "all" in self.applies_to or "parent_repo" in self.applies_to
 
+    def payload(self) -> dict[str, object]:
+        """Return a machine-readable task object for parent agents."""
+        return {
+            "id": self.task_id,
+            "title": self.title,
+            "introduced_after": self.introduced_after,
+            "severity": self.severity,
+            "applies_to": list(self.applies_to),
+            "summary": self.summary,
+            "actions": list(self.actions),
+            "acceptance": list(self.acceptance),
+            "paths": list(self.paths),
+        }
+
 
 @dataclass(frozen=True)
 class UpdateState:
@@ -150,6 +164,7 @@ class Plan:
 
     def output_lines(self) -> list[str]:
         """Return machine-readable status lines."""
+        first = self.pending_tasks[0] if self.pending_tasks else None
         return [
             f"AGENT_CANON_UPDATE_TODO_STATUS={self.status}",
             f"AGENT_CANON_UPDATE_TODO_REASON={self.reason}",
@@ -159,9 +174,15 @@ class Plan:
             f"AGENT_CANON_UPDATE_TODO_PENDING_COUNT={len(self.pending_tasks)}",
             f"AGENT_CANON_UPDATE_TODO_RESOLVED_UNACKED_COUNT={len(self.resolved_tasks)}",
             f"AGENT_CANON_UPDATE_TODO_TASKS={','.join(task.task_id for task in self.pending_tasks)}",
+            f"AGENT_CANON_UPDATE_TODO_RESOLVED_TASKS={','.join(task.task_id for task in self.resolved_tasks)}",
             f"AGENT_CANON_UPDATE_TODO_MANIFEST={self.manifest_path.as_posix()}",
             f"AGENT_CANON_UPDATE_TODO_STATE={self.state_path.as_posix()}",
             f"AGENT_CANON_UPDATE_TODO_GENERATED={self.generated_path.as_posix()}",
+            f"AGENT_CANON_UPDATE_TODO_PENDING_JSON={self.pending_json_path.as_posix()}",
+            f"AGENT_CANON_UPDATE_TODO_FIRST_TASK={first.task_id if first else ''}",
+            f"AGENT_CANON_UPDATE_TODO_FIRST_SEVERITY={first.severity if first else ''}",
+            f"AGENT_CANON_UPDATE_TODO_FIRST_ACTION={first.actions[0] if first and first.actions else ''}",
+            f"AGENT_CANON_UPDATE_TODO_FIRST_PATHS={','.join(first.paths) if first else ''}",
         ]
 
 
@@ -510,8 +531,30 @@ def render_pending_json(plan: Plan) -> str:
         "next_action": plan.next_action,
         "target_commit": plan.target_commit,
         "state_commit": plan.state_commit,
+        "state_path": plan.state_path.as_posix(),
+        "generated_path": plan.generated_path.as_posix(),
+        "pending_json_path": plan.pending_json_path.as_posix(),
         "pending_tasks": [task.task_id for task in plan.pending_tasks],
+        "pending_task_details": [task.payload() for task in plan.pending_tasks],
         "resolved_unacknowledged_tasks": [task.task_id for task in plan.resolved_tasks],
+        "resolved_unacknowledged_task_details": [
+            task.payload() for task in plan.resolved_tasks
+        ],
+        "operator_protocol": {
+            "pending_next_action": "apply_or_defer_pending_tasks_before_unrelated_work",
+            "complete_command": (
+                "python3 tools/agent_tools/agent_canon_update_todos.py complete "
+                "<task-id> --note '<evidence>'"
+            ),
+            "not_applicable_command": (
+                "python3 tools/agent_tools/agent_canon_update_todos.py not-applicable "
+                "<task-id> --reason '<evidence>' --owner '<owner>'"
+            ),
+            "defer_command": (
+                "python3 tools/agent_tools/agent_canon_update_todos.py defer "
+                "<task-id> --reason '<blocker>' --owner '<owner>'"
+            ),
+        },
     }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
@@ -669,6 +712,13 @@ def build_parser() -> argparse.ArgumentParser:
     defer.add_argument("task_id")
     defer.add_argument("--reason", required=True)
     defer.add_argument("--owner", required=True)
+    not_applicable = subparsers.add_parser(
+        "not-applicable",
+        help="Mark one TODO not applicable to this parent repo.",
+    )
+    not_applicable.add_argument("task_id")
+    not_applicable.add_argument("--reason", required=True)
+    not_applicable.add_argument("--owner", required=True)
     subparsers.add_parser("acknowledge", help="Advance tasks_applied_through.")
     return parser
 
@@ -711,6 +761,16 @@ def main() -> int:
                 paths,
                 args.task_id,
                 status="deferred",
+                note=args.reason,
+                owner=args.owner,
+                target_commit=target_commit,
+            )
+            return 0
+        if args.command == "not-applicable":
+            update_task_state(
+                paths,
+                args.task_id,
+                status="not_applicable",
                 note=args.reason,
                 owner=args.owner,
                 target_commit=target_commit,

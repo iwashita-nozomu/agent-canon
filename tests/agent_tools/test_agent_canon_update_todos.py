@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -142,8 +143,28 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("AGENT_CANON_UPDATE_TODO_STATUS=pending", plan.stdout)
             self.assertIn(f"AGENT_CANON_UPDATE_TODO_TASKS={TASK_ID}", plan.stdout)
+            self.assertIn(f"AGENT_CANON_UPDATE_TODO_FIRST_TASK={TASK_ID}", plan.stdout)
+            self.assertIn(
+                "AGENT_CANON_UPDATE_TODO_FIRST_ACTION=Apply fixture task.",
+                plan.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_UPDATE_TODO_PENDING_JSON=.agent-canon/update-todos.pending.json",
+                plan.stdout,
+            )
             generated = root / ".agent-canon" / "update-todos.generated.md"
             self.assertIn(TASK_ID, generated.read_text(encoding="utf-8"))
+            pending_json = json.loads(
+                (root / ".agent-canon" / "update-todos.pending.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(pending_json["pending_tasks"], [TASK_ID])
+            self.assertEqual(
+                pending_json["pending_task_details"][0]["actions"],
+                ["Apply fixture task."],
+            )
+            self.assertIn("not_applicable_command", pending_json["operator_protocol"])
 
             complete = self.run_tool(
                 root,
@@ -167,6 +188,42 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             final = self.run_tool(root, "--target-commit", target, "status")
             self.assertEqual(final.returncode, 0, final.stderr)
             self.assertIn("AGENT_CANON_UPDATE_TODO_STATUS=pass", final.stdout)
+
+    def test_not_applicable_resolves_update_task_before_acknowledge(self) -> None:
+        """Parent repos can resolve TODOs that do not apply without using defer."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            _, boundary, target = create_canon_repo(root)
+            self.assertEqual(
+                self.run_tool(root, "--target-commit", boundary, "init").returncode,
+                0,
+            )
+
+            not_applicable = self.run_tool(
+                root,
+                "--target-commit",
+                target,
+                "not-applicable",
+                TASK_ID,
+                "--reason",
+                "fixture not applicable",
+                "--owner",
+                "repo-owner",
+            )
+            self.assertEqual(not_applicable.returncode, 0, not_applicable.stderr)
+            self.assertIn(
+                "AGENT_CANON_UPDATE_TODO_MARKED_STATUS=not_applicable",
+                not_applicable.stdout,
+            )
+
+            ready = self.run_tool(root, "--target-commit", target, "status")
+            self.assertEqual(ready.returncode, 0, ready.stderr)
+            self.assertIn("AGENT_CANON_UPDATE_TODO_STATUS=ready_to_ack", ready.stdout)
+
+            state_text = (root / ".agent-canon" / "update-state.toml").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('status = "not_applicable"', state_text)
 
     def test_missing_state_routes_to_initialization_without_failure(self) -> None:
         """Missing parent state is a route, not a hard status failure."""

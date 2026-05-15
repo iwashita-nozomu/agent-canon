@@ -156,8 +156,20 @@ Task-start behavior:
 
 - `tasks_applied_through` older than the current submodule pin plus pending
   manifest tasks yields `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos`.
+- Pending output must include both the human markdown view and the machine JSON
+  view:
+  - `.agent-canon/update-todos.generated.md`
+  - `.agent-canon/update-todos.pending.json`
+- The JSON view includes `pending_task_details[]` with each task's severity,
+  actions, acceptance criteria, and expected paths. Parent agents should use
+  those details as the first TODO list for the current run rather than treating
+  `AGENT_CANON_UPDATE_TODO_TASKS` as opaque IDs.
 - The agent should apply those tasks first, then continue the user's requested
   work in the same repo run when safe.
+- For each pending TODO, record exactly one of:
+  - `python3 tools/agent_tools/agent_canon_update_todos.py complete <task-id> --note "<evidence>"`
+  - `python3 tools/agent_tools/agent_canon_update_todos.py not-applicable <task-id> --reason "<evidence>" --owner "<owner>"`
+  - `python3 tools/agent_tools/agent_canon_update_todos.py defer <task-id> --reason "<blocker>" --owner "<owner>"`
 - This is deliberately not a pre-tool stop hook. Hooks may log evidence, but the
   task-start/preflight protocol owns routing and repair.
 
@@ -301,8 +313,17 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `AGENT_CANON_UPDATE_TODO_STATUS`
 - `AGENT_CANON_UPDATE_TODO_NEXT`
 - `AGENT_CANON_UPDATE_TODO_PENDING_COUNT`
+- `AGENT_CANON_UPDATE_TODO_RESOLVED_UNACKED_COUNT`
+- `AGENT_CANON_UPDATE_TODO_TASKS`
+- `AGENT_CANON_UPDATE_TODO_RESOLVED_TASKS`
 - `AGENT_CANON_UPDATE_TODO_STATE`
 - `AGENT_CANON_UPDATE_TODO_MANIFEST`
+- `AGENT_CANON_UPDATE_TODO_GENERATED`
+- `AGENT_CANON_UPDATE_TODO_PENDING_JSON`
+- `AGENT_CANON_UPDATE_TODO_FIRST_TASK`
+- `AGENT_CANON_UPDATE_TODO_FIRST_SEVERITY`
+- `AGENT_CANON_UPDATE_TODO_FIRST_ACTION`
+- `AGENT_CANON_UPDATE_TODO_FIRST_PATHS`
 
 `AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present` means this checklist was found in the parent repo's vendored AgentCanon surface.
 `missing` means the parent repo is stale or malformed; the agent must repair AgentCanon checkout/sync before treating repo-changing work as started.
@@ -312,6 +333,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
+- local checkout branch: allowed, but PR-ready only after `bash tools/update_agent_canon.sh merge-main-into-current` emits `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`; these fields prove the branch contains the fetched remote `main`.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun `bash tools/sync_agent_canon.sh link-root`.

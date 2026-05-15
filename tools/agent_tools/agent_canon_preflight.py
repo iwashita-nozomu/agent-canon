@@ -61,8 +61,15 @@ class AgentCanonPreflightResult:
     update_todo_pending_count: str = "0"
     update_todo_resolved_count: str = "0"
     update_todo_tasks: str = ""
+    update_todo_resolved_tasks: str = ""
     update_todo_state: str = ".agent-canon/update-state.toml"
     update_todo_manifest: str = "vendor/agent-canon/documents/agent-canon-update-tasks.toml"
+    update_todo_generated: str = ".agent-canon/update-todos.generated.md"
+    update_todo_pending_json: str = ".agent-canon/update-todos.pending.json"
+    update_todo_first_task: str = ""
+    update_todo_first_severity: str = ""
+    update_todo_first_action: str = ""
+    update_todo_first_paths: str = ""
 
 
 @dataclass(frozen=True)
@@ -217,6 +224,10 @@ def successful_preflight_result(
             "0",
         ),
         update_todo_tasks=todo_result.get("AGENT_CANON_UPDATE_TODO_TASKS", ""),
+        update_todo_resolved_tasks=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_RESOLVED_TASKS",
+            "",
+        ),
         update_todo_state=todo_result.get(
             "AGENT_CANON_UPDATE_TODO_STATE",
             ".agent-canon/update-state.toml",
@@ -225,6 +236,21 @@ def successful_preflight_result(
             "AGENT_CANON_UPDATE_TODO_MANIFEST",
             "vendor/agent-canon/documents/agent-canon-update-tasks.toml",
         ),
+        update_todo_generated=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_GENERATED",
+            ".agent-canon/update-todos.generated.md",
+        ),
+        update_todo_pending_json=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_PENDING_JSON",
+            ".agent-canon/update-todos.pending.json",
+        ),
+        update_todo_first_task=todo_result.get("AGENT_CANON_UPDATE_TODO_FIRST_TASK", ""),
+        update_todo_first_severity=todo_result.get(
+            "AGENT_CANON_UPDATE_TODO_FIRST_SEVERITY",
+            "",
+        ),
+        update_todo_first_action=todo_result.get("AGENT_CANON_UPDATE_TODO_FIRST_ACTION", ""),
+        update_todo_first_paths=todo_result.get("AGENT_CANON_UPDATE_TODO_FIRST_PATHS", ""),
     )
 
 

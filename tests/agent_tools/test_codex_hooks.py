@@ -836,6 +836,12 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
+        self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
+        self.assertEqual(entries[1]["skill_source_fields"], ["last_assistant_message"])
+        self.assertEqual(entries[2]["observed_text_field_count"], 1)
+        self.assertEqual(entries[2]["observed_text_value_count"], 1)
+        self.assertTrue(all(entry["payload_key_count"] >= 2 for entry in entries))
+        self.assertTrue(all(entry["event_fallback"] is False for entry in entries))
 
     def test_skill_usage_logger_defaults_to_agentcanon_hook_result(self) -> None:
         """Default skill hook output should live under AgentCanon hook results."""
@@ -871,6 +877,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
         self.assertEqual(entries[0]["hook_log_namespace"], "test-container")
+        self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
+        self.assertEqual(entries[0]["observed_text_field_count"], 1)
 
     def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
         """No-skill hook payloads should not dirty durable AgentCanon logs."""
@@ -933,6 +941,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
+        self.assertEqual(entries[0]["payload_key_count"], 2)
 
     def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(self) -> None:
         """Skill usage hook should reuse workflow_monitor.py for run-bundle evidence."""
@@ -965,6 +974,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["workflow_monitor_event_count"], 1)
+        self.assertEqual(entry["workflow_monitor_report_dir"], str(report_dir))
+        self.assertEqual(entry["skill_source_fields"], ["prompt"])
         self.assertIn(
             "skill_invocation=$agent-orchestration status=observed source=codex_hook",
             monitoring,
