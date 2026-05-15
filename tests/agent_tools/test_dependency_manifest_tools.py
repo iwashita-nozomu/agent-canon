@@ -977,6 +977,36 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", scan.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
 
+    def test_legal_license_files_are_skipped_without_dependency_headers(self) -> None:
+        """Canonical legal license files keep standard legal text without repo headers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            license_file = root / "LICENSE"
+            license_file.write_text("Apache License\nVersion 2.0\n", encoding="utf-8")
+
+            scan = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                str(license_file),
+                root=root,
+            )
+            fmt = run_tool(
+                str(FORMAT),
+                "--root",
+                str(root),
+                "--require-header",
+                str(license_file),
+                root=root,
+            )
+
+            self.assertEqual(scan.returncode, 0, scan.stdout + scan.stderr)
+            self.assertEqual(fmt.returncode, 0, fmt.stdout + fmt.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_SKIPPED=1", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", scan.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", fmt.stdout)
+
     def test_agent_runtime_surfaces_pass_manifest_scan_and_format(self) -> None:
         """Agent runtime docs and skill surfaces stay compatible with manifest tools."""
         paths = [
