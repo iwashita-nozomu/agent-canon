@@ -71,6 +71,14 @@ submodule、diverged history、merge conflict がある場合は、その場で�
 AgentCanon conflict workflow に入り、branch commit、merge-main、PR、post-merge latest を
 順に処理します。
 
+local checkout branch に shared-canon commit がある場合、その checkout は merge してよい
+正規の AgentCanon PR 入力です。親 repo の gitlink を戻したり、submodule を remote
+main へ checkout し直して差分を消すのではなく、current branch に GitHub `main` を
+merge し、conflict を submodule 内で解消してから同じ branch を PR に出します。
+この merge は任意の自己申告ではなく、`merge-main-into-current` が
+`agent_canon_merge_remote_main_in_post_head=yes` と
+`agent_canon_merge_remote_main_verified=yes` を出すことで保証します。
+
 扱いは次の順に固定します。
 
 1. `vendor/agent-canon/` の shared canon 差分を dedicated branch / commit に分ける

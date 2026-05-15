@@ -1583,6 +1583,9 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertEqual(merge.returncode, 0, merge.stderr)
             self.assertIn("agent_canon_merge_result=merged", merge.stdout)
+            self.assertIn("agent_canon_merge_source_sha=", merge.stdout)
+            self.assertIn("agent_canon_merge_remote_main_in_post_head=yes", merge.stdout)
+            self.assertIn("agent_canon_merge_remote_main_verified=yes", merge.stdout)
             self.assertIn("agent_canon_parent_pin_pending=yes", merge.stdout)
             self.assertIn("NEXT_ACTION=run_validation_then_push_current_agentcanon_branch", merge.stdout)
             self.assertTrue((submodule / "local-marker.txt").is_file())

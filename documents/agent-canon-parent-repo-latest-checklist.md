@@ -333,6 +333,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
+- local checkout branch: allowed, but PR-ready only after `bash tools/update_agent_canon.sh merge-main-into-current` emits `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`; these fields prove the branch contains the fetched remote `main`.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun `bash tools/sync_agent_canon.sh link-root`.
