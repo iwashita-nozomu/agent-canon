@@ -3,7 +3,9 @@
 @dependency-start
 responsibility Documents agent-canon for this repository.
 upstream design AGENTS.md shared canon runtime contract
+upstream design LICENSE AgentCanon license text
 downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer operation rulebook.
+downstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
 @dependency-end
 -->
 
@@ -122,3 +124,13 @@ git -C vendor/agent-canon push origin HEAD
 
 update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
 canonical remote の詳細は `documents/agent-canon-github-remote.md` を見ます。
+
+## License
+
+AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
+[documents/agent-canon-licensing-policy.md](documents/agent-canon-licensing-policy.md).
+
+Parent repositories may use a different root project license, but AgentCanon
+submodule content and root views into AgentCanon retain the AgentCanon license.
+Third-party skills or assets under `vendor/` must keep upstream URL, revision,
+and license metadata before they are enabled.
