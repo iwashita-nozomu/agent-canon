@@ -557,10 +557,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["failed_count"], 1)
         commands = cast(list[dict[str, object]], log_entry["commands"])
         command = commands[0]
-        self.assertNotIn(
-            "OOP_READABILITY_BASELINE=preexisting-only",
-            str(command["output_snippet"]),
-        )
+        output_snippet = cast(str, command["output_snippet"])
+        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
     def test_oop_readability_guard_allows_preexisting_findings_in_diff_mode(self) -> None:
         """OOP guard should use baseline filtering only when explicitly requested."""
@@ -575,13 +573,11 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["failed_count"], 0)
         commands = cast(list[dict[str, object]], log_entry["commands"])
         command = commands[0]
-        command_parts = cast(list[str], command["command"])
-        self.assertIn("--baseline-ref", command_parts)
-        self.assertIn("HEAD", command_parts)
-        self.assertIn(
-            "OOP_READABILITY_BASELINE=preexisting-only",
-            str(command["output_snippet"]),
-        )
+        command_args = cast(list[str], command["command"])
+        output_snippet = cast(str, command["output_snippet"])
+        self.assertIn("--baseline-ref", command_args)
+        self.assertIn("HEAD", command_args)
+        self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
     def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
         """Bash tool names alone should not re-run OOP checks for read-only commands."""

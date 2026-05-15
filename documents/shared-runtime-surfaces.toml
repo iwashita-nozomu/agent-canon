@@ -64,6 +64,7 @@ paths = [
   "documents/agent-canon-parent-repo-latest-checklist.md",
   "documents/agent-canon-update-tasks.toml",
   "documents/github-first-module-and-devcontainer-policy.md",
+  "documents/agent-canon-licensing-policy.md",
   "documents/SKILL_IMPLEMENTATION_GUIDE.md",
   "documents/TROUBLESHOOTING.md",
   "documents/WORKTREE_SCOPE_TEMPLATE.md",
@@ -118,7 +119,9 @@ owner = "template-or-derived-repo"
 class = "active_contract"
 local_override_allowed = true
 paths = [
+  "LICENSE",
   "documents/README.md",
+  "documents/licensing-policy.md",
   "documents/template-bootstrap.md",
   "documents/template-github-remote.md",
   "documents/linux-wsl-host-requirements.md",
