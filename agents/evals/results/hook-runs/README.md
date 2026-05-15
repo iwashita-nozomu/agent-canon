@@ -18,6 +18,11 @@ intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
 hook destination must remain this AgentCanon-owned hook result surface so
 improvement-guide and eval tooling can read one durable chronology.
 
+OOP hook entries include a `mode` field. The default mode is `full`, which blocks
+all current findings in changed source files. `diff` mode is opt-in for tasks
+where the user explicitly asked to ignore baseline findings; those entries also
+record the `baseline_ref` used for comparison.
+
 ## Artifact Handling
 
 Tracked JSONL in this directory is an evidence artifact, not disposable generated

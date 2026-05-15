@@ -534,8 +534,16 @@ Template-specific hook behavior:
 - `UserPromptSubmit` runs MCP context injection, prompt secret scanning, and `skill_usage_logger.py`.
 - `PostToolUse` runs `oop_readability_guard.py` for source-editing tool calls.
 - `Stop` reruns `oop_readability_guard.py` and records a final skill usage observation.
+- The OOP hook defaults to blocking all current findings in changed source files,
+  including findings that already existed in the file. Use
+  `AGENT_CANON_OOP_HOOK_MODE=diff` only when the user explicitly requests
+  baseline-only checking; `AGENT_CANON_OOP_HOOK_BASELINE_REF` overrides the
+  diff baseline when needed.
 - OOP hook logs append to AgentCanon-owned `agents/evals/results/hook-runs/oop_readability_guard.jsonl`; skill hook logs append to `agents/evals/results/hook-runs/skill_usage.jsonl`.
-- Hook log entries include `hook_run_id`, `payload_fingerprint`, and status fields. Local log paths can be overridden with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, and `AGENT_CANON_SKILL_LOG_PATH`.
+- Hook log entries include `hook_run_id`, `payload_fingerprint`, `mode`,
+  `baseline_ref`, and status fields. Local log paths can be overridden with
+  `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, and
+  `AGENT_CANON_SKILL_LOG_PATH`.
 
 ## Skills
 

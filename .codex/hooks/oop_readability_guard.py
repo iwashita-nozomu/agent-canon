@@ -8,7 +8,7 @@
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard output.
 # @dependency-end
 
-"""Block progression when changed source files still fail OOP readability checks."""
+"""Block progression when changed source files fail OOP readability checks."""
 
 from __future__ import annotations
 
@@ -39,6 +39,11 @@ PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
 TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_OOP_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+MODE_ENV = "AGENT_CANON_OOP_HOOK_MODE"
+BASELINE_REF_ENV = "AGENT_CANON_OOP_HOOK_BASELINE_REF"
+MODE_FULL = "full"
+MODE_DIFF = "diff"
+DEFAULT_DIFF_BASELINE_REF = "HEAD"
 GIT_ROOT_TIMEOUT_SECONDS = 5
 GIT_CHANGED_PATHS_TIMEOUT_SECONDS = 10
 ANALYZER_TIMEOUT_SECONDS = 30
@@ -66,6 +71,14 @@ class HeadSource:
     relative_path: str
     text: str
     exists: bool
+
+
+@dataclass(frozen=True)
+class CheckMode:
+    """Describe how the hook should evaluate changed-source findings."""
+
+    mode: str
+    baseline_ref: str | None
 
 
 def load_payload() -> dict[str, object]:
@@ -207,7 +220,23 @@ def default_oop_min_score(root: Path) -> int | None:
     return None
 
 
-def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResult | None:
+def check_mode_from_environment() -> CheckMode:
+    """Return the OOP hook mode, defaulting to full current finding blocking."""
+    mode = os.environ.get(MODE_ENV, MODE_FULL).strip().casefold() or MODE_FULL
+    if mode in {"baseline", "changed", "changed-only", "diff-only"}:
+        mode = MODE_DIFF
+    if mode != MODE_DIFF:
+        return CheckMode(mode=MODE_FULL, baseline_ref=None)
+    baseline_ref = os.environ.get(BASELINE_REF_ENV, DEFAULT_DIFF_BASELINE_REF).strip()
+    return CheckMode(mode=MODE_DIFF, baseline_ref=baseline_ref or DEFAULT_DIFF_BASELINE_REF)
+
+
+def run_analyzer(
+    root: Path,
+    analyzer: Path,
+    paths: list[Path],
+    check_mode: CheckMode,
+) -> AnalyzerResult | None:
     """Run one OOP analyzer for changed files."""
     if not analyzer.is_file() or not paths:
         return None
@@ -221,7 +250,8 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
     ]
     if min_score is not None:
         command_parts.extend(("--min-score", str(min_score)))
-    command_parts.extend(("--baseline-ref", "HEAD"))
+    if check_mode.mode == MODE_DIFF and check_mode.baseline_ref is not None:
+        command_parts.extend(("--baseline-ref", check_mode.baseline_ref))
     command_parts.extend(relative_paths)
     command = tuple(command_parts)
     result = subprocess.run(
@@ -240,7 +270,15 @@ def run_analyzer(root: Path, analyzer: Path, paths: list[Path]) -> AnalyzerResul
     )
     if result_record.returncode == 0:
         return result_record
-    return run_preexisting_finding_filter(root, analyzer, paths, result_record)
+    if check_mode.mode == MODE_DIFF and check_mode.baseline_ref is not None:
+        return run_preexisting_finding_filter(
+            root,
+            analyzer,
+            paths,
+            result_record,
+            baseline_ref=check_mode.baseline_ref,
+        )
+    return result_record
 
 
 def build_finding_key(finding: dict[str, object]) -> FindingKey:
@@ -307,10 +345,10 @@ def run_analyzer_finding_keys(
     return parse_finding_keys(result.stdout)
 
 
-def read_head_source(root: Path, relative_path: str) -> HeadSource:
-    """Return one changed file's HEAD content when it exists."""
+def read_baseline_source(root: Path, baseline_ref: str, relative_path: str) -> HeadSource:
+    """Return one changed file's baseline content when it exists."""
     result = subprocess.run(
-        ["git", "-C", str(root), "show", f"HEAD:{relative_path}"],
+        ["git", "-C", str(root), "show", f"{baseline_ref}:{relative_path}"],
         check=False,
         capture_output=True,
         text=True,
@@ -323,14 +361,16 @@ def read_head_source(root: Path, relative_path: str) -> HeadSource:
     )
 
 
-def run_head_finding_keys(
+def run_baseline_finding_keys(
     root: Path,
     analyzer: Path,
     paths: list[Path],
+    *,
+    baseline_ref: str,
 ) -> tuple[set[FindingKey], bool]:
-    """Run one analyzer against HEAD copies of changed files."""
+    """Run one analyzer against baseline copies of changed files."""
     sources = [
-        read_head_source(root, path.relative_to(root).as_posix())
+        read_baseline_source(root, baseline_ref, path.relative_to(root).as_posix())
         for path in paths
     ]
     existing_sources = [source for source in sources if source.exists]
@@ -352,10 +392,17 @@ def run_preexisting_finding_filter(
     analyzer: Path,
     paths: list[Path],
     result: AnalyzerResult,
+    *,
+    baseline_ref: str,
 ) -> AnalyzerResult:
-    """Allow an analyzer failure only when every finding already existed at HEAD."""
+    """Allow an analyzer failure only when every finding already existed in baseline."""
     current_keys, current_ok = run_analyzer_finding_keys(root, analyzer, paths)
-    baseline_keys, baseline_ok = run_head_finding_keys(root, analyzer, paths)
+    baseline_keys, baseline_ok = run_baseline_finding_keys(
+        root,
+        analyzer,
+        paths,
+        baseline_ref=baseline_ref,
+    )
     if not current_ok or not baseline_ok:
         return result
     new_or_worse_keys = current_keys - baseline_keys
@@ -378,7 +425,7 @@ def candidate_roots(root: Path) -> list[Path]:
     return roots
 
 
-def run_oop_checks(root: Path) -> list[AnalyzerResult]:
+def run_oop_checks(root: Path, check_mode: CheckMode) -> list[AnalyzerResult]:
     """Run applicable OOP checks for changed Python and C++ files."""
     results: list[AnalyzerResult] = []
     for candidate in candidate_roots(root):
@@ -386,11 +433,13 @@ def run_oop_checks(root: Path) -> list[AnalyzerResult]:
             candidate,
             candidate / "tools" / "oop" / "python" / "readability.py",
             source_paths(candidate, PYTHON_SUFFIXES),
+            check_mode,
         )
         cpp_result = run_analyzer(
             candidate,
             candidate / "tools" / "oop" / "cpp" / "readability.py",
             source_paths(candidate, CPP_SUFFIXES),
+            check_mode,
         )
         for result in (python_result, cpp_result):
             if result is not None:
@@ -494,6 +543,7 @@ def analyzer_log_payload(
     *,
     checked: bool,
     results: list[AnalyzerResult],
+    check_mode: CheckMode,
 ) -> dict[str, object]:
     """Build one OOP hook invocation log payload."""
     failed = [result for result in results if result.returncode != 0]
@@ -524,6 +574,8 @@ def analyzer_log_payload(
         "check_requested": checked,
         "checked": logged_checked(checked, results),
         "skip_reason": _log_skip_reason(payload, checked, results),
+        "mode": check_mode.mode,
+        "baseline_ref": check_mode.baseline_ref or "",
         "min_score": min_score,
         "result_count": len(results),
         "failed_count": len(failed),
@@ -560,16 +612,29 @@ def main() -> int:
     payload = load_payload()
     root = repo_root()
     checked = should_check(payload)
+    check_mode = check_mode_from_environment()
     if not checked:
         _log_append_hook_log(
             root,
-            analyzer_log_payload(payload, root, checked=False, results=[]),
+            analyzer_log_payload(
+                payload,
+                root,
+                checked=False,
+                results=[],
+                check_mode=check_mode,
+            ),
         )
         return 0
-    results = run_oop_checks(root)
+    results = run_oop_checks(root, check_mode)
     _log_append_hook_log(
         root,
-        analyzer_log_payload(payload, root, checked=True, results=results),
+        analyzer_log_payload(
+            payload,
+            root,
+            checked=True,
+            results=results,
+            check_mode=check_mode,
+        ),
     )
     if any(result.returncode != 0 for result in results):
         emit_block(results)

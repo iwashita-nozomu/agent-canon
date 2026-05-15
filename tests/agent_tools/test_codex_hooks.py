@@ -40,6 +40,7 @@ class CodexHooksTest(unittest.TestCase):
         hook_input: str,
         *,
         analyzer_text: str | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[dict[str, object], dict[str, object]]:
         """Run the OOP guard against one changed Python file in a temp repo."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -80,7 +81,11 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                    **(extra_env or {}),
+                },
             )
 
             log_entry = cast(
@@ -88,6 +93,87 @@ class CodexHooksTest(unittest.TestCase):
                 json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
             )
             payload = cast("dict[str, object]", json.loads(result.stdout))
+        return payload, log_entry
+
+    def _run_oop_guard_with_preexisting_finding(
+        self,
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Run the OOP guard against a file whose finding already exists at HEAD."""
+        analyzer_text = (
+            "#!/usr/bin/env python3\n"
+            "import json\n"
+            "import sys\n"
+            "finding = {\n"
+            "    'path': 'bad.py',\n"
+            "    'language': 'python',\n"
+            "    'severity': 'warn',\n"
+            "    'kind': 'optional_boundary',\n"
+            "    'symbol': 'helper_value',\n"
+            "    'actual': 1,\n"
+            "    'limit': 0,\n"
+            "}\n"
+            "if '--format' in sys.argv:\n"
+            "    print(json.dumps({'findings': [finding]}))\n"
+            "    raise SystemExit(0)\n"
+            "print('OOP_READABILITY_FINDING=bad.py:1:python:warn:optional_boundary:helper_value:1>0:x')\n"
+            "print('OOP_READABILITY=fail')\n"
+            "raise SystemExit(1)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
+            analyzer.parent.mkdir(parents=True)
+            analyzer.write_text(analyzer_text, encoding="utf-8")
+            source = temp_root / "bad.py"
+            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(OOP_READABILITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path),
+                    **(extra_env or {}),
+                },
+            )
+
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+            payload = (
+                cast("dict[str, object]", json.loads(result.stdout))
+                if result.stdout.strip()
+                else {}
+            )
         return payload, log_entry
 
     def _run_helper_guard_with_changed_python(
@@ -299,9 +385,11 @@ class CodexHooksTest(unittest.TestCase):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
         self.assertIn("--min-score 95", reason)
-        self.assertIn("--baseline-ref HEAD", reason)
+        self.assertNotIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertTrue(log_entry["checked"])
+        self.assertEqual(log_entry["mode"], "full")
+        self.assertEqual(log_entry["baseline_ref"], "")
         self.assertEqual(log_entry["min_score"], 95)
         self.assertEqual(log_entry["failed_count"], 1)
 
@@ -370,6 +458,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("decision", json.loads(result.stdout))
         self.assertTrue(durable_log_exists)
         self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
 
     def test_oop_readability_guard_skips_payloadless_invocations(self) -> None:
@@ -457,79 +546,32 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("payload_fingerprint", log_entry)
         self.assertIn("failure_fingerprint", log_entry)
 
-    def test_oop_readability_guard_allows_preexisting_findings(self) -> None:
-        """OOP guard should block new findings, not unchanged file-local debt."""
-        analyzer_text = (
-            "#!/usr/bin/env python3\n"
-            "import json\n"
-            "import sys\n"
-            "finding = {\n"
-            "    'path': 'bad.py',\n"
-            "    'language': 'python',\n"
-            "    'severity': 'warn',\n"
-            "    'kind': 'optional_boundary',\n"
-            "    'symbol': 'helper_value',\n"
-            "    'actual': 1,\n"
-            "    'limit': 0,\n"
-            "}\n"
-            "if '--format' in sys.argv:\n"
-            "    print(json.dumps({'findings': [finding]}))\n"
-            "    raise SystemExit(0)\n"
-            "print('OOP_READABILITY_FINDING=bad.py:1:python:warn:optional_boundary:helper_value:1>0:x')\n"
-            "print('OOP_READABILITY=fail')\n"
-            "raise SystemExit(1)\n"
+    def test_oop_readability_guard_blocks_preexisting_findings_by_default(self) -> None:
+        """OOP guard should block current changed-source findings by default."""
+        payload, log_entry = self._run_oop_guard_with_preexisting_finding()
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["mode"], "full")
+        self.assertEqual(log_entry["baseline_ref"], "")
+        self.assertEqual(log_entry["failed_count"], 1)
+        command = log_entry["commands"][0]
+        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", command["output_snippet"])
+
+    def test_oop_readability_guard_allows_preexisting_findings_in_diff_mode(self) -> None:
+        """OOP guard should use baseline filtering only when explicitly requested."""
+        payload, log_entry = self._run_oop_guard_with_preexisting_finding(
+            extra_env={"AGENT_CANON_OOP_HOOK_MODE": "diff"}
         )
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.invalid"],
-                cwd=temp_root,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Test User"],
-                cwd=temp_root,
-                check=True,
-                capture_output=True,
-            )
-            analyzer = temp_root / "tools" / "oop" / "python" / "readability.py"
-            analyzer.parent.mkdir(parents=True)
-            analyzer.write_text(analyzer_text, encoding="utf-8")
-            source = temp_root / "bad.py"
-            source.write_text("def helper_value(value):\n    return value\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(
-                ["git", "commit", "-m", "initial"],
-                cwd=temp_root,
-                check=True,
-                capture_output=True,
-            )
-            source.write_text("def helper_value(value):\n    return value + 1\n", encoding="utf-8")
-            log_path = temp_root / "reports" / "hooks" / "oop.jsonl"
 
-            result = subprocess.run(
-                [sys.executable, str(OOP_READABILITY_GUARD)],
-                cwd=temp_root,
-                input=json.dumps(
-                    {
-                        "hookEventName": "PostToolUse",
-                        "tool_name": "apply_patch",
-                    }
-                ),
-                check=True,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "AGENT_CANON_OOP_HOOK_LOG_PATH": str(log_path)},
-            )
-
-            log_entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
-
-        self.assertEqual(result.stdout, "")
+        self.assertEqual(payload, {})
         self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["mode"], "diff")
+        self.assertEqual(log_entry["baseline_ref"], "HEAD")
         self.assertEqual(log_entry["failed_count"], 0)
         command = log_entry["commands"][0]
+        self.assertIn("--baseline-ref", command["command"])
+        self.assertIn("HEAD", command["command"])
         self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", command["output_snippet"])
 
     def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
@@ -678,6 +720,18 @@ class CodexHooksTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
             policy = temp_root / "helper_inventory_guard_policy.json"
             policy.write_text(json.dumps({"enabled": True}), encoding="utf-8")
             source = temp_root / "changed.py"
