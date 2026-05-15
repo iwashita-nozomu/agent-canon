@@ -116,7 +116,12 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_UPDATE_TODO_INIT=created", result.stdout)
             state_path = root / ".agent-canon" / "update-state.toml"
-            self.assertIn(target, state_path.read_text(encoding="utf-8"))
+            state_text = state_path.read_text(encoding="utf-8")
+            self.assertIn(target, state_text)
+            self.assertIn(
+                "../vendor/agent-canon/documents/agent-canon-update-tasks.toml",
+                state_text,
+            )
             self.assertEqual(
                 "*\n!.gitignore\n!update-state.toml\n",
                 (root / ".agent-canon" / ".gitignore").read_text(encoding="utf-8"),

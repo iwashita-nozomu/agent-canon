@@ -540,9 +540,9 @@ def render_state(state: UpdateState) -> str:
     lines = [
         "# @dependency-start",
         "# responsibility Tracks this parent repo's applied AgentCanon update TODO boundary.",
-        "# upstream design vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md parent update workflow",
-        "# upstream design vendor/agent-canon/documents/agent-canon-update-tasks.toml shared update TODO manifest",
-        "# downstream workflow tools/agent_tools/agent_canon_update_todos.py advances this state",
+        "# upstream design ../vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md parent update workflow",
+        "# upstream design ../vendor/agent-canon/documents/agent-canon-update-tasks.toml shared update TODO manifest",
+        "# downstream implementation ../tools/agent_tools/agent_canon_update_todos.py advances this state",
         "# @dependency-end",
         "",
         f"[{STATE_TABLE}]",
