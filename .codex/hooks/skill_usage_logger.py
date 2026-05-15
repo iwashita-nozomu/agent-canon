@@ -100,6 +100,15 @@ def observed_text(payload: dict[str, object]) -> list[str]:
     return texts
 
 
+def observed_text_sources(payload: dict[str, object]) -> list[str]:
+    """Return payload field names that contributed text for skill discovery."""
+    sources: list[str] = []
+    for key in ("prompt", "last_assistant_message", "message", "tool_input"):
+        if key in payload and text_values(payload[key]):
+            sources.append(key)
+    return sources
+
+
 def observed_skills(payload: dict[str, object]) -> list[str]:
     """Return sorted unique skill ids observed in a hook payload."""
     skills: set[str] = set()
@@ -172,6 +181,8 @@ def main() -> int:
     skills = observed_skills(payload)
     if not skills:
         return 0
+    text_sources = observed_text_sources(payload)
+    text_values_seen = observed_text(payload)
     workflow_event_count = append_workflow_monitor_events(root, skills)
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
@@ -183,8 +194,13 @@ def main() -> int:
             "hook_log_namespace": context.runtime_namespace(),
             "timestamp": timestamp,
             "event": hook_event_name(payload),
+            "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
             "skills": skills,
             "skill_count": len(skills),
+            "skill_source_fields": text_sources,
+            "observed_text_field_count": len(text_sources),
+            "observed_text_value_count": len(text_values_seen),
+            "payload_key_count": len(payload),
             "payload_fingerprint": payload_fingerprint,
             "status": "pass",
             "workflow_monitor_event_count": workflow_event_count,

@@ -30,3 +30,26 @@ paths = [
   ".agent-canon/.gitignore",
   ".agent-canon/update-state.toml",
 ]
+
+[[task]]
+id = "ACUT-20260515-update-todo-detail-fields"
+title = "Consume detailed AgentCanon update TODO routing fields"
+introduced_after = "ebde9bb6c02dbd0fcd84aa4fd8e915e70f8b6ed8"
+severity = "S1"
+applies_to = ["parent_repo"]
+summary = "Parent repositories should consume detailed TODO metadata instead of treating pending AgentCanon update TODOs as opaque IDs."
+actions = [
+  "Run `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` after updating the AgentCanon pin.",
+  "Read `.agent-canon/update-todos.pending.json` and apply, defer, or mark not applicable each `pending_task_details[]` entry before unrelated repo work.",
+  "Preserve `AGENT_CANON_UPDATE_TODO_FIRST_*` and `AGENT_CANON_UPDATE_TODO_PENDING_JSON` lines in task-start logs or PR evidence.",
+]
+acceptance = [
+  "Task-start or PR evidence includes `AGENT_CANON_UPDATE_TODO_PENDING_JSON` and `AGENT_CANON_UPDATE_TODO_FIRST_TASK` when pending tasks exist.",
+  "The parent agent records either `complete`, `not-applicable`, or `defer` for every pending update TODO before acknowledging `tasks_applied_through`.",
+  "Repo-specific update decisions cite the generated JSON task detail rather than only the task ID.",
+]
+paths = [
+  ".agent-canon/update-todos.pending.json",
+  ".agent-canon/update-todos.generated.md",
+  ".agent-canon/update-state.toml",
+]
