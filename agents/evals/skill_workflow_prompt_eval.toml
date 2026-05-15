@@ -905,6 +905,24 @@ critical = true
 description = "Documents hook result accumulation and PR/push improvement guide generation."
 required_regex = ["agents/evals/results/hook-runs/", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
 
+[[evals.checklist]]
+id = "EVALS-README-PROMPT-FEEDBACK-1"
+critical = true
+description = "Documents prompt-derived candidate routing and human feedback evidence."
+required_regex = ["candidate skill / workflow / tool", "human feedback", "skill usage entries"]
+
+[[evals]]
+id = "hook-runs-prompt-feedback-routing"
+target = "agents/evals/results/hook-runs/README.md"
+kind = "hook-result-doc"
+description = "Hook result policy must describe prompt-intake routing evidence without raw prompt retention."
+
+[[evals.checklist]]
+id = "HOOK-RUNS-PROMPT-FEEDBACK-1"
+critical = true
+description = "Requires skill_usage prompt candidate routing and human feedback fields."
+required_regex = ["candidate skill", "workflow / tool", "human feedback labels", "raw prompt text"]
+
 [[evals]]
 id = "tools-readme-prompt-eval-audit"
 target = "tools/README.md"

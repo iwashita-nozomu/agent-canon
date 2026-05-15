@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now
@@ -27,6 +28,62 @@ SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 GIT_ROOT_TIMEOUT_SECONDS = 5
+SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
+    "agent-orchestration": ("どのスキル", "どのskill", "workflow=", "routing", "フロー"),
+    "result-artifact-writeout": ("結果書き出し", "結果を書き出", "result writeout", "artifact"),
+    "oop-readability-check": ("oop", "readability", "オブジェクト指向"),
+}
+WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "adaptive-improvement-loop": ("goal.md", "next_action", "backlog", "iteration", "改善ループ"),
+    "agent-canon-pr-workflow": ("agent-canon pr", "pull request", "pr #", "マージ", "merge"),
+    "codex-task-workflow": ("実装", "修正", "組み込み", "続けて", "repo-changing"),
+    "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
+}
+TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "skill_usage_logger.py": ("入力プロンプト", "prompt", "skill usage", "skill_usage"),
+    "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
+    "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
+    "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
+    "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
+}
+FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "quality_gap": ("弱い", "足り", "浅い", "甘い", "まずい", "だめ", "ダメ"),
+    "repair_request": ("直して", "修正", "改善", "見直", "組み込み", "入れたい"),
+    "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
+}
+
+
+@dataclass(frozen=True)
+class PromptIntakeSignals:
+    """Classified prompt signals written by the skill usage hook."""
+
+    skills: tuple[str, ...]
+    candidate_skills: tuple[str, ...]
+    candidate_workflows: tuple[str, ...]
+    candidate_tools: tuple[str, ...]
+    feedback_labels: tuple[str, ...]
+    feedback_action: str
+
+    def should_log(self) -> bool:
+        """Return whether this payload contains durable prompt-intake evidence."""
+        return bool(
+            self.skills
+            or self.candidate_skills
+            or self.candidate_workflows
+            or self.candidate_tools
+            or self.feedback_labels
+        )
+
+    def feedback_targets(self) -> tuple[str, ...]:
+        """Return concrete feedback targets for workflow monitor routing."""
+        skill_targets = tuple(sorted(set(self.skills + self.candidate_skills)))
+        targets = [
+            *(f"skill:{item}" for item in skill_targets),
+            *(f"workflow:{item}" for item in self.candidate_workflows),
+            *(f"tool:{item}" for item in self.candidate_tools),
+        ]
+        return tuple(targets or (("agent-runtime",) if self.feedback_labels else ()))
 
 
 def load_payload() -> dict[str, object]:
@@ -117,6 +174,39 @@ def observed_skills(payload: dict[str, object]) -> list[str]:
     return sorted(skills)
 
 
+def keyword_matches(texts: list[str], mapping: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
+    """Return mapping keys whose keywords appear in observed prompt text."""
+    haystack = "\n".join(texts).lower()
+    return tuple(
+        key
+        for key, needles in sorted(mapping.items())
+        if any(needle.lower() in haystack for needle in needles)
+    )
+
+
+def feedback_action(labels: tuple[str, ...]) -> str:
+    """Return the workflow-monitor action for observed human feedback."""
+    if not labels:
+        return ""
+    if "quality_gap" in labels or "repair_request" in labels:
+        return "prompt_repair"
+    return "memory_record"
+
+
+def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
+    """Classify prompt text into explicit and candidate routing signals."""
+    texts = observed_text(payload)
+    labels = keyword_matches(texts, FEEDBACK_KEYWORDS)
+    return PromptIntakeSignals(
+        skills=tuple(observed_skills(payload)),
+        candidate_skills=keyword_matches(texts, SKILL_KEYWORDS),
+        candidate_workflows=keyword_matches(texts, WORKFLOW_KEYWORDS),
+        candidate_tools=keyword_matches(texts, TOOL_KEYWORDS),
+        feedback_labels=labels,
+        feedback_action=feedback_action(labels),
+    )
+
+
 def default_log_path(root: Path) -> Path:
     """Return the skill usage log path."""
     override = os.environ.get(LOG_PATH_ENV, "").strip()
@@ -147,14 +237,15 @@ def workflow_monitor_report_dir() -> str:
     return os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
 
 
-def append_workflow_monitor_events(root: Path, skills: list[str]) -> int:
-    """Append skill invocation behavior events when a run bundle is active."""
+def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> tuple[int, int]:
+    """Append skill invocation and feedback events when a run bundle is active."""
     report_dir = workflow_monitor_report_dir()
     monitor = workflow_monitor_path(root)
-    if not report_dir or not monitor.is_file() or not skills:
-        return 0
-    event_count = 0
-    for skill in skills:
+    if not report_dir or not monitor.is_file():
+        return 0, 0
+    skill_event_count = 0
+    feedback_event_count = 0
+    for skill in signals.skills:
         result = subprocess.run(
             [
                 sys.executable,
@@ -170,20 +261,43 @@ def append_workflow_monitor_events(root: Path, skills: list[str]) -> int:
             timeout=GIT_ROOT_TIMEOUT_SECONDS,
         )
         if result.returncode == 0:
-            event_count += 1
-    return event_count
+            skill_event_count += 1
+    if signals.feedback_labels and signals.feedback_action:
+        for target in signals.feedback_targets():
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(monitor),
+                    "--report-dir",
+                    report_dir,
+                    "--runtime-feedback",
+                    (
+                        "source=user "
+                        f"target={target} "
+                        f"action={signals.feedback_action} "
+                        "evidence=codex_prompt_intake"
+                    ),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=GIT_ROOT_TIMEOUT_SECONDS,
+            )
+            if result.returncode == 0:
+                feedback_event_count += 1
+    return skill_event_count, feedback_event_count
 
 
 def main() -> int:
     """Append one skill usage hook log entry."""
     payload = load_payload()
     root = repo_root()
-    skills = observed_skills(payload)
-    if not skills:
+    signals = prompt_intake_signals(payload)
+    if not signals.should_log():
         return 0
     text_sources = observed_text_sources(payload)
     text_values_seen = observed_text(payload)
-    workflow_event_count = append_workflow_monitor_events(root, skills)
+    workflow_event_count, workflow_feedback_count = append_workflow_monitor_events(root, signals)
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
     context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
@@ -195,8 +309,18 @@ def main() -> int:
             "timestamp": timestamp,
             "event": hook_event_name(payload),
             "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
-            "skills": skills,
-            "skill_count": len(skills),
+            "skills": list(signals.skills),
+            "skill_count": len(signals.skills),
+            "candidate_skills": list(signals.candidate_skills),
+            "candidate_skill_count": len(signals.candidate_skills),
+            "candidate_workflows": list(signals.candidate_workflows),
+            "candidate_workflow_count": len(signals.candidate_workflows),
+            "candidate_tools": list(signals.candidate_tools),
+            "candidate_tool_count": len(signals.candidate_tools),
+            "prompt_feedback_detected": bool(signals.feedback_labels),
+            "feedback_labels": list(signals.feedback_labels),
+            "feedback_targets": list(signals.feedback_targets()),
+            "feedback_action": signals.feedback_action,
             "skill_source_fields": text_sources,
             "observed_text_field_count": len(text_sources),
             "observed_text_value_count": len(text_values_seen),
@@ -204,6 +328,7 @@ def main() -> int:
             "payload_fingerprint": payload_fingerprint,
             "status": "pass",
             "workflow_monitor_event_count": workflow_event_count,
+            "workflow_monitor_feedback_count": workflow_feedback_count,
             "workflow_monitor_report_dir": workflow_monitor_report_dir(),
             "root": str(root),
         },

@@ -58,6 +58,18 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("test-container", guide)
         self.assertIn("skill_source_counts:", guide)
         self.assertIn("prompt", guide)
+        self.assertIn("prompt_candidate_skill_counts:", guide)
+        self.assertIn("result-artifact-writeout", guide)
+        self.assertIn("prompt_candidate_workflow_counts:", guide)
+        self.assertIn("codex-task-workflow", guide)
+        self.assertIn("prompt_candidate_tool_counts:", guide)
+        self.assertIn("workflow_monitor.py", guide)
+        self.assertIn("human_feedback_label_counts:", guide)
+        self.assertIn("quality_gap", guide)
+        self.assertIn("human_feedback_target_counts:", guide)
+        self.assertIn("skill:result-artifact-writeout", guide)
+        self.assertIn("human_feedback_action_counts:", guide)
+        self.assertIn("prompt_repair", guide)
         self.assertIn("Top Failure Repair Targets", guide)
         self.assertIn("tools/agent_tools/task_start.py", guide)
         self.assertIn("hook_quality_counts:", guide)
@@ -167,6 +179,13 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "hook_log_namespace": "test-container",
                     "skills": ["agent-orchestration", "codex-task-workflow"],
                     "skill_count": 2,
+                    "candidate_skills": ["result-artifact-writeout"],
+                    "candidate_workflows": ["codex-task-workflow"],
+                    "candidate_tools": ["workflow_monitor.py"],
+                    "prompt_feedback_detected": True,
+                    "feedback_labels": ["quality_gap", "repair_request"],
+                    "feedback_targets": ["skill:result-artifact-writeout", "tool:workflow_monitor.py"],
+                    "feedback_action": "prompt_repair",
                     "skill_source_fields": ["prompt"],
                     "observed_text_field_count": 1,
                     "observed_text_value_count": 1,
