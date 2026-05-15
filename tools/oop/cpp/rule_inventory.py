@@ -1,33 +1,25 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402,I001
 # @dependency-start
 # responsibility Inventories C++ OOP policy, tool, document, and test surfaces.
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
 # upstream design ../../../documents/object-oriented-design.md OOP policy source
+# upstream implementation ../shared/rule_inventory_core.py shared OOP inventory behavior
 # downstream implementation ../../../tests/agent_tools/test_oop_rule_inventory.py tests inventory entrypoint
 # @dependency-end
 """Inventory C++ OOP rule surfaces."""
 
 from __future__ import annotations
 
-import argparse
-import json
 import sys
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-@dataclass(frozen=True)
-class InventoryEntry:
-    """One required C++ OOP surface."""
-
-    kind: str
-    path: str
-    purpose: str
-
-    def exists(self, root: Path) -> bool:
-        """Return whether this surface exists below root."""
-        return (root / self.path).exists()
+from tools.oop.shared.rule_inventory_core import InventoryEntry, run_inventory_cli
 
 
 ENTRIES = (
@@ -79,79 +71,16 @@ ENTRIES = (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Create the command-line parser."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
-    parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
-    return parser
-
-
-def missing_entries(root: Path) -> list[InventoryEntry]:
-    """Return missing C++ OOP surfaces."""
-    return [entry for entry in ENTRIES if not entry.exists(root)]
-
-
-def print_text(root: Path, missing: Sequence[InventoryEntry]) -> None:
-    """Print stable text output."""
-    status = "fail" if missing else "pass"
-    print(f"OOP_CPP_RULE_INVENTORY={status}")
-    print(f"OOP_CPP_RULE_INVENTORY_ENTRIES={len(ENTRIES)}")
-    print(f"OOP_CPP_RULE_INVENTORY_MISSING={len(missing)}")
-    for entry in ENTRIES:
-        exists = "yes" if entry.exists(root) else "no"
-        print(
-            f"OOP_CPP_RULE_SOURCE={entry.kind}\t{entry.path}\t"
-            f"exists={exists}\t{entry.purpose}"
-        )
-
-
-def print_markdown(root: Path, missing: Sequence[InventoryEntry]) -> None:
-    """Print a Markdown inventory report."""
-    status = "fail" if missing else "pass"
-    print("# C++ OOP Rule Inventory")
-    print()
-    print(f"- Status: `{status}`")
-    print(f"- Entries: `{len(ENTRIES)}`")
-    print(f"- Missing entries: `{len(missing)}`")
-    print()
-    print("| Kind | Path | Exists | Purpose |")
-    print("| --- | --- | --- | --- |")
-    for entry in ENTRIES:
-        exists = "yes" if entry.exists(root) else "no"
-        print(f"| {entry.kind} | `{entry.path}` | {exists} | {entry.purpose} |")
-
-
-def print_json(root: Path, missing: Sequence[InventoryEntry]) -> None:
-    """Print a JSON inventory report."""
-    print(
-        json.dumps(
-            {
-                "status": "fail" if missing else "pass",
-                "entries": [
-                    {**asdict(entry), "exists": entry.exists(root)}
-                    for entry in ENTRIES
-                ],
-                "missing": [entry.path for entry in missing],
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
-
-
 def main(argv: Sequence[str]) -> int:
     """Run the C++ OOP inventory CLI."""
-    args = build_parser().parse_args(argv)
-    root = Path(args.root).resolve()
-    missing = missing_entries(root)
-    if args.format == "json":
-        print_json(root, missing)
-    elif args.format == "markdown":
-        print_markdown(root, missing)
-    else:
-        print_text(root, missing)
-    return 1 if missing else 0
+    entries = ENTRIES
+    return run_inventory_cli(
+        argv,
+        description=__doc__ or "",
+        prefix="OOP_CPP",
+        title="C++ OOP Rule Inventory",
+        entries=entries,
+    )
 
 
 if __name__ == "__main__":

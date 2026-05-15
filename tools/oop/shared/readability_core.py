@@ -2302,8 +2302,10 @@ FUNCTION_RE = re.compile(
 )
 
 
-def matching_brace(text: str, open_index: int) -> int:
-    """Return matching brace index or end of text when unmatched."""
+def matching_brace(text: str, open_index: int) -> int | None:
+    """Return matching brace index, or None when unmatched."""
+    if open_index < 0:
+        return None
     depth = 0
     for index in range(open_index, len(text)):
         char = text[index]
@@ -2313,7 +2315,7 @@ def matching_brace(text: str, open_index: int) -> int:
             depth -= 1
             if depth == 0:
                 return index
-    return len(text)
+    return None
 
 
 def line_at(text: str, index: int) -> int:
@@ -2780,16 +2782,24 @@ def analyze_cpp_class(
 ) -> None:
     """Record class-level C++ readability findings for one regex match."""
     shape = cpp_class_shape(analysis_text, match)
+    if shape is None:
+        add_cpp_syntax_error(context, analysis_text, match, findings)
+        return
     add_cpp_class_identity_findings(context, shape, findings)
     add_cpp_class_surface_findings(context, shape, findings)
 
 
-def cpp_class_shape(analysis_text: str, match: re.Match[str]) -> CppClassShape:
+def cpp_class_shape(
+    analysis_text: str,
+    match: re.Match[str],
+) -> CppClassShape | None:
     """Return C++ class metrics without recording findings."""
     class_kind = match.group("kind")
     bases = match.group("bases") or ""
     open_index = analysis_text.find("{", match.end() - 1)
     close_index = matching_brace(analysis_text, open_index)
+    if close_index is None:
+        return None
     body = analysis_text[open_index + 1 : close_index]
     public_body = cpp_public_section(class_kind, body)
     public_members = cpp_member_candidates(public_body)
@@ -2925,15 +2935,23 @@ def analyze_cpp_function(
 ) -> None:
     """Record function-level C++ readability findings for one regex match."""
     shape = cpp_function_shape(analysis_text, match)
+    if shape is None:
+        add_cpp_syntax_error(context, analysis_text, match, findings)
+        return
     add_cpp_function_shape_findings(context, shape, findings)
     add_cpp_function_type_findings(context, shape, findings)
 
 
-def cpp_function_shape(analysis_text: str, match: re.Match[str]) -> CppFunctionShape:
+def cpp_function_shape(
+    analysis_text: str,
+    match: re.Match[str],
+) -> CppFunctionShape | None:
     """Return C++ function metrics without recording findings."""
     name = match.group("name")
     open_index = analysis_text.find("{", match.end() - 1)
     close_index = matching_brace(analysis_text, open_index)
+    if close_index is None:
+        return None
     body = analysis_text[open_index + 1 : close_index]
     return CppFunctionShape(
         name=name,
@@ -2946,6 +2964,28 @@ def cpp_function_shape(analysis_text: str, match: re.Match[str]) -> CppFunctionS
         identity_parameter=cpp_identity_parameter(match.group("params"), body),
         passthrough=cpp_passthrough_call(match.group("params"), body),
         trivial_format=cpp_trivial_format_function(name, body),
+    )
+
+
+def add_cpp_syntax_error(
+    context: SourceContext,
+    analysis_text: str,
+    match: re.Match[str],
+    findings: list[Finding],
+) -> None:
+    """Record a parseability finding for an unmatched C++ brace body."""
+    add_finding(
+        findings,
+        context.root,
+        context.path,
+        line_at(analysis_text, match.start()),
+        context.language,
+        "error",
+        "syntax_error",
+        match.group("name"),
+        "unmatched-brace",
+        "parseable-cpp",
+        "fix-cpp-brace-structure-before-readability-analysis",
     )
 
 

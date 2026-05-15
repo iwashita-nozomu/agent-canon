@@ -25,11 +25,19 @@ C / C++ source に対して、class / struct / function が責務と所有境界
 - `nullptr` 分岐による runtime routing: 参照、`optional`、`variant`、prevalidated handle で表現すべき variant を検出します。
 - 純粋変換と副作用の混在: 値を返しながら IO、filesystem、process、resource effect をまたぐ処理を検出します。
 - pass-through / identity に近い wrapper: 役割が薄く、domain contract を持たない adapter 候補を検出します。
+- 未完了の brace body: class / struct / function の `{ ... }` が閉じていない場合は `syntax_error` として検出します。
 
 ## 実行例
 
 ```bash
 python3 tools/oop/cpp/readability.py --format markdown --include-snippets include src tests/cpp
+```
+
+混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。
+この場合、file suffix で Python / C++ を自動選択します。
+
+```bash
+python3 tools/oop/python/readability.py --language all --format markdown python include src tests/cpp
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
