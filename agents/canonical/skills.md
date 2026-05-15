@@ -27,6 +27,8 @@ upstream design README.md canonical workflow index
   - build / header / ownership を前提にした C / C++ review
 - `oop-readability-check`
   - OOP readability tool の機械実行、表形式 report、分離された agent 分析
+- `result-artifact-writeout`
+  - tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`

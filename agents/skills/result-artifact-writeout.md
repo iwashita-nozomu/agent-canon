@@ -1,0 +1,79 @@
+# result-artifact-writeout
+<!--
+@dependency-start
+responsibility Documents result-artifact-writeout for this repository.
+upstream design ../canonical/skills.md skill canon registry
+upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement
+upstream design ../../documents/experiment-report-style.md experiment report artifact policy
+downstream implementation ../../.agents/skills/result-artifact-writeout/SKILL.md exposes this workflow as a runtime skill
+@dependency-end
+-->
+
+
+## Purpose
+
+tool、hook、eval、experiment、review、CI の結果を、あとから再利用できる
+artifact として書き出すための skill です。
+chat 要約だけで閉じず、raw result、human summary、manifest、report path を
+同じ source result に結び付けます。
+
+## Use When
+
+- user が結果の保存、書き出し、export、report、表、JSON / JSONL / Markdown 化を求める
+- tool / checker / hook / skill eval の結果を次の改善 branch が読む必要がある
+- experiment result と reader-facing report を同じ run から作る
+- 既存 result を上書きせず、unique ID 付きで蓄積したい
+
+## Output Contract
+
+- `source_result`: どの command、tool output、raw JSON / JSONL、run directory、hook line を正本にしたか
+- `artifact_id`: timestamp、run id、hook_run_id、commit SHA、または run_name から作る unique ID
+- `raw_artifact`: 生データまたは機械可読 result
+- `summary_artifact`: Markdown / table / short report
+- `manifest`: command、argv、cwd、branch、commit、runtime namespace、started / finished timestamp、exit code、status、input config、counts、schema version
+- `destination_class`: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, `generated-triage`
+- `overwrite_policy`: `append-only`, `unique-file`, `regenerate-from-source`, or explicit cleanup task
+
+## Destination Rules
+
+- run-local task evidence: `reports/agents/<run-id>/`
+- accumulated skill / workflow eval: `agents/evals/results/<eval-family>/<unique-id>.md`
+- hook result chronology: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`
+- experiment raw result: `experiments/<topic>/result/<run_name>/`
+- experiment reader report: `experiments/report/<run_name>.md`
+- generated triage report: `reports/<tool-or-task>/`
+
+Do not store generated reports as policy truth. If a report changes a rule, edit
+the canonical workflow, skill, document, or tool and cite the result artifact as
+evidence.
+
+## Required Shape
+
+1. Choose the destination class before writing.
+1. Preserve the raw machine-readable result before writing a prose summary.
+1. Derive tables and Markdown from the same raw result; do not rerun a checker
+   just to get nicer prose unless the rerun is explicitly recorded as a new
+   source result.
+1. Treat failed, skipped, blocked, and partial runs as writeout targets too;
+   do not drop them because they are not success evidence.
+1. Use a unique path or append-only JSONL for repeated runs. Do not overwrite
+   detailed eval, hook, skill, or experiment results.
+1. Include enough stable identifiers to group repeats without losing chronology:
+   status, exit code, payload / input fingerprint, runtime namespace, branch,
+   commit, and tool or hook name when available.
+1. Include the artifact path in the final response or handoff.
+1. If the result is reader-facing, separate observation, interpretation,
+   limitations, and next action.
+
+## Closeout Tokens
+
+Record these in `workflow_monitoring.md`, a handoff, or the generated report:
+
+```text
+result_writeout=complete
+result_source=<command-or-raw-artifact>
+result_raw_artifact=<path>
+result_summary_artifact=<path>
+result_manifest=<path-or-inline>
+result_overwrite_policy=<append-only|unique-file|regenerate-from-source>
+```

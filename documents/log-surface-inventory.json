@@ -436,8 +436,56 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "tool_call",
-      "line": 146,
+      "line": 149,
       "path": "agents/skills/oop-readability-check.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_manifest",
+      "line": 77,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_overwrite_policy",
+      "line": 78,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_raw_artifact",
+      "line": 75,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_source",
+      "line": 74,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_summary_artifact",
+      "line": 76,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "result_writeout",
+      "line": 73,
+      "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
     {
@@ -6264,6 +6312,7 @@
     ".agents/skills/python-review/SKILL.md",
     ".agents/skills/repo-onboarding/SKILL.md",
     ".agents/skills/research-workflow/SKILL.md",
+    ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
     ".agents/skills/subagent-bootstrap/SKILL.md",
     ".agents/skills/test-design/SKILL.md",
@@ -6292,6 +6341,7 @@
     ".claude/skills/python-review/SKILL.md",
     ".claude/skills/repo-onboarding/SKILL.md",
     ".claude/skills/research-workflow/SKILL.md",
+    ".claude/skills/result-artifact-writeout/SKILL.md",
     ".claude/skills/start-repository/SKILL.md",
     ".claude/skills/subagent-bootstrap/SKILL.md",
     ".claude/skills/test-design/SKILL.md",
@@ -6350,6 +6400,7 @@
     "agents/skills/report-review.md",
     "agents/skills/research-perspective-review.md",
     "agents/skills/research-workflow.md",
+    "agents/skills/result-artifact-writeout.md",
     "agents/skills/start-repository.md",
     "agents/skills/static-check.md",
     "agents/skills/static-validation.md",

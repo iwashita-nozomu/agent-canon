@@ -41,6 +41,10 @@ skill_families:
     purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
+  - id: result-artifact-writeout
+    purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
+    canonical_doc: agents/skills/result-artifact-writeout.md
+    shim: .agents/skills/result-artifact-writeout/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md

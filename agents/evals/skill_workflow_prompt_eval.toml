@@ -10,7 +10,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 28
+expected_count = 29
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -35,7 +35,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 50
+expected_count = 51
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -86,7 +86,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 28
+expected_count = 29
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -107,6 +107,30 @@ id = "CLAUDE-SKILL-GENERIC-3"
 critical = true
 description = "Provides an executable numbered instruction list."
 required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "result-artifact-writeout-skill"
+target = ".agents/skills/result-artifact-writeout/SKILL.md"
+kind = "skill"
+description = "Result writeout must preserve raw evidence, summary artifacts, manifests, unique paths, and no-overwrite policy."
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-1"
+critical = true
+description = "Requires raw source result and summary artifact separation."
+required_regex = ["raw", "summary", "source result"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-2"
+critical = true
+description = "Requires manifest, unique artifact path, and overwrite policy."
+required_regex = ["manifest", "unique", "overwrite"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-3"
+critical = true
+description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
+required_regex = ["failed", "partial", "status", "exit code"]
 
 [[evals]]
 id = "all-canonical-routing-docs"
