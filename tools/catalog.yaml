@@ -1055,3 +1055,20 @@ entries:
       - tools/README.md
     tests: []
     test_exempt_reason: Consumed through the compatibility wrapper.
+
+  - id: notebook-quality
+    summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
+    path: tools/validation/notebook_quality.py
+    family: validation
+    role: checker
+    status: canonical
+    command: python3 tools/validation/notebook_quality.py --all
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_notebook_quality.py

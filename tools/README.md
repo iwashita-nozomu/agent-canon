@@ -93,6 +93,7 @@ retired legacy tool reintroduction.
   - shared helper
 - `validation/`
   - generic validation helper
+  - `notebook_quality.py` は notebook を細かい test ではなく、説明付きで部分実行しやすい実用 demo として保つための checker です。
 - `static_analysis/`
   - language-organized index for Python, C/C++, and common static-analysis entrypoints. OOP readability implementations are exposed through `oop/python/` and `oop/cpp/`.
 - top-level helper
