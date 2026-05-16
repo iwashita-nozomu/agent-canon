@@ -671,6 +671,184 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotIn("public_fields:RunConfig", result.stdout)
             self.assertNotIn("state_heavy_public_surface:StepMetrics", result.stdout)
 
+    def test_cpp_named_schema_aggregates_are_value_objects(self) -> None:
+        """Schema-named C++ aggregates are data contracts, not behavior owners."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "schema.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "struct PacketRecord {",
+                        *[f"  int field_{index};" for index in range(12)],
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("public_fields:PacketRecord", result.stdout)
+            self.assertNotIn("state_heavy_public_surface:PacketRecord", result.stdout)
+
+    def test_cpp_struct_with_behavior_keeps_public_state_signal(self) -> None:
+        """A struct that mixes public state and methods is still reported."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "model.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "struct MutableModel {",
+                        "  int value;",
+                        "  int cache;",
+                        "  int run() const { return value; }",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("state_heavy_public_surface:MutableModel", result.stdout)
+
+    def test_cpp_annotated_primitive_abi_parameters_are_allowed(self) -> None:
+        """Annotated primitive ABI signatures keep their raw parameter lists."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "primitive.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "#define NATIVE_AD_VJP(name)",
+                        "template <typename T>",
+                        "NATIVE_AD_VJP(\"primitive\")",
+                        "inline void primitive_vjp(",
+                        "    const T* input,",
+                        "    const T* weights,",
+                        "    const T* bias,",
+                        "    T* dinput,",
+                        "    T* dweights,",
+                        "    T* dbias,",
+                        "    const T* doutput,",
+                        "    std::size_t input_width,",
+                        "    std::size_t output_width,",
+                        "    std::size_t batch_size) {}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("parameters:primitive_vjp", result.stdout)
+
+    def test_cpp_exported_abi_parameters_are_allowed(self) -> None:
+        """Stable exported ABI functions are not forced into request objects."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "abi.cpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "extern \"C\" void __nad_ep_impl_example(",
+                        "    const float* input,",
+                        "    const float* weights,",
+                        "    const float* bias,",
+                        "    float* output,",
+                        "    std::size_t input_width,",
+                        "    std::size_t output_width,",
+                        "    std::size_t batch_size) {}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("parameters:__nad_ep_impl_example", result.stdout)
+
+    def test_cpp_expression_dsl_identity_terminal_is_allowed(self) -> None:
+        """Expression-rewrite visitors may return unchanged terminal nodes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "dsl.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "template <typename Expression, typename Bindings>",
+                        "constexpr auto apply_compile_bindings(",
+                        "    const Expression& expression,",
+                        "    const Bindings&) noexcept {",
+                        "  return expression;",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("identity_function:apply_compile_bindings", result.stdout)
+
+    def test_cpp_operator_heavy_scalar_surface_is_allowed(self) -> None:
+        """Numeric scalar value objects are allowed to expose arithmetic operators."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "scalar.hpp"
+            source.write_text(
+                "\n".join(
+                    [
+                        "struct float32x2 {",
+                        "  float x0 = 0.0f;",
+                        "  float x1 = 0.0f;",
+                        "  float32x2() = default;",
+                        *[
+                            (
+                                "  friend auto operator"
+                                f"{operator}(const float32x2&, const float32x2&) "
+                                "-> float32x2;"
+                            )
+                            for operator in (
+                                "+",
+                                "-",
+                                "*",
+                                "/",
+                                "==",
+                                "!=",
+                                "<",
+                                ">",
+                                "<=",
+                                ">=",
+                                "+=",
+                                "-=",
+                                "*=",
+                            )
+                        ],
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(source))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("public_methods:float32x2", result.stdout)
+
     def test_cpp_null_runtime_branch_is_flagged(self) -> None:
         """Null-driven C++ routing is reported as a readability risk."""
         with tempfile.TemporaryDirectory() as tmp_dir:

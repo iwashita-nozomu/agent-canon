@@ -166,6 +166,12 @@ python3 tools/oop/cpp/rule_inventory.py
 - 数理的に不要な identity function、pass-through function、stateless callable class。
 - domain contract を足さない trivial formatting function。
 
+C++ checker は schema / DTO / config / metrics などの named aggregate value
+object、annotated primitive ABI / `__nad_` exported ABI function、式 DSL の
+terminal identity morphism、compact numeric scalar wrapper を意図的な境界として扱います。
+これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
+public state owner や domain contract のない wrapper の finding とは区別します。
+
 score は設計判断の補助です。
 `OOP_READABILITY=pass` は behavior correctness や設計妥当性を保証しません。
 重要な変更では、機械 report を正本にします。

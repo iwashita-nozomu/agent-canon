@@ -124,6 +124,28 @@ class OopRuleInventoryTest(unittest.TestCase):
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["missing"], [])
 
+    def test_cpp_readability_doc_covers_boundary_exemptions(self) -> None:
+        """C++ tool docs should describe the implemented allowed boundaries."""
+        doc = (
+            PROJECT_ROOT
+            / "documents"
+            / "tools"
+            / "oop"
+            / "cpp"
+            / "readability.md"
+        ).read_text(encoding="utf-8")
+
+        required_terms = (
+            "named aggregate value object",
+            "NATIVE_AD_VJP",
+            "__nad_",
+            "apply_compile_bindings",
+            "numeric scalar value object",
+        )
+        for term in required_terms:
+            with self.subTest(term=term):
+                self.assertIn(term, doc)
+
 
 if __name__ == "__main__":
     unittest.main()

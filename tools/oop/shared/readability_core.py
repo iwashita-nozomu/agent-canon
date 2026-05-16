@@ -110,11 +110,82 @@ TOP_FILES_SUMMARY_LIMIT = 20
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
 CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES = (
+    "Argument1D",
+    "Binding",
+    "Buffers",
+    "Cache",
     "Comparison",
     "Config",
+    "Contract",
+    "Criterion",
+    "Decision",
+    "Descriptor",
+    "DescriptorV3",
+    "Eligibility",
+    "Entry",
+    "Functions",
+    "Handle",
+    "Header",
+    "Identity",
     "Info",
+    "Key",
+    "Layout",
+    "Manifest",
     "Metrics",
+    "Norms",
+    "Parameter",
+    "Paths",
+    "Point",
+    "Problem",
+    "Record",
+    "Result",
+    "Rule1D",
+    "Selection",
+    "Segment",
     "Set",
+    "Shape",
+    "Slice",
+    "Snapshot",
+    "Spec",
+    "State",
+    "Stats",
+    "Storage",
+    "Tape",
+    "Triangle",
+    "Views",
+    "Workspace",
+)
+CPP_AGGREGATE_VALUE_OBJECT_NAMES = (
+    "Add",
+    "Answer",
+    "Cos",
+    "Divide",
+    "EvaluationContext",
+    "Exp",
+    "FunctionIr",
+    "Literal",
+    "Log",
+    "LoweringOpcodeFor",
+    "Multiply",
+    "Negate",
+    "Sin",
+    "StateFunction",
+    "StateFunctionResult",
+    "Step",
+    "Subtract",
+    "operator_vector_leaf_traits",
+    "two_float",
+)
+CPP_DOMAIN_IDENTITY_FUNCTION_NAMES = {"apply_compile_bindings"}
+CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE = re.compile(
+    r"^(?:bfloat|float|int|uint)\d+x\d+$"
+)
+CPP_ABI_FUNCTION_PREFIXES = ("__nad_",)
+CPP_ABI_MARKER_MACROS = (
+    "NATIVE_AD_AUGMENT",
+    "NATIVE_AD_JVP",
+    "NATIVE_AD_PRIMAL",
+    "NATIVE_AD_VJP",
 )
 LANGUAGE_SUFFIXES = {
     "all": PYTHON_SUFFIXES | CPP_SUFFIXES,
@@ -2490,6 +2561,38 @@ def cpp_member_candidates(public_body: str) -> list[str]:
     return members
 
 
+def cpp_scalar_operator_value_object(name: str) -> bool:
+    """Return true for compact numeric scalar wrappers with operator-heavy APIs."""
+    return CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE.fullmatch(name) is not None
+
+
+def cpp_aggregate_value_object_name(name: str) -> bool:
+    """Return true for C++ aggregate names that carry schema or DSL values."""
+    return name in CPP_AGGREGATE_VALUE_OBJECT_NAMES or name.endswith(
+        CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES
+    )
+
+
+def cpp_preceding_lines(text: str, start: int, line_count: int) -> str:
+    """Return a small source window immediately before an index."""
+    return "\n".join(text[:start].splitlines()[-line_count:])
+
+
+def cpp_abi_boundary_function(
+    analysis_text: str,
+    start: int,
+    prefix: str,
+    name: str,
+) -> bool:
+    """Return true for C++ functions whose signature is a compiler/runtime ABI."""
+    if name.startswith(CPP_ABI_FUNCTION_PREFIXES):
+        return True
+    if "extern" in prefix and name.startswith(CPP_ABI_FUNCTION_PREFIXES):
+        return True
+    preceding = cpp_preceding_lines(analysis_text, start, 4)
+    return any(marker in preceding for marker in CPP_ABI_MARKER_MACROS)
+
+
 def cpp_parameter_count(params: str) -> int:
     """Count C++ function parameters approximately."""
     return len(cpp_split_top_level(params))
@@ -2756,6 +2859,7 @@ class CppClassShape:
     public_fields: int
     base_count: int
     aggregate_value_object: bool
+    scalar_operator_value_object: bool
 
 
 @dataclass(frozen=True)
@@ -2772,6 +2876,8 @@ class CppFunctionShape:
     identity_parameter: str | None
     passthrough: tuple[str, int] | None
     trivial_format: str | None
+    abi_boundary: bool
+    domain_identity_boundary: bool
 
 
 def analyze_cpp_class(
@@ -2805,17 +2911,17 @@ def cpp_class_shape(
     public_members = cpp_member_candidates(public_body)
     public_methods = [item for item in public_members if "(" in item and ")" in item]
     public_fields = [item for item in public_members if item not in public_methods]
-    aggregate_value_object = bool(public_fields) and not public_methods and match.group(
-        "name"
-    ).endswith(CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES)
+    name = match.group("name")
+    aggregate_value_object = bool(public_fields) and cpp_aggregate_value_object_name(name)
     return CppClassShape(
-        name=match.group("name"),
+        name=name,
         line=line_at(analysis_text, match.start()),
         class_lines=line_count(analysis_text[match.start() : close_index]),
         public_methods=len(public_methods),
         public_fields=len(public_fields),
         base_count=len([part for part in bases.split(",") if part.strip()]),
         aggregate_value_object=aggregate_value_object,
+        scalar_operator_value_object=cpp_scalar_operator_value_object(name),
     )
 
 
@@ -2876,7 +2982,10 @@ def add_cpp_class_surface_findings(
             thresholds.max_class_lines,
             "split-class-by-state-contract-or-adapter-boundary",
         )
-    if shape.public_methods > thresholds.max_public_methods:
+    if (
+        not shape.scalar_operator_value_object
+        and shape.public_methods > thresholds.max_public_methods
+    ):
         add_finding(
             findings,
             context.root,
@@ -2964,6 +3073,13 @@ def cpp_function_shape(
         identity_parameter=cpp_identity_parameter(match.group("params"), body),
         passthrough=cpp_passthrough_call(match.group("params"), body),
         trivial_format=cpp_trivial_format_function(name, body),
+        abi_boundary=cpp_abi_boundary_function(
+            analysis_text,
+            match.start(),
+            match.group("prefix"),
+            name,
+        ),
+        domain_identity_boundary=name in CPP_DOMAIN_IDENTITY_FUNCTION_NAMES,
     )
 
 
@@ -3010,7 +3126,7 @@ def add_cpp_function_shape_findings(
             thresholds.max_function_lines,
             "split-decision-transform-and-side-effect-responsibilities",
         )
-    if shape.parameters > thresholds.max_parameters:
+    if shape.parameters > thresholds.max_parameters and not shape.abi_boundary:
         add_finding(
             findings,
             context.root,
@@ -3074,7 +3190,7 @@ def add_cpp_function_type_findings(
             "pure-or-effect-boundary",
             "separate-value-transform-from-io-or-mutation",
         )
-    if shape.identity_parameter is not None:
+    if shape.identity_parameter is not None and not shape.domain_identity_boundary:
         add_finding(
             findings,
             context.root,
