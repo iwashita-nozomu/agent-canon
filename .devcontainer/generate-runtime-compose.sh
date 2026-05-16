@@ -38,6 +38,7 @@ try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
+import json
 
 with open(sys.argv[1], "rb") as handle:
     data = tomllib.load(handle)
@@ -46,6 +47,10 @@ runtime = data.get("runtime", {})
 print(pack["dockerfile"])
 print(runtime.get("workdir", "/workspace"))
 print(runtime.get("workspace_mount", "/workspace"))
+for item in runtime.get("env", []):
+    name, separator, value = str(item).partition("=")
+    if separator:
+        print(f"ENV:{name}: {json.dumps(value)}")
 PY
   )
 
@@ -53,11 +58,18 @@ PY
   dockerfile="${pack_values[0]}"
   workdir="${pack_values[1]}"
   workspace_mount="${pack_values[2]}"
+  pack_environment_lines=()
+  for pack_value in "${pack_values[@]:3}"; do
+    if [[ "$pack_value" == ENV:* ]]; then
+      pack_environment_lines+=("      ${pack_value#ENV:}")
+    fi
+  done
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_environment_lines=()
 fi
 
 volume_lines=("      - ..:${workspace_mount}:cached")
@@ -85,6 +97,7 @@ fi
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
+  "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
