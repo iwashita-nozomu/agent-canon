@@ -80,8 +80,7 @@ agentcanon_pr_branch_pending() {
   fi
   git -C vendor/agent-canon fetch origin main >/dev/null 2>&1 || true
   remote_main="$(git -C vendor/agent-canon rev-parse origin/main 2>/dev/null || true)"
-  if [[ -n "${remote_main}" && "${parent_pin}" != "${remote_main}" ]] \
-    && git -C vendor/agent-canon merge-base --is-ancestor "${remote_main}" "${parent_pin}" >/dev/null 2>&1; then
+  if [[ -z "${remote_main}" || "${parent_pin}" != "${remote_main}" ]]; then
     return 0
   fi
   return 1
