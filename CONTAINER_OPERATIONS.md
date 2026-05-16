@@ -111,6 +111,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - `/mnt/git` is compatibility-only. Configure it only when the host path exists.
 - Shared post-create logic must tolerate a repository that has no local bare
   mirror and no host-specific optional mount.
+- Devcontainer-generated Compose must forward repo-local runtime environment
+  entries from `docker/packs/default.toml` so editor kernels, shells, and smoke
+  commands share the same import root.
 
 ## Python Dependency Rules
 

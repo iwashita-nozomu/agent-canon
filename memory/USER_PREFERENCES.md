@@ -147,6 +147,9 @@ upstream design README.md memory surface index
 - 2026-05-11 | Within Docker or devcontainer environments, Codex may use available runtime features and install/configure development dependencies more freely, while keeping host-level changes conservative.
   - source: chat
 
+- 2026-05-15 | Jupyter notebooks should be readable practical demos that show partial execution and runnable visualization; detailed assertions and fine-grained tests belong in tests/, and hooks should block notebook-as-test misuse.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

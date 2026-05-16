@@ -5,7 +5,6 @@ responsibility Documents AgentCanon licensing ownership and parent-repository bo
 upstream design ../LICENSE AgentCanon license text
 upstream design ./SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 upstream design ../vendor/README.md third-party vendor policy
-downstream design ../README.md AgentCanon repository overview
 downstream design ./shared-runtime-surfaces.toml classifies parent-repository license surfaces
 @dependency-end
 -->

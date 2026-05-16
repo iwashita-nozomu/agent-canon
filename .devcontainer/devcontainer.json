@@ -16,5 +16,27 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh /workspace",
   "postAttachCommand": "bash .devcontainer/post-attach.sh",
   "shutdownAction": "stopCompose",
-  "overrideCommand": false
+  "overrideCommand": false,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode-remote.remote-containers",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-renderers",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ],
+      "settings": {
+        "jupyter.notebookFileRoot": "/workspace",
+        "python.analysis.extraPaths": [
+          "/workspace/python"
+        ],
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.terminal.activateEnvironment": false
+      }
+    }
+  }
 }
