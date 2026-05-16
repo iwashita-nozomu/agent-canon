@@ -27,7 +27,6 @@ SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/shared-runtime-surfa
 usage() {
   cat <<EOF
 Usage:
-  # Normal submodule-era routes
   bash tools/sync_agent_canon.sh plan [branch]
   bash tools/sync_agent_canon.sh link-root
   bash tools/sync_agent_canon.sh check
@@ -35,11 +34,9 @@ Usage:
   bash tools/sync_agent_canon.sh ensure-latest [branch]
   bash tools/sync_agent_canon.sh status
 
-  # Legacy / low-level compatibility routes
-  bash tools/sync_agent_canon.sh snapshot
-  bash tools/sync_agent_canon.sh add <remote-url> [branch]
-  bash tools/sync_agent_canon.sh pull [branch]
-  bash tools/sync_agent_canon.sh push <branch>
+Legacy subtree / snapshot / direct push routes are compatibility-only and are
+not listed as user-facing commands. Use tools/update_agent_canon.sh for normal
+GitHub/submodule-first parent repo updates.
 
 Environment overrides:
   AGENT_CANON_PREFIX

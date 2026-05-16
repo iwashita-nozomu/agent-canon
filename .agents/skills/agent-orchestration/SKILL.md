@@ -23,7 +23,8 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`
-   - for `repo-changing execution`, add `$codex-task-workflow` and `$subagent-bootstrap`
+   - for `repo-changing execution`, add `$codex-task-workflow`
+   - add `$subagent-bootstrap` only when the task is Shared canon, Large delivery, high-risk, multi-step, or explicitly uses subagents
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
      - README, workflow, guide, migration, or other long reader-facing docs -> `$long-form-writing`
@@ -46,5 +47,5 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - the starter command when the scenario asks for kickoff guidance
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`
 1. Mention Codex implementation routing only when implementation is in scope. Read `agents/canonical/CODEX_SUBAGENTS.md` before assigning agents.
-1. For implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
+1. For Routine docs or Focused code, parent-direct implementation is allowed after the risk class and check matrix are fixed. For subagent implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
 1. Do not route detailed design, review, or final judgment to `spark_worker`.

@@ -24,6 +24,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 ## Core References
 
 - `agents/TASK_WORKFLOWS.md`
+- `documents/runtime-profiles-and-check-matrix.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
 - `agents/canonical/CLI_ENTRYPOINTS.md`
@@ -43,7 +44,8 @@ mode の意味:
 - `repo-changing execution`
   - repo を今から触る
   - run bundle や kickoff command が必要
-  - `$codex-task-workflow` と `$subagent-bootstrap` を足す
+  - `$codex-task-workflow` を足す
+  - `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の時だけ足す
   - task-shape skill は `$agent-orchestration` の後に足す
 - `routing-only/advisory`
   - workflow family、skill、review、starter guidance だけを先に決める
@@ -78,7 +80,8 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - user が明示した `$skill-name` は preserve します
 - `$agent-orchestration` は routing skill として常に先頭に置きます
-- `repo-changing execution` では `$codex-task-workflow` と `$subagent-bootstrap` を足します
+- `repo-changing execution` では `$codex-task-workflow` を足します
+- `$subagent-bootstrap` は Shared canon / Large delivery / high-risk / multi-step / explicit subagent work の時だけ足します
 - README、workflow、guide、migration のような長文 docs では `long-form-writing` を足します
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
@@ -99,13 +102,13 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - family に応じた reviewer / specialist stack まで出します
 - `Research-Driven Change` では research / report / reproducibility / benchmark / artifact 系 reviewer を落としません
-- long-form docs では `document_flow_reviewer` と docs completeness review を落としません
+- long-form docs では docs-impact がある場合に `document_flow_reviewer` と docs completeness review を使います
 - academic/paper work では notation / logic review を落とさず、paper draft では `citation_evidence_reviewer` も追加します
 
 ## Codex Implementation Routing
 
 - implementation が scope に入るときだけ routing を出します
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS` を確認してから route します
-- design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
+- Routine docs / Focused code では parent-direct を許可します。subagent 実装では、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。

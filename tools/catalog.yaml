@@ -14,6 +14,9 @@ scope: shared_canon
 status_values:
   - canonical
   - compatibility_wrapper
+  - optional
+  - maintainer_only
+  - retired
 
 family_values:
   - agent_tools

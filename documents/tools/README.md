@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents ツール入口 for this repository.
 upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
@@ -16,11 +17,12 @@ root 側からよく使う実行導線だけを整理します。
 
 agent/worktree helper、review / validation runner、docs-check helper、container runtime helper、experiment scaffold / registry helper のうち shared canon に属するものは `vendor/agent-canon/` が正本です。
 ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
+実行する tool は [Runtime Profiles And Check Matrix](../runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
 
 ## AgentCanon Tool Catalog
 
 - `tools/catalog.yaml`
-  - canonical tool と compatibility wrapper の構造化カタログです。
+  - canonical、compatibility wrapper、optional、maintainer-only、retired tool の構造化カタログです。
 - `tools/agent_tools/tool_catalog.py`
   - catalog の schema、path、説明、docs/tests、default wiring、retired legacy 混入を検査し、`--format markdown` で対応表を出します。
 - `tools/agent_tools/tool_drift.py`
@@ -39,7 +41,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 ## よく使うもの
 
 - `tools/ci/run_all_checks.sh`
-  - 主要なチェックをまとめて実行します。
+  - full confidence が必要な時に主要なチェックをまとめて実行します。small docs / focused code では check matrix に従って個別 check を選びます。
 - `tools/ci/pre_review.sh`
   - review 前の基礎 gate をまとめて実行します。
 - `tools/ci/run_docs_checks.sh`
@@ -68,7 +70,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/experiments/run_managed_experiment.py`
   - shared managed-runner として server 上の実験 run artifact を初期化します。
 - `tools/run_comprehensive_review.sh`
-  - repo 全体の確認をまとめて実行します。
+  - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
 - `tools/run_pytest_with_logs.sh`
   - Python テストをログ付きで実行します。
 - `tools/docs/check_markdown_lint.py`
@@ -84,7 +86,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/docs/fix_markdown_docs.py`
   - conservatively な Markdown 整形を当てます。
 - `tools/docs/find_similar_documents.py`
-  - 重複・統合候補の文書を探します。
+  - document maintenance profile で重複・統合候補の文書を探します。
 - `tools/docs/find_redundant_designs.py`
   - `documents/design/` の exact duplicate を検出し、consolidation report を作ります。
 - `tools/docs/find_similar_designs.py`
@@ -98,7 +100,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/hlo/summarize_hlo_jsonl.py`
   - HLO JSONL から dialect、tag、operation count の summary JSON を出します。
 - `tools/audit/audit_logger.py`
-  - agent / repo automation event を JSONL audit log として保存します。
+  - audit profile で agent / repo automation event を JSONL audit log として保存します。
 - `tools/worktree_start.sh`
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
@@ -152,6 +154,7 @@ python3 tools/agent_tools/vector_search.py --surface tools --query "github cli v
   - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
 - `tools/agent_tools/review_backlog_scan.sh`
   - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
+  - goal / maintainer / audit profile の tool であり、通常の small change では required gate にしません。
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
   - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。
   - PR readiness 前に、出力された inventory と dependency graph から、AgentCanon-owned source、template/root local state、synced copy、symlink view、GitHub path-constraint copy、project-owned artifact のどれを編集 / 検証するかを明示します。

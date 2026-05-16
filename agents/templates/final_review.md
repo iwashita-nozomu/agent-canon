@@ -39,7 +39,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Post-Fix Full Review Rerun Review
 
-<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the full required review set was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last full review pass. Return revise if any tiny fix skipped the rerun. -->
+<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the active required review set for the risk class and changed surface was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last applicable review pass. Return revise if any tiny fix skipped the rerun. -->
 
 ## Repo-Wide Dependency Review
 

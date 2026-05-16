@@ -40,8 +40,9 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 ## Required Output
 
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
-- repo-changing task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
-- repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` を併用する
+- Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
+- Routine docs / Focused code では parent-direct を許可し、必要な targeted validation を通す
+- repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る
 - repository task の intake では、ユーザーが MCP を明示していなくても `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行し、pass したら repo MCP tools を repo root / status / context 確認の優先候補にする
 - AgentCanon owns the repo MCP implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md`; Codex owns `.codex/config.toml` registration, project trust, hooks, apps, external connectors, and session tool availability
@@ -53,4 +54,4 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 - parent 直編集でも write-capable subagent でも、実装前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、予測された OOP / helper / dependency / hook runtime / skill mirror / tool catalog / protocol / log-surface gate と repair plan を handoff または work log に残す
 - closeout 前に `check_dependency_headers.py --changed`、`scan_dependency_headers.sh --changed --fail-missing`、`check_dependency_header_format.sh --changed --require-header` を通す
 - dependency edge を変更した場合は `check_dependency_graph.sh --print-edges` の結果、または移行中 baseline と今回差分で新規 graph error を増やしていない evidence を残す
-- closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を tool で検出する
+- Shared canon / Large delivery / high-risk / workflow-tooling change では closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を tool で検出する
