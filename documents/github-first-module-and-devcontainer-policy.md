@@ -94,7 +94,8 @@ The shared devcontainer owns:
 
 The shared devcontainer consumes repo-local Docker runtime contracts instead of
 owning them. It reads `docker/packs/default.toml`, builds the repo-local
-`docker/Dockerfile`, and runs repo-local `docker/install_python_dependencies.sh`
+`docker/Dockerfile`, forwards the pack runtime environment into the generated
+Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
 
 `devcontainer.json` must not use a fixed AgentCanon display name for every

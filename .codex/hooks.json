@@ -10,6 +10,7 @@
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
+    "downstream implementation hooks/notebook_quality_guard.py blocks changed notebooks that behave like tests",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
     "@dependency-end"
   ],
@@ -66,6 +67,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed notebooks"
           }
         ]
       }
@@ -90,6 +97,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking changed notebooks"
           },
           {
             "type": "command",

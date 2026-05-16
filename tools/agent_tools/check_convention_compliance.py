@@ -89,6 +89,14 @@ TOOL_GATES = {
             "documents/conventions/common/02_naming.md",
         ),
     ),
+    "notebook_quality": (
+        "tools/validation/notebook_quality.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
     "oop_readability": (
         "tools/oop/python/readability.py",
         (
