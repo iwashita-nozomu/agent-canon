@@ -136,6 +136,9 @@ route_requires_agent_workflow() {
     local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
       return 0
       ;;
+    deferred_branch_pr)
+      return 1
+      ;;
   esac
   if [ "$prefix_mode" = "submodule" ] && [ "$submodule_worktree_status" = "dirty" ]; then
     return 0
@@ -223,14 +226,21 @@ cmd_latest() {
   fi
 
   latest_log="$(mktemp)"
-  if ! bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1; then
-    latest_rc=$?
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
     rm -f "$latest_log"
     emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
     return "$latest_rc"
   fi
   cat "$latest_log"
+  if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
+    rm -f "$latest_log"
+    bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
+    echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+    return 0
+  fi
   rm -f "$latest_log"
 
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" check

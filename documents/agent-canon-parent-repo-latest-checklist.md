@@ -8,6 +8,8 @@ downstream implementation ../tools/agent_tools/agent_canon_preflight.py emits ch
 downstream implementation ../tools/agent_tools/agent_canon_update_todos.py manages parent update TODO state
 downstream implementation ../tools/agent_tools/bootstrap_agent_run.py prints checklist evidence
 downstream implementation ../tools/agent_tools/task_start.py prints checklist evidence
+downstream implementation ../tools/sync_agent_canon.sh classifies parent pin freshness routes
+downstream implementation ../tools/ci/check_agent_canon_latest.sh enforces latest-state CI gate
 @dependency-end
 -->
 
@@ -332,7 +334,8 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 
 - unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
-- local-ahead parent gitlink: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
+- local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
+- clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.
 - local checkout branch: allowed, but PR-ready only after `bash tools/update_agent_canon.sh merge-main-into-current` emits `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`; these fields prove the branch contains the fetched remote `main`.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.

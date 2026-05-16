@@ -151,6 +151,59 @@ submodule_remote_url() {
   git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
 }
 
+submodule_pushed_branch_ref() {
+  local commit="$1"
+  local current_branch=""
+  local upstream_ref=""
+  local remote_ref=""
+  local remote_branch=""
+  local remote_commit=""
+  local display_branch=""
+
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+
+  if [ -n "$current_branch" ] && [ "$current_branch" != "$DEFAULT_BRANCH" ]; then
+    upstream_ref="$(git -C "$ROOT_DIR/$PREFIX" for-each-ref --format='%(upstream:short)' "refs/heads/$current_branch" 2>/dev/null || true)"
+  fi
+  if [ -n "${upstream_ref:-}" ]; then
+    remote_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify "$upstream_ref^{commit}" 2>/dev/null || true)"
+    if [ "$remote_commit" = "$commit" ]; then
+      echo "$current_branch:$upstream_ref"
+      return 0
+    fi
+  fi
+
+  while IFS= read -r remote_ref; do
+    [ -n "$remote_ref" ] || continue
+    case "$remote_ref" in
+      */HEAD)
+        continue
+        ;;
+    esac
+    remote_branch="${remote_ref#*/}"
+    [ "$remote_branch" != "$DEFAULT_BRANCH" ] || continue
+    remote_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify "$remote_ref^{commit}" 2>/dev/null || true)"
+    if [ "$remote_commit" = "$commit" ]; then
+      display_branch="${current_branch:-$remote_branch}"
+      [ "$display_branch" != "$DEFAULT_BRANCH" ] || display_branch="$remote_branch"
+      echo "$display_branch:$remote_ref"
+      return 0
+    fi
+  done < <(git -C "$ROOT_DIR/$PREFIX" for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null || true)
+
+  return 1
+}
+
+submodule_deferred_branch_pr_ref() {
+  local commit="$1"
+  local worktree_head="$2"
+  local worktree_status="$3"
+
+  [ "$worktree_head" = "$commit" ] || return 1
+  [ "$worktree_status" = "clean" ] || return 1
+  submodule_pushed_branch_ref "$commit"
+}
+
 ensure_submodule_checkout() {
   if git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     return
@@ -696,10 +749,24 @@ print_submodule_plan_details() {
   local worktree_head="$2"
   local worktree_status="$3"
   local remote_sha="$4"
+  local deferred_ref="${5:-}"
+  local deferred_branch=""
+  local deferred_remote_branch=""
 
   echo "agent_canon_plan_submodule_parent_pin=$parent_pin"
   echo "agent_canon_plan_submodule_worktree_head=${worktree_head:-<unavailable>}"
   echo "agent_canon_plan_submodule_worktree_status=$worktree_status"
+  if [ -n "$deferred_ref" ]; then
+    deferred_branch="${deferred_ref%%:*}"
+    deferred_remote_branch="${deferred_ref#*:}"
+    echo "agent_canon_plan_submodule_deferred_branch=$deferred_branch"
+    echo "agent_canon_plan_submodule_deferred_remote_branch=$deferred_remote_branch"
+    echo "agent_canon_plan_submodule_deferred_remote_branch_match=yes"
+  else
+    echo "agent_canon_plan_submodule_deferred_branch=<none>"
+    echo "agent_canon_plan_submodule_deferred_remote_branch=<none>"
+    echo "agent_canon_plan_submodule_deferred_remote_branch_match=no"
+  fi
   if [ -n "$remote_sha" ]; then
     if [ "$parent_pin" = "$remote_sha" ]; then
       echo "agent_canon_plan_submodule_parent_pin_remote_match=yes"
@@ -733,6 +800,7 @@ cmd_plan() {
   local dirty_update_surface="no"
   local submodule_worktree_head=""
   local submodule_worktree_status="not_applicable"
+  local submodule_deferred_ref=""
 
   ensure_prefix_exists
   if is_submodule_prefix; then
@@ -803,7 +871,12 @@ cmd_plan() {
     if [ "$local_tree" = "$remote_sha" ]; then
       route="already_current_submodule"
     elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_tree"; then
-      route="local_contains_remote"
+      submodule_deferred_ref="$(submodule_deferred_branch_pr_ref "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" || true)"
+      if [ -n "$submodule_deferred_ref" ]; then
+        route="deferred_branch_pr"
+      else
+        route="local_contains_remote"
+      fi
     elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$local_tree" "$remote_sha"; then
       route="submodule_update"
       requires_clean="yes"
@@ -842,7 +915,7 @@ cmd_plan() {
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
     "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
   if [ "$prefix_mode" = "submodule" ]; then
-    print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha"
+    print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha" "$submodule_deferred_ref"
   fi
 }
 
@@ -936,6 +1009,7 @@ cmd_ensure_latest() {
     local local_commit=""
     local worktree_commit=""
     local submodule_status=""
+    local submodule_deferred_ref=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     local_commit="$(submodule_commit)"
@@ -967,6 +1041,17 @@ cmd_ensure_latest() {
       return
     fi
     if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$local_commit"; then
+      submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+      submodule_deferred_ref="$(submodule_deferred_branch_pr_ref "$local_commit" "$worktree_commit" "$([ -z "$submodule_status" ] && echo clean || echo dirty)" || true)"
+      if [ -n "$submodule_deferred_ref" ]; then
+        echo "agent_canon_latest=deferred_branch_pr"
+        echo "agent_canon_latest_branch=${submodule_deferred_ref%%:*}"
+        echo "agent_canon_latest_remote_branch=${submodule_deferred_ref#*:}"
+        echo "agent_canon_latest_remote_branch_match=yes"
+        echo "agent_canon_latest_next=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+        cmd_link_root
+        return
+      fi
       echo "agent_canon_latest=local_contains_remote"
       echo "agent_canon_latest_next=push_agentcanon_branch_open_agent-canon_PR_then_rerun_ensure-latest"
       die "submodule '$PREFIX' parent pin contains commits not in remote main; push an AgentCanon branch and open a PR before treating it as latest"
