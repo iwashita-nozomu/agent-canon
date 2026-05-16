@@ -64,6 +64,8 @@ paths = [
   "documents/log-surface-inventory.json",
   "documents/agent-canon-parent-repo-latest-checklist.md",
   "documents/agent-canon-update-tasks.toml",
+  "documents/runtime-profiles-and-check-matrix.md",
+  "documents/template-agent-canon-audit-resolution.md",
   "documents/github-first-module-and-devcontainer-policy.md",
   "documents/agent-canon-licensing-policy.md",
   "documents/SKILL_IMPLEMENTATION_GUIDE.md",

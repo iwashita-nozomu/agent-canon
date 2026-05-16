@@ -14,7 +14,7 @@ skill_families:
     canonical_doc: agents/skills/repo-onboarding.md
     shim: .agents/skills/repo-onboarding/SKILL.md
   - id: start-repository
-    purpose: Start a new repository from the template clone, including bare remotes and project-local agent-canon seeding.
+    purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
     shim: .agents/skills/start-repository/SKILL.md
   - id: codex-task-workflow

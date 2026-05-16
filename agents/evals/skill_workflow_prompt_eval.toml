@@ -602,8 +602,8 @@ description = "The Codex workflow must route token-saving and goal-driven reques
 [[evals.checklist]]
 id = "CODEX-WF-TOKEN-1"
 critical = true
-description = "Mentions token profiles, agent modes, and non-waivable gates."
-required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "Full dependency review"]
+description = "Mentions token profiles, agent modes, and profile/risk-selected gates."
+required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "risk class", "targeted checks"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"

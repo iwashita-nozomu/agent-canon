@@ -3,8 +3,9 @@
 responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
-upstream design documents/agent-canon-subtree-migration.md legacy vendoring compatibility policy.
+upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
 upstream design documents/github-copilot-configuration.md GitHub Copilot configuration and PR-template routing.
+upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
 upstream design issues/README.md durable AgentCanon operational finding storage.
 downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
 downstream implementation tools/agent_tools/goal_loop.py controls active goal iteration state.
@@ -25,7 +26,8 @@ contract listed in `documents/README.md`.
 
 ## Subagent Usage
 
-- repo-changing task では、requirements / planning / detailed design / review / implementation を parent 1 人で抱え込まず、stage ごとに適切な subagent を明示して進めます。例外は trivial な単発編集だけで、その場合も run bundle に parent 直処理の理由を残します。
+- repo-changing task では、task の risk class を先に決めます。trivial / Routine docs / Focused code は parent-direct を許可し、Shared canon / Large delivery / high-risk では requirements / planning / detailed design / review / implementation を stage ごとに分けます。
+- subagent は task の複雑さ、review 独立性、write scope 分離で使います。使わない場合は user update または run bundle に parent-direct rationale を短く残します。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
@@ -59,7 +61,7 @@ contract listed in `documents/README.md`.
 - `documents/coding-conventions-python.md`
 - `documents/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
-- `documents/agent-canon-subtree-migration.md`
+- `documents/runtime-profiles-and-check-matrix.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
@@ -78,6 +80,15 @@ contract listed in `documents/README.md`.
 - Template-default implementation lives in `python/`.
 - Template-default environment and runtime guidance live in `docker/`.
 - Repo-wide durable rules live in `documents/`.
+
+## Runtime Profiles And Risk
+
+- Runtime surface が存在することと、その task で active であることを分けます。
+- Profile と validation matrix の正本は `documents/runtime-profiles-and-check-matrix.md` です。
+- Routine docs / Focused code / Profile change / Shared canon / Large delivery の risk class を使い、changed path と user request に合う check を選びます。
+- `make ci` は full confidence gate です。small docs や narrow code では docs check、targeted tests、changed-file dependency checks を evidence にできます。
+- AgentCanon-owned path、root shared views、hooks、skills、workflows、tools、submodule pin を触る場合は Shared canon profile として扱い、AgentCanon PR gate を通します。
+- MCP inventory check は現行 runtime requirement なので repository task では維持します。これは optional profile 化しません。
 
 ## AgentCanon Submodule Update Flow
 
@@ -123,9 +134,9 @@ contract listed in `documents/README.md`.
 - hook、skill eval、OOP/readability guard、workflow monitor が `agents/evals/results/**` または `reports/agents/<run-id>/` に記録を出した場合、その記録は closeout evidence です。append-only / unique-id file として扱い、上書き・削除・未説明の dirty log を残したまま完了報告しません。
 - tool / hook / review / CI の finding は、まず severity と修正先を決めます。S0/S1 または `fix-now` finding は新規機能や追加整理より先に直し、直せない場合は `issues/open/AC-YYYYMMDD-*.md`、PR body、run bundle のすべてに blocker として残します。
 - workflow defect、ログ欠落、hook 誤判定、PR gate 欠陥、検索/依存展開の欠落を見つけた場合は、同じ task 内で durable finding を作るか、既存 issue に追記します。会話上の指摘だけ、または run bundle だけに残して closeout しません。
-- repo-changing task では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。
-- repo-changing task では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
-- repo-changing task では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
+- Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
+- Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
+- Shared canon、Large delivery、goal task、long-running worktree では `reports/agents/<run-id>/work_log.md` を作業開始から closeout まで維持し、意味のある step ごとに更新します。
 - 詳細設計へ入る前に、その task で正本として残す設計文書 path と実装 path を固定します。tracked tree に parallel design doc、backup implementation、snapshot copy、`*_old`、`*_copy`、dated mirror を残しません。
 - repo に残す durable state は current tree head 上の canonical path だけです。履歴、review、作業メモは `git` と `reports/agents/<run-id>/` に残し、repo tree に別の truth surface を増やしません。
 - 大規模改修、統合、rename、構成変更の直後は、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書への参照を sweep し、current tree head の canonical surface だけを reader に見せます。旧参照の温存や「後で消す」前提で closeout してはいけません。
@@ -159,7 +170,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - host runtime では repo-local virtual environment を作りません。container runtime では canonical tool `python3 tools/ci/python_env_policy.py --create` から `.venv` だけを許可し、`venv/`、`env/`、`.conda/`、`conda-env/` や ad hoc env manager は使いません。
 - user request clause を持たない planning、design、implementation、review は無効です。active work は必ず clause ID に結び付けます。
 
-- Long README、workflow、guide、migration docs では `agents/skills/long-form-writing.md` を使い、subagent review を closeout 前に通します。
+- Long README、workflow、guide、migration docs では `$long-form-writing` または workflow の long-form overlay を使い、docs-impact がある場合だけ subagent review を closeout 前に通します。
 - Academic papers、thesis chapters、scholarly notes、symbol-dense claim-heavy documents では `agents/skills/academic-writing.md` を使い、notation reviewer と logic reviewer を closeout 前に分離して通します。
 - 投稿論文や thesis chapter の draft では `agents/skills/paper-writing.md` を優先し、citation / evidence reviewer も通します。
 - tuning、比較改善、探索的改造を backlog 付きで継続反復する task では `agents/skills/adaptive-improvement-loop.md` を outer loop にします。
@@ -172,7 +183,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - closeout 前に `agents/workflows/agent-learning-workflow.md` を見て、今回の task から `memory/AGENT_PHILOSOPHY.md` へ残す observation があるか確認します。
 - closeout 前に、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目があれば実装または該当 stage へ戻ります。
 - closeout 前に `python3 tools/agent_tools/task_close.py ...` の結果を mechanical closeout authority として扱い、chat 上の自己申告だけで完了扱いにしてはいけません。
-- closeout 前に independent diff-check を通します。user が multi-agent work を明示した場合は read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して approve / revise / escalate decision を artifact に残します。
+- Shared canon、Large delivery、高 risk 変更では closeout 前に independent diff-check を通します。user が multi-agent work を明示した場合は read-only diff-check agent を起動し、run bundle、request contract、schedule、latest diff、validation evidence、dependency evidence を渡して approve / revise / escalate decision を artifact に残します。
 - runtime の上位制約で spontaneous subagent spawn が禁止され、user も multi-agent work を明示していない場合は、read-only diff-check agent を起動せず、no-spawn rationale、mechanical diff review、`task_close.py` evidence を artifact に残します。
 - eval feedback action は chat で認めるだけでは完了ではありません。`workflow_monitoring.md`、eval report、goal backlog、workflow、skill、memory、または closeout artifact の該当箇所へ反映してから closeout します。
 - `workflow_monitoring.md` は `evaluate_agent_run.py` が読める machine-readable token を含めます。少なくとも skills、subagent routing、MCP preflight、dependency review、web research decision、eval feedback decision、intervention、next improvement target を token 化します。
@@ -191,8 +202,8 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - user-facing completion report は、`closeout_gate.md` が `mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes` になるまで出してはいけません。
 - user-facing completion report は、`closeout_gate.md` が `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が今回 scope に残っていないことを示すまで出してはいけません。
 - user-facing completion report は、作成・編集した human-authored text file の冒頭に `@dependency-start` / `@dependency-end` manifest block があり、`closeout_gate.md` が `dependency_headers_complete=yes` になるまで出してはいけません。
-- repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、依存 graph、header 欠落、header format を確認します。失敗した header は修正してから再実行し、`closeout_gate.md` に evidence を残します。
-- repo-changing task では、user-facing completion report 前に差分限定ではなく全 repo 対象の静的解析を通します。既定は `make ci` です。時間短縮目的の `make ci-quick` だけでは closeout evidence にしてはいけません。
+- Shared canon、Large delivery、高 risk 変更では、user-facing completion report 前に全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通します。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできます。
+- Shared canon、Large delivery、高 risk 変更では、user-facing completion report 前に全 repo 対象の静的解析を通します。既定は `make ci` です。Routine docs / Focused code は check matrix に従った targeted validation を evidence にできます。
 - `make ci` が環境要因で実行不能な場合は、少なくとも `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` を全 repo 設定で実行し、不足 toolchain は修復します。未実行のまま user-facing completion report を返してはいけません。
 - If a shared surface drifts, repair it with `bash tools/sync_agent_canon.sh link-root`.
 - `link-root` restores both symlink views and root files that are intentionally synced as copies.
@@ -215,7 +226,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - export worker に live Python object reference を渡してはいけません。cross-process 境界は serializable manifest と reconstruction recipe で渡します。
 - spot run、debug run、smoke run、partial run を正式 evidence や比較表の根拠にしてはいけません。
 - 最小実装、仕様の一部だけの実装、または未反映の required review findings が残る状態で完了扱いにしてはいけません。
-- review を受けて修正したあと、tiny fix だからといって full required review set を省略して closeout してはいけません。
+- review を受けて修正したあと、tiny fix だからといって risk class と changed surface に対する active required review set を省略して closeout してはいけません。
 - parent 自身の差分確認だけで mechanical completion loop や diff-check agent approval を完了扱いにしてはいけません。
 - correctness evidence と performance evidence を混同してはいけません。
 - code change、protocol change、XLA / runtime flag change を 1 つの iteration に混ぜてはいけません。
@@ -228,7 +239,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 未完了の planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断が残る状態で user-facing completion を返してはいけません。
 - read-only diff-check agent が最新 diff を approve していない状態で user-facing completion を返してはいけません。
 - 作成・編集した text file の冒頭に依存 file header が無い状態で user-facing completion を返してはいけません。
-- 全 repo 対象の依存解析、header scan / format / graph check、静的解析を通さないまま user-facing completion を返してはいけません。
+- active profile と risk class に応じた依存解析、header scan / format / graph check、静的解析を通さないまま user-facing completion を返してはいけません。Shared canon、Large delivery、高 risk 変更では全 repo 対象の evidence が必要です。
 - 正本でない設計文書、実装 copy、snapshot tree、backup file を tracked tree に残したまま closeout してはいけません。
 - 大規模改修や構成変更のあとに、削除済み・置換済みの implementation / document surface への参照を README、guide、workflow、規約文書、script help、validation 出力へ残したまま closeout してはいけません。
 - current tree head 以外を durable な product state として扱ってはいけません。履歴保持は `git` と run bundle artifact に限ります。

@@ -8,6 +8,7 @@ upstream design ../../issues/README.md durable AgentCanon operational finding st
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
+upstream design ../../documents/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
 -->
@@ -21,8 +22,8 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 
 1. `AGENTS.md` を読む
 1. AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。親 repo の無関係な dirty state だけを理由に skip しない
-1. Base Runtime Packet を読む
-1. Cross-Cutting Packet を読む
+1. Base Runtime Packet を読む。Routine docs / Focused code では必要最小限の packet に絞ってよい
+1. Cross-Cutting Packet を読む。profile 外の packet は `not_applicable` として扱う
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
@@ -45,7 +46,7 @@ Cross-Cutting Packet:
 - `documents/coding-conventions-python.md`
 - `documents/notes-lifecycle.md`
 - `agents/workflows/agent-learning-workflow.md`
-- `documents/agent-canon-subtree-migration.md`
+- `documents/runtime-profiles-and-check-matrix.md`
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
@@ -69,10 +70,27 @@ task 開始時は、parent repo の `vendor/agent-canon` submodule pin と submo
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
+### Runtime Profile And Risk Selection
+
+Before broad context loading or validation, classify the task with
+`documents/runtime-profiles-and-check-matrix.md`.
+
+- Routine docs and Focused code may run parent-direct with targeted validation.
+- Profile changes activate only their matching checker family: Docker,
+  GitHub/Copilot, experiment, C++, devcontainer, memory/eval, or maintenance.
+- Shared canon changes activate AgentCanon PR workflow and PR gate.
+- Large delivery activates the full run bundle, independent review, full
+  dependency review, and full validation gate.
+
+Do not run or explain inactive profiles just because the files exist in the
+template. Mark inactive profiles as `not_applicable` in the run artifact or PR
+body when evidence is needed.
+
 ### Context Sweep
 
 実装、設計変更、文書改訂、実験計画の前に、会話だけを根拠に進めません。
-次を topic keyword で探索し、該当 file を読んでから着手します。
+topic keyword search は risk class に合わせます。Large delivery / Shared canon は広く、
+Routine docs / Focused code は関連 directory と dependency header の範囲に絞ります。
 
 - `documents/`
 - `issues/`
@@ -90,7 +108,7 @@ user の durable preference を見落とさないため、`memory/USER_PREFERENC
 agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。
+large / multi-file / refactor で検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph で edit scope を展開します。small changes は dependency header と nearby call site / docs の manual related-file review で足ります。
 
 ```bash
 rg -l "topic keywords" > reports/search_hits.txt
@@ -187,9 +205,9 @@ Choose one subagent mode before delegation:
   implementation agents.
 - `deep-review`: additional independent read-only reviewers for high-risk work.
 
-Token-saving changes context loading, not correctness. Full dependency review,
-static analysis, diff-check review, closeout gates, and push requirements still
-apply when the task requires them.
+Token-saving changes context loading, not correctness. The active gates are
+those selected by runtime profile and risk class; token saving is not a reason
+to skip a gate that the selected profile requires.
 
 ### Edit Execution Surface
 
@@ -227,7 +245,7 @@ dependency surface は task に応じて次を見ます。
 
 ### File Dependency Manifest
 
-新規作成・編集する human-authored text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。
+新規作成・編集する canonical design / workflow / tool / policy / template text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。Routine notes、generated reports、closed issue records、archive / compatibility records は scanner の classification に従います。
 設計正本は `documents/dependency-manifest-design.md` です。
 旧 `Dependency Files:` block は新規・変更 file では使いません。
 
@@ -298,7 +316,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success だけでなく implementation alignment evidence が review artifact に残っている
-- required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも full required review set を最新 diff に対して最初からやり直している
+- required review の `fix now` findings が実装へ反映され、どんなに小さい review-driven fix でも risk class と changed surface に対する active required review set を最新 diff に対して最初からやり直している
 - 反映しない findings は follow-up ではなく、今回の completion を阻害しない理由と escalation が artifact に記録されている
 
 `closeout_gate.md` の `spec_product_coverage_complete=yes`、`review_findings_integrated=yes`、`post_fix_full_review_complete=yes` が揃うまで、`user_completion_report` を `unlocked` にしてはいけません。
@@ -528,11 +546,11 @@ cost を無視して review coverage を優先する run では、research-drive
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
-- README、workflow、guide、migration 文書のような長文では `long-form-writing` を読み、別 reviewer で `docs-completeness-review` も通す
-- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通す
+- README、workflow、guide、migration 文書のような長文で reader-facing 構成を変える場合は `long-form-writing` を読み、docs-impact が高い場合だけ別 reviewer で `docs-completeness-review` も通す
+- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、`notation_definition_reviewer`、`logic_gap_reviewer`、必要に応じて別 reviewer の `docs-completeness-review` を通す
 - 投稿論文や thesis chapter の draft では `paper-writing` を読み、`citation_evidence_reviewer` も別 instance で通す
-- code 変更では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
-- 研究・実験系の変更では `report_reviewer` と research perspective reviewers を default にし、optional 扱いを避ける
+- high-risk code 変更、新規 behavior、または regression-prone な修正では `test-design` を読み、実装前に `test_designer` で nasty case と regression case を固定する
+- 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
 - JAX export / native runtime の task では、最初の implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
 - cross-process export worker には live Python object reference を渡さず、serializable manifest と reconstruction recipe を渡す
 - `LoadedProgram` のような runtime materialization は compile DAG node にせず、runtime vertex / lifetime scope として扱う
@@ -549,14 +567,14 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 6. Validation
 
-- repo-changing task は差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。失敗した header は修正してから再実行する
-- repo-changing task は user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。`make ci-quick` は途中 checkpoint 用であり、final closeout の静的解析 evidence にはしない
+- Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
+- Shared canon、Large delivery、高 risk 変更では user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。Routine docs / Focused code は active profile の targeted checks を evidence にできる
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
 - Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
 - Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を parent 直編集の work log または write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
-- agent runtime / skill 変更では `make agent-checks`
-- checkpoint では `make ci-quick` を使ってよいが、final closeout では `make ci` を優先する
-- 必要に応じて `make ci`
+- agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
+- checkpoint では `make ci-quick` を使ってよい。final closeout は risk class に応じて `make ci`、`make agent-checks`、または targeted checks を選ぶ
+- full confidence が必要な場合は `make ci`
 - Python 変更では `pyright`、`pytest tests/`、`ruff check python tests --select D,E,F,I,UP --ignore E501` を確認する
 - C / C++ 変更では project-native configure / build / test evidence を確認し、CMake project なら `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build` を既定候補にする
 - 文書変更では markdown / link check を使う
@@ -573,8 +591,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes` が揃うまで、chunk completion を completion report にしない
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` が揃うまで、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断が残る completion report を出さない
 - `closeout_gate.md` の `dependency_headers_complete=yes` が揃うまで、作成・編集した text file の依存 file header が抜けた completion report を出さない
-- `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、header 修正まで完了していない completion report を出さない
-- `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence が無い completion report を出さない
+- Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` が揃うまで、checkpoint / final review で全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、header 修正まで完了していない completion report を出さない。Routine docs / Focused code は targeted dependency evidence を残す
+- Shared canon、Large delivery、高 risk 変更では `closeout_gate.md` の `repo_wide_static_analysis_complete=yes` が揃うまで、全 repo 対象の `make ci`、または `python3 -m pyright` と `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501` の static analysis evidence が無い completion report を出さない。Routine docs / Focused code は active profile の targeted static evidence を残す
 - `closeout_gate.md` の `spec_product_coverage_complete=yes` と `review_findings_integrated=yes` が揃うまで、仕様の一部だけの実装や未反映 review findings が残る completion report を出さない
 - `closeout_gate.md` の `mechanical_completion_loop_complete=yes` が揃い、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断が構造化 loop evidence として残るまで completion report を出さない
 - `closeout_gate.md` の `subagents_closed=yes` が揃い、run-local subagent が閉じられ、新規 user request で前 task の subagent を使い回していないことが `Subagent Lifecycle Evidence` に残るまで completion report を出さない

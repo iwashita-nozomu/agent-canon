@@ -5364,6 +5364,14 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
+      "line": 111,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
       "line": 114,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5372,7 +5380,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 117,
+      "line": 325,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5380,7 +5388,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 328,
+      "line": 499,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5388,15 +5396,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 502,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 517,
+      "line": 514,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5404,7 +5404,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 590,
+      "line": 587,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5412,7 +5412,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 631,
+      "line": 628,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5420,7 +5420,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 956,
+      "line": 953,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5428,7 +5428,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 961,
+      "line": 958,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5436,7 +5436,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 965,
+      "line": 962,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5444,7 +5444,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 970,
+      "line": 967,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5452,7 +5452,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 979,
+      "line": 976,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5460,7 +5460,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 1003,
+      "line": 1000,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5468,7 +5468,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 1013,
+      "line": 1010,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5476,7 +5476,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 1023,
+      "line": 1020,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5484,7 +5484,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest",
-      "line": 1033,
+      "line": 1030,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5492,7 +5492,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_latest_next",
-      "line": 971,
+      "line": 968,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5500,7 +5500,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_local_split",
-      "line": 922,
+      "line": 919,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5508,7 +5508,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_local_split",
-      "line": 996,
+      "line": 993,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5516,7 +5516,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_local_split",
-      "line": 998,
+      "line": 995,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5524,7 +5524,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_local_submodule",
-      "line": 950,
+      "line": 947,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5532,22 +5532,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_apply_command",
-      "line": 691,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_branch",
-      "line": 665,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_dirty_update_surface",
       "line": 688,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5555,15 +5539,15 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_dirty_worktree",
-      "line": 687,
+      "field": "agent_canon_plan_branch",
+      "line": 662,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_has_subtree_metadata",
+      "field": "agent_canon_plan_dirty_update_surface",
       "line": 685,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5571,8 +5555,16 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_local_split",
-      "line": 681,
+      "field": "agent_canon_plan_dirty_worktree",
+      "line": 684,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_has_subtree_metadata",
+      "line": 682,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5580,7 +5572,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_local_split",
-      "line": 683,
+      "line": 678,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_local_split",
+      "line": 680,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5588,7 +5588,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_local_tree",
-      "line": 679,
+      "line": 676,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5596,7 +5596,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_prefix_mode",
-      "line": 686,
+      "line": 683,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_remote_sha",
+      "line": 670,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5611,15 +5619,15 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_remote_sha",
-      "line": 676,
+      "field": "agent_canon_plan_remote_source",
+      "line": 668,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_remote_source",
+      "field": "agent_canon_plan_remote_tree",
       "line": 671,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5635,8 +5643,8 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_remote_tree",
-      "line": 677,
+      "field": "agent_canon_plan_remote_url",
+      "line": 664,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5644,15 +5652,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_remote_url",
-      "line": 667,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_remote_url",
-      "line": 669,
+      "line": 666,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5660,7 +5660,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_requires_clean",
-      "line": 690,
+      "line": 687,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5668,7 +5668,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_route",
-      "line": 689,
+      "line": 686,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5676,7 +5676,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_submodule_parent_pin",
-      "line": 700,
+      "line": 697,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5684,62 +5684,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_plan_submodule_parent_pin_remote_match",
-      "line": 705,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_parent_pin_remote_match",
-      "line": 707,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_parent_pin_remote_match",
-      "line": 715,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_worktree_head",
-      "line": 701,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_worktree_remote_match",
-      "line": 710,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_worktree_remote_match",
-      "line": 712,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_worktree_remote_match",
-      "line": 716,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_plan_submodule_worktree_status",
       "line": 702,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5747,8 +5691,56 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_remote",
-      "line": 952,
+      "field": "agent_canon_plan_submodule_parent_pin_remote_match",
+      "line": 704,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_parent_pin_remote_match",
+      "line": 712,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_worktree_head",
+      "line": 698,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_worktree_remote_match",
+      "line": 707,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_worktree_remote_match",
+      "line": 709,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_worktree_remote_match",
+      "line": 713,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_plan_submodule_worktree_status",
+      "line": 699,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5756,7 +5748,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_remote",
-      "line": 1000,
+      "line": 949,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_remote",
+      "line": 997,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5764,7 +5764,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_remote_added",
-      "line": 131,
+      "line": 128,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5772,7 +5772,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_snapshot_alias",
-      "line": 366,
+      "line": 363,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5780,7 +5780,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_snapshot_import",
-      "line": 585,
+      "line": 582,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5788,7 +5788,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_snapshot_import",
-      "line": 615,
+      "line": 612,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5796,7 +5796,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_snapshot_import",
-      "line": 620,
+      "line": 617,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5804,7 +5804,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_subtree_pull",
-      "line": 869,
+      "line": 866,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5812,7 +5812,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_subtree_pull",
-      "line": 886,
+      "line": 883,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5820,7 +5820,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_update_method",
-      "line": 595,
+      "line": 592,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5828,7 +5828,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_update_method",
-      "line": 878,
+      "line": 875,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5836,7 +5836,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_worktree_submodule",
-      "line": 951,
+      "line": 948,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5844,118 +5844,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "default_branch",
-      "line": 1076,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "goal.md",
-      "line": 443,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "goal_md",
-      "line": 215,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "goal_md",
-      "line": 220,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix",
-      "line": 1074,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_mode",
-      "line": 1079,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_mode_name",
-      "line": 1081,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_mode_name",
-      "line": 1085,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_mode_name",
-      "line": 1087,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_status",
-      "line": 1095,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "prefix_status",
-      "line": 1097,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "remote_name",
-      "line": 1075,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "remote_url",
-      "line": 1090,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "remote_url",
-      "line": 1092,
-      "path": "tools/sync_agent_canon.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "repo_root",
       "line": 1073,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
@@ -5963,8 +5851,120 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
+      "field": "goal.md",
+      "line": 440,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "goal_md",
+      "line": 212,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "goal_md",
+      "line": 217,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix",
+      "line": 1071,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_mode",
+      "line": 1076,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_mode_name",
+      "line": 1078,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_mode_name",
+      "line": 1082,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_mode_name",
+      "line": 1084,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_status",
+      "line": 1092,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "prefix_status",
+      "line": 1094,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "remote_name",
+      "line": 1072,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "remote_url",
+      "line": 1087,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "remote_url",
+      "line": 1089,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "repo_root",
+      "line": 1070,
+      "path": "tools/sync_agent_canon.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
       "field": "submodule_pin",
-      "line": 1083,
+      "line": 1080,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
@@ -5972,7 +5972,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "submodule_url",
-      "line": 1082,
+      "line": 1079,
       "path": "tools/sync_agent_canon.sh",
       "surface": "tool"
     },
