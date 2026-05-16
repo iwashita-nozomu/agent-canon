@@ -151,6 +151,7 @@ def validate_project_hooks() -> None:
         "prompt_secret_guard.py",
         "goal_completion_guard.py",
         "oop_readability_guard.py",
+        "log_surface_inventory_guard.py",
         "notebook_quality_guard.py",
         "skill_usage_logger.py",
     ):

@@ -4,8 +4,8 @@
 responsibility Documents agent-canon for this repository.
 upstream design AGENTS.md shared canon runtime contract
 upstream design LICENSE AgentCanon license text
+upstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
 downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer operation rulebook.
-downstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
 @dependency-end
 -->
 

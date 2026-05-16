@@ -40,6 +40,7 @@ upstream implementation ../../../tools/agent_tools/workflow_monitor.py records o
    no file / chat only. Use `--format markdown --max-report-findings 80` for the
    artifact, or save JSON as a sibling file and derive the Markdown tables from
    that same JSON result. Include the artifact path in the final response.
+1. Use `$result-artifact-writeout` when the result must persist beyond chat; save the checker output as the raw artifact and derive Markdown tables from the same source result.
 1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
    Keep it under a separate `Agent Analysis` section after the mechanical
    result. Prioritize by risk and leverage, identify likely false positives,

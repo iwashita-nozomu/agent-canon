@@ -39,3 +39,4 @@ upstream design ../canonical/skills.md skill canon registry
 - topic の entrypoint と formal command は `experiments/registry.toml` を正本にします。
 - main server host で formal run を回す場合は、`run_manifest.json` と `run.log` を残す wrapper を優先します。
 - 実験設定は `config.json` のような書き出し可能な JSON object / dict として固定し、registered command は `{config_path}` を受け取ります。
+- result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。

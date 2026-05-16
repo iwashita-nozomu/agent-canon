@@ -553,6 +553,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - repo-changing task は user-facing completion 前に `make ci` を通し、pytest、pyright、pydocstyle、ruff を全 repo 設定で確認する。`make ci-quick` は途中 checkpoint 用であり、final closeout の静的解析 evidence にはしない
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
 - Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
+- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を parent 直編集の work log または write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
 - agent runtime / skill 変更では `make agent-checks`
 - checkpoint では `make ci-quick` を使ってよいが、final closeout では `make ci` を優先する
 - 必要に応じて `make ci`

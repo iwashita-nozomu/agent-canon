@@ -56,8 +56,14 @@ class HookEvidenceCounts:
     namespaces: Counter[str]
     tools: Counter[str]
     skills: Counter[str]
+    candidate_skills: Counter[str]
+    candidate_workflows: Counter[str]
+    candidate_tools: Counter[str]
     skill_events: Counter[str]
     skill_sources: Counter[str]
+    feedback_labels: Counter[str]
+    feedback_targets: Counter[str]
+    feedback_actions: Counter[str]
     checker_targets: Counter[str]
     failure_targets: Counter[str]
     quality: Counter[str]
@@ -86,8 +92,14 @@ class HookCounterState:
     namespaces: Counter[str]
     tools: Counter[str]
     skills: Counter[str]
+    candidate_skills: Counter[str]
+    candidate_workflows: Counter[str]
+    candidate_tools: Counter[str]
     skill_events: Counter[str]
     skill_sources: Counter[str]
+    feedback_labels: Counter[str]
+    feedback_targets: Counter[str]
+    feedback_actions: Counter[str]
     checker_targets: Counter[str]
     failure_targets: Counter[str]
     quality: Counter[str]
@@ -103,8 +115,14 @@ class HookCounterState:
             namespaces=Counter(),
             tools=Counter(),
             skills=Counter(),
+            candidate_skills=Counter(),
+            candidate_workflows=Counter(),
+            candidate_tools=Counter(),
             skill_events=Counter(),
             skill_sources=Counter(),
+            feedback_labels=Counter(),
+            feedback_targets=Counter(),
+            feedback_actions=Counter(),
             checker_targets=Counter(),
             failure_targets=Counter(),
             quality=Counter(),
@@ -120,8 +138,14 @@ class HookCounterState:
             namespaces=self.namespaces,
             tools=self.tools,
             skills=self.skills,
+            candidate_skills=self.candidate_skills,
+            candidate_workflows=self.candidate_workflows,
+            candidate_tools=self.candidate_tools,
             skill_events=self.skill_events,
             skill_sources=self.skill_sources,
+            feedback_labels=self.feedback_labels,
+            feedback_targets=self.feedback_targets,
+            feedback_actions=self.feedback_actions,
             checker_targets=self.checker_targets,
             failure_targets=self.failure_targets,
             quality=self.quality,
@@ -267,8 +291,31 @@ class HookEvidenceCounter:
             self.state.quality["missing_skill_source_fields"] += 1
         if "observed_text_field_count" not in entry:
             self.state.quality["missing_observed_text_field_count"] += 1
+        for skill in self.normalized_strings(entry.get("candidate_skills")):
+            self.state.candidate_skills[skill] += 1
+        for workflow in self.normalized_strings(entry.get("candidate_workflows")):
+            self.state.candidate_workflows[workflow] += 1
+        for tool in self.normalized_strings(entry.get("candidate_tools")):
+            self.state.candidate_tools[tool] += 1
+        for label in self.normalized_strings(entry.get("feedback_labels")):
+            self.state.feedback_labels[label] += 1
+        for target in self.normalized_strings(entry.get("feedback_targets")):
+            self.state.feedback_targets[target] += 1
+        action = str(entry.get("feedback_action") or "")
+        if action:
+            self.state.feedback_actions[action] += 1
+        if entry.get("prompt_feedback_detected") is True and not self.normalized_strings(entry.get("feedback_labels")):
+            self.state.quality["feedback_detected_without_labels"] += 1
         skills = self.normalized_strings(entry.get("skills"))
-        if not skills:
+        candidate_seen = any(
+            (
+                self.normalized_strings(entry.get("candidate_skills")),
+                self.normalized_strings(entry.get("candidate_workflows")),
+                self.normalized_strings(entry.get("candidate_tools")),
+                self.normalized_strings(entry.get("feedback_labels")),
+            )
+        )
+        if not skills and not candidate_seen:
             self.state.quality["empty_skill_usage"] += 1
             return
         for skill in skills:
@@ -443,7 +490,13 @@ def evidence_summary_lines(root: Path, summary: EvidenceSummary) -> list[str]:
         f"- hook_namespace_counts: `{dict(counts.namespaces)}`",
         f"- hook_tool_counts: `{dict(counts.tools)}`",
         f"- skill_usage_counts: `{dict(counts.skills)}`",
+        f"- prompt_candidate_skill_counts: `{dict(counts.candidate_skills)}`",
+        f"- prompt_candidate_workflow_counts: `{dict(counts.candidate_workflows)}`",
+        f"- prompt_candidate_tool_counts: `{dict(counts.candidate_tools)}`",
         f"- skill_source_counts: `{dict(counts.skill_sources)}`",
+        f"- human_feedback_label_counts: `{dict(counts.feedback_labels)}`",
+        f"- human_feedback_target_counts: `{dict(counts.feedback_targets)}`",
+        f"- human_feedback_action_counts: `{dict(counts.feedback_actions)}`",
         f"- hook_failure_target_counts: `{dict(counts.failure_targets)}`",
         f"- hook_quality_counts: `{dict(counts.quality)}`",
     ]
@@ -454,8 +507,14 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     sections: list[str] = []
     sections.extend(named_section("Improvement Guidance", guidance(summary)))
     sections.extend(named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills)))
+    sections.extend(named_section("Prompt Candidate Skills", counter_lines(summary.hook_counts.candidate_skills)))
+    sections.extend(named_section("Prompt Candidate Workflows", counter_lines(summary.hook_counts.candidate_workflows)))
+    sections.extend(named_section("Prompt Candidate Tools", counter_lines(summary.hook_counts.candidate_tools)))
     sections.extend(named_section("Skill Event Coverage", counter_lines(summary.hook_counts.skill_events)))
     sections.extend(named_section("Skill Source Fields", counter_lines(summary.hook_counts.skill_sources)))
+    sections.extend(named_section("Human Feedback Labels", counter_lines(summary.hook_counts.feedback_labels)))
+    sections.extend(named_section("Human Feedback Targets", counter_lines(summary.hook_counts.feedback_targets)))
+    sections.extend(named_section("Human Feedback Actions", counter_lines(summary.hook_counts.feedback_actions)))
     sections.extend(named_section("Hook Runtime Namespaces", counter_lines(summary.hook_counts.namespaces)))
     sections.extend(named_section("Hook Tool Evidence", counter_lines(summary.hook_counts.tools)))
     sections.extend(named_section("Code Checker Targets", counter_lines(summary.hook_counts.checker_targets)))
