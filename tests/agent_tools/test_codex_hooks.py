@@ -6,6 +6,7 @@
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
+# upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
@@ -31,6 +32,7 @@ GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_gua
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
+NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
@@ -255,6 +257,92 @@ class CodexHooksTest(unittest.TestCase):
             )
         return payload, log_entry
 
+    def _notebook_payload(self, source: str) -> str:
+        """Return one minimal notebook document."""
+        return json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "metadata": {},
+                        "source": "# Demo\n\nReadable notebook narrative for users.",
+                    },
+                    {
+                        "cell_type": "code",
+                        "execution_count": 1,
+                        "metadata": {},
+                        "outputs": [],
+                        "source": source,
+                    },
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        )
+
+    def _run_notebook_guard_with_changed_notebook(
+        self,
+        source: str,
+        hook_input: str,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Run notebook guard against one changed notebook in a temp repo."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            checker = temp_root / "tools" / "validation" / "notebook_quality.py"
+            checker.parent.mkdir(parents=True)
+            checker.write_text(
+                (PROJECT_ROOT / "tools" / "validation" / "notebook_quality.py").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            notebook_path = temp_root / "jupyter" / "demo.ipynb"
+            notebook_path.parent.mkdir()
+            notebook_path.write_text(
+                self._notebook_payload(
+                    "import matplotlib.pyplot as plt\nplt.plot([0], [0])\nplt.show()"
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            notebook_path.write_text(self._notebook_payload(source), encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(NOTEBOOK_QUALITY_GUARD)],
+                cwd=temp_root,
+                input=hook_input,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+        return payload, log_entry
+
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
         """Codex hooks must be enabled from the project config layer."""
         config_text = CONFIG.read_text(encoding="utf-8")
@@ -292,6 +380,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
         self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("notebook_quality_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("notebook_quality_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
 
     def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
@@ -778,6 +868,53 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_notebook_quality_guard_blocks_test_like_notebook(self) -> None:
+        """Notebook hook should block notebooks that embed fine-grained tests."""
+        payload, log_entry = self._run_notebook_guard_with_changed_notebook(
+            "assert True\nplt.plot([0], [0])\nplt.show()",
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+        )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("Notebook quality hook", cast(str, payload["reason"]))
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["finding_count"], 2)
+        self.assertEqual(log_entry["notebooks"], ["jupyter/demo.ipynb"])
+
+    def test_notebook_quality_guard_skips_read_only_bash_payloads(self) -> None:
+        """Read-only Bash payloads should not run notebook quality checks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(NOTEBOOK_QUALITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "sed -n '1,20p' jupyter/demo.ipynb"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH": str(log_path),
                 },
             )
 

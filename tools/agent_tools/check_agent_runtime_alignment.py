@@ -152,6 +152,7 @@ def validate_project_hooks() -> None:
         "goal_completion_guard.py",
         "oop_readability_guard.py",
         "log_surface_inventory_guard.py",
+        "notebook_quality_guard.py",
         "skill_usage_logger.py",
     ):
         ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")

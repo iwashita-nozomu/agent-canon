@@ -220,7 +220,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 53,
+      "line": 54,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -228,7 +228,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 146,
+      "line": 147,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -246,6 +246,38 @@
       "field": "reason",
       "line": 172,
       "path": ".codex/hooks/log_surface_inventory_guard.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "decision",
+      "line": 274,
+      "path": ".codex/hooks/notebook_quality_guard.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "reason",
+      "line": 274,
+      "path": ".codex/hooks/notebook_quality_guard.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "decision",
+      "line": 274,
+      "path": ".codex/hooks/notebook_quality_guard.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "reason",
+      "line": 274,
+      "path": ".codex/hooks/notebook_quality_guard.py",
       "surface": "hook"
     },
     {
@@ -1132,7 +1164,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 599,
+      "line": 600,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -1308,7 +1340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "convention_sources",
-      "line": 506,
+      "line": 514,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1316,7 +1348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 506,
+      "line": 514,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1324,7 +1356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 506,
+      "line": 514,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1332,7 +1364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_gates",
-      "line": 506,
+      "line": 514,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1340,7 +1372,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_prompts",
-      "line": 506,
+      "line": 514,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1348,7 +1380,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE",
-      "line": 525,
+      "line": 533,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1356,7 +1388,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_FINDINGS",
-      "line": 524,
+      "line": 532,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1364,7 +1396,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_SOURCES",
-      "line": 521,
+      "line": 529,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1372,7 +1404,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_TOOL_GATES",
-      "line": 522,
+      "line": 530,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1380,7 +1412,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_WORKFLOWS",
-      "line": 523,
+      "line": 531,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -4993,10 +5025,18 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 51,
+      "path": "tools/ci/render_devcontainer_compose.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 226,
+      "line": 233,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -5004,7 +5044,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 259,
+      "line": 266,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -5012,7 +5052,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 279,
+      "line": 286,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -5204,7 +5244,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 3707,
+      "line": 3823,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5212,7 +5252,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 3707,
+      "line": 3823,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5220,7 +5260,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 3707,
+      "line": 3823,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5228,7 +5268,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 3707,
+      "line": 3823,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5236,7 +5276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 3739,
+      "line": 3855,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5244,7 +5284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 3734,
+      "line": 3850,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5252,7 +5292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 3735,
+      "line": 3851,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5260,7 +5300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 3737,
+      "line": 3853,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5268,7 +5308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 3736,
+      "line": 3852,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -5276,7 +5316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 3738,
+      "line": 3854,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -6375,6 +6415,30 @@
       "line": 344,
       "path": "tools/update_agent_canon.sh",
       "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "findings",
+      "line": 521,
+      "path": "tools/validation/notebook_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "metrics",
+      "line": 521,
+      "path": "tools/validation/notebook_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 521,
+      "path": "tools/validation/notebook_quality.py",
+      "surface": "tool"
     }
   ],
   "scanned_files": [
@@ -6442,6 +6506,7 @@
     ".codex/hooks/hook_event_log.py",
     ".codex/hooks/log_surface_inventory_guard.py",
     ".codex/hooks/mcp_session_context.sh",
+    ".codex/hooks/notebook_quality_guard.py",
     ".codex/hooks/oop_readability_guard.py",
     ".codex/hooks/pre_tool_guard.py",
     ".codex/hooks/prompt_secret_guard.py",
@@ -6620,6 +6685,7 @@
     "tools/shared/error_handler.py",
     "tools/sync_agent_canon.sh",
     "tools/update_agent_canon.sh",
+    "tools/validation/notebook_quality.py",
     "tools/validation/triplet_validator.py",
     "tools/worktree_start.sh"
   ],
