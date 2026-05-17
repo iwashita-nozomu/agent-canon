@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
+            "command": "AGENT_CANON_OOP_HOOK_MODE=diff python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking current OOP findings"
           },
@@ -95,7 +95,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
+            "command": "AGENT_CANON_OOP_HOOK_MODE=diff python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking current OOP findings"
           },
