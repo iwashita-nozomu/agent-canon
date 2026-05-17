@@ -76,6 +76,19 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("coverage:issues:uncovered-required-path", result.stdout)
 
+    def test_parent_repository_requires_top_level_manifest(self) -> None:
+        """A parent repo must not fall back to a vendored AgentCanon manifest."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_file(root, "tools/catalog.yaml", "version: 1\nentries: []\n")
+            self.write_file(root, "vendor/agent-canon/responsibility-scope.toml", "catalog_kind = \"agent_canon_responsibility_scope\"\n")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("manifest:", result.stdout)
+            self.assertIn("responsibility-scope.toml:missing-file", result.stdout)
+
     def write_fixture(self, root: Path) -> None:
         """Write a small responsibility-scope fixture repository."""
         self.write_file(root, "tools/agent_tools/responsibility_scope.py", "# tool\n")

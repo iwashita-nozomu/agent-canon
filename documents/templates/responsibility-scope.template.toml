@@ -37,6 +37,7 @@ required_coverage = [
   "vendor/agent-canon",
   "README.md",
   "QUICK_START.md",
+  "responsibility-scope.toml",
 ]
 
 [[scope]]
@@ -69,6 +70,7 @@ description = "Parent repository entrypoints, bootstrap contracts, Docker runtim
 paths = [
   "README.md",
   "QUICK_START.md",
+  "responsibility-scope.toml",
   "documents/**",
   "docker/**",
   "scripts/**",

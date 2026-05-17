@@ -2956,7 +2956,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 263,
+      "line": 253,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -2964,7 +2964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "scopes",
-      "line": 263,
+      "line": 253,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -2972,7 +2972,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 263,
+      "line": 253,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -2980,7 +2980,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE",
-      "line": 285,
+      "line": 275,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -2988,7 +2988,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_FINDINGS",
-      "line": 284,
+      "line": 274,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -2996,7 +2996,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_SCOPES",
-      "line": 283,
+      "line": 273,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },

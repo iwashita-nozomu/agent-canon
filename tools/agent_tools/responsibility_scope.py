@@ -78,16 +78,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def responsibility_root(root: Path, manifest: str) -> Path:
-    """Return the repository root that owns the responsibility manifest."""
-    if (root / manifest).is_file():
-        return root
-    vendored = root / "vendor" / "agent-canon"
-    if (vendored / manifest).is_file():
-        return vendored
-    return root
-
-
 def string_tuple(value: object) -> tuple[str, ...]:
     """Return a tuple of strings from a TOML value."""
     if not isinstance(value, list):
@@ -231,7 +221,7 @@ def coverage_findings(required: Sequence[str], scopes: Sequence[Scope]) -> list[
 
 def validate(root: Path, manifest: str) -> ScopeReport:
     """Validate responsibility scopes under one root."""
-    scope_root = responsibility_root(root.resolve(), manifest)
+    scope_root = root.resolve()
     data, findings = load_manifest(scope_root / manifest)
     catalog_paths, catalog_findings = load_catalog_paths(scope_root)
     findings.extend(catalog_findings)
