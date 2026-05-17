@@ -273,7 +273,16 @@ network access.
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
 python3 tools/agent_tools/vector_search.py --query "mcp goal loop" --format json
+python3 tools/agent_tools/vector_search.py --surface . --query "solver logging" --context
+python3 tools/agent_tools/vector_search.py --surface python --query "initialize info" --context --symbol initialize
 ```
+
+With `--context`, the tool keeps the TF-IDF search result and also emits
+context candidates. `CONTEXT_PATH` rows expand search-hit files through
+dependency manifest upstream / downstream edges, while `PYTHON_SYMBOL` and
+`PYTHON_EDGE` rows use Python AST definitions and direct calls to show local
+function fan-out and reverse caller fan-in. Use `--dependency-depth` to walk
+more than one hop and `--context-top` to cap the emitted context pack.
 
 If a repo later adds embedding-backed search, keep it optional: put generated
 indices under `reports/` or another ignored artifact path, never commit

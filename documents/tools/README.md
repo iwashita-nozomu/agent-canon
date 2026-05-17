@@ -131,12 +131,16 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/vector_search.py`
   - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
   - exact symbol / path / error message は `rg` を優先し、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
+  - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
+  - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
   - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
   - 例:
 
 ```bash
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
+python3 tools/agent_tools/vector_search.py --surface . --query "solver logging" --context
+python3 tools/agent_tools/vector_search.py --surface python --query "initialize info" --context --symbol initialize
 ```
 
 - `tools/agent_tools/file_surface_inventory.py`
