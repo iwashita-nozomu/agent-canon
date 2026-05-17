@@ -276,10 +276,20 @@ in `reports/hooks/` only when a task explicitly overrides the destination with
 durable hook results, and `issues/open|closed/` to produce the PR /
 branch-push improvement guide artifact; it does not mutate skills, workflows,
 tools, or memory.
+`generate_agent_runtime_dashboard.py` is the read-only viewing entrypoint for
+that same evidence tree. It writes a Markdown dashboard showing the canonical
+log locations, hook namespaces, hook entry counts, skill usage, prompt routing
+candidates, human feedback labels, eval report families, and open/closed issue
+counts. GitHub Actions publishes the dashboard to the workflow Step Summary and
+uploads it as an artifact; it is not committed automatically.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules
 before the improvement guide tries to mine them.
+`evaluate_workflow_selection.py` checks the prompt-intake classifier against
+frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
+Use `--accumulate` only when the measurement should become durable evidence
+under `agents/evals/results/workflow-selection/`.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -480,6 +490,16 @@ The guide summarizes `memory/`, `agents/evals/results/skill-workflow-prompt/`,
 `agents/evals/results/hook-runs/`, `issues/open/`, and `issues/closed/`.
 It is read-only evidence. Local Agent or Copilot PR work applies the actual
 skill, workflow, and tool changes.
+For log visibility rather than repair guidance, use:
+
+```bash
+python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+  --root . \
+  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md
+```
+
+The dashboard also includes local LLM and workflow-selection eval families when
+their accumulated reports exist.
 Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
 When one prompt surface needs more coverage, consolidate the checks into that surface's existing
 eval entry instead of adding a parallel duplicate-target eval.
