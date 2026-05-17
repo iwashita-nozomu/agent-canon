@@ -99,12 +99,10 @@ issues = []
 id = "project-durable-state"
 owner = "derived-project"
 class = "durable_state"
-description = "Project-specific experiments, notes, reports, and goal state."
+description = "Project-specific checked-in experiments, notes, and durable state."
 paths = [
-  "goal.md",
   "experiments/**",
   "notes/**",
-  "reports/**",
 ]
 protecting_tools = [
   "tools/agent_tools/responsibility_scope.py",
