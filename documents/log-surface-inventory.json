@@ -2641,6 +2641,38 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 370,
+      "path": "tools/agent_tools/route.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 388,
+      "path": "tools/agent_tools/route.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 408,
+      "path": "tools/agent_tools/route.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "ROUTE",
+      "line": 470,
+      "path": "tools/agent_tools/route.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
@@ -6467,6 +6499,7 @@
     ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
     ".agents/skills/subagent-bootstrap/SKILL.md",
+    ".agents/skills/task-routing/SKILL.md",
     ".agents/skills/test-design/SKILL.md",
     ".agents/skills/user-preference-sync/SKILL.md",
     ".agents/skills/worktree-health/SKILL.md",
@@ -6496,6 +6529,7 @@
     ".claude/skills/result-artifact-writeout/SKILL.md",
     ".claude/skills/start-repository/SKILL.md",
     ".claude/skills/subagent-bootstrap/SKILL.md",
+    ".claude/skills/task-routing/SKILL.md",
     ".claude/skills/test-design/SKILL.md",
     ".claude/skills/user-preference-sync/SKILL.md",
     ".claude/skills/worktree-health/SKILL.md",
@@ -6558,6 +6592,7 @@
     "agents/skills/static-check.md",
     "agents/skills/static-validation.md",
     "agents/skills/subagent-bootstrap.md",
+    "agents/skills/task-routing.md",
     "agents/skills/test-design.md",
     "agents/skills/user-preference-sync.md",
     "agents/skills/worktree-health.md",
@@ -6597,6 +6632,7 @@
     "tools/agent_tools/persist_agent_memory.py",
     "tools/agent_tools/report_artifact_checks.py",
     "tools/agent_tools/review_backlog_scan.sh",
+    "tools/agent_tools/route.py",
     "tools/agent_tools/run_repo_dependency_review.sh",
     "tools/agent_tools/scan_code_dependencies.sh",
     "tools/agent_tools/scan_dependency_headers.sh",
@@ -6627,6 +6663,7 @@
     "tools/ci/check_github_workflows.py",
     "tools/ci/check_jax_export_stack.py",
     "tools/ci/check_merge_structure.py",
+    "tools/ci/check_no_runtime_symbols.sh",
     "tools/ci/check_server_readiness.py",
     "tools/ci/checkout_agent_canon_submodule.sh",
     "tools/ci/container_config.py",
