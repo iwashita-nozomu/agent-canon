@@ -54,10 +54,15 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - AgentCanon Rust CLI の stable wrapper です。`/opt/agent-canon/bin/agent-canon`
     が devcontainer post-create で install 済みならそれを使い、未 install
     で `cargo` がある場合は `vendor/agent-canon/rust/agent-canon` の source
-    から実行します。
+    から実行します。installed binary が checked-out Rust source より古い場合も
+    source から実行し、AgentCanon 最新化後の stale binary を避けます。
   - `rust-migration-audit` の `--root` は AgentCanon source root を指します。
     standalone AgentCanon checkout では `--root .`、template / derived repo
     では `--root vendor/agent-canon` を使います。
+  - `rust-migration-plan` も AgentCanon source root を指します。AgentCanon を
+    最新化した template / derived repo は、DevContainer を作り直したあと
+    `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
+    次に Rust 化する tool 候補を確認します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`

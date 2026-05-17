@@ -295,7 +295,7 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: agent-canon-cli
-    summary: Stable wrapper for the AgentCanon Rust CLI.
+    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, and migration plan.
     path: tools/bin/agent-canon
     family: root
     role: runner
