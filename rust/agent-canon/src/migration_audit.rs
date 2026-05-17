@@ -26,7 +26,15 @@ const REQUIRED_POST_CREATE_SNIPPETS: &[&str] = &[
     "/usr/local/bin/agent-canon",
 ];
 
-const FORBIDDEN_DOCKERFILE_SNIPPETS: &[&str] = &["rustup", "cargo build", "cargo install"];
+const FORBIDDEN_DOCKERFILE_SNIPPETS: &[&str] = &[
+    "rustup",
+    "cargo build",
+    "cargo install",
+    "cargo test",
+    "cargo clippy",
+    "cargo fmt",
+    "rustc --version",
+];
 
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
@@ -147,6 +155,20 @@ mod tests {
         fs::remove_file(root.join("tools/bin/agent-canon")).expect("remove wrapper");
 
         assert!(findings(&root).contains(&"missing-path:tools/bin/agent-canon".to_string()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn audit_rejects_dockerfile_cargo_test() {
+        let root = make_fixture_root();
+        write_fixture(&root);
+        write(
+            &root,
+            "docker/Dockerfile",
+            "FROM ubuntu:22.04\nRUN cargo test\n",
+        );
+
+        assert!(findings(&root).contains(&"dockerfile-forbidden:cargo test".to_string()));
         let _ = fs::remove_dir_all(root);
     }
 
