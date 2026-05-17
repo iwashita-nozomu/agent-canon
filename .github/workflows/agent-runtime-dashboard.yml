@@ -1,15 +1,14 @@
 # @dependency-start
-# responsibility Publishes read-only AgentCanon runtime log and eval dashboards on PRs, pushes, and manual dispatch.
+# responsibility Publishes read-only AgentCanon runtime log and eval dashboards in the standalone AgentCanon repository.
 # upstream design ../../agents/evals/README.md eval evidence contract
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated evidence
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
-# upstream implementation ../../tools/ci/checkout_agent_canon_submodule.sh checks out AgentCanon when copied into template repos
 # @dependency-end
 
-# Synced to /.github/workflows/agent-runtime-dashboard.yml by tools/sync_agent_canon.sh link-root.
-# Edit vendor/agent-canon/.github/workflows/agent-runtime-dashboard.yml, not the root copy.
+# Standalone-only workflow. Template and derived repositories should not copy
+# this workflow into their root; they should read the AgentCanon repository run.
 name: Agent Runtime Dashboard
 
 on:
@@ -21,9 +20,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
 
 concurrency:
   group: agent-runtime-dashboard-${{ github.ref }}
@@ -39,16 +35,6 @@ jobs:
           submodules: false
           persist-credentials: false
 
-      - name: Checkout AgentCanon submodule
-        env:
-          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-        run: |
-          if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
-            bash .github/scripts/checkout_agent_canon_submodule.sh
-          else
-            bash tools/ci/checkout_agent_canon_submodule.sh
-          fi
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -60,18 +46,12 @@ jobs:
       - name: Validate accumulated evidence
         run: |
           canon_root="${GITHUB_WORKSPACE}"
-          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
-            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
-          fi
           python3 "${canon_root}/tools/agent_tools/eval_accumulation_check.py" --root "${canon_root}"
 
       - name: Run workflow selection eval
         id: workflow_selection
         run: |
           canon_root="${GITHUB_WORKSPACE}"
-          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
-            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
-          fi
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
           mkdir -p "${report_dir}"
           eval_path="${report_dir}/workflow-selection-eval-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
@@ -84,9 +64,6 @@ jobs:
         id: report_quality
         run: |
           canon_root="${GITHUB_WORKSPACE}"
-          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
-            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
-          fi
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
           mkdir -p "${report_dir}"
           eval_path="${report_dir}/report-quality-eval-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
@@ -99,9 +76,6 @@ jobs:
         id: dashboard
         run: |
           canon_root="${GITHUB_WORKSPACE}"
-          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
-            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
-          fi
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
           mkdir -p "${report_dir}"
           dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"

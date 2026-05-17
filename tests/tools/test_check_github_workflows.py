@@ -637,6 +637,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "documents/github-copilot-configuration.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
+            ".github/workflows/agent-runtime-dashboard.yml",
             "documents/github-copilot-configuration.md",
             "issues/README.md",
             "issues/open/AC-20260513-durable-finding-auto-promotion.md",
@@ -647,6 +648,36 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if source.is_symlink():
                 source = source.resolve()
             shutil.copy2(source, destination)
+
+    def test_template_runtime_dashboard_root_copy_is_rejected(self) -> None:
+        """Template roots should use the AgentCanon repo dashboard, not a root copy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            self.copy_template_agent_canon_template(root)
+            (root / ".gitmodules").write_text(
+                '[submodule "vendor/agent-canon"]\n'
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+            stale_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+            stale_dashboard.parent.mkdir(parents=True, exist_ok=True)
+            stale_dashboard.write_text("name: stale dashboard\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "template_runtime_dashboard_workflow_must_be_absent_use_agentcanon_repo",
+                result.stdout,
+            )
 
 
 if __name__ == "__main__":

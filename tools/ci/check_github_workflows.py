@@ -13,7 +13,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
-# upstream design ../../.github/workflows/agent-runtime-dashboard.yml PR and push runtime dashboard workflow
+# upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
@@ -36,7 +36,7 @@ HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
 )
-AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = set()
+AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {"agent-runtime-dashboard.yml"}
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
@@ -195,9 +195,9 @@ ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
     "generate_agent_improvement_guide.py",
 )
-ROOT_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
-    "Synced to /.github/workflows/agent-runtime-dashboard.yml",
-    "Edit vendor/agent-canon/.github/workflows/agent-runtime-dashboard.yml",
+STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
+    "Standalone-only workflow",
+    "Template and derived repositories should not copy",
     "generate_agent_runtime_dashboard.py",
 )
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
@@ -493,6 +493,15 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
 def check_root_copy_headers(root: Path) -> list[Finding]:
     """Check synced root-copy workflow source markers."""
     findings: list[Finding] = []
+    stale_template_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    if is_template_or_derived_repo(root) and stale_template_dashboard.exists():
+        findings.append(
+            Finding(
+                "error",
+                stale_template_dashboard,
+                "template_runtime_dashboard_workflow_must_be_absent_use_agentcanon_repo",
+            )
+        )
     for path, required in workflow_header_requirement_specs(root):
         if path.exists():
             findings.extend(require_text(path, required))
@@ -503,7 +512,7 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
     """Return optional workflow files and snippets that identify their contract."""
     workflow_dir = root / ".github" / "workflows"
     vendor_workflow_dir = root / "vendor" / "agent-canon" / ".github" / "workflows"
-    return [
+    specs: list[tuple[Path, Sequence[str]]] = [
         (
             workflow_dir / "agent-coordination.yml",
             ROOT_COORDINATION_WORKFLOW_REQUIREMENTS,
@@ -511,10 +520,6 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
         (
             workflow_dir / "agent-improvement-guide.yml",
             ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
-        ),
-        (
-            workflow_dir / "agent-runtime-dashboard.yml",
-            ROOT_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
         ),
         (
             workflow_dir / "agent-canon-static-gates.yml",
@@ -529,14 +534,25 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
             VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
         ),
         (
-            vendor_workflow_dir / "agent-runtime-dashboard.yml",
-            VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
-        ),
-        (
             vendor_workflow_dir / "agent-canon-static-gates.yml",
             AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
         ),
     ]
+    if is_template_or_derived_repo(root):
+        specs.append(
+            (
+                vendor_workflow_dir / "agent-runtime-dashboard.yml",
+                VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
+            )
+        )
+    else:
+        specs.append(
+            (
+                workflow_dir / "agent-runtime-dashboard.yml",
+                STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
+            )
+        )
+    return specs
 
 
 def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:

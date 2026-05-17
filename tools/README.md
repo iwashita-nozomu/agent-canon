@@ -287,8 +287,9 @@ tools, or memory.
 that same evidence tree. It writes a Markdown dashboard showing the canonical
 log locations, hook namespaces, hook entry counts, skill usage, prompt routing
 candidates, human feedback labels, eval report families, and open/closed issue
-counts. GitHub Actions publishes the dashboard to the workflow Step Summary and
-uploads it as an artifact; it is not committed automatically.
+counts. The standalone AgentCanon GitHub Actions workflow publishes the
+dashboard to the workflow Step Summary and uploads it as an artifact; template
+and derived repositories do not publish their own runtime dashboard copies.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules

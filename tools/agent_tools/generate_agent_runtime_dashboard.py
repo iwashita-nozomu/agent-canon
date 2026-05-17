@@ -5,7 +5,7 @@
 # upstream design ../../agents/evals/results/README.md eval result storage contract
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, memory, eval, and issue evidence
-# downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes PR and push dashboards
+# downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
 # @dependency-end
 """Generate a read-only AgentCanon runtime evidence dashboard."""
@@ -95,6 +95,102 @@ class ResultFamilyReader:
         return match.group(1) if match else "unknown"
 
 
+class RuntimeDashboardVisuals:
+    """Renders reader-facing visual dashboard sections."""
+
+    def __init__(self, summary: RuntimeDashboardSummary) -> None:
+        """Store the dashboard summary used by visual sections."""
+        self.summary = summary
+
+    def evidence_flow_lines(self) -> list[str]:
+        """Return a Mermaid diagram showing how evidence flows into decisions."""
+        summary = self.summary
+        return [
+            "```mermaid",
+            "flowchart LR",
+            f"  Hooks[\"Hook JSONL<br/>files: {len(summary.hook_files)}<br/>entries: {summary.hook_entries}\"]",
+            f"  SkillEval[\"Skill prompt evals<br/>reports: {family_count(summary, 'skill-workflow-prompt')}\"]",
+            f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
+            f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
+            f"  LocalLLM[\"Local LLM evals<br/>reports: {family_count(summary, 'local-llm-responsibility')}\"]",
+            f"  Issues[\"Durable issues<br/>open: {len(summary.evidence.open_issues)}<br/>closed: {len(summary.evidence.closed_issues)}\"]",
+            "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
+            "  Guide[\"Improvement guide<br/>next repair targets\"]",
+            "  Reviewer[\"Human / PR reviewer<br/>summary + artifacts\"]",
+            "  Hooks --> Dashboard",
+            "  SkillEval --> Dashboard",
+            "  WorkflowEval --> Dashboard",
+            "  ReportEval --> Dashboard",
+            "  LocalLLM --> Dashboard",
+            "  Issues --> Dashboard",
+            "  Dashboard --> Reviewer",
+            "  Dashboard --> Guide",
+            "  Issues --> Guide",
+            "```",
+        ]
+
+    def action_map_lines(self) -> list[str]:
+        """Return a reader-facing table that maps signals to next actions."""
+        rows = (
+            self.hook_row(),
+            self.skill_eval_row(),
+            self.family_row(
+                "workflow selection eval",
+                "workflow-selection",
+                "repair workflow routing examples or classifier rules",
+            ),
+            self.family_row(
+                "report quality eval",
+                "report-quality",
+                "repair report-writing skill or reader-facing report outputs",
+            ),
+            self.family_row(
+                "local LLM eval",
+                "local-llm-responsibility",
+                "repair single-file responsibility prompt or local model harness",
+            ),
+            self.issue_row(),
+        )
+        return [
+            "| signal | state | evidence | action when attention is needed |",
+            "| --- | --- | ---: | --- |",
+            *rows,
+        ]
+
+    def hook_row(self) -> str:
+        """Return the hook evidence action-map row."""
+        failed = self.summary.evidence.hook_counts.statuses.get("fail", 0) > 0
+        return action_map_row(
+            "hook evidence",
+            "review failing hook namespaces first",
+            len(self.summary.hook_files),
+            failed,
+        )
+
+    def skill_eval_row(self) -> str:
+        """Return the skill prompt eval action-map row."""
+        return action_map_row(
+            "skill prompt eval",
+            "repair skills or prompts with failed eval reports",
+            len(family_by_name(self.summary, "skill-workflow-prompt").reports),
+            bool(family_by_name(self.summary, "skill-workflow-prompt").failed_reports),
+        )
+
+    def family_row(self, signal: str, family_name: str, action: str) -> str:
+        """Return an eval-family action-map row."""
+        family = family_by_name(self.summary, family_name)
+        return action_map_row(signal, action, len(family.reports), bool(family.failed_reports))
+
+    def issue_row(self) -> str:
+        """Return the durable issue action-map row."""
+        return action_map_row(
+            "durable issues",
+            "triage open issues before claiming workflow health",
+            len(self.summary.evidence.open_issues),
+            bool(self.summary.evidence.open_issues),
+        )
+
+
 class AgentRuntimeDashboard:
     """Builds a reader-facing dashboard from AgentCanon runtime evidence."""
 
@@ -135,6 +231,7 @@ class AgentRuntimeDashboard:
 
     def render(self, summary: RuntimeDashboardSummary) -> str:
         """Render the dashboard as Markdown."""
+        visuals = RuntimeDashboardVisuals(summary)
         lines = [
             "# Agent Runtime Dashboard",
             "",
@@ -152,16 +249,15 @@ class AgentRuntimeDashboard:
             "",
             "## Machine Summary",
             "",
-            "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
-            f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}",
-            f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
-            f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
-            f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={len(summary.evidence.skill_eval_reports)}",
-            f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={self.family_count(summary, 'local-llm-responsibility')}",
-            f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={self.family_count(summary, 'workflow-selection')}",
-            f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={self.family_count(summary, 'report-quality')}",
-            f"AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES={len(summary.evidence.open_issues)}",
-            f"AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES={len(summary.evidence.closed_issues)}",
+            *machine_summary_lines(summary),
+            "",
+            "## Visual Evidence Map",
+            "",
+            *visuals.evidence_flow_lines(),
+            "",
+            "## Action Map",
+            "",
+            *visuals.action_map_lines(),
             "",
             "## Where Logs Accumulate",
             "",
@@ -214,14 +310,6 @@ class AgentRuntimeDashboard:
         return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
 
     @staticmethod
-    def family_count(summary: RuntimeDashboardSummary, family_name: str) -> int:
-        """Return report count for one result family."""
-        for family in summary.result_families:
-            if family.family == family_name:
-                return len(family.reports)
-        return 0
-
-    @staticmethod
     def evidence_location_lines(root: Path) -> list[str]:
         """Return the canonical runtime evidence locations."""
         return [
@@ -233,7 +321,7 @@ class AgentRuntimeDashboard:
             "- report_quality_eval_reports: `agents/evals/results/report-quality/<eval-run-id>-<status>.md`",
             "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
             "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
-            "- github_actions_dashboard: Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
+            "- github_actions_dashboard: AgentCanon repository Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
         ]
 
     @staticmethod
@@ -271,6 +359,54 @@ class AgentRuntimeDashboard:
             f"- `{path.relative_to(summary.root).as_posix()}`"
             for path in sorted(set(reports))[:MAX_REPORT_LINES]
         ]
+
+
+def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return the machine-readable summary block."""
+    return [
+        "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
+        f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}",
+        f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
+        f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
+        f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={family_count(summary, 'skill-workflow-prompt')}",
+        f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={family_count(summary, 'local-llm-responsibility')}",
+        f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
+        f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
+        f"AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES={len(summary.evidence.open_issues)}",
+        f"AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES={len(summary.evidence.closed_issues)}",
+    ]
+
+
+def family_count(summary: RuntimeDashboardSummary, family_name: str) -> int:
+    """Return report count for one result family."""
+    return len(family_by_name(summary, family_name).reports)
+
+
+def family_by_name(
+    summary: RuntimeDashboardSummary,
+    family_name: str,
+) -> ResultFamilySummary:
+    """Return one result family summary by name."""
+    for family in summary.result_families:
+        if family.family == family_name:
+            return family
+    raise KeyError(family_name)
+
+
+def action_map_row(
+    signal: str,
+    action: str,
+    evidence_count: int,
+    needs_attention: bool,
+) -> str:
+    """Return one action-map table row."""
+    if evidence_count == 0:
+        state = "missing"
+    elif needs_attention:
+        state = "attention"
+    else:
+        state = "healthy"
+    return f"| {signal} | `{state}` | `{evidence_count}` | {action} |"
 
 
 def build_parser() -> argparse.ArgumentParser:

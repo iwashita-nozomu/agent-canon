@@ -2580,7 +2580,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 296,
+      "line": 432,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2588,7 +2588,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 298,
+      "line": 434,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2596,7 +2596,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 300,
+      "line": 436,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2604,7 +2604,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 299,
+      "line": 435,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2612,7 +2612,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 297,
+      "line": 433,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -5340,7 +5340,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 715,
+      "line": 731,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5348,7 +5348,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 716,
+      "line": 732,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5356,7 +5356,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 717,
+      "line": 733,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
