@@ -10,7 +10,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 30
+expected_count = 31
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -35,7 +35,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 52
+expected_count = 53
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -86,7 +86,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 30
+expected_count = 31
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -131,6 +131,30 @@ id = "RESULT-WRITEOUT-3"
 critical = true
 description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
 required_regex = ["failed", "partial", "status", "exit code"]
+
+[[evals]]
+id = "report-writing-skill"
+target = ".agents/skills/report-writing/SKILL.md"
+kind = "skill"
+description = "Report writing must require source packets, evidence traceability, limitations, actionability, reviewer routing, and result-artifact separation."
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-1"
+critical = true
+description = "Requires reader-facing report classification and source packet setup."
+required_regex = ["reader-facing", "Classify the report", "source packet"]
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-2"
+critical = true
+description = "Requires quality checklist dimensions, limitations, and actionability."
+required_regex = ["Report Quality Checklist", "limitations", "actionability", "evidence traceability"]
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-3"
+critical = true
+description = "Separates raw result writeout from report narrative and requires reviewer routing."
+required_regex = ["\\$result-artifact-writeout", "raw", "reader report", "report_reviewer"]
 
 [[evals]]
 id = "all-canonical-routing-docs"

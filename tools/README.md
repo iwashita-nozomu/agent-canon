@@ -11,6 +11,7 @@ downstream implementation agent_tools/responsibility_scope.py validates responsi
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
+downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 @dependency-end
 -->
 
@@ -55,6 +56,7 @@ python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/local_llm_eval.py
+python3 tools/agent_tools/evaluate_report_quality.py
 ```
 
 `tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
@@ -77,6 +79,9 @@ non-ignored, append-only AgentCanon evidence.
 `local_llm_eval.py` validates the configured single-file local LLM
 responsibility prompt boundary and can optionally accumulate prompt-only or
 model-backed reports under `agents/evals/results/local-llm-responsibility/`.
+`evaluate_report_quality.py` validates the report-writing skill and report
+reviewer route against the Report Quality Checklist and can accumulate reports
+under `agents/evals/results/report-quality/`.
 
 ## 含めるもの
 - `bin/`
@@ -105,6 +110,7 @@ model-backed reports under `agents/evals/results/local-llm-responsibility/`.
   - `eval_accumulation_check.py` は `agents/evals/results/` の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う advisory checker です。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価します。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
+  - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `noncanonical_document_inventory.py` は Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補と正本候補を出します。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
@@ -181,6 +187,7 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
   - `agent_tools/compare_agent_run_paths.py`
   - `agent_tools/goal_loop.py`
   - `agent_tools/evaluate_skill_workflow_prompts.py`
+  - `agent_tools/evaluate_report_quality.py`
   - `agent_tools/check_convention_compliance.py`
   - `agent_tools/check_static_any.py`
   - `agent_tools/check_log_helper_names.py`

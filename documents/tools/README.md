@@ -11,6 +11,7 @@ downstream implementation ../../tools/agent_tools/issue_sync.py validates local 
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
+downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 @dependency-end
 -->
 
@@ -42,6 +43,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `tools/agent_tools/local_llm_eval.py`
   - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
+- `tools/agent_tools/evaluate_report_quality.py`
+  - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
 - `documents/tools/tool-docs.toml`
   - tool 実装と説明文書を一対一で対応させる機械可読 map です。`tool` と `doc` は同じ basename にし、`tool_catalog.py` が path、dependency header、catalog docs wiring を検査します。
 

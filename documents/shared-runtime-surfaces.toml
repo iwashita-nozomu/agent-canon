@@ -214,6 +214,7 @@ paths = [
   "tests/agent_tools/test_evaluate_agent_run.py",
   "tests/agent_tools/test_evaluate_skill_workflow_prompts.py",
   "tests/agent_tools/test_evaluate_workflow_selection.py",
+  "tests/agent_tools/test_evaluate_report_quality.py",
   "tests/agent_tools/test_generate_agent_improvement_guide.py",
   "tests/agent_tools/test_generate_agent_runtime_dashboard.py",
   "tests/agent_tools/test_file_surface_inventory.py",

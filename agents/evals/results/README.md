@@ -8,6 +8,7 @@ downstream design skill-workflow-prompt/README.md skill prompt eval result namin
 downstream design hook-runs/README.md hook result naming convention
 downstream design local-llm-responsibility/README.md local LLM eval result naming convention
 downstream design workflow-selection/README.md workflow selection eval result naming convention
+downstream design report-quality/README.md report quality eval result naming convention
 downstream implementation ../../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py summarizes accumulated result evidence
 @dependency-end
@@ -34,6 +35,10 @@ Current result families:
 - `workflow-selection/`: prompt-to-workflow routing eval reports produced by
   `evaluate_workflow_selection.py`. These reports prove that common user
   wording still maps to the expected workflow labels.
+- `report-quality/`: report-writing checklist eval reports produced by
+  `evaluate_report_quality.py`. These reports prove that report authoring
+  prompts still require source packets, evidence traceability, limitations,
+  actionability, artifact separation, and reviewer routing.
 
 Validate the accumulated evidence before using it as workflow feedback:
 

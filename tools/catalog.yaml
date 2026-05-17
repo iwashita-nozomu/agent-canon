@@ -198,6 +198,27 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
 
+  - id: report-quality-eval
+    summary: Validates report-writing skill quality checklist and report reviewer routing.
+    path: tools/agent_tools/evaluate_report_quality.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_report_quality.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/report_quality_eval.toml
+      - agents/evals/results/report-quality/README.md
+      - agents/skills/report-writing.md
+    tests:
+      - tests/agent_tools/test_evaluate_report_quality.py
+
   - id: file-resp-llm
     summary: Runs advisory local LLM responsibility review for exactly one file.
     path: tools/agent_tools/file_responsibility_llm.py

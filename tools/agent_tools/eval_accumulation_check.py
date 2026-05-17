@@ -6,6 +6,7 @@
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # upstream design ../../agents/evals/results/local-llm-responsibility/README.md local LLM eval result accumulation contract
 # upstream design ../../agents/evals/results/workflow-selection/README.md workflow selection eval result accumulation contract
+# upstream design ../../agents/evals/results/report-quality/README.md report quality eval result accumulation contract
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/ci/run_all_checks.sh runs eval accumulation checks
@@ -39,6 +40,9 @@ LOCAL_LLM_REPORT_RE = re.compile(
 WORKFLOW_SELECTION_REPORT_RE = re.compile(
     r"^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
+REPORT_QUALITY_REPORT_RE = re.compile(
+    r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,7 @@ class EvalAccumulationReport:
     skill_reports: int
     local_llm_reports: int
     workflow_selection_reports: int
+    report_quality_reports: int
     findings: tuple[Finding, ...]
 
 
@@ -110,6 +115,7 @@ def required_directory_findings(root: Path) -> list[Finding]:
         root / "agents" / "evals" / "results" / "skill-workflow-prompt",
         root / "agents" / "evals" / "results" / "local-llm-responsibility",
         root / "agents" / "evals" / "results" / "workflow-selection",
+        root / "agents" / "evals" / "results" / "report-quality",
     ):
         if not path.is_dir():
             findings.append(Finding("directory", relative(root, path), "missing"))
@@ -267,6 +273,36 @@ def workflow_selection_eval_findings(root: Path, results_dir: Path) -> tuple[int
     return len(reports), findings
 
 
+def report_quality_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Finding]]:
+    """Validate accumulated report quality eval reports."""
+    findings: list[Finding] = []
+    reports = sorted(path for path in results_dir.glob("*.md") if path.name != "README.md")
+    seen_run_ids: dict[str, str] = {}
+    if not reports:
+        findings.append(Finding("report_quality_eval", relative(root, results_dir), "no-report-quality-eval-reports"))
+    for path in reports:
+        rel_path = relative(root, path)
+        if not REPORT_QUALITY_REPORT_RE.fullmatch(path.name):
+            findings.append(Finding("report_quality_eval", rel_path, "invalid-report-name"))
+        text = path.read_text(encoding="utf-8")
+        run_id = re.search(r"\bREPORT_QUALITY_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)", text)
+        if run_id is None:
+            findings.append(Finding("report_quality_eval", rel_path, "missing-report-quality-eval-run-id"))
+            continue
+        previous = seen_run_ids.get(run_id.group(1))
+        if previous is not None:
+            findings.append(
+                Finding(
+                    "report_quality_eval",
+                    rel_path,
+                    f"duplicate-report-quality-eval-run-id:{previous}",
+                )
+            )
+        seen_run_ids[run_id.group(1)] = rel_path
+    findings.extend(ignored_path_findings(root, reports))
+    return len(reports), findings
+
+
 def validate(root: Path) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
     canon_root = agent_canon_root(root.resolve())
@@ -287,16 +323,22 @@ def validate(root: Path) -> EvalAccumulationReport:
         canon_root,
         canon_root / "agents" / "evals" / "results" / "workflow-selection",
     )
+    report_quality_reports, report_quality_findings = report_quality_eval_findings(
+        canon_root,
+        canon_root / "agents" / "evals" / "results" / "report-quality",
+    )
     findings.extend(hook_findings)
     findings.extend(skill_findings)
     findings.extend(local_llm_findings)
     findings.extend(workflow_selection_findings)
+    findings.extend(report_quality_findings)
     return EvalAccumulationReport(
         hook_files=hook_files,
         hook_entries=hook_entries,
         skill_reports=skill_reports,
         local_llm_reports=local_llm_reports,
         workflow_selection_reports=workflow_selection_reports,
+        report_quality_reports=report_quality_reports,
         findings=tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
     )
 
@@ -311,6 +353,7 @@ def render_json(report: EvalAccumulationReport) -> str:
             "skill_reports": report.skill_reports,
             "local_llm_reports": report.local_llm_reports,
             "workflow_selection_reports": report.workflow_selection_reports,
+            "report_quality_reports": report.report_quality_reports,
             "findings": [asdict(item) for item in report.findings],
         },
         indent=2,
@@ -332,6 +375,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"EVAL_ACCUMULATION_SKILL_REPORTS={report.skill_reports}")
         print(f"EVAL_ACCUMULATION_LOCAL_LLM_REPORTS={report.local_llm_reports}")
         print(f"EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS={report.workflow_selection_reports}")
+        print(f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={report.report_quality_reports}")
         print(f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}")
         print(f"EVAL_ACCUMULATION={'pass' if not report.findings else 'fail'}")
     return 1 if report.findings else 0
