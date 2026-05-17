@@ -7,6 +7,10 @@ downstream design catalog.yaml structured AgentCanon tool catalog
 downstream design ../documents/tools/tool-docs.toml same-named tool documentation map
 downstream implementation agent_tools/tool_catalog.py validates catalog/docs consistency
 downstream implementation agent_tools/tool_drift.py validates tool/convention trace contracts
+downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
+downstream implementation agent_tools/issue_sync.py validates local issue sync state
+downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
+downstream implementation agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
 @dependency-end
 -->
 
@@ -47,6 +51,10 @@ Validation entrypoints:
 ```bash
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
+python3 tools/agent_tools/responsibility_scope.py
+python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/eval_accumulation_check.py
+python3 tools/agent_tools/local_llm_eval.py
 ```
 
 `tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
@@ -57,13 +65,26 @@ tool table.
 `tool_drift.py` uses dependency manifests plus the catalog to
 detect stale tool/convention links, missing required PR-flow checks, and
 retired legacy tool reintroduction.
+`responsibility_scope.py` validates top-level `responsibility-scope.toml`
+so each durable surface has an owner class, path coverage, protecting tools,
+and linked operational issues.
+`issue_sync.py` validates `issues/open|closed/` offline and prints a deterministic
+GitHub Issue creation plan for local issues that do not yet have a
+`github_issue:` mirror field.
+`eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
+reports are accumulating under `agents/evals/results/` as readable,
+non-ignored, append-only AgentCanon evidence.
+`local_llm_eval.py` validates the configured single-file local LLM
+responsibility prompt boundary and can optionally accumulate prompt-only or
+model-backed reports under `agents/evals/results/local-llm-responsibility/`.
 
 ## 含めるもの
 - `bin/`
   - `agent-canon` は AgentCanon Rust CLI の stable wrapper です。template /
     derived repo では root `tools/` symlink から呼び、実体 source は
     `vendor/agent-canon/rust/agent-canon/` を使います。devcontainer では
-    post-create が release binary を `/opt/agent-canon/bin/agent-canon` へ
+    post-create が release binary を
+    `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon` へ
     install し、`/usr/local/bin/agent-canon` から実行できるようにします。
     wrapper は installed binary が checked-out Rust source より古い場合、
     stale binary ではなく source から `cargo run` します。
@@ -79,6 +100,11 @@ retired legacy tool reintroduction.
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
+  - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
+  - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
+  - `eval_accumulation_check.py` は `agents/evals/results/` の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
+  - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う advisory checker です。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
+  - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価します。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `noncanonical_document_inventory.py` は Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補と正本候補を出します。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
@@ -246,6 +272,10 @@ in `reports/hooks/` only when a task explicitly overrides the destination with
 durable hook results, and `issues/open|closed/` to produce the PR /
 branch-push improvement guide artifact; it does not mutate skills, workflows,
 tools, or memory.
+`eval_accumulation_check.py` is the structural gate for that accumulation
+surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
+reports are readable, uniquely identified, and not hidden by ignore rules
+before the improvement guide tries to mine them.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -469,6 +499,9 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
   present, so root-copy review does not require duplicate root-only headers.
 - `tool_catalog.py` validates the structured AgentCanon tool catalog, per-entry summaries, default wiring, docs/tests, retired legacy paths, and one-to-one tool docs.
 - `tool_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
+- `responsibility_scope.py` validates top-level `responsibility-scope.toml`, required top-level coverage, protecting tool catalog entries, and linked issue files.
+- `issue_sync.py` validates durable local issues and plans GitHub Issue mirrors without requiring network access in CI.
+- `eval_accumulation_check.py` validates append-only hook, skill eval, and local LLM eval results before guide generation consumes them.
 
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
@@ -482,6 +515,10 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `check_convention_compliance.py` aggregates convention compliance evidence. It verifies that every convention source exists, every normative convention document exposes a verification route, prohibition-bearing documents carry a prohibition section, every manifestable convention gate has a tool or prompt-eval check, every workflow calls the convention gate, workflow prohibitions remain wired, and skill-routing prompts delegate tool-covered rules to the checker.
 - `tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, retired legacy entries, and broken tool-doc mappings.
 - `tool_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, and the tool catalog.
+- `responsibility_scope.py` keeps checker/tool ownership tied to a scope so new gates do not become orphaned entrypoints.
+- `issue_sync.py` keeps folder issues structurally valid and gives GitHub Issue sync a repeatable command plan.
+- `eval_accumulation_check.py` keeps hook and skill eval evidence usable by improvement-guide and feedback-loop tools.
+- `local_llm_eval.py` keeps Local LLM single-file responsibility analysis covered by configurable eval cases without making model output a repo-wide gate.
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `helper_function_inventory.py` inventories Python helper functions/classes and infers roles from AST body facts, calls, side effects, path domain, internal call graph evidence, single-caller or file-local specialization, and functional candidate rules. It reports high-confidence `auto_helper` verdicts separately from `needs_user_judgment` symbols, with `--only-auto-helpers` and `--only-user-judgment` filters for review loops.

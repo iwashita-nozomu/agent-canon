@@ -37,16 +37,23 @@ container PATH for non-interactive `devcontainer exec` commands, and builds the
 canonical AgentCanon CLI into:
 
 ```text
-/opt/agent-canon/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon
 ```
 
-with:
+with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
+may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
+`~/.tools` for compiled agent-tool binaries.
+
+llama.cpp follows the same compiled-tool cache rule:
 
 ```text
-/usr/local/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 ```
 
-as a symlink.
+The initial local LLM model selector is `Qwen/Qwen3-0.6B-GGUF:Q8_0`, used only
+by `tools/agent_tools/file_responsibility_llm.py` for single-file advisory
+responsibility review.
 
 In a template or derived repository, the normal adoption path is:
 
@@ -168,7 +175,8 @@ The audit checks:
 - the Rust migration document, crate manifest, CLI entrypoint, audit module,
   and stable wrapper exist;
 - `.devcontainer/post-create.sh` installs the Rust toolchain, developer
-  components, release CLI, and `/usr/local/bin/agent-canon` entrypoint;
+  components, `~/.tools` release CLI cache, and `/usr/local/bin/agent-canon`
+  entrypoint;
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 

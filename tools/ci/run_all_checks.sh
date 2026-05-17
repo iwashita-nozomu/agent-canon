@@ -12,6 +12,9 @@
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
+# upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
+# upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
+# upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
@@ -201,6 +204,30 @@ if "$PYTHON_BIN" tools/agent_tools/tool_drift.py 2>&1; then
   echo "✅ tool/convention drift checks 成功"
 else
   echo "❌ tool/convention drift checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/responsibility_scope.py 2>&1; then
+  echo "✅ responsibility scope checks 成功"
+else
+  echo "❌ responsibility scope checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/issue_sync.py 2>&1; then
+  echo "✅ local issue sync checks 成功"
+else
+  echo "❌ local issue sync checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
+  echo "✅ eval accumulation checks 成功"
+else
+  echo "❌ eval accumulation checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/local_llm_eval.py 2>&1; then
+  echo "✅ local LLM responsibility eval checks 成功"
+else
+  echo "❌ local LLM responsibility eval checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then

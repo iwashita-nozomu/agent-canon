@@ -9,11 +9,14 @@ upstream design ../documents/dependency-manifest-design.md defines dependency gr
 downstream design open/AC-20260513-durable-finding-auto-promotion.md records the initial workflow defect
 downstream design closed/README.md defines closed finding storage
 downstream implementation ../tools/ci/check_github_workflows.py validates issue conventions
+downstream implementation ../tools/agent_tools/issue_sync.py validates local issues and plans GitHub Issue sync
 @dependency-end
 -->
 
 This directory stores durable AgentCanon operational findings.
-It is not a mirror of GitHub Issues and it is not a run-bundle scratchpad.
+It is the local durable source of truth; GitHub Issues are an optional visible
+mirror created or updated by explicit sync tooling.
+It is not a run-bundle scratchpad.
 Use it when a user, reviewer, runtime check, CI failure, or agent retrospective exposes a workflow defect that should survive beyond the current run.
 
 ## Directory Contract
@@ -54,6 +57,13 @@ close_condition: <one sentence>
 
 Issue text must summarize the behavior and cite evidence.
 Do not paste raw chat logs or long run-bundle transcripts.
+When an issue is mirrored to GitHub, add this optional field:
+
+```text
+github_issue: https://github.com/<owner>/<repo>/issues/<number>
+```
+
+Use `github_issue: pending` only while a branch is preparing the GitHub mirror.
 Closed issue files must additionally include:
 
 ```text
@@ -89,3 +99,31 @@ AgentCanon PRs that change workflow, tooling, memory, evaluation, search behavio
 
 If a run bundle exposes a workflow defect, the defect is not considered captured until this directory, `memory/`, or `notes/failures/` contains the durable record.
 Do not delete closed findings during ordinary cleanup; archive or compact only during an explicit issue-retention pass.
+
+## GitHub Issue Sync
+
+Local issue files remain canonical because they carry dependency headers,
+dependency-expanded edit scope, and reviewable history. GitHub Issues are the
+operator-facing mirror for triage and branch/PR routing.
+
+Offline validation:
+
+```bash
+python3 tools/agent_tools/issue_sync.py --root .
+```
+
+Plan missing GitHub mirrors:
+
+```bash
+python3 tools/agent_tools/issue_sync.py --root . --repo iwashita-nozomu/agent-canon
+```
+
+Apply mode may create GitHub Issues and insert `github_issue:` fields, but it
+must be an explicit operator action:
+
+```bash
+python3 tools/agent_tools/issue_sync.py \
+  --root . \
+  --repo iwashita-nozomu/agent-canon \
+  --apply
+```

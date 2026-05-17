@@ -145,6 +145,60 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="responsibility_scope",
+        tool="tools/agent_tools/responsibility_scope.py",
+        links=(
+            LinkCheck("responsibility-scope.toml"),
+            LinkCheck("documents/templates/responsibility-scope.template.toml"),
+            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_responsibility_scope.py"),
+        ),
+    ),
+    ToolContract(
+        name="local_llm_eval",
+        tool="tools/agent_tools/local_llm_eval.py",
+        links=(
+            LinkCheck("agents/evals/README.md"),
+            LinkCheck("agents/evals/local_llm_responsibility_eval.toml"),
+            LinkCheck("agents/evals/results/local-llm-responsibility/README.md"),
+            LinkCheck("documents/local-llm-responsibility-analysis.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_local_llm_eval.py"),
+        ),
+    ),
+    ToolContract(
+        name="issue_sync",
+        tool="tools/agent_tools/issue_sync.py",
+        links=(
+            LinkCheck("issues/README.md"),
+            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_issue_sync.py"),
+        ),
+    ),
+    ToolContract(
+        name="eval_accumulation",
+        tool="tools/agent_tools/eval_accumulation_check.py",
+        links=(
+            LinkCheck("agents/evals/README.md"),
+            LinkCheck("agents/evals/results/README.md"),
+            LinkCheck("agents/evals/results/hook-runs/README.md"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_eval_accumulation_check.py"),
+        ),
+    ),
+    ToolContract(
         name="agent_canon_pr_check",
         tool="tools/ci/check_agent_canon_pr.sh",
         links=(
@@ -262,6 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--contract",
         action="append",
+        default=[],
         choices=tuple(contract.name for contract in CONTRACTS),
         help="Limit checks to one contract. May be repeated.",
     )
@@ -522,7 +577,7 @@ def check_catalog_entries(root: Path) -> list[Finding]:
     return findings
 
 
-def selected_contracts(names: Sequence[str] | None) -> tuple[ToolContract, ...]:
+def selected_contracts(names: Sequence[str]) -> tuple[ToolContract, ...]:
     """Return selected contracts."""
     if not names:
         return CONTRACTS
@@ -530,7 +585,7 @@ def selected_contracts(names: Sequence[str] | None) -> tuple[ToolContract, ...]:
     return tuple(contract for contract in CONTRACTS if contract.name in selected)
 
 
-def run_checks(root: Path, names: Sequence[str] | None) -> list[Finding]:
+def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
     """Run drift checks."""
     contracts = selected_contracts(names)
     paths = sorted(

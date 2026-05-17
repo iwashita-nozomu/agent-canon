@@ -207,6 +207,10 @@ VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "tool_catalog.py",
     "tool_drift.py",
+    "responsibility_scope.py",
+    "issue_sync.py",
+    "eval_accumulation_check.py",
+    "local_llm_eval.py",
     "run_repo_dependency_review.sh --fail-missing",
     "check_github_workflows.py",
     "container_config.py",

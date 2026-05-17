@@ -7,6 +7,10 @@ upstream implementation ../../tools/update_agent_canon.sh tool-first latest upda
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
 upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
+upstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility scope gate
+upstream implementation ../../tools/agent_tools/issue_sync.py local/GitHub issue sync gate
+upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval accumulation gate
+upstream implementation ../../tools/agent_tools/local_llm_eval.py local LLM responsibility eval gate
 upstream design ../../tools/catalog.yaml structured tool catalog
 upstream design ../../issues/README.md durable operational finding storage
 upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
@@ -134,6 +138,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - standalone AgentCanon repo では `.github/PULL_REQUEST_TEMPLATE.md` の `Operational Findings / Issues` に記入します。
 - template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
 - 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
+- `python3 tools/agent_tools/issue_sync.py` を実行し、GitHub mirror が未作成の local issue は `ISSUE_SYNC_PLAN=` を PR body に貼るか、明示的に defer します。
 - GitHub Actions の Agent Improvement Guide がある場合は、その artifact / step summary を確認し、memory、eval、hook、issues 由来の改善候補を PR body に反映します。
 
 ## Branch ルール
@@ -166,6 +171,10 @@ standalone AgentCanon repo:
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
+python3 tools/agent_tools/responsibility_scope.py
+python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/eval_accumulation_check.py
+python3 tools/agent_tools/local_llm_eval.py
 python3 tools/ci/check_github_workflows.py
 bash tools/ci/run_docs_checks.sh
 bash tools/ci/run_all_checks.sh --quick
@@ -187,6 +196,10 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - `python3 tools/agent_tools/tool_catalog.py`
 - `python3 tools/agent_tools/tool_drift.py`
+- `python3 tools/agent_tools/responsibility_scope.py`
+- `python3 tools/agent_tools/issue_sync.py`
+- `python3 tools/agent_tools/eval_accumulation_check.py`
+- `python3 tools/agent_tools/local_llm_eval.py`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI

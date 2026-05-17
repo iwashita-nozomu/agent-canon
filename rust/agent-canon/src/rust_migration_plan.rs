@@ -1,7 +1,7 @@
 // @dependency-start
 // responsibility Prints sequential Rust migration candidates for AgentCanon tools.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
-// upstream evidence ../../../agents/evals/results/hook-runs hook and skill usage logs
+// upstream design ../../../agents/evals/results/hook-runs hook and skill usage logs
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
@@ -245,7 +245,7 @@ fn inspect_foundation(root: &Path) -> FoundationStatus {
             for snippet in [
                 "rustup toolchain install",
                 "cargo build --release",
-                "/opt/agent-canon/bin/agent-canon",
+                "${tools_home}/agent-canon/bin/agent-canon",
                 "/usr/local/bin/agent-canon",
             ] {
                 if !text.contains(snippet) {
@@ -564,7 +564,7 @@ mod tests {
         write(
             root,
             ".devcontainer/post-create.sh",
-            "rustup toolchain install\ncargo build --release\n/opt/agent-canon/bin/agent-canon\n/usr/local/bin/agent-canon\n",
+            "tools_home=\"${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}\"\nrustup toolchain install\ncargo build --release\n${tools_home}/agent-canon/bin/agent-canon\n/usr/local/bin/agent-canon\n",
         );
     }
 

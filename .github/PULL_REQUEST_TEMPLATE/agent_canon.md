@@ -7,6 +7,7 @@ upstream design ../../issues/README.md durable operational issue storage
 upstream design ../../tools/catalog.yaml structured tool catalog
 downstream implementation ../../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
+downstream implementation ../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
 @dependency-end
 -->
 
@@ -71,6 +72,7 @@ Plan / exception:
 - [ ] Existing durable findings were searched in `vendor/agent-canon/issues/open/`, `vendor/agent-canon/issues/closed/`, `vendor/agent-canon/memory/`, `vendor/agent-canon/notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md`, `vendor/agent-canon/memory/`, or `vendor/agent-canon/notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
+- [ ] `python3 tools/agent_tools/issue_sync.py` was run; any missing GitHub mirrors are listed as `ISSUE_SYNC_PLAN=` or intentionally deferred.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
 
@@ -97,6 +99,10 @@ Impact notes:
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
 - [ ] `python3 tools/agent_tools/tool_catalog.py`
 - [ ] `python3 tools/agent_tools/tool_drift.py`
+- [ ] `python3 tools/agent_tools/responsibility_scope.py`
+- [ ] `python3 tools/agent_tools/issue_sync.py`
+- [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
+- [ ] `python3 tools/agent_tools/local_llm_eval.py`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source when AgentCanon is needed.
 - [ ] Private AgentCanon submodule access is covered by repository secret `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or the PR explains why the workflow does not need it.

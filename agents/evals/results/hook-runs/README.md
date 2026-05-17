@@ -4,8 +4,9 @@
 @dependency-start
 responsibility Documents accumulated hook run result naming.
 upstream design ../README.md eval result accumulation contract
-upstream implementation ../../../../.codex/hooks/hook_event_log.py assigns hook run ids
+downstream implementation ../../../../.codex/hooks/hook_event_log.py assigns hook run ids
 downstream implementation ../../../../tools/agent_tools/generate_agent_improvement_guide.py reads hook results
+downstream implementation ../../../../tools/agent_tools/eval_accumulation_check.py validates hook result structure
 @dependency-end
 -->
 

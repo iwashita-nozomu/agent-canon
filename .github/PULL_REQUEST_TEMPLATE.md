@@ -10,6 +10,7 @@ upstream design ../issues/README.md defines durable operational issue storage
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
 downstream implementation ../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
+downstream implementation ../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
 downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side AgentCanon PRs
 @dependency-end
 -->
@@ -84,6 +85,7 @@ Plan / exception:
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
+- [ ] `python3 tools/agent_tools/issue_sync.py` was run; any missing GitHub mirrors are listed as `ISSUE_SYNC_PLAN=` or intentionally deferred.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
 - [ ] AgentCanon Static Gates from `.github/workflows/agent-canon-static-gates.yml` are passing when available.
@@ -109,6 +111,10 @@ Impact notes:
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`
 - [ ] `python3 tools/agent_tools/tool_catalog.py`
 - [ ] `python3 tools/agent_tools/tool_drift.py`
+- [ ] `python3 tools/agent_tools/responsibility_scope.py`
+- [ ] `python3 tools/agent_tools/issue_sync.py`
+- [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
+- [ ] `python3 tools/agent_tools/local_llm_eval.py`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] `bash tools/ci/run_docs_checks.sh`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`

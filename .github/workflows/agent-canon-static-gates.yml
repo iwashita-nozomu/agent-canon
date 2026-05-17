@@ -3,6 +3,10 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
 # upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
+# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
+# upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
+# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../tools/agent_tools/local_llm_eval.py validates local LLM eval prompts
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
 # upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
 # @dependency-end
@@ -53,6 +57,10 @@ jobs:
         run: |
           python3 tools/agent_tools/tool_catalog.py
           python3 tools/agent_tools/tool_drift.py
+          python3 tools/agent_tools/responsibility_scope.py
+          python3 tools/agent_tools/issue_sync.py
+          python3 tools/agent_tools/eval_accumulation_check.py
+          python3 tools/agent_tools/local_llm_eval.py
           bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
           python3 tools/ci/check_github_workflows.py
           python3 tools/ci/container_config.py
