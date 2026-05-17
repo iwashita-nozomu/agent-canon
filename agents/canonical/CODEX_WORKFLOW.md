@@ -140,6 +140,8 @@ repository task では、ユーザーが MCP を明示していなくても、re
 python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 ```
 
+- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合はこの preflight を走らせず、repo MCP tool、shell、GitHub check も起動せず、会話だけで応答します。
+- repo state 確認、file edit、validation、PR / issue 処理、CI 確認、または実装作業へ切り替わった時点で repository task として扱い、切り替えを user-facing update で明示してから preflight へ進みます。
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
 - AgentCanon owns the server implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and the repo MCP tool contract documented by `mcp/README.md`.
@@ -148,7 +150,7 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 - current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / MCP-covered context check 用です。file editing capability は持ちません。
 - Do not add file edit, GitHub connector, shell runner, web access, or Codex app replacement behavior to `repo_mcp_server`; use the Codex-provided tool or connector surface when that capability is needed.
 - MCP が pass したあと、毎回「MCP は編集できないので patch で編集する」と user update に書いてはいけません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
-- `.codex/hooks.json` の `SessionStart` / `UserPromptSubmit` hook は MCP preflight context を session に注入します。これは「MCP をユーザーが明示しなくても思い出す」ための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
+- `.codex/hooks.json` の `SessionStart` hook は MCP preflight context を session に注入します。`UserPromptSubmit` では MCP context hook を起動しません。これは repo task だけで MCP を思い出し、普通の相談を毎回 repository task に昇格させないための routing 補助であり、checker 実行と run bundle evidence の代替ではありません。
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
 - inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。

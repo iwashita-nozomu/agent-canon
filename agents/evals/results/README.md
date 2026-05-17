@@ -48,7 +48,10 @@ python3 tools/agent_tools/eval_accumulation_check.py --root .
 
 The checker is structural. It accepts legacy readable reports, but namespaced
 new hook logs must carry the required fields documented under `hook-runs/`.
-For a human-readable view, generate the runtime dashboard. In GitHub Actions,
+For a human-readable view, generate the runtime dashboard. It shows not only
+aggregate counts, but also Mermaid evidence flow, per-skill eval failure rates,
+workflow attribution for hook firing, prompt/tool-selection evidence, token
+comparison coverage, and explicit missing-evidence signals. In GitHub Actions,
 the canonical published dashboard is the standalone AgentCanon repository
 workflow summary and artifact, not a template or derived repository workflow
 copy:

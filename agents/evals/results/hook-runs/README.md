@@ -73,12 +73,20 @@ raw chronology.
 Guide-generation tools also mine these JSONL lines for routing evidence:
 `skill_usage.jsonl` contributes explicit skill counts, candidate skill /
 workflow / tool counts inferred from prompt text, human feedback labels and
-targets, and skill/event coverage. Hook entries with `tool_name` contribute tool
-usage counts, and checker command arrays contribute target file counts. Do not
-strip command target paths from hook results; they are how the next repair
-branch can see which skill, workflow, tool, or source file needs attention.
-Prompt-intake logs must not store raw prompt text; they keep fingerprints,
-source field names, and classified routing fields instead.
+targets, prompt fingerprints, bounded redacted prompt excerpts, and skill/event
+coverage. `PostToolUse` entries in that same file contribute chosen tool names,
+tool input fingerprints, input key names, and command verbs. Hook entries with
+`tool_name` contribute tool usage counts, and checker command arrays contribute
+target file counts. Do not strip command target paths from hook results; they
+are how the next repair branch can see which skill, workflow, tool, or source
+file needs attention.
+
+Prompt-intake logs must not store unbounded raw prompt text. Store only
+`prompt_excerpt_redacted`, `prompt_fingerprint`, `prompt_char_count`, and
+`prompt_excerpt_truncated`. If a prompt contains secret-like values, redact them
+before writing the excerpt. If later analysis cannot answer which prompt shape,
+tool selection, or workflow attribution caused a failure, that is evidence that
+the hook log schema is still too weak and should be extended deliberately.
 
 Before editing `.codex/hooks.json` or `.codex/hooks/*`, run
 `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`.

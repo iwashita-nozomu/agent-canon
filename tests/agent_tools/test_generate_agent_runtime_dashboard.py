@@ -53,9 +53,22 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("## Action Map", dashboard)
         self.assertIn("| hook evidence | `healthy` | `2` |", dashboard)
         self.assertIn("| report quality eval | `missing` | `0` |", dashboard)
+        self.assertIn("## Skill Eval Failure Analysis", dashboard)
+        self.assertIn("| `agent-orchestration` | `1` | `1` | `100.0%` |", dashboard)
+        self.assertIn("## Hook Workflow Attribution", dashboard)
+        self.assertIn("| `environment-maintenance@UserPromptSubmit` | `1` |", dashboard)
+        self.assertIn("hook_entries_missing_workflow_attribution: `3`", dashboard)
+        self.assertIn("## Token Consumption Evidence", dashboard)
+        self.assertIn("token_comparison_status: `present`", dashboard)
+        self.assertIn("average_token_ratio: `0.500`", dashboard)
+        self.assertIn("## Prompt And Tool Selection Evidence", dashboard)
+        self.assertIn("prompt_entries: `1`", dashboard)
+        self.assertIn("tool_selection_entries: `2`", dashboard)
+        self.assertIn("| `Bash` | `2` |", dashboard)
+        self.assertIn("| `python3` | `1` |", dashboard)
         self.assertIn("agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl", dashboard)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_FILES=2", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=3", dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=4", dashboard)
         self.assertIn("skill-workflow-prompt", dashboard)
         self.assertIn("local-llm-responsibility", dashboard)
         self.assertIn("workflow-selection", dashboard)
@@ -115,7 +128,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         (root / "memory" / "USER_PREFERENCES.md").write_text("- preference\n", encoding="utf-8")
         (root / "memory" / "AGENT_PHILOSOPHY.md").write_text("- learning\n", encoding="utf-8")
         (skill_dir / "skill-eval-test-fail-agent-orchestration.md").write_text(
-            "EVAL_STATUS=fail\n",
+            "- used_skills: `agent-orchestration`\nEVAL_STATUS=fail\n",
             encoding="utf-8",
         )
         (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
@@ -151,6 +164,11 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "skills": ["agent-orchestration"],
                     "candidate_workflows": ["environment-maintenance"],
                     "feedback_labels": ["quality_gap"],
+                    "prompt_capture_status": "present",
+                    "prompt_excerpt_redacted": "Use environment maintenance",
+                    "prompt_char_count": 27,
+                    "tool_name": "",
+                    "tool_command_verb": "",
                     "skill_source_fields": ["prompt"],
                     "observed_text_field_count": 1,
                     "workflow_monitor_event_count": 1,
@@ -172,7 +190,29 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "workflow_monitor_report_dir": "reports/agents/test",
                 }
             )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "hook-skill-3",
+                    "hook_log_namespace": "test-container",
+                    "event": "PostToolUse",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-d",
+                    "tool_name": "Bash",
+                    "tool_selection_kind": "executed_tool",
+                    "tool_command_verb": "python3",
+                    "tool_input_key_count": 1,
+                    "tool_input_keys": ["cmd"],
+                }
+            )
             + "\n",
+            encoding="utf-8",
+        )
+        workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report.parent.mkdir(parents=True)
+        workflow_report.write_text(
+            "token_efficiency_protocol=active token_footprint_comparison=pass "
+            "baseline_total=200 candidate_total=100 token_ratio=0.500 target_ratio=0.500\n",
             encoding="utf-8",
         )
 

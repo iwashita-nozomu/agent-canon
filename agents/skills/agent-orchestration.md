@@ -50,6 +50,9 @@ mode の意味:
 - `routing-only/advisory`
   - workflow family、skill、review、starter guidance だけを先に決める
   - full kickoff や repo-changing-only skill を勝手に足さない
+  - 普通の相談、壁打ち、説明だけの turn を含む
+  - repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答する
+  - user が repo inspection、file edit、validation、PR / issue 処理、CI 確認、または実装作業を求めた時点で `repo-changing execution` へ切り替え、切り替えを user-facing update で明示してから preflight へ進む
 
 ## Outputs
 

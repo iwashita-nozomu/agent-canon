@@ -36,7 +36,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, or multi-candidate comparison -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay
    - do not add unrelated family skills just because they are nearby in the catalog
-1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, or repo-changing-only skills.
+1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, or repo-changing-only skills. Ordinary consultation, brainstorming, and explanation-only turns stay conversational until the user asks to inspect repo state, edit files, run validation, process PRs/issues, check CI, or execute implementation work.
 1. Choose the starter command with explicit precedence:
    - if the request is `repo-changing execution`, or the user asks for the startup command / run bundle, prefer `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"`
    - use `python3 tools/agent_tools/task_start.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"` only for routing-only starter guidance when no run bundle is being created yet
