@@ -119,6 +119,25 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
+  - id: route
+    summary: Maps long proposed tool and skill names to short task-routing areas.
+    path: tools/agent_tools/route.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/route.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/route.md
+      - documents/tool-skill-routing-refactor.md
+    tests:
+      - tests/agent_tools/test_route.py
+
   - id: check-convention-compliance
     summary: Verifies convention sources and workflow gate wiring stay connected.
     path: tools/agent_tools/check_convention_compliance.py

@@ -13,6 +13,10 @@ skill_families:
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
     shim: .agents/skills/repo-onboarding/SKILL.md
+  - id: task-routing
+    purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
+    canonical_doc: agents/skills/task-routing.md
+    shim: .agents/skills/task-routing/SKILL.md
   - id: start-repository
     purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
