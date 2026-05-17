@@ -143,6 +143,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon-update-tasks.toml` から抽出します。
   - 親 repo の進捗は `.agent-canon/update-state.toml` にだけ残し、生成された pending view は `.agent-canon/.gitignore` で ignored にします。
   - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
+- `tools/rebuild_agent_tools.sh`
+  - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled AgentCanon tools を source commit に合わせます。
+  - `make agent-canon-ensure-latest`、`make agent-canon-latest`、`make agent-canon-update` の safe path から自動的に呼ばれます。
+  - `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo` が出た場合は、DevContainer 内で再実行するか Rust toolchain を用意してから `make agent-canon-rebuild-tools` を実行します。
 - `tools/agent_tools/route.py`
   - 長い候補 tool / skill 名を短い route area へ解決します。
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。

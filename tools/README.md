@@ -145,19 +145,23 @@ model-backed reports under `agents/evals/results/local-llm-responsibility/`.
   - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
-    - `latest` は通常の最新化を tool-first に実行し、safe な場合は `ensure-latest`、root view check、AgentCanon update TODO acknowledge まで進めます。local shared-canon branch、dirty submodule、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW` と `NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
-    - `apply` は `ensure-latest` を呼び、GitHub `main` の submodule pin を parent repo に持ち帰ります。
+    - `latest` は通常の最新化を tool-first に実行し、safe な場合は `ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO acknowledge まで進めます。local shared-canon branch、dirty submodule、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW` と `NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
+    - `apply` は `ensure-latest` を呼び、GitHub `main` の submodule pin を parent repo に持ち帰ったあと、compiled AgentCanon tools を rebuild します。
+    - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
     - `merge-main-into-current` は `vendor/agent-canon/` の current branch に GitHub `main` を merge し、AgentCanon PR branch を push できる状態へ近づけます。
     - compatibility commands for local remotes, source refresh, and direct main alignment are intentionally not user-facing.
+  - `rebuild_agent_tools.sh`
+    - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。
+    - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は AgentCanon source そのものには依存しないため、devcontainer post-create または明示的な llama.cpp rebuild policy で扱います。
 
 ## AgentCanon Update Path
 
 通常の派生 repo では `update_agent_canon.sh latest` を入口にします。
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
-1. `make agent-canon-latest` で通常の AgentCanon `main` 更新、root view check、親 repo update TODO acknowledge を tool に任せます。
+1. `make agent-canon-latest` で通常の AgentCanon `main` 更新、root view check、compiled tool rebuild、親 repo update TODO acknowledge を tool に任せます。
 1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current` を出します。その場合は agent が conflict workflow に入り、必要なら `make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
-1. AgentCanon PR が merge された後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。
+1. AgentCanon PR が merge された後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `update_agent_canon.sh apply` を通り、pin 更新後に `tools/rebuild_agent_tools.sh` を走らせます。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば親 repo の agent が先に適用し、完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` で GitHub `main` の submodule pin を適用します。

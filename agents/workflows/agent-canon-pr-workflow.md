@@ -246,6 +246,11 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
+`make agent-canon-ensure-latest` rebuilds compiled AgentCanon tools after the
+pin update. If it reports `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo`,
+rerun `make agent-canon-rebuild-tools` inside the DevContainer before relying
+on Rust-backed `agent-canon` CLI behavior.
+
 9. local working clone がある場合は fast-forward する
 
 ```bash

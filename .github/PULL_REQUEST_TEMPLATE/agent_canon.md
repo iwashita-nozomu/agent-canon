@@ -103,6 +103,7 @@ Impact notes:
 - [ ] `python3 tools/agent_tools/issue_sync.py`
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
 - [ ] `python3 tools/agent_tools/local_llm_eval.py`
+- [ ] AgentCanon pin/update path: `bash tools/update_agent_canon.sh rebuild-tools` or a documented `AGENT_CANON_TOOL_REBUILD_*` skip reason.
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source when AgentCanon is needed.
 - [ ] Private AgentCanon submodule access is covered by repository secret `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or the PR explains why the workflow does not need it.
@@ -135,6 +136,7 @@ Integration notes:
 
 - [ ] AgentCanon source PR was opened and merged before this template pin update, or this is a pin-only update to existing AgentCanon `main`.
 - [ ] After AgentCanon merge, ran `make agent-canon-ensure-latest`.
+- [ ] Compiled AgentCanon tools were rebuilt by the latest/ensure path, or `AGENT_CANON_TOOL_REBUILD_*` explains why rebuild is deferred to DevContainer.
 - [ ] Ran `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check`.
 - [ ] Direct `bash tools/sync_agent_canon.sh push` was not used, or a maintainer direct-push exception is explained below.
 - [ ] Upstream sync is intentionally deferred and explained below.

@@ -114,6 +114,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   must not live in the project Dockerfile or tracked repository tree.
 - Devcontainer post-create must publish Rust on PATH for non-interactive
   `devcontainer exec` commands, not only for the current post-create shell.
+- AgentCanon pin updates must refresh compiled AgentCanon tools after the new
+  source is checked out. The canonical path is `tools/rebuild_agent_tools.sh`,
+  called by `make agent-canon-ensure-latest`, `make agent-canon-latest`, and
+  `make agent-canon-update`.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository

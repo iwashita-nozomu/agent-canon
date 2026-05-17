@@ -61,8 +61,11 @@ In a template or derived repository, the normal adoption path is:
    contains this policy and the Rust CLI.
 1. Repair shared root views with `bash tools/sync_agent_canon.sh link-root` if
    the root view drifts.
-1. Rebuild or recreate the DevContainer so `.devcontainer/post-create.sh` runs
-   again.
+1. Run `make agent-canon-ensure-latest` or
+   `bash tools/update_agent_canon.sh apply`; this calls
+   `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
+   host has no Rust toolchain, rerun the same target inside the DevContainer or
+   recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
 1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
    the Rust foundation is present.
 1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before

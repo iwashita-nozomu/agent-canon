@@ -498,6 +498,24 @@ entries:
     tests:
       - tests/tools/test_update_agent_canon.py
 
+  - id: rebuild-agent-tools
+    summary: Rebuilds compiled AgentCanon tools after AgentCanon source updates.
+    path: tools/rebuild_agent_tools.sh
+    family: root
+    role: runner
+    status: canonical
+    command: bash tools/rebuild_agent_tools.sh
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/rust-agent-tool-migration.md
+    tests:
+      - tests/tools/test_update_agent_canon.py
+
   - id: agent-canon-update-todos
     summary: Routes parent-repo agents through AgentCanon update TODOs after submodule pin updates.
     path: tools/agent_tools/agent_canon_update_todos.py
