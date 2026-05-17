@@ -1,0 +1,191 @@
+# @dependency-start
+# responsibility Defines top-level machine-readable responsibility scopes and protecting tools.
+# upstream design documents/SHARED_RUNTIME_SURFACES.md shared runtime ownership policy
+# upstream design documents/shared-runtime-surfaces.toml shared surface manifest
+# upstream design tools/catalog.yaml structured tool ownership
+# downstream design documents/responsibility-scope-management.md explains the scope model
+# downstream implementation tools/agent_tools/responsibility_scope.py validates this manifest
+# downstream implementation tests/agent_tools/test_responsibility_scope.py tests scope validation
+# @dependency-end
+
+catalog_kind = "agent_canon_responsibility_scope"
+version = 1
+
+owner_values = [
+  "agent-canon",
+  "template",
+  "derived-project",
+  "github",
+  "external-vendor",
+]
+
+class_values = [
+  "shared_runtime",
+  "shared_policy",
+  "active_contract",
+  "durable_state",
+  "evidence",
+  "tooling",
+  "github_surface",
+  "external_dependency",
+]
+
+required_coverage = [
+  ".agents",
+  ".claude",
+  ".codex",
+  ".devcontainer",
+  ".github",
+  "agents",
+  "agents/evals",
+  "documents",
+  "issues",
+  "mcp",
+  "memory",
+  "notes",
+  "references",
+  "rust",
+  "tools",
+  "vendor",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "CONTAINER_OPERATIONS.md",
+  "README.md",
+  "responsibility-scope.toml",
+  "ROOT_AGENTS.md",
+]
+
+[[scope]]
+id = "runtime-entrypoints"
+owner = "agent-canon"
+class = "shared_runtime"
+description = "Agent runtime entrypoints, workflow canon, skills, hooks, MCP bridge, and shared runtime configuration."
+paths = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "ROOT_AGENTS.md",
+  ".agents/**",
+  ".claude/**",
+  ".codex/**",
+  ".devcontainer/**",
+  "agents/**",
+  "mcp/**",
+]
+protecting_tools = [
+  "tools/agent_tools/check_agent_runtime_alignment.py",
+  "tools/agent_tools/tool_rejection_preflight.py",
+  "tools/agent_tools/log_surface_inventory.py",
+]
+issues = [
+  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/open/AC-20260517-responsibility-scope-management.md",
+]
+
+[[scope]]
+id = "operational-issues"
+owner = "agent-canon"
+class = "durable_state"
+description = "Durable local issue files plus optional GitHub Issue mirror metadata."
+paths = [
+  "issues/**",
+]
+protecting_tools = [
+  "tools/agent_tools/issue_sync.py",
+  "tools/ci/check_github_workflows.py",
+]
+issues = [
+  "issues/open/AC-20260517-github-folder-issue-sync.md",
+]
+
+[[scope]]
+id = "eval-and-hook-evidence"
+owner = "agent-canon"
+class = "evidence"
+description = "Append-only hook, skill, workflow, and behavior eval evidence consumed by improvement tooling."
+paths = [
+  "agents/evals/**",
+]
+protecting_tools = [
+  "tools/agent_tools/eval_accumulation_check.py",
+  "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+  "tools/agent_tools/evaluate_agent_run.py",
+  "tools/agent_tools/generate_agent_improvement_guide.py",
+]
+issues = [
+  "issues/open/AC-20260517-eval-accumulation-gaps.md",
+]
+
+[[scope]]
+id = "shared-tooling"
+owner = "agent-canon"
+class = "tooling"
+description = "Shared automation, static gates, OOP checkers, Rust CLI, and tool catalog metadata."
+paths = [
+  "tools/**",
+  "rust/**",
+  "helper_inventory_guard_policy.json",
+]
+protecting_tools = [
+  "tools/agent_tools/tool_catalog.py",
+  "tools/agent_tools/tool_drift.py",
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/ci/check_agent_canon_pr.sh",
+  "tools/ci/run_all_checks.sh",
+]
+issues = [
+  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/open/AC-20260517-responsibility-scope-management.md",
+]
+
+[[scope]]
+id = "shared-policy-documents"
+owner = "agent-canon"
+class = "shared_policy"
+description = "Shared policy, convention, container, bootstrap, and tool documentation."
+paths = [
+  "CONTAINER_OPERATIONS.md",
+  "README.md",
+  "responsibility-scope.toml",
+  "documents/**",
+  "notes/**",
+  "memory/**",
+  "references/**",
+]
+protecting_tools = [
+  "tools/agent_tools/run_repo_dependency_review.sh",
+  "tools/ci/run_docs_checks.sh",
+  "tools/agent_tools/responsibility_scope.py",
+]
+issues = [
+  "issues/open/AC-20260517-responsibility-scope-management.md",
+]
+
+[[scope]]
+id = "github-automation"
+owner = "github"
+class = "github_surface"
+description = "GitHub Actions, Copilot instructions, PR templates, and GitHub-facing checkout helpers."
+paths = [
+  ".github/**",
+]
+protecting_tools = [
+  "tools/ci/check_github_workflows.py",
+  "tools/agent_tools/issue_sync.py",
+]
+issues = [
+  "issues/open/AC-20260517-github-folder-issue-sync.md",
+]
+
+[[scope]]
+id = "external-skill-vendor"
+owner = "external-vendor"
+class = "external_dependency"
+description = "Vendored third-party skills and related external agent components inside AgentCanon."
+paths = [
+  "vendor/**",
+]
+protecting_tools = [
+  "tools/agent_tools/vendor_skill_adapters.py",
+  "tools/agent_tools/responsibility_scope.py",
+]
+issues = []

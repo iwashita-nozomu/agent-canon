@@ -18,6 +18,7 @@ affected_surfaces: .codex/hooks/skill_usage_logger.py, agents/evals/results/hook
 edit_scope: .codex/hooks/skill_usage_logger.py, tests/agent_tools/test_codex_hooks.py, issues/closed/AC-20260514-skill-usage-noop-hook-churn.md
 required_action: Keep real skill-use evidence append-only, but do not write durable hook JSONL for payloads where no skill was observed.
 close_condition: Skill usage hook still logs observed `$skill-name` payloads and skips empty / no-skill payloads without creating a log file.
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/31
 resolved_at: 2026-05-14
 
 ## Finding

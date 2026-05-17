@@ -37,16 +37,23 @@ container PATH for non-interactive `devcontainer exec` commands, and builds the
 canonical AgentCanon CLI into:
 
 ```text
-/opt/agent-canon/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon
 ```
 
-with:
+with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
+may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
+`~/.tools` for compiled agent-tool binaries.
+
+llama.cpp follows the same compiled-tool cache rule:
 
 ```text
-/usr/local/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 ```
 
-as a symlink.
+The initial local LLM model selector is `Qwen/Qwen3-0.6B-GGUF:Q8_0`, used only
+by `tools/agent_tools/file_responsibility_llm.py` for single-file advisory
+responsibility review.
 
 In a template or derived repository, the normal adoption path is:
 
@@ -54,8 +61,11 @@ In a template or derived repository, the normal adoption path is:
    contains this policy and the Rust CLI.
 1. Repair shared root views with `bash tools/sync_agent_canon.sh link-root` if
    the root view drifts.
-1. Rebuild or recreate the DevContainer so `.devcontainer/post-create.sh` runs
-   again.
+1. Run `make agent-canon-ensure-latest` or
+   `bash tools/update_agent_canon.sh apply`; this calls
+   `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
+   host has no Rust toolchain, rerun the same target inside the DevContainer or
+   recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
 1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
    the Rust foundation is present.
 1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before
@@ -168,7 +178,8 @@ The audit checks:
 - the Rust migration document, crate manifest, CLI entrypoint, audit module,
   and stable wrapper exist;
 - `.devcontainer/post-create.sh` installs the Rust toolchain, developer
-  components, release CLI, and `/usr/local/bin/agent-canon` entrypoint;
+  components, `~/.tools` release CLI cache, and `/usr/local/bin/agent-canon`
+  entrypoint;
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 

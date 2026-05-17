@@ -889,6 +889,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         (repo / "tools").mkdir()
         shutil.copy2(REPO_ROOT / "tools" / "sync_agent_canon.sh", repo / "tools")
         shutil.copy2(REPO_ROOT / "tools" / "update_agent_canon.sh", repo / "tools")
+        shutil.copy2(REPO_ROOT / "tools" / "rebuild_agent_tools.sh", repo / "tools")
         subprocess.run(
             [
                 "git",
@@ -1177,10 +1178,71 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("agent_canon_plan_route=submodule_update", latest.stdout)
             self.assertIn("agent_canon_latest=updating_submodule", latest.stdout)
             self.assertIn("shared surface is in sync", latest.stdout)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest", latest.stdout)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD=pass", latest.stdout)
             self.assertIn("AGENT_CANON_LATEST_TODOS=skipped_missing_tool", latest.stdout)
             self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", latest.stdout)
             self.assertIn("NEXT_ACTION=run_validation_then_push_parent_repo", latest.stdout)
             self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
+
+    def test_rebuild_tools_installs_rust_cli_from_current_submodule(self) -> None:
+        """Rebuild-tools should install a Rust CLI matching the current AgentCanon source."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            rust_root = submodule / "rust" / "agent-canon"
+            fake_bin = root / "fake-bin"
+            tools_home = root / "tools-home"
+            rust_root.mkdir(parents=True)
+            (rust_root / "Cargo.toml").write_text("[package]\nname = \"agent-canon\"\nversion = \"0.1.0\"\nedition = \"2021\"\n", encoding="utf-8")
+            fake_bin.mkdir()
+            cargo = fake_bin / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env bash\n"
+                "manifest=''\n"
+                "while [ \"$#\" -gt 0 ]; do\n"
+                "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
+                "done\n"
+                "crate_dir=\"$(dirname \"$manifest\")\"\n"
+                "mkdir -p \"$crate_dir/target/release\"\n"
+                "cat >\"$crate_dir/target/release/agent-canon\" <<'SH'\n"
+                "#!/usr/bin/env bash\n"
+                "echo 'agent-canon test 0.1.0'\n"
+                "SH\n"
+                "chmod +x \"$crate_dir/target/release/agent-canon\"\n",
+                encoding="utf-8",
+            )
+            cargo.chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+            env["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            env["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
+
+            first = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "rebuild-tools"],
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            second = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "rebuild-tools"],
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", first.stdout)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD=pass", first.stdout)
+            self.assertTrue((tools_home / "bin" / "agent-canon").is_symlink())
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=already_current", second.stdout)
 
     def test_latest_routes_dirty_submodule_to_agent_conflict_workflow(self) -> None:
         """The high-level latest command should not overwrite dirty shared canon work."""

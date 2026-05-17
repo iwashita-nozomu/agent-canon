@@ -1,0 +1,34 @@
+# @dependency-start
+# responsibility Defines deterministic prompt-to-workflow routing eval cases.
+# upstream design README.md workflow selection eval contract
+# upstream implementation ../../.codex/hooks/skill_usage_logger.py owns prompt-intake workflow classification
+# downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs these evals
+# downstream implementation ../../tests/agent_tools/test_evaluate_workflow_selection.py tests routing eval behavior
+# @dependency-end
+
+catalog_kind = "agent_canon_workflow_selection_eval"
+version = 1
+
+[[cases]]
+id = "environment-maintenance-container-ci"
+description = "Container and GitHub Actions requests must route to environment-maintenance."
+prompt = "Docker devcontainer GitHub Actions の失敗を見て修正して"
+expected_workflows = ["environment-maintenance", "codex-task-workflow"]
+
+[[cases]]
+id = "adaptive-loop-next-action"
+description = "Goal loop backlog requests must route to adaptive-improvement-loop."
+prompt = "goal.md の NEXT_ACTION と backlog を見て次の iteration を回して"
+expected_workflows = ["adaptive-improvement-loop"]
+
+[[cases]]
+id = "agent-canon-pr-merge"
+description = "AgentCanon PR merge handling must route to the AgentCanon PR workflow."
+prompt = "Agent-Canon の PR #38 を確認して merge まで進めて"
+expected_workflows = ["agent-canon-pr-workflow"]
+
+[[cases]]
+id = "repo-changing-implementation"
+description = "Plain implementation requests must still route to codex-task-workflow."
+prompt = "この repo-changing task を実装して修正を続けて"
+expected_workflows = ["codex-task-workflow"]

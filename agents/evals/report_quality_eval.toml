@@ -1,0 +1,107 @@
+# @dependency-start
+# responsibility Defines deterministic report-writing quality checklist evals.
+# upstream design README.md eval usage contract
+# upstream design ../skills/report-writing.md report writing quality checklist
+# upstream design ../skills/result-artifact-writeout.md raw result artifact placement contract
+# downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs these evals
+# downstream implementation ../../tests/agent_tools/test_evaluate_report_quality.py tests report quality eval behavior
+# @dependency-end
+
+catalog_kind = "agent_canon_report_quality_eval"
+version = 1
+
+[[evals]]
+id = "report-writing-runtime-skill"
+target = ".agents/skills/report-writing/SKILL.md"
+description = "The discoverable report-writing skill must route report authors through source packets, artifact separation, the report quality checklist, and review gates."
+
+[[evals.checklist]]
+id = "REPORT-RUNTIME-1"
+critical = true
+description = "Requires report classification and source packet construction before drafting."
+required_regex = ["Classify the report", "source packet", "audience", "decision context"]
+
+[[evals.checklist]]
+id = "REPORT-RUNTIME-2"
+critical = true
+description = "Separates raw artifact writeout from reader-facing report writing."
+required_regex = ["\\$result-artifact-writeout", "raw machine results", "reader report"]
+
+[[evals.checklist]]
+id = "REPORT-RUNTIME-3"
+critical = true
+description = "Requires the report quality checklist and core quality dimensions."
+required_regex = [
+  "Report Quality Checklist",
+  "evidence traceability",
+  "limitations",
+  "provenance",
+  "actionability",
+  "rule-drift control",
+]
+
+[[evals.checklist]]
+id = "REPORT-RUNTIME-4"
+critical = true
+description = "Requires report reviewer routing and closeout tokens."
+required_regex = ["report_reviewer", "report_quality_checklist", "report_rule_drift"]
+
+[[evals]]
+id = "report-writing-human-doc"
+target = "agents/skills/report-writing.md"
+description = "The human-facing report-writing doc must expose a concrete report quality checklist."
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-1"
+critical = true
+description = "Checklist covers audience, decision context, purpose, and non-goals."
+required_regex = [
+  "- \\[ \\] Audience and decision context are explicit\\.",
+  "- \\[ \\] Purpose and non-goals are explicit\\.",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-2"
+critical = true
+description = "Checklist covers evidence traceability and observation/interpretation separation."
+required_regex = [
+  "Source artifacts, commands, commits, issues, PRs, or run ids",
+  "Observations are separated from interpretations",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-3"
+critical = true
+description = "Checklist covers claim strength, limitations, uncertainty, and provenance."
+required_regex = [
+  "Each recommendation or strong claim has evidence",
+  "Limitations, uncertainty, missing checks, and stale evidence",
+  "Provenance includes command, runtime, branch, commit, timestamp",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-4"
+critical = true
+description = "Checklist covers actionability, artifact integrity, and policy truth control."
+required_regex = [
+  "The report is actionable",
+  "Raw artifacts and reader-facing summary paths are not conflated",
+  "second policy truth surface",
+]
+
+[[evals]]
+id = "report-reviewer-route"
+target = "agents/agents_config.json"
+description = "The report reviewer role remains available for high-impact or claim-heavy reports."
+
+[[evals.checklist]]
+id = "REPORT-REVIEWER-1"
+critical = true
+description = "Report reviewer role includes structure, evidence traceability, claim strength, and reader-facing review ownership."
+required_regex = [
+  "\"report_reviewer\"",
+  "report_structure_review",
+  "evidence_traceability_review",
+  "claim_strength_review",
+  "reader_facing_report_review",
+]
