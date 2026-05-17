@@ -1,9 +1,9 @@
 <!--
 @dependency-start
 responsibility Documents Shared Runtime Surfaces for this repository.
-upstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream design ./github-copilot-configuration.md GitHub Copilot configuration surface
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
+downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
 downstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
 downstream implementation ../tools/agent_tools/check_convention_compliance.py verifies manifest/doc wiring

@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Checks that compiled artifacts do not expose forbidden runtime symbols.
 # upstream design ../README.md shared automation index
-# downstream implementation ../../../CMakeLists.txt uses this helper for native autodiff smoke tests
+# downstream design ../../documents/cpp-build-layout.md describes native smoke-test entrypoints that may use this helper
 # @dependency-end
 
 set -euo pipefail

@@ -4,9 +4,9 @@
 @dependency-start
 responsibility Documents AgentCanon-owned container, devcontainer, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
+upstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
 downstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
-downstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
 downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
