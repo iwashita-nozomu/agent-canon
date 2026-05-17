@@ -31,6 +31,8 @@ upstream design README.md canonical workflow index
   - OOP readability tool の機械実行、表形式 report、分離された agent 分析
 - `result-artifact-writeout`
   - tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す
+- `report-writing`
+  - evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`

@@ -7,6 +7,7 @@ downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs beh
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
+downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 @dependency-end
 -->
 
@@ -23,6 +24,9 @@ Local LLM responsibility evals live in `local_llm_responsibility_eval.toml` and
 only cover single-file advisory responsibility analysis.
 Workflow selection evals live in `workflow_selection_eval.toml` and cover the
 prompt-intake route from user wording to candidate workflow labels.
+Report quality evals live in `report_quality_eval.toml` and cover the
+reader-facing report-writing checklist, artifact separation, and reviewer
+routing surfaces.
 
 Use these evals when changing a skill, workflow, or routing prompt:
 
@@ -124,6 +128,17 @@ Use `--accumulate` when the workflow-routing measurement itself should become
 durable AgentCanon evidence under `agents/evals/results/workflow-selection/`.
 Reports list case IDs, expected workflow labels, and observed workflow labels;
 they do not store the raw prompt text.
+Report quality evals are configured separately:
+
+```bash
+python3 tools/agent_tools/evaluate_report_quality.py \
+  --manifest agents/evals/report_quality_eval.toml
+```
+
+Use `--accumulate` when the report-writing checklist measurement itself should
+become durable AgentCanon evidence under `agents/evals/results/report-quality/`.
+Reports list checklist IDs and missing patterns; they do not store raw report
+drafts or prompts.
 GitHub Actions reads these hook results recursively, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 That guide must not stop at raw pass/fail counts: it summarizes skill usage,

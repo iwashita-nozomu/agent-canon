@@ -563,6 +563,46 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "report_quality_checklist",
+      "line": 114,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "report_reviewer",
+      "line": 116,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "report_rule_drift",
+      "line": 117,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "report_source_packet",
+      "line": 115,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "report_writing",
+      "line": 113,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "result_manifest",
       "line": 77,
       "path": "agents/skills/result-artifact-writeout.md",
@@ -2092,7 +2132,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2100,7 +2140,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_entries",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2108,7 +2148,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_files",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2116,7 +2156,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "local_llm_reports",
-      "line": 306,
+      "line": 348,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "report_quality_reports",
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2124,7 +2172,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "skill_reports",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2132,7 +2180,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2140,7 +2188,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_selection_reports",
-      "line": 306,
+      "line": 348,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2148,7 +2196,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION",
-      "line": 336,
+      "line": 380,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2156,7 +2204,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_FINDINGS",
-      "line": 335,
+      "line": 379,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2164,7 +2212,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_HOOK_ENTRIES",
-      "line": 331,
+      "line": 374,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2172,7 +2220,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_HOOK_FILES",
-      "line": 330,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2180,7 +2228,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS",
-      "line": 333,
+      "line": 376,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS",
+      "line": 378,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2188,7 +2244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_SKILL_REPORTS",
-      "line": 332,
+      "line": 375,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2196,7 +2252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS",
-      "line": 334,
+      "line": 377,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -2246,6 +2302,62 @@
       "field": "AGENT_EVALUATION_THRESHOLD",
       "line": 1004,
       "path": "tools/agent_tools/evaluate_agent_run.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_CHECKS",
+      "line": 351,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_CRITICAL_FAILED",
+      "line": 353,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_FAILED",
+      "line": 352,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_REPORT",
+      "line": 355,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_RUN_ID",
+      "line": 349,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_STATUS",
+      "line": 356,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REPORT_QUALITY_EVAL_TARGETS",
+      "line": 350,
+      "path": "tools/agent_tools/evaluate_report_quality.py",
       "surface": "tool"
     },
     {
@@ -2468,7 +2580,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 290,
+      "line": 296,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2476,7 +2588,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 292,
+      "line": 298,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2484,7 +2596,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 294,
+      "line": 300,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2492,7 +2604,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 293,
+      "line": 299,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2500,7 +2612,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 291,
+      "line": 297,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -5228,7 +5340,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 713,
+      "line": 715,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5236,7 +5348,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 714,
+      "line": 716,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5244,7 +5356,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 715,
+      "line": 717,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5652,7 +5764,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 267,
+      "line": 274,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -5660,7 +5772,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 300,
+      "line": 307,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -5668,7 +5780,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 320,
+      "line": 327,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -7327,6 +7439,7 @@
     ".agents/skills/paper-writing/SKILL.md",
     ".agents/skills/python-review/SKILL.md",
     ".agents/skills/repo-onboarding/SKILL.md",
+    ".agents/skills/report-writing/SKILL.md",
     ".agents/skills/research-workflow/SKILL.md",
     ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
@@ -7357,6 +7470,7 @@
     ".claude/skills/paper-writing/SKILL.md",
     ".claude/skills/python-review/SKILL.md",
     ".claude/skills/repo-onboarding/SKILL.md",
+    ".claude/skills/report-writing/SKILL.md",
     ".claude/skills/research-workflow/SKILL.md",
     ".claude/skills/result-artifact-writeout/SKILL.md",
     ".claude/skills/start-repository/SKILL.md",
@@ -7417,6 +7531,7 @@
     "agents/skills/python-review.md",
     "agents/skills/repo-onboarding.md",
     "agents/skills/report-review.md",
+    "agents/skills/report-writing.md",
     "agents/skills/research-perspective-review.md",
     "agents/skills/research-workflow.md",
     "agents/skills/result-artifact-writeout.md",
@@ -7453,6 +7568,7 @@
     "tools/agent_tools/doc_start.py",
     "tools/agent_tools/eval_accumulation_check.py",
     "tools/agent_tools/evaluate_agent_run.py",
+    "tools/agent_tools/evaluate_report_quality.py",
     "tools/agent_tools/evaluate_skill_workflow_prompts.py",
     "tools/agent_tools/evaluate_workflow_selection.py",
     "tools/agent_tools/file_responsibility_llm.py",

@@ -8,6 +8,7 @@
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../../tools/agent_tools/local_llm_eval.py validates local LLM eval prompts
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
+# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist prompts
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
 # upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
 # @dependency-end
@@ -63,6 +64,7 @@ jobs:
           python3 tools/agent_tools/eval_accumulation_check.py
           python3 tools/agent_tools/local_llm_eval.py
           python3 tools/agent_tools/evaluate_workflow_selection.py
+          python3 tools/agent_tools/evaluate_report_quality.py
           bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
           python3 tools/ci/check_github_workflows.py
           python3 tools/ci/container_config.py

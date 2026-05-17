@@ -3,6 +3,7 @@
 # upstream design ../../agents/evals/README.md eval evidence contract
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated evidence
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
+# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
 # upstream implementation ../../tools/ci/checkout_agent_canon_submodule.sh checks out AgentCanon when copied into template repos
 # @dependency-end
@@ -79,6 +80,21 @@ jobs:
             --report-out "${eval_path}"
           echo "workflow_selection_report=${eval_path}" >> "$GITHUB_OUTPUT"
 
+      - name: Run report quality eval
+        id: report_quality
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
+            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
+          fi
+          report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
+          mkdir -p "${report_dir}"
+          eval_path="${report_dir}/report-quality-eval-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          python3 "${canon_root}/tools/agent_tools/evaluate_report_quality.py" \
+            --root "${canon_root}" \
+            --report-out "${eval_path}"
+          echo "report_quality_report=${eval_path}" >> "$GITHUB_OUTPUT"
+
       - name: Generate runtime dashboard
         id: dashboard
         run: |
@@ -102,3 +118,4 @@ jobs:
           path: |
             ${{ steps.dashboard.outputs.dashboard_path }}
             ${{ steps.workflow_selection.outputs.workflow_selection_report }}
+            ${{ steps.report_quality.outputs.report_quality_report }}

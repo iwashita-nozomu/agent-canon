@@ -126,6 +126,10 @@ class AgentRuntimeDashboard:
                     "workflow-selection",
                     "agents/evals/results/workflow-selection",
                 ),
+                reader.read_family(
+                    "report-quality",
+                    "agents/evals/results/report-quality",
+                ),
             ),
         )
 
@@ -155,6 +159,7 @@ class AgentRuntimeDashboard:
             f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={len(summary.evidence.skill_eval_reports)}",
             f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={self.family_count(summary, 'local-llm-responsibility')}",
             f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={self.family_count(summary, 'workflow-selection')}",
+            f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={self.family_count(summary, 'report-quality')}",
             f"AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES={len(summary.evidence.open_issues)}",
             f"AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES={len(summary.evidence.closed_issues)}",
             "",
@@ -225,6 +230,7 @@ class AgentRuntimeDashboard:
             "- skill_prompt_eval_reports: `agents/evals/results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
             "- local_llm_eval_reports: `agents/evals/results/local-llm-responsibility/<eval-run-id>-<status>.md`",
             "- workflow_selection_eval_reports: `agents/evals/results/workflow-selection/<eval-run-id>-<status>.md`",
+            "- report_quality_eval_reports: `agents/evals/results/report-quality/<eval-run-id>-<status>.md`",
             "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
             "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
             "- github_actions_dashboard: Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
