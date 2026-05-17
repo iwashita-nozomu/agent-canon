@@ -11,6 +11,7 @@ downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first 
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
+downstream design ./rust-agent-tool-migration.md Rust tool migration policy
 @dependency-end
 -->
 
@@ -48,6 +49,8 @@ contract, edit the root regular file.
   2026-05-16 500-item audit coverage and resolution ledger.
 - [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md): short
   public tool/skill names, compatibility aliases, and routing policy.
+- [Rust Agent Tool Migration](./rust-agent-tool-migration.md): Rust CLI,
+  devcontainer toolchain, and Python-to-Rust migration boundaries.
 - [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
   reusable module distribution, local Git compatibility, Dockerfile ownership,
   and shared devcontainer ownership.

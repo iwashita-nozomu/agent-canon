@@ -294,6 +294,24 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: agent-canon-cli
+    summary: Stable wrapper for the AgentCanon Rust CLI.
+    path: tools/bin/agent-canon
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon --version
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/rust-agent-tool-migration.md
+    tests: []
+    test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
     path: tools/ci/check_agent_canon_pr.sh

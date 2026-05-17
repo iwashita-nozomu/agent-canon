@@ -3,6 +3,7 @@
 # responsibility Validates Docker dependency declarations in repository tooling.
 # upstream design README.md shared automation index
 # upstream design ../CONTAINER_OPERATIONS.md canonical Docker and devcontainer ownership boundary
+# upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary
 # upstream environment ../documents/linux-wsl-host-requirements.md documents canonical host tool inventory
 # @dependency-end
 
@@ -105,6 +106,12 @@ check_dockerfile_coherence() {
     || report_issue "docker/Dockerfile must not install Codex CLI; shared devcontainer post-create owns Codex setup"
   ! grep -q 'codex --version' "$dockerfile" \
     || report_issue "docker/Dockerfile must not smoke-check Codex CLI; shared devcontainer post-create owns Codex setup"
+  ! grep -Eq '(^|[^[:alnum:]_])rustup([^[:alnum:]_]|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not install rustup; shared devcontainer post-create owns AgentCanon Rust setup"
+  ! grep -Eq '(^|[^[:alnum:]_])cargo[[:space:]]+(build|install|test|clippy|fmt)([^[:alnum:]_]|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not run cargo for AgentCanon tooling; shared devcontainer post-create owns Rust setup"
+  ! grep -Eq '(^|[^[:alnum:]_])rustc[[:space:]]+--version([^[:alnum:]_]|$)' "$dockerfile" \
+    || report_issue "docker/Dockerfile must not smoke-check rustc for AgentCanon tooling; shared devcontainer post-create owns Rust setup"
 }
 
 check_post_create_python_install() {
@@ -144,6 +151,22 @@ check_post_create_python_install() {
       || report_issue ".devcontainer/post-create.sh must smoke-check gh"
     grep -q 'codex --version' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must smoke-check Codex CLI"
+    grep -q 'rustup toolchain install' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install the Rust toolchain"
+    grep -q 'rustfmt' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install rustfmt"
+    grep -q 'clippy' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install clippy"
+    grep -q 'rust-analyzer' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install rust-analyzer"
+    grep -q 'cargo build --release' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must build the AgentCanon Rust CLI"
+    grep -q '/opt/agent-canon/bin/agent-canon' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must install the AgentCanon Rust CLI under /opt/agent-canon/bin"
+    grep -q '/usr/local/bin/agent-canon' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must expose the AgentCanon Rust CLI on PATH"
+    grep -q '/etc/profile.d/agent-canon-rust.sh' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must publish Rust PATH for non-interactive devcontainer exec"
   fi
 
   if [ "$has_docker_surface" -eq 0 ]; then

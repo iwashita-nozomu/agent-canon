@@ -50,6 +50,14 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
   - repo-local Dockerfile / runtime pack と AgentCanon-owned devcontainer 生成導線の静的整合を検査します。`docker/` が無くても `.devcontainer/` があれば shared devcontainer source を検査します。
+- `tools/bin/agent-canon`
+  - AgentCanon Rust CLI の stable wrapper です。`/opt/agent-canon/bin/agent-canon`
+    が devcontainer post-create で install 済みならそれを使い、未 install
+    で `cargo` がある場合は `vendor/agent-canon/rust/agent-canon` の source
+    から実行します。
+  - `rust-migration-audit` の `--root` は AgentCanon source root を指します。
+    standalone AgentCanon checkout では `--root .`、template / derived repo
+    では `--root vendor/agent-canon` を使います。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`

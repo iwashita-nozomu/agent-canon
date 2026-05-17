@@ -4900,7 +4900,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 566,
+      "line": 587,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4908,7 +4908,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 566,
+      "line": 587,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4916,7 +4916,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 566,
+      "line": 587,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4924,7 +4924,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 566,
+      "line": 587,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4932,7 +4932,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 591,
+      "line": 612,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4940,7 +4940,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 589,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4948,7 +4948,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 590,
+      "line": 611,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -4956,7 +4956,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 583,
+      "line": 604,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
