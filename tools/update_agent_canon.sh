@@ -247,6 +247,11 @@ cmd_latest() {
     return "$latest_rc"
   fi
   cat "$latest_log"
+  if [ "$prefix_mode" = "submodule" ] && ! grep -q '^agent_canon_latest_submodule_local_state_checked=yes$' "$latest_log"; then
+    rm -f "$latest_log"
+    emit_agentcanon_conflict_workflow_route "ensure_latest_missing_submodule_local_state_evidence=yes;route=${route:-unknown}"
+    return 2
+  fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
     rm -f "$latest_log"
     bash "$ROOT_DIR/tools/sync_agent_canon.sh" check

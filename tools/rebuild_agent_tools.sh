@@ -3,7 +3,7 @@
 # responsibility Rebuilds local compiled AgentCanon tools after AgentCanon source updates.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/rust-agent-tool-migration.md Rust CLI migration and rebuild policy.
-# upstream implementation ./update_agent_canon.sh calls this after safe AgentCanon updates.
+# downstream implementation ./update_agent_canon.sh calls this after safe AgentCanon updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates rebuild behavior.
 # @dependency-end
 
