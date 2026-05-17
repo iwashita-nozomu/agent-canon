@@ -9,6 +9,13 @@ catalog_kind = "agent_canon_tool_docs"
 version = 1
 
 [[tool]]
+id = "route"
+tool = "tools/agent_tools/route.py"
+doc = "documents/tools/route.md"
+language = "python"
+summary = "Short task-routing tool documentation."
+
+[[tool]]
 id = "oop-python-readability"
 tool = "tools/oop/python/readability.py"
 doc = "documents/tools/oop/python/readability.md"
