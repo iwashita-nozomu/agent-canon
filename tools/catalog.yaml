@@ -675,7 +675,7 @@ entries:
       - tests/agent_tools/test_review_backlog_scan.py
 
   - id: vector-search
-    summary: Provides dependency-free TF-IDF search across canon text surfaces.
+    summary: Provides dependency-free TF-IDF search plus dependency-aware context expansion.
     path: tools/agent_tools/vector_search.py
     family: agent_tools
     role: inventory
@@ -688,8 +688,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Dependency-free semantic search helper; covered by help/runtime use.
+    tests:
+      - tests/agent_tools/test_vector_search.py
 
   - id: file-surface-inventory
     summary: Classifies root, submodule, and AgentCanon source file surfaces.
