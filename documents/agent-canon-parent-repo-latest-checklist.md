@@ -66,6 +66,13 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 make agent-canon-ensure-latest
 ```
 
+This target also runs the compiled AgentCanon tool rebuild. Treat
+`AGENT_CANON_TOOL_REBUILD_RUST=rebuilt` or
+`AGENT_CANON_TOOL_REBUILD_RUST=already_current` as the expected evidence. If the
+host lacks Rust and the output is `skipped_missing_cargo`, rerun
+`make agent-canon-rebuild-tools` inside the DevContainer before depending on
+Rust-backed tools.
+
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
 1. If the dirty state is inside AgentCanon source, `.gitmodules`, the parent gitlink, or an AgentCanon-owned root view that `link-root` may overwrite, route the change through a normal AgentCanon GitHub branch and PR first.

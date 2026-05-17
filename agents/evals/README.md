@@ -4,6 +4,8 @@ responsibility Documents skill and workflow prompt eval definitions.
 upstream design ../canonical/skills.md skill canon registry
 downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs behavior evals
+downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
+downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 @dependency-end
 -->
 
@@ -16,6 +18,8 @@ Behavior evals are frozen criteria for observable agent actions recorded in run 
 The default prompt manifest covers all discoverable skill shims, all human-facing skill docs,
 and all workflow docs. Add narrower eval entries when a specific skill or workflow needs
 stronger invariants.
+Local LLM responsibility evals live in `local_llm_responsibility_eval.toml` and
+only cover single-file advisory responsibility analysis.
 
 Use these evals when changing a skill, workflow, or routing prompt:
 
@@ -91,6 +95,21 @@ Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
 `hook_run_id` values. Normal hook writers shard JSONL files by runtime namespace
 under `hook-runs/<runtime-namespace>/<hook-name>.jsonl` so multiple containers
 or template-derived repositories do not append to one conflicting filename.
+Run `python3 tools/agent_tools/eval_accumulation_check.py --root .` before
+using accumulated evidence in a PR or guide. The gate validates directory
+presence, JSONL readability, unique run ids, non-ignored evidence paths, and
+legacy report readability without compacting or deleting old results.
+Local LLM responsibility prompt evals are configured separately:
+
+```bash
+python3 tools/agent_tools/local_llm_eval.py \
+  --manifest agents/evals/local_llm_responsibility_eval.toml
+```
+
+Use `--accumulate` to write a uniquely named report under
+`agents/evals/results/local-llm-responsibility/`. Use `--run-llm` only when the
+local llama.cpp runtime is intentionally available; CI and static gates keep the
+model-backed step optional and evaluate prompt boundaries only.
 GitHub Actions reads these hook results recursively, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 That guide must not stop at raw pass/fail counts: it summarizes skill usage,

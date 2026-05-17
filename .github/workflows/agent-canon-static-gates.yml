@@ -1,0 +1,66 @@
+# @dependency-start
+# responsibility Runs lightweight AgentCanon static gates on PRs and branch pushes.
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
+# upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
+# upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
+# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
+# upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
+# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../tools/agent_tools/local_llm_eval.py validates local LLM eval prompts
+# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
+# upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
+# @dependency-end
+
+name: AgentCanon Static Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+
+concurrency:
+  group: agent-canon-static-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install static gate dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Run static gates
+        run: |
+          python3 tools/agent_tools/tool_catalog.py
+          python3 tools/agent_tools/tool_drift.py
+          python3 tools/agent_tools/responsibility_scope.py
+          python3 tools/agent_tools/issue_sync.py
+          python3 tools/agent_tools/eval_accumulation_check.py
+          python3 tools/agent_tools/local_llm_eval.py
+          bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+          python3 tools/ci/check_github_workflows.py
+          python3 tools/ci/container_config.py

@@ -13,7 +13,13 @@ if command -v readlink >/dev/null 2>&1; then
 fi
 canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
 manifest="${canon_root}/rust/agent-canon/Cargo.toml"
-installed_binary="/opt/agent-canon/bin/agent-canon"
+tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+installed_binary="${tools_home}/agent-canon/bin/agent-canon"
+legacy_binary="/opt/agent-canon/bin/agent-canon"
+
+if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
+  installed_binary="$legacy_binary"
+fi
 
 if [ -x "$installed_binary" ]; then
   source_newer=""

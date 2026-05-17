@@ -119,6 +119,104 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
+  - id: responsibility-scope
+    summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
+    path: tools/agent_tools/responsibility_scope.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/responsibility_scope.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/responsibility-scope-management.md
+      - responsibility-scope.toml
+      - documents/templates/responsibility-scope.template.toml
+    tests:
+      - tests/agent_tools/test_responsibility_scope.py
+
+  - id: issue-sync
+    summary: Validates local AgentCanon issue files and plans GitHub Issue synchronization.
+    path: tools/agent_tools/issue_sync.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/issue_sync.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - issues/README.md
+      - documents/responsibility-scope-management.md
+    tests:
+      - tests/agent_tools/test_issue_sync.py
+
+  - id: eval-accumulation-check
+    summary: Validates append-only AgentCanon hook and skill eval result accumulation.
+    path: tools/agent_tools/eval_accumulation_check.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/eval_accumulation_check.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/results/README.md
+      - agents/evals/results/hook-runs/README.md
+    tests:
+      - tests/agent_tools/test_eval_accumulation_check.py
+
+  - id: file-resp-llm
+    summary: Runs advisory local LLM responsibility review for exactly one file.
+    path: tools/agent_tools/file_responsibility_llm.py
+    family: agent_tools
+    role: checker
+    status: optional
+    command: python3 tools/agent_tools/file_responsibility_llm.py --print-prompt <file>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+    tests:
+      - tests/agent_tools/test_file_responsibility_llm.py
+
+  - id: local-llm-eval
+    summary: Runs configurable prompt and optional model evals for single-file local LLM responsibility review.
+    path: tools/agent_tools/local_llm_eval.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/local_llm_eval.py --manifest agents/evals/local_llm_responsibility_eval.toml
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+      - agents/evals/README.md
+      - agents/evals/local_llm_responsibility_eval.toml
+      - agents/evals/results/local-llm-responsibility/README.md
+    tests:
+      - tests/agent_tools/test_local_llm_eval.py
+
   - id: route
     summary: Maps long proposed tool and skill names to short task-routing areas.
     path: tools/agent_tools/route.py
@@ -397,6 +495,24 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/agent-canon-subtree-migration.md
+    tests:
+      - tests/tools/test_update_agent_canon.py
+
+  - id: rebuild-agent-tools
+    summary: Rebuilds compiled AgentCanon tools after AgentCanon source updates.
+    path: tools/rebuild_agent_tools.sh
+    family: root
+    role: runner
+    status: canonical
+    command: bash tools/rebuild_agent_tools.sh
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/rust-agent-tool-migration.md
     tests:
       - tests/tools/test_update_agent_canon.py
 

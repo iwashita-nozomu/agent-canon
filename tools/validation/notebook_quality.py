@@ -3,7 +3,7 @@
 # responsibility Validates notebooks as readable runnable demos instead of fine-grained tests.
 # upstream design ../../tools/README.md shared validation tool family ownership
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
-# upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks changed notebook quality findings
+# downstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks changed notebook quality findings
 # downstream implementation ../../tools/ci/run_all_checks.sh runs notebook quality validation in CI
 # downstream implementation ../../tests/tools/test_notebook_quality.py tests notebook quality checks
 # @dependency-end

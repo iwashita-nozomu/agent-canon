@@ -11,6 +11,9 @@ set -euo pipefail
 workspace="${1:-/workspace}"
 node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
+tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
+local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-Qwen/Qwen3-0.6B-GGUF:Q8_0}"
 
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
@@ -28,6 +31,25 @@ run_as_root() {
 apt_install() {
   run_as_root apt-get update
   run_as_root apt-get install -y --no-install-recommends "$@"
+}
+
+publish_agent_tools_profile() {
+  local profile_script
+
+  install -d -m 755 "${tools_home}/bin"
+  profile_script="$(mktemp)"
+  cat >"$profile_script" <<EOF
+export AGENT_CANON_TOOLS_HOME="${tools_home}"
+export AGENT_CANON_LOCAL_LLM_MODEL="${local_llm_model}"
+export AGENT_CANON_LLAMA_CLI="${tools_home}/bin/llama-cli"
+case ":\${PATH}:" in
+  *:"${tools_home}/bin":*) ;;
+  *) export PATH="${tools_home}/bin:\${PATH}" ;;
+esac
+EOF
+  run_as_root install -m 644 "$profile_script" /etc/profile.d/agent-canon-tools.sh
+  rm -f "$profile_script"
+  export PATH="${tools_home}/bin:${PATH}"
 }
 
 install_node_for_codex() {
@@ -137,12 +159,44 @@ install_agent_canon_cli() {
   cargo build --release --manifest-path "$manifest"
   binary="${canon_root}/rust/agent-canon/target/release/agent-canon"
 
-  run_as_root install -d -m 755 /opt/agent-canon/bin
-  run_as_root install -m 755 "$binary" /opt/agent-canon/bin/agent-canon
-  run_as_root ln -sf /opt/agent-canon/bin/agent-canon /usr/local/bin/agent-canon
+  install -d -m 755 "${tools_home}/agent-canon/bin" "${tools_home}/bin"
+  install -m 755 "$binary" "${tools_home}/agent-canon/bin/agent-canon"
+  ln -sf "${tools_home}/agent-canon/bin/agent-canon" "${tools_home}/bin/agent-canon"
+  run_as_root ln -sf "${tools_home}/bin/agent-canon" /usr/local/bin/agent-canon
   /usr/local/bin/agent-canon --version
 }
 
+install_llama_cpp() {
+  local source_dir
+  local build_dir
+  local jobs
+
+  if [ -x "${tools_home}/bin/llama-cli" ] && [ "${AGENT_CANON_REBUILD_LLAMA_CPP:-0}" != "1" ]; then
+    "${tools_home}/bin/llama-cli" --help >/dev/null
+    return
+  fi
+
+  apt_install ca-certificates curl git cmake build-essential pkg-config libcurl4-openssl-dev
+  source_dir="${tools_home}/src/llama.cpp"
+  build_dir="${tools_home}/build/llama.cpp"
+  install -d -m 755 "${tools_home}/src" "${tools_home}/build" "${tools_home}/bin"
+
+  if [ ! -d "${source_dir}/.git" ]; then
+    git clone --depth 1 --branch "$llama_cpp_ref" https://github.com/ggml-org/llama.cpp.git "$source_dir"
+  else
+    git -C "$source_dir" fetch --depth 1 origin "$llama_cpp_ref"
+    git -C "$source_dir" checkout --detach FETCH_HEAD
+  fi
+
+  cmake -S "$source_dir" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON
+  jobs="$(nproc 2>/dev/null || printf '%s\n' 2)"
+  cmake --build "$build_dir" --config Release -j "$jobs" --target llama-cli llama-server
+  ln -sf "${build_dir}/bin/llama-cli" "${tools_home}/bin/llama-cli"
+  ln -sf "${build_dir}/bin/llama-server" "${tools_home}/bin/llama-server"
+  "${tools_home}/bin/llama-cli" --help >/dev/null
+}
+
+publish_agent_tools_profile
 if [ -f "${workspace%/}/docker/register_safe_directories.sh" ]; then
   bash "${workspace%/}/docker/register_safe_directories.sh" "$workspace"
 else
@@ -159,5 +213,6 @@ fi
 install_github_cli
 install_codex_cli
 install_agent_canon_cli
+install_llama_cpp
 gh --version
 codex --version

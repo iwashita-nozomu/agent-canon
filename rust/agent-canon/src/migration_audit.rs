@@ -23,7 +23,7 @@ const REQUIRED_POST_CREATE_SNIPPETS: &[&str] = &[
     "clippy",
     "rust-analyzer",
     "cargo build --release",
-    "/opt/agent-canon/bin/agent-canon",
+    "${tools_home}/agent-canon/bin/agent-canon",
     "/usr/local/bin/agent-canon",
 ];
 

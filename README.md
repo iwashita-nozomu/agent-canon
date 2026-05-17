@@ -81,6 +81,7 @@ Installed root views:
 - `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
 - `documents/github-copilot-configuration.md`: standalone AgentCanon の Copilot configuration catalog。template / derived repo root では `vendor/agent-canon/documents/github-copilot-configuration.md` から読み、root `documents/` へ symlink しません。
 - `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
+- `.github/workflows/agent-canon-static-gates.yml`: standalone AgentCanon PR / push で tool catalog、tool drift、dependency review、workflow convention、container config の軽量 gate を走らせる workflow。
 - `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。
 

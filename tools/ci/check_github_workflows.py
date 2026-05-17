@@ -13,6 +13,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
+# upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
@@ -99,6 +100,7 @@ STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "issues/open/AC-YYYYMMDD-<slug>.md",
     "issues/closed/",
     "Agent Improvement Guide artifact",
+    "AgentCanon Static Gates",
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
     "documents/github-copilot-configuration.md",
@@ -182,6 +184,36 @@ SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
     "url.${ssh_submodule_url}.insteadOf",
     "untrusted PR context",
     "exit 86",
+)
+ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
+    "Synced to /.github/workflows/agent-coordination.yml",
+    "Edit vendor/agent-canon/.github/workflows/agent-coordination.yml",
+)
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
+    "Synced to /.github/workflows/agent-improvement-guide.yml",
+    "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
+    "generate_agent_improvement_guide.py",
+)
+VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
+    "agents/workflows/agent-canon-pr-workflow.md",
+)
+VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
+    "pull_request:",
+    "push:",
+    "generate_agent_improvement_guide.py",
+    "GITHUB_STEP_SUMMARY",
+    "actions/upload-artifact@v4",
+)
+AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
+    "tool_catalog.py",
+    "tool_drift.py",
+    "responsibility_scope.py",
+    "issue_sync.py",
+    "eval_accumulation_check.py",
+    "local_llm_eval.py",
+    "run_repo_dependency_review.sh --fail-missing",
+    "check_github_workflows.py",
+    "container_config.py",
 )
 
 
@@ -443,66 +475,42 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
 def check_root_copy_headers(root: Path) -> list[Finding]:
     """Check synced root-copy workflow source markers."""
     findings: list[Finding] = []
-    root_workflow = root / ".github" / "workflows" / "agent-coordination.yml"
-    if root_workflow.exists():
-        findings.extend(
-            require_text(
-                root_workflow,
-                [
-                    "Synced to /.github/workflows/agent-coordination.yml",
-                    "Edit vendor/agent-canon/.github/workflows/agent-coordination.yml",
-                ],
-            )
-        )
-    root_guide_workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
-    if root_guide_workflow.exists():
-        findings.extend(
-            require_text(
-                root_guide_workflow,
-                [
-                    "Synced to /.github/workflows/agent-improvement-guide.yml",
-                    "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
-                    "generate_agent_improvement_guide.py",
-                ],
-            )
-        )
-    vendor_workflow = (
-        root
-        / "vendor"
-        / "agent-canon"
-        / ".github"
-        / "workflows"
-        / "agent-coordination.yml"
-    )
-    if vendor_workflow.exists():
-        findings.extend(
-            require_text(
-                vendor_workflow,
-                ["agents/workflows/agent-canon-pr-workflow.md"],
-            )
-        )
-    vendor_guide_workflow = (
-        root
-        / "vendor"
-        / "agent-canon"
-        / ".github"
-        / "workflows"
-        / "agent-improvement-guide.yml"
-    )
-    if vendor_guide_workflow.exists():
-        findings.extend(
-            require_text(
-                vendor_guide_workflow,
-                [
-                    "pull_request:",
-                    "push:",
-                    "generate_agent_improvement_guide.py",
-                    "GITHUB_STEP_SUMMARY",
-                    "actions/upload-artifact@v4",
-                ],
-            )
-        )
+    for path, required in workflow_header_requirement_specs(root):
+        if path.exists():
+            findings.extend(require_text(path, required))
     return findings
+
+
+def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
+    """Return optional workflow files and snippets that identify their contract."""
+    workflow_dir = root / ".github" / "workflows"
+    vendor_workflow_dir = root / "vendor" / "agent-canon" / ".github" / "workflows"
+    return [
+        (
+            workflow_dir / "agent-coordination.yml",
+            ROOT_COORDINATION_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            workflow_dir / "agent-improvement-guide.yml",
+            ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            workflow_dir / "agent-canon-static-gates.yml",
+            AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            vendor_workflow_dir / "agent-coordination.yml",
+            VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            vendor_workflow_dir / "agent-improvement-guide.yml",
+            VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            vendor_workflow_dir / "agent-canon-static-gates.yml",
+            AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
+        ),
+    ]
 
 
 def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
