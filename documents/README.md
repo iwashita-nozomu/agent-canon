@@ -10,6 +10,7 @@ downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo late
 downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
+downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
 @dependency-end
 -->
 
@@ -45,6 +46,8 @@ contract, edit the root regular file.
   active profile selection, risk classes, and validation routing.
 - [Template / AgentCanon Audit Resolution](./template-agent-canon-audit-resolution.md):
   2026-05-16 500-item audit coverage and resolution ledger.
+- [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md): short
+  public tool/skill names, compatibility aliases, and routing policy.
 - [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
   reusable module distribution, local Git compatibility, Dockerfile ownership,
   and shared devcontainer ownership.

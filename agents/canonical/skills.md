@@ -13,6 +13,8 @@ upstream design README.md canonical workflow index
   - task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint の選択
 - `repo-onboarding`
   - unfamiliar repo の入口確認
+- `task-routing`
+  - 長い tool / skill 候補名を短い route area と command に解決する
 - `start-repository`
   - template clone から新 repository を開始する
 - `codex-task-workflow`

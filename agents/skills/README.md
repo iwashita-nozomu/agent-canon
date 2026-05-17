@@ -32,6 +32,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | ------ | ------- | ------------- | -------------- |
 | `agent-orchestration` | task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint を先に選ぶ | `agents/skills/agent-orchestration.md` | `.agents/skills/agent-orchestration/SKILL.md` |
 | `repo-onboarding` | unfamiliar repo の最短入口確認 | `agents/skills/repo-onboarding.md` | `.agents/skills/repo-onboarding/SKILL.md` |
+| `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
 | `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
 | `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
@@ -73,6 +74,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
+- 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
 - repo-changing task では `$agent-orchestration`、`$codex-task-workflow`、`$subagent-bootstrap` の順で使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
