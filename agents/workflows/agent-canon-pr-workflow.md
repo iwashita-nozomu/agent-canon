@@ -247,7 +247,11 @@ bash tools/sync_agent_canon.sh check
 ```
 
 `make agent-canon-ensure-latest` rebuilds compiled AgentCanon tools after the
-pin update. If it reports `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo`,
+pin update. In submodule repos, treat `vendor/agent-canon` local git state and
+the `agent_canon_latest_submodule_local_state_checked=yes` evidence as the
+primary latest decision surface; GitHub MCP / codex-app PR checks are optional
+external confirmation and must not reimplement this tool route. If it reports
+`AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo`,
 rerun `make agent-canon-rebuild-tools` inside the DevContainer before relying
 on Rust-backed `agent-canon` CLI behavior.
 

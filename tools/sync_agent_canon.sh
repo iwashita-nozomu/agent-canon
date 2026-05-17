@@ -750,6 +750,7 @@ print_submodule_plan_details() {
   local deferred_branch=""
   local deferred_remote_branch=""
 
+  echo "agent_canon_plan_submodule_local_state_checked=yes"
   echo "agent_canon_plan_submodule_parent_pin=$parent_pin"
   echo "agent_canon_plan_submodule_worktree_head=${worktree_head:-<unavailable>}"
   echo "agent_canon_plan_submodule_worktree_status=$worktree_status"
@@ -1006,6 +1007,8 @@ cmd_ensure_latest() {
     local local_commit=""
     local worktree_commit=""
     local submodule_status=""
+    local submodule_branch=""
+    local submodule_worktree_status=""
     local submodule_deferred_ref=""
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
@@ -1016,6 +1019,16 @@ cmd_ensure_latest() {
       git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX"
       worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     fi
+    submodule_branch="$(git -C "$ROOT_DIR/$PREFIX" branch --show-current || true)"
+    if [ -n "$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)" ]; then
+      submodule_worktree_status="dirty"
+    else
+      submodule_worktree_status="clean"
+    fi
+    echo "agent_canon_latest_submodule_local_state_checked=yes"
+    echo "agent_canon_latest_submodule_local_state_source=$PREFIX"
+    echo "agent_canon_latest_submodule_branch=${submodule_branch:-detached}"
+    echo "agent_canon_latest_submodule_worktree_status=$submodule_worktree_status"
     git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch"
     remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
     echo "agent_canon_local_submodule=$local_commit"

@@ -929,6 +929,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("agent_canon_latest_submodule_local_state_checked=yes", result.stdout)
             self.assertIn("agent_canon_latest=already_current_submodule", result.stdout)
 
     def test_pull_redirects_to_ensure_latest_for_submodules(self) -> None:
@@ -1501,6 +1502,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertEqual(plan.returncode, 0, plan.stderr)
             self.assertIn("agent_canon_plan_route=deferred_branch_pr", plan.stdout)
+            self.assertIn("agent_canon_plan_submodule_local_state_checked=yes", plan.stdout)
             self.assertIn(
                 "agent_canon_plan_submodule_deferred_branch=canon-pr/local-work",
                 plan.stdout,
@@ -1510,6 +1512,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 plan.stdout,
             )
             self.assertEqual(ensure_latest.returncode, 0, ensure_latest.stderr)
+            self.assertIn(
+                "agent_canon_latest_submodule_local_state_checked=yes",
+                ensure_latest.stdout,
+            )
             self.assertIn("agent_canon_latest=deferred_branch_pr", ensure_latest.stdout)
             self.assertIn("agent_canon_latest_branch=canon-pr/local-work", ensure_latest.stdout)
             self.assertIn(
