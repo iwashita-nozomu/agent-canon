@@ -6,7 +6,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership po
 upstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream design ../README.md AgentCanon repository overview
 downstream design ../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
-downstream design ../../README.md template repository overview when consumed as a submodule
+downstream design ./agent-canon-parent-repo-latest-checklist.md parent repository update checklist
 @dependency-end
 -->
 

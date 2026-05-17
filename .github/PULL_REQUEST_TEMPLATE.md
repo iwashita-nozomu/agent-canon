@@ -86,6 +86,7 @@ Plan / exception:
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
 - [ ] No new durable operational finding is required, and the reason is stated below.
 - [ ] Agent Improvement Guide artifact from `.github/workflows/agent-improvement-guide.yml` was reviewed when available.
+- [ ] AgentCanon Static Gates from `.github/workflows/agent-canon-static-gates.yml` are passing when available.
 
 Issue / edit-scope evidence:
 

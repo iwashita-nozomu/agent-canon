@@ -4724,7 +4724,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 681,
+      "line": 685,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -4732,7 +4732,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 682,
+      "line": 686,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -4740,7 +4740,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 683,
+      "line": 687,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },

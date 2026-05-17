@@ -50,6 +50,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
 - PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Agent または Copilot PR が別 branch で行います。
+- standalone AgentCanon PR / branch push では `.github/workflows/agent-canon-static-gates.yml` が tool catalog、tool drift、dependency review、GitHub workflow convention、container config を軽量 gate として走らせます。local の `make agent-canon-pr-check` は引き続き merge 前の広い gate です。
 
 ## Freshness Gate Route
 
