@@ -1,8 +1,7 @@
 <!--
 @dependency-start
 responsibility Indexes legacy OOP check support tools imported from jax_solver_util.
-upstream design ../README.md explains legacy import policy
-upstream design ../../../../documents/repo-local-tool-imports.md records canonical disposition
+upstream design ../../../../documents/repo-local-tool-imports.md records canonical disposition and legacy import policy
 downstream implementation restructure_code_review_skill.py legacy review-rule restructuring provenance
 downstream implementation read_conventions.sh legacy convention listing provenance
 downstream implementation view_conventions.sh legacy convention viewer provenance
