@@ -59,13 +59,18 @@ detect stale tool/convention links, missing required PR-flow checks, and
 retired legacy tool reintroduction.
 
 ## 含めるもの
-
 - `bin/`
   - `agent-canon` は AgentCanon Rust CLI の stable wrapper です。template /
     derived repo では root `tools/` symlink から呼び、実体 source は
     `vendor/agent-canon/rust/agent-canon/` を使います。devcontainer では
     post-create が release binary を `/opt/agent-canon/bin/agent-canon` へ
     install し、`/usr/local/bin/agent-canon` から実行できるようにします。
+    wrapper は installed binary が checked-out Rust source より古い場合、
+    stale binary ではなく source から `cargo run` します。
+    `rust-migration-audit` は DevContainer / Dockerfile 境界を確認し、
+    `rust-migration-plan` は固定 policy と hook / skill feedback logs から
+    次に Rust 化する tool 候補を出します。派生 repo では
+    `agent-canon rust-migration-plan --root vendor/agent-canon` を使います。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。

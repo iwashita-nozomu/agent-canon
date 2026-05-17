@@ -7,19 +7,35 @@
 
 set -euo pipefail
 
-if [ -x /opt/agent-canon/bin/agent-canon ]; then
-  exec /opt/agent-canon/bin/agent-canon "$@"
-fi
-
 script_path="${BASH_SOURCE[0]}"
 if command -v readlink >/dev/null 2>&1; then
   script_path="$(readlink -f "$script_path")"
 fi
 canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
 manifest="${canon_root}/rust/agent-canon/Cargo.toml"
+installed_binary="/opt/agent-canon/bin/agent-canon"
+
+if [ -x "$installed_binary" ]; then
+  source_newer=""
+  if [ -d "${canon_root}/rust/agent-canon/src" ] && command -v find >/dev/null 2>&1; then
+    source_newer="$(
+      find "${canon_root}/rust/agent-canon" \
+        \( -name '*.rs' -o -name 'Cargo.toml' \) \
+        -newer "$installed_binary" \
+        -print -quit
+    )"
+  fi
+  if [ -z "$source_newer" ]; then
+    exec "$installed_binary" "$@"
+  fi
+fi
 
 if command -v cargo >/dev/null 2>&1; then
   exec cargo run --manifest-path "$manifest" -- "$@"
+fi
+
+if [ -x "$installed_binary" ]; then
+  exec "$installed_binary" "$@"
 fi
 
 echo "agent-canon runtime is unavailable" >&2
