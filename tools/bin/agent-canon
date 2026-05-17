@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -x /opt/agent-canon/bin/agent-canon ]; then
+  exec /opt/agent-canon/bin/agent-canon "$@"
+fi
+
+if command -v cargo >/dev/null 2>&1; then
+  exec cargo run --manifest-path rust/agent-canon/Cargo.toml -- "$@"
+fi
+
+echo "agent-canon runtime is unavailable" >&2
+exit 1
