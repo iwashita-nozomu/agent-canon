@@ -206,6 +206,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("# Skill Workflow Prompt Eval", text)
             self.assertIn("eval_run_id:", text)
             self.assertIn("EVAL_STATUS=pass", text)
+            self.assertIn("## Run Manifest", text)
+            self.assertIn("git_commit:", text)
 
     def test_existing_report_out_gets_unique_sibling(self) -> None:
         """An existing report path should not be overwritten."""
@@ -256,6 +258,39 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("used_skills: `agent-orchestration`", text)
             self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", text)
             self.assertIn("skill_workflow_prompt_eval.toml", text)
+            self.assertIn("## Run Manifest", text)
+
+    def test_accumulate_records_workflow_monitoring_event(self) -> None:
+        """Accumulated prompt evals should append behavior-eval evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report_dir = root / "reports" / "agents" / "run-123"
+
+            result = run_eval(
+                "--root",
+                str(PROJECT_ROOT),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--results-dir",
+                str(root / "results"),
+                "--run-id",
+                "run-123",
+                "--skill-used",
+                "agent-orchestration",
+                "--report-dir",
+                str(report_dir),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            monitor = report_dir / "workflow_monitoring.md"
+            self.assertTrue(monitor.is_file())
+            text = monitor.read_text(encoding="utf-8")
+            self.assertIn("tool_call=evaluate_skill_workflow_prompts.py", text)
+            self.assertIn("EVAL_RUN_ID=skill-eval-", text)
+            self.assertIn("EVAL_USED_SKILLS=agent-orchestration", text)
+            self.assertIn("EVAL_ACCUMULATED_REPORT=", text)
+            self.assertIn("EVAL_GIT_COMMIT=", text)
 
     def test_accumulated_report_dependencies_resolve_through_root_symlinks(
         self,
