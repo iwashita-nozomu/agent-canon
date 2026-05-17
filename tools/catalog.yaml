@@ -434,7 +434,7 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: agent-canon-cli
-    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, and migration plan.
+    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, and MCP preflight tools.
     path: tools/bin/agent-canon
     family: root
     role: runner
@@ -448,8 +448,29 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/rust-agent-tool-migration.md
+      - .codex/README.md
+      - mcp/README.md
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+
+  - id: agent-canon-mcp-preflight
+    summary: Rust MCP preflight classifier and session-cached inventory checker.
+    path: rust/agent-canon/src/mcp_inventory.rs
+    family: root
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon mcp-preflight-policy --request-kind github-actions-read
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - .codex/README.md
+      - mcp/README.md
+      - documents/rust-agent-tool-migration.md
+      - agent-canon-environment.toml
+    tests:
+      - rust/agent-canon/src/mcp_inventory.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.

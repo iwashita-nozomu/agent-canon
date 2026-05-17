@@ -48,6 +48,7 @@ required_coverage = [
   "tools",
   "vendor",
   "AGENTS.md",
+  "agent-canon-environment.toml",
   "CLAUDE.md",
   "CONTAINER_OPERATIONS.md",
   "README.md",
@@ -68,6 +69,7 @@ paths = [
   ".claude/**",
   ".codex/**",
   ".devcontainer/**",
+  "agent-canon-environment.toml",
   "agents/**",
   "mcp/**",
 ]

@@ -42,6 +42,17 @@ installed_commit() {
   awk -F= '$1 == "agent_canon_source_commit" {print $2; exit}' "$state_file" 2>/dev/null || true
 }
 
+rust_sources_newer_than_binary() {
+  local source_root="$1"
+  local binary="$2"
+  if [ ! -x "$binary" ]; then
+    return 0
+  fi
+  find "$source_root/rust/agent-canon" \
+    \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \) \
+    -newer "$binary" -print -quit
+}
+
 maybe_link_usr_local() {
   local binary="$1"
   if [ "${AGENT_CANON_SKIP_USR_LOCAL_LINK:-0}" = "1" ]; then
@@ -70,6 +81,7 @@ rebuild_rust_cli() {
   local installed_sha
   local build_binary
   local install_binary
+  local source_newer
 
   source_root="$(agent_canon_source_root)"
   if [ -z "$source_root" ]; then
@@ -88,7 +100,8 @@ rebuild_rust_cli() {
   state_file="$state_dir/.build-state"
   install_binary="$state_dir/bin/agent-canon"
   installed_sha="$(installed_commit "$state_file")"
-  if [ "$FORCE_REBUILD" != "1" ] && [ -x "$install_binary" ] && [ "$installed_sha" = "$source_sha" ]; then
+  source_newer="$(rust_sources_newer_than_binary "$source_root" "$install_binary")"
+  if [ "$FORCE_REBUILD" != "1" ] && [ -x "$install_binary" ] && [ "$installed_sha" = "$source_sha" ] && [ -z "$source_newer" ]; then
     echo "AGENT_CANON_TOOL_REBUILD_RUST=already_current"
     return
   fi

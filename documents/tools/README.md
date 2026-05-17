@@ -82,6 +82,14 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     最新化した template / derived repo は、DevContainer を作り直したあと
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
+  - `mcp-preflight-policy` は prompt / user request の種類から MCP preflight
+    が必要かを機械判定します。GitHub Actions run、PR check、GitHub Issue を
+    読むだけなら `agent-canon mcp-preflight-policy --request-kind
+    github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
+  - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
+    repository task では `agent-canon mcp-inventory --root . --require
+    repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
+    surface での繰り返し確認を cache hit にします。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -148,6 +156,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
 - `tools/rebuild_agent_tools.sh`
   - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled AgentCanon tools を source commit に合わせます。
+  - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
   - `make agent-canon-ensure-latest`、`make agent-canon-latest`、`make agent-canon-update` の safe path から自動的に呼ばれます。
   - `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo` が出た場合は、DevContainer 内で再実行するか Rust toolchain を用意してから `make agent-canon-rebuild-tools` を実行します。
 - `tools/agent_tools/route.py`

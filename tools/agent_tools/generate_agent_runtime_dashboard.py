@@ -627,6 +627,10 @@ def dashboard_visual_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "",
         *visuals.action_map_lines(),
         "",
+        "## Issue Routing",
+        "",
+        *issue_routing_lines(summary),
+        "",
     ]
 
 
@@ -863,6 +867,68 @@ def prompt_tool_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "| --- | ---: |",
         *counter_table_rows(breakdown.command_verbs),
     ]
+
+
+def issue_routing_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return durable issue routes for dashboard attention signals."""
+    rows = [
+        issue_route_row(
+            summary,
+            "mcp preflight scope",
+            "mcp-inventory-preflight-cache",
+            "use Rust policy/cache commands for GitHub-only read versus local repo task boundaries",
+        )
+    ]
+    if dashboard_has_evidence_gaps(summary):
+        rows.append(
+            issue_route_row(
+                summary,
+                "eval evidence gaps",
+                "eval-accumulation-gaps",
+                "repair missing workflow attribution, prompt capture, or token comparison evidence",
+            )
+        )
+    rows.append(
+        issue_route_row(
+            summary,
+            "GitHub issue mirror",
+            "github-folder-issue-sync",
+            "mirror durable local issues to GitHub only through explicit sync tooling",
+        )
+    )
+    return [
+        "| signal | durable issue | route reason |",
+        "| --- | --- | --- |",
+        *rows,
+    ]
+
+
+def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
+    """Return whether the dashboard found missing runtime evidence."""
+    return (
+        summary.hook_workflow_breakdown.entries_without_workflow > 0
+        or summary.token_usage_breakdown.comparison_count == 0
+        or summary.prompt_tool_breakdown.prompt_entries == 0
+    )
+
+
+def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, reason: str) -> str:
+    """Return one durable issue routing row."""
+    issue = issue_by_slug(summary, slug)
+    issue_label = (
+        f"`{issue.relative_to(summary.root).as_posix()}`"
+        if issue is not None
+        else "`missing-local-issue`"
+    )
+    return f"| `{signal}` | {issue_label} | {reason} |"
+
+
+def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> Path | None:
+    """Return a durable issue path whose filename contains the requested slug."""
+    for issue in (*summary.evidence.open_issues, *summary.evidence.closed_issues):
+        if slug in issue.name:
+            return issue
+    return None
 
 
 def token_file_rows(summary: RuntimeDashboardSummary) -> list[str]:

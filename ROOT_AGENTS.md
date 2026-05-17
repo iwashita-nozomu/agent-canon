@@ -89,7 +89,8 @@ contract listed in `documents/README.md`.
 - `make ci` は full confidence gate です。small docs や narrow code では docs check、targeted tests、changed-file dependency checks を evidence にできます。
 - AgentCanon-owned path、root shared views、hooks、skills、workflows、tools、submodule pin を触る場合は Shared canon profile として扱い、AgentCanon PR gate を通します。
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答します。
-- repo state 確認、file edit、validation、PR / issue 処理、CI 確認、または実装作業へ切り替わった時だけ repository task として扱います。その場合、MCP inventory check は現行 runtime requirement なので維持します。これは optional profile 化しません。
+- GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させません。`agent-canon mcp-preflight-policy --request-kind github-actions-read` は `MCP_PREFLIGHT_DECISION=skip` を返します。
+- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。その場合、MCP inventory check は現行 runtime requirement なので維持します。これは optional profile 化しません。
 
 ## AgentCanon Submodule Update Flow
 
@@ -118,7 +119,8 @@ contract listed in `documents/README.md`.
 
 ## Required Before Implementation
 
-- task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn では `make agent-canon-ensure-latest`、MCP inventory、repo MCP tools、CI / GitHub checks を実行しません。
+- task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection では `make agent-canon-ensure-latest`、MCP inventory、repo MCP tools、local CI / GitHub checks を実行しません。
+- repository task で MCP preflight が必要な場合は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を既定にし、run bundle の `workflow_monitoring.md` へ evidence を直接追記する必要がある場合だけ `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。
 - repository task 開始時、AgentCanon update surface が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
 - task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。

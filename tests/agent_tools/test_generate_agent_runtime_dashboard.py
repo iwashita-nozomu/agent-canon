@@ -53,6 +53,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("## Action Map", dashboard)
         self.assertIn("| hook evidence | `healthy` | `2` |", dashboard)
         self.assertIn("| report quality eval | `missing` | `0` |", dashboard)
+        self.assertIn("## Issue Routing", dashboard)
+        self.assertIn("AC-20260517-mcp-inventory-preflight-cache.md", dashboard)
+        self.assertIn("AC-20260517-eval-accumulation-gaps.md", dashboard)
+        self.assertIn("AC-20260517-github-folder-issue-sync.md", dashboard)
         self.assertIn("## Skill Eval Failure Analysis", dashboard)
         self.assertIn("| `agent-orchestration` | `1` | `1` | `100.0%` |", dashboard)
         self.assertIn("## Hook Workflow Attribution", dashboard)
@@ -121,6 +125,15 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "issue_id: AC-20260517-open\nstatus: open\n",
             encoding="utf-8",
         )
+        for slug in (
+            "mcp-inventory-preflight-cache",
+            "eval-accumulation-gaps",
+            "github-folder-issue-sync",
+        ):
+            (root / "issues" / "open" / f"AC-20260517-{slug}.md").write_text(
+                f"issue_id: AC-20260517-{slug}\nstatus: open\n",
+                encoding="utf-8",
+            )
         (root / "issues" / "closed" / "AC-20260517-closed.md").write_text(
             "issue_id: AC-20260517-closed\nstatus: resolved\n",
             encoding="utf-8",

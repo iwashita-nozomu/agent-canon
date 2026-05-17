@@ -2668,7 +2668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 984,
+      "line": 1050,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2676,7 +2676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 986,
+      "line": 1052,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2684,7 +2684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 988,
+      "line": 1054,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2692,7 +2692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 987,
+      "line": 1053,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2700,7 +2700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 985,
+      "line": 1051,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -6188,7 +6188,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD",
-      "line": 114,
+      "line": 127,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6196,7 +6196,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_NEXT",
-      "line": 81,
+      "line": 93,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6204,7 +6204,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_ROOT",
-      "line": 111,
+      "line": 124,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6212,15 +6212,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_RUST",
-      "line": 76,
-      "path": "tools/rebuild_agent_tools.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
-      "line": 80,
+      "line": 88,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6236,7 +6228,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_RUST",
-      "line": 107,
+      "line": 105,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
+      "line": 120,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6244,7 +6244,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_TOOLS_HOME",
-      "line": 112,
+      "line": 125,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6252,7 +6252,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_USR_LOCAL",
-      "line": 48,
+      "line": 59,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6260,7 +6260,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_USR_LOCAL",
-      "line": 53,
+      "line": 64,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6268,7 +6268,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_USR_LOCAL",
-      "line": 58,
+      "line": 69,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6276,7 +6276,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_TOOL_REBUILD_USR_LOCAL",
-      "line": 61,
+      "line": 72,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6284,7 +6284,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_source_commit",
-      "line": 103,
+      "line": 116,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
@@ -6292,7 +6292,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_source_root",
-      "line": 102,
+      "line": 115,
       "path": "tools/rebuild_agent_tools.sh",
       "surface": "tool"
     },
