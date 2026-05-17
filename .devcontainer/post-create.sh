@@ -147,6 +147,9 @@ if [ -f "${workspace%/}/docker/register_safe_directories.sh" ]; then
   bash "${workspace%/}/docker/register_safe_directories.sh" "$workspace"
 else
   git config --global --add safe.directory "$workspace" || true
+  if [ -d "${workspace%/}/.git" ]; then
+    git config --global --add safe.directory "${workspace%/}/.git" || true
+  fi
 fi
 if [ -f "${workspace%/}/docker/install_python_dependencies.sh" ]; then
   bash "${workspace%/}/docker/install_python_dependencies.sh" "$workspace"

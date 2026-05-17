@@ -2,9 +2,11 @@
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // @dependency-end
 
 mod migration_audit;
+mod rust_migration_plan;
 
 use std::env;
 
@@ -20,7 +22,13 @@ fn main() {
         std::process::exit(migration_audit::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "rust-migration-plan" {
+        std::process::exit(rust_migration_plan::run(&args[2..]));
+    }
+
     eprintln!("agent-canon: unknown or missing command");
-    eprintln!("usage: agent-canon --version | rust-migration-audit --root <repo-root>");
+    eprintln!(
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N]"
+    );
     std::process::exit(2);
 }

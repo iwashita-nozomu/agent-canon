@@ -6,6 +6,7 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 downstream environment ../.devcontainer/post-create.sh installs Rust toolchain and CLI
 downstream implementation ../rust/agent-canon/src/main.rs Rust CLI entrypoint
 downstream implementation ../rust/agent-canon/src/migration_audit.rs validates migration boundaries
+downstream implementation ../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
 downstream implementation ../tools/bin/agent-canon stable shell wrapper
 @dependency-end
 -->
@@ -47,6 +48,24 @@ with:
 
 as a symlink.
 
+In a template or derived repository, the normal adoption path is:
+
+1. Update the `vendor/agent-canon` submodule pin to an AgentCanon commit that
+   contains this policy and the Rust CLI.
+1. Repair shared root views with `bash tools/sync_agent_canon.sh link-root` if
+   the root view drifts.
+1. Rebuild or recreate the DevContainer so `.devcontainer/post-create.sh` runs
+   again.
+1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
+   the Rust foundation is present.
+1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before
+   porting the next tool.
+
+The parent repository does not need Rust in its repo-local Dockerfile to use
+AgentCanon Rust tooling. The DevContainer is AgentCanon-owned shared
+development infrastructure; the Dockerfile remains a repo-local runtime and
+dependency contract.
+
 ## Runtime Boundary
 
 Rust compiler toolchains must not be installed through:
@@ -80,6 +99,34 @@ tools/
 1. Port inventory/static-analysis tools.
 1. Keep workflow/orchestration tools in Python until stable.
 
+## Sequential Migration Policy
+
+Repos that vendor AgentCanon should not invent their own Rust migration order.
+After updating the AgentCanon pin, run:
+
+```bash
+agent-canon rust-migration-plan --root vendor/agent-canon --limit 12
+```
+
+Standalone AgentCanon checkouts use:
+
+```bash
+agent-canon rust-migration-plan --root . --limit 12
+```
+
+The plan combines this document's fixed first-target list with accumulated
+hook and skill feedback logs under `agents/evals/results/hook-runs/`. It emits
+`port-now` entries for stable, repo-wide inventory or static-analysis tools,
+`observe-before-port` entries for tools that appear in feedback logs but are
+not yet stable migration targets, and `keep-python` entries for orchestration
+tools that should stay Python-first.
+
+Port one tool family at a time. A port is ready for review only when the Rust
+tool preserves the old command's machine-readable output contract, the Python
+entrypoint is either retired or kept as a compatibility wrapper, and the tool
+catalog, docs, tests, and hook or workflow references point at the current
+canonical command.
+
 ## First Rust Targets
 
 Recommended first migrations:
@@ -89,6 +136,7 @@ Recommended first migrations:
 - noncanonical_document_inventory.py
 - helper_function_inventory.py
 - log_surface_inventory.py
+- tools/oop/python/readability.py
 - dependency graph scanners
 
 ## Keep In Python
@@ -124,6 +172,28 @@ The audit checks:
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 
+## Rust Migration Plan
+
+The planning command is read-only:
+
+```bash
+agent-canon rust-migration-plan --root .
+```
+
+In a template or derived repository:
+
+```bash
+agent-canon rust-migration-plan --root vendor/agent-canon
+```
+
+It reports:
+
+- whether the DevContainer and CLI foundation is present;
+- how many hook log files were inspected;
+- ranked `RUST_MIGRATION_CANDIDATE` lines;
+- `RUST_MIGRATION_KEEP_PYTHON` boundaries that should not be ported just
+  because a tool was recently used.
+
 ## Validation
 
 ```bash
@@ -131,6 +201,7 @@ cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
 cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path rust/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
+agent-canon rust-migration-plan --root .
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/ci/container_config.py
