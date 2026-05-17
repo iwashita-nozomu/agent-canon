@@ -27,6 +27,8 @@ print(f"{slug}-{digest}-devcontainer")
 PY
 )"
 compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
+devcontainer_subnet="${DEVCONTAINER_SUBNET:-192.168.248.16/28}"
+devcontainer_gateway="${DEVCONTAINER_GATEWAY:-192.168.248.17}"
 
 if [ -f "$pack" ]; then
   mapfile -t pack_values < <(
@@ -43,24 +45,39 @@ with open(sys.argv[1], "rb") as handle:
     data = tomllib.load(handle)
 pack = data["pack"]
 runtime = data.get("runtime", {})
-print(pack["dockerfile"])
-print(runtime.get("workdir", "/workspace"))
-print(runtime.get("workspace_mount", "/workspace"))
+print(f"dockerfile={pack['dockerfile']}")
+print(f"workdir={runtime.get('workdir', '/workspace')}")
+print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
+for mount in runtime.get("mounts", []):
+    print(f"mount={mount}")
 PY
   )
 
   compose_mode="repo-docker-pack"
-  dockerfile="${pack_values[0]}"
-  workdir="${pack_values[1]}"
-  workspace_mount="${pack_values[2]}"
+  dockerfile=""
+  workdir="/workspace"
+  workspace_mount="/workspace"
+  pack_mounts=()
+  for pack_value in "${pack_values[@]}"; do
+    case "$pack_value" in
+      dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
+      workdir=*) workdir="${pack_value#workdir=}" ;;
+      workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
+      mount=*) pack_mounts+=("${pack_value#mount=}") ;;
+    esac
+  done
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_mounts=()
 fi
 
 volume_lines=("      - ..:${workspace_mount}:cached")
+for pack_mount in "${pack_mounts[@]}"; do
+  volume_lines+=("      - ${pack_mount}")
+done
 if [ -d /mnt/git ]; then
   volume_lines+=("      - /mnt/git:/mnt/git")
 fi
@@ -118,6 +135,14 @@ fi
   fi
   printf '    environment:\n'
   printf '%s\n' "${environment_lines[@]}"
+  printf '    networks:\n'
+  printf '      default:\n'
+  printf 'networks:\n'
+  printf '  default:\n'
+  printf '    ipam:\n'
+  printf '      config:\n'
+  printf '        - subnet: %s\n' "$devcontainer_subnet"
+  printf '          gateway: %s\n' "$devcontainer_gateway"
 } > "$output"
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$pack"
+printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s subnet=%s gateway=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$devcontainer_subnet" "$devcontainer_gateway" "$pack"
