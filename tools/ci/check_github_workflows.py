@@ -13,6 +13,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
+# upstream design ../../.github/workflows/agent-runtime-dashboard.yml PR and push runtime dashboard workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
@@ -194,6 +195,11 @@ ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
     "generate_agent_improvement_guide.py",
 )
+ROOT_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
+    "Synced to /.github/workflows/agent-runtime-dashboard.yml",
+    "Edit vendor/agent-canon/.github/workflows/agent-runtime-dashboard.yml",
+    "generate_agent_runtime_dashboard.py",
+)
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "agents/workflows/agent-canon-pr-workflow.md",
 )
@@ -204,6 +210,15 @@ VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "GITHUB_STEP_SUMMARY",
     "actions/upload-artifact@v4",
 )
+VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
+    "pull_request:",
+    "push:",
+    "eval_accumulation_check.py",
+    "evaluate_workflow_selection.py",
+    "generate_agent_runtime_dashboard.py",
+    "GITHUB_STEP_SUMMARY",
+    "actions/upload-artifact@v4",
+)
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "tool_catalog.py",
     "tool_drift.py",
@@ -211,6 +226,7 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "issue_sync.py",
     "eval_accumulation_check.py",
     "local_llm_eval.py",
+    "evaluate_workflow_selection.py",
     "run_repo_dependency_review.sh --fail-missing",
     "check_github_workflows.py",
     "container_config.py",
@@ -495,6 +511,10 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
             ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
         ),
         (
+            workflow_dir / "agent-runtime-dashboard.yml",
+            ROOT_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
+        ),
+        (
             workflow_dir / "agent-canon-static-gates.yml",
             AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
         ),
@@ -505,6 +525,10 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
         (
             vendor_workflow_dir / "agent-improvement-guide.yml",
             VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
+        ),
+        (
+            vendor_workflow_dir / "agent-runtime-dashboard.yml",
+            VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
         ),
         (
             vendor_workflow_dir / "agent-canon-static-gates.yml",

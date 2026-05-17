@@ -15,6 +15,7 @@
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
@@ -228,6 +229,12 @@ if "$PYTHON_BIN" tools/agent_tools/local_llm_eval.py 2>&1; then
   echo "✅ local LLM responsibility eval checks 成功"
 else
   echo "❌ local LLM responsibility eval checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/evaluate_workflow_selection.py 2>&1; then
+  echo "✅ workflow selection eval checks 成功"
+else
+  echo "❌ workflow selection eval checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then

@@ -178,6 +178,26 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: workflow-selection-eval
+    summary: Validates deterministic prompt-to-workflow routing cases.
+    path: tools/agent_tools/evaluate_workflow_selection.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_workflow_selection.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/workflow_selection_eval.toml
+      - agents/evals/results/workflow-selection/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_workflow_selection.py
+
   - id: file-resp-llm
     summary: Runs advisory local LLM responsibility review for exactly one file.
     path: tools/agent_tools/file_responsibility_llm.py
@@ -1055,6 +1075,24 @@ entries:
       - agents/evals/results/README.md
     tests:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
+
+  - id: generate-agent-runtime-dashboard
+    summary: Generates read-only dashboards for AgentCanon runtime logs and eval results.
+    path: tools/agent_tools/generate_agent_runtime_dashboard.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/results/README.md
+    tests:
+      - tests/agent_tools/test_generate_agent_runtime_dashboard.py
 
   - id: compare-agent-run-paths
     summary: Compares two run bundles for route and static-feedback differences.

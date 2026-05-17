@@ -83,14 +83,30 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("no-local-llm-eval-reports", result.stdout)
 
+    def test_missing_workflow_selection_eval_report_fails(self) -> None:
+        """At least one accumulated workflow selection eval report is required."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            for path in (root / "agents" / "evals" / "results" / "workflow-selection").glob("*.md"):
+                if path.name != "README.md":
+                    path.unlink()
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("no-workflow-selection-eval-reports", result.stdout)
+
     def write_fixture(self, root: Path) -> None:
         """Write a minimal eval result fixture."""
         hook_dir = root / "agents" / "evals" / "results" / "hook-runs" / "test"
         skill_dir = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
         local_llm_dir = root / "agents" / "evals" / "results" / "local-llm-responsibility"
+        workflow_selection_dir = root / "agents" / "evals" / "results" / "workflow-selection"
         hook_dir.mkdir(parents=True)
         skill_dir.mkdir(parents=True)
         local_llm_dir.mkdir(parents=True)
+        workflow_selection_dir.mkdir(parents=True)
         (hook_dir / "hook.jsonl").write_text(
             json.dumps(self.hook_entry("hook-1")) + "\n",
             encoding="utf-8",
@@ -101,6 +117,13 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         )
         (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
             "LOCAL_LLM_EVAL_RUN_ID=local-llm-eval-20260517T010203040506Z-1234567890\n",
+            encoding="utf-8",
+        )
+        (
+            workflow_selection_dir
+            / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md"
+        ).write_text(
+            "WORKFLOW_SELECTION_EVAL_RUN_ID=workflow-selection-eval-20260517T010203040506Z-1234567890\n",
             encoding="utf-8",
         )
 
