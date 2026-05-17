@@ -9,12 +9,16 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import re
 from pathlib import Path
 
 from container_runtime import (
     HOST_GH_CONFIG,
     HOST_SSH_DIR,
+    WORKSPACE_ROOT,
     detect_host_runtime_features,
     load_or_default_pack,
     workspace_path,
@@ -39,6 +43,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def compose_environment_line(env_item: str) -> str:
+    """Render one Docker runtime environment entry as a Compose mapping line."""
+    name, separator, value = env_item.partition("=")
+    if not separator:
+        return f"      {name}: \"\""
+    return f"      {name}: {json.dumps(value)}"
+
+
+def default_project_name(repo_root: Path) -> str:
+    """Return the default repository-specific devcontainer Compose name."""
+    repo_name = repo_root.name.casefold()
+    slug = re.sub(r"[^a-z0-9_-]+", "-", repo_name).strip("-_") or "workspace"
+    digest = hashlib.sha1(str(repo_root).encode("utf-8")).hexdigest()[:8]
+    return f"{slug}-{digest}-devcontainer"
+
+
 def main() -> int:
     """Render the compose file."""
     args = build_parser().parse_args()
@@ -47,6 +67,7 @@ def main() -> int:
     features = detect_host_runtime_features()
     devcontainer_subnet = os.environ.get("DEVCONTAINER_SUBNET", "192.168.248.16/28")
     devcontainer_gateway = os.environ.get("DEVCONTAINER_GATEWAY", "192.168.248.17")
+    project_name = os.environ.get("DEVCONTAINER_PROJECT_NAME") or default_project_name(WORKSPACE_ROOT)
 
     volume_lines = [f"      - ..:{pack.runtime.workspace_mount}:cached"]
     volume_lines.extend(f"      - {mount}" for mount in pack.runtime.mounts)
@@ -61,7 +82,10 @@ def main() -> int:
     if features.ssh_auth_sock is not None:
         volume_lines.append(f"      - {features.ssh_auth_sock}:/ssh-agent")
 
-    environment_lines = ['      DEVCONTAINER_RUNTIME_MODE: "generated"']
+    environment_lines = [
+        '      DEVCONTAINER_RUNTIME_MODE: "generated"',
+        *(compose_environment_line(env_item) for env_item in pack.runtime.env),
+    ]
     if features.ssh_auth_sock is not None:
         environment_lines.append('      SSH_AUTH_SOCK: "/ssh-agent"')
     if features.has_gpu:
@@ -76,6 +100,7 @@ def main() -> int:
         environment_lines.append('      DEVCONTAINER_GPU_MODE: "disabled"')
 
     lines = [
+        f"name: {project_name}",
         "services:",
         "  workspace:",
         "    build:",
@@ -110,6 +135,7 @@ def main() -> int:
     output_path.write_text("\n".join(lines), encoding="utf-8")
     print(
         "devcontainer runtime generated:"
+        f" name={project_name}"
         f" gpu={int(features.has_gpu)}"
         f" mount_mnt_git={int(features.has_mnt_git)}"
         f" mount_host_codex={int(features.has_host_codex_home)}"

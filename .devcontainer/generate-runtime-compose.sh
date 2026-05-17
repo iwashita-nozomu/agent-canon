@@ -36,6 +36,7 @@ if [ -f "$pack" ]; then
 from __future__ import annotations
 
 import sys
+import json
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -50,6 +51,10 @@ print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
 for mount in runtime.get("mounts", []):
     print(f"mount={mount}")
+for item in runtime.get("env", []):
+    name, separator, value = str(item).partition("=")
+    if separator:
+        print(f"ENV:{name}: {json.dumps(value)}")
 PY
   )
 
@@ -58,12 +63,14 @@ PY
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
+  pack_environment_lines=()
   for pack_value in "${pack_values[@]}"; do
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
+      ENV:*) pack_environment_lines+=("      ${pack_value#ENV:}") ;;
     esac
   done
 else
@@ -72,6 +79,7 @@ else
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
+  pack_environment_lines=()
 fi
 
 volume_lines=("      - ..:${workspace_mount}:cached")
@@ -102,6 +110,7 @@ fi
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
+  "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')

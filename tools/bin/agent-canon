@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# @dependency-start
+# responsibility Provides stable shell entrypoint for the AgentCanon Rust CLI.
+# upstream design ../../documents/rust-agent-tool-migration.md Rust tool migration policy
+# upstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
+# @dependency-end
+
+set -euo pipefail
+
+if [ -x /opt/agent-canon/bin/agent-canon ]; then
+  exec /opt/agent-canon/bin/agent-canon "$@"
+fi
+
+script_path="${BASH_SOURCE[0]}"
+if command -v readlink >/dev/null 2>&1; then
+  script_path="$(readlink -f "$script_path")"
+fi
+canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
+manifest="${canon_root}/rust/agent-canon/Cargo.toml"
+
+if command -v cargo >/dev/null 2>&1; then
+  exec cargo run --manifest-path "$manifest" -- "$@"
+fi
+
+echo "agent-canon runtime is unavailable" >&2
+exit 1

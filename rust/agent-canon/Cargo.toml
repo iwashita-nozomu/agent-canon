@@ -1,0 +1,14 @@
+# @dependency-start
+# responsibility Defines the AgentCanon Rust CLI crate.
+# upstream design ../../documents/rust-agent-tool-migration.md Rust tool migration policy
+# downstream implementation src/main.rs CLI entrypoint
+# downstream implementation src/migration_audit.rs Rust migration audit command
+# @dependency-end
+
+[package]
+name = "agent-canon"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]

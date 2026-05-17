@@ -13,8 +13,12 @@ skill_families:
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
     shim: .agents/skills/repo-onboarding/SKILL.md
+  - id: task-routing
+    purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
+    canonical_doc: agents/skills/task-routing.md
+    shim: .agents/skills/task-routing/SKILL.md
   - id: start-repository
-    purpose: Start a new repository from the template clone, including bare remotes and project-local agent-canon seeding.
+    purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
     shim: .agents/skills/start-repository/SKILL.md
   - id: codex-task-workflow
@@ -41,6 +45,10 @@ skill_families:
     purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
     shim: .agents/skills/oop-readability-check/SKILL.md
+  - id: result-artifact-writeout
+    purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
+    canonical_doc: agents/skills/result-artifact-writeout.md
+    shim: .agents/skills/result-artifact-writeout/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md

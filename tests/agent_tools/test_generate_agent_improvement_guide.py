@@ -54,17 +54,64 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("agent-orchestration@UserPromptSubmit", guide)
         self.assertIn("hook_tool_counts:", guide)
         self.assertIn("apply_patch", guide)
+        self.assertIn("hook_namespace_counts:", guide)
+        self.assertIn("test-container", guide)
+        self.assertIn("skill_source_counts:", guide)
+        self.assertIn("prompt", guide)
+        self.assertIn("prompt_candidate_skill_counts:", guide)
+        self.assertIn("result-artifact-writeout", guide)
+        self.assertIn("prompt_candidate_workflow_counts:", guide)
+        self.assertIn("codex-task-workflow", guide)
+        self.assertIn("prompt_candidate_tool_counts:", guide)
+        self.assertIn("workflow_monitor.py", guide)
+        self.assertIn("human_feedback_label_counts:", guide)
+        self.assertIn("quality_gap", guide)
+        self.assertIn("human_feedback_target_counts:", guide)
+        self.assertIn("skill:result-artifact-writeout", guide)
+        self.assertIn("human_feedback_action_counts:", guide)
+        self.assertIn("prompt_repair", guide)
+        self.assertIn("Top Failure Repair Targets", guide)
         self.assertIn("tools/agent_tools/task_start.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
+        self.assertIn("Hook Quality Findings", guide)
         self.assertIn("Protocol Feedback Coverage", guide)
         self.assertIn("hook_tool_feedback=reviewed", guide)
         self.assertIn("failure-a", guide)
         self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
         self.assertIn("Local Agent or Copilot PR", guide)
 
+    def test_resolves_vendored_agentcanon_root_from_parent_repo(self) -> None:
+        """Parent-root invocation should use vendored AgentCanon evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent_root = Path(temp_dir)
+            canon_root = parent_root / "vendor" / "agent-canon"
+            self.write_fixture(canon_root)
+            output = parent_root / "reports" / "guide.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(parent_root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            guide = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"evidence_root: `{canon_root.resolve().as_posix()}`", guide)
+        self.assertIn("open_issues: `1`", guide)
+        self.assertIn("hook_status_counts: `{'fail': 1, 'pass': 2}`", guide)
+
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
+        root.mkdir(parents=True, exist_ok=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
         (root / "memory").mkdir()
@@ -96,8 +143,10 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             json.dumps(
                 {
                     "hook_run_id": "hook-test",
+                    "hook_log_namespace": "test-container",
                     "event": "PostToolUse",
                     "status": "fail",
+                    "payload_fingerprint": "payload-a",
                     "failure_fingerprint": "failure-a",
                     "tool_name": "apply_patch",
                     "commands": [
@@ -112,6 +161,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                                 "tools/agent_tools/task_start.py",
                             ],
                             "returncode": 1,
+                            "output_snippet": "OOP_READABILITY_FINDING=tools/agent_tools/task_start.py:1",
                         }
                     ],
                 }
@@ -125,8 +175,20 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "hook_run_id": "skill-hook-test",
                     "event": "UserPromptSubmit",
                     "status": "pass",
+                    "payload_fingerprint": "payload-skill-a",
+                    "hook_log_namespace": "test-container",
                     "skills": ["agent-orchestration", "codex-task-workflow"],
                     "skill_count": 2,
+                    "candidate_skills": ["result-artifact-writeout"],
+                    "candidate_workflows": ["codex-task-workflow"],
+                    "candidate_tools": ["workflow_monitor.py"],
+                    "prompt_feedback_detected": True,
+                    "feedback_labels": ["quality_gap", "repair_request"],
+                    "feedback_targets": ["skill:result-artifact-writeout", "tool:workflow_monitor.py"],
+                    "feedback_action": "prompt_repair",
+                    "skill_source_fields": ["prompt"],
+                    "observed_text_field_count": 1,
+                    "observed_text_value_count": 1,
                     "workflow_monitor_event_count": 0,
                 }
             )
@@ -136,6 +198,8 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "hook_run_id": "skill-hook-empty",
                     "event": "UnknownHookEvent",
                     "status": "pass",
+                    "payload_fingerprint": "payload-skill-empty",
+                    "hook_log_namespace": "test-container",
                     "skills": [],
                     "skill_count": 0,
                 }

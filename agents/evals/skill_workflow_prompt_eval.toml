@@ -10,7 +10,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 28
+expected_count = 30
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -35,7 +35,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 50
+expected_count = 52
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -86,7 +86,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 28
+expected_count = 30
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -107,6 +107,30 @@ id = "CLAUDE-SKILL-GENERIC-3"
 critical = true
 description = "Provides an executable numbered instruction list."
 required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "result-artifact-writeout-skill"
+target = ".agents/skills/result-artifact-writeout/SKILL.md"
+kind = "skill"
+description = "Result writeout must preserve raw evidence, summary artifacts, manifests, unique paths, and no-overwrite policy."
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-1"
+critical = true
+description = "Requires raw source result and summary artifact separation."
+required_regex = ["raw", "summary", "source result"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-2"
+critical = true
+description = "Requires manifest, unique artifact path, and overwrite policy."
+required_regex = ["manifest", "unique", "overwrite"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-3"
+critical = true
+description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
+required_regex = ["failed", "partial", "status", "exit code"]
 
 [[evals]]
 id = "all-canonical-routing-docs"
@@ -578,8 +602,8 @@ description = "The Codex workflow must route token-saving and goal-driven reques
 [[evals.checklist]]
 id = "CODEX-WF-TOKEN-1"
 critical = true
-description = "Mentions token profiles, agent modes, and non-waivable gates."
-required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "Full dependency review"]
+description = "Mentions token profiles, agent modes, and profile/risk-selected gates."
+required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "risk class", "targeted checks"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"
@@ -880,6 +904,24 @@ id = "EVALS-README-HOOK-GUIDE-1"
 critical = true
 description = "Documents hook result accumulation and PR/push improvement guide generation."
 required_regex = ["agents/evals/results/hook-runs/", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+
+[[evals.checklist]]
+id = "EVALS-README-PROMPT-FEEDBACK-1"
+critical = true
+description = "Documents prompt-derived candidate routing and human feedback evidence."
+required_regex = ["candidate skill / workflow / tool", "human feedback", "skill usage entries"]
+
+[[evals]]
+id = "hook-runs-prompt-feedback-routing"
+target = "agents/evals/results/hook-runs/README.md"
+kind = "hook-result-doc"
+description = "Hook result policy must describe prompt-intake routing evidence without raw prompt retention."
+
+[[evals.checklist]]
+id = "HOOK-RUNS-PROMPT-FEEDBACK-1"
+critical = true
+description = "Requires skill_usage prompt candidate routing and human feedback fields."
+required_regex = ["candidate skill", "workflow / tool", "human feedback labels", "raw prompt text"]
 
 [[evals]]
 id = "tools-readme-prompt-eval-audit"

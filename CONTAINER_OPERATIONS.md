@@ -4,9 +4,10 @@
 @dependency-start
 responsibility Documents AgentCanon-owned container, devcontainer, and recent cross-repository operation rules.
 upstream design README.md AgentCanon top-level entrypoint and rule index.
+upstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 downstream design documents/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
+downstream design documents/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary.
 downstream design documents/coding-conventions-project.md project environment and dependency ownership conventions.
-downstream design documents/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
 downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
@@ -34,6 +35,7 @@ Read this file when a task touches any of these surfaces:
 - `tools/ci/container_config.py`
 - `tools/ci/check_github_workflows.py`
 - `documents/github-first-module-and-devcontainer-policy.md`
+- `documents/rust-agent-tool-migration.md`
 
 ## Canonical Source Contract
 
@@ -64,8 +66,8 @@ Container surfaces have four owner classes.
 
 | Surface | Owner | Rule |
 | --- | --- | --- |
-| `.devcontainer/` | AgentCanon | Shared runtime view. Keep common Codex, GitHub CLI, mount, and post-create behavior here. |
-| `Dockerfile` | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, or agent convenience tooling here. |
+| `.devcontainer/` | AgentCanon | Shared runtime view. Keep common Codex, GitHub CLI, Rust toolchain, mount, and post-create behavior here. |
+| `Dockerfile` | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here. |
 | `docker/` | Template or derived repository | Project-local container runbook, dependency packs, runtime package contract, and repository-specific image policy. |
 | GitHub Docker workflow | Mixed | Workflow file may be GitHub path-constrained copy, but its Docker behavior must follow this rulebook and checkout AgentCanon before shared devcontainer smoke. |
 
@@ -82,14 +84,17 @@ Keep the project `Dockerfile` focused on the project runtime.
   them.
 - Do not install Codex CLI, GitHub CLI, `gh`, Node.js, or npm solely for agent
   convenience.
+- Do not install rustup or run cargo solely for AgentCanon CLI or shared
+  analysis-tool migration work.
 - Do not bake host-specific mount paths such as `/mnt/git` into the image.
 - Do not install repository Python dependencies during image build when those
   dependencies depend on the mounted workspace.
 - Do not make Dockerfile changes to repair AgentCanon post-create behavior.
 
-If a project genuinely needs Node.js, npm, GitHub CLI, or another agent-looking
-tool as a product/runtime dependency, document that as a repository-local
-requirement in `docker/README.md` and validate it through the project CI path.
+If a project genuinely needs Node.js, npm, GitHub CLI, Rust, or another
+agent-looking tool as a product/runtime dependency, document that as a
+repository-local requirement in `docker/README.md` and validate it through the
+project CI path.
 
 ## Devcontainer Rules
 
@@ -97,6 +102,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling, and
   post-create bootstrap belong in `.devcontainer/post-create.sh`.
+- Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
+  belong in `.devcontainer/post-create.sh` when they are only needed for shared
+  AgentCanon tooling.
+- Devcontainer post-create must publish Rust on PATH for non-interactive
+  `devcontainer exec` commands, not only for the current post-create shell.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository
@@ -111,6 +121,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - `/mnt/git` is compatibility-only. Configure it only when the host path exists.
 - Shared post-create logic must tolerate a repository that has no local bare
   mirror and no host-specific optional mount.
+- Devcontainer-generated Compose must forward repo-local runtime environment
+  entries from `docker/packs/default.toml` so editor kernels, shells, and smoke
+  commands share the same import root.
 
 ## Python Dependency Rules
 

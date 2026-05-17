@@ -4,6 +4,7 @@
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
 # @dependency-end
 
@@ -24,6 +25,7 @@ usage() {
   cat <<EOF
 Usage:
   bash tools/update_agent_canon.sh plan [branch]
+  bash tools/update_agent_canon.sh latest [branch]
   bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh merge-main-into-current [branch]
   bash tools/update_agent_canon.sh status
@@ -31,6 +33,11 @@ Usage:
 Commands:
   plan
       Print the AgentCanon update route for the current parent repo.
+  latest
+      Tool-first update workflow. It applies a safe AgentCanon main update,
+      repairs root views, writes/acknowledges parent update TODO state when
+      possible, and emits a machine-readable Agent workflow route when local
+      shared-canon work or merge conflicts require human/agent resolution.
   apply
       Update the parent repo to AgentCanon main when the update surface is safe.
   merge-main-into-current
@@ -89,9 +96,157 @@ parent_pin_pending() {
   fi
 }
 
+emit_remote_main_ancestor_evidence() {
+  local remote_sha="$1"
+  local post_head="$2"
+
+  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$post_head"; then
+    echo "agent_canon_merge_remote_main_in_post_head=yes"
+    echo "agent_canon_merge_remote_main_verified=yes"
+    return
+  fi
+  echo "agent_canon_merge_remote_main_in_post_head=no"
+  echo "agent_canon_merge_remote_main_verified=no"
+  die "current AgentCanon branch does not contain fetched remote main after merge-main-into-current"
+}
+
+plan_value() {
+  local key="$1"
+  local text="$2"
+  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1); exit}' <<< "$text"
+}
+
+emit_agentcanon_conflict_workflow_route() {
+  local reason="$1"
+  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
+  echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
+  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
+  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
+  echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
+}
+
+route_requires_agent_workflow() {
+  local route="$1"
+  local prefix_mode="$2"
+  local dirty_update_surface="$3"
+  local submodule_worktree_status="$4"
+
+  case "$route" in
+    local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
+      return 0
+      ;;
+    deferred_branch_pr)
+      return 1
+      ;;
+  esac
+  if [ "$prefix_mode" = "submodule" ] && [ "$submodule_worktree_status" = "dirty" ]; then
+    return 0
+  fi
+  if [ "$dirty_update_surface" = "yes" ]; then
+    case "$route" in
+      submodule_update)
+        return 1
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  fi
+  return 1
+}
+
+acknowledge_update_todos_if_available() {
+  local todo_tool="$ROOT_DIR/tools/agent_tools/agent_canon_update_todos.py"
+  local state_path="$ROOT_DIR/.agent-canon/update-state.toml"
+  local todo_log=""
+  local pending_count=""
+
+  if [ ! -f "$todo_tool" ]; then
+    echo "AGENT_CANON_LATEST_TODOS=skipped_missing_tool"
+    return 0
+  fi
+
+  todo_log="$(mktemp)"
+  if ! python3 "$todo_tool" plan --write >"$todo_log" 2>&1; then
+    cat "$todo_log"
+    rm -f "$todo_log"
+    echo "AGENT_CANON_LATEST_TODOS=failed"
+    echo "NEXT_ACTION=repair_agent_canon_update_todo_state_then_rerun_latest"
+    return 1
+  fi
+  cat "$todo_log"
+  pending_count="$(awk -F= '/^AGENT_CANON_UPDATE_TODO_PENDING_COUNT=/{print $2}' "$todo_log")"
+  rm -f "$todo_log"
+
+  if [ "${pending_count:-0}" != "0" ]; then
+    echo "AGENT_CANON_LATEST_TODOS=pending"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=todo_workflow_required"
+    echo "NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest"
+    return 2
+  fi
+
+  python3 "$todo_tool" acknowledge
+  if [ -f "$state_path" ]; then
+    git -C "$ROOT_DIR" add "$state_path"
+    if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
+      git -C "$ROOT_DIR" commit -m "chore: acknowledge agent-canon update tasks"
+      echo "AGENT_CANON_LATEST_TODOS=acknowledged_committed"
+      return 0
+    fi
+  fi
+  echo "AGENT_CANON_LATEST_TODOS=acknowledged_noop"
+}
+
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
+}
+
+cmd_latest() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local plan_output=""
+  local route=""
+  local prefix_mode=""
+  local dirty_update_surface=""
+  local submodule_worktree_status=""
+  local latest_log=""
+  local latest_rc=0
+
+  plan_output="$(cmd_plan "$branch")"
+  printf '%s\n' "$plan_output"
+  route="$(plan_value agent_canon_plan_route "$plan_output")"
+  prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
+  dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
+  submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
+
+  if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
+    emit_agentcanon_conflict_workflow_route "route=${route:-unknown};dirty_update_surface=${dirty_update_surface:-unknown};submodule_worktree_status=${submodule_worktree_status:-unknown}"
+    return 2
+  fi
+
+  latest_log="$(mktemp)"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  if [ "$latest_rc" -ne 0 ]; then
+    cat "$latest_log"
+    rm -f "$latest_log"
+    emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    return "$latest_rc"
+  fi
+  cat "$latest_log"
+  if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
+    rm -f "$latest_log"
+    bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
+    echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+    return 0
+  fi
+  rm -f "$latest_log"
+
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+  acknowledge_update_todos_if_available || return $?
+  echo "AGENT_CANON_LATEST_TOOL_RESULT=updated"
+  echo "NEXT_ACTION=run_validation_then_push_parent_repo"
 }
 
 cmd_apply() {
@@ -152,6 +307,7 @@ cmd_merge_main_into_current() {
 
   if [ "$pre_head" = "$remote_sha" ]; then
     echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
     echo "agent_canon_merge_result=already_current"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
     echo "NEXT_ACTION=continue_parent_workflow"
@@ -166,6 +322,7 @@ cmd_merge_main_into_current() {
 
   if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
     echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
     echo "agent_canon_merge_result=already_contains_main"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
     echo "NEXT_ACTION=push_current_agentcanon_branch_and_open_or_update_PR"
@@ -182,6 +339,7 @@ cmd_merge_main_into_current() {
     fi
     rm -f "$merge_log"
     echo "agent_canon_merge_post_head=$post_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
     echo "agent_canon_merge_result=$result"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$post_head")"
     echo "NEXT_ACTION=run_validation_then_push_current_agentcanon_branch_and_open_or_update_PR"
@@ -204,6 +362,10 @@ main() {
     plan)
       shift
       cmd_plan "${1:-$DEFAULT_BRANCH}"
+      ;;
+    latest)
+      shift
+      cmd_latest "${1:-$DEFAULT_BRANCH}"
       ;;
     apply)
       shift

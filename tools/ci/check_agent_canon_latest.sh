@@ -59,6 +59,14 @@ case "$route" in
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
     emit_submodule_worktree_evidence
     ;;
+  deferred_branch_pr)
+    echo "AGENT_CANON_LATEST=pass"
+    echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+    emit_submodule_worktree_evidence
+    echo "AGENT_CANON_LATEST_GATE=deferred_branch_pr"
+    echo "AGENT_CANON_LATEST_NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+    echo "AgentCanon parent pin is a clean pushed branch head ahead of remote main; treating latest as deferred to the AgentCanon PR workflow." >&2
+    ;;
   local_contains_remote)
     echo "AGENT_CANON_LATEST=fail"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"

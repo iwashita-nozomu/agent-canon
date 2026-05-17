@@ -67,6 +67,7 @@ Dockerfile content must not include agent-side convenience tooling:
 - npm / Node installation solely for Codex or agent tooling;
 - GitHub CLI repository setup;
 - `gh` installation or authentication setup;
+- Rust toolchain installation for AgentCanon CLI or shared analysis tools;
 - host auth material;
 - host workspace, `/mnt/git`, or machine-local mount policy.
 
@@ -83,6 +84,9 @@ The shared devcontainer owns:
 
 - post-create installation of Codex, npm/Node when needed for Codex, and
   GitHub CLI / `gh`;
+- post-create installation of the Rust toolchain, rustfmt, clippy,
+  rust-analyzer, and the AgentCanon CLI when the AgentCanon source tree contains
+  `rust/agent-canon/Cargo.toml`;
 - repository-specific devcontainer and Docker Compose project names, so template
   clones do not all create the same visible container names;
 - host auth mount conventions for Codex, GitHub CLI, and SSH;
@@ -94,7 +98,8 @@ The shared devcontainer owns:
 
 The shared devcontainer consumes repo-local Docker runtime contracts instead of
 owning them. It reads `docker/packs/default.toml`, builds the repo-local
-`docker/Dockerfile`, and runs repo-local `docker/install_python_dependencies.sh`
+`docker/Dockerfile`, forwards the pack runtime environment into the generated
+Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
 
 `devcontainer.json` must not use a fixed AgentCanon display name for every

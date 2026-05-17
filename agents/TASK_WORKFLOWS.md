@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents Agent Task Workflows for this repository.
 upstream design README.md agent canon overview
+upstream design ../documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 upstream implementation task_catalog.yaml workflow family defaults
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract
 downstream design workflows/implementation-waterfall-workflow.md stage gate implementation flow
@@ -18,6 +19,12 @@ task を細かく増やしすぎず、少数の family に寄せて運用しま�
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
+
+ただし、runtime profile と risk class は
+[runtime-profiles-and-check-matrix.md](../documents/runtime-profiles-and-check-matrix.md)
+を優先します。Routine docs / Focused code は parent-direct と targeted validation
+を許可し、Shared canon / Large delivery / high-risk work だけ full staged flow を
+既定にします。
 
 ## 共通実装フロー
 
@@ -56,10 +63,10 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
-- code change では `test_designer` を独立に立て、static path と nasty case を先に固定します
+- high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
 - `実行計画 -> 計画レビュー`、`詳細設計 -> 詳細設計レビュー -> 文書通読レビュー`、`実装 -> 実装 checkpoint review` は、それぞれ review decision が `approve` になるまで同じ段を反復します
-- README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、別 reviewer で docs completeness review も通します
+- README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、docs-impact がある場合に別 reviewer で docs completeness review も通します
 - slide、presentation、PPT production では `slide-production-workflow.md` を追加し、固定 template、slot mapping、layout review、reference visibility を先に固めます
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
@@ -74,7 +81,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - `spark_worker` は設計判断、scope判断、review判断には使いません
 - user が `/goal <objective>` または goal-driven task を指定した場合は `agents/workflows/codex-goals-workflow.md` と `agents/workflows/goal-plan-implementation-loop.md` を overlay とします。objective が未確定なら parent が conservative な goal draft を作り、`/goal` 確定前に provisional run bundle と read-only subagent fan-out plan (`requirements_organizer`、`explorer`、必要なら `execution_planner`、`plan_reviewer`) を作ります。active runtime が explicit spawn authorization を持つ場合はその wave を起動し、持たない場合は handoff packet と `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を artifact に残して許可待ちにします。`/goal` 設定後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を固定するまで実装へ進みません。ただし planning は次の cohesive slice を実装可能にする checkpoint に限定し、`NEXT_ACTION=run_next_iteration` のたびに broad planning へ戻りません
 - token 消費を抑える必要がある場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、parent profile (`token-lite` / `token-standard` / `token-deep`) と agent mode (`parent-direct` / `scout-only` / `spark-slice` / `full-stage` / `deep-review`) を先に決めます
-- token 節約は context loading と fan-out の制御であり、required review、dependency analysis、validation、closeout gate を省略する理由にはなりません
+- token 節約は context loading と fan-out の制御であり、active profile が要求する review、dependency analysis、validation、closeout gate を省略する理由にはなりません
 - 要件整理では、今回 request、過去ログ由来の durable preference、repo/code precedent、domain/external constraint、unknown/open question を source bucket として分けます
 - 要件整理では、ユーザーへ戻す前に notes、guardrails、documents、prior logs、local code / tests で解決できる unknown を解決し、根拠を `Resolved From Accumulated Context` に残します
 - 要件レビューでは、active clause に `unknown_or_open_question` が残っていないことと、解決可能な unknown を放置していないことを `manager_reviewer` が確認します
@@ -82,8 +89,8 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 実装では、詳細設計または明白な局所 precedent にない reusable / user-facing な名前を worker が発明しません
 - 各 review の直後は、直前の execution role が feedback を反映してから次段へ進みます
 - `revise` は同じ段の owner へ戻し、`escalate` は 1 つ上の設計段へ戻します
-- 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、read-only diff-check agent が最新 diff を approve するまで completion loop を反復します
-- すべての repo-changing workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
+- 実装後は、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙します。read-only diff-check agent は Shared canon / Large delivery / high-risk work で必須にします
+- Shared canon / Large delivery / high-risk workflow は closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を prompt 記憶ではなく tool で検出します。
 - skill selection は `$agent-orchestration` を先頭に置き、repo-changing execution では `$codex-task-workflow` と `$subagent-bootstrap` を足し、さらに task-shape skill を最小限だけ追加します。機械化済み規約は追加 skill ではなく `check_convention_compliance.py` に委譲します。
 - parent 自身の差分確認だけで `mechanical_completion_loop_complete` や `diff_check_agent_complete` を yes にしてはいけません
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません

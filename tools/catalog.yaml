@@ -14,6 +14,9 @@ scope: shared_canon
 status_values:
   - canonical
   - compatibility_wrapper
+  - optional
+  - maintainer_only
+  - retired
 
 family_values:
   - agent_tools
@@ -115,6 +118,25 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_tool_drift.py
+
+  - id: route
+    summary: Maps long proposed tool and skill names to short task-routing areas.
+    path: tools/agent_tools/route.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/route.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/route.md
+      - documents/tool-skill-routing-refactor.md
+    tests:
+      - tests/agent_tools/test_route.py
 
   - id: check-convention-compliance
     summary: Verifies convention sources and workflow gate wiring stay connected.
@@ -272,6 +294,24 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: agent-canon-cli
+    summary: Stable wrapper for the AgentCanon Rust CLI.
+    path: tools/bin/agent-canon
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon --version
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/rust-agent-tool-migration.md
+    tests: []
+    test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
     path: tools/ci/check_agent_canon_pr.sh
@@ -343,7 +383,7 @@ entries:
       - tests/tools/test_update_agent_canon.py
 
   - id: update-agent-canon
-    summary: Provides user-facing AgentCanon update, branch merge, and PR routes.
+    summary: Provides user-facing AgentCanon latest update, branch merge, and PR routes.
     path: tools/update_agent_canon.sh
     family: root
     role: sync
@@ -672,7 +712,7 @@ entries:
       - tests/agent_tools/test_review_backlog_scan.py
 
   - id: vector-search
-    summary: Provides dependency-free TF-IDF search across canon text surfaces.
+    summary: Provides dependency-free TF-IDF search plus dependency-aware context expansion.
     path: tools/agent_tools/vector_search.py
     family: agent_tools
     role: inventory
@@ -685,8 +725,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-    tests: []
-    test_exempt_reason: Dependency-free semantic search helper; covered by help/runtime use.
+    tests:
+      - tests/agent_tools/test_vector_search.py
 
   - id: file-surface-inventory
     summary: Classifies root, submodule, and AgentCanon source file surfaces.
@@ -741,6 +781,40 @@ entries:
       - documents/coding-conventions-python.md
     tests:
       - tests/agent_tools/test_helper_function_inventory.py
+
+  - id: log-surface-inventory
+    summary: Inventories hook, skill, and tool machine-readable output fields.
+    path: tools/agent_tools/log_surface_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/log_surface_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - agents/evals/results/hook-runs/README.md
+    tests:
+      - tests/agent_tools/test_log_surface_inventory.py
+
+  - id: tool-rejection-preflight
+    summary: Predicts edit-time hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
+    path: tools/agent_tools/tool_rejection_preflight.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/tool_rejection_preflight.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - agents/COMMUNICATION_PROTOCOL.md
+    tests:
+      - tests/agent_tools/test_tool_rejection_preflight.py
 
   - id: goal-loop
     summary: Manages goal.md exit criteria, backlog, and loop status.
@@ -1055,3 +1129,20 @@ entries:
       - tools/README.md
     tests: []
     test_exempt_reason: Consumed through the compatibility wrapper.
+
+  - id: notebook-quality
+    summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
+    path: tools/validation/notebook_quality.py
+    family: validation
+    role: checker
+    status: canonical
+    command: python3 tools/validation/notebook_quality.py --all
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_notebook_quality.py

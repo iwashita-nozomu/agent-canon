@@ -60,16 +60,25 @@ retired legacy tool reintroduction.
 
 ## 含めるもの
 
+- `bin/`
+  - `agent-canon` は AgentCanon Rust CLI の stable wrapper です。template /
+    derived repo では root `tools/` symlink から呼び、実体 source は
+    `vendor/agent-canon/rust/agent-canon/` を使います。devcontainer では
+    post-create が release binary を `/opt/agent-canon/bin/agent-canon` へ
+    install し、`/usr/local/bin/agent-canon` から実行できるようにします。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
+  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `noncanonical_document_inventory.py` は Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補と正本候補を出します。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
+  - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`.claude/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
+  - `tool_rejection_preflight.py` は planned edit path から OOP readability、helper inventory、dependency review、GitHub workflow、hook runtime alignment、skill mirror sync、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。
 - `ci/`
@@ -93,6 +102,7 @@ retired legacy tool reintroduction.
   - shared helper
 - `validation/`
   - generic validation helper
+  - `notebook_quality.py` は notebook を細かい test ではなく、説明付きで部分実行しやすい実用 demo として保つための checker です。
 - `static_analysis/`
   - language-organized index for Python, C/C++, and common static-analysis entrypoints. OOP readability implementations are exposed through `oop/python/` and `oop/cpp/`.
 - top-level helper
@@ -104,17 +114,18 @@ retired legacy tool reintroduction.
   - legacy subtree repo では subtree metadata / snapshot import fallback を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
+    - `latest` は通常の最新化を tool-first に実行し、safe な場合は `ensure-latest`、root view check、AgentCanon update TODO acknowledge まで進めます。local shared-canon branch、dirty submodule、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW` と `NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
     - `apply` は `ensure-latest` を呼び、GitHub `main` の submodule pin を parent repo に持ち帰ります。
     - `merge-main-into-current` は `vendor/agent-canon/` の current branch に GitHub `main` を merge し、AgentCanon PR branch を push できる状態へ近づけます。
     - compatibility commands for local remotes, source refresh, and direct main alignment are intentionally not user-facing.
 
 ## AgentCanon Update Path
 
-通常の派生 repo では `update_agent_canon.sh` を入口にします。
+通常の派生 repo では `update_agent_canon.sh latest` を入口にします。
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
-1. submodule 内に local branch commit がある場合は `make agent-canon-merge-main` で GitHub `main` を current branch に取り込みます。
-1. dirty shared-canon 差分がある場合は `make agent-canon-ensure-latest` で消さず、AgentCanon branch と PR に出します。
+1. `make agent-canon-latest` で通常の AgentCanon `main` 更新、root view check、親 repo update TODO acknowledge を tool に任せます。
+1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は停止ではなく `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と `AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current` を出します。その場合は agent が conflict workflow に入り、必要なら `make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、AgentCanon branch と PR に出します。
 1. AgentCanon PR が merge された後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば親 repo の agent が先に適用し、完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
@@ -268,7 +279,16 @@ network access.
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
 python3 tools/agent_tools/vector_search.py --query "mcp goal loop" --format json
+python3 tools/agent_tools/vector_search.py --surface . --query "solver logging" --context
+python3 tools/agent_tools/vector_search.py --surface python --query "initialize info" --context --symbol initialize
 ```
+
+With `--context`, the tool keeps the TF-IDF search result and also emits
+context candidates. `CONTEXT_PATH` rows expand search-hit files through
+dependency manifest upstream / downstream edges, while `PYTHON_SYMBOL` and
+`PYTHON_EDGE` rows use Python AST definitions and direct calls to show local
+function fan-out and reverse caller fan-in. Use `--dependency-depth` to walk
+more than one hop and `--context-top` to cap the emitted context pack.
 
 If a repo later adds embedding-backed search, keep it optional: put generated
 indices under `reports/` or another ignored artifact path, never commit
@@ -461,7 +481,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `helper_function_inventory.py` inventories Python helper functions/classes and infers roles from AST body facts, calls, side effects, path domain, internal call graph evidence, single-caller or file-local specialization, and functional candidate rules. It reports high-confidence `auto_helper` verdicts separately from `needs_user_judgment` symbols, with `--only-auto-helpers` and `--only-user-judgment` filters for review loops.
 - `tools/oop/python/readability.py` scores Python OOP readability risks. It checks vague class/helper names, oversized classes/functions, wide public surfaces, excessive instance state/parameters, static-method namespace classes, `None` runtime routing, mixed transform/effect boundaries, cognitive-complexity signals, redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
-- `tools/oop/cpp/readability.py` scores C/C++ OOP readability risks. It checks vague type names, oversized classes/functions, wide public fields/methods, excessive parameters/base classes, `nullptr` runtime routing, mixed transform/effect boundaries, pass-through wrappers, identity functions, and trivial formatting functions.
+- `tools/oop/cpp/readability.py` scores C/C++ OOP readability risks. It checks vague type names, oversized classes/functions, wide public fields/methods, excessive parameters/base classes, `nullptr` runtime routing, mixed transform/effect boundaries, pass-through wrappers, identity functions, and trivial formatting functions. It also preserves intentional C++ boundaries for schema/value-object aggregates, annotated primitive ABI functions, `__nad_` exported ABI functions, expression-DSL identity terminals, and compact numeric scalar wrappers.
 - `tools/oop/*/readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.
 - `tools/oop/*/readability.py --exclude vendor --exclude reports ...` keeps vendored snapshots and generated artifacts out of external-repo scans. Record the exact path set and excludes beside the report.
 - `tools/oop/*/readability.py --review-prompt-out <path>` writes a prompt for `oop_readability_reviewer`. The reviewer documents the mechanical report, but does not change the score, thresholds, counts, paths, line numbers, or pass/fail verdict.

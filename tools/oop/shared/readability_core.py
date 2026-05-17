@@ -39,6 +39,25 @@ from typing import cast
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")
 PRESENTATION_FUNCTION_PARTS = ("format", "render", "stringify", "to_string", "display", "label")
+CPP_LOCAL_MUTATION_METHODS = {
+    "append",
+    "assign",
+    "clear",
+    "emplace",
+    "emplace_back",
+    "emplace_front",
+    "erase",
+    "insert",
+    "pop",
+    "pop_back",
+    "pop_front",
+    "push",
+    "push_back",
+    "push_front",
+    "remove",
+    "resize",
+    "swap",
+}
 EFFECT_ADAPTER_NAMES = {
     "agent_canon_update_surface_status",
     "default_log_path",
@@ -90,6 +109,84 @@ WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
+CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES = (
+    "Argument1D",
+    "Binding",
+    "Buffers",
+    "Cache",
+    "Comparison",
+    "Config",
+    "Contract",
+    "Criterion",
+    "Decision",
+    "Descriptor",
+    "DescriptorV3",
+    "Eligibility",
+    "Entry",
+    "Functions",
+    "Handle",
+    "Header",
+    "Identity",
+    "Info",
+    "Key",
+    "Layout",
+    "Manifest",
+    "Metrics",
+    "Norms",
+    "Parameter",
+    "Paths",
+    "Point",
+    "Problem",
+    "Record",
+    "Result",
+    "Rule1D",
+    "Selection",
+    "Segment",
+    "Set",
+    "Shape",
+    "Slice",
+    "Snapshot",
+    "Spec",
+    "State",
+    "Stats",
+    "Storage",
+    "Tape",
+    "Triangle",
+    "Views",
+    "Workspace",
+)
+CPP_AGGREGATE_VALUE_OBJECT_NAMES = (
+    "Add",
+    "Answer",
+    "Cos",
+    "Divide",
+    "EvaluationContext",
+    "Exp",
+    "FunctionIr",
+    "Literal",
+    "Log",
+    "LoweringOpcodeFor",
+    "Multiply",
+    "Negate",
+    "Sin",
+    "StateFunction",
+    "StateFunctionResult",
+    "Step",
+    "Subtract",
+    "operator_vector_leaf_traits",
+    "two_float",
+)
+CPP_DOMAIN_IDENTITY_FUNCTION_NAMES = {"apply_compile_bindings"}
+CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE = re.compile(
+    r"^(?:bfloat|float|int|uint)\d+x\d+$"
+)
+CPP_ABI_FUNCTION_PREFIXES = ("__nad_",)
+CPP_ABI_MARKER_MACROS = (
+    "NATIVE_AD_AUGMENT",
+    "NATIVE_AD_JVP",
+    "NATIVE_AD_PRIMAL",
+    "NATIVE_AD_VJP",
+)
 LANGUAGE_SUFFIXES = {
     "all": PYTHON_SUFFIXES | CPP_SUFFIXES,
     "python": PYTHON_SUFFIXES,
@@ -317,7 +414,7 @@ class PythonClassUsage:
 
     def usage_summary(self) -> str:
         """Return a compact usage summary for findings."""
-        file_count = len(self.source_files or set())
+        file_count = len(self.source_files) if self.source_files is not None else 0
         return (
             f"construct={self.constructor_calls},type={self.boundary_refs()},"
             f"method={self.instance_method_calls},attr={self.instance_attribute_refs},"
@@ -2276,8 +2373,10 @@ FUNCTION_RE = re.compile(
 )
 
 
-def matching_brace(text: str, open_index: int) -> int:
-    """Return matching brace index or end of text when unmatched."""
+def matching_brace(text: str, open_index: int) -> int | None:
+    """Return matching brace index, or None when unmatched."""
+    if open_index < 0:
+        return None
     depth = 0
     for index in range(open_index, len(text)):
         char = text[index]
@@ -2287,7 +2386,7 @@ def matching_brace(text: str, open_index: int) -> int:
             depth -= 1
             if depth == 0:
                 return index
-    return len(text)
+    return None
 
 
 def line_at(text: str, index: int) -> int:
@@ -2406,26 +2505,173 @@ def cpp_public_section(class_kind: str, body: str) -> str:
     return "\n".join(lines)
 
 
+def cpp_brace_delta(line: str) -> int:
+    """Return the net brace nesting change for one C++ source line."""
+    return line.count("{") - line.count("}")
+
+
+def cpp_skippable_public_line(line: str) -> bool:
+    """Return whether a public-section line cannot declare a member."""
+    return not line or line.startswith("//") or line.startswith("#")
+
+
+def cpp_member_candidate_start(line: str) -> bool:
+    """Return whether a top-level line can start a C++ member declaration."""
+    if line.startswith(("using ", "typedef ")):
+        return False
+    return "(" in line or line.endswith(";")
+
+
+def cpp_member_candidate_text(pending: str, line: str) -> str:
+    """Return the current accumulated top-level member candidate."""
+    if pending:
+        return f"{pending} {line}"
+    if cpp_member_candidate_start(line):
+        return line
+    return ""
+
+
+def cpp_member_candidate_complete(candidate: str, line: str) -> bool:
+    """Return whether the current line terminates a member candidate."""
+    return bool(candidate) and (";" in line or "{" in line)
+
+
+def cpp_member_candidate_is_member(candidate: str) -> bool:
+    """Return whether an accumulated candidate looks like a field or method."""
+    return ("(" in candidate and ")" in candidate) or candidate.endswith(";")
+
+
 def cpp_member_candidates(public_body: str) -> list[str]:
-    """Return rough public member declarations."""
+    """Return rough top-level public member declarations."""
     members: list[str] = []
+    pending = ""
+    depth = 0
     for line in public_body.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("//") or stripped.startswith("#"):
+        if cpp_skippable_public_line(stripped):
+            depth = max(0, depth + cpp_brace_delta(stripped))
             continue
-        if "(" in stripped and ")" in stripped:
-            members.append(stripped)
-        elif stripped.endswith(";") and not stripped.startswith(("using ", "typedef ")):
-            members.append(stripped)
+        if depth == 0:
+            pending = cpp_member_candidate_text(pending, stripped)
+            if cpp_member_candidate_complete(pending, stripped):
+                if cpp_member_candidate_is_member(pending):
+                    members.append(pending)
+                pending = ""
+        depth = max(0, depth + cpp_brace_delta(stripped))
     return members
+
+
+def cpp_scalar_operator_value_object(name: str) -> bool:
+    """Return true for compact numeric scalar wrappers with operator-heavy APIs."""
+    return CPP_SCALAR_OPERATOR_VALUE_OBJECT_RE.fullmatch(name) is not None
+
+
+def cpp_aggregate_value_object_name(name: str) -> bool:
+    """Return true for C++ aggregate names that carry schema or DSL values."""
+    return name in CPP_AGGREGATE_VALUE_OBJECT_NAMES or name.endswith(
+        CPP_AGGREGATE_VALUE_OBJECT_SUFFIXES
+    )
+
+
+def cpp_preceding_lines(text: str, start: int, line_count: int) -> str:
+    """Return a small source window immediately before an index."""
+    return "\n".join(text[:start].splitlines()[-line_count:])
+
+
+def cpp_abi_boundary_function(
+    analysis_text: str,
+    start: int,
+    prefix: str,
+    name: str,
+) -> bool:
+    """Return true for C++ functions whose signature is a compiler/runtime ABI."""
+    if name.startswith(CPP_ABI_FUNCTION_PREFIXES):
+        return True
+    if "extern" in prefix and name.startswith(CPP_ABI_FUNCTION_PREFIXES):
+        return True
+    preceding = cpp_preceding_lines(analysis_text, start, 4)
+    return any(marker in preceding for marker in CPP_ABI_MARKER_MACROS)
 
 
 def cpp_parameter_count(params: str) -> int:
     """Count C++ function parameters approximately."""
-    params = params.strip()
-    if not params or params == "void":
-        return 0
-    return len([part for part in params.split(",") if part.strip()])
+    return len(cpp_split_top_level(params))
+
+
+def cpp_split_top_level(text: str) -> list[str]:
+    """Split a C++ comma list while preserving simple template arguments."""
+    text = text.strip()
+    if not text or text == "void":
+        return []
+    parts: list[str] = []
+    start = 0
+    depths = (0, 0, 0, 0)
+    for index, char in enumerate(text):
+        if char == "," and cpp_at_top_level(depths):
+            parts.append(text[start:index].strip())
+            start = index + 1
+            continue
+        depths = cpp_delimiter_depths_after(char, depths)
+    parts.append(text[start:].strip())
+    return [part for part in parts if part]
+
+
+def cpp_at_top_level(depths: tuple[int, int, int, int]) -> bool:
+    """Return true when no C++ delimiter depth is currently open."""
+    return not any(depths)
+
+
+def cpp_delimiter_depths_after(
+    char: str,
+    depths: tuple[int, int, int, int],
+) -> tuple[int, int, int, int]:
+    """Update delimiter depths after consuming one C++ character."""
+    open_index = "<([{".find(char)
+    if open_index != -1:
+        return cpp_depth_tuple_with_delta(depths, open_index, 1)
+    close_index = ">)]}".find(char)
+    if close_index != -1:
+        return cpp_depth_tuple_with_delta(depths, close_index, -1)
+    return depths
+
+
+def cpp_depth_tuple_with_delta(
+    depths: tuple[int, int, int, int],
+    index: int,
+    delta: int,
+) -> tuple[int, int, int, int]:
+    """Return delimiter depths after changing one depth slot."""
+    items = list(depths)
+    items[index] = max(0, items[index] + delta)
+    return (items[0], items[1], items[2], items[3])
+
+
+def cpp_parameter_names(params: str) -> list[str]:
+    """Return approximate C++ parameter names for redundancy checks."""
+    names: list[str] = []
+    for param in cpp_split_top_level(params):
+        name = cpp_parameter_name(param)
+        if name is not None:
+            names.append(name)
+    return names
+
+
+def cpp_parameter_name(param: str) -> str | None:
+    """Return the declared parameter name from one C++ parameter."""
+    normalized = param.split("=", 1)[0].strip()
+    normalized = re.sub(r"\s*\[[^\]]*\]\s*$", "", normalized).strip()
+    identifiers = list(re.finditer(r"\b[A-Za-z_][A-Za-z0-9_]*\b", normalized))
+    if len(identifiers) < 2:
+        return None
+    last = identifiers[-1]
+    if normalized[last.end() :].strip():
+        return None
+    prefix = normalized[: last.start()]
+    if prefix.rstrip().endswith("::"):
+        return None
+    if not re.search(r"[\s*&>]", prefix):
+        return None
+    return last.group(0)
 
 
 def cpp_cognitive_complexity(body: str) -> int:
@@ -2449,18 +2695,140 @@ def cpp_null_runtime_checks(body: str) -> int:
     return sum(len(re.findall(pattern, body)) for pattern in patterns)
 
 
+def cpp_meaningful_statements(body: str) -> list[str]:
+    """Return nonblank C++ body lines after comments and literals are masked."""
+    return [
+        line.strip()
+        for line in body.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+def cpp_single_return_statement(body: str) -> str | None:
+    """Return the single return statement for a trivial C++ function."""
+    statements = cpp_meaningful_statements(body)
+    if len(statements) != 1 or not statements[0].startswith("return "):
+        return None
+    return statements[0]
+
+
+def cpp_return_expression(statement: str) -> str:
+    """Return the expression inside a C++ return statement."""
+    expression = statement.removeprefix("return ").strip()
+    if expression.endswith(";"):
+        expression = expression[:-1].strip()
+    while expression.startswith("(") and expression.endswith(")"):
+        expression = expression[1:-1].strip()
+    return expression
+
+
+def cpp_identity_parameter(params: str, body: str) -> str | None:
+    """Return parameter name when a C++ function only returns that parameter."""
+    statement = cpp_single_return_statement(body)
+    if statement is None:
+        return None
+    expression = cpp_return_expression(statement)
+    parameter_names = set(cpp_parameter_names(params))
+    return expression if expression in parameter_names else None
+
+
+def cpp_forwarded_argument_name(argument: str, parameter_names: set[str]) -> str | None:
+    """Return parameter name when one C++ call argument forwards it unchanged."""
+    argument = argument.strip()
+    if argument in parameter_names:
+        return argument
+    move_match = re.fullmatch(r"(?:std::)?move\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", argument)
+    if move_match and move_match.group(1) in parameter_names:
+        return move_match.group(1)
+    forward_match = re.fullmatch(
+        r"(?:std::)?forward\s*<[^>]+>\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)",
+        argument,
+    )
+    if forward_match and forward_match.group(1) in parameter_names:
+        return forward_match.group(1)
+    return None
+
+
+def cpp_passthrough_call(params: str, body: str) -> tuple[str, int] | None:
+    """Return callee and forwarded parameter count for a C++ pass-through wrapper."""
+    parameter_names = cpp_parameter_names(params)
+    if not parameter_names:
+        return None
+    statement = cpp_single_return_statement(body)
+    if statement is None:
+        return None
+    call_match = re.fullmatch(r"return\s+(.+?)\((.*)\)\s*;", statement)
+    if call_match is None:
+        return None
+    callee = call_match.group(1).strip()
+    if re.search(r"\s", callee) or callee.startswith(
+        ("static_cast", "dynamic_cast", "reinterpret_cast", "const_cast")
+    ):
+        return None
+    parameter_set = set(parameter_names)
+    arguments = cpp_split_top_level(call_match.group(2))
+    forwarded = [
+        forwarded_name
+        for argument in arguments
+        if (forwarded_name := cpp_forwarded_argument_name(argument, parameter_set)) is not None
+    ]
+    if len(forwarded) != len(parameter_names) or set(forwarded) != parameter_set:
+        return None
+    return callee, len(forwarded)
+
+
+def cpp_returns_value(body: str) -> bool:
+    """Return true when a C++ body contains a value-return statement."""
+    return bool(re.search(r"\breturn\s+[^;\s][^;]*;", body))
+
+
+def cpp_external_effect_call(body: str) -> bool:
+    """Return true when a C++ body appears to cross an external effect boundary."""
+    patterns = (
+        r"\bstd::(?:cout|cerr|clog)\s*<<",
+        r"\b(?:printf|fprintf|system|popen|remove|rename)\s*\(",
+        r"\b(?:std::print|fmt::print)\s*\(",
+        r"\.\s*(?:open|close|flush|write)\s*\(",
+        r"\bstd::filesystem::(?:copy|copy_file|create_directories|remove|remove_all|rename)\s*\(",
+        r"\bstd::ofstream\b",
+        r"\bstd::ifstream\b",
+        r"\bstd::fstream\b",
+    )
+    return any(re.search(pattern, body) for pattern in patterns)
+
+
+def cpp_parameter_mutation_call(body: str, parameter_names: Sequence[str]) -> bool:
+    """Return true when a C++ body mutates a parameter-owned object."""
+    method_pattern = "|".join(sorted(CPP_LOCAL_MUTATION_METHODS))
+    for name in parameter_names:
+        escaped = re.escape(name)
+        if re.search(rf"\b{escaped}\s*(?:\.|->)\s*(?:{method_pattern})\s*\(", body):
+            return True
+        if re.search(rf"\*\s*{escaped}\s*=", body):
+            return True
+    return False
+
+
+def cpp_has_side_effect(params: str, body: str) -> bool:
+    """Return true when a C++ function likely mixes return values with effects."""
+    return cpp_external_effect_call(body) or cpp_parameter_mutation_call(
+        body,
+        cpp_parameter_names(params),
+    )
+
+
+def cpp_mixed_effect_function(name: str, params: str, body: str) -> bool:
+    """Return true when a C++ function returns a value while crossing effects."""
+    return cpp_returns_value(body) and cpp_has_side_effect(params, body) and not is_effect_adapter_name(name)
+
+
 def cpp_trivial_format_function(name: str, body: str) -> str | None:
     """Return a label when a C++ function is only a thin presentation wrapper."""
     if not symbol_has_presentation_name(name):
         return None
-    statements = [
-        line.strip()
-        for line in body.splitlines()
-        if line.strip() and not line.strip().startswith("//")
-    ]
-    if len(statements) != 1 or not statements[0].startswith("return "):
+    statement = cpp_single_return_statement(body)
+    if statement is None:
         return None
-    statement = statements[0]
     for marker in ("std::to_string", "std::format", "fmt::format"):
         if marker in statement:
             return marker
@@ -2490,6 +2858,8 @@ class CppClassShape:
     public_methods: int
     public_fields: int
     base_count: int
+    aggregate_value_object: bool
+    scalar_operator_value_object: bool
 
 
 @dataclass(frozen=True)
@@ -2502,7 +2872,12 @@ class CppFunctionShape:
     parameters: int
     complexity: int
     null_checks: int
+    mixed_effect: bool
+    identity_parameter: str | None
+    passthrough: tuple[str, int] | None
     trivial_format: str | None
+    abi_boundary: bool
+    domain_identity_boundary: bool
 
 
 def analyze_cpp_class(
@@ -2513,28 +2888,40 @@ def analyze_cpp_class(
 ) -> None:
     """Record class-level C++ readability findings for one regex match."""
     shape = cpp_class_shape(analysis_text, match)
+    if shape is None:
+        add_cpp_syntax_error(context, analysis_text, match, findings)
+        return
     add_cpp_class_identity_findings(context, shape, findings)
     add_cpp_class_surface_findings(context, shape, findings)
 
 
-def cpp_class_shape(analysis_text: str, match: re.Match[str]) -> CppClassShape:
+def cpp_class_shape(
+    analysis_text: str,
+    match: re.Match[str],
+) -> CppClassShape | None:
     """Return C++ class metrics without recording findings."""
     class_kind = match.group("kind")
     bases = match.group("bases") or ""
     open_index = analysis_text.find("{", match.end() - 1)
     close_index = matching_brace(analysis_text, open_index)
+    if close_index is None:
+        return None
     body = analysis_text[open_index + 1 : close_index]
     public_body = cpp_public_section(class_kind, body)
     public_members = cpp_member_candidates(public_body)
     public_methods = [item for item in public_members if "(" in item and ")" in item]
     public_fields = [item for item in public_members if item not in public_methods]
+    name = match.group("name")
+    aggregate_value_object = bool(public_fields) and cpp_aggregate_value_object_name(name)
     return CppClassShape(
-        name=match.group("name"),
+        name=name,
         line=line_at(analysis_text, match.start()),
         class_lines=line_count(analysis_text[match.start() : close_index]),
         public_methods=len(public_methods),
         public_fields=len(public_fields),
         base_count=len([part for part in bases.split(",") if part.strip()]),
+        aggregate_value_object=aggregate_value_object,
+        scalar_operator_value_object=cpp_scalar_operator_value_object(name),
     )
 
 
@@ -2595,7 +2982,10 @@ def add_cpp_class_surface_findings(
             thresholds.max_class_lines,
             "split-class-by-state-contract-or-adapter-boundary",
         )
-    if shape.public_methods > thresholds.max_public_methods:
+    if (
+        not shape.scalar_operator_value_object
+        and shape.public_methods > thresholds.max_public_methods
+    ):
         add_finding(
             findings,
             context.root,
@@ -2609,7 +2999,10 @@ def add_cpp_class_surface_findings(
             thresholds.max_public_methods,
             "narrow-public-api-or-split-responsibilities",
         )
-    if shape.public_fields > thresholds.max_public_fields:
+    if (
+        not shape.aggregate_value_object
+        and shape.public_fields > thresholds.max_public_fields
+    ):
         add_finding(
             findings,
             context.root,
@@ -2623,7 +3016,11 @@ def add_cpp_class_surface_findings(
             thresholds.max_public_fields,
             "hide-mutable-state-behind-explicit-boundary",
         )
-    if shape.public_fields and shape.public_fields > shape.public_methods:
+    if (
+        not shape.aggregate_value_object
+        and shape.public_fields
+        and shape.public_fields > shape.public_methods
+    ):
         add_finding(
             findings,
             context.root,
@@ -2647,15 +3044,23 @@ def analyze_cpp_function(
 ) -> None:
     """Record function-level C++ readability findings for one regex match."""
     shape = cpp_function_shape(analysis_text, match)
+    if shape is None:
+        add_cpp_syntax_error(context, analysis_text, match, findings)
+        return
     add_cpp_function_shape_findings(context, shape, findings)
     add_cpp_function_type_findings(context, shape, findings)
 
 
-def cpp_function_shape(analysis_text: str, match: re.Match[str]) -> CppFunctionShape:
+def cpp_function_shape(
+    analysis_text: str,
+    match: re.Match[str],
+) -> CppFunctionShape | None:
     """Return C++ function metrics without recording findings."""
     name = match.group("name")
     open_index = analysis_text.find("{", match.end() - 1)
     close_index = matching_brace(analysis_text, open_index)
+    if close_index is None:
+        return None
     body = analysis_text[open_index + 1 : close_index]
     return CppFunctionShape(
         name=name,
@@ -2664,7 +3069,39 @@ def cpp_function_shape(analysis_text: str, match: re.Match[str]) -> CppFunctionS
         parameters=cpp_parameter_count(match.group("params")),
         complexity=cpp_cognitive_complexity(body),
         null_checks=cpp_null_runtime_checks(body),
+        mixed_effect=cpp_mixed_effect_function(name, match.group("params"), body),
+        identity_parameter=cpp_identity_parameter(match.group("params"), body),
+        passthrough=cpp_passthrough_call(match.group("params"), body),
         trivial_format=cpp_trivial_format_function(name, body),
+        abi_boundary=cpp_abi_boundary_function(
+            analysis_text,
+            match.start(),
+            match.group("prefix"),
+            name,
+        ),
+        domain_identity_boundary=name in CPP_DOMAIN_IDENTITY_FUNCTION_NAMES,
+    )
+
+
+def add_cpp_syntax_error(
+    context: SourceContext,
+    analysis_text: str,
+    match: re.Match[str],
+    findings: list[Finding],
+) -> None:
+    """Record a parseability finding for an unmatched C++ brace body."""
+    add_finding(
+        findings,
+        context.root,
+        context.path,
+        line_at(analysis_text, match.start()),
+        context.language,
+        "error",
+        "syntax_error",
+        match.group("name"),
+        "unmatched-brace",
+        "parseable-cpp",
+        "fix-cpp-brace-structure-before-readability-analysis",
     )
 
 
@@ -2689,7 +3126,7 @@ def add_cpp_function_shape_findings(
             thresholds.max_function_lines,
             "split-decision-transform-and-side-effect-responsibilities",
         )
-    if shape.parameters > thresholds.max_parameters:
+    if shape.parameters > thresholds.max_parameters and not shape.abi_boundary:
         add_finding(
             findings,
             context.root,
@@ -2724,7 +3161,7 @@ def add_cpp_function_type_findings(
     shape: CppFunctionShape,
     findings: list[Finding],
 ) -> None:
-    """Record typed-boundary and presentation findings for one C++ function."""
+    """Record typed-boundary, effect, and redundancy findings for one C++ function."""
     if shape.null_checks > 0:
         add_finding(
             findings,
@@ -2738,6 +3175,49 @@ def add_cpp_function_type_findings(
             shape.null_checks,
             "typed-reference-or-variant-boundary",
             "prefer-reference-optional-or-variant-boundary-over-null-driven-routing",
+        )
+    if shape.mixed_effect:
+        add_finding(
+            findings,
+            context.root,
+            context.path,
+            shape.line,
+            context.language,
+            "warn",
+            "mixed_morphism_effect",
+            shape.name,
+            "return+effect",
+            "pure-or-effect-boundary",
+            "separate-value-transform-from-io-or-mutation",
+        )
+    if shape.identity_parameter is not None and not shape.domain_identity_boundary:
+        add_finding(
+            findings,
+            context.root,
+            context.path,
+            shape.line,
+            context.language,
+            "warn",
+            "identity_function",
+            shape.name,
+            f"returns {shape.identity_parameter}",
+            "non-identity-domain-transform",
+            "remove-wrapper-or-document-domain-contract",
+        )
+    if shape.passthrough is not None:
+        callee, forwarded_count = shape.passthrough
+        add_finding(
+            findings,
+            context.root,
+            context.path,
+            shape.line,
+            context.language,
+            "warn",
+            "pass_through_function",
+            shape.name,
+            f"{callee}/{forwarded_count}",
+            "adds-domain-or-adapter-contract",
+            "inline-call-or-document-adapter-contract",
         )
     if shape.trivial_format is not None:
         add_finding(

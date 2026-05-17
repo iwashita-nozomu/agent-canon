@@ -9,6 +9,7 @@ upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/mcp_session_context.sh injects MCP preflight context
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
+downstream implementation ./hooks/notebook_quality_guard.py blocks notebook-as-test misuse
 downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
 @dependency-end
 -->
@@ -124,12 +125,13 @@ or high-risk review. Profiles do not waive workflow gates.
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
 - `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
-- `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、既定では AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。skill が観測されない payload は durable log を汚さず skip します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、同じ検出結果を `workflow_monitor.py --behavior-event` 経由で run bundle にも記録します。
+- `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。既定では AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。skill、candidate、feedback が観測されない payload は durable log を汚さず skip します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。raw prompt は保存せず、payload fingerprint と分類結果だけを残します。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行し、既存 finding を含む current finding があれば中間作業でも block します。実装ミスにつながるため、closeout まで先送りしません。
+- `PostToolUse` は `hooks/notebook_quality_guard.py` でも changed notebook を確認し、細かい assertion / pytest / unittest / `test_` helper / stored error output を含む notebook、または visualization を持たない notebook を block します。notebook は部分実行できる実用 demo として保ち、細かい検証は `tests/` へ置きます。
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を継続させます。
-- `Stop` でも `hooks/oop_readability_guard.py` を再実行し、hook を迂回した変更が残っていれば completion を block します。
+- `Stop` でも `hooks/oop_readability_guard.py` と `hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば completion を block します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
-- `hooks/oop_readability_guard.py` は実行ごとに AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/oop_readability_guard.jsonl` へ `hook_run_id`、`hook_log_namespace`、`payload_fingerprint`、`failure_fingerprint`、`mode`、`baseline_ref` 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:`、host/repo hash fallback の順で決まります。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` で出力先を差し替えられます。
+- `hooks/oop_readability_guard.py` と `hooks/notebook_quality_guard.py` は実行ごとに AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/` 配下へ `hook_run_id`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:`、host/repo hash fallback の順で決まります。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` で出力先を差し替えられます。
 - hook の役割は「MCP をユーザーが明示しなくても repo task の標準 preflight として扱う context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。

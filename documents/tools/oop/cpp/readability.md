@@ -25,11 +25,44 @@ C / C++ source に対して、class / struct / function が責務と所有境界
 - `nullptr` 分岐による runtime routing: 参照、`optional`、`variant`、prevalidated handle で表現すべき variant を検出します。
 - 純粋変換と副作用の混在: 値を返しながら IO、filesystem、process、resource effect をまたぐ処理を検出します。
 - pass-through / identity に近い wrapper: 役割が薄く、domain contract を持たない adapter 候補を検出します。
+- 未完了の brace body: class / struct / function の `{ ... }` が閉じていない場合は `syntax_error` として検出します。
+
+## 許容する境界
+
+この checker はすべての public field、長い primitive 引数列、identity
+function を一律に落とすものではありません。C++ では ABI、schema、
+式 DSL、数値 scalar wrapper が実装上の正当な境界になるため、次は警告対象から外します。
+
+- schema / DTO / manifest / metrics / config のような named aggregate value object。
+  `RunConfig`、`StepMetrics`、`LayerInfo`、`PacketRecord` など、名前が
+  data contract を示し、behavior と state ownership を混ぜない aggregate は
+  public field 過多として扱いません。
+- `NATIVE_AD_AUGMENT`、`NATIVE_AD_JVP`、`NATIVE_AD_PRIMAL`、
+  `NATIVE_AD_VJP` で注釈された primitive ABI function、および
+  `__nad_` prefix の exported ABI function。これらは request object へ
+  畳むと ABI contract が崩れるため、primitive 引数列を許容します。
+- `apply_compile_bindings` のように、式 DSL の terminal node をそのまま返す
+  identity morphism。domain rewrite boundary として意味がある場合は
+  identity function warning を出しません。
+- `float32x2`、`uint64x4` のような compact numeric scalar value object。
+  arithmetic operator が public API の本体であるため、operator-heavy
+  surface を public method 過多として扱いません。
+
+許容は名前と周辺注釈に基づく機械判定です。state owner と behavior を混ぜた
+struct、domain contract のない pass-through wrapper、`nullptr` runtime routing
+は引き続き finding として扱います。
 
 ## 実行例
 
 ```bash
 python3 tools/oop/cpp/readability.py --format markdown --include-snippets include src tests/cpp
+```
+
+混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。
+この場合、file suffix で Python / C++ を自動選択します。
+
+```bash
+python3 tools/oop/python/readability.py --language all --format markdown python include src tests/cpp
 ```
 
 この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。

@@ -602,7 +602,7 @@ exit 条件:
 - 実行した checks と未実行理由が説明できる
 - dependency manifest checks と graph validation の実行結果または移行中 baseline 理由が説明できる
 - final acceptance review が `resolved` になっている
-- `final_review.md` に post-fix full review rerun review が記録され、review-driven fix の後に full required review set を rerun したことが追える
+- `final_review.md` に post-fix review rerun review が記録され、review-driven fix の後に risk class と changed surface に対する active required review set を rerun したことが追える
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate final"` が pass している
 
 ### Gate 10. Audit And Gate Closure

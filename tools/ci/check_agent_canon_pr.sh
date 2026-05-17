@@ -63,6 +63,7 @@ agentcanon_pr_branch_dirty() {
 agentcanon_pr_branch_pending() {
   local submodule_head=""
   local parent_pin=""
+  local remote_main=""
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 1
   fi
@@ -71,7 +72,18 @@ agentcanon_pr_branch_pending() {
   fi
   submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
   parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  [[ -n "${submodule_head}" && -n "${parent_pin}" && "${submodule_head}" != "${parent_pin}" ]]
+  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
+    return 1
+  fi
+  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+    return 0
+  fi
+  git -C vendor/agent-canon fetch origin main >/dev/null 2>&1 || true
+  remote_main="$(git -C vendor/agent-canon rev-parse origin/main 2>/dev/null || true)"
+  if [[ -z "${remote_main}" || "${parent_pin}" != "${remote_main}" ]]; then
+    return 0
+  fi
+  return 1
 }
 
 run_pr_agent_checks() {

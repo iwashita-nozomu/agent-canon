@@ -47,7 +47,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Revision Loop
 
-<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the full required review set on the refreshed diff. -->
+<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the active required review set for the risk class and changed surface on the refreshed diff. -->
 
 ## Post-Review Fix Rerun Requirement
 

@@ -69,6 +69,9 @@ C++-only. The tool should decide which files are relevant by suffix.
 When a report is requested or any tool-running mode runs the tool, create a
 Markdown report artifact by default. Chat-only tables are insufficient unless
 the user explicitly says no file / chat only.
+Use `result-artifact-writeout` when the OOP result must be retained beyond the
+chat turn: the checker output is the raw result, the Markdown table is the
+summary artifact, and both point to the same run.
 
 Default artifact path:
 

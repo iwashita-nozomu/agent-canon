@@ -816,7 +816,25 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             encoding="utf-8",
         )
         (work_dir / "documents" / "SHARED_RUNTIME_SURFACES.md").write_text(
-            "# Standalone Surface Policy\n",
+            "\n".join(
+                [
+                    "# Standalone Surface Policy",
+                    "",
+                    "documents/shared-runtime-surfaces.toml",
+                    ".codex/hooks.json",
+                    ".codex/hooks",
+                    ".devcontainer/",
+                    "documents/README.md",
+                    "documents/template-bootstrap.md",
+                    "documents/github-first-module-and-devcontainer-policy.md",
+                    "memory/USER_PREFERENCES.md",
+                    "tests/agent_tools/",
+                    "Root `tools/` is a symlink view",
+                    "vendor/agent-canon/tools/",
+                    "Project-local automation must stay in project-owned paths",
+                    "",
+                ]
+            ),
             encoding="utf-8",
         )
         (work_dir / ".github" / "AGENTS.md").write_text(
@@ -1136,6 +1154,69 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("agent_canon_plan_prefix_mode=submodule", plan.stdout)
             self.assertIn("agent_canon_plan_route=submodule_update", plan.stdout)
 
+    def test_latest_updates_clean_submodule_and_reports_tool_completion(self) -> None:
+        """The high-level latest command should apply safe submodule updates."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
+            self.assertIn("agent_canon_plan_route=submodule_update", latest.stdout)
+            self.assertIn("agent_canon_latest=updating_submodule", latest.stdout)
+            self.assertIn("shared surface is in sync", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TODOS=skipped_missing_tool", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", latest.stdout)
+            self.assertIn("NEXT_ACTION=run_validation_then_push_parent_repo", latest.stdout)
+            self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
+
+    def test_latest_routes_dirty_submodule_to_agent_conflict_workflow(self) -> None:
+        """The high-level latest command should not overwrite dirty shared canon work."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "dirty-marker.txt").write_text("dirty\n", encoding="utf-8")
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(latest.returncode, 0)
+            self.assertIn("agent_canon_plan_route=submodule_update", latest.stdout)
+            self.assertIn("agent_canon_plan_submodule_worktree_status=dirty", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required", latest.stdout)
+            self.assertIn(
+                "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md",
+                latest.stdout,
+            )
+            self.assertIn(
+                "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current",
+                latest.stdout,
+            )
+            self.assertIn("NEXT_ACTION=run_agentcanon_conflict_workflow", latest.stdout)
+
     def test_plan_ignores_removed_source_repo_override_for_submodule_remote(self) -> None:
         """Submodule plan should keep GitHub-first submodule remote semantics."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1266,6 +1347,122 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("AgentCanon branch and PR", result.stderr)
+
+    def test_latest_defers_clean_pushed_agentcanon_branch_pin(self) -> None:
+        """A clean pushed AgentCanon branch head is deferred to the AgentCanon PR."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (repo / "tools" / "ci").mkdir()
+            shutil.copy2(
+                REPO_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                repo / "tools" / "ci" / "check_agent_canon_latest.sh",
+            )
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "push", "-u", "origin", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
+            branch_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "checkout", "--detach", branch_head],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(["git", "add", "vendor/agent-canon"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "pin pushed proposal"], cwd=repo, check=True)
+            subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "sync root views"], cwd=repo, check=True)
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            ensure_latest = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "ensure-latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            latest_check = subprocess.run(
+                ["bash", "tools/ci/check_agent_canon_latest.sh"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=deferred_branch_pr", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_submodule_deferred_branch=canon-pr/local-work",
+                plan.stdout,
+            )
+            self.assertIn(
+                "agent_canon_plan_submodule_deferred_remote_branch=origin/canon-pr/local-work",
+                plan.stdout,
+            )
+            self.assertEqual(ensure_latest.returncode, 0, ensure_latest.stderr)
+            self.assertIn("agent_canon_latest=deferred_branch_pr", ensure_latest.stdout)
+            self.assertIn("agent_canon_latest_branch=canon-pr/local-work", ensure_latest.stdout)
+            self.assertIn(
+                "agent_canon_latest_remote_branch=origin/canon-pr/local-work",
+                ensure_latest.stdout,
+            )
+            self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr", latest.stdout)
+            self.assertIn(
+                "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest",
+                latest.stdout,
+            )
+            self.assertEqual(latest_check.returncode, 0, latest_check.stdout + latest_check.stderr)
+            self.assertIn("AGENT_CANON_LATEST=pass", latest_check.stdout)
+            self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
 
     def test_apply_updates_submodule_pin_with_untracked_root_file(self) -> None:
         """Apply should update the gitlink without requiring unrelated root cleanup."""
@@ -1502,6 +1699,9 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertEqual(merge.returncode, 0, merge.stderr)
             self.assertIn("agent_canon_merge_result=merged", merge.stdout)
+            self.assertIn("agent_canon_merge_source_sha=", merge.stdout)
+            self.assertIn("agent_canon_merge_remote_main_in_post_head=yes", merge.stdout)
+            self.assertIn("agent_canon_merge_remote_main_verified=yes", merge.stdout)
             self.assertIn("agent_canon_parent_pin_pending=yes", merge.stdout)
             self.assertIn("NEXT_ACTION=run_validation_then_push_current_agentcanon_branch", merge.stdout)
             self.assertTrue((submodule / "local-marker.txt").is_file())

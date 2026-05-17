@@ -1,7 +1,7 @@
 """Tests for dependency-free vector search."""
 
 # @dependency-start
-# responsibility Tests vector search indexing exclusions.
+# responsibility Tests vector search indexing exclusions and context expansion.
 # upstream implementation ../../tools/agent_tools/vector_search.py searches text surfaces
 # upstream design ../../tools/README.md documents vector search usage
 # @dependency-end
@@ -88,6 +88,117 @@ class VectorSearchTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["hits"], [])
             self.assertEqual(payload["indexed_files"], 1)
+
+    def test_context_expands_dependency_headers(self) -> None:
+        """Context mode should expand search hits through dependency manifests."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "tools").mkdir()
+            (root / "documents").mkdir()
+            (root / "tests").mkdir()
+            (root / "tools" / "search_tool.py").write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Implements alpha search entrypoint.",
+                        "# upstream design ../documents/search.md alpha search design",
+                        "# downstream implementation ../tests/test_search_tool.py validates search",
+                        "# @dependency-end",
+                        "def alpha_entry():",
+                        "    return alpha_helper()",
+                        "",
+                        "def alpha_helper():",
+                        "    return 1",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "documents" / "search.md").write_text(
+                "# Search Design\n",
+                encoding="utf-8",
+            )
+            (root / "tests" / "test_search_tool.py").write_text(
+                "from tools.search_tool import alpha_entry\n",
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--surface",
+                ".",
+                "--query",
+                "alpha_entry",
+                "--context",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            context_paths = {
+                (item["role"], item["path"]) for item in payload["context"]["paths"]
+            }
+            self.assertIn(("search_hit", "tools/search_tool.py"), context_paths)
+            self.assertIn(("declared_upstream", "documents/search.md"), context_paths)
+            self.assertIn(("declared_downstream", "tests/test_search_tool.py"), context_paths)
+
+    def test_context_expands_python_call_graph(self) -> None:
+        """Context mode should include direct callees and callers for focus symbols."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_dir = root / "python"
+            source_dir.mkdir()
+            (source_dir / "workflow.py").write_text(
+                "\n".join(
+                    [
+                        "def caller():",
+                        "    return alpha_entry()",
+                        "",
+                        "def alpha_entry():",
+                        "    return alpha_helper()",
+                        "",
+                        "def alpha_helper():",
+                        "    return 1",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--surface",
+                "python",
+                "--query",
+                "alpha_entry",
+                "--context",
+                "--symbol",
+                "alpha_entry",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            edge_pairs = {
+                (item["direction"], item["caller"], item["callee"])
+                for item in payload["context"]["python_edges"]
+            }
+            self.assertIn(
+                (
+                    "calls",
+                    "python/workflow.py:alpha_entry",
+                    "python/workflow.py:alpha_helper",
+                ),
+                edge_pairs,
+            )
+            self.assertIn(
+                (
+                    "called_by",
+                    "python/workflow.py:caller",
+                    "python/workflow.py:alpha_entry",
+                ),
+                edge_pairs,
+            )
 
 
 if __name__ == "__main__":

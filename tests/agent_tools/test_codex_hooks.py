@@ -6,7 +6,9 @@
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
+# upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
+# upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # @dependency-end
 
@@ -29,6 +31,8 @@ PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.p
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
+LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
+NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
@@ -253,6 +257,92 @@ class CodexHooksTest(unittest.TestCase):
             )
         return payload, log_entry
 
+    def _notebook_payload(self, source: str) -> str:
+        """Return one minimal notebook document."""
+        return json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "metadata": {},
+                        "source": "# Demo\n\nReadable notebook narrative for users.",
+                    },
+                    {
+                        "cell_type": "code",
+                        "execution_count": 1,
+                        "metadata": {},
+                        "outputs": [],
+                        "source": source,
+                    },
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        )
+
+    def _run_notebook_guard_with_changed_notebook(
+        self,
+        source: str,
+        hook_input: str,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        """Run notebook guard against one changed notebook in a temp repo."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            checker = temp_root / "tools" / "validation" / "notebook_quality.py"
+            checker.parent.mkdir(parents=True)
+            checker.write_text(
+                (PROJECT_ROOT / "tools" / "validation" / "notebook_quality.py").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            notebook_path = temp_root / "jupyter" / "demo.ipynb"
+            notebook_path.parent.mkdir()
+            notebook_path.write_text(
+                self._notebook_payload(
+                    "import matplotlib.pyplot as plt\nplt.plot([0], [0])\nplt.show()"
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            notebook_path.write_text(self._notebook_payload(source), encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(NOTEBOOK_QUALITY_GUARD)],
+                cwd=temp_root,
+                input=hook_input,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+        return payload, log_entry
+
     def test_config_enables_hooks_and_hooks_file_exists(self) -> None:
         """Codex hooks must be enabled from the project config layer."""
         config_text = CONFIG.read_text(encoding="utf-8")
@@ -275,7 +365,9 @@ class CodexHooksTest(unittest.TestCase):
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
 
+        self.assertIn("SessionStart", session_start["command"])
         self.assertIn("mcp_session_context.sh", session_start["command"])
+        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
         self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
@@ -286,9 +378,24 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("notebook_quality_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("notebook_quality_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
-        self.assertIn("SessionStart", session_start["command"])
-        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
+
+    def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
+        """Log surface guard should not consume tokens on a passing inventory check."""
+        result = subprocess.run(
+            [sys.executable, str(LOG_SURFACE_INVENTORY_GUARD)],
+            cwd=PROJECT_ROOT,
+            input=json.dumps({"hookEventName": "Stop"}),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.stdout, "")
 
     def test_mcp_context_hook_outputs_valid_additional_context(self) -> None:
         """The hook script should emit JSON Codex can add to model context."""
@@ -555,8 +662,10 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["baseline_ref"], "")
         self.assertEqual(log_entry["failed_count"], 1)
-        command = log_entry["commands"][0]
-        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", command["output_snippet"])
+        commands = cast(list[dict[str, object]], log_entry["commands"])
+        command = commands[0]
+        output_snippet = cast(str, command["output_snippet"])
+        self.assertNotIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
     def test_oop_readability_guard_allows_preexisting_findings_in_diff_mode(self) -> None:
         """OOP guard should use baseline filtering only when explicitly requested."""
@@ -569,10 +678,13 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["mode"], "diff")
         self.assertEqual(log_entry["baseline_ref"], "HEAD")
         self.assertEqual(log_entry["failed_count"], 0)
-        command = log_entry["commands"][0]
-        self.assertIn("--baseline-ref", command["command"])
-        self.assertIn("HEAD", command["command"])
-        self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", command["output_snippet"])
+        commands = cast(list[dict[str, object]], log_entry["commands"])
+        command = commands[0]
+        command_args = cast(list[str], command["command"])
+        output_snippet = cast(str, command["output_snippet"])
+        self.assertIn("--baseline-ref", command_args)
+        self.assertIn("HEAD", command_args)
+        self.assertIn("OOP_READABILITY_BASELINE=preexisting-only", output_snippet)
 
     def test_oop_readability_guard_skips_read_only_bash_payloads(self) -> None:
         """Bash tool names alone should not re-run OOP checks for read-only commands."""
@@ -762,6 +874,53 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
+    def test_notebook_quality_guard_blocks_test_like_notebook(self) -> None:
+        """Notebook hook should block notebooks that embed fine-grained tests."""
+        payload, log_entry = self._run_notebook_guard_with_changed_notebook(
+            "assert True\nplt.plot([0], [0])\nplt.show()",
+            json.dumps(
+                {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": "apply_patch",
+                }
+            ),
+        )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("Notebook quality hook", cast(str, payload["reason"]))
+        self.assertEqual(log_entry["event"], "PostToolUse")
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["finding_count"], 2)
+        self.assertEqual(log_entry["notebooks"], ["jupyter/demo.ipynb"])
+
+    def test_notebook_quality_guard_skips_read_only_bash_payloads(self) -> None:
+        """Read-only Bash payloads should not run notebook quality checks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "notebook.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(NOTEBOOK_QUALITY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "sed -n '1,20p' jupyter/demo.ipynb"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
     def test_skill_usage_logger_writes_prompt_and_stop_logs(self) -> None:
         """Skill usage hook should append local JSONL records when skills are observed."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -831,6 +990,12 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
+        self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
+        self.assertEqual(entries[1]["skill_source_fields"], ["last_assistant_message"])
+        self.assertEqual(entries[2]["observed_text_field_count"], 1)
+        self.assertEqual(entries[2]["observed_text_value_count"], 1)
+        self.assertTrue(all(entry["payload_key_count"] >= 2 for entry in entries))
+        self.assertTrue(all(entry["event_fallback"] is False for entry in entries))
 
     def test_skill_usage_logger_defaults_to_agentcanon_hook_result(self) -> None:
         """Default skill hook output should live under AgentCanon hook results."""
@@ -866,6 +1031,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
         self.assertEqual(entries[0]["hook_log_namespace"], "test-container")
+        self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
+        self.assertEqual(entries[0]["observed_text_field_count"], 1)
 
     def test_skill_usage_logger_skips_no_skill_payloads(self) -> None:
         """No-skill hook payloads should not dirty durable AgentCanon logs."""
@@ -898,6 +1065,56 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertFalse(log_path.exists())
 
+    def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
+        """Prompt feedback should be classified without storing raw prompt text."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_dir = root / "reports" / "agents" / "run-feedback"
+            log_path = root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": (
+                            "人間からのフィードバックを受ける機構が弱い。"
+                            "結果書き出しのスキルと入力プロンプトを解析して "
+                            "workflow_monitor.py と Agent Improvement Guide に "
+                            "ログに積む機構を組み込みたい。"
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report_dir),
+                },
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result.stdout, "")
+        self.assertNotIn("結果書き出し", json.dumps(entry, ensure_ascii=False))
+        self.assertEqual(entry["skills"], [])
+        self.assertIn("result-artifact-writeout", entry["candidate_skills"])
+        self.assertIn("agent-learning", entry["candidate_skills"])
+        self.assertIn("skill_usage_logger.py", entry["candidate_tools"])
+        self.assertIn("workflow_monitor.py", entry["candidate_tools"])
+        self.assertIn("generate_agent_improvement_guide.py", entry["candidate_tools"])
+        self.assertTrue(entry["prompt_feedback_detected"])
+        self.assertEqual(entry["feedback_action"], "prompt_repair")
+        self.assertIn("quality_gap", entry["feedback_labels"])
+        self.assertIn("repair_request", entry["feedback_labels"])
+        self.assertIn("missing_mechanism", entry["feedback_labels"])
+        self.assertGreaterEqual(entry["workflow_monitor_feedback_count"], 3)
+        self.assertIn("runtime_feedback=observed", monitoring)
+        self.assertIn("target=skill:result-artifact-writeout", monitoring)
+        self.assertIn("target=tool:workflow_monitor.py", monitoring)
+
     def test_skill_usage_logger_honors_results_dir_override(self) -> None:
         """Explicit overrides can route hook logs to a temporary local path."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -928,6 +1145,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
+        self.assertEqual(entries[0]["payload_key_count"], 2)
 
     def test_skill_usage_logger_records_workflow_monitor_events_when_report_dir_is_set(self) -> None:
         """Skill usage hook should reuse workflow_monitor.py for run-bundle evidence."""
@@ -960,6 +1178,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(entry["workflow_monitor_event_count"], 1)
+        self.assertEqual(entry["workflow_monitor_report_dir"], str(report_dir))
+        self.assertEqual(entry["skill_source_fields"], ["prompt"])
         self.assertIn(
             "skill_invocation=$agent-orchestration status=observed source=codex_hook",
             monitoring,
