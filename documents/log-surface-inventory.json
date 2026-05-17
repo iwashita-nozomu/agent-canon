@@ -332,7 +332,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_skill_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -340,7 +340,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_skills",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -348,7 +348,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_tool_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -356,7 +356,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_tools",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -364,7 +364,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_workflow_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -372,7 +372,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_workflows",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -380,7 +380,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "event",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -388,7 +388,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "event_fallback",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -396,7 +396,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "feedback_action",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -404,7 +404,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "feedback_labels",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -412,7 +412,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "feedback_targets",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -420,7 +420,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "hook_log_namespace",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -428,7 +428,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "hook_run_id",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -436,7 +436,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "observed_text_field_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -444,7 +444,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "observed_text_value_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -452,7 +452,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "payload_fingerprint",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -460,7 +460,39 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "payload_key_count",
-      "line": 304,
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "prompt_capture_status",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "prompt_char_count",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "prompt_excerpt_redacted",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "prompt_excerpt_truncated",
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -468,7 +500,15 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "prompt_feedback_detected",
-      "line": 304,
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "prompt_fingerprint",
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -476,7 +516,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "root",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -484,7 +524,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "skill_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -492,7 +532,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "skill_source_fields",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -500,7 +540,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "skills",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -508,7 +548,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "status",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -516,7 +556,55 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "timestamp",
-      "line": 304,
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_command_verb",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_input_fingerprint",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_input_key_count",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_input_keys",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_name",
+      "line": 398,
+      "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_log_helper",
+      "field": "tool_selection_kind",
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -524,7 +612,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "workflow_monitor_event_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -532,7 +620,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "workflow_monitor_feedback_count",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -540,7 +628,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "workflow_monitor_report_dir",
-      "line": 304,
+      "line": 398,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -548,7 +636,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 224,
+      "line": 316,
       "path": ".codex/hooks/skill_usage_logger.py",
       "surface": "hook"
     },
@@ -2580,7 +2668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 432,
+      "line": 984,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2588,7 +2676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 434,
+      "line": 986,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2596,7 +2684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 436,
+      "line": 988,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2604,7 +2692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 435,
+      "line": 987,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2612,7 +2700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 433,
+      "line": 985,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },

@@ -112,7 +112,8 @@ or high-risk review. Profiles do not waive workflow gates.
 - Codex-owned surface は `[mcp_servers.repo_mcp_server]` の registration、project trust、hook context、apps / external connectors / tool availability です。
 - AgentCanon repo MCP は repo context / goal loop status / goal plan 専用です。file edit、GitHub 操作、shell 実行、web access、Codex apps の代替を `repo_mcp_server` に実装しません。
 - MCP server startup timeout は 20 秒、tool call timeout は 300 秒にします。repo-local graph / status 系 tool が少し重くても、即 timeout で落とさないためです。
-- repository task では、ユーザーが MCP を明示していなくても、intake で `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
+- 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答します。
+- repository task へ切り替えるのは、ユーザーが repo state 確認、file edit、validation、PR / issue 処理、CI 確認、または実装作業を求めた場合です。その時だけ、ユーザーが MCP を明示していなくても intake で `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` を実行します。
 - inventory が pass した task では、repo root / status / goal loop status / goal plan / MCP-covered context checks で repo MCP tools を優先候補にします。
 - current `repo_mcp_server` は repo root / status / goal.loop_status / goal.plan / context check 専用で、file edit tool は提供しません。
 - MCP が pass している通常作業では、この制限を user update で毎回説明しません。MCP startup / inventory / tool mismatch が作業判断に影響する場合、または user が編集手段を質問した場合だけ説明します。
@@ -123,16 +124,16 @@ or high-risk review. Profiles do not waive workflow gates.
 ## MCP Hook Context
 
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
-- `hooks.json` は `SessionStart` と `UserPromptSubmit` で `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。
+- `hooks.json` は `SessionStart` だけで `hooks/mcp_session_context.sh` を起動し、MCP preflight の追加 context を Codex に渡します。`UserPromptSubmit` では MCP context hook を起動しません。普通の相談を毎回 repository task に昇格させないためです。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
-- `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。既定では AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。skill、candidate、feedback が観測されない payload は durable log を汚さず skip します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。raw prompt は保存せず、payload fingerprint と分類結果だけを残します。
+- `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行し、既存 finding を含む current finding があれば中間作業でも block します。実装ミスにつながるため、closeout まで先送りしません。
 - `PostToolUse` は `hooks/notebook_quality_guard.py` でも changed notebook を確認し、細かい assertion / pytest / unittest / `test_` helper / stored error output を含む notebook、または visualization を持たない notebook を block します。notebook は部分実行できる実用 demo として保ち、細かい検証は `tests/` へ置きます。
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を継続させます。
 - `Stop` でも `hooks/oop_readability_guard.py` と `hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば completion を block します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
 - `hooks/oop_readability_guard.py` と `hooks/notebook_quality_guard.py` は実行ごとに AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/` 配下へ `hook_run_id`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:`、host/repo hash fallback の順で決まります。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` で出力先を差し替えられます。
-- hook の役割は「MCP をユーザーが明示しなくても repo task の標準 preflight として扱う context 注入」です。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
+- hook の役割は「repo task では MCP を標準 preflight として扱う」ことを session 開始時に思い出させることです。普通の相談、壁打ち、routing-only advice、説明だけの turn を repo task に変換してはいけません。完了 gate は引き続き `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server` と run bundle evidence で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。

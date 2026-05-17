@@ -286,10 +286,12 @@ tools, or memory.
 `generate_agent_runtime_dashboard.py` is the read-only viewing entrypoint for
 that same evidence tree. It writes a Markdown dashboard showing the canonical
 log locations, hook namespaces, hook entry counts, skill usage, prompt routing
-candidates, human feedback labels, eval report families, and open/closed issue
-counts. The standalone AgentCanon GitHub Actions workflow publishes the
-dashboard to the workflow Step Summary and uploads it as an artifact; template
-and derived repositories do not publish their own runtime dashboard copies.
+candidates, per-skill eval failure rates, workflow-attributed hook firing,
+prompt/tool-selection evidence, token comparison coverage, human feedback
+labels, eval report families, and open/closed issue counts. The standalone
+AgentCanon GitHub Actions workflow publishes the dashboard to the workflow Step
+Summary and uploads it as an artifact; template and derived repositories do not
+publish their own runtime dashboard copies.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules
