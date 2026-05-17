@@ -25,7 +25,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -368,7 +368,7 @@ def report_status(results: Sequence[CaseResult]) -> str:
 
 def make_run_id(seed: str) -> str:
     """Return a unique local LLM eval run id."""
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     digest = hashlib.sha256(f"{timestamp}\n{seed}".encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
     return f"{RUN_ID_PREFIX}-{timestamp}-{digest}"
 
