@@ -67,6 +67,7 @@ paths = [
   "documents/runtime-profiles-and-check-matrix.md",
   "documents/template-agent-canon-audit-resolution.md",
   "documents/tool-skill-routing-refactor.md",
+  "documents/rust-agent-tool-migration.md",
   "documents/github-first-module-and-devcontainer-policy.md",
   "documents/agent-canon-licensing-policy.md",
   "documents/SKILL_IMPLEMENTATION_GUIDE.md",

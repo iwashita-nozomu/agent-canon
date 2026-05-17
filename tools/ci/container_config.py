@@ -3,6 +3,7 @@
 # responsibility Validates Dockerfile, runtime pack, and devcontainer configuration.
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -44,6 +45,9 @@ FORBIDDEN_DOCKERFILE_PATTERNS = (
     (re.compile(r"gh\s+--version"), "dockerfile-must-not-smoke-check-gh"),
     (re.compile(r"@openai/codex"), "dockerfile-must-not-install-codex-cli"),
     (re.compile(r"codex\s+--version"), "dockerfile-must-not-smoke-check-codex"),
+    (re.compile(r"\brustup\b"), "dockerfile-must-not-install-rustup"),
+    (re.compile(r"\bcargo\s+(build|install|test|clippy|fmt)\b"), "dockerfile-must-not-run-cargo"),
+    (re.compile(r"\brustc\s+--version\b"), "dockerfile-must-not-smoke-check-rustc"),
     (
         re.compile(r"npm\s+install\s+-g\s+@openai/codex"),
         "dockerfile-must-not-install-codex-via-npm",
@@ -58,6 +62,13 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "cli.github.com/packages",
     "apt_install gh",
     "npm install -g @openai/codex",
+    "rustup toolchain install",
+    "rustfmt",
+    "clippy",
+    "rust-analyzer",
+    "cargo build --release",
+    "/opt/agent-canon/bin/agent-canon",
+    "/usr/local/bin/agent-canon",
     "gh --version",
     "codex --version",
 )
@@ -144,14 +155,12 @@ def require_string(
     key: str,
     source: str,
     section: str,
-    findings: list[Finding],
-) -> str:
+) -> tuple[str, Finding | None]:
     """Read one required non-empty string field."""
     value = table.get(key)
     if isinstance(value, str) and value:
-        return value
-    findings.append(Finding("invalid_manifest", source, f"{section}.{key}-must-be-string"))
-    return ""
+        return value, None
+    return "", Finding("invalid_manifest", source, f"{section}.{key}-must-be-string")
 
 
 def require_string_list(
@@ -159,19 +168,15 @@ def require_string_list(
     key: str,
     source: str,
     section: str,
-    findings: list[Finding],
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], Finding | None]:
     """Read one optional list of strings."""
     value = table.get(key)
     if value is None:
-        return ()
+        return (), None
     sequence = as_sequence(value)
     if sequence is None or not all(isinstance(item, str) for item in sequence):
-        findings.append(
-            Finding("invalid_manifest", source, f"{section}.{key}-must-be-string-list")
-        )
-        return ()
-    return tuple(cast(Sequence[str], sequence))
+        return (), Finding("invalid_manifest", source, f"{section}.{key}-must-be-string-list")
+    return tuple(cast(Sequence[str], sequence)), None
 
 
 def is_safe_repo_relative(path_text: str) -> bool:
@@ -213,18 +218,34 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     if pack is None or smoke is None or runtime is None:
         return None, [Finding("invalid_manifest", source, "pack-smoke-runtime-required")]
 
-    name = require_string(pack, "name", source, "pack", findings)
-    dockerfile = require_string(pack, "dockerfile", source, "pack", findings)
-    context = require_string(pack, "context", source, "pack", findings)
-    image_tag = require_string(pack, "image_tag", source, "pack", findings)
+    required_pack_fields = {
+        "name": "",
+        "dockerfile": "",
+        "context": "",
+        "image_tag": "",
+    }
+    for field_name in required_pack_fields:
+        value, finding = require_string(pack, field_name, source, "pack")
+        required_pack_fields[field_name] = value
+        if finding is not None:
+            findings.append(finding)
+    name = required_pack_fields["name"]
+    dockerfile = required_pack_fields["dockerfile"]
+    context = required_pack_fields["context"]
+    image_tag = required_pack_fields["image_tag"]
     target_value = pack.get("target")
     target = target_value if isinstance(target_value, str) else None
     if target_value is not None and target is None:
         findings.append(Finding("invalid_manifest", source, "pack.target-must-be-string"))
 
-    require_string_list(smoke, "commands", source, "smoke", findings)
-    require_string_list(runtime, "env", source, "runtime", findings)
-    require_string_list(runtime, "mounts", source, "runtime", findings)
+    for table, key, section in (
+        (smoke, "commands", "smoke"),
+        (runtime, "env", "runtime"),
+        (runtime, "mounts", "runtime"),
+    ):
+        _, finding = require_string_list(table, key, source, section)
+        if finding is not None:
+            findings.append(finding)
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     if not isinstance(workdir, str):

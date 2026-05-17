@@ -1,3 +1,15 @@
+<!--
+@dependency-start
+responsibility Documents Rust migration policy for AgentCanon tools.
+upstream design README.md AgentCanon documentation index
+upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+downstream environment ../.devcontainer/post-create.sh installs Rust toolchain and CLI
+downstream implementation ../rust/agent-canon/src/main.rs Rust CLI entrypoint
+downstream implementation ../rust/agent-canon/src/migration_audit.rs validates migration boundaries
+downstream implementation ../tools/bin/agent-canon stable shell wrapper
+@dependency-end
+-->
+
 # Rust Agent Tool Migration
 
 ## Goals
@@ -19,7 +31,9 @@ Required components:
 - clippy
 - rust-analyzer
 
-The shared DevContainer installs Rust and builds the canonical AgentCanon CLI into:
+The shared DevContainer installs Rust, publishes the Rust toolchain on the
+container PATH for non-interactive `devcontainer exec` commands, and builds the
+canonical AgentCanon CLI into:
 
 ```text
 /opt/agent-canon/bin/agent-canon
@@ -89,27 +103,33 @@ Keep these Python-first until behavior stabilizes:
 
 ## Rust Migration Audit
 
-The first Rust command is:
+The first Rust command audits an AgentCanon source root:
 
 ```bash
 agent-canon rust-migration-audit --root .
 ```
 
+In a template or derived repository, the AgentCanon source root is the submodule:
+
+```bash
+agent-canon rust-migration-audit --root vendor/agent-canon
+```
+
 The audit checks:
 
-- undocumented migrations
-- duplicate migration targets
-- missing Rust crates
-- missing wrappers
-- stale Python-only ownership
-- migration inventory drift
+- the Rust migration document, crate manifest, CLI entrypoint, audit module,
+  and stable wrapper exist;
+- `.devcontainer/post-create.sh` installs the Rust toolchain, developer
+  components, release CLI, and `/usr/local/bin/agent-canon` entrypoint;
+- `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
+  convenience path.
 
 ## Validation
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
+cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path rust/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
