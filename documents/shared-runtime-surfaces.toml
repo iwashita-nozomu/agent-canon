@@ -251,9 +251,16 @@ local_override_allowed = false
 paths = [
   ".github/workflows/agent-coordination.yml",
   ".github/workflows/agent-improvement-guide.yml",
-  ".github/workflows/agent-runtime-dashboard.yml",
   ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
 ]
+
+[[surface]]
+path = ".github/workflows/agent-runtime-dashboard.yml"
+mode = "standalone_only"
+source = ".github/workflows/agent-runtime-dashboard.yml"
+owner = "agent-canon-standalone"
+class = "standalone_only"
+local_override_allowed = false
 
 [[surface]]
 path = ".github/scripts/checkout_agent_canon_submodule.sh"
