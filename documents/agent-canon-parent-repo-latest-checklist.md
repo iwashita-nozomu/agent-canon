@@ -2,8 +2,8 @@
 <!--
 @dependency-start
 responsibility Documents latest-state checklist for parent repositories that vendor AgentCanon.
+upstream design ./agent-canon-subtree-migration.md submodule and legacy subtree update policy
 upstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
-upstream design ./agent-canon-subtree-migration.md legacy subtree compatibility appendix
 downstream design ./agent-canon-update-tasks.toml shared parent-repo update TODO manifest
 downstream implementation ../tools/agent_tools/agent_canon_preflight.py emits checklist evidence at task start
 downstream implementation ../tools/agent_tools/agent_canon_update_todos.py manages parent update TODO state

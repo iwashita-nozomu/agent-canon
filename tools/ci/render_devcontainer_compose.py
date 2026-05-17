@@ -65,9 +65,12 @@ def main() -> int:
     pack = load_or_default_pack(args.pack)
     output_path = workspace_path(args.output)
     features = detect_host_runtime_features()
+    devcontainer_subnet = os.environ.get("DEVCONTAINER_SUBNET", "192.168.248.16/28")
+    devcontainer_gateway = os.environ.get("DEVCONTAINER_GATEWAY", "192.168.248.17")
     project_name = os.environ.get("DEVCONTAINER_PROJECT_NAME") or default_project_name(WORKSPACE_ROOT)
 
     volume_lines = [f"      - ..:{pack.runtime.workspace_mount}:cached"]
+    volume_lines.extend(f"      - {mount}" for mount in pack.runtime.mounts)
     if features.has_mnt_git:
         volume_lines.append("      - /mnt/git:/mnt/git")
     if features.has_host_codex_home:
@@ -116,6 +119,14 @@ def main() -> int:
         [
             "    environment:",
             *environment_lines,
+            "    networks:",
+            "      default:",
+            "networks:",
+            "  default:",
+            "    ipam:",
+            "      config:",
+            f"        - subnet: {devcontainer_subnet}",
+            f"          gateway: {devcontainer_gateway}",
             "",
         ]
     )
@@ -131,6 +142,8 @@ def main() -> int:
         f" mount_host_gh={int(features.has_host_gh_config)}"
         f" mount_host_ssh={int(features.has_host_ssh_dir)}"
         f" forward_ssh_agent={int(features.ssh_auth_sock is not None)}"
+        f" subnet={devcontainer_subnet}"
+        f" gateway={devcontainer_gateway}"
         f" pack={args.pack}"
     )
     return 0
