@@ -32,6 +32,7 @@ GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
     "agent-orchestration": ("どのスキル", "どのskill", "workflow=", "routing", "フロー"),
+    "md-style-check": ("markdown", "マークダウン", "md-style", "docs-check", "markdownlint"),
     "result-artifact-writeout": ("結果書き出し", "結果を書き出", "result writeout", "artifact"),
     "oop-readability-check": ("oop", "readability", "オブジェクト指向"),
 }
@@ -42,11 +43,16 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
+    "check_markdown_lint.py": ("check_markdown_lint.py", "markdownlint"),
+    "check_markdown_math.py": ("check_markdown_math.py", "markdown math"),
+    "format_markdown.py": ("format_markdown.py", "markdown format"),
     "skill_usage_logger.py": ("入力プロンプト", "prompt", "skill usage", "skill_usage"),
     "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
     "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
     "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
+    "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "markdownlint"),
 }
 PROMPT_EXCERPT_LIMIT = 600
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
