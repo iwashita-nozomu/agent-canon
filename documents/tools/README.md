@@ -95,9 +95,12 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     読むだけなら `agent-canon mcp-preflight-policy --request-kind
     github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
   - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
-    repository task では `agent-canon mcp-inventory --root . --require
-    repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
-    surface での繰り返し確認を cache hit にします。
+    MCP evidence が必要な workflow、または MCP surface を変更する task
+    で `agent-canon mcp-inventory --root . --require repo_mcp_server
+    --session-cache` を使い、同じ session / unchanged MCP surface での
+    繰り返し確認を cache hit にします。local Cargo が lockfile を読めない
+    環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime
+    behavior が scope でない限り Python / shell gate で検証を続けます。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`

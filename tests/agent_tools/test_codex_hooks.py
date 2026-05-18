@@ -3,8 +3,8 @@
 # @dependency-start
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
-# upstream implementation ../../.codex/hooks.json declares MCP context hooks
-# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
+# upstream implementation ../../.codex/hooks.json declares active guardrail hooks
+# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits optional MCP context JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
@@ -353,11 +353,16 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(HOOKS_JSON.exists())
         self.assertTrue(HOOK_SCRIPT.exists())
 
-    def test_hooks_json_wires_mcp_context_hook(self) -> None:
-        """Only session startup should point at the repo-local MCP context script."""
+    def test_hooks_json_does_not_wire_mcp_context_hook(self) -> None:
+        """MCP context is not a startup hook; active hooks stay guardrail-only."""
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
 
-        session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
+        session_start_hooks = hooks["hooks"].get("SessionStart", [])
+        session_start_commands = [
+            hook["command"]
+            for group in session_start_hooks
+            for hook in group.get("hooks", [])
+        ]
         prompt_hooks = hooks["hooks"]["UserPromptSubmit"][0]["hooks"]
         prompt_commands = [hook["command"] for hook in prompt_hooks]
         post_tool = hooks["hooks"]["PostToolUse"][0]
@@ -365,8 +370,9 @@ class CodexHooksTest(unittest.TestCase):
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
 
-        self.assertIn("SessionStart", session_start["command"])
-        self.assertIn("mcp_session_context.sh", session_start["command"])
+        self.assertFalse(
+            any("mcp_session_context.sh" in command for command in session_start_commands)
+        )
         self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
@@ -415,7 +421,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("Do not run check_mcp_inventory.py", hook_output["additionalContext"])
         self.assertIn("repo_mcp_server", hook_output["additionalContext"])
         self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("even when the user did not mention MCP", hook_output["additionalContext"])
+        self.assertIn("manual context helper only", hook_output["additionalContext"])
+        self.assertIn("mcp_preflight_unavailable", hook_output["additionalContext"])
         self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])
         self.assertIn("goal.loop_status", hook_output["additionalContext"])
         self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])

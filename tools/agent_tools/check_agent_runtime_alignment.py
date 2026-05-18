@@ -136,18 +136,25 @@ def validate_project_config() -> None:
 
 
 def validate_project_hooks() -> None:
-    """Check that project hooks cover context, safety, and goal completion guardrails."""
+    """Check that project hooks cover active safety and completion guardrails."""
     hooks_payload = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
     hooks = hooks_payload.get("hooks", {})
     ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
 
-    for event in ("SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"):
+    for event in ("UserPromptSubmit", "PostToolUse", "Stop"):
         entries = hooks.get(event, [])
         ensure(isinstance(entries, list) and entries, f"{event} hook must be configured")
 
     hooks_text = HOOKS_JSON_PATH.read_text(encoding="utf-8")
+    ensure(
+        "mcp_session_context.sh" not in hooks_text,
+        "mcp_session_context.sh must not be wired as a startup hook",
+    )
+    ensure(
+        (ROOT / ".codex" / "hooks" / "mcp_session_context.sh").is_file(),
+        "mcp_session_context.sh must exist as an optional context helper",
+    )
     for hook_script in (
-        "mcp_session_context.sh",
         "prompt_secret_guard.py",
         "goal_completion_guard.py",
         "oop_readability_guard.py",
