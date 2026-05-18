@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Updates latest experiment result pointers.
-# upstream design documents/result-log-retention-and-visualization.md
-# upstream design documents/experiment-report-style.md
-# downstream tests tests/tools/test_update_latest_result.py
+# upstream design ../../documents/result-log-retention-and-visualization.md defines latest-result pointer policy.
+# upstream design ../../documents/experiment-report-style.md defines experiment report artifact layout.
+# downstream implementation ../../tests/tools/test_update_latest_result.py validates latest result pointer updates.
 # @dependency-end
 """Update LATEST.json and LATEST.md for experiment result roots."""
 from __future__ import annotations
