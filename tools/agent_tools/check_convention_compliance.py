@@ -142,6 +142,14 @@ TOOL_GATES = {
             "documents/tools/README.md",
         ),
     ),
+    "import_responsibility": (
+        "tools/agent_tools/import_responsibility.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "documents/responsibility-scope-management.md",
+            "documents/coding-conventions-python.md",
+        ),
+    ),
     "github_workflow_pr_flow": (
         "tools/ci/check_github_workflows.py",
         (

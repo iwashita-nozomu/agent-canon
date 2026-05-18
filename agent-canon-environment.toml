@@ -5,6 +5,7 @@
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
 # downstream implementation tools/install_llama_cpp.sh installs local LLM llama.cpp tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
+# downstream implementation rust/agent-canon/src/local_llm.rs implements the local LLM CLI entrypoint
 # downstream implementation rust/agent-canon/src/mcp_inventory.rs implements Rust MCP preflight tooling
 # @dependency-end
 
@@ -48,6 +49,8 @@ validation_commands = [
   "agent-canon --version",
   "agent-canon rust-migration-audit --root .",
   "agent-canon rust-migration-plan --root . --limit 12",
+  "agent-canon local-llm --help",
+  "agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs",
 ]
 
 [compiled_tools.llama_cpp]
@@ -107,3 +110,8 @@ llama_cli = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli"
 llama_server = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server"
 default_model = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
 scope = "single-file responsibility analysis only"
+primary_cli = "agent-canon local-llm classify-responsibility"
+search_cli = "agent-canon local-llm search"
+index_cli = "agent-canon local-llm build-index"
+eval_cli = "agent-canon local-llm eval"
+compatibility_python_entrypoint = "tools/agent_tools/file_responsibility_llm.py"

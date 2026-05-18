@@ -9,6 +9,9 @@ upstream design ../responsibility-scope.toml machine-readable repo-local scope m
 downstream design templates/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../tools/catalog.yaml structured tool ownership
 downstream implementation ../tools/agent_tools/responsibility_scope.py validates scope coverage
+downstream implementation ../tools/agent_tools/import_responsibility.py validates local import ownership
+downstream implementation ../.codex/hooks/library_implementation_guard.py blocks protected external dependency rewrites
+downstream implementation ../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 downstream implementation ../tools/agent_tools/tool_drift.py validates scope/tool trace links
 @dependency-end
 -->
@@ -25,6 +28,12 @@ Each scope declares:
 - `paths`: path patterns covered by the scope.
 - `protecting_tools`: checkers or workflow tools that keep the scope valid.
 - `issues`: durable local issues that currently drive or explain the scope.
+
+Each `[[import_rule]]` declares which local Python scope imports are allowed:
+
+- `source`: the responsibility scope of the importing file.
+- `targets`: responsibility scopes that the source scope may import when the
+  import resolves to a local repository file.
 
 ## Owner Classes
 
@@ -44,13 +53,36 @@ Each scope declares:
 
 `tools/agent_tools/responsibility_scope.py` validates the manifest. It fails
 when a required top-level surface has no scope, a scope names a missing tool, a
-tool is not present in `tools/catalog.yaml`, or an issue link is stale.
+tool is not present in `tools/catalog.yaml`, an issue link is stale, or an
+`[[import_rule]]` points at an unknown scope.
 
 Use it before adding a new checker, hook, skill, workflow, or issue family:
 
 ```bash
 python3 tools/agent_tools/responsibility_scope.py --root .
 ```
+
+`tools/agent_tools/import_responsibility.py` uses the same manifest for code
+imports. It parses Python AST, flags unused imported aliases and wildcard
+imports, resolves local imports to files when possible, and rejects source-scope
+to target-scope crossings that are not present in `[[import_rule]]`.
+
+```bash
+python3 tools/agent_tools/import_responsibility.py --root .
+python3 tools/agent_tools/import_responsibility.py --root . --changed
+```
+
+Edit-time hooks use the same ownership model for two common failure modes:
+
+- `.codex/hooks/library_implementation_guard.py` blocks direct rewrites of
+  vendored or installed library implementation files. External code changes
+  must be a wrapper / adapter, fork / upstream patch, or manifest-backed vendor
+  import rather than an in-place patch to library internals.
+- `.codex/hooks/helper_first_guard.py` blocks helper-like function additions
+  that do not carry ownership evidence such as a test, issue, docs, or
+  responsibility-scope update. Its JSONL records include role, candidate rule,
+  judgment rule, incoming count, and specialization so prompt and skill evals
+  can identify where agents started from helpers instead of an owning contract.
 
 For template or derived repositories, run it from the parent root. The tool
 expects the parent repository to carry its own top-level

@@ -17,8 +17,17 @@ tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 installed_binary="${tools_home}/agent-canon/bin/agent-canon"
 legacy_binary="/opt/agent-canon/bin/agent-canon"
 
+if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
+  # shellcheck disable=SC1091
+  . "${HOME}/.cargo/env"
+fi
+
 if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
   installed_binary="$legacy_binary"
+fi
+
+if [ "${1:-}" = "local-llm" ] && command -v cargo >/dev/null 2>&1; then
+  exec cargo run --manifest-path "$manifest" -- "$@"
 fi
 
 if [ -x "$installed_binary" ]; then

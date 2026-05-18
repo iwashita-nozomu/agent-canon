@@ -68,8 +68,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("tools/agent_tools/search.py --purpose", result.stdout)
-        self.assertIn("tools/agent_tools/search_index.py build", result.stdout)
+        self.assertIn("agent-canon local-llm search --purpose", result.stdout)
+        self.assertIn("agent-canon local-llm build-index", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""

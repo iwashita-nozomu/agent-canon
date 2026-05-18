@@ -37,12 +37,38 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         )
 
         self.assertIn("TOOL_REJECTION_PREFLIGHT=warn", result.stdout)
+        self.assertIn("gate:cause_investigation_guard", result.stdout)
+        self.assertIn("gate:import_responsibility", result.stdout)
+        self.assertIn("gate:module_boundary_guard", result.stdout)
+        self.assertIn("gate:helper_first_guard", result.stdout)
         self.assertIn("gate:oop_readability_guard", result.stdout)
         self.assertIn("gate:helper_inventory_guard", result.stdout)
         self.assertIn("gate:style_checker_guard", result.stdout)
         self.assertIn("gate:dependency_review", result.stdout)
         self.assertIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
+
+    def test_vendor_library_path_predicts_library_guard(self) -> None:
+        """Vendored dependency implementation edits should route to library guard."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "vendor/skills/example/SKILL.md",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("library_implementation_guard", gates)
+        self.assertNotIn("tool_catalog", gates)
 
     def test_github_workflow_path_predicts_workflow_check(self) -> None:
         """Workflow edits under GitHub paths should route to the workflow checker."""

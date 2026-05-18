@@ -10,6 +10,7 @@ upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention tr
 upstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility scope gate
 upstream implementation ../../tools/agent_tools/issue_sync.py local/GitHub issue sync gate
 upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval accumulation gate
+upstream implementation ../../rust/agent-canon/src/local_llm.rs local LLM Rust CLI gate
 upstream implementation ../../tools/agent_tools/local_llm_eval.py local LLM responsibility eval gate
 upstream design ../../tools/catalog.yaml structured tool catalog
 upstream design ../../issues/README.md durable operational finding storage
@@ -175,7 +176,7 @@ python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
 python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/local_llm_eval.py
+tools/bin/agent-canon local-llm eval
 python3 tools/ci/check_github_workflows.py
 bash tools/ci/run_docs_checks.sh
 bash tools/ci/run_all_checks.sh --quick
@@ -200,7 +201,7 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - `python3 tools/agent_tools/responsibility_scope.py`
 - `python3 tools/agent_tools/issue_sync.py`
 - `python3 tools/agent_tools/eval_accumulation_check.py`
-- `python3 tools/agent_tools/local_llm_eval.py`
+- `tools/bin/agent-canon local-llm eval`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI

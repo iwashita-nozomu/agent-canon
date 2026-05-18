@@ -34,7 +34,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
-    "documents/coding-conventions-python.md": "python\n",
+    "documents/coding-conventions-python.md": "python import_responsibility.py\n",
     "documents/coding-conventions-cpp.md": "cpp\n",
     "documents/coding-conventions-project.md": "project container_config.py\n",
     "documents/coding-conventions-house-style.md": "house\n",
@@ -67,8 +67,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
     ),
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
-    "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py\n",
-    "tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py\n",
+    "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
+    "tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Close-Out Prohibitions\n"
         "user-facing completion\n"
@@ -120,7 +121,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "tools/ci/run_all_checks.sh": (
         "check_hardcoded_numbers.py check_static_any.py "
-        "check_log_helper_names.py check_convention_compliance.py "
+        "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py\n"
     ),
@@ -134,6 +135,7 @@ MINIMAL_AGENT_TOOLS = (
     "check_hardcoded_numbers.py",
     "check_static_any.py",
     "check_log_helper_names.py",
+    "import_responsibility.py",
     "evaluate_skill_workflow_prompts.py",
     "evaluate_agent_run.py",
     "check_convention_compliance.py",

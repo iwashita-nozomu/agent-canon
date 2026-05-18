@@ -9,8 +9,9 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/c
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation ../../tools/agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
-downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
+downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
+downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
+downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
@@ -37,19 +38,22 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
 - `tools/agent_tools/responsibility_scope.py`
   - top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub、vendor の責務範囲と protecting tool を固定します。
+- `tools/agent_tools/import_responsibility.py`
+  - Python import の未使用 alias、wildcard import、local import の responsibility-scope 越境を検査します。
+  - 越境許可は repo top-level `responsibility-scope.toml` の `[[import_rule]]` に書き、reviewer の推測にしません。
 - `tools/agent_tools/issue_sync.py`
   - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
 - `tools/agent_tools/eval_accumulation_check.py`
   - `agents/evals/results/` の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
-- `tools/agent_tools/file_responsibility_llm.py`
-  - llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
-- `tools/agent_tools/local_llm_eval.py`
+- `agent-canon local-llm classify-responsibility`
+  - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `agent-canon local-llm eval`
   - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
 - `tools/agent_tools/evaluate_report_quality.py`
   - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
-- `tools/agent_tools/search.py`
+- `agent-canon local-llm search`
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
-- `tools/agent_tools/search_index.py`
+- `agent-canon local-llm build-index`
   - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
 - `tools/agent_tools/route.py --area search`
   - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
@@ -98,6 +102,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     repository task では `agent-canon mcp-inventory --root . --require
     repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
     surface での繰り返し確認を cache hit にします。
+  - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
+    入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
+    Python 実装は互換 engine として残します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -194,8 +201,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 例:
 
 ```bash
-python3 tools/agent_tools/search.py --purpose "dependency header graph tool"
-python3 tools/agent_tools/search.py --purpose "github cli validation" --providers llm,tool,vector
+agent-canon local-llm search --purpose "dependency header graph tool"
+agent-canon local-llm search --purpose "github cli validation" --providers llm,tool,vector
 python3 tools/agent_tools/route.py --area search
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
@@ -212,9 +219,15 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
 - `tools/agent_tools/reference_materializer.py`
   - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
   - `reference_capture_guard.py` の未登録 URL block を解消する canonical tool です。PDF の代わりに同等 HTML を参照した場合も、HTML source URL を Markdown reference に登録します。
+- `.codex/hooks/cause_investigation_guard.py`
+  - `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。
+  - `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を含む run artifact、issue、または design note が無い code edit を block し、log に `cause_evidence_status` と `code_paths` を残します。
 - `tools/agent_tools/helper_function_inventory.py`
-  - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
+  - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。
+  - `redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
   - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
+  - `helper_first_guard.py` は `helper_function_inventory.py --changed --baseline-ref HEAD --format json` の record を読み、test / docs / issue / responsibility-scope などの ownership evidence がない helper-like function 追加を block します。log には accepted / blocked の両方を分析できる `helper_candidate_records` と、blocking subset の `helper_first_records` を残し、prompt / skill eval の改善材料にします。
+  - `library_implementation_guard.py` は `vendor/**`、`site-packages`、`node_modules`、`responsibility-scope.toml` の `external_dependency` scope を protected library implementation として扱い、既存 file の直接 rewrite を block します。外部実装は wrapper / adapter、fork / upstream patch、または manifest-backed vendor import で扱います。
 - `tools/agent_tools/vendor_skill_adapters.py`
   - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
   - GitHub 由来の skill では `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致を検査し、外部 repo が root や canonical skill path に直接入るのを防ぎます。

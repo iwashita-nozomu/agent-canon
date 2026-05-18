@@ -7,7 +7,8 @@ upstream design responsibility-scope-management.md responsibility scope policy
 upstream design rust-agent-tool-migration.md compiled tool installation boundary
 upstream design ../CONTAINER_OPERATIONS.md devcontainer and Dockerfile ownership boundary
 downstream environment ../.devcontainer/post-create.sh installs llama.cpp under AGENT_CANON_TOOLS_HOME
-downstream implementation ../tools/agent_tools/file_responsibility_llm.py runs single-file advisory analysis
+downstream implementation ../rust/agent-canon/src/local_llm.rs runs the Rust CLI single-file advisory analysis
+downstream implementation ../tools/agent_tools/file_responsibility_llm.py keeps the Python compatibility prompt helper
 downstream implementation ../tests/agent_tools/test_file_responsibility_llm.py tests prompt and scope limits
 @dependency-end
 -->
@@ -51,18 +52,21 @@ the repository.
 ## Command
 
 ```bash
-python3 tools/agent_tools/file_responsibility_llm.py path/to/file.py
+agent-canon local-llm classify-responsibility path/to/file.py
 ```
 
 Dry prompt inspection:
 
 ```bash
-python3 tools/agent_tools/file_responsibility_llm.py \
+agent-canon local-llm classify-responsibility \
   --print-prompt \
   path/to/file.py
 ```
 
-The command rejects directories and multiple files. It emits
+The Rust CLI is the canonical operator entrypoint. The Python
+`tools/agent_tools/file_responsibility_llm.py` entrypoint remains only as a
+compatibility helper for existing eval and index code until those internals are
+ported or removed. The command rejects directories and multiple files. It emits
 `FILE_RESP_LLM_SCOPE=single_file` so downstream logs can tell this is not a
 repo-wide analyzer.
 

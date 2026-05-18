@@ -1,11 +1,13 @@
 // @dependency-start
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
+// downstream implementation local_llm.rs routes local LLM responsibility, search, index, and eval commands
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation mcp_inventory.rs checks MCP preflight scope and inventory
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // @dependency-end
 
+mod local_llm;
 mod mcp_inventory;
 mod migration_audit;
 mod rust_migration_plan;
@@ -36,9 +38,13 @@ fn main() {
         std::process::exit(mcp_inventory::run_policy(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "local-llm" {
+        std::process::exit(local_llm::run(&args[2..]));
+    }
+
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind>"
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command>"
     );
     std::process::exit(2);
 }

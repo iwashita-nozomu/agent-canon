@@ -13,6 +13,7 @@ const REQUIRED_PATHS: &[&str] = &[
     "agent-canon-environment.toml",
     "rust/agent-canon/Cargo.toml",
     "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/local_llm.rs",
     "rust/agent-canon/src/mcp_inventory.rs",
     "rust/agent-canon/src/migration_audit.rs",
     "rust/agent-canon/src/rust_migration_plan.rs",

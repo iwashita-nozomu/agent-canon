@@ -53,8 +53,10 @@ ${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 
 The default local LLM model selector is
 `ggml-org/SmolLM3-3B-GGUF:Q4_K_M`, used only by
-`tools/agent_tools/file_responsibility_llm.py` for single-file advisory
-responsibility review. Post-create fetches and builds llama.cpp through
+`agent-canon local-llm classify-responsibility` for single-file advisory
+responsibility review. `tools/agent_tools/file_responsibility_llm.py` is a
+Python compatibility helper for eval and index internals, not the primary
+operator entrypoint. Post-create fetches and builds llama.cpp through
 `tools/install_llama_cpp.sh`; AgentCanon update/rebuild paths reuse the same
 installer and rebuild an existing local llama.cpp checkout after pin updates.
 
@@ -249,6 +251,29 @@ MCP runtime surface fingerprint. Changes to `.codex/config.toml`, `mcp/`,
 The Python `tools/agent_tools/check_mcp_inventory.py` remains as a compatibility
 entrypoint when a run bundle needs direct `workflow_monitoring.md` evidence.
 
+## Local LLM Rust CLI
+
+Local LLM responsibility review is now a Rust CLI command:
+
+```bash
+agent-canon local-llm classify-responsibility --print-prompt rust/agent-canon/src/local_llm.rs
+```
+
+The command owns the single-file responsibility prompt boundary and emits
+`FILE_RESP_LLM_*` machine-readable fields. Search, index, and eval subcommands
+are routed through the same CLI surface while their current Python engines
+remain the compatibility implementation:
+
+```bash
+agent-canon local-llm search --purpose "find responsibility scope tooling"
+agent-canon local-llm build-index
+agent-canon local-llm eval
+```
+
+Do not add a second local LLM public entrypoint for responsibility analysis.
+Port the remaining Python engines only when their tests, catalog row, docs, and
+log-surface inventory are updated in the same change.
+
 ## Validation
 
 ```bash
@@ -259,6 +284,8 @@ agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
 agent-canon mcp-preflight-policy --request-kind github-actions-read
 agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
+agent-canon local-llm --help
+agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/ci/container_config.py
