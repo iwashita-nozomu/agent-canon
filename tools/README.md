@@ -100,7 +100,7 @@ retired legacy tool reintroduction.
 - `audit/`
   - portable audit-log schema and JSONL writer
 - `experiments/`
-  - topic scaffold、registry sync、managed run
+  - topic scaffold、registry sync、managed run、remote HTML artifact access
 - `oop/`
   - `python/` と `cpp/` に分けた OOP readability / inventory entrypoint。共有実装は `oop/shared/` に置き、言語別の default path を機械的に列挙できるようにします。
 - `shared/`
@@ -208,6 +208,7 @@ Canonical helper commands:
 ```bash
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+python3 tools/experiments/html_artifact_access.py <report.html>
 dot -V
 ```
 

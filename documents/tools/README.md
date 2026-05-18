@@ -82,6 +82,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - registry の branch / worktree metadata を同期します。
 - `tools/experiments/run_managed_experiment.py`
   - shared managed-runner として server 上の実験 run artifact を初期化します。
+- `tools/experiments/html_artifact_access.py`
+  - SSH 越しの HPC / container 上にある HTML artifact を手元 PC のブラウザで見るため、`python3 -m http.server`、SSH tunnel、local URL の command を出します。
 - `tools/run_comprehensive_review.sh`
   - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
 - `tools/run_pytest_with_logs.sh`

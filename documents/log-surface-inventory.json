@@ -564,7 +564,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 77,
+      "line": 104,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -572,7 +572,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 78,
+      "line": 105,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -580,7 +580,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 75,
+      "line": 102,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -588,7 +588,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 74,
+      "line": 101,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -596,7 +596,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_summary_artifact",
-      "line": 76,
+      "line": 103,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -604,7 +604,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 73,
+      "line": 100,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
