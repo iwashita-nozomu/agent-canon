@@ -75,9 +75,10 @@ retired legacy tool reintroduction.
 `responsibility_scope.py` validates top-level `responsibility-scope.toml`
 so each durable surface has an owner class, path coverage, protecting tools,
 and linked operational issues.
-`issue_sync.py` validates `issues/open|closed/` offline and prints a deterministic
+`issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
-`github_issue:` mirror field.
+`github_issue:` mirror field, and can run read-only GitHub mirror drift checks
+for PR summaries.
 `eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
 reports are accumulating under `agents/evals/results/` as readable,
 non-ignored, append-only AgentCanon evidence.

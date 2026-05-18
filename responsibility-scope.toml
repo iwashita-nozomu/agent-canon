@@ -96,7 +96,7 @@ protecting_tools = [
   "tools/ci/check_github_workflows.py",
 ]
 issues = [
-  "issues/open/AC-20260517-github-folder-issue-sync.md",
+  "issues/closed/AC-20260517-github-folder-issue-sync.md",
 ]
 
 [[scope]]
@@ -175,7 +175,7 @@ protecting_tools = [
   "tools/agent_tools/issue_sync.py",
 ]
 issues = [
-  "issues/open/AC-20260517-github-folder-issue-sync.md",
+  "issues/closed/AC-20260517-github-folder-issue-sync.md",
 ]
 
 [[scope]]

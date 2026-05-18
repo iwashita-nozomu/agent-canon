@@ -14,6 +14,7 @@
 # upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
+# upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR and push static gate workflow
 # upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
@@ -36,7 +37,10 @@ HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
 )
-AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {"agent-runtime-dashboard.yml"}
+AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
+    "agent-runtime-dashboard.yml",
+    "issue-mirror.yml",
+}
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
@@ -53,6 +57,7 @@ TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "vendor/agent-canon/issues/README.md",
     "vendor/agent-canon/issues/closed/",
     "Agent Improvement Guide artifact",
+    "Issue Mirror artifact",
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
     "vendor/agent-canon/documents/github-copilot-configuration.md",
@@ -77,6 +82,7 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md",
     "vendor/agent-canon/issues/closed/",
     "Agent Improvement Guide artifact",
+    "Issue Mirror artifact",
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
     "documents/github-copilot-configuration.md",
@@ -101,6 +107,7 @@ STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "issues/open/AC-YYYYMMDD-<slug>.md",
     "issues/closed/",
     "Agent Improvement Guide artifact",
+    "Issue Mirror artifact",
     "AgentCanon Static Gates",
     "run_repo_dependency_review.sh --search-hits-file",
     "Copilot Configuration Impact",
@@ -199,6 +206,17 @@ STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "Standalone-only workflow",
     "Template and derived repositories should not copy",
     "generate_agent_runtime_dashboard.py",
+)
+STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
+    "Standalone-only workflow",
+    "Template and derived repositories should not copy",
+    "issue_sync.py",
+    "--github-check",
+    "--sync-github",
+    "GITHUB_STEP_SUMMARY",
+    "permissions:",
+    "issues: read",
+    "issues: write",
 )
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "agents/workflows/agent-canon-pr-workflow.md",
@@ -545,11 +563,23 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
                 VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
             )
         )
+        specs.append(
+            (
+                vendor_workflow_dir / "issue-mirror.yml",
+                STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS,
+            )
+        )
     else:
         specs.append(
             (
                 workflow_dir / "agent-runtime-dashboard.yml",
                 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
+            )
+        )
+        specs.append(
+            (
+                workflow_dir / "issue-mirror.yml",
+                STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS,
             )
         )
     return specs

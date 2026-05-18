@@ -38,7 +38,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/responsibility_scope.py`
   - top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub、vendor の責務範囲と protecting tool を固定します。
 - `tools/agent_tools/issue_sync.py`
-  - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan を出します。CI では network を要求しません。
+  - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
 - `tools/agent_tools/eval_accumulation_check.py`
   - `agents/evals/results/` の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
 - `tools/agent_tools/file_responsibility_llm.py`

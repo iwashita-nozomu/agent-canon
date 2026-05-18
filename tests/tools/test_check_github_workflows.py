@@ -325,6 +325,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                     "vendor/agent-canon/issues/README.md",
                     "vendor/agent-canon/issues/closed/",
                     "Agent Improvement Guide artifact",
+                    "Issue Mirror artifact",
                     "run_repo_dependency_review.sh --search-hits-file",
                     "Copilot Configuration Impact",
                     "documents/github-copilot-configuration.md",

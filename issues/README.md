@@ -118,12 +118,37 @@ Plan missing GitHub mirrors:
 python3 tools/agent_tools/issue_sync.py --root . --repo iwashita-nozomu/agent-canon
 ```
 
+PR read-only mirror check:
+
+```bash
+python3 tools/agent_tools/issue_sync.py \
+  --root . \
+  --repo iwashita-nozomu/agent-canon \
+  --github-check
+```
+
+`.github/workflows/issue-mirror.yml` runs the read-only check on PRs and branch
+pushes and writes the mirror status, drift, and planned sync commands to the
+GitHub Step Summary. Missing `github_issue:` links generate deterministic
+`ISSUE_SYNC_PLAN=` lines; they do not fail PRs unless the local issue schema,
+status, duplicate IDs, or linked GitHub mirror state is inconsistent.
+
 Apply mode may create GitHub Issues and insert `github_issue:` fields, but it
-must be an explicit operator action:
+must be an explicit operator action. GitHub Actions sync mode updates already
+linked GitHub Issues on `main` pushes or manual dispatch; it does not commit
+new `github_issue:` fields back to the repository.
 
 ```bash
 python3 tools/agent_tools/issue_sync.py \
   --root . \
   --repo iwashita-nozomu/agent-canon \
   --apply
+```
+
+```bash
+python3 tools/agent_tools/issue_sync.py \
+  --root . \
+  --repo iwashita-nozomu/agent-canon \
+  --github-check \
+  --sync-github
 ```

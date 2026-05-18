@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Validates local AgentCanon issue files and plans GitHub Issue synchronization.
+# responsibility Validates local AgentCanon issue files and mirrors them to GitHub Issues.
 # upstream design ../../issues/README.md durable local issue convention
 # upstream design ../../documents/responsibility-scope-management.md local/GitHub issue sync policy
 # upstream design ../../tools/README.md tool entrypoint index
@@ -8,7 +8,7 @@
 # downstream implementation ../../tools/ci/run_all_checks.sh runs offline issue validation
 # downstream implementation ../../tests/agent_tools/test_issue_sync.py tests issue validation
 # @dependency-end
-"""Validate local AgentCanon issues and plan GitHub Issue synchronization."""
+"""Validate local AgentCanon issues and plan or run GitHub Issue synchronization."""
 
 from __future__ import annotations
 
@@ -70,12 +70,34 @@ class IssueRecord:
 
 
 @dataclass(frozen=True)
+class GitHubIssueReference:
+    """Parsed GitHub Issue mirror reference."""
+
+    repo: str
+    number: str
+
+
+@dataclass(frozen=True)
+class GitHubIssueSnapshot:
+    """One GitHub Issue snapshot read through gh."""
+
+    number: str
+    title: str
+    body: str
+    state: str
+    url: str
+
+
+@dataclass(frozen=True)
 class IssueSyncReport:
     """Issue sync validation report."""
 
     issues: tuple[IssueRecord, ...]
     findings: tuple[Finding, ...]
     sync_plan: tuple[str, ...]
+    github_checked: int = 0
+    github_missing_links: int = 0
+    github_drift: int = 0
 
 
 @dataclass
@@ -102,13 +124,89 @@ class GitHubIssueCreator:
         self.created_url = result.stdout.strip()
 
 
+@dataclass
+class GitHubIssueClient:
+    """Small gh-backed client for GitHub Issue mirror reads and writes."""
+
+    default_repo: str
+
+    def repo_for(self, reference: GitHubIssueReference) -> str:
+        """Return the repository for one issue reference."""
+        return reference.repo or self.default_repo
+
+    def read(self, reference: GitHubIssueReference) -> GitHubIssueSnapshot:
+        """Read one GitHub Issue."""
+        result = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "view",
+                reference.number,
+                "--repo",
+                self.repo_for(reference),
+                "--json",
+                "number,title,body,state,url",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+        data = json.loads(result.stdout)
+        return GitHubIssueSnapshot(
+            number=str(data.get("number") or reference.number),
+            title=str(data.get("title") or ""),
+            body=str(data.get("body") or ""),
+            state=str(data.get("state") or ""),
+            url=str(data.get("url") or ""),
+        )
+
+    def edit_body_and_title(self, reference: GitHubIssueReference, issue: IssueRecord) -> None:
+        """Update one GitHub Issue title and body from the local issue file."""
+        result = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "edit",
+                reference.number,
+                "--repo",
+                self.repo_for(reference),
+                "--title",
+                issue_title(issue.path),
+                "--body-file",
+                str(issue.path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+
+    def set_state(self, reference: GitHubIssueReference, expected_state: str) -> None:
+        """Set one GitHub Issue open/closed state."""
+        command = "close" if expected_state == "CLOSED" else "reopen"
+        result = subprocess.run(
+            ["gh", "issue", command, reference.number, "--repo", self.repo_for(reference)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--repo", default="", help="GitHub repository owner/name.")
     parser.add_argument("--require-github-link", action="store_true")
+    parser.add_argument("--github-check", action="store_true", help="Read linked GitHub Issues and report mirror drift.")
     parser.add_argument("--apply", action="store_true", help="Create missing GitHub Issues with gh.")
+    parser.add_argument("--sync-github", action="store_true", help="Update linked GitHub Issues to match local issue files.")
+    parser.add_argument("--summary-file", type=Path, help="Append a Markdown summary to this path.")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -197,9 +295,11 @@ def validate_issue_identity(root: Path, issue: IssueRecord) -> list[Finding]:
 
 def github_link_findings(root: Path, issue: IssueRecord, required: bool) -> list[Finding]:
     """Validate optional GitHub Issue link fields."""
+    value = issue.github_issue
+    if value and value not in {"pending", "not-created"} and github_issue_reference(value, "") is None:
+        return [Finding("github", relative(root, issue.path), "invalid-github_issue")]
     if not required:
         return []
-    value = issue.github_issue
     if value.startswith("https://github.com/") or value in {"pending", "not-created"}:
         return []
     return [Finding("github", relative(root, issue.path), "missing-github_issue")]
@@ -238,6 +338,81 @@ def plan_lines(root: Path, issues: Sequence[IssueRecord], repo: str) -> tuple[st
     return tuple(lines)
 
 
+def issue_title(path: Path) -> str:
+    """Return a local issue title from the first Markdown heading."""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line.lstrip("# ").strip()
+    return path.stem
+
+
+def github_issue_reference(value: str, default_repo: str) -> GitHubIssueReference | None:
+    """Parse a GitHub Issue URL or issue number."""
+    if not value or value in {"pending", "not-created"}:
+        return None
+    url_match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/issues/(\d+)", value)
+    if url_match is not None:
+        return GitHubIssueReference(repo=url_match.group(1), number=url_match.group(2))
+    if value.isdigit() and default_repo:
+        return GitHubIssueReference(repo=default_repo, number=value)
+    return None
+
+
+def expected_github_state(issue: IssueRecord) -> str:
+    """Return the GitHub Issue state expected from local state."""
+    if issue.directory_state == "closed":
+        return "CLOSED"
+    return "OPEN"
+
+
+def github_mirror_findings(
+    root: Path,
+    issues: Sequence[IssueRecord],
+    repo: str,
+) -> tuple[list[Finding], int, int]:
+    """Return findings from read-only GitHub Issue mirror checks."""
+    findings: list[Finding] = []
+    checked = 0
+    drift = 0
+    client = GitHubIssueClient(repo)
+    for issue in issues:
+        reference = github_issue_reference(issue.github_issue, repo)
+        if reference is None:
+            continue
+        rel_path = relative(root, issue.path)
+        try:
+            snapshot = client.read(reference)
+        except (RuntimeError, json.JSONDecodeError) as error:
+            findings.append(Finding("github", rel_path, f"gh-read-failed:{error}"))
+            drift += 1
+            continue
+        checked += 1
+        expected_state = expected_github_state(issue)
+        if snapshot.state != expected_state:
+            findings.append(
+                Finding(
+                    "github",
+                    rel_path,
+                    f"state-drift:expected={expected_state}:actual={snapshot.state}",
+                )
+            )
+            drift += 1
+        expected_title = issue_title(issue.path)
+        if snapshot.title != expected_title:
+            findings.append(Finding("github", rel_path, "title-drift"))
+            drift += 1
+        expected_body = issue.path.read_text(encoding="utf-8")
+        if snapshot.body != expected_body:
+            findings.append(Finding("github", rel_path, "body-drift"))
+            drift += 1
+    return findings, checked, drift
+
+
+def github_missing_link_count(issues: Sequence[IssueRecord]) -> int:
+    """Return how many local issue files have no GitHub mirror link."""
+    return sum(1 for issue in issues if not issue.github_issue)
+
+
 def insert_github_issue(path: Path, url: str) -> None:
     """Insert a github_issue field into one local issue file."""
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -262,7 +437,32 @@ def apply_missing_links(issues: Sequence[IssueRecord], repo: str) -> tuple[str, 
     return tuple(created)
 
 
-def validate(root: Path, require_github_link: bool) -> IssueSyncReport:
+def sync_linked_github_issues(issues: Sequence[IssueRecord], repo: str) -> tuple[str, ...]:
+    """Update linked GitHub Issues to match local title, body, and state."""
+    client = GitHubIssueClient(repo)
+    synced: list[str] = []
+    for issue in issues:
+        reference = github_issue_reference(issue.github_issue, repo)
+        if reference is None:
+            continue
+        snapshot = client.read(reference)
+        expected_state = expected_github_state(issue)
+        expected_body = issue.path.read_text(encoding="utf-8")
+        if snapshot.title != issue_title(issue.path) or snapshot.body != expected_body:
+            client.edit_body_and_title(reference, issue)
+            synced.append(f"{issue.issue_id}:title-body")
+        if snapshot.state != expected_state:
+            client.set_state(reference, expected_state)
+            synced.append(f"{issue.issue_id}:state:{expected_state.lower()}")
+    return tuple(synced)
+
+
+def validate(
+    root: Path,
+    require_github_link: bool,
+    repo: str = "",
+    github_check: bool = False,
+) -> IssueSyncReport:
     """Validate local issue sync state."""
     canon_root = agent_canon_root(root.resolve())
     issues = read_issues(canon_root)
@@ -274,10 +474,18 @@ def validate(root: Path, require_github_link: bool) -> IssueSyncReport:
         findings.extend(validate_issue_identity(canon_root, issue))
         findings.extend(github_link_findings(canon_root, issue, require_github_link))
     findings.extend(duplicate_id_findings(canon_root, issues))
+    github_checked = 0
+    github_drift = 0
+    if github_check and not findings:
+        github_findings, github_checked, github_drift = github_mirror_findings(canon_root, issues, repo)
+        findings.extend(github_findings)
     return IssueSyncReport(
         issues=issues,
         findings=tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
         sync_plan=(),
+        github_checked=github_checked,
+        github_missing_links=github_missing_link_count(issues),
+        github_drift=github_drift,
     )
 
 
@@ -288,6 +496,9 @@ def report_with_plan(report: IssueSyncReport, root: Path, repo: str) -> IssueSyn
         issues=report.issues,
         findings=report.findings,
         sync_plan=plan_lines(canon_root, report.issues, repo),
+        github_checked=report.github_checked,
+        github_missing_links=report.github_missing_links,
+        github_drift=report.github_drift,
     )
 
 
@@ -307,23 +518,65 @@ def render_json(report: IssueSyncReport) -> str:
                 for issue in report.issues
             ],
             "sync_plan": list(report.sync_plan),
+            "github_checked": report.github_checked,
+            "github_missing_links": report.github_missing_links,
+            "github_drift": report.github_drift,
         },
         indent=2,
         sort_keys=True,
     )
 
 
+def render_markdown_summary(report: IssueSyncReport) -> str:
+    """Render a compact GitHub Actions Markdown summary."""
+    status = "pass" if not report.findings else "fail"
+    lines = [
+        "## Issue Mirror Check",
+        "",
+        f"- status: `{status}`",
+        f"- local_issues: `{len(report.issues)}`",
+        f"- missing_github_links: `{report.github_missing_links}`",
+        f"- github_checked: `{report.github_checked}`",
+        f"- github_drift: `{report.github_drift}`",
+        f"- findings: `{len(report.findings)}`",
+        f"- planned_sync_commands: `{len(report.sync_plan)}`",
+    ]
+    if report.findings:
+        lines.extend(["", "### Findings", ""])
+        lines.extend(f"- `{finding.check}` `{finding.path}` `{finding.detail}`" for finding in report.findings)
+    if report.sync_plan:
+        lines.extend(["", "### Planned Sync Commands", "", "```text"])
+        lines.extend(report.sync_plan)
+        lines.append("```")
+    return "\n".join(lines) + "\n"
+
+
+def append_summary(path: Path, report: IssueSyncReport) -> None:
+    """Append Markdown summary output to a file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(render_markdown_summary(report))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run issue validation and optional GitHub sync planning."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root, args.require_github_link)
+    report = validate(args.root, args.require_github_link, args.repo, github_check=False)
     if args.apply and not report.findings:
         created = apply_missing_links(report.issues, args.repo)
         print(f"ISSUE_SYNC_CREATED={len(created)}")
         for item in created:
             print(f"ISSUE_SYNC_CREATED_ITEM={item}")
-        report = validate(args.root, args.require_github_link)
+        report = validate(args.root, args.require_github_link, args.repo, github_check=False)
+    if args.sync_github and not report.findings:
+        synced = sync_linked_github_issues(report.issues, args.repo)
+        print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
+        for item in synced:
+            print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+    report = validate(args.root, args.require_github_link, args.repo, args.github_check or args.sync_github)
     report = report_with_plan(report, args.root, args.repo)
+    if args.summary_file:
+        append_summary(args.summary_file, report)
     if args.format == "json":
         print(render_json(report))
     else:
@@ -332,6 +585,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         for line in report.sync_plan:
             print(f"ISSUE_SYNC_PLAN={line}")
         print(f"ISSUE_SYNC_LOCAL_ISSUES={len(report.issues)}")
+        print(f"ISSUE_SYNC_GITHUB_MISSING_LINKS={report.github_missing_links}")
+        print(f"ISSUE_SYNC_GITHUB_CHECKED={report.github_checked}")
+        print(f"ISSUE_SYNC_GITHUB_DRIFT={report.github_drift}")
         print(f"ISSUE_SYNC_FINDINGS={len(report.findings)}")
         print(f"ISSUE_SYNC={'pass' if not report.findings else 'fail'}")
     return 1 if report.findings else 0
