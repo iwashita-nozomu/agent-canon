@@ -11,6 +11,7 @@ __pycache__/
 # Test/tool cache
 .pytest_cache/
 .ruff_cache/
+.agent-canon/search-index/
 rust/agent-canon/target/
 
 # Local run artifacts

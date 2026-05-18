@@ -61,6 +61,24 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=runtime", result.stdout)
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
+    def test_search_area_exposes_coordinated_search_tools(self) -> None:
+        """Search routing should expose the purpose-based search entrypoint."""
+        result = self.run_route("--area", "search", "--risk", "focused")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AREA=search", result.stdout)
+        self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
+        self.assertIn("tools/agent_tools/search.py --purpose", result.stdout)
+        self.assertIn("tools/agent_tools/search_index.py build", result.stdout)
+
+    def test_search_alias_resolves_to_search_area(self) -> None:
+        """Legacy vector-search names should route to coordinated search."""
+        result = self.run_route("--name", "vector_search.py")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CANONICAL_AREA=search", result.stdout)
+        self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
+
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""
         result = self.run_route("--name", "unknown_super_router.py")
@@ -83,6 +101,7 @@ class RouteToolTest(unittest.TestCase):
         rows = json.loads(result.stdout)
         areas = {row["key"] for row in rows}
         self.assertIn("checks", areas)
+        self.assertIn("search", areas)
         self.assertIn("surface", areas)
 
 

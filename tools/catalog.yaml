@@ -258,6 +258,43 @@ entries:
     tests:
       - tests/agent_tools/test_local_llm_eval.py
 
+  - id: agent-search
+    summary: Coordinates purpose-based search across text, LLM cards, vector search, tool catalog, dependency headers, and code facts.
+    path: tools/agent_tools/search.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search.py --purpose "<goal>"
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/search-coordination.md
+    tests:
+      - tests/agent_tools/test_search.py
+
+  - id: search-index
+    summary: Builds repo-local ignored semantic cards for the coordinated LLM search provider.
+    path: tools/agent_tools/search_index.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search_index.py build
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/search-coordination.md
+      - .gitignore
+    tests:
+      - tests/agent_tools/test_search_index.py
+
   - id: route
     summary: Maps long proposed tool and skill names to short task-routing areas.
     path: tools/agent_tools/route.py

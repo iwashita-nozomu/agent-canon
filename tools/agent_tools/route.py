@@ -206,6 +206,24 @@ AREA_DATA: tuple[AreaData, ...] = (
         ("canon_doc_router.py", "doc-canon-flex", "docs_check_router.py", "docs-lite"),
     ),
     (
+        "search",
+        "coordinated search",
+        "Find candidate tools, documents, code, and dependency context from a purpose string.",
+        "run_coordinated_search",
+        (
+            "python3 tools/agent_tools/search.py --purpose \"<goal>\"",
+            "python3 tools/agent_tools/search_index.py build --surface tools --surface documents",
+        ),
+        (
+            "vector_search.py",
+            "tool-search",
+            "llm-search",
+            "semantic-search",
+            "search-to-edit-scope",
+            "dependency-expanded-search",
+        ),
+    ),
+    (
         "logs",
         "logs and evals",
         "Route hook, skill, eval, and result evidence without overwriting logs.",

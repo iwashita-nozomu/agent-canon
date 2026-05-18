@@ -11,6 +11,8 @@ downstream implementation agent_tools/responsibility_scope.py validates responsi
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
+downstream implementation agent_tools/search.py coordinates purpose-based search providers
+downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 @dependency-end
 -->
@@ -55,6 +57,9 @@ python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
+python3 tools/agent_tools/search.py --purpose "find tool for dependency graph edit scope"
+python3 tools/agent_tools/search_index.py build
+python3 tools/agent_tools/route.py --area search
 python3 tools/agent_tools/local_llm_eval.py
 python3 tools/agent_tools/evaluate_report_quality.py
 ```
@@ -76,6 +81,11 @@ GitHub Issue creation plan for local issues that do not yet have a
 `eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
 reports are accumulating under `agents/evals/results/` as readable,
 non-ignored, append-only AgentCanon evidence.
+`search.py` accepts a `--purpose` string and coordinates exact text, local LLM
+semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
+and Python code dependency facts into ranked candidates.
+`search_index.py` builds the repo-local ignored semantic-card index consumed by
+the LLM provider under `.agent-canon/search-index/`.
 `local_llm_eval.py` validates the configured single-file local LLM
 responsibility prompt boundary and can optionally accumulate prompt-only or
 model-backed reports under `agents/evals/results/local-llm-responsibility/`.
@@ -108,8 +118,10 @@ under `agents/evals/results/report-quality/`.
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
+  - `search.py` は `--purpose` から text / LLM card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers llm,tool,vector` のように絞れます。
+  - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
-  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。
+  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
@@ -341,12 +353,30 @@ python3 tools/agent_tools/compare_codex_token_footprints.py \
   --report-out reports/agents/<run-id>/token_footprint.md
 ```
 
-## Vector Search Tool
+## Coordinated Search Tool
 
 Use `rg` first for exact symbol, path, and error-message lookup. Use
-`vector_search.py` when the question is semantic: "どの tool が dependency graph
+`search.py` when the question is a purpose: "どの tool が dependency graph
 を見ているか", "GitHub remote migration に近い文書はどれか", "safe.directory
-周りの helper はどこか" のような再利用候補探索です。
+周りの helper はどこか" のような再利用候補探索です。`search.py` coordinates
+text, LLM semantic cards, vector search, tool catalog matches, dependency
+headers, and Python code facts.
+
+```bash
+python3 tools/agent_tools/search.py --purpose "dependency header graph tool"
+python3 tools/agent_tools/search.py --purpose "github cli validation" --providers llm,tool,vector
+python3 tools/agent_tools/search.py --purpose "alpha dispatch caller target" --providers header-deps,code-deps --format json
+python3 tools/agent_tools/search_index.py build --surface tools --surface documents
+python3 tools/agent_tools/route.py --area search
+```
+
+`search_index.py` writes `.agent-canon/search-index/llm-cards.jsonl` and
+`.agent-canon/search-index/index-state.json`. These files are generated,
+repo-local ignored state. Rebuild them after AgentCanon updates or when a repo
+adds important tools, skills, workflow docs, or code surfaces.
+
+`vector_search.py` remains available when you only want the dependency-free
+TF-IDF provider or its explicit `--context` expansion.
 
 The default index is dependency-free and transient. It scans shared text
 surfaces with TF-IDF vectors and does not write embedding artifacts or require
