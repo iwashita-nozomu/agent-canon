@@ -4,6 +4,7 @@
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
 # upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
+# upstream implementation ../../tools/agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs validates local LLM Rust CLI routing
@@ -40,6 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: false
           persist-credentials: false
 
@@ -67,6 +69,9 @@ jobs:
           python3 tools/agent_tools/tool_catalog.py
           python3 tools/agent_tools/tool_drift.py
           python3 tools/agent_tools/responsibility_scope.py
+          BASE_REF="${GITHUB_BASE_REF:-main}"
+          git fetch origin "${BASE_REF}" --depth=1 || true
+          python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
           python3 tools/agent_tools/issue_sync.py
           python3 tools/agent_tools/eval_accumulation_check.py
           tools/bin/agent-canon local-llm eval

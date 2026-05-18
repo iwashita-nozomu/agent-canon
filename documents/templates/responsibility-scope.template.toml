@@ -40,6 +40,39 @@ required_coverage = [
   "responsibility-scope.toml",
 ]
 
+[[import_rule]]
+source = "agent-canon-runtime-view"
+targets = [
+  "agent-canon-runtime-view",
+  "parent-repo-active-contract",
+  "github-automation",
+  "project-durable-state",
+]
+
+[[import_rule]]
+source = "parent-repo-active-contract"
+targets = [
+  "parent-repo-active-contract",
+  "agent-canon-runtime-view",
+  "github-automation",
+  "project-durable-state",
+]
+
+[[import_rule]]
+source = "github-automation"
+targets = [
+  "github-automation",
+  "agent-canon-runtime-view",
+  "parent-repo-active-contract",
+]
+
+[[import_rule]]
+source = "project-durable-state"
+targets = [
+  "project-durable-state",
+  "parent-repo-active-contract",
+]
+
 [[scope]]
 id = "agent-canon-runtime-view"
 owner = "agent-canon"

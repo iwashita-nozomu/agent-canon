@@ -139,6 +139,26 @@ entries:
     tests:
       - tests/agent_tools/test_responsibility_scope.py
 
+  - id: import-responsibility
+    summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
+    path: tools/agent_tools/import_responsibility.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/import_responsibility.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/responsibility-scope-management.md
+      - documents/coding-conventions-python.md
+      - responsibility-scope.toml
+    tests:
+      - tests/agent_tools/test_import_responsibility.py
+
   - id: issue-sync
     summary: Validates local AgentCanon issue files and checks or syncs GitHub Issue mirrors.
     path: tools/agent_tools/issue_sync.py

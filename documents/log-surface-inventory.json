@@ -220,7 +220,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 55,
+      "line": 56,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -228,7 +228,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 148,
+      "line": 149,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -1820,7 +1820,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "convention_sources",
-      "line": 514,
+      "line": 522,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1828,7 +1828,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 514,
+      "line": 522,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1836,7 +1836,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 514,
+      "line": 522,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1844,7 +1844,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_gates",
-      "line": 514,
+      "line": 522,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1852,7 +1852,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_prompts",
-      "line": 514,
+      "line": 522,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1860,7 +1860,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE",
-      "line": 533,
+      "line": 541,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1868,7 +1868,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_FINDINGS",
-      "line": 532,
+      "line": 540,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1876,7 +1876,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_SOURCES",
-      "line": 529,
+      "line": 537,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1884,7 +1884,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_TOOL_GATES",
-      "line": 530,
+      "line": 538,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -1892,7 +1892,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONVENTION_COMPLIANCE_WORKFLOWS",
-      "line": 531,
+      "line": 539,
       "path": "tools/agent_tools/check_convention_compliance.py",
       "surface": "tool"
     },
@@ -3756,7 +3756,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 253,
+      "line": 301,
+      "path": "tools/agent_tools/responsibility_scope.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "import_rules",
+      "line": 301,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -3764,7 +3772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "scopes",
-      "line": 253,
+      "line": 301,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -3772,7 +3780,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 253,
+      "line": 301,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -3780,7 +3788,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE",
-      "line": 275,
+      "line": 325,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -3788,7 +3796,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_FINDINGS",
-      "line": 274,
+      "line": 324,
+      "path": "tools/agent_tools/responsibility_scope.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RESPONSIBILITY_SCOPE_IMPORT_RULES",
+      "line": 323,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -3796,7 +3812,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RESPONSIBILITY_SCOPE_SCOPES",
-      "line": 273,
+      "line": 322,
       "path": "tools/agent_tools/responsibility_scope.py",
       "surface": "tool"
     },
@@ -5100,46 +5116,6 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "contracts",
-      "line": 655,
-      "path": "tools/agent_tools/tool_drift.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "findings",
-      "line": 655,
-      "path": "tools/agent_tools/tool_drift.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 655,
-      "path": "tools/agent_tools/tool_drift.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TOOL_CONVENTION_DRIFT",
-      "line": 670,
-      "path": "tools/agent_tools/tool_drift.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TOOL_CONVENTION_DRIFT_CONTRACTS",
-      "line": 668,
-      "path": "tools/agent_tools/tool_drift.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "TOOL_CONVENTION_DRIFT_FINDINGS",
       "line": 669,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
@@ -5147,8 +5123,48 @@
     {
       "certainty": "static",
       "emitter": "json_object",
+      "field": "findings",
+      "line": 669,
+      "path": "tools/agent_tools/tool_drift.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 669,
+      "path": "tools/agent_tools/tool_drift.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_CONVENTION_DRIFT",
+      "line": 684,
+      "path": "tools/agent_tools/tool_drift.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_CONVENTION_DRIFT_CONTRACTS",
+      "line": 682,
+      "path": "tools/agent_tools/tool_drift.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "TOOL_CONVENTION_DRIFT_FINDINGS",
+      "line": 683,
+      "path": "tools/agent_tools/tool_drift.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 338,
+      "line": 360,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -5156,7 +5172,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 338,
+      "line": 360,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -5164,7 +5180,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 338,
+      "line": 360,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -6284,7 +6300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 764,
+      "line": 766,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -6292,7 +6308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 765,
+      "line": 767,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -6300,7 +6316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 766,
+      "line": 768,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -6708,7 +6724,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 305,
+      "line": 312,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -6716,7 +6732,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 338,
+      "line": 345,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -6724,7 +6740,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 358,
+      "line": 365,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },

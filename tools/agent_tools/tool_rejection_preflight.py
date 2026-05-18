@@ -103,6 +103,28 @@ class GateTemplate:
 
 PYTHON_GATE_TEMPLATES = (
     GateTemplate(
+        gate="import_responsibility",
+        command_template=(
+            "python3 tools/agent_tools/import_responsibility.py --root . {path}"
+        ),
+        handoff=(
+            "include unused-import and responsibility-scope import boundary risk "
+            "before implementation edits"
+        ),
+    ),
+    GateTemplate(
+        gate="module_boundary_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/module_boundary_guard.py"
+        ),
+        handoff=(
+            "include module boundary evidence before changing Python module "
+            "internals or public surface"
+        ),
+    ),
+    GateTemplate(
         gate="oop_readability_guard",
         command_template=(
             "python3 tools/oop/python/readability.py --root . --min-score 95 {path}"

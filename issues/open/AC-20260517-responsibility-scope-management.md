@@ -16,10 +16,10 @@ status: in_progress
 source: user
 severity: S1
 evidence: User feedback on 2026-05-17: responsibility boundaries and tool responses remain weak and need a management tool.
-affected_surfaces: documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md
-edit_scope: responsibility-scope.toml, documents/templates/responsibility-scope.template.toml, documents/responsibility-scope-management.md, tools/agent_tools/responsibility_scope.py, tests/agent_tools/test_responsibility_scope.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh
-required_action: Add a machine-readable responsibility scope manifest and checker so tools, issues, evals, memory, GitHub surfaces, and shared runtime paths have explicit owners.
-close_condition: A checker validates required top-level responsibility scopes, owner classes, matching tool paths, and issue links.
+affected_surfaces: documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, responsibility-scope.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md
+edit_scope: responsibility-scope.toml, documents/templates/responsibility-scope.template.toml, documents/responsibility-scope-management.md, documents/coding-conventions-python.md, tools/agent_tools/responsibility_scope.py, tools/agent_tools/import_responsibility.py, tests/agent_tools/test_responsibility_scope.py, tests/agent_tools/test_import_responsibility.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh
+required_action: Add a machine-readable responsibility scope manifest and checker so tools, issues, evals, memory, GitHub surfaces, shared runtime paths, and local Python import boundaries have explicit owners.
+close_condition: Checkers validate required top-level responsibility scopes, owner classes, matching tool paths, issue links, import rules, unused imports, wildcard imports, and local scope import crossings.
 
 ## Finding
 
@@ -33,3 +33,8 @@ That gap makes tool routing reactive instead of planned.
 Introduce a responsibility scope manifest and checker. The manifest should
 classify each durable operational surface by owner class and name the tool or
 gate that protects it.
+
+Extend the same manifest to code imports. `[[import_rule]]` entries should make
+source-scope to target-scope local imports explicit, and an AST checker should
+catch unused aliases and wildcard imports before agents spend tokens on changes
+that style or ownership gates will reject.

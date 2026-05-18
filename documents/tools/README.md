@@ -38,6 +38,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
 - `tools/agent_tools/responsibility_scope.py`
   - top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub、vendor の責務範囲と protecting tool を固定します。
+- `tools/agent_tools/import_responsibility.py`
+  - Python import の未使用 alias、wildcard import、local import の responsibility-scope 越境を検査します。
+  - 越境許可は repo top-level `responsibility-scope.toml` の `[[import_rule]]` に書き、reviewer の推測にしません。
 - `tools/agent_tools/issue_sync.py`
   - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
 - `tools/agent_tools/eval_accumulation_check.py`

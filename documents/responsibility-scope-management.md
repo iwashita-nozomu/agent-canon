@@ -26,6 +26,12 @@ Each scope declares:
 - `protecting_tools`: checkers or workflow tools that keep the scope valid.
 - `issues`: durable local issues that currently drive or explain the scope.
 
+Each `[[import_rule]]` declares which local Python scope imports are allowed:
+
+- `source`: the responsibility scope of the importing file.
+- `targets`: responsibility scopes that the source scope may import when the
+  import resolves to a local repository file.
+
 ## Owner Classes
 
 - `agent-canon`: shared runtime, policy, tooling, memory, eval, and issue state
@@ -44,12 +50,23 @@ Each scope declares:
 
 `tools/agent_tools/responsibility_scope.py` validates the manifest. It fails
 when a required top-level surface has no scope, a scope names a missing tool, a
-tool is not present in `tools/catalog.yaml`, or an issue link is stale.
+tool is not present in `tools/catalog.yaml`, an issue link is stale, or an
+`[[import_rule]]` points at an unknown scope.
 
 Use it before adding a new checker, hook, skill, workflow, or issue family:
 
 ```bash
 python3 tools/agent_tools/responsibility_scope.py --root .
+```
+
+`tools/agent_tools/import_responsibility.py` uses the same manifest for code
+imports. It parses Python AST, flags unused imported aliases and wildcard
+imports, resolves local imports to files when possible, and rejects source-scope
+to target-scope crossings that are not present in `[[import_rule]]`.
+
+```bash
+python3 tools/agent_tools/import_responsibility.py --root .
+python3 tools/agent_tools/import_responsibility.py --root . --changed
 ```
 
 For template or derived repositories, run it from the parent root. The tool

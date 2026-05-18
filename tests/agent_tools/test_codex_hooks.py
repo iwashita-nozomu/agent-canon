@@ -6,6 +6,7 @@
 # upstream implementation ../../.codex/hooks.json declares MCP context hooks
 # upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
+# upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
@@ -33,11 +34,16 @@ PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.p
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
+MODULE_BOUNDARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "module_boundary_guard.py"
 LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
+NOTEBOOK_MAJOR_VERSION = 4
+NOTEBOOK_MINOR_VERSION = 5
+OOP_READABILITY_MIN_SCORE = 95
+EXPECTED_PROMPT_FEEDBACK_MIN = 3
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -280,8 +286,8 @@ class CodexHooksTest(unittest.TestCase):
                     },
                 ],
                 "metadata": {},
-                "nbformat": 4,
-                "nbformat_minor": 5,
+                "nbformat": NOTEBOOK_MAJOR_VERSION,
+                "nbformat_minor": NOTEBOOK_MINOR_VERSION,
             }
         )
 
@@ -380,8 +386,10 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
         self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("module_boundary_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("module_boundary_guard.py" in command for command in stop_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
         self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
@@ -459,6 +467,152 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             cast("list[dict[str, object]]", log_entry["unchecked_files"])[0]["paths"],
             ["data.lock"],
+        )
+
+    def test_module_boundary_guard_blocks_public_surface_change_without_evidence(self) -> None:
+        """Module hook should block forced module rewrites without tests or docs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            self._write_module_boundary_fixture(temp_root)
+            module = temp_root / "app" / "module.py"
+            module.parent.mkdir()
+            module.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("def renamed() -> int:\n    return 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "module.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(MODULE_BOUNDARY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("public-surface-change-without-evidence", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["changed_module_count"], 1)
+
+    def test_module_boundary_guard_blocks_import_responsibility_failure(self) -> None:
+        """Module hook should surface import responsibility failures immediately."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            self._write_module_boundary_fixture(temp_root)
+            module = temp_root / "app" / "module.py"
+            module.parent.mkdir()
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("import sys\n\nVALUE = 1\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "module.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(MODULE_BOUNDARY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("IMPORT_RESPONSIBILITY_FINDING=unused-import", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(cast("list[dict[str, object]]", log_entry["import_checks"])[0]["returncode"], 1)
+
+    def _write_module_boundary_fixture(self, root: Path) -> None:
+        """Write fixture files needed by the module boundary hook."""
+        checker = root / "tools" / "agent_tools" / "import_responsibility.py"
+        checker.parent.mkdir(parents=True)
+        checker.write_text(
+            (PROJECT_ROOT / "tools" / "agent_tools" / "import_responsibility.py").read_text(
+                encoding="utf-8"
+            ),
+            encoding="utf-8",
+        )
+        (root / "responsibility-scope.toml").write_text(
+            "\n".join(
+                [
+                    'catalog_kind = "agent_canon_responsibility_scope"',
+                    "version = 1",
+                    "[[scope]]",
+                    'id = "app"',
+                    'paths = ["app/**"]',
+                    "",
+                    "[[scope]]",
+                    'id = "tools"',
+                    'paths = ["tools/**"]',
+                    "",
+                    "[[import_rule]]",
+                    'source = "app"',
+                    'targets = ["app"]',
+                    "",
+                    "[[import_rule]]",
+                    'source = "tools"',
+                    'targets = ["tools", "app"]',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
         )
 
     def test_style_checker_guard_selects_cpp_and_notebook_checkers(self) -> None:
@@ -680,7 +834,7 @@ class CodexHooksTest(unittest.TestCase):
             analyzer_text=(
                 "#!/usr/bin/env python3\n"
                 "import sys\n"
-                "if sys.argv[sys.argv.index('--min-score') + 1] != '95':\n"
+                f"if sys.argv[sys.argv.index('--min-score') + 1] != '{OOP_READABILITY_MIN_SCORE}':\n"
                 "    raise SystemExit(0)\n"
                 "print('OOP_READABILITY=fail')\n"
                 "raise SystemExit(1)\n"
@@ -697,7 +851,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["baseline_ref"], "")
-        self.assertEqual(log_entry["min_score"], 95)
+        self.assertEqual(log_entry["min_score"], OOP_READABILITY_MIN_SCORE)
         self.assertEqual(log_entry["failed_count"], 1)
 
     def test_oop_readability_guard_defaults_to_agentcanon_hook_result(self) -> None:
@@ -1415,7 +1569,9 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("quality_gap", entry["feedback_labels"])
         self.assertIn("repair_request", entry["feedback_labels"])
         self.assertIn("missing_mechanism", entry["feedback_labels"])
-        self.assertGreaterEqual(entry["workflow_monitor_feedback_count"], 3)
+        self.assertGreaterEqual(
+            entry["workflow_monitor_feedback_count"], EXPECTED_PROMPT_FEEDBACK_MIN
+        )
         self.assertIn("runtime_feedback=observed", monitoring)
         self.assertIn("target=skill:result-artifact-writeout", monitoring)
         self.assertIn("target=tool:workflow_monitor.py", monitoring)

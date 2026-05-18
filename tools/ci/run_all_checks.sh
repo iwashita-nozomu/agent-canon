@@ -7,6 +7,7 @@
 # upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
+# upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
@@ -187,6 +188,12 @@ if "$PYTHON_BIN" tools/agent_tools/check_log_helper_names.py --changed --exclude
   echo "✅ log helper naming checks 成功"
 else
   echo "❌ log helper naming checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/import_responsibility.py --changed 2>&1; then
+  echo "✅ import responsibility checks 成功"
+else
+  echo "❌ import responsibility checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/validation/notebook_quality.py --all 2>&1; then

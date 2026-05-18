@@ -10,6 +10,7 @@
     "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
+    "downstream implementation hooks/module_boundary_guard.py blocks forced module-internal rewrites without boundary evidence",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
     "downstream implementation hooks/style_checker_guard.py runs changed-file style checks and logs unchecked edits",
     "downstream implementation hooks/log_surface_inventory_guard.py blocks hook/tool/skill log-surface inventory drift",
@@ -79,6 +80,12 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking Python module boundaries"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
@@ -118,6 +125,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking current OOP findings"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking Python module boundaries"
           },
           {
             "type": "command",

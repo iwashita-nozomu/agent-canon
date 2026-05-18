@@ -30,6 +30,13 @@ Style checker hook entries include `selected_checkers`, `checked_files`, and
 `unchecked_files`. `unchecked_files` is the durable signal that a changed file
 had no automatic Python / C++ / notebook / Markdown style checker selected.
 
+Module boundary hook entries include `changed_modules`, `finding_count`,
+`findings`, and `import_checks`. They are the durable signal that a Python
+module rewrite changed public surface or exceeded rewrite thresholds without
+test / docs / issue / responsibility-scope evidence, or that
+`import_responsibility.py` rejected unused imports, wildcard imports, or
+responsibility-scope import crossings.
+
 Reference capture hook entries include `urls`, `registered_urls`,
 `missing_urls`, `reference_files`, and `decision`. UserPromptSubmit entries are
 measurement-only, while PostToolUse and Stop entries may block when a consulted

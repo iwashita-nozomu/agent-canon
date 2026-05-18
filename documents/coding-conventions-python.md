@@ -94,6 +94,16 @@ def load_config(path: Path) -> dict[str, str]:
 - 行長は lint の fail 条件ではなく、可読性、既存 formatter、project-local `pyproject.toml` の明示設定に従って判断します。
 - Ruff を使う repo では、行長だけを理由に fail させたくない場合、`E501` を ignore します。
 
+## Import と責務境界
+
+- 未使用 import、wildcard import、責務外 local import は変更に残しません。
+- 追加した import が local file に解決できる場合は、repo top-level
+  `responsibility-scope.toml` の `[[import_rule]]` に沿う必要があります。
+- 既存 scope を越える import が必要な場合は、先に設計上の依存方向を確認し、
+  scope rule を更新するか、薄い adapter を既存責務側へ置きます。
+- `python3 tools/agent_tools/import_responsibility.py --changed` を
+  `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
+
 ## 目次
 
 1. [対象](./conventions/python/01_scope.md)

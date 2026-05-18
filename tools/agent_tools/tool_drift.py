@@ -159,6 +159,20 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="import_responsibility",
+        tool="tools/agent_tools/import_responsibility.py",
+        links=(
+            LinkCheck("responsibility-scope.toml"),
+            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/coding-conventions-python.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_import_responsibility.py"),
+        ),
+    ),
+    ToolContract(
         name="local_llm_eval",
         tool="tools/agent_tools/local_llm_eval.py",
         links=(

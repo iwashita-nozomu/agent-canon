@@ -242,6 +242,8 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "tool_catalog.py",
     "tool_drift.py",
     "responsibility_scope.py",
+    "import_responsibility.py",
+    "--baseline-ref",
     "issue_sync.py",
     "eval_accumulation_check.py",
     "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
