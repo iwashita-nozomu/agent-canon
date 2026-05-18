@@ -172,6 +172,10 @@ TOOL_GATES = {
             "documents/SHARED_RUNTIME_SURFACES.md",
         ),
     ),
+    "runtime_profile_inventory": (
+        "tools/agent_tools/check_runtime_profile_inventory.py",
+        ("tools/ci/run_docs_checks.sh",),
+    ),
 }
 
 SKILL_ROUTING_PROMPTS = (

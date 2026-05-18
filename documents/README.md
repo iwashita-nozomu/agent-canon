@@ -45,6 +45,8 @@ contract, edit the root regular file.
   task-start checklist for repos that vendor AgentCanon.
 - [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md):
   active profile selection, risk classes, and validation routing.
+- [Runtime Profile Inventory](./runtime-profiles-and-check-matrix.json):
+  machine-readable source of truth for the runtime profile/check matrix doc.
 - [Template / AgentCanon Audit Resolution](./template-agent-canon-audit-resolution.md):
   2026-05-16 500-item audit coverage and resolution ledger.
 - [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md): short
