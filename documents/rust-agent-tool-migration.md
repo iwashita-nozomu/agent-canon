@@ -51,9 +51,12 @@ ${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
 ${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 ```
 
-The initial local LLM model selector is `Qwen/Qwen3-0.6B-GGUF:Q8_0`, used only
-by `tools/agent_tools/file_responsibility_llm.py` for single-file advisory
-responsibility review.
+The default local LLM model selector is
+`ggml-org/SmolLM3-3B-GGUF:Q4_K_M`, used only by
+`tools/agent_tools/file_responsibility_llm.py` for single-file advisory
+responsibility review. Post-create fetches and builds llama.cpp through
+`tools/install_llama_cpp.sh`; AgentCanon update/rebuild paths reuse the same
+installer and rebuild an existing local llama.cpp checkout after pin updates.
 
 In a template or derived repository, the normal adoption path is:
 
@@ -66,6 +69,9 @@ In a template or derived repository, the normal adoption path is:
    `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
    host has no Rust toolchain, rerun the same target inside the DevContainer or
    recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
+   If llama.cpp was already installed under
+   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp`, the same rebuild
+   path also recompiles `llama-cli` and `llama-server`.
 1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
    the Rust foundation is present.
 1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before

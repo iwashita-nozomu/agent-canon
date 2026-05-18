@@ -4,6 +4,7 @@
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream environment devcontainer.json postCreateCommand entrypoint
+# upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
 # @dependency-end
 
 set -euo pipefail
@@ -13,7 +14,7 @@ node_version="${NODE_VERSION:-22.14.0}"
 rust_toolchain="${RUST_TOOLCHAIN:-stable}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
-local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-Qwen/Qwen3-0.6B-GGUF:Q8_0}"
+local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}"
 
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
@@ -167,33 +168,19 @@ install_agent_canon_cli() {
 }
 
 install_llama_cpp() {
-  local source_dir
-  local build_dir
-  local jobs
-
-  if [ -x "${tools_home}/bin/llama-cli" ] && [ "${AGENT_CANON_REBUILD_LLAMA_CPP:-0}" != "1" ]; then
-    "${tools_home}/bin/llama-cli" --help >/dev/null
-    return
-  fi
+  local canon_root
+  local installer
 
   apt_install ca-certificates curl git cmake build-essential pkg-config libcurl4-openssl-dev
-  source_dir="${tools_home}/src/llama.cpp"
-  build_dir="${tools_home}/build/llama.cpp"
-  install -d -m 755 "${tools_home}/src" "${tools_home}/build" "${tools_home}/bin"
-
-  if [ ! -d "${source_dir}/.git" ]; then
-    git clone --depth 1 --branch "$llama_cpp_ref" https://github.com/ggml-org/llama.cpp.git "$source_dir"
-  else
-    git -C "$source_dir" fetch --depth 1 origin "$llama_cpp_ref"
-    git -C "$source_dir" checkout --detach FETCH_HEAD
+  canon_root="$(agent_canon_source_root)"
+  installer="${canon_root}/tools/install_llama_cpp.sh"
+  if [ -z "$canon_root" ] || [ ! -f "$installer" ]; then
+    echo "AgentCanon llama.cpp installer absent; skipping local LLM tool install"
+    return
   fi
-
-  cmake -S "$source_dir" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON
-  jobs="$(nproc 2>/dev/null || printf '%s\n' 2)"
-  cmake --build "$build_dir" --config Release -j "$jobs" --target llama-cli llama-server
-  ln -sf "${build_dir}/bin/llama-cli" "${tools_home}/bin/llama-cli"
-  ln -sf "${build_dir}/bin/llama-server" "${tools_home}/bin/llama-server"
-  "${tools_home}/bin/llama-cli" --help >/dev/null
+  AGENT_CANON_TOOLS_HOME="$tools_home" \
+    AGENT_CANON_LLAMA_CPP_REF="$llama_cpp_ref" \
+    bash "$installer" --allow-fetch
 }
 
 publish_agent_tools_profile

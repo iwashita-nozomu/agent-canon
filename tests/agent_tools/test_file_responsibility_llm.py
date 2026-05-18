@@ -46,6 +46,7 @@ class FileResponsibilityLlmTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("FILE_RESP_LLM_SCOPE=single_file", result.stdout)
         self.assertIn("FILE_RESP_LLM_FILE=tools/example.py", result.stdout)
+        self.assertIn("FILE_RESP_LLM_MODEL=ggml-org/SmolLM3-3B-GGUF:Q4_K_M", result.stdout)
         self.assertIn("Do not infer repo-wide ownership.", result.stdout)
         self.assertIn("Responsibility Summary", result.stdout)
 
