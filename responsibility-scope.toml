@@ -182,7 +182,7 @@ issues = [
 id = "external-skill-vendor"
 owner = "external-vendor"
 class = "external_dependency"
-description = "Vendored third-party skills and related external agent components inside AgentCanon."
+description = "Vendored third-party skills and related external agent components inside AgentCanon; GitHub imports stay under vendor/<asset-class>/<owner>/<import-id> and expose only adapters."
 paths = [
   "vendor/**",
 ]

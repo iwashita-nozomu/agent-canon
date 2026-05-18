@@ -4908,7 +4908,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "actions",
-      "line": 504,
+      "line": 569,
       "path": "tools/agent_tools/vendor_skill_adapters.py",
       "surface": "tool"
     },
@@ -4916,7 +4916,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 504,
+      "line": 569,
       "path": "tools/agent_tools/vendor_skill_adapters.py",
       "surface": "tool"
     },
@@ -4924,7 +4924,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 504,
+      "line": 569,
       "path": "tools/agent_tools/vendor_skill_adapters.py",
       "surface": "tool"
     },
@@ -4932,7 +4932,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "VENDOR_SKILL_ADAPTERS",
-      "line": 527,
+      "line": 592,
       "path": "tools/agent_tools/vendor_skill_adapters.py",
       "surface": "tool"
     },
@@ -4940,7 +4940,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "VENDOR_SKILL_ADAPTER_FINDINGS",
-      "line": 526,
+      "line": 591,
       "path": "tools/agent_tools/vendor_skill_adapters.py",
       "surface": "tool"
     },

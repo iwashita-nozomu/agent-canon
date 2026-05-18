@@ -15,12 +15,14 @@ skills.
 
 ## Layout
 
-Use one provider directory and one skill directory:
+Use one provider directory and one skill directory. For GitHub imports,
+`provider` is the upstream GitHub owner or organization, not `agent-canon` and
+not the template repository that happens to consume the skill:
 
 ```text
-vendor/skills/<provider>/<skill>/SKILL.md
-vendor/skills/<provider>/<skill>/LICENSE
-vendor/skills/<provider>/<skill>/README.md
+vendor/skills/<github-owner>/<skill-id>/SKILL.md
+vendor/skills/<github-owner>/<skill-id>/LICENSE
+vendor/skills/<github-owner>/<skill-id>/README.md
 ```
 
 The vendored `SKILL.md` must keep valid runtime frontmatter:
@@ -53,6 +55,11 @@ upstream = "https://github.com/upstream-owner/skill-repo"
 revision = "commit-sha-or-release-tag"
 ```
 
+For GitHub URLs, `provider` must match the URL owner or organization. If the
+upstream repository name differs from the skill id, keep the skill id as the
+adapter name and record the exact repository in `upstream`; the source path
+still stays under `vendor/skills/<github-owner>/<skill-id>/`.
+
 Run:
 
 ```bash
@@ -71,6 +78,10 @@ python3 tools/agent_tools/check_agent_runtime_alignment.py
 
 - Do not copy third-party skill source directly into canonical
   `agents/skills/`.
+- Do not clone a GitHub skill repository directly into `.agents/skills/`,
+  `tools/`, `documents/`, or a template parent repository. Attach it under
+  AgentCanon `vendor/skills/<github-owner>/<skill-id>/` and expose it through a
+  manifest-backed adapter.
 - Do not create a runtime adapter without a manifest entry.
 - Do not enable a skill without upstream URL, revision, and license metadata.
 - Do not edit vendored source to satisfy AgentCanon house style unless the

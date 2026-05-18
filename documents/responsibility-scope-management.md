@@ -36,7 +36,9 @@ Each scope declares:
 - `github`: GitHub Actions, PR templates, Copilot configuration, and GitHub
   Issue mirror behavior.
 - `external-vendor`: third-party skills or agent components vendored into
-  AgentCanon.
+  AgentCanon. GitHub-sourced external repositories stay below
+  `vendor/<asset-class>/<github-owner>/<import-id>/` and are exposed through
+  adapters or manifests rather than copied into canonical runtime paths.
 
 ## Tool Contract
 

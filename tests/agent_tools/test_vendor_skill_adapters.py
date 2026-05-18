@@ -113,7 +113,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'adapter = ".agents/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
-                        'upstream = "https://example.invalid/external/example-skill"',
+                        'upstream = "https://github.com/external/example-skill"',
                         'revision = "abc123"',
                         "",
                     ]
@@ -172,7 +172,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'adapter = ".agents/skills/existing-skill"',
                         "enabled = true",
                         'license = "MIT"',
-                        'upstream = "https://example.invalid/external/existing-skill"',
+                        'upstream = "https://github.com/external/existing-skill"',
                         'revision = "abc123"',
                         "",
                     ]
@@ -204,7 +204,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'adapter = ".agents/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
-                        'upstream = "https://example.invalid/external/example-skill"',
+                        'upstream = "https://github.com/external/example-skill"',
                         'revision = "abc123"',
                         "",
                     ]
@@ -220,6 +220,104 @@ class VendorSkillAdaptersTest(unittest.TestCase):
             self.write_prompt_eval_manifest(root, expected_count=1)
             final_result = self.run_cli(root)
             self.assertEqual(final_result.returncode, 0, final_result.stdout + final_result.stderr)
+
+    def test_github_upstream_owner_must_match_provider(self) -> None:
+        """Imported GitHub skills should attach under their upstream owner."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(
+                root,
+                "vendor/skills/external/example-skill/SKILL.md",
+                skill_text("example-skill"),
+            )
+            self.write_manifest(
+                root,
+                "\n".join(
+                    [
+                        "[[skills]]",
+                        'id = "example-skill"',
+                        'provider = "external"',
+                        'source = "vendor/skills/external/example-skill"',
+                        'adapter = ".agents/skills/example-skill"',
+                        "enabled = true",
+                        'license = "MIT"',
+                        'upstream = "https://github.com/someone-else/example-skill"',
+                        'revision = "abc123"',
+                        "",
+                    ]
+                ),
+            )
+
+            result = self.run_cli(root, "--sync")
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("github-owner-must-match-provider:someone-else!=external", result.stdout)
+
+    def test_source_must_stay_under_provider_skill_path(self) -> None:
+        """Manifest source should not point at another vendor owner or root path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(
+                root,
+                "vendor/skills/other/example-skill/SKILL.md",
+                skill_text("example-skill"),
+            )
+            self.write_manifest(
+                root,
+                "\n".join(
+                    [
+                        "[[skills]]",
+                        'id = "example-skill"',
+                        'provider = "external"',
+                        'source = "vendor/skills/other/example-skill"',
+                        'adapter = ".agents/skills/example-skill"',
+                        "enabled = true",
+                        'license = "MIT"',
+                        'upstream = "https://github.com/external/example-skill"',
+                        'revision = "abc123"',
+                        "",
+                    ]
+                ),
+            )
+
+            result = self.run_cli(root, "--sync")
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "source-must-match-provider-skill:vendor/skills/external/example-skill",
+                result.stdout,
+            )
+
+    def test_github_ssh_upstream_can_match_provider(self) -> None:
+        """Imported GitHub SSH URLs are valid when the owner matches provider."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(
+                root,
+                "vendor/skills/external/example-skill/SKILL.md",
+                skill_text("example-skill"),
+            )
+            self.write_manifest(
+                root,
+                "\n".join(
+                    [
+                        "[[skills]]",
+                        'id = "example-skill"',
+                        'provider = "external"',
+                        'source = "vendor/skills/external/example-skill"',
+                        'adapter = ".agents/skills/example-skill"',
+                        "enabled = true",
+                        'license = "MIT"',
+                        'upstream = "git@github.com:external/example-skill.git"',
+                        'revision = "abc123"',
+                        "",
+                    ]
+                ),
+            )
+
+            sync_result = self.run_cli(root, "--sync")
+
+            self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
 
 
 if __name__ == "__main__":
