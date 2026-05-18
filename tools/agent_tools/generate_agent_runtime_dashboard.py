@@ -15,10 +15,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -45,6 +47,11 @@ TOKEN_MARKDOWN_RE = re.compile(
     re.DOTALL,
 )
 MAX_REPORT_LINES = 20
+NO_RESET_EPOCH = 0
+GIT_LOG_TIMEOUT_SECONDS = 5
+COMMIT_ABBREV_CHARS = 12
+PERCENT_SCALE = 100.0
+UNKNOWN_RESET_BASIS = "untracked-or-unknown"
 MARKDOWN_SKILL_IDS = ("md-style-check",)
 MARKDOWN_TOOL_IDS = (
     "audit_and_fix_links.py",
@@ -54,6 +61,13 @@ MARKDOWN_TOOL_IDS = (
     "fix_markdown_docs.py",
     "fix_markdown_headers.py",
     "run_docs_checks.sh",
+)
+SELECTION_RESPONSIBILITIES = ("skill", "workflow", "tool")
+SELECTED_WORKFLOW_FIELDS = (
+    "workflows",
+    "workflow",
+    "workflow_family",
+    "selected_workflow",
 )
 
 
@@ -125,6 +139,40 @@ class MarkdownDocsBreakdown:
 
 
 @dataclass(frozen=True)
+class SelectionReset:
+    """Reset window for one selectable AgentCanon component."""
+
+    reset_path: str
+    reset_epoch: int
+    reset_commit: str
+
+
+@dataclass(frozen=True)
+class SelectionMetric:
+    """Selection and miss counts for one skill, workflow, or tool."""
+
+    responsibility: str
+    name: str
+    selected_count: int
+    candidate_count: int
+    missed_count: int
+    reset_path: str
+    reset_at: str
+    reset_commit: str
+
+
+@dataclass(frozen=True)
+class SelectionMetricsBreakdown:
+    """Responsibility-scoped selection accuracy inferred from hook logs."""
+
+    metrics: tuple[SelectionMetric, ...]
+    entries_seen: int
+    entries_with_candidates: int
+    entries_with_selection: int
+    filtered_observations: int
+
+
+@dataclass(frozen=True)
 class RuntimeDashboardSummary:
     """All evidence used by one runtime dashboard."""
 
@@ -138,6 +186,7 @@ class RuntimeDashboardSummary:
     token_usage_breakdown: TokenUsageBreakdown
     prompt_tool_breakdown: PromptToolBreakdown
     markdown_docs_breakdown: MarkdownDocsBreakdown
+    selection_metrics_breakdown: SelectionMetricsBreakdown
 
 
 class ResultFamilyReader:
@@ -222,13 +271,7 @@ class SkillEvalBreakdownReader:
 class HookWorkflowBreakdownReader:
     """Reads workflow attribution from accumulated hook JSONL entries."""
 
-    WORKFLOW_FIELDS = (
-        "candidate_workflows",
-        "workflows",
-        "workflow",
-        "workflow_family",
-        "selected_workflow",
-    )
+    WORKFLOW_FIELDS = ("candidate_workflows", *SELECTED_WORKFLOW_FIELDS)
 
     @classmethod
     def read(cls, hook_files: Sequence[Path]) -> HookWorkflowBreakdown:
@@ -336,6 +379,172 @@ class TokenUsageBreakdownReader:
         return tuple(matches)
 
 
+@dataclass
+class SelectionMetricAccumulator:
+    """Mutable accumulator for one selection metric."""
+
+    responsibility: str
+    name: str
+    reset: SelectionReset
+    selected_count: int = 0
+    candidate_count: int = 0
+    missed_count: int = 0
+
+    def add_selected(self) -> None:
+        """Record one confirmed selection."""
+        self.selected_count += 1
+
+    def add_candidate(self, missed: bool) -> None:
+        """Record one candidate and whether it was missed in the same entry."""
+        self.candidate_count += 1
+        if missed:
+            self.missed_count += 1
+
+    def to_metric(self) -> SelectionMetric:
+        """Return an immutable metric row."""
+        return SelectionMetric(
+            responsibility=self.responsibility,
+            name=self.name,
+            selected_count=self.selected_count,
+            candidate_count=self.candidate_count,
+            missed_count=self.missed_count,
+            reset_path=self.reset.reset_path,
+            reset_at=reset_epoch_label(self.reset.reset_epoch),
+            reset_commit=self.reset.reset_commit,
+        )
+
+
+class SelectionMetricStore:
+    """Stores selection metrics and source-path reset windows."""
+
+    def __init__(self, root: Path) -> None:
+        """Store the evidence root and initialize caches."""
+        self.root = root
+        self.resets: dict[tuple[str, str], SelectionReset] = {}
+        self.metrics: dict[tuple[str, str], SelectionMetricAccumulator] = {}
+
+    def add_selected(self, responsibility: str, name: str, entry_epoch: int) -> bool:
+        """Add a selected component if the entry is inside its reset window."""
+        metric = self.metric_for(responsibility, name)
+        if not entry_inside_reset_window(entry_epoch, metric.reset):
+            return False
+        metric.add_selected()
+        return True
+
+    def add_candidate(
+        self,
+        responsibility: str,
+        name: str,
+        entry_epoch: int,
+        missed: bool,
+    ) -> bool:
+        """Add a candidate component if the entry is inside its reset window."""
+        metric = self.metric_for(responsibility, name)
+        if not entry_inside_reset_window(entry_epoch, metric.reset):
+            return False
+        metric.add_candidate(missed)
+        return True
+
+    def metric_for(self, responsibility: str, name: str) -> SelectionMetricAccumulator:
+        """Return a stable metric accumulator for a component."""
+        key = (responsibility, name)
+        if key not in self.metrics:
+            reset = self.reset_for(responsibility, name)
+            self.metrics[key] = SelectionMetricAccumulator(responsibility, name, reset)
+        return self.metrics[key]
+
+    def reset_for(self, responsibility: str, name: str) -> SelectionReset:
+        """Return the reset window for a component."""
+        key = (responsibility, name)
+        if key not in self.resets:
+            self.resets[key] = read_selection_reset(self.root, responsibility, name)
+        return self.resets[key]
+
+    def to_metrics(self) -> tuple[SelectionMetric, ...]:
+        """Return sorted immutable metric rows."""
+        rows = tuple(metric.to_metric() for metric in self.metrics.values())
+        return tuple(
+            sorted(
+                rows,
+                key=lambda row: (
+                    SELECTION_RESPONSIBILITIES.index(row.responsibility),
+                    -row.missed_count,
+                    -row.candidate_count,
+                    row.name,
+                ),
+            )
+        )
+
+
+class SelectionMetricsReader:
+    """Reads selection accuracy for skills, workflows, and tools."""
+
+    def __init__(self, root: Path) -> None:
+        """Store the AgentCanon root used to resolve reset windows."""
+        self.root = root
+
+    def read(self, hook_files: Sequence[Path]) -> SelectionMetricsBreakdown:
+        """Return responsibility-scoped selection metrics."""
+        store = SelectionMetricStore(self.root)
+        entries_seen = 0
+        entries_with_candidates = 0
+        entries_with_selection = 0
+        filtered_observations = 0
+        for hook_file in hook_files:
+            for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+                entries_seen += 1
+                entry_epoch = parse_hook_timestamp(entry.get("timestamp"))
+                selected = selected_by_responsibility(entry)
+                candidates = candidates_by_responsibility(entry)
+                entries_with_selection += int(any(selected.values()))
+                entries_with_candidates += int(any(candidates.values()))
+                filtered_observations += self.add_selected_components(store, selected, entry_epoch)
+                filtered_observations += self.add_candidate_components(
+                    store,
+                    candidates,
+                    selected,
+                    entry_epoch,
+                )
+        return SelectionMetricsBreakdown(
+            metrics=store.to_metrics(),
+            entries_seen=entries_seen,
+            entries_with_candidates=entries_with_candidates,
+            entries_with_selection=entries_with_selection,
+            filtered_observations=filtered_observations,
+        )
+
+    @staticmethod
+    def add_selected_components(
+        store: SelectionMetricStore,
+        selected: dict[str, tuple[str, ...]],
+        entry_epoch: int,
+    ) -> int:
+        """Add selected components and return filtered observation count."""
+        filtered = 0
+        for responsibility, names in selected.items():
+            for name in names:
+                if not store.add_selected(responsibility, name, entry_epoch):
+                    filtered += 1
+        return filtered
+
+    @staticmethod
+    def add_candidate_components(
+        store: SelectionMetricStore,
+        candidates: dict[str, tuple[str, ...]],
+        selected: dict[str, tuple[str, ...]],
+        entry_epoch: int,
+    ) -> int:
+        """Add candidate components and return filtered observation count."""
+        filtered = 0
+        for responsibility, names in candidates.items():
+            selected_names = set(selected.get(responsibility, ()))
+            for name in names:
+                missed = name not in selected_names
+                if not store.add_candidate(responsibility, name, entry_epoch, missed):
+                    filtered += 1
+        return filtered
+
+
 class RuntimeDashboardVisuals:
     """Renders reader-facing visual dashboard sections."""
 
@@ -355,6 +564,7 @@ class RuntimeDashboardVisuals:
             f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
             f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}\"]",
             f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
+            f"  Selection[\"Selection accuracy<br/>items: {len(summary.selection_metrics_breakdown.metrics)}<br/>misses: {selection_missed_total(summary)}\"]",
             f"  MarkdownDocs[\"Markdown/docs signals<br/>eval fails: {summary.markdown_docs_breakdown.failed_eval_reports}<br/>hook signals: {markdown_hook_signal_count(summary)}\"]",
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
@@ -371,6 +581,9 @@ class RuntimeDashboardVisuals:
             "  WorkflowHooks --> Dashboard",
             "  Tokens --> Dashboard",
             "  PromptTools --> Dashboard",
+            "  Hooks --> Selection",
+            "  PromptTools --> Selection",
+            "  Selection --> Dashboard",
             "  PromptTools --> MarkdownDocs",
             "  SkillEval --> MarkdownDocs",
             "  MarkdownDocs --> Dashboard",
@@ -393,6 +606,7 @@ class RuntimeDashboardVisuals:
             self.workflow_hook_row(),
             self.token_usage_row(),
             self.prompt_tool_row(),
+            self.selection_metrics_row(),
             self.markdown_docs_row(),
             self.family_row(
                 "workflow selection eval",
@@ -481,6 +695,15 @@ class RuntimeDashboardVisuals:
             or breakdown.prompt_missing_excerpt_entries > 0,
         )
 
+    def selection_metrics_row(self) -> str:
+        """Return the selection accuracy action-map row."""
+        return action_map_row(
+            "selection accuracy by responsibility",
+            "repair routing or logging when candidate skills/workflows/tools are not selected",
+            selection_candidate_total(self.summary) + selection_selected_total(self.summary),
+            selection_missed_total(self.summary) > 0,
+        )
+
     def markdown_docs_row(self) -> str:
         """Return the Markdown/docs signal action-map row."""
         breakdown = self.summary.markdown_docs_breakdown
@@ -553,6 +776,7 @@ class AgentRuntimeDashboard:
                 evidence.hook_counts,
                 skill_eval_breakdown,
             ),
+            selection_metrics_breakdown=SelectionMetricsReader(self.root).read(hook_files),
         )
 
 
@@ -733,6 +957,14 @@ def dashboard_analysis_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "## Token Consumption Evidence",
         "",
         *token_usage_lines(summary),
+        "",
+        "## Selection Accuracy By Responsibility",
+        "",
+        "This section compares candidate skills, workflows, and tools against the same-entry selections recorded in hook JSONL.",
+        "Counts are filtered to hook entries after the component source path's latest Git commit when a source path can be resolved.",
+        "A tool miss means a candidate repo tool was not confirmed by `tool_name` or `tool_command_verb`; coarse Bash-only logs can therefore identify missing evidence rather than definite misuse.",
+        "",
+        *selection_metrics_lines(summary),
         "",
         "## Prompt And Tool Selection Evidence",
         "",
@@ -938,6 +1170,68 @@ def prompt_tool_lines(summary: RuntimeDashboardSummary) -> list[str]:
     ]
 
 
+def selection_metrics_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return selection accuracy tables by responsibility."""
+    breakdown = summary.selection_metrics_breakdown
+    lines = [
+        f"- selection_entries_seen: `{breakdown.entries_seen}`",
+        f"- selection_entries_with_candidates: `{breakdown.entries_with_candidates}`",
+        f"- selection_entries_with_confirmed_selection: `{breakdown.entries_with_selection}`",
+        f"- selection_filtered_observations_before_component_update: `{breakdown.filtered_observations}`",
+        "",
+        "| responsibility | item | selected | candidates | missed | miss rate | reset window |",
+        "| --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    if not breakdown.metrics:
+        lines.append("| `_none` | `_none` | `0` | `0` | `0` | `unknown` | `_none` |")
+        return lines
+    lines.extend(selection_metric_row(row) for row in breakdown.metrics)
+    lines.extend(
+        (
+            "",
+            "### Responsibility Totals",
+            "",
+            "| responsibility | selected | candidates | missed | miss rate |",
+            "| --- | ---: | ---: | ---: | ---: |",
+            *selection_responsibility_rows(summary),
+        )
+    )
+    return lines
+
+
+def selection_metric_row(row: SelectionMetric) -> str:
+    """Return one responsibility-scoped selection metric row."""
+    cells = (
+        f"`{row.responsibility}`",
+        f"`{row.name}`",
+        f"`{row.selected_count}`",
+        f"`{row.candidate_count}`",
+        f"`{row.missed_count}`",
+        f"`{failure_rate(row.missed_count, row.candidate_count)}`",
+        f"`{selection_reset_label(row)}`",
+    )
+    return "| " + " | ".join(cells) + " |"
+
+
+def selection_responsibility_rows(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return aggregate rows for each selectable responsibility."""
+    return [
+        selection_responsibility_row(summary, responsibility)
+        for responsibility in SELECTION_RESPONSIBILITIES
+    ]
+
+
+def selection_responsibility_row(summary: RuntimeDashboardSummary, responsibility: str) -> str:
+    """Return one aggregate responsibility row."""
+    selected = selection_selected_total_for(summary, responsibility)
+    candidates = selection_candidate_total_for(summary, responsibility)
+    missed = selection_missed_total_for(summary, responsibility)
+    return (
+        f"| `{responsibility}` | `{selected}` | `{candidates}` | `{missed}` | "
+        f"`{failure_rate(missed, candidates)}` |"
+    )
+
+
 def markdown_docs_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return Markdown/docs-specific hook and eval signal lines."""
     breakdown = summary.markdown_docs_breakdown
@@ -1048,6 +1342,13 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS={summary.token_usage_breakdown.comparison_count}",
         f"AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES={summary.prompt_tool_breakdown.prompt_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES={summary.prompt_tool_breakdown.tool_selection_entries}",
+        f"AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS={len(summary.selection_metrics_breakdown.metrics)}",
+        f"AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED={selection_selected_total(summary)}",
+        f"AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES={selection_candidate_total(summary)}",
+        f"AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES={selection_missed_total(summary)}",
+        f"AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE={selection_miss_rate(summary, 'skill')}",
+        f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_MISS_RATE={selection_miss_rate(summary, 'workflow')}",
+        f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_MISS_RATE={selection_miss_rate(summary, 'tool')}",
         f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS={summary.markdown_docs_breakdown.eval_reports}",
         f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES={summary.markdown_docs_breakdown.failed_eval_reports}",
         f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS={markdown_hook_signal_count(summary)}",
@@ -1094,6 +1395,63 @@ def markdown_hook_signal_count(summary: RuntimeDashboardSummary) -> int:
     return breakdown.candidate_skill_entries + breakdown.candidate_tool_entries
 
 
+def selection_selected_total(summary: RuntimeDashboardSummary) -> int:
+    """Return total selected count for all responsibilities."""
+    return sum(row.selected_count for row in summary.selection_metrics_breakdown.metrics)
+
+
+def selection_candidate_total(summary: RuntimeDashboardSummary) -> int:
+    """Return total candidate count for all responsibilities."""
+    return sum(row.candidate_count for row in summary.selection_metrics_breakdown.metrics)
+
+
+def selection_missed_total(summary: RuntimeDashboardSummary) -> int:
+    """Return total missed candidate count for all responsibilities."""
+    return sum(row.missed_count for row in summary.selection_metrics_breakdown.metrics)
+
+
+def selection_selected_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+    """Return selected count for one responsibility."""
+    return sum(
+        row.selected_count
+        for row in summary.selection_metrics_breakdown.metrics
+        if row.responsibility == responsibility
+    )
+
+
+def selection_candidate_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+    """Return candidate count for one responsibility."""
+    return sum(
+        row.candidate_count
+        for row in summary.selection_metrics_breakdown.metrics
+        if row.responsibility == responsibility
+    )
+
+
+def selection_missed_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+    """Return missed candidate count for one responsibility."""
+    return sum(
+        row.missed_count
+        for row in summary.selection_metrics_breakdown.metrics
+        if row.responsibility == responsibility
+    )
+
+
+def selection_miss_rate(summary: RuntimeDashboardSummary, responsibility: str) -> str:
+    """Return candidate miss rate for one responsibility."""
+    return failure_rate(
+        selection_missed_total_for(summary, responsibility),
+        selection_candidate_total_for(summary, responsibility),
+    )
+
+
+def selection_reset_label(row: SelectionMetric) -> str:
+    """Return a compact reset-window label for one selection row."""
+    if row.reset_path == UNKNOWN_RESET_BASIS:
+        return UNKNOWN_RESET_BASIS
+    return f"{row.reset_at} {row.reset_commit} {row.reset_path}"
+
+
 def normalized_text_values(value: object) -> tuple[str, ...]:
     """Return non-empty string values from a string or list-like field."""
     if isinstance(value, str):
@@ -1109,11 +1467,218 @@ def integer_field(entry: dict[str, object], key: str) -> int:
     return value if isinstance(value, int) else 0
 
 
+def selected_by_responsibility(entry: dict[str, object]) -> dict[str, tuple[str, ...]]:
+    """Return selected skills, workflows, and tools from one hook entry."""
+    return {
+        "skill": normalized_text_values(entry.get("skills")),
+        "workflow": selected_workflow_values(entry),
+        "tool": selected_tool_values(entry),
+    }
+
+
+def candidates_by_responsibility(entry: dict[str, object]) -> dict[str, tuple[str, ...]]:
+    """Return candidate skills, workflows, and tools from one hook entry."""
+    return {
+        "skill": normalized_text_values(entry.get("candidate_skills")),
+        "workflow": normalized_text_values(entry.get("candidate_workflows")),
+        "tool": normalized_text_values(entry.get("candidate_tools")),
+    }
+
+
+def selected_workflow_values(entry: dict[str, object]) -> tuple[str, ...]:
+    """Return selected workflow names from one hook entry."""
+    names: list[str] = []
+    for workflow_field in SELECTED_WORKFLOW_FIELDS:
+        names.extend(normalized_text_values(entry.get(workflow_field)))
+    return unique_text_values(names)
+
+
+def selected_tool_values(entry: dict[str, object]) -> tuple[str, ...]:
+    """Return selected tool names from one hook entry."""
+    names: list[str] = []
+    names.extend(normalized_text_values(entry.get("tool_name")))
+    names.extend(normalized_text_values(entry.get("tool_command_verb")))
+    names.extend(command_tool_values(entry.get("commands")))
+    return unique_text_values(names)
+
+
+def command_tool_values(value: object) -> tuple[str, ...]:
+    """Return command-derived tool names from a hook command result list."""
+    if not isinstance(value, list):
+        return ()
+    names: list[str] = []
+    for item in cast(list[object], value):
+        if not isinstance(item, dict):
+            continue
+        command = cast(dict[str, object], item).get("command")
+        names.extend(command_parts_to_tool_values(command))
+    return unique_text_values(names)
+
+
+def command_parts_to_tool_values(value: object) -> tuple[str, ...]:
+    """Return selected tool names inferred from a command array."""
+    if not isinstance(value, list):
+        return ()
+    names: list[str] = []
+    parts = tuple(part for part in cast(list[object], value) if isinstance(part, str) and part)
+    if not parts:
+        return ()
+    names.append(command_part_tool_name(parts[0]))
+    for part in parts[1:]:
+        if command_part_is_repo_tool_path(part):
+            names.append(command_part_tool_name(part))
+    return unique_text_values(names)
+
+
+def command_part_tool_name(part: str) -> str:
+    """Return a compact command or path basename for tool selection accounting."""
+    if "/" not in part:
+        return part
+    return Path(part).name
+
+
+def command_part_is_repo_tool_path(part: str) -> bool:
+    """Return whether a command argument points at a repo tool script."""
+    tool_path = "tools/" in part
+    tool_suffix = part.endswith((".py", ".sh"))
+    return tool_path and tool_suffix
+
+
+def parse_hook_timestamp(value: object) -> int:
+    """Return a UTC epoch second parsed from a hook timestamp field."""
+    if not isinstance(value, str) or not value:
+        return NO_RESET_EPOCH
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return NO_RESET_EPOCH
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())
+
+
+def entry_inside_reset_window(entry_epoch: int, reset: SelectionReset) -> bool:
+    """Return whether an event should count for a component reset window."""
+    return (
+        reset.reset_epoch == NO_RESET_EPOCH
+        or entry_epoch == NO_RESET_EPOCH
+        or entry_epoch >= reset.reset_epoch
+    )
+
+
+def reset_epoch_label(epoch: int) -> str:
+    """Return a compact UTC reset timestamp label."""
+    if epoch == NO_RESET_EPOCH:
+        return UNKNOWN_RESET_BASIS
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def read_selection_reset(root: Path, responsibility: str, name: str) -> SelectionReset:
+    """Return the latest source-path update window for one component."""
+    resets = read_candidate_selection_resets(root, responsibility, name)
+    if not resets:
+        return SelectionReset(UNKNOWN_RESET_BASIS, NO_RESET_EPOCH, UNKNOWN_RESET_BASIS)
+    return max(resets, key=lambda reset: reset.reset_epoch)
+
+
+def read_candidate_selection_resets(
+    root: Path,
+    responsibility: str,
+    name: str,
+) -> tuple[SelectionReset, ...]:
+    """Return reset windows for existing candidate source paths."""
+    resets: list[SelectionReset] = []
+    for relative_path in selection_source_path_candidates(responsibility, name):
+        if (root / relative_path).exists():
+            resets.append(read_selection_path_reset(root, relative_path))
+    return tuple(resets)
+
+
+def read_selection_path_reset(root: Path, relative_path: Path) -> SelectionReset:
+    """Return latest Git update timestamp for an existing source path."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            root.as_posix(),
+            "log",
+            "-1",
+            "--format=%ct%x00%H",
+            "--",
+            relative_path.as_posix(),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=GIT_LOG_TIMEOUT_SECONDS,
+    )
+    output = result.stdout.strip()
+    if result.returncode == 0 and output:
+        epoch_text, commit = output.split("\x00", maxsplit=1)
+        return SelectionReset(
+            relative_path.as_posix(),
+            int(epoch_text),
+            commit[:COMMIT_ABBREV_CHARS],
+        )
+    return SelectionReset(relative_path.as_posix(), NO_RESET_EPOCH, UNKNOWN_RESET_BASIS)
+
+
+def selection_source_path_candidates(responsibility: str, name: str) -> tuple[Path, ...]:
+    """Return likely source paths for one skill, workflow, or tool."""
+    slug = name.removeprefix("$")
+    if responsibility == "skill":
+        return skill_source_path_candidates(slug)
+    if responsibility == "workflow":
+        return workflow_source_path_candidates(slug)
+    if responsibility == "tool":
+        return tool_source_path_candidates(slug)
+    return ()
+
+
+def skill_source_path_candidates(slug: str) -> tuple[Path, ...]:
+    """Return likely source paths for one skill slug."""
+    return (
+        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path("agents") / "skills" / f"{slug}.md",
+        Path(".claude") / "skills" / slug / "SKILL.md",
+    )
+
+
+def workflow_source_path_candidates(slug: str) -> tuple[Path, ...]:
+    """Return likely source paths for one workflow slug."""
+    return (
+        Path("agents") / "workflows" / f"{slug}.md",
+        Path("agents") / "workflows" / f"{slug}-workflow.md",
+        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path("agents") / "TASK_WORKFLOWS.md",
+    )
+
+
+def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
+    """Return likely source paths for one tool name."""
+    if "/" in slug:
+        return (Path(slug),)
+    return (
+        Path(".codex") / "hooks" / slug,
+        Path("tools") / "agent_tools" / slug,
+        Path("tools") / "ci" / slug,
+        Path("tools") / "docs" / slug,
+        Path("tools") / "oop" / "python" / slug,
+        Path("tools") / slug,
+    )
+
+
+def unique_text_values(values: Sequence[str]) -> tuple[str, ...]:
+    """Return non-empty unique text values while preserving order."""
+    return tuple(dict.fromkeys(value for value in values if value))
+
+
 def failure_rate(failed: int, total: int) -> str:
     """Return a compact percent failure rate."""
     if total <= 0:
         return "unknown"
-    return f"{(failed / total) * 100:.1f}%"
+    return f"{(failed / total) * PERCENT_SCALE:.1f}%"
 
 
 def average_ratio(values: Sequence[float]) -> str:
