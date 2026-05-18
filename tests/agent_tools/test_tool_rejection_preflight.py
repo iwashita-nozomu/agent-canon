@@ -39,6 +39,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("TOOL_REJECTION_PREFLIGHT=warn", result.stdout)
         self.assertIn("gate:oop_readability_guard", result.stdout)
         self.assertIn("gate:helper_inventory_guard", result.stdout)
+        self.assertIn("gate:style_checker_guard", result.stdout)
         self.assertIn("gate:dependency_review", result.stdout)
         self.assertIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
@@ -86,6 +87,28 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertIn("codex_hook_runtime_alignment", gates)
+        self.assertIn("dependency_review", gates)
+
+    def test_markdown_path_predicts_style_checker_gate(self) -> None:
+        """Markdown edits should carry automatic style checker coverage."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(PROJECT_ROOT),
+                "--format",
+                "json",
+                "documents/example.md",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        gates = {gate["gate"] for gate in payload["predicted_gates"]}
+        self.assertIn("style_checker_guard", gates)
         self.assertIn("dependency_review", gates)
 
     def test_skill_path_predicts_mirror_and_log_surface_gates(self) -> None:

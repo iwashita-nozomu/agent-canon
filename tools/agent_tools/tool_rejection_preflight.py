@@ -4,6 +4,7 @@
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
+# upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
@@ -20,6 +21,8 @@ from pathlib import Path
 
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+NOTEBOOK_SUFFIXES = {".ipynb"}
+MARKDOWN_SUFFIXES = {".md"}
 TEXT_SUFFIXES = {
     ".bash",
     ".cfg",
@@ -127,6 +130,20 @@ CPP_GATE_TEMPLATES = (
             "python3 tools/oop/cpp/readability.py --root . --min-score 95 {path}"
         ),
         handoff="include C/C++ OOP readability risk before edits",
+    ),
+)
+STYLE_CHECK_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="style_checker_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/style_checker_guard.py"
+        ),
+        handoff=(
+            "include selected style checker families and unchecked changed-file "
+            "coverage before continuing"
+        ),
     ),
 )
 DEPENDENCY_GATE_TEMPLATES = (
@@ -282,6 +299,8 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(PYTHON_GATE_TEMPLATES)
     if suffix in CPP_SUFFIXES:
         templates.extend(CPP_GATE_TEMPLATES)
+    if suffix in PYTHON_SUFFIXES | CPP_SUFFIXES | NOTEBOOK_SUFFIXES | MARKDOWN_SUFFIXES:
+        templates.extend(STYLE_CHECK_GATE_TEMPLATES)
     if suffix in TEXT_SUFFIXES:
         templates.extend(DEPENDENCY_GATE_TEMPLATES)
     if path in HOOK_CONFIG_PATHS or path.startswith(HOOK_SURFACE_PREFIXES):

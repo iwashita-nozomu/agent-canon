@@ -9,6 +9,7 @@
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
+# upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # @dependency-end
 
@@ -33,6 +34,7 @@ OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_gua
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
+STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 
 
@@ -382,7 +384,197 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
         self.assertTrue(any("notebook_quality_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("notebook_quality_guard.py" in command for command in stop_commands))
+        self.assertTrue(any("style_checker_guard.py" in command for command in post_tool_commands))
+        self.assertTrue(any("style_checker_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
+
+    def test_style_checker_guard_logs_markdown_and_unchecked_files(self) -> None:
+        """Style hook should select Markdown checks and log changed files without a checker."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            docs_dir = temp_root / "tools" / "docs"
+            docs_dir.mkdir(parents=True)
+            checker_text = (
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "print('STYLE_TEST_CHECKER_OK=' + ','.join(sys.argv[1:]))\n"
+            )
+            (docs_dir / "check_markdown_lint.py").write_text(checker_text, encoding="utf-8")
+            (docs_dir / "check_markdown_math.py").write_text(checker_text, encoding="utf-8")
+            readme = temp_root / "README.md"
+            data = temp_root / "data.lock"
+            readme.write_text("# Title\n\nInitial text.\n", encoding="utf-8")
+            data.write_text("initial\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            readme.write_text("# Title\n\nChanged text.\n", encoding="utf-8")
+            data.write_text("changed\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(STYLE_CHECKER_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["selected_checkers"], ["markdown_lint", "markdown_math"])
+        self.assertEqual(log_entry["unchecked_count"], 1)
+        self.assertEqual(
+            cast("list[dict[str, object]]", log_entry["unchecked_files"])[0]["paths"],
+            ["data.lock"],
+        )
+
+    def test_style_checker_guard_selects_cpp_and_notebook_checkers(self) -> None:
+        """Style hook should route changed C++ and notebook files to existing checkers."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            cpp_checker = temp_root / "tools" / "oop" / "cpp" / "readability.py"
+            notebook_checker = temp_root / "tools" / "validation" / "notebook_quality.py"
+            cpp_checker.parent.mkdir(parents=True)
+            notebook_checker.parent.mkdir(parents=True)
+            pass_checker = "#!/usr/bin/env python3\nprint('STYLE_TEST_CHECKER_OK=1')\n"
+            cpp_checker.write_text(pass_checker, encoding="utf-8")
+            notebook_checker.write_text(pass_checker, encoding="utf-8")
+            source = temp_root / "src" / "demo.cpp"
+            notebook = temp_root / "jupyter" / "demo.ipynb"
+            source.parent.mkdir()
+            notebook.parent.mkdir()
+            source.write_text("int value() { return 1; }\n", encoding="utf-8")
+            notebook.write_text(self._notebook_payload("display(1)"), encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("int value() { return 2; }\n", encoding="utf-8")
+            notebook.write_text(self._notebook_payload("display(2)"), encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(STYLE_CHECKER_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(
+            log_entry["selected_checkers"],
+            ["cpp_readability", "notebook_quality"],
+        )
+
+    def test_style_checker_guard_blocks_failed_python_style(self) -> None:
+        """Style hook should block when the selected Python checker fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            source = temp_root / "sample.py"
+            source.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            source.write_text("import os\n\nVALUE = 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(STYLE_CHECKER_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("Style checker hook", cast(str, payload["reason"]))
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["selected_checkers"], ["ruff"])
+        self.assertEqual(log_entry["unchecked_count"], 0)
 
     def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
         """Log surface guard should not consume tokens on a passing inventory check."""
