@@ -35,6 +35,13 @@ PROMPT_EVAL_MANIFEST = Path("agents/evals/skill_workflow_prompt_eval.toml")
 RUNTIME_SKILL_TARGET_GLOB = ".agents/skills/*/SKILL.md"
 FRONTMATTER_SCAN_LINES = 24
 SKILL_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+PROVIDER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$")
+GITHUB_HTTPS_UPSTREAM_RE = re.compile(
+    r"^https://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s?#]+?)(?:\.git)?(?:[/?#].*)?$"
+)
+GITHUB_SSH_UPSTREAM_RE = re.compile(
+    r"^(?:git@github\.com:|ssh://git@github\.com/)(?P<owner>[^/\s]+)/(?P<repo>[^/\s?#]+?)(?:\.git)?(?:[/?#].*)?$"
+)
 
 
 @dataclass(frozen=True)
@@ -89,6 +96,46 @@ class VendorSkillManifest:
     path: Path
     entries: tuple[VendorSkill, ...]
     findings: tuple[Finding, ...]
+
+
+@dataclass(frozen=True)
+class ManifestOwnershipPolicy:
+    """Validate manifest fields that attach external repositories under vendor."""
+
+    index: int
+    skill_id: str
+    provider: str
+    source_text: str
+    upstream: str
+
+    def validate(self) -> list[Finding]:
+        """Return ownership findings for one external skill import."""
+        findings: list[Finding] = []
+        if self.provider and not PROVIDER_RE.fullmatch(self.provider):
+            findings.append(
+                Finding("manifest", f"skills[{self.index}].provider", "invalid-github-owner-provider")
+            )
+        if self.source_text and self.provider and self.skill_id:
+            expected_source = VENDOR_SKILL_ROOT / self.provider / self.skill_id
+            if Path(self.source_text) != expected_source:
+                findings.append(
+                    Finding(
+                        "manifest",
+                        self.source_text,
+                        f"source-must-match-provider-skill:{expected_source.as_posix()}",
+                    )
+                )
+        if self.upstream and self.provider:
+            owner = github_upstream_owner(self.upstream)
+            if owner is not None and owner != self.provider:
+                findings.append(
+                    Finding(
+                        "manifest",
+                        f"skills[{self.index}].upstream",
+                        f"github-owner-must-match-provider:{owner}!={self.provider}",
+                    )
+                )
+        return findings
 
 
 @dataclass(frozen=True)
@@ -190,6 +237,15 @@ def validate_contained_path(root: Path, path: Path, container: Path, label: str)
     return findings
 
 
+def github_upstream_owner(upstream: str) -> str | None:
+    """Return the GitHub owner or organization when upstream is a GitHub URL."""
+    for pattern in (GITHUB_HTTPS_UPSTREAM_RE, GITHUB_SSH_UPSTREAM_RE):
+        match = pattern.fullmatch(upstream)
+        if match is not None:
+            return match.group("owner").lower()
+    return None
+
+
 def parse_frontmatter(skill_path: Path) -> tuple[SkillFrontmatter | None, list[Finding]]:
     """Parse the required frontmatter fields from one SKILL.md file."""
     if not skill_path.is_file():
@@ -275,6 +331,15 @@ def parse_entry(root: Path, raw_entry: object, index: int) -> tuple[VendorSkill 
         findings.append(Finding("manifest", f"skills[{index}].source", "must-be-relative-contained-path"))
     if adapter_text and not is_relative_path(adapter_text):
         findings.append(Finding("manifest", f"skills[{index}].adapter", "must-be-relative-contained-path"))
+    findings.extend(
+        ManifestOwnershipPolicy(
+            index=index,
+            skill_id=skill_id,
+            provider=provider,
+            source_text=source_text,
+            upstream=upstream,
+        ).validate()
+    )
 
     source = root / source_text
     adapter = root / adapter_text

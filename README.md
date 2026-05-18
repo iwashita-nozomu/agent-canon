@@ -152,4 +152,7 @@ AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
 Parent repositories may use a different root project license, but AgentCanon
 submodule content and root views into AgentCanon retain the AgentCanon license.
 Third-party skills or assets under `vendor/` must keep upstream URL, revision,
-and license metadata before they are enabled.
+and license metadata before they are enabled. GitHub-sourced third-party
+repositories attach under `vendor/<asset-class>/<github-owner>/<import-id>/`
+with a manifest-backed adapter instead of being copied into canonical runtime
+paths.

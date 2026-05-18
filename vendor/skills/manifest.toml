@@ -11,6 +11,7 @@ version = 1
 #
 # [[skills]]
 # id = "third-party-skill"
+# # For GitHub imports, provider must be the upstream owner or organization.
 # provider = "upstream-owner"
 # source = "vendor/skills/upstream-owner/third-party-skill"
 # adapter = ".agents/skills/third-party-skill"
