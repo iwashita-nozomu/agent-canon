@@ -1,6 +1,22 @@
 {
   "records": [
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 261,
+      "path": "tools/experiments/html_artifact_access.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 261,
+      "path": "tools/experiments/html_artifact_access.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
