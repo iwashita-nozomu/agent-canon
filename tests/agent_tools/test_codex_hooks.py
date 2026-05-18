@@ -1129,6 +1129,50 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["tool_input_keys"], ["cmd"])
         self.assertTrue(entry["tool_input_fingerprint"])
 
+    def test_skill_usage_logger_records_markdown_docs_signals(self) -> None:
+        """Markdown prompts and docs-check commands should be measurable later."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
+            prompt = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "マークダウンの hook と docs-check が引っかかっていないか見たい。",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            tool = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(prompt.stdout, "")
+        self.assertEqual(tool.stdout, "")
+        self.assertIn("md-style-check", entries[0]["candidate_skills"])
+        self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
+        self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
+
     def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
         """Prompt feedback should be classified with bounded redacted prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:

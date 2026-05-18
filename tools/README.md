@@ -97,6 +97,13 @@ under `agents/evals/results/report-quality/`.
     `rust-migration-plan` は固定 policy と hook / skill feedback logs から
     次に Rust 化する tool 候補を出します。派生 repo では
     `agent-canon rust-migration-plan --root vendor/agent-canon` を使います。
+    `mcp-preflight-policy` は相談、GitHub-only read inspection、local repo
+    task の境界を機械判定します。`github-actions-read`、`github-read`、
+    `pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、
+    `implementation`、`validation`、`pr-mutation`、`issue-sync` は `required`
+    です。`mcp-inventory` は Rust 実装の repo MCP inventory checker で、
+    repository task では `agent-canon mcp-inventory --root . --require
+    repo_mcp_server --session-cache` を既定にします。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
@@ -154,10 +161,12 @@ under `agents/evals/results/report-quality/`.
     - `latest` は通常の最新化を tool-first に実行し、safe な場合は `ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO acknowledge まで進めます。submodule repo では `ensure-latest` の local-state evidence を必須にし、外側の GitHub / PR 照会で latest 判定を再実装しません。local shared-canon branch、dirty submodule、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW` と `NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
     - `apply` は `ensure-latest` を呼び、GitHub `main` の submodule pin を parent repo に持ち帰ったあと、compiled AgentCanon tools を rebuild します。
     - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
+      commit SHA が同じでも Rust source が installed binary より新しければ再ビルドします。
     - `merge-main-into-current` は `vendor/agent-canon/` の current branch に GitHub `main` を merge し、AgentCanon PR branch を push できる状態へ近づけます。
     - compatibility commands for local remotes, source refresh, and direct main alignment are intentionally not user-facing.
   - `rebuild_agent_tools.sh`
     - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。
+    - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
     - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は AgentCanon source そのものには依存しないため、devcontainer post-create または明示的な llama.cpp rebuild policy で扱います。
 
 ## AgentCanon Update Path
@@ -268,7 +277,13 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitoring.md` is the in-workflow monitoring artifact consumed by the evaluation. Keep it current during the run, not only at closeout.
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 After evidence is verified, `workflow_monitor.py --closeout-token-preset` records the standard behavior tokens consumed by `evaluate_agent_run.py`; it is a recording shortcut, not a substitute for validation evidence.
-`bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically, and tools such as `check_mcp_inventory.py` and `run_repo_dependency_review.sh` can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
+`bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically.
+Use `agent-canon mcp-preflight-policy` before turning read-only GitHub
+inspection into a local repository task. Use `agent-canon mcp-inventory --root
+. --require repo_mcp_server --session-cache` for the standard MCP preflight,
+and use `check_mcp_inventory.py --report-dir <run>` only when the run bundle
+needs direct `workflow_monitoring.md` evidence. `run_repo_dependency_review.sh`
+can append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.
 `compare_codex_token_footprints.py` compares two Codex session JSONL files, emits `TOKEN_FOOTPRINT_*` machine status lines, and can append token-efficiency evidence to `workflow_monitoring.md`.
 When a run uses skills, prompt eval evidence is required. Run

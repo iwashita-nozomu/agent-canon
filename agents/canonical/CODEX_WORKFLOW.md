@@ -134,14 +134,17 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 
 ### MCP Surface Preflight
 
-repository task では、ユーザーが MCP を明示していなくても、repo-local `repo_mcp_server` が configured inventory にあるものとして扱い、task intake の標準 preflight で確認します。
+repository task では、ユーザーが MCP を明示していなくても、repo-local `repo_mcp_server` が configured inventory にあるものとして扱い、task intake の標準 preflight で確認します。GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させず、repo MCP preflight を走らせません。
 
 ```bash
-python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
+agent-canon mcp-preflight-policy --request-kind github-actions-read
+agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
 ```
 
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合はこの preflight を走らせず、repo MCP tool、shell、GitHub check も起動せず、会話だけで応答します。
-- repo state 確認、file edit、validation、PR / issue 処理、CI 確認、または実装作業へ切り替わった時点で repository task として扱い、切り替えを user-facing update で明示してから preflight へ進みます。
+- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時点で repository task として扱い、切り替えを user-facing update で明示してから preflight へ進みます。
+- 判断が曖昧なときは `agent-canon mcp-preflight-policy --request-kind <kind>` を使います。`github-actions-read`、`github-read`、`pr-read`、`issue-read` は `MCP_PREFLIGHT_DECISION=skip`、`repo-read`、`implementation`、`validation`、`pr-mutation`、`issue-sync` は `required` です。
+- session 内の小さな follow-up repository task では、`agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` の cache hit を pass evidence として使えます。`.codex/config.toml`、`mcp/`、Rust MCP inventory source、Python compatibility checker が変わったら cache は無効です。
 - `repo_mcp_server` の正本 launcher は `.codex/config.toml` の `[mcp_servers.repo_mcp_server]` です。
 - template / derived repo では host-global command ではなく root `mcp/` から `vendor/agent-canon/mcp/` の repo-local launcher を起動します。
 - AgentCanon owns the server implementation in `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and the repo MCP tool contract documented by `mcp/README.md`.
@@ -154,7 +157,7 @@ python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server
 - configured inventory に無い server を、parent や worker が bridge-local process として暗黙に起動して代替してはいけません。
 - `.codex/config.toml` が `repo_mcp_server` を宣言しているのに inventory が空の場合は、project trust または Codex project-config loading の問題として扱い、repo task を続ける前に修復します。
 - inventory にあるが startup に失敗する場合は、`mcp/` symlink view、launcher path、または host の base command availability の問題として run bundle に記録し、MCP 前提作業を続けません。
-- contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。
+- contract 確定前の preflight 記録は `work_log.py --allow-missing-request-clause-id --missing-request-clause-reason "<reason>"` で run bundle に残します。`workflow_monitoring.md` への explicit evidence が必要な run では、Python 互換入口 `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。
 
 ### Codex Goals Feature Preflight
 

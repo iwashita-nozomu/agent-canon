@@ -71,7 +71,9 @@ This target also runs the compiled AgentCanon tool rebuild. Treat
 `AGENT_CANON_TOOL_REBUILD_RUST=already_current` as the expected evidence. If the
 host lacks Rust and the output is `skipped_missing_cargo`, rerun
 `make agent-canon-rebuild-tools` inside the DevContainer before depending on
-Rust-backed tools.
+Rust-backed tools. The rebuild tool also rebuilds when Rust source files are
+newer than the installed binary, so local Rust CLI smoke should not reuse a stale
+binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 

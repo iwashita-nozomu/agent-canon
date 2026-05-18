@@ -19,10 +19,10 @@ status: open
 source: user
 severity: S2
 evidence: .codex/hooks/mcp_session_context.sh
-affected_surfaces: .codex/hooks/mcp_session_context.sh, .codex/README.md, mcp/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, tools/agent_tools/check_mcp_inventory.py, tests/agent_tools/test_check_mcp_inventory.py, tests/agent_tools/test_codex_hooks.py
+affected_surfaces: agent-canon-environment.toml, rust/agent-canon/src/mcp_inventory.rs, .codex/hooks/mcp_session_context.sh, .codex/README.md, mcp/README.md, agents/skills/codex-task-workflow.md, agents/canonical/CODEX_WORKFLOW.md, tools/agent_tools/check_mcp_inventory.py, tests/agent_tools/test_check_mcp_inventory.py, tests/agent_tools/test_codex_hooks.py
 edit_scope: reports/dependency-review/mcp-inventory-preflight-20260517/dependency_edit_scope.txt
-required_action: Replace per-message MCP inventory repetition with session-scoped or run-scoped evidence while preserving fail-closed repair behavior when MCP configuration is missing or stale.
-close_condition: MCP preflight docs, hook context, checker behavior, and tests define when cached evidence is valid, when revalidation is required, and how run bundles record the evidence.
+required_action: Replace per-message MCP inventory repetition with Rust session-scoped or run-scoped evidence while preserving fail-closed repair behavior when MCP configuration is missing or stale.
+close_condition: Rust MCP preflight docs, hook context, checker behavior, environment TOML, and tests define when cached evidence is valid, when revalidation is required, and how run bundles record the evidence.
 
 ## Finding
 
@@ -50,6 +50,37 @@ the policy does not distinguish these cases:
 - Record cache invalidation triggers, such as changes to `.codex/config.toml`,
   `mcp/`, `tools/agent_tools/check_mcp_inventory.py`, or the active run bundle.
 - Update tests for the checker and hook context wording.
+
+## 2026-05-17 Implementation Direction
+
+The fix belongs in the Rust CLI, not in another Python helper. The expected
+machine surfaces are:
+
+- `agent-canon mcp-preflight-policy --request-kind <kind>` for classifying
+  ordinary consultation, GitHub-only read inspection, and local repository
+  tasks.
+- `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache`
+  for repository-task inventory with session-scoped pass evidence.
+- `agent-canon-environment.toml` for the machine-readable environment contract,
+  including cache path and invalidation surfaces.
+- `python3 tools/agent_tools/check_mcp_inventory.py --report-dir <run>` remains
+  only when `workflow_monitoring.md` needs direct evidence.
+
+Observed command smoke:
+
+```text
+MCP_PREFLIGHT_SCOPE=github-actions-read
+MCP_PREFLIGHT_DECISION=skip
+MCP_PREFLIGHT_REASON=github_only_read_inspection
+
+MCP_PREFLIGHT_SCOPE=implementation
+MCP_PREFLIGHT_DECISION=required
+MCP_PREFLIGHT_REASON=local_repo_state_or_mutation
+
+MCP_SERVER=repo_mcp_server status=enabled command=bash args=mcp/repo_mcp_server.sh cwd=.
+MCP_INVENTORY_CACHE=written
+MCP_INVENTORY=pass
+```
 
 ## Evidence
 

@@ -16,7 +16,7 @@ status: in_progress
 source: user
 severity: S1
 evidence: User feedback on 2026-05-17: eval collection is still not reliably accumulating into AgentCanon.
-affected_surfaces: agents/evals/README.md, agents/evals/results/README.md, agents/evals/results/hook-runs/README.md, agents/evals/results/skill-workflow-prompt/README.md, .codex/hooks/hook_event_log.py, .codex/hooks/skill_usage_logger.py, tools/agent_tools/evaluate_skill_workflow_prompts.py, tools/agent_tools/generate_agent_improvement_guide.py
+affected_surfaces: agents/evals/README.md, agents/evals/results/README.md, agents/evals/results/hook-runs/README.md, agents/evals/results/skill-workflow-prompt/README.md, .codex/hooks/hook_event_log.py, .codex/hooks/skill_usage_logger.py, tools/agent_tools/evaluate_skill_workflow_prompts.py, tools/agent_tools/generate_agent_improvement_guide.py, tools/agent_tools/generate_agent_runtime_dashboard.py
 edit_scope: tools/agent_tools/eval_accumulation_check.py, tests/agent_tools/test_eval_accumulation_check.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, .github/workflows/agent-canon-static-gates.yml
 required_action: Add a gate that verifies AgentCanon-owned hook and skill eval result directories are append-only, tracked, and structurally readable.
 close_condition: The gate passes on current accumulated evidence and fails on missing result directories, duplicate hook run ids, malformed JSONL, or ignored result paths.
@@ -35,3 +35,21 @@ should stay structural: it must not reject old evidence merely because it is
 legacy-shaped, but it must fail on missing canonical directories, ignored
 result paths, malformed JSONL, duplicate ids, or missing required fields in new
 namespaced hook logs.
+
+## 2026-05-17 Dashboard Evidence
+
+The Agent Runtime Dashboard now routes missing evidence back to this issue
+instead of only showing raw counts. The latest observed dashboard run exposed:
+
+```text
+AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=832
+AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED=29
+AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=803
+AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS=0
+AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES=0
+AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES=756
+```
+
+This confirms that structural accumulation exists, but the log schema still
+needs better workflow attribution, prompt capture coverage after deployment,
+and token footprint comparison evidence.

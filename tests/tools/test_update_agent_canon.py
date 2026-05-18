@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -1237,6 +1238,19 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            time.sleep(1.1)
+            (rust_root / "Cargo.toml").write_text(
+                "[package]\nname = \"agent-canon\"\nversion = \"0.1.0\"\nedition = \"2021\"\n# dirty source\n",
+                encoding="utf-8",
+            )
+            third = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "rebuild-tools"],
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", first.stdout)
@@ -1244,6 +1258,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertTrue((tools_home / "bin" / "agent-canon").is_symlink())
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=already_current", second.stdout)
+            self.assertEqual(third.returncode, 0, third.stdout + third.stderr)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", third.stdout)
 
     def test_latest_routes_dirty_submodule_to_agent_conflict_workflow(self) -> None:
         """The high-level latest command should not overwrite dirty shared canon work."""

@@ -28,6 +28,7 @@ if __package__ in (None, ""):
 from generate_agent_improvement_guide import (  # noqa: E402
     AgentImprovementGuide,
     EvidenceSummary,
+    HookEvidenceCounts,
     counter_lines,
 )
 
@@ -44,6 +45,16 @@ TOKEN_MARKDOWN_RE = re.compile(
     re.DOTALL,
 )
 MAX_REPORT_LINES = 20
+MARKDOWN_SKILL_IDS = ("md-style-check",)
+MARKDOWN_TOOL_IDS = (
+    "audit_and_fix_links.py",
+    "check_markdown_lint.py",
+    "check_markdown_math.py",
+    "format_markdown.py",
+    "fix_markdown_docs.py",
+    "fix_markdown_headers.py",
+    "run_docs_checks.sh",
+)
 
 
 @dataclass(frozen=True)
@@ -103,6 +114,17 @@ class PromptToolBreakdown:
 
 
 @dataclass(frozen=True)
+class MarkdownDocsBreakdown:
+    """Markdown/docs hook and eval signals inferred from accumulated evidence."""
+
+    eval_reports: int
+    failed_eval_reports: int
+    candidate_skill_entries: int
+    candidate_tool_entries: int
+    candidate_tools: Counter[str]
+
+
+@dataclass(frozen=True)
 class RuntimeDashboardSummary:
     """All evidence used by one runtime dashboard."""
 
@@ -115,6 +137,7 @@ class RuntimeDashboardSummary:
     hook_workflow_breakdown: HookWorkflowBreakdown
     token_usage_breakdown: TokenUsageBreakdown
     prompt_tool_breakdown: PromptToolBreakdown
+    markdown_docs_breakdown: MarkdownDocsBreakdown
 
 
 class ResultFamilyReader:
@@ -332,6 +355,7 @@ class RuntimeDashboardVisuals:
             f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
             f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}\"]",
             f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
+            f"  MarkdownDocs[\"Markdown/docs signals<br/>eval fails: {summary.markdown_docs_breakdown.failed_eval_reports}<br/>hook signals: {markdown_hook_signal_count(summary)}\"]",
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
             f"  LocalLLM[\"Local LLM evals<br/>reports: {family_count(summary, 'local-llm-responsibility')}\"]",
@@ -347,6 +371,9 @@ class RuntimeDashboardVisuals:
             "  WorkflowHooks --> Dashboard",
             "  Tokens --> Dashboard",
             "  PromptTools --> Dashboard",
+            "  PromptTools --> MarkdownDocs",
+            "  SkillEval --> MarkdownDocs",
+            "  MarkdownDocs --> Dashboard",
             "  WorkflowEval --> Dashboard",
             "  ReportEval --> Dashboard",
             "  LocalLLM --> Dashboard",
@@ -366,6 +393,7 @@ class RuntimeDashboardVisuals:
             self.workflow_hook_row(),
             self.token_usage_row(),
             self.prompt_tool_row(),
+            self.markdown_docs_row(),
             self.family_row(
                 "workflow selection eval",
                 "workflow-selection",
@@ -453,6 +481,17 @@ class RuntimeDashboardVisuals:
             or breakdown.prompt_missing_excerpt_entries > 0,
         )
 
+    def markdown_docs_row(self) -> str:
+        """Return the Markdown/docs signal action-map row."""
+        breakdown = self.summary.markdown_docs_breakdown
+        evidence_count = breakdown.eval_reports + markdown_hook_signal_count(self.summary)
+        return action_map_row(
+            "Markdown/docs hook signals",
+            "add or inspect Markdown/docs hook measurements when markdown checks feel noisy",
+            evidence_count,
+            breakdown.failed_eval_reports > 0 or markdown_hook_signal_count(self.summary) == 0,
+        )
+
     def family_row(self, signal: str, family_name: str, action: str) -> str:
         """Return an eval-family action-map row."""
         family = family_by_name(self.summary, family_name)
@@ -499,16 +538,21 @@ class AgentRuntimeDashboard:
                 "agents/evals/results/report-quality",
             ),
         )
+        skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         return RuntimeDashboardSummary(
             root=self.root,
             evidence=evidence,
             hook_files=hook_files,
             hook_entries=sum(non_empty_line_count(path) for path in hook_files),
             result_families=result_families,
-            skill_eval_breakdown=SkillEvalBreakdownReader.read(result_families[0]),
+            skill_eval_breakdown=skill_eval_breakdown,
             hook_workflow_breakdown=HookWorkflowBreakdownReader.read(hook_files),
             token_usage_breakdown=TokenUsageBreakdownReader.read(self.root),
             prompt_tool_breakdown=read_prompt_tool_breakdown(hook_files),
+            markdown_docs_breakdown=read_markdown_docs_breakdown(
+                evidence.hook_counts,
+                skill_eval_breakdown,
+            ),
         )
 
 
@@ -538,6 +582,27 @@ def read_prompt_tool_breakdown(hook_files: Sequence[Path]) -> PromptToolBreakdow
         for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
             prompt.add_entry(entry)
     return prompt.to_breakdown()
+
+
+def read_markdown_docs_breakdown(
+    hook_counts: HookEvidenceCounts,
+    skill_eval: SkillEvalBreakdown,
+) -> MarkdownDocsBreakdown:
+    """Return Markdown/docs-specific hook and eval signal counts."""
+    markdown_tools = Counter(
+        {
+            tool: hook_counts.candidate_tools[tool]
+            for tool in MARKDOWN_TOOL_IDS
+            if hook_counts.candidate_tools.get(tool, 0) > 0
+        }
+    )
+    return MarkdownDocsBreakdown(
+        eval_reports=sum(skill_eval.evaluated.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
+        failed_eval_reports=sum(skill_eval.failed.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
+        candidate_skill_entries=sum(hook_counts.candidate_skills.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
+        candidate_tool_entries=sum(markdown_tools.values()),
+        candidate_tools=markdown_tools,
+    )
 
 
 @dataclass
@@ -627,6 +692,10 @@ def dashboard_visual_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "",
         *visuals.action_map_lines(),
         "",
+        "## Issue Routing",
+        "",
+        *issue_routing_lines(summary),
+        "",
     ]
 
 
@@ -668,6 +737,10 @@ def dashboard_analysis_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "## Prompt And Tool Selection Evidence",
         "",
         *prompt_tool_lines(summary),
+        "",
+        "## Markdown Docs Hook Signals",
+        "",
+        *markdown_docs_lines(summary),
         "",
     ]
 
@@ -865,6 +938,93 @@ def prompt_tool_lines(summary: RuntimeDashboardSummary) -> list[str]:
     ]
 
 
+def markdown_docs_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return Markdown/docs-specific hook and eval signal lines."""
+    breakdown = summary.markdown_docs_breakdown
+    status = "present" if markdown_hook_signal_count(summary) > 0 else "missing"
+    reason = (
+        "Markdown/docs prompt or tool signals are present in hook JSONL."
+        if status == "present"
+        else "No Markdown/docs candidate skill or docs-tool signal is present in hook JSONL yet."
+    )
+    return [
+        f"- markdown_hook_signal_status: `{status}`",
+        f"- markdown_hook_signal_reason: `{reason}`",
+        f"- markdown_skill_eval_reports: `{breakdown.eval_reports}`",
+        f"- markdown_failed_skill_eval_reports: `{breakdown.failed_eval_reports}`",
+        f"- markdown_candidate_skill_entries: `{breakdown.candidate_skill_entries}`",
+        f"- markdown_candidate_tool_entries: `{breakdown.candidate_tool_entries}`",
+        "",
+        "### Markdown Docs Candidate Tools",
+        "",
+        "| tool | hook entries |",
+        "| --- | ---: |",
+        *counter_table_rows(breakdown.candidate_tools),
+    ]
+
+
+def issue_routing_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return durable issue routes for dashboard attention signals."""
+    rows = [
+        issue_route_row(
+            summary,
+            "mcp preflight scope",
+            "mcp-inventory-preflight-cache",
+            "use Rust policy/cache commands for GitHub-only read versus local repo task boundaries",
+        )
+    ]
+    if dashboard_has_evidence_gaps(summary):
+        rows.append(
+            issue_route_row(
+                summary,
+                "eval evidence gaps",
+                "eval-accumulation-gaps",
+                "repair missing workflow attribution, prompt capture, or token comparison evidence",
+            )
+        )
+    rows.append(
+        issue_route_row(
+            summary,
+            "GitHub issue mirror",
+            "github-folder-issue-sync",
+            "mirror durable local issues to GitHub only through explicit sync tooling",
+        )
+    )
+    return [
+        "| signal | durable issue | route reason |",
+        "| --- | --- | --- |",
+        *rows,
+    ]
+
+
+def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
+    """Return whether the dashboard found missing runtime evidence."""
+    return (
+        summary.hook_workflow_breakdown.entries_without_workflow > 0
+        or summary.token_usage_breakdown.comparison_count == 0
+        or summary.prompt_tool_breakdown.prompt_entries == 0
+    )
+
+
+def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, reason: str) -> str:
+    """Return one durable issue routing row."""
+    issue = issue_by_slug(summary, slug)
+    issue_label = (
+        f"`{issue.relative_to(summary.root).as_posix()}`"
+        if issue is not None
+        else "`missing-local-issue`"
+    )
+    return f"| `{signal}` | {issue_label} | {reason} |"
+
+
+def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> Path | None:
+    """Return a durable issue path whose filename contains the requested slug."""
+    for issue in (*summary.evidence.open_issues, *summary.evidence.closed_issues):
+        if slug in issue.name:
+            return issue
+    return None
+
+
 def token_file_rows(summary: RuntimeDashboardSummary) -> list[str]:
     """Return bounded token evidence file rows."""
     files = summary.token_usage_breakdown.comparison_files[:MAX_REPORT_LINES]
@@ -888,6 +1048,9 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS={summary.token_usage_breakdown.comparison_count}",
         f"AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES={summary.prompt_tool_breakdown.prompt_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES={summary.prompt_tool_breakdown.tool_selection_entries}",
+        f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS={summary.markdown_docs_breakdown.eval_reports}",
+        f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES={summary.markdown_docs_breakdown.failed_eval_reports}",
+        f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS={markdown_hook_signal_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES={len(summary.evidence.open_issues)}",
         f"AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES={len(summary.evidence.closed_issues)}",
     ]
@@ -923,6 +1086,12 @@ def action_map_row(
     else:
         state = "healthy"
     return f"| {signal} | `{state}` | `{evidence_count}` | {action} |"
+
+
+def markdown_hook_signal_count(summary: RuntimeDashboardSummary) -> int:
+    """Return total Markdown/docs candidate hook signals."""
+    breakdown = summary.markdown_docs_breakdown
+    return breakdown.candidate_skill_entries + breakdown.candidate_tool_entries
 
 
 def normalized_text_values(value: object) -> tuple[str, ...]:

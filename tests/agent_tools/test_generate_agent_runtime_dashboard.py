@@ -53,6 +53,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("## Action Map", dashboard)
         self.assertIn("| hook evidence | `healthy` | `2` |", dashboard)
         self.assertIn("| report quality eval | `missing` | `0` |", dashboard)
+        self.assertIn("## Issue Routing", dashboard)
+        self.assertIn("AC-20260517-mcp-inventory-preflight-cache.md", dashboard)
+        self.assertIn("AC-20260517-eval-accumulation-gaps.md", dashboard)
+        self.assertIn("AC-20260517-github-folder-issue-sync.md", dashboard)
         self.assertIn("## Skill Eval Failure Analysis", dashboard)
         self.assertIn("| `agent-orchestration` | `1` | `1` | `100.0%` |", dashboard)
         self.assertIn("## Hook Workflow Attribution", dashboard)
@@ -66,6 +70,12 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("tool_selection_entries: `2`", dashboard)
         self.assertIn("| `Bash` | `2` |", dashboard)
         self.assertIn("| `python3` | `1` |", dashboard)
+        self.assertIn("## Markdown Docs Hook Signals", dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1", dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1", dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS=2", dashboard)
+        self.assertIn("markdown_hook_signal_status: `present`", dashboard)
+        self.assertIn("| `run_docs_checks.sh` | `1` |", dashboard)
         self.assertIn("agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl", dashboard)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_FILES=2", dashboard)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=4", dashboard)
@@ -121,6 +131,15 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "issue_id: AC-20260517-open\nstatus: open\n",
             encoding="utf-8",
         )
+        for slug in (
+            "mcp-inventory-preflight-cache",
+            "eval-accumulation-gaps",
+            "github-folder-issue-sync",
+        ):
+            (root / "issues" / "open" / f"AC-20260517-{slug}.md").write_text(
+                f"issue_id: AC-20260517-{slug}\nstatus: open\n",
+                encoding="utf-8",
+            )
         (root / "issues" / "closed" / "AC-20260517-closed.md").write_text(
             "issue_id: AC-20260517-closed\nstatus: resolved\n",
             encoding="utf-8",
@@ -129,6 +148,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         (root / "memory" / "AGENT_PHILOSOPHY.md").write_text("- learning\n", encoding="utf-8")
         (skill_dir / "skill-eval-test-fail-agent-orchestration.md").write_text(
             "- used_skills: `agent-orchestration`\nEVAL_STATUS=fail\n",
+            encoding="utf-8",
+        )
+        (skill_dir / "skill-eval-test-fail-md-style-check.md").write_text(
+            "- used_skills: `md-style-check`\nEVAL_STATUS=fail\n",
             encoding="utf-8",
         )
         (local_llm_dir / "local-llm-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
@@ -163,6 +186,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "payload_fingerprint": "payload-b",
                     "skills": ["agent-orchestration"],
                     "candidate_workflows": ["environment-maintenance"],
+                    "candidate_skills": ["md-style-check"],
+                    "candidate_tools": ["run_docs_checks.sh"],
                     "feedback_labels": ["quality_gap"],
                     "prompt_capture_status": "present",
                     "prompt_excerpt_redacted": "Use environment maintenance",

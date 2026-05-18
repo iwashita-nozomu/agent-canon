@@ -3,6 +3,7 @@
 # upstream design ../../documents/rust-agent-tool-migration.md Rust tool migration policy
 # downstream implementation src/main.rs CLI entrypoint
 # downstream implementation src/migration_audit.rs Rust migration audit command
+# downstream implementation src/mcp_inventory.rs Rust MCP preflight command
 # downstream implementation src/rust_migration_plan.rs Rust migration planning command
 # @dependency-end
 
@@ -13,3 +14,4 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
+serde_json = "1"
