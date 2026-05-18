@@ -140,7 +140,7 @@ entries:
       - tests/agent_tools/test_responsibility_scope.py
 
   - id: issue-sync
-    summary: Validates local AgentCanon issue files and plans GitHub Issue synchronization.
+    summary: Validates local AgentCanon issue files and checks or syncs GitHub Issue mirrors.
     path: tools/agent_tools/issue_sync.py
     family: agent_tools
     role: sync

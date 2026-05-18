@@ -139,6 +139,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
 - 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
 - `python3 tools/agent_tools/issue_sync.py` を実行し、GitHub mirror が未作成の local issue は `ISSUE_SYNC_PLAN=` を PR body に貼るか、明示的に defer します。
+- `.github/workflows/issue-mirror.yml` の PR check が出す Step Summary を確認し、linked GitHub Issue の state / title drift があれば PR 内で修正します。
 - GitHub Actions の Agent Improvement Guide がある場合は、その artifact / step summary を確認し、memory、eval、hook、issues 由来の改善候補を PR body に反映します。
 
 ## Branch ルール
@@ -172,7 +173,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
-python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/local_llm_eval.py
 python3 tools/ci/check_github_workflows.py
