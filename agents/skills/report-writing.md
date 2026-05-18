@@ -116,3 +116,14 @@ report_source_packet=<path-or-inline>
 report_reviewer=<path|not_required>
 report_rule_drift=<none|canonical_update_required>
 ```
+
+## Reader Guide For Evaluations And Experiments
+
+Evaluation and experiment reports must include a reader guide before the
+detailed table. The guide must state:
+
+- what to inspect first
+- each key metric's denominator and directionality
+- valid and invalid comparisons
+- the main caveat
+- what result would change the next action

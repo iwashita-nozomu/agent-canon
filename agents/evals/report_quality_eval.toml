@@ -46,6 +46,12 @@ critical = true
 description = "Requires report reviewer routing and closeout tokens."
 required_regex = ["report_reviewer", "report_quality_checklist", "report_rule_drift"]
 
+[[evals.checklist]]
+id = "REPORT-RUNTIME-5"
+critical = true
+description = "Requires evaluation and experiment reports to explain how readers should interpret results."
+required_regex = ["reader guide", "denominator", "directionality", "valid or invalid", "next action"]
+
 [[evals]]
 id = "report-writing-human-doc"
 target = "agents/skills/report-writing.md"
@@ -87,6 +93,18 @@ required_regex = [
   "The report is actionable",
   "Raw artifacts and reader-facing summary paths are not conflated",
   "second policy truth surface",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-5"
+critical = true
+description = "Checklist covers reader interpretation guidance for evaluation and experiment reports."
+required_regex = [
+  "reader guide",
+  "what to inspect first",
+  "denominator and directionality",
+  "valid and invalid comparisons",
+  "what result would change the next action",
 ]
 
 [[evals]]
