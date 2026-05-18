@@ -220,7 +220,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 54,
+      "line": 55,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -228,7 +228,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 147,
+      "line": 148,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -638,6 +638,14 @@
       "field": "<dynamic>",
       "line": 322,
       "path": ".codex/hooks/skill_usage_logger.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 499,
+      "path": ".codex/hooks/style_checker_guard.py",
       "surface": "hook"
     },
     {
@@ -1292,7 +1300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 600,
+      "line": 601,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -4660,7 +4668,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 319,
+      "line": 338,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -4668,7 +4676,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 319,
+      "line": 338,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -4676,7 +4684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 319,
+      "line": 338,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -8083,6 +8091,7 @@
     ".codex/hooks/pre_tool_guard.py",
     ".codex/hooks/prompt_secret_guard.py",
     ".codex/hooks/skill_usage_logger.py",
+    ".codex/hooks/style_checker_guard.py",
     "agents/skills/README.md",
     "agents/skills/academic-writing.md",
     "agents/skills/adaptive-improvement-loop.md",

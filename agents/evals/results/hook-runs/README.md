@@ -16,7 +16,8 @@ It is the canonical hook-result surface for normal Codex hook runs.
 
 Runtime-local `reports/hooks/` output is temporary debug output only when a task
 intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
-`AGENT_CANON_OOP_HOOK_LOG_PATH`, or `AGENT_CANON_SKILL_LOG_PATH`. The default
+`AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
+or `AGENT_CANON_SKILL_LOG_PATH`. The default
 hook destination must remain this AgentCanon-owned hook result surface so
 improvement-guide and eval tooling can read one durable chronology.
 
@@ -24,6 +25,10 @@ OOP hook entries include a `mode` field. The default mode is `full`, which block
 all current findings in changed source files. `diff` mode is opt-in for tasks
 where the user explicitly asked to ignore baseline findings; those entries also
 record the `baseline_ref` used for comparison.
+
+Style checker hook entries include `selected_checkers`, `checked_files`, and
+`unchecked_files`. `unchecked_files` is the durable signal that a changed file
+had no automatic Python / C++ / notebook / Markdown style checker selected.
 
 ## Artifact Handling
 
