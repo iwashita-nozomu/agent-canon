@@ -127,3 +127,11 @@ detailed table. The guide must state:
 - valid and invalid comparisons
 - the main caveat
 - what result would change the next action
+
+## External Source Provenance
+
+Reports that use web pages, papers, official docs, or downloaded artifacts must
+cite existing durable source notes or create/update source packets before
+publishing. Include URL/DOI, access date, claim used, limitation,
+adoption/exclusion decision, and artifact location. Browser tabs, download
+caches, temporary PDFs, and chat-only summaries are not enough provenance.

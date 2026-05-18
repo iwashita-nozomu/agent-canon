@@ -17,6 +17,7 @@ downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py 
 1. Read `agents/skills/report-writing.md`.
 1. Classify the report before writing: `status-report`, `evaluation-report`, `experiment-report`, `review-report`, `audit-report`, `decision-brief`, or `improvement-guide`.
 1. Build a source packet with audience, decision context, source artifacts, observed facts, inferred claims, limitations, provenance, and requested next action.
+1. If the report uses external references, first inspect existing repo reference notes and cite/update those durable source packets; a browser tab, downloaded temp file, or chat-only source summary is not enough provenance.
 1. Use `$result-artifact-writeout` when the task also writes raw machine results, append-only eval evidence, hook logs, or experiment artifacts; do not treat the reader report as the raw evidence store.
 1. Apply the Report Quality Checklist: audience and decision fit, purpose and non-goals, evidence traceability, observation/interpretation separation, claim strength, limitations and uncertainty, provenance, actionability, artifact integrity, and rule-drift control.
 1. For `evaluation-report` and `experiment-report`, include a reader guide before detailed results. The guide must state what to inspect first, each key metric's denominator and directionality, which comparisons are valid or invalid, the main caveat, and what result would change the next action.
