@@ -150,6 +150,15 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - shared canon 以外の implementation change と同じ branch に混ぜません。
 - shared canon 変更と repo-local implementation change の両方が必要な場合は branch と PR を分けます。
 
+## Push / GitHub write 前の remote 確認
+
+- push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
+- まず `git status --short --branch` で upstream / tracking branch を確認します。`...origin/<branch>` のような tracking 情報がある通常ケースでは、その tracking branch を優先し、`git push` を既定候補にします。
+- 次に `git remote -v` または `git remote get-url <name>` で現在 repo の canonical remote を確認します。
+- hook 出力などで `git remote -v` の本文を読めない場合は、`git config --get-regexp '^remote\\..*\\.url$'`、`.git/config`、repo metadata の順に fallback 確認し、確認できるまで write 操作へ進みません。
+- literal URL push は例外扱いです。remote / upstream が無い、または通常の `git push` では目的を達成できないことを確認した場合だけ使い、work log または PR evidence に理由を残します。
+- PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
+
 ## 標準手順
 
 1. AgentCanon source worktree または `vendor/agent-canon/` branch を編集する

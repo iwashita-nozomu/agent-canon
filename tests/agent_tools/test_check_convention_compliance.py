@@ -118,6 +118,13 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_github_workflows.py\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "remote_verified=yes\n"
+        "git status --short --branch\n"
+        "git remote -v\n"
+        "git config --get-regexp '^remote\\\\..*\\\\.url$'\n"
+        ".git/config\n"
+        "literal URL push\n"
+        "hardcoded repository name\n"
     ),
     "tools/ci/run_all_checks.sh": (
         "check_hardcoded_numbers.py check_static_any.py "
@@ -246,6 +253,23 @@ class CheckConventionComplianceTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["findings"])
+
+    def test_agentcanon_pr_workflow_requires_remote_verification_guard(self) -> None:
+        """The AgentCanon PR workflow must keep remote verification markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace("remote_verified=yes\n", ""),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("agentcanon_push_remote_guard", result.stdout)
+            self.assertIn("missing-marker:remote_verified=yes", result.stdout)
 
     def test_missing_surface_manifest_marker_fails(self) -> None:
         """Shared surface docs must stay manifest-backed and complete."""
