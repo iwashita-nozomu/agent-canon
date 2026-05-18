@@ -5,6 +5,7 @@ upstream design ../canonical/skills.md skill canon registry
 downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs behavior evals
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
+downstream implementation ../../rust/agent-canon/src/local_llm.rs routes local LLM eval commands
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
@@ -109,7 +110,7 @@ legacy report readability without compacting or deleting old results.
 Local LLM responsibility prompt evals are configured separately:
 
 ```bash
-python3 tools/agent_tools/local_llm_eval.py \
+agent-canon local-llm eval \
   --manifest agents/evals/local_llm_responsibility_eval.toml
 ```
 

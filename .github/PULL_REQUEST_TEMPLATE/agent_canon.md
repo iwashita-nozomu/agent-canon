@@ -103,7 +103,7 @@ Impact notes:
 - [ ] `python3 tools/agent_tools/responsibility_scope.py`
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
-- [ ] `python3 tools/agent_tools/local_llm_eval.py`
+- [ ] `tools/bin/agent-canon local-llm eval`
 - [ ] AgentCanon pin/update path: `bash tools/update_agent_canon.sh rebuild-tools` or a documented `AGENT_CANON_TOOL_REBUILD_*` skip reason.
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source when AgentCanon is needed.

@@ -15,6 +15,7 @@
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
@@ -57,6 +58,13 @@ set -euo pipefail
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$WORKSPACE_ROOT"
 
+AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
+if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
+  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+fi
+AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
+
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
   if command -v python3 >/dev/null 2>&1; then
@@ -97,6 +105,11 @@ export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-AgentCanon CI}"
 export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-agent-canon-ci@example.invalid}"
 export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-AgentCanon CI}"
 export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-agent-canon-ci@example.invalid}"
+
+if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
+  # shellcheck disable=SC1091
+  . "${HOME}/.cargo/env"
+fi
 
 PYTHON_SOURCE_PATHS=()
 for candidate_path in python tests; do
@@ -226,7 +239,25 @@ else
   echo "❌ eval accumulation checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/local_llm_eval.py 2>&1; then
+if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
+  echo "✅ Rust format checks 成功"
+else
+  echo "❌ Rust format checks 失敗"
+  EXIT_CODE=1
+fi
+if cargo clippy --manifest-path "$AGENT_CANON_CARGO_MANIFEST" --all-targets -- -D warnings 2>&1; then
+  echo "✅ Rust clippy checks 成功"
+else
+  echo "❌ Rust clippy checks 失敗"
+  EXIT_CODE=1
+fi
+if cargo test --manifest-path "$AGENT_CANON_CARGO_MANIFEST" 2>&1; then
+  echo "✅ Rust tests 成功"
+else
+  echo "❌ Rust tests 失敗"
+  EXIT_CODE=1
+fi
+if tools/bin/agent-canon local-llm eval 2>&1; then
   echo "✅ local LLM responsibility eval checks 成功"
 else
   echo "❌ local LLM responsibility eval checks 失敗"

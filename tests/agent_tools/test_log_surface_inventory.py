@@ -1,5 +1,5 @@
 # @dependency-start
-# responsibility Tests log surface inventory and baseline drift detection.
+# responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
 # upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted machine-readable fields
 # downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py consumes inventory checks
 # @dependency-end
@@ -21,8 +21,8 @@ TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "log_surface_inventory.py"
 class LogSurfaceInventoryTest(unittest.TestCase):
     """Validate static log field extraction."""
 
-    def test_extracts_python_shell_and_skill_fields(self) -> None:
-        """The inventory should find JSON, key-value, shell, and skill examples."""
+    def test_extracts_python_shell_rust_and_skill_fields(self) -> None:
+        """The inventory should find JSON, key-value, Rust, shell, and skill examples."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             hook = root / ".codex" / "hooks" / "sample.py"
@@ -41,6 +41,12 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             shell = root / "tools" / "sample.sh"
             shell.parent.mkdir(parents=True)
             shell.write_text("echo TOOL_STATUS=pass\n", encoding="utf-8")
+            rust_tool = root / "rust" / "agent-canon" / "src" / "sample.rs"
+            rust_tool.parent.mkdir(parents=True)
+            rust_tool.write_text(
+                'fn main() {\n    println!("RUST_TOOL_STATUS=pass");\n}\n',
+                encoding="utf-8",
+            )
             skill = root / ".agents" / "skills" / "sample" / "SKILL.md"
             skill.parent.mkdir(parents=True)
             skill.write_text("```text\nSKILL_RESULT=pass\n```\n", encoding="utf-8")
@@ -55,6 +61,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     "json",
                     ".codex",
                     "tools",
+                    "rust",
                     ".agents",
                 ],
                 check=True,
@@ -68,6 +75,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         self.assertIn("status", fields)
         self.assertIn("hook_run_id", fields)
         self.assertIn("TOOL_STATUS", fields)
+        self.assertIn("RUST_TOOL_STATUS", fields)
         self.assertIn("SKILL_RESULT", fields)
 
     def test_baseline_check_detects_and_accepts_regenerated_inventory(self) -> None:

@@ -9,8 +9,9 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/c
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation ../../tools/agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
-downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
+downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
+downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
+downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
@@ -41,15 +42,15 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
 - `tools/agent_tools/eval_accumulation_check.py`
   - `agents/evals/results/` の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
-- `tools/agent_tools/file_responsibility_llm.py`
-  - llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
-- `tools/agent_tools/local_llm_eval.py`
+- `agent-canon local-llm classify-responsibility`
+  - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `agent-canon local-llm eval`
   - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
 - `tools/agent_tools/evaluate_report_quality.py`
   - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
-- `tools/agent_tools/search.py`
+- `agent-canon local-llm search`
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
-- `tools/agent_tools/search_index.py`
+- `agent-canon local-llm build-index`
   - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
 - `tools/agent_tools/route.py --area search`
   - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
@@ -98,6 +99,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     repository task では `agent-canon mcp-inventory --root . --require
     repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
     surface での繰り返し確認を cache hit にします。
+  - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
+    入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
+    Python 実装は互換 engine として残します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -194,8 +198,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 例:
 
 ```bash
-python3 tools/agent_tools/search.py --purpose "dependency header graph tool"
-python3 tools/agent_tools/search.py --purpose "github cli validation" --providers llm,tool,vector
+agent-canon local-llm search --purpose "dependency header graph tool"
+agent-canon local-llm search --purpose "github cli validation" --providers llm,tool,vector
 python3 tools/agent_tools/route.py --area search
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"

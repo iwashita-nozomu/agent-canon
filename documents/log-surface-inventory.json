@@ -753,6 +753,342 @@
       "surface": "skill"
     },
     {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM",
+      "line": 331,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_ERROR",
+      "line": 236,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_ERROR",
+      "line": 243,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_ERROR",
+      "line": 257,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_ERROR",
+      "line": 388,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_FILE",
+      "line": 328,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_MODEL",
+      "line": 329,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_PROMPT_SHA",
+      "line": 330,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "FILE_RESP_LLM_SCOPE",
+      "line": 327,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI",
+      "line": 63,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI",
+      "line": 113,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI",
+      "line": 125,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI_ERROR",
+      "line": 64,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI_ERROR",
+      "line": 114,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "LOCAL_LLM_CLI_ERROR",
+      "line": 126,
+      "path": "rust/agent-canon/src/local_llm.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY",
+      "line": 56,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY",
+      "line": 201,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY",
+      "line": 210,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY",
+      "line": 224,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY",
+      "line": 228,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY_CACHE",
+      "line": 200,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY_CACHE",
+      "line": 221,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY_ERROR",
+      "line": 57,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_INVENTORY_ERROR",
+      "line": 211,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_DECISION",
+      "line": 69,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_ERROR",
+      "line": 75,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_POLICY",
+      "line": 67,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_POLICY",
+      "line": 74,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_REASON",
+      "line": 70,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MCP_PREFLIGHT_SCOPE",
+      "line": 68,
+      "path": "rust/agent-canon/src/mcp_inventory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_AUDIT",
+      "line": 52,
+      "path": "rust/agent-canon/src/migration_audit.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_AUDIT",
+      "line": 124,
+      "path": "rust/agent-canon/src/migration_audit.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_AUDIT",
+      "line": 127,
+      "path": "rust/agent-canon/src/migration_audit.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_FINDING",
+      "line": 53,
+      "path": "rust/agent-canon/src/migration_audit.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_FINDING",
+      "line": 129,
+      "path": "rust/agent-canon/src/migration_audit.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_CANDIDATE_COUNT",
+      "line": 453,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_FOUNDATION_FINDING",
+      "line": 450,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_HOOK_LOG_FILES",
+      "line": 452,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_PLAN",
+      "line": 122,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_PLAN",
+      "line": 439,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_PLAN_FINDING",
+      "line": 123,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "RUST_MIGRATION_SOURCE_ROOT",
+      "line": 440,
+      "path": "rust/agent-canon/src/rust_migration_plan.rs",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
@@ -2956,7 +3292,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -2964,7 +3300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "model",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -2972,7 +3308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_path",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -2980,7 +3316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -2988,7 +3324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_llm",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -2996,7 +3332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 443,
+      "line": 444,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3004,7 +3340,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL",
-      "line": 486,
+      "line": 487,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3012,7 +3348,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_ACCUMULATED_REPORT",
-      "line": 488,
+      "line": 489,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3020,14 +3356,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_CASES",
-      "line": 484,
-      "path": "tools/agent_tools/local_llm_eval.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "LOCAL_LLM_EVAL_FINDINGS",
       "line": 485,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
@@ -3035,8 +3363,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "LOCAL_LLM_EVAL_FINDINGS",
+      "line": 486,
+      "path": "tools/agent_tools/local_llm_eval.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_MODEL",
-      "line": 482,
+      "line": 483,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3044,7 +3380,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_RUN_ID",
-      "line": 481,
+      "line": 482,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3052,7 +3388,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOCAL_LLM_EVAL_RUN_LLM",
-      "line": 483,
+      "line": 484,
       "path": "tools/agent_tools/local_llm_eval.py",
       "surface": "tool"
     },
@@ -3084,7 +3420,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 470,
+      "line": 510,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3092,7 +3428,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 602,
+      "line": 642,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3100,7 +3436,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 602,
+      "line": 642,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3108,7 +3444,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_BASELINE_MISSING",
-      "line": 591,
+      "line": 631,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3116,7 +3452,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 590,
+      "line": 630,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3124,7 +3460,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 598,
+      "line": 638,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -3132,7 +3468,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY_OUTPUT",
-      "line": 585,
+      "line": 625,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -4764,7 +5100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "contracts",
-      "line": 636,
+      "line": 655,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -4772,7 +5108,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 636,
+      "line": 655,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -4780,7 +5116,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 636,
+      "line": 655,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -4788,7 +5124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOOL_CONVENTION_DRIFT",
-      "line": 651,
+      "line": 670,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -4796,7 +5132,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOOL_CONVENTION_DRIFT_CONTRACTS",
-      "line": 649,
+      "line": 668,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -4804,7 +5140,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "TOOL_CONVENTION_DRIFT_FINDINGS",
-      "line": 650,
+      "line": 669,
       "path": "tools/agent_tools/tool_drift.py",
       "surface": "tool"
     },
@@ -5948,7 +6284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 761,
+      "line": 764,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5956,7 +6292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 762,
+      "line": 765,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -5964,7 +6300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 763,
+      "line": 766,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -6372,7 +6708,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 274,
+      "line": 305,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -6380,7 +6716,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 307,
+      "line": 338,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -6388,7 +6724,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 327,
+      "line": 358,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -8290,6 +8626,11 @@
     "agents/skills/user-preference-sync.md",
     "agents/skills/worktree-health.md",
     "agents/skills/worktree-start.md",
+    "rust/agent-canon/src/local_llm.rs",
+    "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/mcp_inventory.rs",
+    "rust/agent-canon/src/migration_audit.rs",
+    "rust/agent-canon/src/rust_migration_plan.rs",
     "tools/__init__.py",
     "tools/agent_tools/agent_canon_preflight.py",
     "tools/agent_tools/agent_canon_update_todos.py",

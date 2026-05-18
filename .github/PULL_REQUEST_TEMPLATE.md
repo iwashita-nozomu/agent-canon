@@ -115,7 +115,7 @@ Impact notes:
 - [ ] `python3 tools/agent_tools/responsibility_scope.py`
 - [ ] `python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
-- [ ] `python3 tools/agent_tools/local_llm_eval.py`
+- [ ] `tools/bin/agent-canon local-llm eval`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] `bash tools/ci/run_docs_checks.sh`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`

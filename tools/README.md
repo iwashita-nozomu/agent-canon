@@ -10,7 +10,8 @@ downstream implementation agent_tools/tool_drift.py validates tool/convention tr
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
+downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
+downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
@@ -57,10 +58,10 @@ python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/search.py --purpose "find tool for dependency graph edit scope"
-python3 tools/agent_tools/search_index.py build
+agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
+agent-canon local-llm build-index
 python3 tools/agent_tools/route.py --area search
-python3 tools/agent_tools/local_llm_eval.py
+agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
 ```
 
@@ -82,12 +83,12 @@ for PR summaries.
 `eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
 reports are accumulating under `agents/evals/results/` as readable,
 non-ignored, append-only AgentCanon evidence.
-`search.py` accepts a `--purpose` string and coordinates exact text, local LLM
+`agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
-`search_index.py` builds the repo-local ignored semantic-card index consumed by
-the LLM provider under `.agent-canon/search-index/`.
-`local_llm_eval.py` validates the configured single-file local LLM
+`agent-canon local-llm build-index` builds the repo-local ignored semantic-card
+index consumed by the LLM provider under `.agent-canon/search-index/`.
+`agent-canon local-llm eval` validates the configured single-file local LLM
 responsibility prompt boundary and can optionally accumulate prompt-only or
 model-backed reports under `agents/evals/results/local-llm-responsibility/`.
 `evaluate_report_quality.py` validates the report-writing skill and report
@@ -115,6 +116,9 @@ under `agents/evals/results/report-quality/`.
     です。`mcp-inventory` は Rust 実装の repo MCP inventory checker で、
     repository task では `agent-canon mcp-inventory --root . --require
     repo_mcp_server --session-cache` を既定にします。
+    `local-llm classify-responsibility` は単一 file 責務分析の canonical
+    Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
+    呼び、現在の Python engine は内部互換実装として扱います。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
@@ -128,8 +132,8 @@ under `agents/evals/results/report-quality/`.
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は `agents/evals/results/` の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
-  - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う advisory checker です。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
-  - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価します。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
+  - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
+  - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
@@ -358,21 +362,21 @@ python3 tools/agent_tools/compare_codex_token_footprints.py \
 ## Coordinated Search Tool
 
 Use `rg` first for exact symbol, path, and error-message lookup. Use
-`search.py` when the question is a purpose: "どの tool が dependency graph
+`agent-canon local-llm search` when the question is a purpose: "どの tool が dependency graph
 を見ているか", "GitHub remote migration に近い文書はどれか", "safe.directory
-周りの helper はどこか" のような再利用候補探索です。`search.py` coordinates
+周りの helper はどこか" のような再利用候補探索です。The Rust CLI coordinates
 text, LLM semantic cards, vector search, tool catalog matches, dependency
 headers, and Python code facts.
 
 ```bash
-python3 tools/agent_tools/search.py --purpose "dependency header graph tool"
-python3 tools/agent_tools/search.py --purpose "github cli validation" --providers llm,tool,vector
-python3 tools/agent_tools/search.py --purpose "alpha dispatch caller target" --providers header-deps,code-deps --format json
-python3 tools/agent_tools/search_index.py build --surface tools --surface documents
+agent-canon local-llm search --purpose "dependency header graph tool"
+agent-canon local-llm search --purpose "github cli validation" --providers llm,tool,vector
+agent-canon local-llm search --purpose "alpha dispatch caller target" --providers header-deps,code-deps --format json
+agent-canon local-llm build-index --surface tools --surface documents
 python3 tools/agent_tools/route.py --area search
 ```
 
-`search_index.py` writes `.agent-canon/search-index/llm-cards.jsonl` and
+`agent-canon local-llm build-index` writes `.agent-canon/search-index/llm-cards.jsonl` and
 `.agent-canon/search-index/index-state.json`. These files are generated,
 repo-local ignored state. Rebuild them after AgentCanon updates or when a repo
 adds important tools, skills, workflow docs, or code surfaces.
@@ -602,7 +606,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `responsibility_scope.py` keeps checker/tool ownership tied to a scope so new gates do not become orphaned entrypoints.
 - `issue_sync.py` keeps folder issues structurally valid and gives GitHub Issue sync a repeatable command plan.
 - `eval_accumulation_check.py` keeps hook and skill eval evidence usable by improvement-guide and feedback-loop tools.
-- `local_llm_eval.py` keeps Local LLM single-file responsibility analysis covered by configurable eval cases without making model output a repo-wide gate.
+- `agent-canon local-llm eval` keeps Local LLM single-file responsibility analysis covered by configurable eval cases without making model output a repo-wide gate.
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `helper_function_inventory.py` inventories Python helper functions/classes and infers roles from AST body facts, calls, side effects, path domain, internal call graph evidence, single-caller or file-local specialization, and functional candidate rules. It reports high-confidence `auto_helper` verdicts separately from `needs_user_judgment` symbols, with `--only-auto-helpers` and `--only-user-judgment` filters for review loops.
