@@ -11,6 +11,7 @@
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
+# upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # @dependency-end
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_i
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
+REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -372,9 +374,11 @@ class CodexHooksTest(unittest.TestCase):
         self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
+        self.assertTrue(any("reference_capture_guard.py" in command for command in prompt_commands))
         self.assertNotIn("PreToolUse", hooks["hooks"])
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
+        self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
@@ -387,6 +391,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("style_checker_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("style_checker_guard.py" in command for command in stop_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
+        self.assertTrue(any("reference_capture_guard.py" in command for command in stop_commands))
 
     def test_style_checker_guard_logs_markdown_and_unchecked_files(self) -> None:
         """Style hook should select Markdown checks and log changed files without a checker."""
@@ -1484,3 +1489,120 @@ class CodexHooksTest(unittest.TestCase):
             "skill_invocation=$agent-orchestration status=observed source=codex_hook",
             monitoring,
         )
+
+    def test_reference_capture_guard_logs_prompt_urls_without_blocking(self) -> None:
+        """Reference hook should log prompt URL capture requirements."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "references.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(REFERENCE_CAPTURE_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use https://example.com/paper.pdf as a source.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["event"], "UserPromptSubmit")
+        self.assertEqual(entry["missing_urls"], ["https://example.com/paper.pdf"])
+        self.assertEqual(entry["decision"], "pass")
+        self.assertEqual(entry["status"], "pass")
+
+    def test_reference_capture_guard_blocks_stop_with_unregistered_url(self) -> None:
+        """Reference hook should block completion when cited URLs are not captured."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "references.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(REFERENCE_CAPTURE_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "I used https://example.com/report.html.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+            )
+            payload = json.loads(result.stdout)
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("reference_materializer.py", payload["reason"])
+        self.assertEqual(entry["missing_count"], 1)
+        self.assertEqual(entry["status"], "fail")
+
+    def test_reference_capture_guard_accepts_registered_reference_url(self) -> None:
+        """Reference hook should pass when references contains the observed URL."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            reference = temp_root / "references" / "external" / "report.md"
+            reference.parent.mkdir(parents=True)
+            reference.write_text(
+                "# Report\n\n- source_url: https://example.com/report.html\n",
+                encoding="utf-8",
+            )
+            log_path = temp_root / "reports" / "hooks" / "references.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(REFERENCE_CAPTURE_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "I used https://example.com/report.html.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["registered_count"], 1)
+        self.assertEqual(entry["missing_count"], 0)
+        self.assertEqual(entry["reference_files"], ["references/external/report.md"])
+
+    def test_reference_capture_guard_ignores_operational_github_pr_urls(self) -> None:
+        """Reference hook should ignore GitHub PR plumbing URLs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "references.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(REFERENCE_CAPTURE_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "PR: https://github.com/org/repo/pull/123",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_REFERENCE_CAPTURE_HOOK_LOG_PATH": str(log_path)},
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())

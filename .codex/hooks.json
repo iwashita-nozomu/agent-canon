@@ -7,6 +7,7 @@
     "downstream implementation hooks/mcp_session_context.sh emits SessionStart MCP hook context",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
     "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
+    "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
@@ -44,6 +45,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
             "statusMessage": "Logging observed skill usage"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 10,
+            "statusMessage": "Logging reference capture requirements"
           }
         ]
       }
@@ -57,6 +64,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
             "statusMessage": "Logging tool selection"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 15,
+            "statusMessage": "Checking referenced source capture"
           },
           {
             "type": "command",
@@ -129,6 +142,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed notebooks"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 15,
+            "statusMessage": "Checking referenced source capture"
           },
           {
             "type": "command",

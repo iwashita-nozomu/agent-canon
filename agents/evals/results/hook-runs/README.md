@@ -30,6 +30,11 @@ Style checker hook entries include `selected_checkers`, `checked_files`, and
 `unchecked_files`. `unchecked_files` is the durable signal that a changed file
 had no automatic Python / C++ / notebook / Markdown style checker selected.
 
+Reference capture hook entries include `urls`, `registered_urls`,
+`missing_urls`, `reference_files`, and `decision`. UserPromptSubmit entries are
+measurement-only, while PostToolUse and Stop entries may block when a consulted
+PDF or HTML URL has not been materialized as Markdown under `references/`.
+
 ## Artifact Handling
 
 Tracked JSONL in this directory is an evidence artifact, not disposable generated
