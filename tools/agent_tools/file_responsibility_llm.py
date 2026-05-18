@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_MODEL = "Qwen/Qwen3-0.6B-GGUF:Q8_0"
+DEFAULT_MODEL = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
 DEFAULT_MAX_BYTES = 24_000
 DEFAULT_PREDICT_TOKENS = 768
 PROMPT_DIGEST_LENGTH = 12

@@ -167,7 +167,10 @@ under `agents/evals/results/report-quality/`.
   - `rebuild_agent_tools.sh`
     - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。
     - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
-    - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は AgentCanon source そのものには依存しないため、devcontainer post-create または明示的な llama.cpp rebuild policy で扱います。
+    - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は `tools/install_llama_cpp.sh` が正本で、PostCreate では fetch/build、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
+  - `install_llama_cpp.sh`
+    - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin` へ公開します。
+    - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は llama.cpp/Hugging Face cache に lazy fetch し、repo にはコミットしません。
 
 ## AgentCanon Update Path
 

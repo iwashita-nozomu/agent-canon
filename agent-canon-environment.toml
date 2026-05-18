@@ -3,6 +3,7 @@
 # upstream design CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 # upstream design documents/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation .devcontainer/post-create.sh installs shared development tooling
+# downstream implementation tools/install_llama_cpp.sh installs local LLM llama.cpp tooling
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
 # downstream implementation rust/agent-canon/src/mcp_inventory.rs implements Rust MCP preflight tooling
 # @dependency-end
@@ -49,6 +50,20 @@ validation_commands = [
   "agent-canon rust-migration-plan --root . --limit 12",
 ]
 
+[compiled_tools.llama_cpp]
+owner = "agent-canon"
+source_repository = "https://github.com/ggml-org/llama.cpp.git"
+source_ref_env = "AGENT_CANON_LLAMA_CPP_REF"
+source_ref_default = "master"
+source_checkout = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp"
+build_dir = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/build/llama.cpp"
+cli_binary = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli"
+server_binary = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server"
+post_create_command = "bash tools/install_llama_cpp.sh --allow-fetch"
+canon_update_command = "bash tools/install_llama_cpp.sh --skip-missing-source --force"
+default_model_selector = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
+model_fetch_policy = "lazy llama.cpp Hugging Face cache; never commit model weights"
+
 [mcp_preflight]
 owner = "agent-canon"
 policy_command = "agent-canon mcp-preflight-policy --request-kind <kind>"
@@ -90,5 +105,5 @@ install_surface = ".devcontainer/post-create.sh"
 tools_home = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}"
 llama_cli = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli"
 llama_server = "${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server"
-default_model = "Qwen/Qwen3-0.6B-GGUF:Q8_0"
+default_model = "ggml-org/SmolLM3-3B-GGUF:Q4_K_M"
 scope = "single-file responsibility analysis only"

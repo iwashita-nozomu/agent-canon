@@ -38,13 +38,15 @@ ${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 The initial model is:
 
 ```text
-Qwen/Qwen3-0.6B-GGUF:Q8_0
+ggml-org/SmolLM3-3B-GGUF:Q4_K_M
 ```
 
-This model is small enough for local responsibility review and is published by
-Qwen as Apache-2.0 GGUF. llama.cpp is compiled in post-create and kept outside
-the Dockerfile. The model itself is fetched lazily by llama.cpp cache behavior
-on first use; it is not committed to the repository.
+This 3B-class model is small enough for local responsibility review and is
+published by ggml-org as Apache-2.0 GGUF. llama.cpp is compiled by the shared
+installer in post-create and rebuilt by the AgentCanon compiled-tool rebuild
+path when a local llama.cpp checkout already exists. The model itself is
+fetched lazily by llama.cpp cache behavior on first use; it is not committed to
+the repository.
 
 ## Command
 

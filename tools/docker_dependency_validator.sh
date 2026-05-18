@@ -169,12 +169,20 @@ check_post_create_python_install() {
       || report_issue ".devcontainer/post-create.sh must expose the AgentCanon Rust CLI on PATH"
     grep -q 'install_llama_cpp' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must install llama.cpp for local single-file responsibility review"
-    grep -q 'ggml-org/llama.cpp' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must fetch llama.cpp from its canonical repository"
-    grep -q 'Qwen/Qwen3-0.6B-GGUF:Q8_0' "$post_create" \
-      || report_issue ".devcontainer/post-create.sh must set the default small local LLM model selector"
+    grep -q 'tools/install_llama_cpp.sh' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must call the shared llama.cpp installer"
+    grep -q 'ggml-org/SmolLM3-3B-GGUF:Q4_K_M' "$post_create" \
+      || report_issue ".devcontainer/post-create.sh must set the default 3B-class local LLM model selector"
     grep -q '${tools_home}/bin/llama-cli' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must expose llama-cli under AGENT_CANON_TOOLS_HOME"
+    if [ ! -f tools/install_llama_cpp.sh ]; then
+      report_issue "tools/install_llama_cpp.sh not found"
+    else
+      grep -q 'ggml-org/llama.cpp' tools/install_llama_cpp.sh \
+        || report_issue "tools/install_llama_cpp.sh must fetch llama.cpp from its canonical repository"
+      grep -q 'cmake --build' tools/install_llama_cpp.sh \
+        || report_issue "tools/install_llama_cpp.sh must build llama.cpp"
+    fi
     grep -q '/etc/profile.d/agent-canon-rust.sh' "$post_create" \
       || report_issue ".devcontainer/post-create.sh must publish Rust PATH for non-interactive devcontainer exec"
   fi

@@ -110,9 +110,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
-- llama.cpp and the default small local LLM model selector belong in
-  `.devcontainer/post-create.sh` when they are used only for single-file
-  AgentCanon responsibility analysis.
+- llama.cpp and the default 3B-class local LLM model selector belong in
+  `.devcontainer/post-create.sh` and `tools/install_llama_cpp.sh` when they are
+  used only for single-file AgentCanon responsibility analysis.
 - Compiled agent convenience binaries belong under
   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}`. `/usr/local/bin` may contain
   symlinks for stable command discovery, but the compiled binary cache itself
@@ -122,7 +122,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - AgentCanon pin updates must refresh compiled AgentCanon tools after the new
   source is checked out. The canonical path is `tools/rebuild_agent_tools.sh`,
   called by `make agent-canon-ensure-latest`, `make agent-canon-latest`, and
-  `make agent-canon-update`.
+  `make agent-canon-update`. That rebuild path also recompiles an existing
+  `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp` checkout so local LLM
+  binaries track the updated AgentCanon tool contract.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository

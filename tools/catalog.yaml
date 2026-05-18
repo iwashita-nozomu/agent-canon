@@ -578,6 +578,25 @@ entries:
     tests:
       - tests/tools/test_update_agent_canon.py
 
+  - id: install-llama-cpp
+    summary: Builds llama.cpp under AGENT_CANON_TOOLS_HOME for local single-file responsibility analysis.
+    path: tools/install_llama_cpp.sh
+    family: root
+    role: runner
+    status: canonical
+    command: bash tools/install_llama_cpp.sh --allow-fetch
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+      - documents/rust-agent-tool-migration.md
+    tests:
+      - tests/tools/test_install_llama_cpp.py
+
   - id: agent-canon-update-todos
     summary: Routes parent-repo agents through AgentCanon update TODOs after submodule pin updates.
     path: tools/agent_tools/agent_canon_update_todos.py
