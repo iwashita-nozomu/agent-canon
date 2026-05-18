@@ -49,6 +49,10 @@ skill_families:
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
     shim: .agents/skills/result-artifact-writeout/SKILL.md
+  - id: report-writing
+    purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
+    canonical_doc: agents/skills/report-writing.md
+    shim: .agents/skills/report-writing/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md

@@ -1,0 +1,95 @@
+# @dependency-start
+# responsibility Publishes read-only AgentCanon runtime log and eval dashboards in the standalone AgentCanon repository.
+# upstream design ../../agents/evals/README.md eval evidence contract
+# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated evidence
+# upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
+# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
+# upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
+# @dependency-end
+
+# Standalone-only workflow. Template and derived repositories should not copy
+# this workflow into their root; they should read the AgentCanon repository run.
+name: Agent Runtime Dashboard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-runtime-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dashboard dependencies
+        run: python3 -m pip install --upgrade tomli
+
+      - name: Validate accumulated evidence
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          python3 "${canon_root}/tools/agent_tools/eval_accumulation_check.py" --root "${canon_root}"
+
+      - name: Run workflow selection eval
+        id: workflow_selection
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
+          mkdir -p "${report_dir}"
+          eval_path="${report_dir}/workflow-selection-eval-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          python3 "${canon_root}/tools/agent_tools/evaluate_workflow_selection.py" \
+            --root "${canon_root}" \
+            --report-out "${eval_path}"
+          echo "workflow_selection_report=${eval_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Run report quality eval
+        id: report_quality
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
+          mkdir -p "${report_dir}"
+          eval_path="${report_dir}/report-quality-eval-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          python3 "${canon_root}/tools/agent_tools/evaluate_report_quality.py" \
+            --root "${canon_root}" \
+            --report-out "${eval_path}"
+          echo "report_quality_report=${eval_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate runtime dashboard
+        id: dashboard
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
+          mkdir -p "${report_dir}"
+          dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          python3 "${canon_root}/tools/agent_tools/generate_agent_runtime_dashboard.py" \
+            --root "${canon_root}" \
+            --out "${dashboard_path}"
+          cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload runtime dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.dashboard.outputs.dashboard_path }}
+            ${{ steps.workflow_selection.outputs.workflow_selection_report }}
+            ${{ steps.report_quality.outputs.report_quality_report }}

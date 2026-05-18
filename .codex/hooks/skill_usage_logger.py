@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now
@@ -31,6 +32,7 @@ GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
     "agent-orchestration": ("どのスキル", "どのskill", "workflow=", "routing", "フロー"),
+    "md-style-check": ("markdown", "マークダウン", "md-style", "docs-check", "markdownlint"),
     "result-artifact-writeout": ("結果書き出し", "結果を書き出", "result writeout", "artifact"),
     "oop-readability-check": ("oop", "readability", "オブジェクト指向"),
 }
@@ -41,12 +43,24 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci"),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
+    "check_markdown_lint.py": ("check_markdown_lint.py", "markdownlint"),
+    "check_markdown_math.py": ("check_markdown_math.py", "markdown math"),
+    "format_markdown.py": ("format_markdown.py", "markdown format"),
     "skill_usage_logger.py": ("入力プロンプト", "prompt", "skill usage", "skill_usage"),
     "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
     "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
     "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
+    "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "markdownlint"),
 }
+PROMPT_EXCERPT_LIMIT = 600
+SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b"), "[REDACTED_GITHUB_TOKEN]"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{32,}\b"), "[REDACTED_API_KEY]"),
+)
 FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "quality_gap": ("弱い", "足り", "浅い", "甘い", "まずい", "だめ", "ダメ"),
     "repair_request": ("直して", "修正", "改善", "見直", "組み込み", "入れたい"),
@@ -84,6 +98,36 @@ class PromptIntakeSignals:
             *(f"tool:{item}" for item in self.candidate_tools),
         ]
         return tuple(targets or (("agent-runtime",) if self.feedback_labels else ()))
+
+
+@dataclass(frozen=True)
+class PromptCapture:
+    """Bounded prompt text capture for later routing analysis."""
+
+    status: str
+    excerpt_redacted: str
+    fingerprint: str
+    char_count: int
+    truncated: bool
+
+    def should_log(self) -> bool:
+        """Return whether prompt evidence exists."""
+        return self.status == "present"
+
+
+@dataclass(frozen=True)
+class ToolSelection:
+    """PostToolUse tool selection evidence."""
+
+    tool_name: str
+    tool_input_fingerprint: str
+    tool_input_key_count: int
+    tool_input_keys: tuple[str, ...]
+    command_verb: str
+
+    def should_log(self) -> bool:
+        """Return whether tool selection evidence exists."""
+        return bool(self.tool_name)
 
 
 def load_payload() -> dict[str, object]:
@@ -157,6 +201,36 @@ def observed_text(payload: dict[str, object]) -> list[str]:
     return texts
 
 
+def prompt_text(payload: dict[str, object]) -> str:
+    """Return the raw UserPromptSubmit prompt text when present."""
+    value = payload.get("prompt")
+    return value if isinstance(value, str) else ""
+
+
+def prompt_capture(payload: dict[str, object]) -> PromptCapture:
+    """Return bounded redacted prompt evidence."""
+    text = prompt_text(payload)
+    if not text:
+        return PromptCapture("missing", "", "", 0, False)
+    redacted = redact_sensitive_text(text)
+    excerpt = redacted[:PROMPT_EXCERPT_LIMIT]
+    return PromptCapture(
+        status="present",
+        excerpt_redacted=excerpt,
+        fingerprint=sha256(text.encode("utf-8")).hexdigest()[:16],
+        char_count=len(text),
+        truncated=len(redacted) > PROMPT_EXCERPT_LIMIT,
+    )
+
+
+def redact_sensitive_text(text: str) -> str:
+    """Redact high-confidence secret-like values from prompt excerpts."""
+    redacted = text
+    for pattern, replacement in SECRET_REDACTIONS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
 def observed_text_sources(payload: dict[str, object]) -> list[str]:
     """Return payload field names that contributed text for skill discovery."""
     sources: list[str] = []
@@ -205,6 +279,30 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
         feedback_labels=labels,
         feedback_action=feedback_action(labels),
     )
+
+
+def tool_selection(payload: dict[str, object]) -> ToolSelection:
+    """Return PostToolUse tool selection evidence."""
+    tool_name = str(payload.get("tool_name") or "")
+    tool_input = payload.get("tool_input")
+    keys = tuple(sorted(tool_input.keys())) if isinstance(tool_input, dict) else ()
+    return ToolSelection(
+        tool_name=tool_name,
+        tool_input_fingerprint=fingerprint_json(tool_input) if tool_input is not None else "",
+        tool_input_key_count=len(keys),
+        tool_input_keys=keys,
+        command_verb=command_verb(tool_input),
+    )
+
+
+def command_verb(tool_input: object) -> str:
+    """Return the first command token for shell-like tool input."""
+    if not isinstance(tool_input, dict):
+        return ""
+    command = tool_input.get("cmd") or tool_input.get("command")
+    if not isinstance(command, str) or not command.strip():
+        return ""
+    return command.strip().split()[0]
 
 
 def default_log_path(root: Path) -> Path:
@@ -293,7 +391,9 @@ def main() -> int:
     payload = load_payload()
     root = repo_root()
     signals = prompt_intake_signals(payload)
-    if not signals.should_log():
+    prompt = prompt_capture(payload)
+    tool = tool_selection(payload)
+    if not (signals.should_log() or prompt.should_log() or tool.should_log()):
         return 0
     text_sources = observed_text_sources(payload)
     text_values_seen = observed_text(payload)
@@ -317,6 +417,17 @@ def main() -> int:
             "candidate_workflow_count": len(signals.candidate_workflows),
             "candidate_tools": list(signals.candidate_tools),
             "candidate_tool_count": len(signals.candidate_tools),
+            "prompt_capture_status": prompt.status,
+            "prompt_excerpt_redacted": prompt.excerpt_redacted,
+            "prompt_fingerprint": prompt.fingerprint,
+            "prompt_char_count": prompt.char_count,
+            "prompt_excerpt_truncated": prompt.truncated,
+            "tool_name": tool.tool_name,
+            "tool_selection_kind": "executed_tool" if tool.should_log() else "",
+            "tool_input_fingerprint": tool.tool_input_fingerprint,
+            "tool_input_key_count": tool.tool_input_key_count,
+            "tool_input_keys": list(tool.tool_input_keys),
+            "tool_command_verb": tool.command_verb,
             "prompt_feedback_detected": bool(signals.feedback_labels),
             "feedback_labels": list(signals.feedback_labels),
             "feedback_targets": list(signals.feedback_targets()),

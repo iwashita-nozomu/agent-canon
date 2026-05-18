@@ -24,6 +24,11 @@ The license boundary is explicit:
   they must keep AgentCanon's license with the submodule.
 - Third-party skills or assets in `vendor/agent-canon/vendor/` must record
   upstream URL, revision, and license metadata before they are enabled.
+- Devcontainer-installed local LLM tooling is not vendored into the repository.
+  llama.cpp is an external MIT-licensed tool fetched into `~/.tools`, and the
+  default SmolLM3-3B GGUF model is an external Apache-2.0 model fetched
+  lazily by llama.cpp cache behavior. Do not commit those binaries or model
+  weights.
 
 When adding a new shared surface, update the dependency header, the surface
 manifest if the path is exposed to parent repositories, and any README section

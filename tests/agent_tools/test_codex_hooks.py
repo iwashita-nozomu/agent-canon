@@ -354,7 +354,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(HOOK_SCRIPT.exists())
 
     def test_hooks_json_wires_mcp_context_hook(self) -> None:
-        """Session and prompt hooks should point at the repo-local MCP context script."""
+        """Only session startup should point at the repo-local MCP context script."""
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
 
         session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
@@ -367,12 +367,12 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertIn("SessionStart", session_start["command"])
         self.assertIn("mcp_session_context.sh", session_start["command"])
-        self.assertTrue(any("UserPromptSubmit" in command for command in prompt_commands))
-        self.assertTrue(any("mcp_session_context.sh" in command for command in prompt_commands))
+        self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
         self.assertNotIn("PreToolUse", hooks["hooks"])
         self.assertIn("apply_patch", post_tool["matcher"])
+        self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
@@ -410,6 +410,9 @@ class CodexHooksTest(unittest.TestCase):
 
         hook_output = payload["hookSpecificOutput"]
         self.assertEqual(hook_output["hookEventName"], "SessionStart")
+        self.assertIn("ordinary consultation", hook_output["additionalContext"])
+        self.assertIn("not repository tasks", hook_output["additionalContext"])
+        self.assertIn("Do not run check_mcp_inventory.py", hook_output["additionalContext"])
         self.assertIn("repo_mcp_server", hook_output["additionalContext"])
         self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
         self.assertIn("even when the user did not mention MCP", hook_output["additionalContext"])
@@ -991,7 +994,11 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
+        self.assertEqual(entries[0]["prompt_capture_status"], "present")
+        self.assertIn("Use $agent-orchestration", entries[0]["prompt_excerpt_redacted"])
+        self.assertTrue(entries[0]["prompt_fingerprint"])
         self.assertEqual(entries[1]["skill_source_fields"], ["last_assistant_message"])
+        self.assertEqual(entries[1]["prompt_capture_status"], "missing")
         self.assertEqual(entries[2]["observed_text_field_count"], 1)
         self.assertEqual(entries[2]["observed_text_value_count"], 1)
         self.assertTrue(all(entry["payload_key_count"] >= 2 for entry in entries))
@@ -1039,10 +1046,6 @@ class CodexHooksTest(unittest.TestCase):
         payloads: tuple[dict[str, object], ...] = (
             {},
             {
-                "hookEventName": "UserPromptSubmit",
-                "prompt": "plain text without a skill token",
-            },
-            {
                 "hookEventName": "Stop",
                 "last_assistant_message": "finished without skill declaration",
             },
@@ -1065,8 +1068,113 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertFalse(log_path.exists())
 
+    def test_skill_usage_logger_records_plain_prompt_capture(self) -> None:
+        """Plain user prompts should be captured as redacted bounded evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "plain consultation with sk-abcdefghijklmnopqrstuvwxyz1234567890",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["prompt_capture_status"], "present")
+        self.assertIn("plain consultation", entry["prompt_excerpt_redacted"])
+        self.assertIn("[REDACTED_API_KEY]", entry["prompt_excerpt_redacted"])
+        self.assertNotIn("sk-abcdefghijklmnopqrstuvwxyz1234567890", entry["prompt_excerpt_redacted"])
+        self.assertEqual(entry["skills"], [])
+        self.assertEqual(entry["candidate_tools"], [])
+
+    def test_skill_usage_logger_records_post_tool_selection(self) -> None:
+        """Tool selection logging should record PostToolUse metadata for later analysis."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "python3 -m pytest tests/agent_tools/test_codex_hooks.py"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["event"], "PostToolUse")
+        self.assertEqual(entry["tool_name"], "Bash")
+        self.assertEqual(entry["tool_selection_kind"], "executed_tool")
+        self.assertEqual(entry["tool_command_verb"], "python3")
+        self.assertEqual(entry["tool_input_keys"], ["cmd"])
+        self.assertTrue(entry["tool_input_fingerprint"])
+
+    def test_skill_usage_logger_records_markdown_docs_signals(self) -> None:
+        """Markdown prompts and docs-check commands should be measurable later."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
+            prompt = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "マークダウンの hook と docs-check が引っかかっていないか見たい。",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            tool = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(prompt.stdout, "")
+        self.assertEqual(tool.stdout, "")
+        self.assertIn("md-style-check", entries[0]["candidate_skills"])
+        self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
+        self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
+
     def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
-        """Prompt feedback should be classified without storing raw prompt text."""
+        """Prompt feedback should be classified with bounded redacted prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             report_dir = root / "reports" / "agents" / "run-feedback"
@@ -1098,7 +1206,7 @@ class CodexHooksTest(unittest.TestCase):
             monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
 
         self.assertEqual(result.stdout, "")
-        self.assertNotIn("結果書き出し", json.dumps(entry, ensure_ascii=False))
+        self.assertIn("結果書き出し", entry["prompt_excerpt_redacted"])
         self.assertEqual(entry["skills"], [])
         self.assertIn("result-artifact-writeout", entry["candidate_skills"])
         self.assertIn("agent-learning", entry["candidate_skills"])

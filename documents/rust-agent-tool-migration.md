@@ -37,16 +37,26 @@ container PATH for non-interactive `devcontainer exec` commands, and builds the
 canonical AgentCanon CLI into:
 
 ```text
-/opt/agent-canon/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon
 ```
 
-with:
+with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
+may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
+`~/.tools` for compiled agent-tool binaries.
+
+llama.cpp follows the same compiled-tool cache rule:
 
 ```text
-/usr/local/bin/agent-canon
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
 ```
 
-as a symlink.
+The default local LLM model selector is
+`ggml-org/SmolLM3-3B-GGUF:Q4_K_M`, used only by
+`tools/agent_tools/file_responsibility_llm.py` for single-file advisory
+responsibility review. Post-create fetches and builds llama.cpp through
+`tools/install_llama_cpp.sh`; AgentCanon update/rebuild paths reuse the same
+installer and rebuild an existing local llama.cpp checkout after pin updates.
 
 In a template or derived repository, the normal adoption path is:
 
@@ -54,8 +64,14 @@ In a template or derived repository, the normal adoption path is:
    contains this policy and the Rust CLI.
 1. Repair shared root views with `bash tools/sync_agent_canon.sh link-root` if
    the root view drifts.
-1. Rebuild or recreate the DevContainer so `.devcontainer/post-create.sh` runs
-   again.
+1. Run `make agent-canon-ensure-latest` or
+   `bash tools/update_agent_canon.sh apply`; this calls
+   `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
+   host has no Rust toolchain, rerun the same target inside the DevContainer or
+   recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
+   If llama.cpp was already installed under
+   `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/src/llama.cpp`, the same rebuild
+   path also recompiles `llama-cli` and `llama-server`.
 1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
    the Rust foundation is present.
 1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before
@@ -168,7 +184,8 @@ The audit checks:
 - the Rust migration document, crate manifest, CLI entrypoint, audit module,
   and stable wrapper exist;
 - `.devcontainer/post-create.sh` installs the Rust toolchain, developer
-  components, release CLI, and `/usr/local/bin/agent-canon` entrypoint;
+  components, `~/.tools` release CLI cache, and `/usr/local/bin/agent-canon`
+  entrypoint;
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 
@@ -194,6 +211,44 @@ It reports:
 - `RUST_MIGRATION_KEEP_PYTHON` boundaries that should not be ported just
   because a tool was recently used.
 
+## MCP Preflight Rust Tools
+
+MCP preflight routing is now part of the Rust CLI because it is a stable,
+machine-readable routing boundary used before expensive repository work.
+
+Use this for request classification:
+
+```bash
+agent-canon mcp-preflight-policy --request-kind github-actions-read
+```
+
+`consultation`, `brainstorming`, `routing-only`, `explanation-only`,
+`github-actions-read`, `github-read`, `pr-read`, and `issue-read` return
+`MCP_PREFLIGHT_DECISION=skip`. Local repo state or mutation kinds such as
+`repo-read`, `implementation`, `validation`, `pr-mutation`, `issue-sync`, and
+`agent-canon-sync` return `required`.
+
+Use this for repository-task inventory:
+
+```bash
+agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
+```
+
+In template or derived repositories:
+
+```bash
+agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
+```
+
+The session cache lives under ignored `reports/agents/.mcp_inventory_cache.json`.
+It is valid only for the same root, required server set, `codex` binary, and
+MCP runtime surface fingerprint. Changes to `.codex/config.toml`, `mcp/`,
+`rust/agent-canon/src/mcp_inventory.rs`, or
+`tools/agent_tools/check_mcp_inventory.py` invalidate the cache.
+
+The Python `tools/agent_tools/check_mcp_inventory.py` remains as a compatibility
+entrypoint when a run bundle needs direct `workflow_monitoring.md` evidence.
+
 ## Validation
 
 ```bash
@@ -202,6 +257,8 @@ cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D war
 cargo test --manifest-path rust/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
+agent-canon mcp-preflight-policy --request-kind github-actions-read
+agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/ci/container_config.py

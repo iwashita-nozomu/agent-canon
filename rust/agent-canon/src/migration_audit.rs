@@ -10,8 +10,10 @@ use std::path::{Path, PathBuf};
 
 const REQUIRED_PATHS: &[&str] = &[
     "documents/rust-agent-tool-migration.md",
+    "agent-canon-environment.toml",
     "rust/agent-canon/Cargo.toml",
     "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/mcp_inventory.rs",
     "rust/agent-canon/src/migration_audit.rs",
     "rust/agent-canon/src/rust_migration_plan.rs",
     "tools/bin/agent-canon",
@@ -23,7 +25,7 @@ const REQUIRED_POST_CREATE_SNIPPETS: &[&str] = &[
     "clippy",
     "rust-analyzer",
     "cargo build --release",
-    "/opt/agent-canon/bin/agent-canon",
+    "${tools_home}/agent-canon/bin/agent-canon",
     "/usr/local/bin/agent-canon",
 ];
 

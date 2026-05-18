@@ -119,6 +119,182 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
+  - id: responsibility-scope
+    summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
+    path: tools/agent_tools/responsibility_scope.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/responsibility_scope.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/responsibility-scope-management.md
+      - responsibility-scope.toml
+      - documents/templates/responsibility-scope.template.toml
+    tests:
+      - tests/agent_tools/test_responsibility_scope.py
+
+  - id: issue-sync
+    summary: Validates local AgentCanon issue files and plans GitHub Issue synchronization.
+    path: tools/agent_tools/issue_sync.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/issue_sync.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - issues/README.md
+      - documents/responsibility-scope-management.md
+    tests:
+      - tests/agent_tools/test_issue_sync.py
+
+  - id: eval-accumulation-check
+    summary: Validates append-only AgentCanon hook and skill eval result accumulation.
+    path: tools/agent_tools/eval_accumulation_check.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/eval_accumulation_check.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/results/README.md
+      - agents/evals/results/hook-runs/README.md
+    tests:
+      - tests/agent_tools/test_eval_accumulation_check.py
+
+  - id: workflow-selection-eval
+    summary: Validates deterministic prompt-to-workflow routing cases.
+    path: tools/agent_tools/evaluate_workflow_selection.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_workflow_selection.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/workflow_selection_eval.toml
+      - agents/evals/results/workflow-selection/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_workflow_selection.py
+
+  - id: report-quality-eval
+    summary: Validates report-writing skill quality checklist and report reviewer routing.
+    path: tools/agent_tools/evaluate_report_quality.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_report_quality.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/evals/report_quality_eval.toml
+      - agents/evals/results/report-quality/README.md
+      - agents/skills/report-writing.md
+    tests:
+      - tests/agent_tools/test_evaluate_report_quality.py
+
+  - id: file-resp-llm
+    summary: Runs advisory local LLM responsibility review for exactly one file.
+    path: tools/agent_tools/file_responsibility_llm.py
+    family: agent_tools
+    role: checker
+    status: optional
+    command: python3 tools/agent_tools/file_responsibility_llm.py --print-prompt <file>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+    tests:
+      - tests/agent_tools/test_file_responsibility_llm.py
+
+  - id: local-llm-eval
+    summary: Runs configurable prompt and optional model evals for single-file local LLM responsibility review.
+    path: tools/agent_tools/local_llm_eval.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/local_llm_eval.py --manifest agents/evals/local_llm_responsibility_eval.toml
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+      - agents/evals/README.md
+      - agents/evals/local_llm_responsibility_eval.toml
+      - agents/evals/results/local-llm-responsibility/README.md
+    tests:
+      - tests/agent_tools/test_local_llm_eval.py
+
+  - id: agent-search
+    summary: Coordinates purpose-based search across text, LLM cards, vector search, tool catalog, dependency headers, and code facts.
+    path: tools/agent_tools/search.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search.py --purpose "<goal>"
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/search-coordination.md
+    tests:
+      - tests/agent_tools/test_search.py
+
+  - id: search-index
+    summary: Builds repo-local ignored semantic cards for the coordinated LLM search provider.
+    path: tools/agent_tools/search_index.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search_index.py build
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/search-coordination.md
+      - .gitignore
+    tests:
+      - tests/agent_tools/test_search_index.py
+
   - id: route
     summary: Maps long proposed tool and skill names to short task-routing areas.
     path: tools/agent_tools/route.py
@@ -295,7 +471,7 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: agent-canon-cli
-    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, and migration plan.
+    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, and MCP preflight tools.
     path: tools/bin/agent-canon
     family: root
     role: runner
@@ -309,8 +485,29 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/rust-agent-tool-migration.md
+      - .codex/README.md
+      - mcp/README.md
     tests: []
     test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+
+  - id: agent-canon-mcp-preflight
+    summary: Rust MCP preflight classifier and session-cached inventory checker.
+    path: rust/agent-canon/src/mcp_inventory.rs
+    family: root
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon mcp-preflight-policy --request-kind github-actions-read
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - .codex/README.md
+      - mcp/README.md
+      - documents/rust-agent-tool-migration.md
+      - agent-canon-environment.toml
+    tests:
+      - rust/agent-canon/src/mcp_inventory.rs
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -399,6 +596,43 @@ entries:
       - documents/agent-canon-subtree-migration.md
     tests:
       - tests/tools/test_update_agent_canon.py
+
+  - id: rebuild-agent-tools
+    summary: Rebuilds compiled AgentCanon tools after AgentCanon source updates.
+    path: tools/rebuild_agent_tools.sh
+    family: root
+    role: runner
+    status: canonical
+    command: bash tools/rebuild_agent_tools.sh
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/rust-agent-tool-migration.md
+    tests:
+      - tests/tools/test_update_agent_canon.py
+
+  - id: install-llama-cpp
+    summary: Builds llama.cpp under AGENT_CANON_TOOLS_HOME for local single-file responsibility analysis.
+    path: tools/install_llama_cpp.sh
+    family: root
+    role: runner
+    status: canonical
+    command: bash tools/install_llama_cpp.sh --allow-fetch
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/local-llm-responsibility-analysis.md
+      - documents/rust-agent-tool-migration.md
+    tests:
+      - tests/tools/test_install_llama_cpp.py
 
   - id: agent-canon-update-todos
     summary: Routes parent-repo agents through AgentCanon update TODOs after submodule pin updates.
@@ -939,6 +1173,24 @@ entries:
       - agents/evals/results/README.md
     tests:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
+
+  - id: generate-agent-runtime-dashboard
+    summary: Generates read-only dashboards for AgentCanon runtime logs and eval results.
+    path: tools/agent_tools/generate_agent_runtime_dashboard.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/results/README.md
+    tests:
+      - tests/agent_tools/test_generate_agent_runtime_dashboard.py
 
   - id: compare-agent-run-paths
     summary: Compares two run bundles for route and static-feedback differences.

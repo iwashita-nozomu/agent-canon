@@ -6,6 +6,14 @@ upstream design ../runtime-profiles-and-check-matrix.md runtime profile and vali
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
 downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
+downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
+downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
+downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+downstream implementation ../../tools/agent_tools/file_responsibility_llm.py runs single-file local LLM responsibility review
+downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
+downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
+downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
+downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
 @dependency-end
 -->
 
@@ -27,6 +35,24 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - catalog の schema、path、説明、docs/tests、default wiring、retired legacy 混入を検査し、`--format markdown` で対応表を出します。
 - `tools/agent_tools/tool_drift.py`
   - dependency manifest を使い、tool / workflow / PR checklist / convention doc の trace 漏れを検出します。
+- `tools/agent_tools/responsibility_scope.py`
+  - top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub、vendor の責務範囲と protecting tool を固定します。
+- `tools/agent_tools/issue_sync.py`
+  - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan を出します。CI では network を要求しません。
+- `tools/agent_tools/eval_accumulation_check.py`
+  - `agents/evals/results/` の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
+- `tools/agent_tools/file_responsibility_llm.py`
+  - llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `tools/agent_tools/local_llm_eval.py`
+  - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
+- `tools/agent_tools/evaluate_report_quality.py`
+  - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
+- `tools/agent_tools/search.py`
+  - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
+- `tools/agent_tools/search_index.py`
+  - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
+- `tools/agent_tools/route.py --area search`
+  - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
 - `documents/tools/tool-docs.toml`
   - tool 実装と説明文書を一対一で対応させる機械可読 map です。`tool` と `doc` は同じ basename にし、`tool_catalog.py` が path、dependency header、catalog docs wiring を検査します。
 
@@ -51,7 +77,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/ci/container_config.py`
   - repo-local Dockerfile / runtime pack と AgentCanon-owned devcontainer 生成導線の静的整合を検査します。`docker/` が無くても `.devcontainer/` があれば shared devcontainer source を検査します。
 - `tools/bin/agent-canon`
-  - AgentCanon Rust CLI の stable wrapper です。`/opt/agent-canon/bin/agent-canon`
+  - AgentCanon Rust CLI の stable wrapper です。
+    `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon`
     が devcontainer post-create で install 済みならそれを使い、未 install
     で `cargo` がある場合は `vendor/agent-canon/rust/agent-canon` の source
     から実行します。installed binary が checked-out Rust source より古い場合も
@@ -63,6 +90,14 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     最新化した template / derived repo は、DevContainer を作り直したあと
     `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
     次に Rust 化する tool 候補を確認します。
+  - `mcp-preflight-policy` は prompt / user request の種類から MCP preflight
+    が必要かを機械判定します。GitHub Actions run、PR check、GitHub Issue を
+    読むだけなら `agent-canon mcp-preflight-policy --request-kind
+    github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
+  - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
+    repository task では `agent-canon mcp-inventory --root . --require
+    repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
+    surface での繰り返し確認を cache hit にします。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
 - `tools/ci/run_codex_in_repo_container.py`
@@ -129,6 +164,15 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon-update-tasks.toml` から抽出します。
   - 親 repo の進捗は `.agent-canon/update-state.toml` にだけ残し、生成された pending view は `.agent-canon/.gitignore` で ignored にします。
   - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
+- `tools/rebuild_agent_tools.sh`
+  - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled AgentCanon tools を source commit に合わせます。
+  - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
+  - `make agent-canon-ensure-latest`、`make agent-canon-latest`、`make agent-canon-update` の safe path から自動的に呼ばれます。
+  - `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo` が出た場合は、DevContainer 内で再実行するか Rust toolchain を用意してから `make agent-canon-rebuild-tools` を実行します。
+- `tools/install_llama_cpp.sh`
+  - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を公開します。
+  - PostCreate では `--allow-fetch` で取得と build を行い、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
+  - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は lazy fetch で、repo にコミットしません。
 - `tools/agent_tools/route.py`
   - 長い候補 tool / skill 名を短い route area へ解決します。
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
@@ -152,6 +196,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 例:
 
 ```bash
+python3 tools/agent_tools/search.py --purpose "dependency header graph tool"
+python3 tools/agent_tools/search.py --purpose "github cli validation" --providers llm,tool,vector
+python3 tools/agent_tools/route.py --area search
 python3 tools/agent_tools/vector_search.py --query "dependency header graph"
 python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
 python3 tools/agent_tools/vector_search.py --surface . --query "solver logging" --context
@@ -214,6 +261,9 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`agents/evals/results/skill-workflow-prompt/` に詳細結果を蓄積します。
   - `generate_agent_improvement_guide.py` は `memory/`、`agents/evals/results/skill-workflow-prompt/`、`agents/evals/results/hook-runs/`、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
+  - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。
+  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。
+  - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `agents/evals/results/workflow-selection/` に詳細結果を蓄積します。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。

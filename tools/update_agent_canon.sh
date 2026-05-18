@@ -4,6 +4,7 @@
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
 # downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
 # @dependency-end
@@ -27,6 +28,7 @@ Usage:
   bash tools/update_agent_canon.sh plan [branch]
   bash tools/update_agent_canon.sh latest [branch]
   bash tools/update_agent_canon.sh apply [branch]
+  bash tools/update_agent_canon.sh rebuild-tools
   bash tools/update_agent_canon.sh merge-main-into-current [branch]
   bash tools/update_agent_canon.sh status
 
@@ -40,6 +42,8 @@ Commands:
       shared-canon work or merge conflicts require human/agent resolution.
   apply
       Update the parent repo to AgentCanon main when the update surface is safe.
+  rebuild-tools
+      Rebuild compiled AgentCanon tools from the currently checked-out source.
   merge-main-into-current
       Inside vendor/agent-canon, fetch AgentCanon main and merge it into the
       currently checked-out AgentCanon branch. This is the canonical repair path
@@ -198,6 +202,15 @@ acknowledge_update_todos_if_available() {
   echo "AGENT_CANON_LATEST_TODOS=acknowledged_noop"
 }
 
+rebuild_agent_tools_if_available() {
+  local rebuild_tool="$ROOT_DIR/tools/rebuild_agent_tools.sh"
+  if [ ! -f "$rebuild_tool" ]; then
+    echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
+    return
+  fi
+  bash "$rebuild_tool"
+}
+
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
@@ -234,6 +247,11 @@ cmd_latest() {
     return "$latest_rc"
   fi
   cat "$latest_log"
+  if [ "$prefix_mode" = "submodule" ] && ! grep -q '^agent_canon_latest_submodule_local_state_checked=yes$' "$latest_log"; then
+    rm -f "$latest_log"
+    emit_agentcanon_conflict_workflow_route "ensure_latest_missing_submodule_local_state_evidence=yes;route=${route:-unknown}"
+    return 2
+  fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
     rm -f "$latest_log"
     bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
@@ -244,6 +262,7 @@ cmd_latest() {
   rm -f "$latest_log"
 
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+  rebuild_agent_tools_if_available
   acknowledge_update_todos_if_available || return $?
   echo "AGENT_CANON_LATEST_TOOL_RESULT=updated"
   echo "NEXT_ACTION=run_validation_then_push_parent_repo"
@@ -251,7 +270,27 @@ cmd_latest() {
 
 cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch"
+  local latest_log=""
+  local latest_rc=0
+
+  latest_log="$(mktemp)"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  cat "$latest_log"
+  if [ "$latest_rc" -ne 0 ]; then
+    rm -f "$latest_log"
+    return "$latest_rc"
+  fi
+  if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
+    rm -f "$latest_log"
+    echo "AGENT_CANON_TOOL_REBUILD=skipped_deferred_branch_pr"
+    return 0
+  fi
+  rm -f "$latest_log"
+  rebuild_agent_tools_if_available
+}
+
+cmd_rebuild_tools() {
+  rebuild_agent_tools_if_available
 }
 
 cmd_status() {
@@ -370,6 +409,10 @@ main() {
     apply)
       shift
       cmd_apply "${1:-$DEFAULT_BRANCH}"
+      ;;
+    rebuild-tools)
+      shift
+      cmd_rebuild_tools
       ;;
     merge-main-into-current)
       shift

@@ -4,6 +4,7 @@
 # upstream design ../../documents/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
+# upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -67,8 +68,13 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "clippy",
     "rust-analyzer",
     "cargo build --release",
-    "/opt/agent-canon/bin/agent-canon",
+    "AGENT_CANON_TOOLS_HOME",
+    "${tools_home}/agent-canon/bin/agent-canon",
     "/usr/local/bin/agent-canon",
+    "install_llama_cpp",
+    "tools/install_llama_cpp.sh",
+    "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
+    "${tools_home}/bin/llama-cli",
     "gh --version",
     "codex --version",
 )

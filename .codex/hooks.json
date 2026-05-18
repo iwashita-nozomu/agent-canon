@@ -4,7 +4,7 @@
     "responsibility Configures Codex hook entrypoints for MCP session context and repo guardrails.",
     "upstream implementation config.toml enables project-local Codex hooks",
     "upstream design README.md documents MCP inventory preflight",
-    "downstream implementation hooks/mcp_session_context.sh emits MCP hook context",
+    "downstream implementation hooks/mcp_session_context.sh emits SessionStart MCP hook context",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
     "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
@@ -34,12 +34,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/mcp_session_context.sh\" UserPromptSubmit",
-            "timeout": 30,
-            "statusMessage": "Loading repo MCP preflight guidance"
-          },
-          {
-            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/prompt_secret_guard.py\"",
             "timeout": 10,
             "statusMessage": "Checking prompt for obvious secrets"
@@ -57,6 +51,12 @@
       {
         "matcher": "Bash|apply_patch|python|python3",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
+            "timeout": 10,
+            "statusMessage": "Logging tool selection"
+          },
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",

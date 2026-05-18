@@ -4,6 +4,7 @@ responsibility Documents MCP Runtime Surface for this repository.
 upstream implementation ../.codex/config.toml declares repo-local MCP launcher
 downstream implementation ./repo_mcp_server.sh starts the stdio server
 downstream implementation ./repo_mcp_server.py implements the stdio server
+downstream implementation ../rust/agent-canon/src/mcp_inventory.rs checks preflight scope and inventory cache
 @dependency-end
 -->
 
@@ -19,6 +20,16 @@ bash mcp/repo_mcp_server.sh
 ```
 
 Do not require a host-global `repo_mcp_server` executable.
+
+For user-request routing, do not start from the MCP server itself. Use the Rust
+CLI policy command:
+
+```bash
+agent-canon mcp-preflight-policy --request-kind github-actions-read
+```
+
+GitHub-only read inspection returns `MCP_PREFLIGHT_DECISION=skip`; local repo
+state or mutation work returns `required`.
 
 The Codex server config pins `cwd = "."`, and the launcher exports
 `CODEX_WORKSPACE_ROOT` from the repo-local `mcp/` path before starting Python.
@@ -49,6 +60,16 @@ repo context and goal-loop checks only. It is not the file-edit surface, GitHub
 connector, shell runner, web browser, or a replacement for Codex-provided apps.
 If Codex already provides a runtime tool or connector, do not reimplement that
 capability in `repo_mcp_server`.
+
+The inventory checker is a separate Rust CLI surface:
+
+```bash
+agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache
+```
+
+It validates the configured Codex inventory and launcher paths, then reuses
+session-scoped pass evidence while the MCP runtime surface fingerprint is
+unchanged.
 
 ## Tools
 
