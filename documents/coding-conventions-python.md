@@ -104,6 +104,18 @@ def load_config(path: Path) -> dict[str, str]:
 - `python3 tools/agent_tools/import_responsibility.py --changed` を
   `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
 
+## Library と helper-first の禁止
+
+- vendored dependency、installed package、`site-packages`、`node_modules` の
+  library implementation を直接書き換えません。必要な場合は wrapper /
+  adapter、fork / upstream patch、または manifest-backed vendor import として
+  扱います。
+- 実装の最初の一手として helper-like function を増やしません。先に owning
+  class / module contract、責務 scope、issue、docs、test のいずれかで境界を
+  固定し、既存 helper / API を再利用できない理由を明示します。
+- `.codex/hooks/library_implementation_guard.py` と
+  `.codex/hooks/helper_first_guard.py` はこの規約の edit-time gate です。
+
 ## 目次
 
 1. [対象](./conventions/python/01_scope.md)

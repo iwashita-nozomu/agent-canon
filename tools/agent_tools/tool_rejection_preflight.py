@@ -4,6 +4,8 @@
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
+# upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
+# upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
@@ -69,6 +71,15 @@ AGENT_PROTOCOL_PATHS = frozenset(
     }
 )
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
+LIBRARY_SURFACE_PREFIXES = (
+    "vendor/",
+    "third_party/",
+    "third-party/",
+    "external/",
+    "node_modules/",
+    ".venv/",
+)
+AGENT_CANON_SUBMODULE_PREFIX = "vendor/agent-canon"
 
 
 @dataclass(frozen=True, order=True)
@@ -125,6 +136,18 @@ PYTHON_GATE_TEMPLATES = (
         ),
     ),
     GateTemplate(
+        gate="helper_first_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/helper_first_guard.py"
+        ),
+        handoff=(
+            "include ownership, module boundary, issue, docs, or test evidence "
+            "before adding helper-like functions"
+        ),
+    ),
+    GateTemplate(
         gate="oop_readability_guard",
         command_template=(
             "python3 tools/oop/python/readability.py --root . --min-score 95 {path}"
@@ -142,6 +165,20 @@ PYTHON_GATE_TEMPLATES = (
         handoff=(
             "avoid ad hoc helper creation or state why existing helper surfaces "
             "cannot be reused"
+        ),
+    ),
+)
+LIBRARY_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="library_implementation_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/library_implementation_guard.py"
+        ),
+        handoff=(
+            "do not rewrite vendored or installed library internals; use wrapper, "
+            "adapter, fork/upstream patch, or manifest-backed vendor import"
         ),
     ),
 )
@@ -337,7 +374,16 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(AGENT_PROTOCOL_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
+    if library_surface_path(path):
+        templates.extend(LIBRARY_GATE_TEMPLATES)
     return tuple(template.for_path(path) for template in templates)
+
+
+def library_surface_path(path: str) -> bool:
+    """Return whether a planned path belongs to protected library surfaces."""
+    if path == AGENT_CANON_SUBMODULE_PREFIX or path.startswith(AGENT_CANON_SUBMODULE_PREFIX + "/"):
+        return False
+    return path.startswith(LIBRARY_SURFACE_PREFIXES)
 
 
 def text_output(gates: tuple[PredictedGate, ...]) -> str:

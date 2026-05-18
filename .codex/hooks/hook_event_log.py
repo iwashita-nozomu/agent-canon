@@ -4,6 +4,8 @@
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # downstream implementation ./oop_readability_guard.py records OOP hook outcomes
 # downstream implementation ./module_boundary_guard.py records module boundary outcomes
+# downstream implementation ./library_implementation_guard.py records protected library rewrite outcomes
+# downstream implementation ./helper_first_guard.py records helper-first implementation outcomes
 # downstream implementation ./notebook_quality_guard.py records notebook hook outcomes
 # downstream implementation ./style_checker_guard.py records changed-file style outcomes
 # downstream implementation ./skill_usage_logger.py records skill hook outcomes

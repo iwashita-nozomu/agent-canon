@@ -11,7 +11,9 @@
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
     "downstream implementation hooks/module_boundary_guard.py blocks forced module-internal rewrites without boundary evidence",
+    "downstream implementation hooks/library_implementation_guard.py blocks direct vendored library implementation rewrites",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
+    "downstream implementation hooks/helper_first_guard.py blocks helper-function-first implementation drift",
     "downstream implementation hooks/style_checker_guard.py runs changed-file style checks and logs unchecked edits",
     "downstream implementation hooks/log_surface_inventory_guard.py blocks hook/tool/skill log-surface inventory drift",
     "downstream implementation hooks/notebook_quality_guard.py blocks changed notebooks that behave like tests",
@@ -86,9 +88,21 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking library implementation ownership"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking helper-first implementation drift"
           },
           {
             "type": "command",
@@ -134,9 +148,21 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking library implementation ownership"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking helper-first implementation drift"
           },
           {
             "type": "command",

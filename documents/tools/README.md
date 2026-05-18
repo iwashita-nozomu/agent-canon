@@ -222,6 +222,8 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
 - `tools/agent_tools/helper_function_inventory.py`
   - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。
   - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
+  - `helper_first_guard.py` は `helper_function_inventory.py --changed --baseline-ref HEAD --format json` の record を読み、test / docs / issue / responsibility-scope などの ownership evidence がない helper-like function 追加を block します。log には accepted / blocked の両方を分析できる `helper_candidate_records` と、blocking subset の `helper_first_records` を残し、prompt / skill eval の改善材料にします。
+  - `library_implementation_guard.py` は `vendor/**`、`site-packages`、`node_modules`、`responsibility-scope.toml` の `external_dependency` scope を protected library implementation として扱い、既存 file の直接 rewrite を block します。外部実装は wrapper / adapter、fork / upstream patch、または manifest-backed vendor import で扱います。
 - `tools/agent_tools/vendor_skill_adapters.py`
   - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
   - GitHub 由来の skill では `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致を検査し、外部 repo が root や canonical skill path に直接入るのを防ぎます。
