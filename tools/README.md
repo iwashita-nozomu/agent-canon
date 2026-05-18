@@ -130,6 +130,7 @@ under `agents/evals/results/report-quality/`.
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う advisory checker です。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価します。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
+  - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `noncanonical_document_inventory.py` は Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補と正本候補を出します。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper` と `needs_user_judgment` を分けて JSON / Markdown / text で出します。

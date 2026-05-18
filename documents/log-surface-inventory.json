@@ -329,6 +329,14 @@
       "surface": "hook"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 293,
+      "path": ".codex/hooks/reference_capture_guard.py",
+      "surface": "hook"
+    },
+    {
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "candidate_skill_count",
@@ -2676,7 +2684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 1718,
+      "line": 2339,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2684,7 +2692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 1720,
+      "line": 2341,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2692,7 +2700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 1722,
+      "line": 2343,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2700,7 +2708,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 1721,
+      "line": 2342,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -2708,7 +2716,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 1719,
+      "line": 2340,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -3270,6 +3278,78 @@
       "field": "SUPERPROJECT_PUSHED",
       "line": 287,
       "path": "tools/agent_tools/persist_agent_memory.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "content_sha256",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "extraction_method",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "extraction_status",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "path",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "source_kind",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "url",
+      "line": 416,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REFERENCE_MATERIALIZE",
+      "line": 440,
+      "path": "tools/agent_tools/reference_materializer.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "REFERENCE_MATERIALIZE_ERROR",
+      "line": 439,
+      "path": "tools/agent_tools/reference_materializer.py",
       "surface": "tool"
     },
     {
@@ -8090,6 +8170,7 @@
     ".codex/hooks/oop_readability_guard.py",
     ".codex/hooks/pre_tool_guard.py",
     ".codex/hooks/prompt_secret_guard.py",
+    ".codex/hooks/reference_capture_guard.py",
     ".codex/hooks/skill_usage_logger.py",
     ".codex/hooks/style_checker_guard.py",
     "agents/skills/README.md",
@@ -8185,6 +8266,7 @@
     "tools/agent_tools/log_user_preference.py",
     "tools/agent_tools/noncanonical_document_inventory.py",
     "tools/agent_tools/persist_agent_memory.py",
+    "tools/agent_tools/reference_materializer.py",
     "tools/agent_tools/report_artifact_checks.py",
     "tools/agent_tools/responsibility_scope.py",
     "tools/agent_tools/review_backlog_scan.sh",

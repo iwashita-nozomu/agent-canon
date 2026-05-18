@@ -46,55 +46,139 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_STATUS=pass", result.stdout)
-        self.assertIn("## Where Logs Accumulate", dashboard)
-        self.assertIn("## Visual Evidence Map", dashboard)
-        self.assertIn("```mermaid", dashboard)
-        self.assertIn("flowchart LR", dashboard)
-        self.assertIn("## Action Map", dashboard)
-        self.assertIn("| hook evidence | `healthy` | `2` |", dashboard)
-        self.assertIn("| report quality eval | `missing` | `0` |", dashboard)
-        self.assertIn("## Issue Routing", dashboard)
-        self.assertIn("AC-20260517-mcp-inventory-preflight-cache.md", dashboard)
-        self.assertIn("AC-20260517-eval-accumulation-gaps.md", dashboard)
-        self.assertIn("AC-20260517-github-folder-issue-sync.md", dashboard)
-        self.assertIn("## Skill Eval Failure Analysis", dashboard)
-        self.assertIn("| `agent-orchestration` | `1` | `1` | `100.0%` |", dashboard)
-        self.assertIn("## Hook Workflow Attribution", dashboard)
-        self.assertIn("| `environment-maintenance@UserPromptSubmit` | `1` |", dashboard)
-        self.assertIn("hook_entries_missing_workflow_attribution: `3`", dashboard)
-        self.assertIn("## Token Consumption Evidence", dashboard)
-        self.assertIn("token_comparison_status: `present`", dashboard)
-        self.assertIn("average_token_ratio: `0.500`", dashboard)
-        self.assertIn("## Selection Accuracy By Responsibility", dashboard)
-        self.assertIn("| `skill` | `md-style-check` | `0` | `1` | `1` | `100.0%` | `untracked-or-unknown` |", dashboard)
-        self.assertIn("| `workflow` | `environment-maintenance` | `0` | `1` | `1` | `100.0%` | `untracked-or-unknown` |", dashboard)
-        self.assertIn("| `tool` | `run_docs_checks.sh` | `0` | `1` | `1` | `100.0%` | `untracked-or-unknown` |", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=6", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=4", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES=3", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES=3", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE=100.0%", dashboard)
-        self.assertIn("## Prompt And Tool Selection Evidence", dashboard)
-        self.assertIn("prompt_entries: `1`", dashboard)
-        self.assertIn("tool_selection_entries: `2`", dashboard)
-        self.assertIn("| `Bash` | `2` |", dashboard)
-        self.assertIn("| `python3` | `1` |", dashboard)
-        self.assertIn("## Markdown Docs Hook Signals", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS=2", dashboard)
-        self.assertIn("markdown_hook_signal_status: `present`", dashboard)
-        self.assertIn("| `run_docs_checks.sh` | `1` |", dashboard)
-        self.assertIn("agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_FILES=2", dashboard)
-        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=4", dashboard)
-        self.assertIn("skill-workflow-prompt", dashboard)
-        self.assertIn("local-llm-responsibility", dashboard)
-        self.assertIn("workflow-selection", dashboard)
-        self.assertIn("test-container", dashboard)
-        self.assertIn("environment-maintenance", dashboard)
-        self.assertIn("quality_gap", dashboard)
-        self.assertIn("skill-eval-test-fail-agent-orchestration.md", dashboard)
+        self.assert_problem_component_section(dashboard)
+        self.assert_next_action_section(dashboard)
+        self.assert_overview_sections(dashboard)
+        self.assert_selection_and_prompt_sections(dashboard)
+        self.assert_reference_and_log_sections(dashboard)
+
+    def assert_problem_component_section(self, dashboard: str) -> None:
+        """Verify glanceable problem component rows."""
+        required = (
+            "## Problem Components",
+            "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=7",
+            "| `workflow` | `_unattributed_hook_entries` | `attention` | "
+            "`5 hook entries lack workflow attribution` | `reference_capture_guard.jsonl` | "
+            "`repair workflow attribution logging` |",
+            "| `tool` | `run_docs_checks.sh` | `attention` | "
+            "`1 candidate miss(es); miss rate 100.0%` | "
+            "`## Selection Accuracy By Responsibility` | `repair tool selection or logging` |",
+            "| `hook` | `reference_capture_guard` | `attention` | "
+            "`1 referenced URLs are unregistered` | "
+            "`agents/evals/results/hook-runs/*/reference_capture_guard.jsonl` | "
+            "`materialize references or repair hook logging` |",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
+        self.assertIn(
+            "| `skill` | `agent-orchestration` | `fail` | `1 failed eval report(s)` | "
+            "`agents/evals/results/skill-workflow-prompt/"
+            "skill-eval-test-fail-agent-orchestration.md` | "
+            "`repair failed skill eval for agent-orchestration` |",
+            dashboard,
+        )
+
+    def assert_next_action_section(self, dashboard: str) -> None:
+        """Verify concrete dashboard-generated next actions."""
+        required = (
+            "## Next Actions",
+            "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=6",
+            "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS=5",
+            "`materialize missing consulted source URLs`",
+            "`repair failed skill eval for agent-orchestration`",
+            "`repair skill selection for md-style-check`",
+            "`repair workflow attribution logging`",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
+
+    def assert_overview_sections(self, dashboard: str) -> None:
+        """Verify overview, visual, and issue-routing sections."""
+        required = (
+            "## Where Logs Accumulate",
+            "## Visual Evidence Map",
+            "```mermaid",
+            "flowchart LR",
+            "## Action Map",
+            "| hook evidence | `healthy` | `3` |",
+            "| report quality eval | `missing` | `0` |",
+            "## Issue Routing",
+            "AC-20260517-mcp-inventory-preflight-cache.md",
+            "AC-20260517-eval-accumulation-gaps.md",
+            "AC-20260517-github-folder-issue-sync.md",
+            "## Skill Eval Failure Analysis",
+            "| `agent-orchestration` | `1` | `1` | `100.0%` |",
+            "## Hook Workflow Attribution",
+            "| `environment-maintenance@UserPromptSubmit` | `1` |",
+            "hook_entries_missing_workflow_attribution: `5`",
+            "## Token Consumption Evidence",
+            "token_comparison_status: `present`",
+            "average_token_ratio: `0.500`",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
+
+    def assert_selection_and_prompt_sections(self, dashboard: str) -> None:
+        """Verify routing selection, prompt, and Markdown evidence sections."""
+        required = (
+            "## Selection Accuracy By Responsibility",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=6",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=4",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES=3",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES=3",
+            "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE=100.0%",
+            "## Prompt And Tool Selection Evidence",
+            "prompt_entries: `1`",
+            "tool_selection_entries: `2`",
+            "| `Bash` | `2` |",
+            "| `python3` | `1` |",
+            "## Markdown Docs Hook Signals",
+            "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1",
+            "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1",
+            "AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS=2",
+            "markdown_hook_signal_status: `present`",
+            "| `run_docs_checks.sh` | `1` |",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
+        self.assert_selection_rows(dashboard)
+
+    def assert_selection_rows(self, dashboard: str) -> None:
+        """Verify selection table rows for each responsibility."""
+        rows = (
+            "| `skill` | `md-style-check` | `0` | `1` | `1` | "
+            "`100.0%` | `untracked-or-unknown` |",
+            "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
+            "`100.0%` | `untracked-or-unknown` |",
+            "| `tool` | `run_docs_checks.sh` | `0` | `1` | `1` | "
+            "`100.0%` | `untracked-or-unknown` |",
+        )
+        for row in rows:
+            self.assertIn(row, dashboard)
+
+    def assert_reference_and_log_sections(self, dashboard: str) -> None:
+        """Verify reference-capture and accumulated log summary sections."""
+        required = (
+            "## Reference Capture Signals",
+            "AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES=2",
+            "AGENT_RUNTIME_DASHBOARD_REFERENCE_URL_OBSERVATIONS=2",
+            "AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS=1",
+            "AGENT_RUNTIME_DASHBOARD_REFERENCE_BLOCKED_ENTRIES=0",
+            "| `UserPromptSubmit` | `1` |",
+            "| `last_assistant_message` | `1` |",
+            "agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl",
+            "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
+            "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
+            "skill-workflow-prompt",
+            "local-llm-responsibility",
+            "workflow-selection",
+            "test-container",
+            "environment-maintenance",
+            "quality_gap",
+            "skill-eval-test-fail-agent-orchestration.md",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
 
     def test_resolves_parent_repo_vendored_agentcanon_logs(self) -> None:
         """Parent-root invocation should read vendored AgentCanon evidence."""
@@ -121,7 +205,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={canon_root.resolve().as_posix()}", dashboard)
-        self.assertIn("hook_jsonl_files: `2`", dashboard)
+        self.assertIn("hook_jsonl_files: `3`", dashboard)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -129,13 +213,29 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         skill_dir = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
         local_llm_dir = root / "agents" / "evals" / "results" / "local-llm-responsibility"
         workflow_dir = root / "agents" / "evals" / "results" / "workflow-selection"
-        hook_dir.mkdir(parents=True)
-        skill_dir.mkdir(parents=True)
-        local_llm_dir.mkdir(parents=True)
-        workflow_dir.mkdir(parents=True)
+        self.create_fixture_dirs(root, hook_dir, skill_dir, local_llm_dir, workflow_dir)
+        self.write_issue_memory_fixture(root)
+        self.write_eval_report_fixture(skill_dir, local_llm_dir, workflow_dir)
+        self.write_hook_fixture(hook_dir)
+        self.write_workflow_monitor_fixture(root)
+
+    def create_fixture_dirs(
+        self,
+        root: Path,
+        hook_dir: Path,
+        skill_dir: Path,
+        local_llm_dir: Path,
+        workflow_dir: Path,
+    ) -> None:
+        """Create fixture directories."""
+        for directory in (hook_dir, skill_dir, local_llm_dir, workflow_dir):
+            directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
         (root / "memory").mkdir()
+
+    def write_issue_memory_fixture(self, root: Path) -> None:
+        """Write issue and memory fixture files."""
         (root / "issues" / "open" / "AC-20260517-open.md").write_text(
             "issue_id: AC-20260517-open\nstatus: open\n",
             encoding="utf-8",
@@ -155,6 +255,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         (root / "memory" / "USER_PREFERENCES.md").write_text("- preference\n", encoding="utf-8")
         (root / "memory" / "AGENT_PHILOSOPHY.md").write_text("- learning\n", encoding="utf-8")
+
+    def write_eval_report_fixture(
+        self,
+        skill_dir: Path,
+        local_llm_dir: Path,
+        workflow_dir: Path,
+    ) -> None:
+        """Write eval report fixture files."""
         (skill_dir / "skill-eval-test-fail-agent-orchestration.md").write_text(
             "- used_skills: `agent-orchestration`\nEVAL_STATUS=fail\n",
             encoding="utf-8",
@@ -171,6 +279,15 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "WORKFLOW_SELECTION_EVAL_STATUS=pass\n",
             encoding="utf-8",
         )
+
+    def write_hook_fixture(self, hook_dir: Path) -> None:
+        """Write hook JSONL fixture files."""
+        self.write_oop_hook_fixture(hook_dir)
+        self.write_skill_usage_hook_fixture(hook_dir)
+        self.write_reference_capture_hook_fixture(hook_dir)
+
+    def write_oop_hook_fixture(self, hook_dir: Path) -> None:
+        """Write OOP hook fixture files."""
         (hook_dir / "oop_readability_guard.jsonl").write_text(
             json.dumps(
                 {
@@ -185,6 +302,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+
+    def write_skill_usage_hook_fixture(self, hook_dir: Path) -> None:
+        """Write skill-usage hook fixture files."""
         (hook_dir / "skill_usage.jsonl").write_text(
             json.dumps(
                 {
@@ -242,6 +362,45 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+
+    def write_reference_capture_hook_fixture(self, hook_dir: Path) -> None:
+        """Write reference-capture hook fixture files."""
+        (hook_dir / "reference_capture_guard.jsonl").write_text(
+            json.dumps(
+                {
+                    "hook_run_id": "hook-reference-1",
+                    "hook_log_namespace": "test-container",
+                    "event": "UserPromptSubmit",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-e",
+                    "url_count": 1,
+                    "registered_count": 0,
+                    "missing_count": 1,
+                    "decision": "pass",
+                    "source_fields": ["prompt"],
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "hook-reference-2",
+                    "hook_log_namespace": "test-container",
+                    "event": "Stop",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-f",
+                    "url_count": 1,
+                    "registered_count": 1,
+                    "missing_count": 0,
+                    "decision": "pass",
+                    "source_fields": ["last_assistant_message"],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    def write_workflow_monitor_fixture(self, root: Path) -> None:
+        """Write token comparison fixture files."""
         workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
         workflow_report.parent.mkdir(parents=True)
         workflow_report.write_text(
