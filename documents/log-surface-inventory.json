@@ -3348,14 +3348,6 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 370,
-      "path": "tools/agent_tools/route.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
       "line": 388,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
@@ -3364,7 +3356,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 408,
+      "line": 406,
+      "path": "tools/agent_tools/route.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 426,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -3372,7 +3372,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 470,
+      "line": 488,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -3478,6 +3478,374 @@
       "field": "MISSING_DEPENDENCY_REASON",
       "line": 185,
       "path": "tools/agent_tools/scan_dependency_headers.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 507,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 518,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 524,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 524,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH",
+      "line": 506,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH",
+      "line": 533,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH_CANDIDATES",
+      "line": 509,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH_ERROR",
+      "line": 534,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH_PROVIDERS",
+      "line": 508,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_SEARCH_QUERY",
+      "line": 507,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "CANDIDATE",
+      "line": 511,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EVIDENCE",
+      "line": 516,
+      "path": "tools/agent_tools/search.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 507,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "card_file",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "cards",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "cards",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "generated_at",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "index_dir",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_requested",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_requested",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_unavailable",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_unavailable",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_used",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "llm_used",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "model",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "root",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema_version",
+      "line": 523,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "state_file",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "card_file",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "cards",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "index_dir",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "llm_requested",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "llm_unavailable",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "llm_used",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "state_file",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_stdout",
+      "field": "status",
+      "line": 618,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX",
+      "line": 597,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX",
+      "line": 627,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_CARDS",
+      "line": 600,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_CARD_FILE",
+      "line": 599,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_DIR",
+      "line": 598,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_ERROR",
+      "line": 628,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_LLM_REQUESTED",
+      "line": 601,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_LLM_UNAVAILABLE",
+      "line": 603,
+      "path": "tools/agent_tools/search_index.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEARCH_INDEX_LLM_USED",
+      "line": 602,
+      "path": "tools/agent_tools/search_index.py",
       "surface": "tool"
     },
     {
@@ -7815,6 +8183,8 @@
     "tools/agent_tools/run_repo_dependency_review.sh",
     "tools/agent_tools/scan_code_dependencies.sh",
     "tools/agent_tools/scan_dependency_headers.sh",
+    "tools/agent_tools/search.py",
+    "tools/agent_tools/search_index.py",
     "tools/agent_tools/smoke_test_research_perspective_pack.py",
     "tools/agent_tools/surface_manifest.py",
     "tools/agent_tools/task_close.py",

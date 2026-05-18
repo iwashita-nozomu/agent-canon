@@ -9,21 +9,27 @@ upstream design ../../tools/README.md documents shared tool entrypoints.
 upstream implementation ../../tools/agent_tools/vector_search.py provides text-surface vector search.
 downstream design ../../documents/tools/README.md should document user-facing tool discovery routes.
 downstream implementation ../../tools/agent_tools/route.py should expose a search route.
+downstream implementation ../../tools/agent_tools/search.py should expose purpose-based coordinated search.
+downstream implementation ../../tools/agent_tools/search_index.py should build local semantic search cards.
 downstream implementation ../../tools/catalog.yaml should catalog the search route and related tools.
 downstream implementation ../../tests/agent_tools/test_route.py should verify the route output.
+downstream implementation ../../tests/agent_tools/test_search.py should verify coordinated provider output.
+downstream implementation ../../tests/agent_tools/test_search_index.py should verify search index generation.
 downstream implementation ../../tests/agent_tools/test_vector_search.py should verify search index behavior.
 @dependency-end
 -->
 
 issue_id: AC-20260517-search-discoverability-routing
-status: open
+status: resolved
 source: user
 severity: S2
-evidence: tools/agent_tools/vector_search.py
-affected_surfaces: tools/agent_tools/route.py, tools/agent_tools/vector_search.py, tools/README.md, documents/tools/README.md, tools/catalog.yaml, tests/agent_tools/test_route.py, tests/agent_tools/test_vector_search.py
-edit_scope: reports/dependency-review/search-discoverability-20260517/dependency_edit_scope.txt
+evidence: tools/agent_tools/search.py
+affected_surfaces: tools/agent_tools/route.py, tools/agent_tools/search.py, tools/agent_tools/search_index.py, tools/agent_tools/vector_search.py, tools/README.md, documents/tools/README.md, documents/search-coordination.md, tools/catalog.yaml, tests/agent_tools/test_route.py, tests/agent_tools/test_search.py, tests/agent_tools/test_search_index.py, tests/agent_tools/test_vector_search.py
+edit_scope: reports/agents/20260518-010710-add-coordinated-text-llm-vector-tool-cod/
 required_action: Add an obvious AgentCanon route and documentation path for searching tools, documents, agents, and dependency-expanded edit scopes without knowing `vector_search.py` by name.
 close_condition: `route.py --area search`, tool docs, catalog entries, and tests expose vector search plus dependency-expanded search usage, and validation passes.
+resolved_by: reports/agents/20260518-010710-add-coordinated-text-llm-vector-tool-cod/
+resolved_at: 2026-05-18
 
 ## Finding
 
@@ -70,3 +76,16 @@ The review produced `REPO_DEPENDENCY_REVIEW=pass` and
 `tools/README.md`, `documents/tools/README.md`, `tools/catalog.yaml`,
 `tests/agent_tools/test_route.py`, and
 `tests/agent_tools/test_vector_search.py`.
+
+## Resolution
+
+AgentCanon now has `tools/agent_tools/search.py` as the purpose-based
+coordinator for text, LLM semantic cards, vector search, tool catalog,
+dependency-header edges, and Python code facts. `tools/agent_tools/search_index.py`
+builds the ignored repo-local `.agent-canon/search-index/` semantic-card index.
+
+`tools/agent_tools/route.py --area search` exposes the search entrypoint without
+requiring agents to know `vector_search.py` by name. Tool docs and
+`documents/search-coordination.md` describe when to use exact `rg`, coordinated
+search, and index rebuilds. Focused route/search/index tests cover the exposed
+command surface.
