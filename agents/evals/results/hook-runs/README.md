@@ -42,6 +42,13 @@ Library implementation hook entries include `changed_library_files`,
 to patch vendored or installed library internals instead of using an adapter,
 fork / upstream patch, or manifest-backed vendor import.
 
+Cause investigation hook entries include `code_paths`,
+`cause_evidence_status`, `cause_evidence_source`, and
+`cause_evidence_files`. They are the durable signal that an agent attempted a
+code edit before or after recording root-cause / hypothesis evidence. Prompt and
+skill evals should use blocked records to improve pre-edit investigation
+wording and accepted records to learn what evidence was sufficient.
+
 Helper-first hook entries include `helper_candidate_records`,
 `helper_candidate_record_count`, `helper_first_records`,
 `helper_first_candidate_count`, `boundary_evidence_changed`, and
@@ -50,6 +57,9 @@ helper-like functions; `helper_first_records` is the blocking subset where no
 ownership, module boundary, issue, docs, or test evidence was changed. Prompt
 and skill evals should consume both the accepted and blocked records when
 improving implementation handoff wording.
+`helper_candidate_records` may include `redundant_helper` records with
+`redundancy_rule` and `redundant_with`; those entries show when an agent tried
+to add identity wrappers, pass-through wrappers, or duplicate helper bodies.
 
 Reference capture hook entries include `urls`, `registered_urls`,
 `missing_urls`, `reference_files`, and `decision`. UserPromptSubmit entries are

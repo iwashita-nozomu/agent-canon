@@ -37,6 +37,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         )
 
         self.assertIn("TOOL_REJECTION_PREFLIGHT=warn", result.stdout)
+        self.assertIn("gate:cause_investigation_guard", result.stdout)
         self.assertIn("gate:import_responsibility", result.stdout)
         self.assertIn("gate:module_boundary_guard", result.stdout)
         self.assertIn("gate:helper_first_guard", result.stdout)

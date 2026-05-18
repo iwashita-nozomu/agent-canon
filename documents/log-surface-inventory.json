@@ -17,6 +17,22 @@
       "surface": "hook"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 393,
+      "path": ".codex/hooks/cause_investigation_guard.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 393,
+      "path": ".codex/hooks/cause_investigation_guard.py",
+      "surface": "hook"
+    },
+    {
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
@@ -36,7 +52,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 404,
+      "line": 408,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -44,7 +60,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
-      "line": 402,
+      "line": 406,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -52,7 +68,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "reason",
-      "line": 402,
+      "line": 406,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -76,7 +92,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 404,
+      "line": 408,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -84,7 +100,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "decision",
-      "line": 402,
+      "line": 406,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -92,7 +108,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "reason",
-      "line": 402,
+      "line": 406,
       "path": ".codex/hooks/helper_first_guard.py",
       "surface": "hook"
     },
@@ -284,7 +300,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 58,
+      "line": 59,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -292,7 +308,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 151,
+      "line": 152,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
     },
@@ -3220,7 +3236,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1975,
+      "line": 2223,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -3228,7 +3244,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 1975,
+      "line": 2223,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -5292,7 +5308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gate_count",
-      "line": 406,
+      "line": 447,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -5300,7 +5316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "predicted_gates",
-      "line": 406,
+      "line": 447,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -5308,7 +5324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 406,
+      "line": 447,
       "path": "tools/agent_tools/tool_rejection_preflight.py",
       "surface": "tool"
     },
@@ -8705,6 +8721,7 @@
     ".claude/skills/worktree-health/SKILL.md",
     ".claude/skills/worktree-start/SKILL.md",
     ".codex/hooks/agent_canon_read_warning.py",
+    ".codex/hooks/cause_investigation_guard.py",
     ".codex/hooks/goal_completion_guard.py",
     ".codex/hooks/helper_first_guard.py",
     ".codex/hooks/helper_inventory_guard.py",

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import copy
+import itertools
 import json
 import os
 import subprocess
@@ -93,6 +95,28 @@ MUTATING_METHODS = frozenset(
         "writelines",
     }
 )
+ROLE_SCORE_WEAK = 1
+ROLE_SCORE_STANDARD = 2
+ROLE_SCORE_STRONG = 3
+ROLE_SCORE_DOMINANT = 4
+ROLE_SCORE_BOUNDARY = 5
+SINGLE_STATEMENT_BODY_COUNT = 1
+BASE_HELPER_CONFIDENCE = 0.35
+PRIVATE_NAME_CONFIDENCE_BONUS = 0.25
+NESTED_SCOPE_CONFIDENCE_BONUS = 0.2
+ROLE_SCORE_CONFIDENCE_CAP = 0.2
+ROLE_SCORE_CONFIDENCE_DIVISOR = 20.0
+DEFAULT_HALF_CONFIDENCE = 0.5
+CALL_CONFIDENCE_BONUS = 0.05
+FEATURE_CONFIDENCE_BONUS = 0.05
+MAX_HELPER_CONFIDENCE = 0.99
+JUDGMENT_CONFIDENCE = 0.4
+SECONDARY_ROLE_SLICE_STOP = 4
+DOC_SUMMARY_LIMIT = 140
+LOCAL_CALLER_CLUSTER_LIMIT = 3
+EVIDENCE_RENDER_LIMIT = 6
+MARKDOWN_EVIDENCE_LIMIT = 4
+REDUNDANT_WITH_EVIDENCE_LIMIT = 3
 
 
 @dataclass(frozen=True)
@@ -124,6 +148,10 @@ class FunctionRecord:
     candidate_rule: str
     needs_user_judgment: bool
     judgment_rule: str
+    redundant_helper: bool
+    redundancy_rule: str
+    redundant_with: list[str]
+    implementation_signature: str
     incoming_count: int
     incoming_callers: list[str]
     incoming_call_sites: list[str]
@@ -605,6 +633,10 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         value = node.value
         if value is not None and any(isinstance(child, ast.Call) for child in ast.walk(value)):
             self.features.add("call_return")
+        if isinstance(value, ast.Call):
+            self.features.add("direct_call_return")
+            if call_passes_parameters_through(self.root, value):
+                self.features.add("pass_through_call_return")
         if value is not None and returned_parameter_name(self.root, value):
             self.features.add("identity_return")
         if isinstance(value, ast.IfExp):
@@ -621,6 +653,8 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         """Record expression-level call delegation."""
         if isinstance(node.value, ast.Call):
             self.features.add("call_statement")
+            if call_passes_parameters_through(self.root, node.value):
+                self.features.add("pass_through_call_statement")
         self.generic_visit(node)
 
     def visit_If(self, node: ast.If) -> None:
@@ -702,10 +736,13 @@ class FunctionBodyVisitor(ast.NodeVisitor):
         expanded_calls: list[str] = []
         for name, count in sorted(self.calls.items()):
             expanded_calls.extend([name] * count)
+        features = set(self.features)
+        if has_single_executable_statement(self.root):
+            features.add("single_statement_body")
         return BodyFacts(
             calls=tuple(expanded_calls),
             call_locations=tuple(sorted(self.call_locations)),
-            features=tuple(sorted(self.features)),
+            features=tuple(sorted(features)),
         )
 
 
@@ -791,10 +828,59 @@ def returned_parameter_name(root: ast.AST, value: ast.AST) -> str:
         return ""
     if not isinstance(value, ast.Name):
         return ""
-    parameter_names = {
-        arg.arg for arg in [*root.args.posonlyargs, *root.args.args, *root.args.kwonlyargs]
-    }
+    parameter_names = function_parameter_names(root)
     return value.id if value.id in parameter_names else ""
+
+
+def function_parameter_names(root: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Return every parameter name accepted by one function definition."""
+    return set(function_parameter_sequence(root))
+
+
+def function_parameter_sequence(root: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    """Return parameter names in function-signature order."""
+    parameter_names = [
+        arg.arg for arg in [*root.args.posonlyargs, *root.args.args, *root.args.kwonlyargs]
+    ]
+    if root.args.vararg is not None:
+        parameter_names.append(root.args.vararg.arg)
+    if root.args.kwarg is not None:
+        parameter_names.append(root.args.kwarg.arg)
+    return parameter_names
+
+
+def call_passes_parameters_through(root: ast.AST, call: ast.Call) -> bool:
+    """Return whether a call forwards only parameters from the current function."""
+    if not isinstance(root, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return False
+    parameter_names = function_parameter_names(root)
+    if not call.args and not call.keywords:
+        return False
+    return all(
+        call_argument_passes_parameter_through(argument, parameter_names)
+        for argument in call.args
+    ) and all(
+        call_keyword_passes_parameter_through(keyword, parameter_names)
+        for keyword in call.keywords
+    )
+
+
+def call_argument_passes_parameter_through(
+    argument: ast.expr,
+    parameter_names: set[str],
+) -> bool:
+    """Return whether one positional call argument forwards a parameter."""
+    if isinstance(argument, ast.Starred):
+        return isinstance(argument.value, ast.Name) and argument.value.id in parameter_names
+    return isinstance(argument, ast.Name) and argument.id in parameter_names
+
+
+def call_keyword_passes_parameter_through(
+    keyword: ast.keyword,
+    parameter_names: set[str],
+) -> bool:
+    """Return whether one keyword call argument forwards a parameter."""
+    return isinstance(keyword.value, ast.Name) and keyword.value.id in parameter_names
 
 
 def body_facts(node: ast.AST) -> BodyFacts:
@@ -802,6 +888,57 @@ def body_facts(node: ast.AST) -> BodyFacts:
     visitor = FunctionBodyVisitor(node)
     visitor.visit(node)
     return visitor.facts()
+
+
+class ParameterNameNormalizer(ast.NodeTransformer):
+    """Normalize parameter names so duplicate bodies can be compared."""
+
+    def __init__(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        """Create a normalizer for one function definition."""
+        self.parameter_names = {
+            name: f"arg{index}"
+            for index, name in enumerate(function_parameter_sequence(node))
+        }
+
+    def visit_Name(self, node: ast.Name) -> ast.AST:
+        """Normalize references to parameters while preserving other names."""
+        if node.id in self.parameter_names:
+            return ast.copy_location(ast.Name(id=self.parameter_names[node.id], ctx=node.ctx), node)
+        return node
+
+    def visit_arg(self, node: ast.arg) -> ast.arg:
+        """Normalize parameter declarations."""
+        if node.arg in self.parameter_names:
+            node.arg = self.parameter_names[node.arg]
+        return node
+
+
+def implementation_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """Return a normalized implementation signature for redundancy comparison."""
+    body = copy.deepcopy(function_body_without_docstring(node))
+    if not body:
+        return ""
+    normalized = ast.Module(body=body, type_ignores=[])
+    normalized = ParameterNameNormalizer(node).visit(normalized)
+    ast.fix_missing_locations(normalized)
+    return ast.dump(normalized, include_attributes=False)
+
+
+def function_body_without_docstring(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.stmt]:
+    """Return function body statements excluding a leading docstring."""
+    body = list(node.body)
+    if body and isinstance(body[0], ast.Expr) and contains_string_literal(body[0]):
+        return body[1:]
+    return body
+
+
+def has_single_executable_statement(root: ast.AST) -> bool:
+    """Return whether one function body has exactly one executable statement."""
+    if not isinstance(root, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return False
+    return len(function_body_without_docstring(root)) == SINGLE_STATEMENT_BODY_COUNT
 
 
 def class_body_facts(node: ast.ClassDef) -> BodyFacts:
@@ -847,7 +984,7 @@ def role_scores(
 
     add_path_role_scores(scores, evidence, path_parts)
     if returns_annotation == "bool" or "predicate_return" in features:
-        add_role_score(scores, evidence, "predicate", 3, "predicate-shape")
+        add_role_score(scores, evidence, "predicate", ROLE_SCORE_STRONG, "predicate-shape")
     if collection_annotation(returns_annotation):
         add_role_score(scores, evidence, "collector_inventory", 2, "collection-annotation")
     add_common_body_role_scores(scores, evidence, calls, features)
@@ -900,17 +1037,17 @@ def add_effect_role_scores(
 ) -> None:
     """Add role scores for effect and reporting behavior."""
     if "subprocess" in features:
-        add_role_score(scores, evidence, "command_runner", 3, "subprocess-call")
+        add_role_score(scores, evidence, "command_runner", ROLE_SCORE_STRONG, "subprocess-call")
     if "network" in features:
         add_role_score(scores, evidence, "command_runner", 1, "network-call")
     if "cli_parser" in features:
-        add_role_score(scores, evidence, "cli_parser", 4, "argparse-call")
+        add_role_score(scores, evidence, "cli_parser", ROLE_SCORE_DOMINANT, "argparse-call")
     if "write" in features or "filesystem_mutation" in features:
         add_role_score(scores, evidence, "writer_mutator", 2, "write-or-filesystem-call")
     if "resource_lifecycle" in features:
-        add_role_score(scores, evidence, "writer_mutator", 3, "resource-lifecycle")
+        add_role_score(scores, evidence, "writer_mutator", ROLE_SCORE_STRONG, "resource-lifecycle")
     if "callback_emission" in features:
-        add_role_score(scores, evidence, "formatter_reporter", 3, "callback-emission")
+        add_role_score(scores, evidence, "formatter_reporter", ROLE_SCORE_STRONG, "callback-emission")
     if "call_statement" in features:
         add_role_score(scores, evidence, "adapter_bridge", 2, "call-statement")
     if "logging" in features or "stdio" in features:
@@ -928,7 +1065,7 @@ def add_transform_role_scores(
     elif "serialization" in features:
         add_role_score(scores, evidence, "formatter_reporter", 2, "serialization-transform")
     if "path_operation" in features:
-        add_role_score(scores, evidence, "converter_normalizer", 3, "path-operation")
+        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STRONG, "path-operation")
     if "text_transform" in features or "encoding_transform" in features:
         add_role_score(scores, evidence, "converter_normalizer", 2, "text-or-encoding-transform")
     if "type_introspection" in features:
@@ -938,9 +1075,9 @@ def add_transform_role_scores(
     if "identity_return" in features:
         add_role_score(scores, evidence, "converter_normalizer", 2, "identity-return")
     if "digest_transform" in features or "security_transform" in features:
-        add_role_score(scores, evidence, "converter_normalizer", 3, "digest-or-security-transform")
+        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STRONG, "digest-or-security-transform")
     if "pointer_interop" in features or "data_shape_transform" in features:
-        add_role_score(scores, evidence, "converter_normalizer", 4, "interop-or-shape-transform")
+        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_DOMINANT, "interop-or-shape-transform")
     if "read" in features:
         add_role_score(scores, evidence, "parser_loader", 2, "read-call")
 
@@ -953,9 +1090,9 @@ def add_structure_role_scores(
 ) -> None:
     """Add role scores for static, numeric, and return-shape behavior."""
     if "static_analysis" in features or any(call.startswith("ast.") for call in calls):
-        add_role_score(scores, evidence, "static_analyzer", 5, "ast-call")
+        add_role_score(scores, evidence, "static_analyzer", ROLE_SCORE_BOUNDARY, "ast-call")
     if "numeric" in features:
-        add_role_score(scores, evidence, "numeric_kernel", 3, "numeric-call")
+        add_role_score(scores, evidence, "numeric_kernel", ROLE_SCORE_STRONG, "numeric-call")
     if "operator_expression" in features:
         add_role_score(scores, evidence, "numeric_kernel", 2, "operator-expression")
     if "mapping_return" in features:
@@ -963,7 +1100,7 @@ def add_structure_role_scores(
     if "collection_return" in features or "generator" in features or "iteration" in features:
         add_role_score(scores, evidence, "collector_inventory", 2, "collection-or-iteration")
     if "nested_function_definition" in features:
-        add_role_score(scores, evidence, "factory_builder", 4, "nested-callable-definition")
+        add_role_score(scores, evidence, "factory_builder", ROLE_SCORE_DOMINANT, "nested-callable-definition")
     if "raises" in features:
         add_role_score(scores, evidence, "validator_checker", 2, "raises")
 
@@ -1019,13 +1156,13 @@ def add_class_boundary_role_scores(
 ) -> None:
     """Add class role scores from inheritance, decorators, and fields."""
     if any(base == "Protocol" or base.endswith(".Protocol") for base in bases):
-        add_role_score(scores, evidence, "protocol_interface", 4, "protocol-base")
+        add_role_score(scores, evidence, "protocol_interface", ROLE_SCORE_DOMINANT, "protocol-base")
     if any(base.endswith(("Exception", "Error")) or base in {"BaseException", "Exception"} for base in bases):
-        add_role_score(scores, evidence, "exception_type", 5, "exception-base")
+        add_role_score(scores, evidence, "exception_type", ROLE_SCORE_BOUNDARY, "exception-base")
     if any(base.endswith(("Answer", "Config", "Info", "Problem", "SolveConfig", "State")) for base in bases):
-        add_role_score(scores, evidence, "data_container", 4, "algorithm-data-container-base")
+        add_role_score(scores, evidence, "data_container", ROLE_SCORE_DOMINANT, "algorithm-data-container-base")
     if any(decorator.endswith(("dataclass", "define")) for decorator in decorators):
-        add_role_score(scores, evidence, "data_container", 4, "data-class-decorator")
+        add_role_score(scores, evidence, "data_container", ROLE_SCORE_DOMINANT, "data-class-decorator")
     if annotated_field_count:
         add_role_score(scores, evidence, "data_container", 2, "annotated-fields")
 
@@ -1072,18 +1209,18 @@ def confidence(
     """Return a conservative helper confidence score."""
     if not candidate:
         return 0.0
-    score = 0.35
+    score = BASE_HELPER_CONFIDENCE
     if name.startswith("_"):
-        score += 0.25
+        score += PRIVATE_NAME_CONFIDENCE_BONUS
     if scope == "nested":
-        score += 0.2
+        score += NESTED_SCOPE_CONFIDENCE_BONUS
     if scores:
-        score += min(0.2, max(scores.values()) / 20.0)
+        score += min(ROLE_SCORE_CONFIDENCE_CAP, max(scores.values()) / ROLE_SCORE_CONFIDENCE_DIVISOR)
     if facts.calls:
-        score += 0.05
+        score += CALL_CONFIDENCE_BONUS
     if facts.features:
-        score += 0.05
-    return round(min(score, 0.99), 2)
+        score += FEATURE_CONFIDENCE_BONUS
+    return round(min(score, MAX_HELPER_CONFIDENCE), 2)
 
 
 class DefinitionCollector(ast.NodeVisitor):
@@ -1151,19 +1288,19 @@ class DefinitionCollector(ast.NodeVisitor):
                 scope=scope,
                 visibility="private" if node.name.startswith("_") else "public",
                 role=role,
-                secondary_roles=ordered_roles[1:4],
+                secondary_roles=ordered_roles[1:SECONDARY_ROLE_SLICE_STOP],
                 confidence=0.0,
                 helper_candidate=candidate,
                 candidate_rule="",
                 needs_user_judgment=False,
                 judgment_rule="",
+                redundant_helper=False, redundancy_rule="", redundant_with=[],
+                implementation_signature=implementation_signature(node),
                 incoming_count=0,
                 incoming_callers=[],
                 incoming_call_sites=[],
                 outgoing_internal=[],
-                outgoing_call_sites=[
-                    f"{call}@{line}" for call, line in facts.call_locations
-                ],
+                outgoing_call_sites=[f"{call}@{line}" for call, line in facts.call_locations],
                 specialized_helper=False,
                 specialization="not_evaluated",
                 side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
@@ -1233,19 +1370,19 @@ class DefinitionCollector(ast.NodeVisitor):
                 scope=scope,
                 visibility="private" if node.name.startswith("_") else "public",
                 role=role,
-                secondary_roles=ordered_roles[1:4],
+                secondary_roles=ordered_roles[1:SECONDARY_ROLE_SLICE_STOP],
                 confidence=0.0,
                 helper_candidate=candidate,
                 candidate_rule="",
                 needs_user_judgment=False,
                 judgment_rule="",
+                redundant_helper=False, redundancy_rule="", redundant_with=[],
+                implementation_signature="",
                 incoming_count=0,
                 incoming_callers=[],
                 incoming_call_sites=[],
                 outgoing_internal=[],
-                outgoing_call_sites=[
-                    f"{call}@{line}" for call, line in facts.call_locations
-                ],
+                outgoing_call_sites=[f"{call}@{line}" for call, line in facts.call_locations],
                 specialized_helper=False,
                 specialization="not_evaluated",
                 side_effects=sorted(feature for feature in facts.features if is_side_effect(feature)),
@@ -1305,7 +1442,7 @@ def _doc_summary(docstring: str | None) -> str:
     for separator in (". ", "。"):
         if separator in compact:
             return compact.split(separator, maxsplit=1)[0].strip() + separator.strip()
-    return compact[:140]
+    return compact[:DOC_SUMMARY_LIMIT]
 
 
 def analyze_file(root: Path, path: Path) -> list[FunctionRecord]:
@@ -1475,6 +1612,8 @@ def is_interface_boundary(record: FunctionRecord) -> bool:
 
 def verdict(record: FunctionRecord) -> str:
     """Return the final deterministic inventory verdict."""
+    if record.redundant_helper:
+        return "redundant_helper"
     if record.helper_candidate:
         return "auto_helper"
     if record.needs_user_judgment:
@@ -1488,6 +1627,8 @@ def apply_call_graph(records: list[FunctionRecord]) -> None:
     edges = collect_call_edges(records, maps)
     for index, record in enumerate(records):
         attach_call_edges(record, index, edges)
+    attach_redundancy(records)
+    for record in records:
         attach_verdict(record)
 
 
@@ -1577,7 +1718,10 @@ def attach_call_edges(record: FunctionRecord, index: int, edges: CallGraphEdges)
 def attach_verdict(record: FunctionRecord) -> None:
     """Attach final candidate and judgment facts to one record."""
     rule = candidate_rule(record)
-    judgment = "" if rule else design_judgment_rule(record)
+    if record.redundant_helper and not rule:
+        judgment = f"{record.domain}:{record.redundancy_rule}"
+    else:
+        judgment = "" if rule else design_judgment_rule(record)
     record.helper_candidate = bool(rule)
     record.candidate_rule = rule
     record.needs_user_judgment = bool(judgment)
@@ -1585,11 +1729,11 @@ def attach_verdict(record: FunctionRecord) -> None:
     if rule:
         record.evidence.insert(0, f"candidate-rule:{rule}")
         if record.confidence == 0.0:
-            record.confidence = 0.5
+            record.confidence = DEFAULT_HALF_CONFIDENCE
     elif judgment:
         record.evidence.insert(0, f"judgment-rule:{judgment}")
         if record.confidence == 0.0:
-            record.confidence = 0.4
+            record.confidence = JUDGMENT_CONFIDENCE
     else:
         record.confidence = 0.0
         record.specialized_helper = False
@@ -1598,6 +1742,105 @@ def attach_verdict(record: FunctionRecord) -> None:
         record.evidence.append("usage:no-internal-callers")
     if record.specialized_helper:
         record.evidence.append(f"usage:{record.specialization}")
+    if record.redundant_helper:
+        record.evidence.append(f"redundant:{record.redundancy_rule}")
+        if record.redundant_with:
+            record.evidence.append(
+                "redundant-with:" + ";".join(record.redundant_with[:REDUNDANT_WITH_EVIDENCE_LIMIT])
+            )
+
+
+def attach_redundancy(records: list[FunctionRecord]) -> None:
+    """Attach redundant helper shape facts before final verdict assignment."""
+    duplicate_groups = implementation_duplicate_groups(records)
+    for record in records:
+        duplicate_peers = duplicate_groups.get(record.implementation_signature, ())
+        record.redundant_with = [
+            peer.qualname for peer in duplicate_peers if peer is not record
+        ]
+        rule = redundancy_rule(record)
+        record.redundant_helper = bool(rule)
+        record.redundancy_rule = rule
+
+
+def implementation_duplicate_groups(
+    records: list[FunctionRecord],
+) -> dict[str, tuple[FunctionRecord, ...]]:
+    """Return duplicated function implementation groups."""
+    return duplicate_implementation_groups(implementation_signature_groups(records))
+
+
+def implementation_signature_groups(
+    records: list[FunctionRecord],
+) -> dict[str, list[FunctionRecord]]:
+    """Group function records by normalized implementation signature."""
+    signature_records = sorted(
+        (
+            (record.implementation_signature, record)
+            for record in records
+            if duplicate_group_record(record)
+        ),
+        key=lambda item: item[0],
+    )
+    return {
+        signature: [record for _signature, record in grouped_records]
+        for signature, grouped_records in itertools.groupby(
+            signature_records,
+            key=lambda item: item[0],
+        )
+    }
+
+
+def duplicate_group_record(record: FunctionRecord) -> bool:
+    """Return whether one record participates in duplicate body grouping."""
+    if record.kind != "function" or not record.implementation_signature:
+        return False
+    return record.scope != "method" and record.domain != "test"
+
+
+def duplicate_implementation_groups(
+    grouped: dict[str, list[FunctionRecord]],
+) -> dict[str, tuple[FunctionRecord, ...]]:
+    """Filter implementation signature groups down to duplicates."""
+    return {
+        signature: tuple(items)
+        for signature, items in grouped.items()
+        if len(items) > 1
+    }
+
+
+def redundancy_rule(record: FunctionRecord) -> str:
+    """Return deterministic redundant-helper rule for one record."""
+    if record.kind != "function":
+        return ""
+    if not redundancy_eligible_symbol(record):
+        return ""
+    features = set(record.features)
+    simple_body = "single_statement_body" in features
+    if simple_body and "identity_return" in features:
+        return "identity-return"
+    if simple_body and "pass_through_call_return" in features:
+        return pass_through_redundancy_rule(record, "return")
+    if simple_body and "pass_through_call_statement" in features:
+        return pass_through_redundancy_rule(record, "statement")
+    if record.redundant_with:
+        return "duplicate-implementation"
+    return ""
+
+
+def redundancy_eligible_symbol(record: FunctionRecord) -> bool:
+    """Return whether a function belongs to the helper-like redundancy surface."""
+    if record.scope == "nested" or record.visibility == "private":
+        return True
+    local_symbol = record.specialization in LOCAL_SPECIALIZATIONS and record.incoming_count > 0
+    return local_symbol and record.role in PUBLIC_LOCAL_HELPER_ROLES
+
+
+def pass_through_redundancy_rule(record: FunctionRecord, shape: str) -> str:
+    """Return a pass-through wrapper redundancy rule."""
+    if record.outgoing_internal:
+        return f"pass-through-{shape}-internal"
+    return f"pass-through-{shape}-external"
 
 
 def internal_call_candidates(
@@ -1645,7 +1888,7 @@ def specialization(record: FunctionRecord) -> tuple[bool, str]:
     if len(record.incoming_callers) == 1:
         return True, "single_caller_helper"
     caller_files = {caller.split(":", maxsplit=1)[0] for caller in record.incoming_callers}
-    if len(caller_files) == 1 and len(record.incoming_callers) <= 3:
+    if len(caller_files) == 1 and len(record.incoming_callers) <= LOCAL_CALLER_CLUSTER_LIMIT:
         return True, "file_local_helper_cluster"
     return False, "shared_helper"
 
@@ -1810,7 +2053,7 @@ def render_text(inventory: Inventory) -> str:
         side_effects = ",".join(record.side_effects) if record.side_effects else "none"
         features = ",".join(record.features) if record.features else "none"
         outgoing = ",".join(record.outgoing_internal) if record.outgoing_internal else "none"
-        evidence = ",".join(record.evidence[:6]) if record.evidence else "none"
+        evidence = ",".join(record.evidence[:EVIDENCE_RENDER_LIMIT]) if record.evidence else "none"
         lines.append(
             "SYMBOL="
             f"{record.path}:{record.line}:{record.qualname} "
@@ -1819,6 +2062,9 @@ def render_text(inventory: Inventory) -> str:
             f"role={record.role} confidence={record.confidence:.2f} "
             f"candidate_rule={record.candidate_rule or 'none'} "
             f"judgment_rule={record.judgment_rule or 'none'} "
+            f"redundant={str(record.redundant_helper).lower()} "
+            f"redundancy_rule={record.redundancy_rule or 'none'} "
+            f"redundant_with={';'.join(record.redundant_with) or 'none'} "
             f"scope={record.scope} visibility={record.visibility} "
             f"incoming={record.incoming_count} outgoing={outgoing} "
             f"specialization={record.specialization} "
@@ -1903,8 +2149,8 @@ def render_markdown(inventory: Inventory) -> str:
             "",
             "## Records",
             "",
-            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
-            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+            "| Path | Line | Kind | Domain | Verdict | Helper | Role | Candidate rule | Judgment rule | Redundancy rule | Redundant with | Confidence | Incoming | Specialization | Side effects | Features | Evidence |",
+            "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
         ]
     )
     for record in inventory.records:
@@ -1921,12 +2167,14 @@ def render_markdown(inventory: Inventory) -> str:
                     markdown_cell(record.role),
                     markdown_cell(record.candidate_rule or "none"),
                     markdown_cell(record.judgment_rule or "none"),
+                    markdown_cell(record.redundancy_rule or "none"),
+                    markdown_cell(", ".join(record.redundant_with) or "none"),
                     f"{record.confidence:.2f}",
                     str(record.incoming_count),
                     markdown_cell(record.specialization),
                     markdown_cell(", ".join(record.side_effects) or "none"),
                     markdown_cell(", ".join(record.features) or "none"),
-                    markdown_cell(", ".join(record.evidence[:4]) or "none"),
+                    markdown_cell(", ".join(record.evidence[:MARKDOWN_EVIDENCE_LIMIT]) or "none"),
                 ]
             )
             + " |"

@@ -3,6 +3,7 @@
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
+# upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
@@ -45,6 +46,25 @@ TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
     ".zsh",
+}
+CODE_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cxx",
+    ".go",
+    ".h",
+    ".hpp",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".py",
+    ".rs",
+    ".sh",
+    ".swift",
+    ".ts",
+    ".tsx",
 }
 HOOK_SURFACE_PREFIXES = (
     ".codex/hooks/",
@@ -110,6 +130,25 @@ class GateTemplate:
             command=command,
             handoff=handoff,
         )
+
+
+CAUSE_INVESTIGATION_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="cause_investigation_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\","
+            "\"tool_input\":{{\"patch\":\"*** Begin Patch\\n*** Update File: {path}\\n"
+            "*** End Patch\\n\"}}}}' "
+            "| python3 .codex/hooks/cause_investigation_guard.py"
+        ),
+        handoff=(
+            "record Observation, Hypothesis or Root Cause, Expected Fix Surface "
+            "or Selected Surface, and Validation Before Edit or Support Evidence "
+            "before code edits"
+        ),
+    ),
+)
 
 
 PYTHON_GATE_TEMPLATES = (
@@ -354,6 +393,8 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
     templates: list[GateTemplate] = []
+    if suffix in CODE_SUFFIXES:
+        templates.extend(CAUSE_INVESTIGATION_GATE_TEMPLATES)
     if suffix in PYTHON_SUFFIXES:
         templates.extend(PYTHON_GATE_TEMPLATES)
     if suffix in CPP_SUFFIXES:

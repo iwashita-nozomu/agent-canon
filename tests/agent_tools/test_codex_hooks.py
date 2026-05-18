@@ -9,6 +9,7 @@
 # upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
+# upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
@@ -39,6 +40,7 @@ HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_g
 MODULE_BOUNDARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "module_boundary_guard.py"
 LIBRARY_IMPLEMENTATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "library_implementation_guard.py"
 HELPER_FIRST_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_first_guard.py"
+CAUSE_INVESTIGATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "cause_investigation_guard.py"
 LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
@@ -374,6 +376,8 @@ class CodexHooksTest(unittest.TestCase):
         session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
         prompt_hooks = hooks["hooks"]["UserPromptSubmit"][0]["hooks"]
         prompt_commands = [hook["command"] for hook in prompt_hooks]
+        pre_tool = hooks["hooks"]["PreToolUse"][0]
+        pre_tool_commands = [hook["command"] for hook in pre_tool["hooks"]]
         post_tool = hooks["hooks"]["PostToolUse"][0]
         post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
@@ -385,7 +389,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
         self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
         self.assertTrue(any("reference_capture_guard.py" in command for command in prompt_commands))
-        self.assertNotIn("PreToolUse", hooks["hooks"])
+        self.assertIn("apply_patch", pre_tool["matcher"])
+        self.assertTrue(any("cause_investigation_guard.py" in command for command in pre_tool_commands))
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
         self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
@@ -677,6 +682,141 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["changed_library_file_count"], 1)
 
+    def test_cause_investigation_guard_blocks_code_edit_without_evidence(self) -> None:
+        """Cause guard should block code edits before cause evidence exists."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            (temp_root / "app").mkdir()
+            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(CAUSE_INVESTIGATION_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "apply_patch",
+                        "tool_input": {
+                            "patch": (
+                                "*** Begin Patch\n"
+                                "*** Update File: app/module.py\n"
+                                "@@\n"
+                                "-VALUE = 1\n"
+                                "+VALUE = 2\n"
+                                "*** End Patch\n"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("CAUSE_INVESTIGATION_FINDING=", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["hook_log_namespace"], "test-container")
+        self.assertTrue(log_entry["code_edit_detected"])
+        self.assertEqual(log_entry["cause_evidence_status"], "fail")
+
+    def test_cause_investigation_guard_allows_code_edit_with_evidence(self) -> None:
+        """Cause guard should accept code edits when cause evidence is already recorded."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            (temp_root / "app").mkdir()
+            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            evidence = temp_root / "reports" / "agents" / "run-1" / "cause_investigation.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(
+                "Observation: app/module.py returns stale value.\n"
+                "Hypothesis: app/module.py owns the value constant.\n"
+                "Expected Fix Surface: app/module.py\n"
+                "Validation Before Edit: run unit smoke after edit.\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(CAUSE_INVESTIGATION_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "apply_patch",
+                        "tool_input": {
+                            "patch": (
+                                "*** Begin Patch\n"
+                                "*** Update File: app/module.py\n"
+                                "@@\n"
+                                "-VALUE = 1\n"
+                                "+VALUE = 2\n"
+                                "*** End Patch\n"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["hook_log_namespace"], "test-container")
+        self.assertTrue(log_entry["code_edit_detected"])
+        self.assertEqual(log_entry["cause_evidence_status"], "pass")
+
     def test_helper_first_guard_blocks_helper_without_boundary_evidence(self) -> None:
         """Helper-first guard should block helper-like additions before ownership evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -729,6 +869,7 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={
                     **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                     "AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH": str(log_path),
                 },
             )
@@ -742,6 +883,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertIn("HELPER_FIRST_FINDING=", "\n".join(cast("list[str]", payload["findings"])))
         self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertEqual(log_entry["helper_candidate_record_count"], 1)
         self.assertEqual(log_entry["helper_first_candidate_count"], 1)
         self.assertFalse(log_entry["boundary_evidence_changed"])
@@ -802,6 +944,7 @@ class CodexHooksTest(unittest.TestCase):
                 text=True,
                 env={
                     **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                     "AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH": str(log_path),
                 },
             )
@@ -813,6 +956,7 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertEqual(log_entry["helper_candidate_record_count"], 1)
         self.assertEqual(log_entry["helper_first_candidate_count"], 0)
         self.assertTrue(log_entry["boundary_evidence_changed"])

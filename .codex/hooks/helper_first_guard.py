@@ -251,6 +251,8 @@ def inventory_records(output: str) -> tuple[dict[str, object], ...]:
 
 def record_verdict(record: dict[str, object]) -> str:
     """Return helper inventory verdict from one JSON record."""
+    if bool(record.get("redundant_helper")):
+        return "redundant_helper"
     if bool(record.get("helper_candidate")):
         return "auto_helper"
     if bool(record.get("needs_user_judgment")):
@@ -276,7 +278,7 @@ def implementation_order_candidates(
     findings: list[HelperFirstFinding] = []
     for record in records:
         verdict = record_verdict(record)
-        if verdict not in {"auto_helper", "needs_user_judgment"}:
+        if verdict not in {"auto_helper", "needs_user_judgment", "redundant_helper"}:
             continue
         if str(record.get("kind") or "function") != "function":
             continue
@@ -301,6 +303,7 @@ def implementation_order_detail(record: dict[str, object]) -> str:
         f"role:{record.get('role') or 'unknown'}",
         f"candidate:{record.get('candidate_rule') or 'none'}",
         f"judgment:{record.get('judgment_rule') or 'none'}",
+        f"redundancy:{record.get('redundancy_rule') or 'none'}",
         f"incoming:{record.get('incoming_count') or 0}",
         f"specialization:{record.get('specialization') or 'unknown'}",
     ]
@@ -322,6 +325,7 @@ def _log_entry(
     candidates = implementation_order_candidates(inventory_run.records)
     return {
         "hook_run_id": context.run_id(timestamp, payload_fingerprint),
+        "hook_log_namespace": context.runtime_namespace(),
         "timestamp": timestamp,
         "event": hook_event_name(payload),
         "tool_name": tool_name(payload),
