@@ -121,7 +121,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "remote_verified=yes\n"
         "git status --short --branch\n"
         "git remote -v\n"
-        "git config --get-regexp '^remote\\\\..*\\\\.url$'\n"
+        r"git config --get-regexp '^remote\\..*\\.url$'" "\n"
         ".git/config\n"
         "literal URL push\n"
         "hardcoded repository name\n"

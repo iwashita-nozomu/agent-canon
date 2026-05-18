@@ -179,7 +179,7 @@ AGENT_CANON_PUSH_REMOTE_MARKERS = (
     "remote_verified=yes",
     "git status --short --branch",
     "git remote -v",
-    "git config --get-regexp '^remote\\\\..*\\\\.url$'",
+    r"git config --get-regexp '^remote\\..*\\.url$'",
     ".git/config",
     "literal URL push",
     "hardcoded repository name",
