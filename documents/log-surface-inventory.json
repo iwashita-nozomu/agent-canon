@@ -7628,7 +7628,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 63,
+      "line": 76,
       "path": "tools/experiments/update_latest_result.py",
       "surface": "tool"
     },
@@ -7636,7 +7636,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "latest_result_dir",
-      "line": 99,
+      "line": 115,
       "path": "tools/experiments/update_latest_result.py",
       "surface": "tool"
     },
