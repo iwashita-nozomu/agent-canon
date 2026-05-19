@@ -392,6 +392,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("apply_patch", pre_tool["matcher"])
         self.assertTrue(any("cause_investigation_guard.py" in command for command in pre_tool_commands))
         self.assertIn("apply_patch", post_tool["matcher"])
+        self.assertIn("spawn_agent", post_tool["matcher"])
+        self.assertIn("close_agent", post_tool["matcher"])
         self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
         self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
         self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
@@ -1833,6 +1835,79 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["tool_command_verb"], "python3")
         self.assertEqual(entry["tool_input_keys"], ["cmd"])
         self.assertTrue(entry["tool_input_fingerprint"])
+        self.assertFalse(entry["subagent_invoked"])
+
+    def test_skill_usage_logger_records_subagent_lifecycle_selection(self) -> None:
+        """Subagent lifecycle logging should record spawn metadata without prompt text."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "spawn_agent",
+                        "tool_input": {
+                            "agent_type": "test_designer",
+                            "model": "gpt-5.3-codex-spark",
+                            "reasoning_effort": "low",
+                            "fork_context": True,
+                            "message": "Design tests for the changed hook.",
+                            "items": [{"type": "text", "text": "packet"}],
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertTrue(entry["subagent_invoked"])
+        self.assertEqual(entry["subagent_event_kind"], "spawn")
+        self.assertEqual(entry["subagent_tool_name"], "spawn_agent")
+        self.assertEqual(entry["subagent_agent_type"], "test_designer")
+        self.assertEqual(entry["subagent_model"], "gpt-5.3-codex-spark")
+        self.assertEqual(entry["subagent_reasoning_effort"], "low")
+        self.assertTrue(entry["subagent_fork_context"])
+        self.assertTrue(entry["subagent_prompt_fingerprint"])
+        self.assertEqual(entry["subagent_prompt_char_count"], len("Design tests for the changed hook."))
+        self.assertEqual(entry["subagent_item_count"], 1)
+        self.assertNotIn("Design tests", json.dumps(entry, sort_keys=True))
+
+    def test_skill_usage_logger_records_subagent_close_selection(self) -> None:
+        """Subagent close logging should record lifecycle target metadata."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "close_agent",
+                        "tool_input": {"target": "agent-123"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertTrue(entry["subagent_invoked"])
+        self.assertEqual(entry["subagent_event_kind"], "close")
+        self.assertEqual(entry["subagent_target"], "agent-123")
+        self.assertEqual(entry["subagent_target_count"], 1)
 
     def test_skill_usage_logger_records_start_declaration_selection(self) -> None:
         """Selection logging should parse workflow and skills from start declarations."""

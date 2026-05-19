@@ -6,7 +6,7 @@
     "upstream design README.md documents MCP inventory preflight",
     "downstream implementation hooks/mcp_session_context.sh emits SessionStart MCP hook context",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
-    "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
+    "downstream implementation hooks/skill_usage_logger.py logs observed skill, workflow, tool, and subagent routing usage",
     "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
     "downstream implementation hooks/cause_investigation_guard.py blocks code edits before cause investigation evidence",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
@@ -74,13 +74,13 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|apply_patch|python|python3",
+        "matcher": "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
-            "statusMessage": "Logging tool selection"
+            "statusMessage": "Logging tool and subagent selection"
           },
           {
             "type": "command",
