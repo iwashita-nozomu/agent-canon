@@ -73,7 +73,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
     "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
     "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
-    "tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
+    "tools/README.md": (
+        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "check_runtime_profile_inventory.py\n"
+    ),
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Close-Out Prohibitions\n"
         "user-facing completion\n"
@@ -128,8 +131,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_hardcoded_numbers.py check_static_any.py "
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
-        "check_github_workflows.py container_config.py\n"
+        "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
+    "tools/ci/run_docs_checks.sh": "check_runtime_profile_inventory.py\n",
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
     "agents/skills/environment-maintenance.md": "container_config.py\n",
 }
@@ -147,6 +151,7 @@ MINIMAL_AGENT_TOOLS = (
     "tool_catalog.py",
     "tool_drift.py",
     "surface_manifest.py",
+    "check_runtime_profile_inventory.py",
 )
 
 MINIMAL_PYTHON_TOOLS = (

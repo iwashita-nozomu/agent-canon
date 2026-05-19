@@ -12,7 +12,10 @@ import json
 import os
 from pathlib import Path
 
-from tools.experiments.update_latest_result import _latest_result_dir, update_latest_result
+from tools.experiments.update_latest_result import (
+    latest_result_dir,
+    update_latest_result,
+)
 
 
 def test_update_latest_result_writes_json_and_markdown(tmp_path: Path) -> None:
@@ -49,7 +52,7 @@ def test_update_latest_result_selects_newest_manifest(tmp_path: Path) -> None:
     os.utime(old_dir / "result_manifest.json", ns=(1_000_000_000, 1_000_000_000))
     os.utime(new_dir / "result_manifest.json", ns=(2_000_000_000, 2_000_000_000))
 
-    selected = _latest_result_dir(result_root)
+    selected = latest_result_dir(result_root)
 
     assert selected == new_dir
 
