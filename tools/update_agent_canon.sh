@@ -369,7 +369,7 @@ acknowledge_update_todos_if_available() {
 
   if [ "${pending_count:-0}" != "0" ]; then
     echo "AGENT_CANON_LATEST_TODOS=pending"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=todo_workflow_required"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos"
     echo "NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest"
     return 2
   fi
@@ -410,6 +410,7 @@ cmd_latest() {
   local latest_log=""
   local latest_rc=0
   local park_rc=0
+  local todo_rc=0
 
   park_eval_log_dirty_state_if_safe || park_rc=$?
   if [ "$park_rc" -gt 1 ]; then
@@ -455,7 +456,13 @@ cmd_latest() {
 
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
   rebuild_agent_tools_if_available
-  acknowledge_update_todos_if_available || return $?
+  acknowledge_update_todos_if_available || todo_rc=$?
+  if [ "$todo_rc" -eq 2 ]; then
+    return 0
+  fi
+  if [ "$todo_rc" -ne 0 ]; then
+    return "$todo_rc"
+  fi
   echo "AGENT_CANON_LATEST_TOOL_RESULT=updated"
   echo "NEXT_ACTION=run_validation_then_push_parent_repo"
 }
