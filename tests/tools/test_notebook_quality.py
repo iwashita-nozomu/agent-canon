@@ -157,8 +157,8 @@ class NotebookQualityTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("missing-visualization", result.stdout)
 
-    def test_error_output_fails(self) -> None:
-        """Stored error outputs should not be committed in demo notebooks."""
+    def test_error_output_warns(self) -> None:
+        """Stored error outputs should warn without blocking demo notebooks."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             path = self.write_notebook(
@@ -176,8 +176,10 @@ class NotebookQualityTest(unittest.TestCase):
 
             result = self.run_checker(root, str(path.relative_to(root)))
 
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("NOTEBOOK_QUALITY_WARNING=", result.stdout)
         self.assertIn("error-output", result.stdout)
+        self.assertIn("NOTEBOOK_QUALITY=pass", result.stdout)
 
     def test_changed_mode_discovers_modified_notebook(self) -> None:
         """Changed mode should inspect tracked notebook edits."""

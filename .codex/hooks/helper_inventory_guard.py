@@ -18,9 +18,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-EDIT_TOOL_NAMES = {"apply_patch", "Bash", "bash", "python", "python3"}
+EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
 EDIT_COMMAND_PATTERN = re.compile(
-    r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
+    r"(?is)(apply_patch|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
 POLICY_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_POLICY"

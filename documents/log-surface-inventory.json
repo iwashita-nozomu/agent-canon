@@ -3420,7 +3420,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2223,
+      "line": 2247,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -3428,7 +3428,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 2223,
+      "line": 2247,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -8876,7 +8876,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 521,
+      "line": 554,
       "path": "tools/validation/notebook_quality.py",
       "surface": "tool"
     },
@@ -8884,7 +8884,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "metrics",
-      "line": 521,
+      "line": 554,
       "path": "tools/validation/notebook_quality.py",
       "surface": "tool"
     },
@@ -8892,7 +8892,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 521,
+      "line": 554,
+      "path": "tools/validation/notebook_quality.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "warnings",
+      "line": 554,
       "path": "tools/validation/notebook_quality.py",
       "surface": "tool"
     }
