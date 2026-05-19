@@ -3,7 +3,7 @@
 # upstream design ../../tools/README.md documents the high-level AgentCanon latest route.
 # upstream implementation ../../tools/update_agent_canon.sh routes pending parent-repo TODOs.
 # upstream implementation ../../tools/agent_tools/agent_canon_update_todos.py defines TODO tool output.
-# upstream test ../../tests/tools/test_update_agent_canon.py provides submodule update fixtures.
+# upstream implementation ../../tests/tools/test_update_agent_canon.py provides submodule update fixtures.
 # @dependency-end
 
 """Focused tests for AgentCanon latest TODO routing."""

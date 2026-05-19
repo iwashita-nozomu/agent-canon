@@ -12,16 +12,18 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
-DEFAULT_INVENTORY = Path("documents/runtime-profiles-and-check-matrix.json")
-DEFAULT_DOC = Path("documents/runtime-profiles-and-check-matrix.md")
-RENDER_SCRIPT = Path("tools/docs/render_runtime_profile_inventory.py")
+AGENT_CANON_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_INVENTORY = AGENT_CANON_ROOT / "documents/runtime-profiles-and-check-matrix.json"
+DEFAULT_DOC = AGENT_CANON_ROOT / "documents/runtime-profiles-and-check-matrix.md"
+RENDER_SCRIPT = AGENT_CANON_ROOT / "tools/docs/render_runtime_profile_inventory.py"
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser."""
     parser = argparse.ArgumentParser(
         description=(
             "Detect drift between runtime profile inventory JSON and rendered markdown."
@@ -41,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Run the runtime profile inventory drift check."""
     args = build_parser().parse_args()
     inventory_path = Path(args.inventory)
     doc_path = Path(args.doc)

@@ -21,6 +21,7 @@ RENDER_SCRIPT = PROJECT_ROOT / "tools" / "docs" / "render_runtime_profile_invent
 
 
 def write_minimal_inventory(path: Path) -> None:
+    """Write one small valid runtime profile inventory."""
     payload = {
         "version": 1,
         "title": "Runtime Profiles And Check Matrix",
@@ -56,6 +57,7 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
     """Exercise runtime profile inventory drift detection end-to-end."""
 
     def render_doc(self, inventory_path: Path, doc_path: Path) -> str:
+        """Render a fixture document from a fixture inventory."""
         result = subprocess.run(
             [
                 sys.executable,
@@ -74,6 +76,7 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
         return result.stdout
 
     def test_passes_when_doc_matches_rendered(self) -> None:
+        """Pass when the checked document matches renderer output."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             inventory = root / "inventory.json"
@@ -99,7 +102,22 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=pass", result.stdout)
 
+    def test_default_paths_resolve_from_script_source_root(self) -> None:
+        """Resolve default inventory/doc paths from AgentCanon source root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = subprocess.run(
+                [sys.executable, str(CHECK_SCRIPT)],
+                cwd=tmp_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=pass", result.stdout)
+
     def test_fails_when_doc_drifts(self) -> None:
+        """Fail with a diff when the checked document drifts."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             inventory = root / "inventory.json"
@@ -126,4 +144,3 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
         self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=fail", result.stdout)
         self.assertIn("---", result.stdout)
         self.assertIn("+++", result.stdout)
-
