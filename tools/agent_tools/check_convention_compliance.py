@@ -172,6 +172,10 @@ TOOL_GATES = {
             "documents/SHARED_RUNTIME_SURFACES.md",
         ),
     ),
+    "runtime_profile_inventory": (
+        "tools/agent_tools/check_runtime_profile_inventory.py",
+        ("tools/ci/run_docs_checks.sh",),
+    ),
 }
 
 AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
