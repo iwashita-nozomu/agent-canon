@@ -1296,6 +1296,58 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertIn("NEXT_ACTION=run_agentcanon_conflict_workflow", latest.stdout)
 
+    def test_latest_parks_eval_logs_before_submodule_update(self) -> None:
+        """Latest should park accumulated eval logs before applying a safe main update."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            log_path = (
+                submodule
+                / "agents"
+                / "evals"
+                / "results"
+                / "hook-runs"
+                / "derived-devcontainer"
+                / "skill_usage.jsonl"
+            )
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text('{"hook_run_id":"local-log","status":"pass"}\n', encoding="utf-8")
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            parked_log = subprocess.run(
+                [
+                    "git",
+                    "--git-dir",
+                    str(bare_repo),
+                    "show",
+                    "refs/heads/agent-logs/derived:agents/evals/results/hook-runs/derived-devcontainer/skill_usage.jsonl",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
+            self.assertIn("AGENT_CANON_EVAL_LOG_PARK=committed", latest.stdout)
+            self.assertIn("AGENT_CANON_EVAL_LOG_PARK_BRANCH=agent-logs/derived", latest.stdout)
+            self.assertIn("agent_canon_latest=updating_submodule", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", latest.stdout)
+            self.assertIn('"hook_run_id":"local-log"', parked_log.stdout)
+            self.assertTrue((submodule / "remote-marker.txt").is_file())
+            self.assertFalse(log_path.exists())
+
     def test_plan_ignores_removed_source_repo_override_for_submodule_remote(self) -> None:
         """Submodule plan should keep GitHub-first submodule remote semantics."""
         with tempfile.TemporaryDirectory() as tmp_dir:

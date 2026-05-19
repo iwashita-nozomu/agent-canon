@@ -87,6 +87,162 @@ sanitize_ref_component() {
   printf '%s\n' "$raw"
 }
 
+parent_repo_log_slug() {
+  local raw="${AGENT_CANON_LOG_REPO_SLUG:-}"
+  if [ -z "$raw" ]; then
+    raw="$(basename "$ROOT_DIR")"
+  fi
+  sanitize_ref_component "$raw"
+}
+
+status_porcelain_path() {
+  local line="$1"
+  local path="${line:3}"
+  case "$path" in
+    *" -> "*)
+      path="${path##* -> }"
+      ;;
+  esac
+  printf '%s\n' "$path"
+}
+
+is_accumulated_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_jsonl_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*.jsonl|agents/evals/results/*/*.jsonl|agents/evals/results/*/*/*.jsonl|agents/evals/results/*/*/*/*.jsonl)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+restore_original_submodule_ref() {
+  local original_branch="$1"
+  local original_head="$2"
+  if [ -n "$original_branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" switch "$original_branch" >/dev/null
+    return
+  fi
+  git -C "$ROOT_DIR/$PREFIX" checkout --detach "$original_head" >/dev/null
+}
+
+resolve_eval_jsonl_conflicts() {
+  local conflict_path=""
+  local tmp_dir=""
+  local unresolved=""
+
+  while IFS= read -r conflict_path; do
+    [ -n "$conflict_path" ] || continue
+    if ! is_jsonl_eval_result_path "$conflict_path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK_CONFLICT_UNSAFE=$conflict_path"
+      return 1
+    fi
+    tmp_dir="$(mktemp -d)"
+    git -C "$ROOT_DIR/$PREFIX" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
+    git -C "$ROOT_DIR/$PREFIX" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
+    mkdir -p "$(dirname "$ROOT_DIR/$PREFIX/$conflict_path")"
+    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$ROOT_DIR/$PREFIX/$conflict_path"
+    rm -rf "$tmp_dir"
+    git -C "$ROOT_DIR/$PREFIX" add "$conflict_path"
+  done < <(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U)
+
+  unresolved="$(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U)"
+  [ -z "$unresolved" ]
+}
+
+park_eval_log_dirty_state_if_safe() {
+  local status_output=""
+  local line=""
+  local path=""
+  local current_branch=""
+  local current_head=""
+  local log_branch=""
+  local stash_sha=""
+  local pop_log=""
+  local pop_rc=0
+  local commit_sha=""
+  local -a paths=()
+
+  ensure_agent_canon_submodule
+  status_output="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
+  if [ -z "$status_output" ]; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=clean"
+    return 0
+  fi
+
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="$(status_porcelain_path "$line")"
+    if ! is_accumulated_eval_result_path "$path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK=skipped_non_log_dirty"
+      echo "AGENT_CANON_EVAL_LOG_PARK_BLOCKING_PATH=$path"
+      return 1
+    fi
+    paths+=("$path")
+  done <<< "$status_output"
+
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  current_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
+
+  echo "AGENT_CANON_EVAL_LOG_PARK=started"
+  echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
+  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
+  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+
+  git -C "$ROOT_DIR/$PREFIX" fetch origin "$log_branch" >/dev/null 2>&1 || true
+  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
+    git -C "$ROOT_DIR/$PREFIX" switch "$log_branch" >/dev/null
+  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
+    git -C "$ROOT_DIR/$PREFIX" switch --track -c "$log_branch" "origin/$log_branch" >/dev/null
+  else
+    git -C "$ROOT_DIR/$PREFIX" switch -c "$log_branch" "$current_head" >/dev/null
+  fi
+  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch" \
+    && git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor HEAD "origin/$log_branch"; then
+    git -C "$ROOT_DIR/$PREFIX" merge --ff-only "origin/$log_branch" >/dev/null
+  fi
+
+  pop_log="$(mktemp)"
+  git -C "$ROOT_DIR/$PREFIX" stash pop >"$pop_log" 2>&1 || pop_rc=$?
+  if [ "$pop_rc" -ne 0 ]; then
+    if ! resolve_eval_jsonl_conflicts; then
+      cat "$pop_log" >&2
+      rm -f "$pop_log"
+      return "$pop_rc"
+    fi
+    if [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash 2>/dev/null || true)" = "$stash_sha" ]; then
+      git -C "$ROOT_DIR/$PREFIX" stash drop stash@{0} >/dev/null
+    fi
+  fi
+  rm -f "$pop_log"
+
+  git -C "$ROOT_DIR/$PREFIX" add -- "${paths[@]}"
+  if git -C "$ROOT_DIR/$PREFIX" diff --cached --quiet; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=noop"
+    restore_original_submodule_ref "$current_branch" "$current_head"
+    return 0
+  fi
+  git -C "$ROOT_DIR/$PREFIX" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  commit_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  git -C "$ROOT_DIR/$PREFIX" push -u origin "$log_branch" >/dev/null
+  echo "AGENT_CANON_EVAL_LOG_PARK=committed"
+  echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
+  restore_original_submodule_ref "$current_branch" "$current_head"
+}
+
 parent_pin() {
   git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
@@ -225,6 +381,14 @@ cmd_latest() {
   local submodule_worktree_status=""
   local latest_log=""
   local latest_rc=0
+  local park_rc=0
+
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
+  fi
 
   plan_output="$(cmd_plan "$branch")"
   printf '%s\n' "$plan_output"
@@ -272,6 +436,14 @@ cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local latest_log=""
   local latest_rc=0
+  local park_rc=0
+
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
+  fi
 
   latest_log="$(mktemp)"
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
