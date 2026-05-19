@@ -139,6 +139,26 @@ entries:
     tests:
       - tests/agent_tools/test_responsibility_scope.py
 
+  - id: parent-repo-readiness
+    summary: Checks whether a parent repo has the AgentCanon expected documents, root views, and environment surfaces.
+    path: tools/agent_tools/parent_repo_readiness.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/parent_repo_readiness.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/shared-runtime-surfaces.toml
+      - documents/agent-canon-parent-repo-latest-checklist.md
+      - documents/github-first-module-and-devcontainer-policy.md
+    tests:
+      - tests/agent_tools/test_parent_repo_readiness.py
+
   - id: import-responsibility
     summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
     path: tools/agent_tools/import_responsibility.py

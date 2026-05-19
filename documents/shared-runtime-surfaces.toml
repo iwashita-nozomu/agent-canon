@@ -206,6 +206,7 @@ paths = [
   "tests/agent_tools/test_check_mcp_inventory.py",
   "tests/agent_tools/test_codex_hooks.py",
   "tests/agent_tools/test_log_surface_inventory.py",
+  "tests/agent_tools/test_parent_repo_readiness.py",
   "tests/agent_tools/test_tool_rejection_preflight.py",
   "tests/agent_tools/test_repo_mcp_server.py",
   "tests/agent_tools/test_check_dependency_headers.py",
