@@ -10,7 +10,7 @@
     "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
     "downstream implementation hooks/cause_investigation_guard.py blocks code edits before cause investigation evidence",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
-    "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
+    "downstream implementation hooks/oop_readability_guard.py warns on current changed-source OOP readability failures",
     "downstream implementation hooks/module_boundary_guard.py blocks forced module-internal rewrites without boundary evidence",
     "downstream implementation hooks/library_implementation_guard.py blocks direct vendored library implementation rewrites",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",

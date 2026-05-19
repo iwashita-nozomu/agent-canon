@@ -508,6 +508,27 @@ def git_ref_text(root: Path, ref: str, relative_path: str) -> str | None:
     return result.stdout
 
 
+def git_renamed_paths(root: Path, ref: str) -> dict[str, str]:
+    """Return current-path to baseline-path mappings for renamed files."""
+    if not ref:
+        return {}
+    result = subprocess.run(
+        ["git", "-C", str(root), "diff", "--name-status", "--find-renames", ref, "--"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return {}
+    renamed: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and parts[0].startswith("R"):
+            old_path, new_path = parts[1], parts[2]
+            renamed[new_path] = old_path
+    return renamed
+
+
 def stable_relative(root: Path, path: Path) -> str:
     """Return a stable root-relative path when possible."""
     try:
@@ -1999,9 +2020,12 @@ def baseline_inventory_records(
     records: list[FunctionRecord] = []
     if not baseline_ref:
         return records
+    renamed_paths = git_renamed_paths(root, baseline_ref)
     for path in files:
         relative = stable_relative(root, path)
         source = git_ref_text(root, baseline_ref, relative)
+        if source is None and relative in renamed_paths:
+            source = git_ref_text(root, baseline_ref, renamed_paths[relative])
         if source is None:
             continue
         records.extend(analyze_source(root, path, source))

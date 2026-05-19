@@ -11,7 +11,7 @@
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
-# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
+# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and warns on OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
@@ -1168,8 +1168,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["decision"], "block")
         self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])
 
-    def test_oop_readability_guard_blocks_changed_python_findings(self) -> None:
-        """OOP guard should block after source edits when changed Python fails."""
+    def test_oop_readability_guard_warns_changed_python_findings(self) -> None:
+        """OOP guard should warn after source edits when changed Python fails."""
         payload, log_entry = self._run_oop_guard_with_changed_python(
             json.dumps(
                 {
@@ -1186,11 +1186,12 @@ class CodexHooksTest(unittest.TestCase):
                 "raise SystemExit(1)\n"
             ),
         )
-        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["decision"], "approve")
         reason = payload["reason"]
         if not isinstance(reason, str):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
+        self.assertIn("warning", reason)
         self.assertIn("--min-score 95", reason)
         self.assertNotIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
@@ -1264,7 +1265,7 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertIn("decision", json.loads(result.stdout))
         self.assertTrue(durable_log_exists)
-        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["status"], "warn")
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
 
@@ -1342,7 +1343,7 @@ class CodexHooksTest(unittest.TestCase):
         payload, log_entry = self._run_oop_guard_with_changed_python(
             json.dumps({"tool_name": "apply_patch"})
         )
-        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["decision"], "approve")
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertEqual(log_entry["tool_name"], "apply_patch")
         self.assertEqual(log_entry["payload_status"], "valid")
@@ -1353,12 +1354,12 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("payload_fingerprint", log_entry)
         self.assertIn("failure_fingerprint", log_entry)
 
-    def test_oop_readability_guard_blocks_preexisting_findings_by_default(self) -> None:
-        """OOP guard should block current changed-source findings by default."""
+    def test_oop_readability_guard_warns_preexisting_findings_by_default(self) -> None:
+        """OOP guard should warn on current changed-source findings by default."""
         payload, log_entry = self._run_oop_guard_with_preexisting_finding()
 
-        self.assertEqual(payload["decision"], "block")
-        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(payload["decision"], "approve")
+        self.assertEqual(log_entry["status"], "warn")
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["baseline_ref"], "")
         self.assertEqual(log_entry["failed_count"], 1)

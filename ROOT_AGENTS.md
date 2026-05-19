@@ -92,6 +92,12 @@ contract listed in `documents/README.md`.
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させません。`agent-canon mcp-preflight-policy --request-kind github-actions-read` は `MCP_PREFLIGHT_DECISION=skip` を返します。
 - local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。その場合、MCP inventory check は現行 runtime requirement なので維持します。これは optional profile 化しません。
 
+## Experiment And Log Diagnostics
+
+- 数値実験、収束、optimizer、KKT / linear solver、preconditioner の失敗を診断するときは、最後の `NaN`、`Inf`、巨大 residual だけで原因を断定してはいけません。
+- run log は時系列で追い、最初に悪化した iteration / step、直前の finite state、RHS / reference norm、tolerance、residual、preconditioner summary、converged flag を分けて確認します。
+- user-facing diagnosis では、観測された最終状態、最初の破綻点、推定原因、未確認仮説を明確に分離します。
+
 ## AgentCanon Submodule Update Flow
 
 - Default AgentCanon routing is submodule-first: update the standalone AgentCanon repository, push AgentCanon `main` or open the AgentCanon PR, update the template `vendor/agent-canon` submodule pin, run `bash tools/sync_agent_canon.sh link-root`, validate, commit the template pin/root-view changes, then push the template.

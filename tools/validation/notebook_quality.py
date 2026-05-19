@@ -60,6 +60,25 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class Warning:
+    """One non-blocking notebook quality warning."""
+
+    path: str
+    cell: int
+    line: int
+    check: str
+    detail: str
+
+    def render(self) -> str:
+        """Render one stable machine-readable warning."""
+        return (
+            "NOTEBOOK_QUALITY_WARNING="
+            f"{self.path}:cell={self.cell}:line={self.line}:"
+            f"{self.check}:{self.detail}"
+        )
+
+
+@dataclass(frozen=True)
 class NotebookMetrics:
     """Notebook quality metrics useful for logs and JSON output."""
 
@@ -76,6 +95,7 @@ class NotebookReport:
     """Validation result for a notebook set."""
 
     findings: tuple[Finding, ...]
+    warnings: tuple[Warning, ...]
     metrics: tuple[NotebookMetrics, ...]
 
 
@@ -85,6 +105,7 @@ class NotebookScanState:
 
     path: str
     findings: list[Finding]
+    warnings: list[Warning]
     markdown_cells: int = 0
     code_cells: int = 0
     visualization_cells: int = 0
@@ -321,12 +342,13 @@ def code_cell_content_findings(
     cell_index: int,
     source: str,
     cell_errors: int,
-) -> list[Finding]:
-    """Return content findings for one code cell."""
+) -> tuple[list[Finding], list[Warning]]:
+    """Return content findings and warnings for one code cell."""
     findings: list[Finding] = []
+    warnings: list[Warning] = []
     if cell_errors:
-        findings.append(
-            Finding(
+        warnings.append(
+            Warning(
                 display_path,
                 cell_index,
                 0,
@@ -345,7 +367,7 @@ def code_cell_content_findings(
                     detail,
                 )
             )
-    return findings
+    return findings, warnings
 
 
 def record_code_cell(
@@ -365,9 +387,11 @@ def record_code_cell(
         state.visualization_cells += 1
     cell_errors = output_has_error(cell)
     state.error_outputs += cell_errors
-    state.findings.extend(
-        code_cell_content_findings(state.path, cell_index, source, cell_errors)
+    content_findings, content_warnings = code_cell_content_findings(
+        state.path, cell_index, source, cell_errors
     )
+    state.findings.extend(content_findings)
+    state.warnings.extend(content_warnings)
 
 
 def record_cell(
@@ -456,7 +480,7 @@ def build_notebook_validation(
     cells, load_findings = load_notebook_cells(path, display_path)
     if cells is None:
         return load_findings, None
-    state = NotebookScanState(path=display_path, findings=list(load_findings))
+    state = NotebookScanState(path=display_path, findings=list(load_findings), warnings=[])
     for cell_index, cell_value in enumerate(cells, start=1):
         record_cell(state, cell_index, cell_value, max_code_cell_lines)
     state.findings.extend(
@@ -465,7 +489,7 @@ def build_notebook_validation(
             min_markdown_chars=min_markdown_chars,
         )
     )
-    return state.findings, state.metrics()
+    return state.findings, state.warnings, state.metrics()
 
 
 def validate_paths(
@@ -477,18 +501,24 @@ def validate_paths(
 ) -> NotebookReport:
     """Validate notebook paths and return one report."""
     findings: list[Finding] = []
+    warnings: list[Warning] = []
     metrics: list[NotebookMetrics] = []
     for path in paths:
-        notebook_findings, notebook_metrics = build_notebook_validation(
+        notebook_findings, notebook_warnings, notebook_metrics = build_notebook_validation(
             root,
             path,
             max_code_cell_lines=max_code_cell_lines,
             min_markdown_chars=min_markdown_chars,
         )
         findings.extend(notebook_findings)
+        warnings.extend(notebook_warnings)
         if notebook_metrics is not None:
             metrics.append(notebook_metrics)
-    return NotebookReport(findings=tuple(findings), metrics=tuple(metrics))
+    return NotebookReport(
+        findings=tuple(findings),
+        warnings=tuple(warnings),
+        metrics=tuple(metrics),
+    )
 
 
 def render_text(report: NotebookReport) -> str:
@@ -496,6 +526,7 @@ def render_text(report: NotebookReport) -> str:
     lines = [
         f"NOTEBOOK_QUALITY_FILES={len(report.metrics)}",
         f"NOTEBOOK_QUALITY_FINDINGS={len(report.findings)}",
+        f"NOTEBOOK_QUALITY_WARNINGS={len(report.warnings)}",
     ]
     for metrics in report.metrics:
         lines.append(
@@ -507,6 +538,7 @@ def render_text(report: NotebookReport) -> str:
             f"markdown_chars={metrics.markdown_chars}"
         )
     lines.extend(finding.render() for finding in report.findings)
+    lines.extend(warning.render() for warning in report.warnings)
     lines.append(f"NOTEBOOK_QUALITY={'fail' if report.findings else 'pass'}")
     return "\n".join(lines)
 
@@ -516,6 +548,7 @@ def render_json(report: NotebookReport) -> str:
     payload = {
         "status": "fail" if report.findings else "pass",
         "findings": [asdict(finding) for finding in report.findings],
+        "warnings": [asdict(warning) for warning in report.warnings],
         "metrics": [asdict(metrics) for metrics in report.metrics],
     }
     return json.dumps(payload, sort_keys=True)
