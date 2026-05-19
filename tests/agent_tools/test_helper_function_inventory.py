@@ -738,6 +738,146 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertFalse(records["add"]["helper_candidate"])
             self.assertEqual(records["add"]["specialization"], "not_helper_candidate")
 
+    def test_redundant_identity_and_passthrough_helpers_are_marked(self) -> None:
+        """Redundant identity and forwarding helpers should be explicit findings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "redundant.py").write_text(
+                dedent(
+                    """
+                    def normalize(value: str) -> str:
+                        return value.strip()
+
+                    def _same(value: str) -> str:
+                        return value
+
+                    def _wrap(value: str) -> str:
+                        return normalize(value)
+
+                    def _proxy(*args: object, **kwargs: object) -> object:
+                        return normalize(*args, **kwargs)
+
+                    def public_api(value: str) -> tuple[str, str, object]:
+                        return _same(value), _wrap(value), _proxy(value)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            self.assertTrue(records["_same"]["redundant_helper"])
+            self.assertEqual(records["_same"]["redundancy_rule"], "identity-return")
+            self.assertTrue(records["_wrap"]["redundant_helper"])
+            self.assertEqual(records["_wrap"]["redundancy_rule"], "pass-through-return-internal")
+            self.assertTrue(records["_proxy"]["redundant_helper"])
+            self.assertEqual(records["_proxy"]["redundancy_rule"], "pass-through-return-internal")
+
+    def test_duplicate_helper_implementations_are_marked(self) -> None:
+        """Duplicate helper bodies should be linked as redundant alternatives."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "duplicates.py").write_text(
+                dedent(
+                    """
+                    def _format(value: object) -> dict[str, str]:
+                        return {'value': str(value)}
+
+                    def _render(item: object) -> dict[str, str]:
+                        return {'value': str(item)}
+
+                    def public_api(value: object) -> tuple[dict[str, str], dict[str, str]]:
+                        return _format(value), _render(value)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            self.assertEqual(records["_format"]["redundancy_rule"], "duplicate-implementation")
+            self.assertEqual(records["_render"]["redundancy_rule"], "duplicate-implementation")
+            self.assertEqual(records["_format"]["redundant_with"], ["_render"])
+            self.assertEqual(records["_render"]["redundant_with"], ["_format"])
+
+    def test_multistep_orchestrator_with_forwarding_call_is_not_redundant(self) -> None:
+        """A forwarding call inside a multi-step function should not imply redundancy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "orchestrator.py").write_text(
+                dedent(
+                    """
+                    def normalize(value: str) -> str:
+                        return value.strip()
+
+                    def sink(value: str) -> None:
+                        print(value)
+
+                    def _orchestrate(value: str) -> str:
+                        normalized = normalize(value)
+                        sink(value)
+                        return normalized
+
+                    def public_api(value: str) -> str:
+                        return _orchestrate(value)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            self.assertFalse(records["_orchestrate"]["redundant_helper"])
+            self.assertEqual(records["_orchestrate"]["redundancy_rule"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

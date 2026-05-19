@@ -19,6 +19,13 @@ AgentCanon pin. This internal `vendor/` directory is part of AgentCanon itself.
 ## Ownership
 
 - External skill source stays under `vendor/skills/<provider>/<skill>/`.
+- For GitHub imports, `provider` is the upstream GitHub owner or
+  organization, even when that repository is maintained by someone outside the
+  AgentCanon project.
+- A GitHub-sourced external repository must attach below
+  `vendor/<asset-class>/<github-owner>/<import-id>/`. Do not clone or copy it
+  directly into `.agents/`, `agents/`, `tools/`, `mcp/`, `documents/`, or a
+  template parent repository root.
 - Runtime exposure goes through `.agents/skills/<skill>` adapter symlinks.
 - `.agents/skills/` remains the discovery surface; it is not the place to copy
   third-party source by hand.
@@ -30,7 +37,9 @@ AgentCanon pin. This internal `vendor/` directory is part of AgentCanon itself.
 
 ## Validation
 
-Use the adapter tool before committing a third-party skill import:
+Use the adapter tool before committing a third-party skill import. It rejects
+GitHub skill sources whose `provider`, `upstream` owner, and
+`vendor/skills/<provider>/<skill>/` source path do not agree.
 
 ```bash
 python3 tools/agent_tools/vendor_skill_adapters.py --sync

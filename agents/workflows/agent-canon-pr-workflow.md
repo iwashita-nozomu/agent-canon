@@ -10,6 +10,7 @@ upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention tr
 upstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility scope gate
 upstream implementation ../../tools/agent_tools/issue_sync.py local/GitHub issue sync gate
 upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval accumulation gate
+upstream implementation ../../rust/agent-canon/src/local_llm.rs local LLM Rust CLI gate
 upstream implementation ../../tools/agent_tools/local_llm_eval.py local LLM responsibility eval gate
 upstream design ../../tools/catalog.yaml structured tool catalog
 upstream design ../../issues/README.md durable operational finding storage
@@ -139,6 +140,7 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - template / derived repo では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` の `Operational Findings / Issues` に記入します。
 - 新規 durable finding が不要な場合は、検索した surface と不要判断の理由を PR body に書きます。
 - `python3 tools/agent_tools/issue_sync.py` を実行し、GitHub mirror が未作成の local issue は `ISSUE_SYNC_PLAN=` を PR body に貼るか、明示的に defer します。
+- `.github/workflows/issue-mirror.yml` の PR check が出す Step Summary を確認し、linked GitHub Issue の state / title drift があれば PR 内で修正します。
 - GitHub Actions の Agent Improvement Guide がある場合は、その artifact / step summary を確認し、memory、eval、hook、issues 由来の改善候補を PR body に反映します。
 
 ## Branch ルール
@@ -147,6 +149,15 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 - 派生 repo から始まる branch も GitHub 上の normal branch として扱い、`canon-pr/<topic>` または `canon/<topic>-YYYYMMDD` に寄せます。
 - shared canon 以外の implementation change と同じ branch に混ぜません。
 - shared canon 変更と repo-local implementation change の両方が必要な場合は branch と PR を分けます。
+
+## Push / GitHub write 前の remote 確認
+
+- push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
+- まず `git status --short --branch` で upstream / tracking branch を確認します。`...origin/<branch>` のような tracking 情報がある通常ケースでは、その tracking branch を優先し、`git push` を既定候補にします。
+- 次に `git remote -v` または `git remote get-url <name>` で現在 repo の canonical remote を確認します。
+- hook 出力などで `git remote -v` の本文を読めない場合は、`git config --get-regexp '^remote\\..*\\.url$'`、`.git/config`、repo metadata の順に fallback 確認し、確認できるまで write 操作へ進みません。
+- literal URL push は例外扱いです。remote / upstream が無い、または通常の `git push` では目的を達成できないことを確認した場合だけ使い、work log または PR evidence に理由を残します。
+- PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
 
 ## 標準手順
 
@@ -172,9 +183,9 @@ bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
-python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
 python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/local_llm_eval.py
+tools/bin/agent-canon local-llm eval
 python3 tools/ci/check_github_workflows.py
 bash tools/ci/run_docs_checks.sh
 bash tools/ci/run_all_checks.sh --quick
@@ -199,7 +210,7 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - `python3 tools/agent_tools/responsibility_scope.py`
 - `python3 tools/agent_tools/issue_sync.py`
 - `python3 tools/agent_tools/eval_accumulation_check.py`
-- `python3 tools/agent_tools/local_llm_eval.py`
+- `tools/bin/agent-canon local-llm eval`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI

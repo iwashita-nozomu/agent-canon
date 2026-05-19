@@ -159,6 +159,20 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="import_responsibility",
+        tool="tools/agent_tools/import_responsibility.py",
+        links=(
+            LinkCheck("responsibility-scope.toml"),
+            LinkCheck("documents/responsibility-scope-management.md"),
+            LinkCheck("documents/coding-conventions-python.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tests/agent_tools/test_import_responsibility.py"),
+        ),
+    ),
+    ToolContract(
         name="local_llm_eval",
         tool="tools/agent_tools/local_llm_eval.py",
         links=(
@@ -171,6 +185,21 @@ CONTRACTS = (
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/ci/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_local_llm_eval.py"),
+        ),
+    ),
+    ToolContract(
+        name="agent_canon_local_llm",
+        tool="rust/agent-canon/src/local_llm.rs",
+        links=(
+            LinkCheck("agent-canon-environment.toml"),
+            LinkCheck("documents/local-llm-responsibility-analysis.md"),
+            LinkCheck("documents/search-coordination.md"),
+            LinkCheck("documents/rust-agent-tool-migration.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck(".github/workflows/agent-canon-static-gates.yml"),
         ),
     ),
     ToolContract(
@@ -341,9 +370,13 @@ def repo_relative(root: Path, path: Path) -> str:
     absolute_root = Path(os.path.normpath(root.absolute().as_posix()))
     absolute_path = Path(os.path.normpath(path.absolute().as_posix()))
     try:
-        return absolute_path.relative_to(absolute_root).as_posix()
+        relative = absolute_path.relative_to(absolute_root).as_posix()
     except ValueError:
         return path.as_posix()
+    vendor_prefix = "vendor/agent-canon/"
+    if relative.startswith(vendor_prefix):
+        return relative[len(vendor_prefix) :]
+    return relative
 
 
 def normalize_target(root: Path, source: Path, relative_target: str) -> str:

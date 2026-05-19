@@ -3,7 +3,11 @@
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
+# upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/oop_readability_guard.py blocks OOP readability failures
+# upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
+# upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
+# upstream implementation ../../.codex/hooks/style_checker_guard.py blocks selected style checker failures
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # downstream implementation ../../tools/agent_tools/agent_team.py injects preflight protocol into team manifests
 # downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
@@ -20,6 +24,8 @@ from pathlib import Path
 
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+NOTEBOOK_SUFFIXES = {".ipynb"}
+MARKDOWN_SUFFIXES = {".md"}
 TEXT_SUFFIXES = {
     ".bash",
     ".cfg",
@@ -40,6 +46,25 @@ TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
     ".zsh",
+}
+CODE_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cxx",
+    ".go",
+    ".h",
+    ".hpp",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".py",
+    ".rs",
+    ".sh",
+    ".swift",
+    ".ts",
+    ".tsx",
 }
 HOOK_SURFACE_PREFIXES = (
     ".codex/hooks/",
@@ -66,6 +91,15 @@ AGENT_PROTOCOL_PATHS = frozenset(
     }
 )
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
+LIBRARY_SURFACE_PREFIXES = (
+    "vendor/",
+    "third_party/",
+    "third-party/",
+    "external/",
+    "node_modules/",
+    ".venv/",
+)
+AGENT_CANON_SUBMODULE_PREFIX = "vendor/agent-canon"
 
 
 @dataclass(frozen=True, order=True)
@@ -98,7 +132,60 @@ class GateTemplate:
         )
 
 
+CAUSE_INVESTIGATION_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="cause_investigation_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\","
+            "\"tool_input\":{{\"patch\":\"*** Begin Patch\\n*** Update File: {path}\\n"
+            "*** End Patch\\n\"}}}}' "
+            "| python3 .codex/hooks/cause_investigation_guard.py"
+        ),
+        handoff=(
+            "record Observation, Hypothesis or Root Cause, Expected Fix Surface "
+            "or Selected Surface, and Validation Before Edit or Support Evidence "
+            "before code edits"
+        ),
+    ),
+)
+
+
 PYTHON_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="import_responsibility",
+        command_template=(
+            "python3 tools/agent_tools/import_responsibility.py --root . {path}"
+        ),
+        handoff=(
+            "include unused-import and responsibility-scope import boundary risk "
+            "before implementation edits"
+        ),
+    ),
+    GateTemplate(
+        gate="module_boundary_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/module_boundary_guard.py"
+        ),
+        handoff=(
+            "include module boundary evidence before changing Python module "
+            "internals or public surface"
+        ),
+    ),
+    GateTemplate(
+        gate="helper_first_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/helper_first_guard.py"
+        ),
+        handoff=(
+            "include ownership, module boundary, issue, docs, or test evidence "
+            "before adding helper-like functions"
+        ),
+    ),
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
@@ -120,6 +207,20 @@ PYTHON_GATE_TEMPLATES = (
         ),
     ),
 )
+LIBRARY_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="library_implementation_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/library_implementation_guard.py"
+        ),
+        handoff=(
+            "do not rewrite vendored or installed library internals; use wrapper, "
+            "adapter, fork/upstream patch, or manifest-backed vendor import"
+        ),
+    ),
+)
 CPP_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
@@ -127,6 +228,20 @@ CPP_GATE_TEMPLATES = (
             "python3 tools/oop/cpp/readability.py --root . --min-score 95 {path}"
         ),
         handoff="include C/C++ OOP readability risk before edits",
+    ),
+)
+STYLE_CHECK_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="style_checker_guard",
+        command_template=(
+            "printf '%s' "
+            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            "| python3 .codex/hooks/style_checker_guard.py"
+        ),
+        handoff=(
+            "include selected style checker families and unchecked changed-file "
+            "coverage before continuing"
+        ),
     ),
 )
 DEPENDENCY_GATE_TEMPLATES = (
@@ -278,10 +393,14 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
     templates: list[GateTemplate] = []
+    if suffix in CODE_SUFFIXES:
+        templates.extend(CAUSE_INVESTIGATION_GATE_TEMPLATES)
     if suffix in PYTHON_SUFFIXES:
         templates.extend(PYTHON_GATE_TEMPLATES)
     if suffix in CPP_SUFFIXES:
         templates.extend(CPP_GATE_TEMPLATES)
+    if suffix in PYTHON_SUFFIXES | CPP_SUFFIXES | NOTEBOOK_SUFFIXES | MARKDOWN_SUFFIXES:
+        templates.extend(STYLE_CHECK_GATE_TEMPLATES)
     if suffix in TEXT_SUFFIXES:
         templates.extend(DEPENDENCY_GATE_TEMPLATES)
     if path in HOOK_CONFIG_PATHS or path.startswith(HOOK_SURFACE_PREFIXES):
@@ -296,7 +415,16 @@ def path_gates(path: str) -> tuple[PredictedGate, ...]:
         templates.extend(AGENT_PROTOCOL_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
+    if library_surface_path(path):
+        templates.extend(LIBRARY_GATE_TEMPLATES)
     return tuple(template.for_path(path) for template in templates)
+
+
+def library_surface_path(path: str) -> bool:
+    """Return whether a planned path belongs to protected library surfaces."""
+    if path == AGENT_CANON_SUBMODULE_PREFIX or path.startswith(AGENT_CANON_SUBMODULE_PREFIX + "/"):
+        return False
+    return path.startswith(LIBRARY_SURFACE_PREFIXES)
 
 
 def text_output(gates: tuple[PredictedGate, ...]) -> str:

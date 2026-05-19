@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Inventories machine-readable log and hook output fields from hooks, skills, and tools.
+# responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # downstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks stale inventory drift
 # downstream implementation ../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
@@ -41,6 +41,9 @@ SKILL_PATTERNS = (
 )
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")
 TOOL_PATTERNS = ("tools/*.py", "tools/*.sh", "tools/**/*.py", "tools/**/*.sh", "tools/**/*.bash")
+RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
+RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
+MAX_DIFF_RECORDS = 20
 
 
 @dataclass(frozen=True, order=True)
@@ -129,7 +132,7 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
         if call_name.endswith("json.dump") or call_name.endswith("json.dumps"):
             self._record_json_arg(node, "json_object")
         if "log" in call_name and call_name not in {"logging.getLogger"}:
-            self._record_log_helper_args(node)
+            self._record_structured_helper_args(node)
         self.generic_visit(node)
 
     def _record_print_call(self, node: ast.Call) -> None:
@@ -148,7 +151,7 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
         for field, certainty in self._fields_from_node(node.args[0]):
             self._add_record(emitter, field, node.lineno, certainty)
 
-    def _record_log_helper_args(self, node: ast.Call) -> None:
+    def _record_structured_helper_args(self, node: ast.Call) -> None:
         for arg in node.args:
             if isinstance(arg, ast.Dict) or (
                 isinstance(arg, ast.Name) and arg.id in self.dict_assignments
@@ -268,6 +271,41 @@ class ShellLogSurfaceScanner:
         return "", cast(Certainty, "static")
 
 
+class RustLogSurfaceScanner:
+    """Extract emitted key-value field names from Rust CLI source."""
+
+    def __init__(self, relative_path: str, surface: SurfaceKind) -> None:
+        """Initialize the scanner for one root-relative Rust path."""
+        self.relative_path = relative_path
+        self.surface: SurfaceKind = surface
+
+    def scan(self, text: str) -> tuple[FieldRecord, ...]:
+        """Return machine-readable Rust output fields."""
+        records: list[FieldRecord] = []
+        for line_number, raw_line in enumerate(text.splitlines(), start=1):
+            match = RUST_PRINT_PATTERN.match(raw_line)
+            if not match:
+                continue
+            field = self._rust_key(match.group("value"))
+            if not field:
+                continue
+            records.append(
+                FieldRecord(
+                    path=self.relative_path,
+                    surface=self.surface,
+                    emitter="rust_key_value_stdout",
+                    field=field,
+                    line=line_number,
+                    certainty="static",
+                )
+            )
+        return tuple(records)
+
+    def _rust_key(self, value: str) -> str:
+        match = KEY_VALUE_PATTERN.match(value)
+        return match.group(1) if match else ""
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -367,7 +405,7 @@ def surface_kind(relative: Path) -> SurfaceKind | None:
         return "hook"
     if matches_any(text, SKILL_PATTERNS):
         return "skill"
-    if matches_any(text, TOOL_PATTERNS):
+    if matches_any(text, TOOL_PATTERNS) or matches_any(text, RUST_TOOL_PATTERNS):
         return "tool"
     return None
 
@@ -407,6 +445,8 @@ def scan_one_file(
         return scan_python_file(relative, kind, text)
     if path.suffix in {".sh", ".bash"}:
         return ShellLogSurfaceScanner(relative, kind).scan(text)
+    if path.suffix == ".rs":
+        return RustLogSurfaceScanner(relative, kind).scan(text)
     if path.name == "SKILL.md" or path.suffix == ".md":
         return scan_markdown_key_values(relative, kind, text)
     _ = root
@@ -552,9 +592,9 @@ def render_check_failure(diff: BaselineDiff, baseline_path: Path) -> str:
         f"LOG_SURFACE_ADDED={len(diff.added)}",
         f"LOG_SURFACE_REMOVED={len(diff.removed)}",
     ]
-    for record in diff.added[:20]:
+    for record in diff.added[:MAX_DIFF_RECORDS]:
         lines.append(render_record("LOG_SURFACE_FIELD_ADDED", record))
-    for record in diff.removed[:20]:
+    for record in diff.removed[:MAX_DIFF_RECORDS]:
         lines.append(render_record("LOG_SURFACE_FIELD_REMOVED", record))
     return "\n".join(lines)
 

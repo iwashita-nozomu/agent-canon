@@ -45,6 +45,7 @@ required_coverage = [
   "notes",
   "references",
   "rust",
+  "tests",
   "tools",
   "vendor",
   "AGENTS.md",
@@ -54,6 +55,67 @@ required_coverage = [
   "README.md",
   "responsibility-scope.toml",
   "ROOT_AGENTS.md",
+]
+
+[[import_rule]]
+source = "runtime-entrypoints"
+targets = [
+  "runtime-entrypoints",
+  "shared-tooling",
+  "shared-policy-documents",
+  "eval-and-hook-evidence",
+]
+
+[[import_rule]]
+source = "eval-and-hook-evidence"
+targets = [
+  "eval-and-hook-evidence",
+  "shared-tooling",
+  "shared-policy-documents",
+]
+
+[[import_rule]]
+source = "shared-tooling"
+targets = [
+  "shared-tooling",
+  "runtime-entrypoints",
+  "eval-and-hook-evidence",
+  "shared-policy-documents",
+  "github-automation",
+  "external-skill-vendor",
+]
+
+[[import_rule]]
+source = "shared-policy-documents"
+targets = [
+  "shared-policy-documents",
+  "shared-tooling",
+]
+
+[[import_rule]]
+source = "github-automation"
+targets = [
+  "github-automation",
+  "shared-tooling",
+]
+
+[[import_rule]]
+source = "external-skill-vendor"
+targets = [
+  "external-skill-vendor",
+  "shared-tooling",
+]
+
+[[import_rule]]
+source = "test-surfaces"
+targets = [
+  "test-surfaces",
+  "runtime-entrypoints",
+  "eval-and-hook-evidence",
+  "shared-tooling",
+  "shared-policy-documents",
+  "github-automation",
+  "external-skill-vendor",
 ]
 
 [[scope]]
@@ -96,7 +158,7 @@ protecting_tools = [
   "tools/ci/check_github_workflows.py",
 ]
 issues = [
-  "issues/open/AC-20260517-github-folder-issue-sync.md",
+  "issues/closed/AC-20260517-github-folder-issue-sync.md",
 ]
 
 [[scope]]
@@ -140,6 +202,23 @@ issues = [
 ]
 
 [[scope]]
+id = "test-surfaces"
+owner = "agent-canon"
+class = "tooling"
+description = "AgentCanon tests that validate shared tools, workflows, and responsibility policies."
+paths = [
+  "tests/**",
+]
+protecting_tools = [
+  "tools/agent_tools/import_responsibility.py",
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/ci/run_all_checks.sh",
+]
+issues = [
+  "issues/open/AC-20260517-responsibility-scope-management.md",
+]
+
+[[scope]]
 id = "shared-policy-documents"
 owner = "agent-canon"
 class = "shared_policy"
@@ -175,14 +254,14 @@ protecting_tools = [
   "tools/agent_tools/issue_sync.py",
 ]
 issues = [
-  "issues/open/AC-20260517-github-folder-issue-sync.md",
+  "issues/closed/AC-20260517-github-folder-issue-sync.md",
 ]
 
 [[scope]]
 id = "external-skill-vendor"
 owner = "external-vendor"
 class = "external_dependency"
-description = "Vendored third-party skills and related external agent components inside AgentCanon."
+description = "Vendored third-party skills and related external agent components inside AgentCanon; GitHub imports stay under vendor/<asset-class>/<owner>/<import-id> and expose only adapters."
 paths = [
   "vendor/**",
 ]

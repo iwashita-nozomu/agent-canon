@@ -206,6 +206,7 @@ paths = [
   "tests/agent_tools/test_check_mcp_inventory.py",
   "tests/agent_tools/test_codex_hooks.py",
   "tests/agent_tools/test_log_surface_inventory.py",
+  "tests/agent_tools/test_parent_repo_readiness.py",
   "tests/agent_tools/test_tool_rejection_preflight.py",
   "tests/agent_tools/test_repo_mcp_server.py",
   "tests/agent_tools/test_check_dependency_headers.py",
@@ -258,6 +259,14 @@ paths = [
 path = ".github/workflows/agent-runtime-dashboard.yml"
 mode = "standalone_only"
 source = ".github/workflows/agent-runtime-dashboard.yml"
+owner = "agent-canon-standalone"
+class = "standalone_only"
+local_override_allowed = false
+
+[[surface]]
+path = ".github/workflows/issue-mirror.yml"
+mode = "standalone_only"
+source = ".github/workflows/issue-mirror.yml"
 owner = "agent-canon-standalone"
 class = "standalone_only"
 local_override_allowed = false

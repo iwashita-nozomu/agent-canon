@@ -2,6 +2,7 @@
 # responsibility Defines local LLM single-file responsibility eval cases.
 # upstream design README.md eval directory contract
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file local LLM scope policy
+# downstream implementation ../../rust/agent-canon/src/local_llm.rs routes this eval through the Rust CLI
 # downstream implementation ../../tools/agent_tools/local_llm_eval.py runs this manifest
 # downstream implementation ../../tests/agent_tools/test_local_llm_eval.py tests manifest execution
 # @dependency-end

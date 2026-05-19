@@ -16,7 +16,8 @@ It is the canonical hook-result surface for normal Codex hook runs.
 
 Runtime-local `reports/hooks/` output is temporary debug output only when a task
 intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
-`AGENT_CANON_OOP_HOOK_LOG_PATH`, or `AGENT_CANON_SKILL_LOG_PATH`. The default
+`AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
+or `AGENT_CANON_SKILL_LOG_PATH`. The default
 hook destination must remain this AgentCanon-owned hook result surface so
 improvement-guide and eval tooling can read one durable chronology.
 
@@ -24,6 +25,46 @@ OOP hook entries include a `mode` field. The default mode is `full`, which block
 all current findings in changed source files. `diff` mode is opt-in for tasks
 where the user explicitly asked to ignore baseline findings; those entries also
 record the `baseline_ref` used for comparison.
+
+Style checker hook entries include `selected_checkers`, `checked_files`, and
+`unchecked_files`. `unchecked_files` is the durable signal that a changed file
+had no automatic Python / C++ / notebook / Markdown style checker selected.
+
+Module boundary hook entries include `changed_modules`, `finding_count`,
+`findings`, and `import_checks`. They are the durable signal that a Python
+module rewrite changed public surface or exceeded rewrite thresholds without
+test / docs / issue / responsibility-scope evidence, or that
+`import_responsibility.py` rejected unused imports, wildcard imports, or
+responsibility-scope import crossings.
+
+Library implementation hook entries include `changed_library_files`,
+`finding_count`, and `findings`. They are the durable signal that an agent tried
+to patch vendored or installed library internals instead of using an adapter,
+fork / upstream patch, or manifest-backed vendor import.
+
+Cause investigation hook entries include `code_paths`,
+`cause_evidence_status`, `cause_evidence_source`, and
+`cause_evidence_files`. They are the durable signal that an agent attempted a
+code edit before or after recording root-cause / hypothesis evidence. Prompt and
+skill evals should use blocked records to improve pre-edit investigation
+wording and accepted records to learn what evidence was sufficient.
+
+Helper-first hook entries include `helper_candidate_records`,
+`helper_candidate_record_count`, `helper_first_records`,
+`helper_first_candidate_count`, `boundary_evidence_changed`, and
+`inventory_output_snippet`. They are the durable signal that an agent touched
+helper-like functions; `helper_first_records` is the blocking subset where no
+ownership, module boundary, issue, docs, or test evidence was changed. Prompt
+and skill evals should consume both the accepted and blocked records when
+improving implementation handoff wording.
+`helper_candidate_records` may include `redundant_helper` records with
+`redundancy_rule` and `redundant_with`; those entries show when an agent tried
+to add identity wrappers, pass-through wrappers, or duplicate helper bodies.
+
+Reference capture hook entries include `urls`, `registered_urls`,
+`missing_urls`, `reference_files`, and `decision`. UserPromptSubmit entries are
+measurement-only, while PostToolUse and Stop entries may block when a consulted
+PDF or HTML URL has not been materialized as Markdown under `references/`.
 
 ## Artifact Handling
 

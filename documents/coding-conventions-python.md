@@ -94,6 +94,38 @@ def load_config(path: Path) -> dict[str, str]:
 - 行長は lint の fail 条件ではなく、可読性、既存 formatter、project-local `pyproject.toml` の明示設定に従って判断します。
 - Ruff を使う repo では、行長だけを理由に fail させたくない場合、`E501` を ignore します。
 
+## Import と責務境界
+
+- 未使用 import、wildcard import、責務外 local import は変更に残しません。
+- 追加した import が local file に解決できる場合は、repo top-level
+  `responsibility-scope.toml` の `[[import_rule]]` に沿う必要があります。
+- 既存 scope を越える import が必要な場合は、先に設計上の依存方向を確認し、
+  scope rule を更新するか、薄い adapter を既存責務側へ置きます。
+- `python3 tools/agent_tools/import_responsibility.py --changed` を
+  `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
+
+## Library と helper-first の禁止
+
+- code edit の前に原因調査を残します。少なくとも `Observation:`、
+  `Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、
+  `Validation Before Edit:` / `Support Evidence:` を run artifact、issue、または
+  design note に書き、どの code path をなぜ触るかを明確にします。
+- vendored dependency、installed package、`site-packages`、`node_modules` の
+  library implementation を直接書き換えません。必要な場合は wrapper /
+  adapter、fork / upstream patch、または manifest-backed vendor import として
+  扱います。
+- 実装の最初の一手として helper-like function を増やしません。先に owning
+  class / module contract、責務 scope、issue、docs、test のいずれかで境界を
+  固定し、既存 helper / API を再利用できない理由を明示します。
+- identity return、pass-through wrapper、同じ normalized body を持つ duplicate
+  helper は冗長 helper として扱います。`helper_function_inventory.py` の
+  `redundant_helper`、`redundancy_rule`、`redundant_with` を見て、既存実装へ
+  統合するか、残す理由を design / issue に書きます。
+- `.codex/hooks/library_implementation_guard.py` と
+  `.codex/hooks/helper_first_guard.py` はこの規約の edit-time gate です。
+- `.codex/hooks/cause_investigation_guard.py` は code edit 前の cause evidence
+  gate です。
+
 ## 目次
 
 1. [対象](./conventions/python/01_scope.md)

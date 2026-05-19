@@ -6,6 +6,7 @@ upstream design tools/README.md operator-facing tool guide
 upstream design local-llm-responsibility-analysis.md local LLM runtime boundary
 downstream implementation ../tools/agent_tools/search.py coordinates search providers from one purpose string
 downstream implementation ../tools/agent_tools/search_index.py builds repo-local semantic search cards
+downstream implementation ../rust/agent-canon/src/local_llm.rs exposes local LLM search and index commands through the Rust CLI
 downstream implementation ../tests/agent_tools/test_search.py validates provider coordination
 downstream implementation ../tests/agent_tools/test_search_index.py validates index generation
 @dependency-end
@@ -22,10 +23,11 @@ AgentCanon search has six provider classes:
 - `header-deps`: dependency-header upstream / downstream edges.
 - `code-deps`: Python symbol and direct-call facts from the AST scanner.
 
-Use `search.py` when the user gives a purpose rather than an exact symbol:
+Use `agent-canon local-llm search` when the user gives a purpose rather than an
+exact symbol:
 
 ```bash
-python3 tools/agent_tools/search.py \
+agent-canon local-llm search \
   --purpose "find tool for dependency graph edit scope validation" \
   --providers llm,tool,vector \
   --format json
@@ -35,11 +37,11 @@ Use `rg` first when the input is an exact path, symbol, literal error message,
 or short unique token. Use coordinated search when the input is ambiguous,
 goal-oriented, or asks for likely files to edit.
 
-`search_index.py` writes generated cards under `.agent-canon/search-index/`.
-That directory is repo-local ignored state. Do not commit generated cards, model
-outputs, embeddings, or index state. Rebuild the index after AgentCanon updates
-or when a repository adds important tools, skills, workflow documents, or code
-surfaces.
+`agent-canon local-llm build-index` writes generated cards under
+`.agent-canon/search-index/`. That directory is repo-local ignored state. Do
+not commit generated cards, model outputs, embeddings, or index state. Rebuild
+the index after AgentCanon updates or when a repository adds important tools,
+skills, workflow documents, or code surfaces.
 
 The LLM provider is advisory. It may use deterministic heuristic cards without
 running a model, or it may refine cards with llama.cpp when `--run-llm` is set.

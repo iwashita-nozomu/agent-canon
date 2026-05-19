@@ -142,6 +142,14 @@ TOOL_GATES = {
             "documents/tools/README.md",
         ),
     ),
+    "import_responsibility": (
+        "tools/agent_tools/import_responsibility.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "documents/responsibility-scope-management.md",
+            "documents/coding-conventions-python.md",
+        ),
+    ),
     "github_workflow_pr_flow": (
         "tools/ci/check_github_workflows.py",
         (
@@ -164,7 +172,22 @@ TOOL_GATES = {
             "documents/SHARED_RUNTIME_SURFACES.md",
         ),
     ),
+    "runtime_profile_inventory": (
+        "tools/agent_tools/check_runtime_profile_inventory.py",
+        ("tools/ci/run_docs_checks.sh",),
+    ),
 }
+
+AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
+AGENT_CANON_PUSH_REMOTE_MARKERS = (
+    "remote_verified=yes",
+    "git status --short --branch",
+    "git remote -v",
+    r"git config --get-regexp '^remote\\..*\\.url$'",
+    ".git/config",
+    "literal URL push",
+    "hardcoded repository name",
+)
 
 SKILL_ROUTING_PROMPTS = (
     ".agents/skills/agent-orchestration/SKILL.md",
@@ -404,6 +427,25 @@ def check_closeout_prohibitions(root: Path) -> list[Finding]:
     return findings
 
 
+def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
+    """Verify AgentCanon PR workflow documents remote verification before push."""
+    path = AGENT_CANON_PR_WORKFLOW_PATH
+    findings = check_required_files(root, (path,), "agentcanon_push_remote_guard")
+    if findings:
+        return findings
+    text = read_text(root, path)
+    for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
+        if marker not in text:
+            findings.append(
+                Finding(
+                    "agentcanon_push_remote_guard",
+                    path,
+                    f"missing-marker:{marker}",
+                )
+            )
+    return findings
+
+
 def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     """Verify prompt evals cover convention verifier and skill-call routing."""
     path = "agents/evals/skill_workflow_prompt_eval.toml"
@@ -492,6 +534,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
     findings.extend(check_closeout_prohibitions(root))
+    findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_convention_assertions(root))

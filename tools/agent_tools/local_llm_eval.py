@@ -8,6 +8,7 @@
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
+# upstream implementation ../../rust/agent-canon/src/local_llm.rs routes local LLM eval command
 # upstream implementation ./file_responsibility_llm.py renders prompts and runs llama.cpp
 # downstream implementation ../../tools/ci/run_all_checks.sh runs local LLM eval checks
 # downstream implementation ../../tests/agent_tools/test_local_llm_eval.py tests eval harness behavior

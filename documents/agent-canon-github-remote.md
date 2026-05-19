@@ -62,6 +62,18 @@ Derived repos that discover AgentCanon changes should commit them inside
 `iwashita-nozomu/agent-canon`, and open or update the AgentCanon PR. Do not
 route new work through project-local compatibility remotes.
 
+Before the branch push, verify the current repo remote and tracking state first:
+
+- Check `git status --short --branch`. If it already shows tracking such as
+  `...origin/<branch>`, prefer a normal `git push`.
+- Confirm the actual remote with `git remote -v` or `git remote get-url`.
+- If hook output hides `git remote -v`, fall back to
+  `git config --get-regexp '^remote\\..*\\.url$'` and `.git/config`.
+- Do not infer the destination repository from PR context, branch naming, or a
+  template repository name.
+- Treat literal URL push as an exception that needs explicit evidence that the
+  verified remote/upstream is unavailable or insufficient.
+
 ```bash
 bash tools/update_agent_canon.sh merge-main-into-current
 git -C vendor/agent-canon push origin HEAD

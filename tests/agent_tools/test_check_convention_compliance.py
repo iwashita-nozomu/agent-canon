@@ -15,6 +15,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.check_convention_compliance import (
+    AGENT_CANON_PUSH_REMOTE_MARKERS,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
 
@@ -34,7 +38,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
-    "documents/coding-conventions-python.md": "python\n",
+    "documents/coding-conventions-python.md": "python import_responsibility.py\n",
     "documents/coding-conventions-cpp.md": "cpp\n",
     "documents/coding-conventions-project.md": "project container_config.py\n",
     "documents/coding-conventions-house-style.md": "house\n",
@@ -67,8 +71,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
     ),
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
-    "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py\n",
-    "tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py\n",
+    "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
+    "tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
     "agents/canonical/CODEX_WORKFLOW.md": (
         "Close-Out Prohibitions\n"
         "user-facing completion\n"
@@ -117,10 +122,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_github_workflows.py\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        + "".join(f"{marker}\n" for marker in AGENT_CANON_PUSH_REMOTE_MARKERS)
     ),
     "tools/ci/run_all_checks.sh": (
         "check_hardcoded_numbers.py check_static_any.py "
-        "check_log_helper_names.py check_convention_compliance.py "
+        "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py\n"
     ),
@@ -134,6 +140,7 @@ MINIMAL_AGENT_TOOLS = (
     "check_hardcoded_numbers.py",
     "check_static_any.py",
     "check_log_helper_names.py",
+    "import_responsibility.py",
     "evaluate_skill_workflow_prompts.py",
     "evaluate_agent_run.py",
     "check_convention_compliance.py",
@@ -244,6 +251,28 @@ class CheckConventionComplianceTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["findings"])
+
+    def test_agentcanon_pr_workflow_requires_remote_verification_guard(self) -> None:
+        """The AgentCanon PR workflow must keep every remote verification marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
+                with self.subTest(marker=marker):
+                    workflow = root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+                    workflow.write_text(
+                        MINIMAL_REPO_FILES["agents/workflows/agent-canon-pr-workflow.md"].replace(
+                            f"{marker}\n",
+                            "",
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    result = self.run_checker(root)
+
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn("agentcanon_push_remote_guard", result.stdout)
+                    self.assertIn(f"missing-marker:{marker}", result.stdout)
 
     def test_missing_surface_manifest_marker_fails(self) -> None:
         """Shared surface docs must stay manifest-backed and complete."""

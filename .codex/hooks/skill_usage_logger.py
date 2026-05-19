@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Logs Codex skill usage signals from hook payloads.
+# responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
 # upstream design ../../agents/evals/README.md requires skill-use eval evidence.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
@@ -27,6 +27,11 @@ WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
+WORKFLOW_FIELD_RE = re.compile(
+    r"(?:^|[^A-Za-z0-9_-])(?:workflow|workflow_family|selected_workflow)="
+    r"([^\n\r]+?)(?=\s+(?:skills|skill_invocation|review|status|source|request_kind|"
+    r"tool_preflight_required|mcp_inventory_required)=|$)"
+)
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -54,6 +59,14 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
     "run_docs_checks.sh": ("run_docs_checks.sh", "docs-check", "markdownlint"),
 }
+SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
+    "task": "spawn",
+    "spawn_agent": "spawn",
+    "send_input": "send_input",
+    "wait_agent": "wait",
+    "close_agent": "close",
+    "resume_agent": "resume",
+}
 PROMPT_EXCERPT_LIMIT = 600
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
@@ -73,6 +86,7 @@ class PromptIntakeSignals:
     """Classified prompt signals written by the skill usage hook."""
 
     skills: tuple[str, ...]
+    selected_workflows: tuple[str, ...]
     candidate_skills: tuple[str, ...]
     candidate_workflows: tuple[str, ...]
     candidate_tools: tuple[str, ...]
@@ -83,6 +97,7 @@ class PromptIntakeSignals:
         """Return whether this payload contains durable prompt-intake evidence."""
         return bool(
             self.skills
+            or self.selected_workflows
             or self.candidate_skills
             or self.candidate_workflows
             or self.candidate_tools
@@ -128,6 +143,42 @@ class ToolSelection:
     def should_log(self) -> bool:
         """Return whether tool selection evidence exists."""
         return bool(self.tool_name)
+
+
+@dataclass(frozen=True)
+class SubagentSelection:
+    """PostToolUse subagent lifecycle evidence."""
+
+    invoked: bool
+    action: str
+    tool_name: str
+    agent_type: str
+    target: str
+    targets: tuple[str, ...]
+    model: str
+    reasoning_effort: str
+    fork_context: bool
+    prompt_fingerprint: str
+    prompt_char_count: int
+    item_count: int
+
+    def should_log(self) -> bool:
+        """Return whether this payload represents subagent activity."""
+        return self.invoked
+
+
+@dataclass(frozen=True)
+class SkillUsageLogInputs:
+    """Grouped inputs for one skill usage log append."""
+
+    payload: dict[str, object]
+    root: Path
+    signals: PromptIntakeSignals
+    prompt: PromptCapture
+    tool: ToolSelection
+    subagent: SubagentSelection
+    workflow_event_count: int
+    workflow_feedback_count: int
 
 
 def load_payload() -> dict[str, object]:
@@ -192,6 +243,22 @@ def extract_skill_ids(text: str) -> set[str]:
     return {skill for skill in skills if SKILL_ID_RE.fullmatch(skill)}
 
 
+def clean_routing_value(value: str) -> str:
+    """Return a display-safe routing field value."""
+    return value.strip().strip("`'\"[](){}<>.,;")
+
+
+def extract_workflow_names(text: str) -> set[str]:
+    """Extract declared workflow names from one text payload."""
+    workflows: set[str] = set()
+    for match in WORKFLOW_FIELD_RE.finditer(text):
+        for raw_value in re.split(r"[,;|]", match.group(1)):
+            value = clean_routing_value(raw_value)
+            if value and value.casefold() not in {"family", "unspecified"}:
+                workflows.add(value)
+    return workflows
+
+
 def observed_text(payload: dict[str, object]) -> list[str]:
     """Return hook payload text fields relevant for skill-use discovery."""
     texts: list[str] = []
@@ -248,6 +315,14 @@ def observed_skills(payload: dict[str, object]) -> list[str]:
     return sorted(skills)
 
 
+def observed_workflows(payload: dict[str, object]) -> list[str]:
+    """Return sorted unique declared workflow names observed in a hook payload."""
+    workflows: set[str] = set()
+    for text in observed_text(payload):
+        workflows.update(extract_workflow_names(text))
+    return sorted(workflows)
+
+
 def keyword_matches(texts: list[str], mapping: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
     """Return mapping keys whose keywords appear in observed prompt text."""
     haystack = "\n".join(texts).lower()
@@ -273,6 +348,7 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     labels = keyword_matches(texts, FEEDBACK_KEYWORDS)
     return PromptIntakeSignals(
         skills=tuple(observed_skills(payload)),
+        selected_workflows=tuple(observed_workflows(payload)),
         candidate_skills=keyword_matches(texts, SKILL_KEYWORDS),
         candidate_workflows=keyword_matches(texts, WORKFLOW_KEYWORDS),
         candidate_tools=keyword_matches(texts, TOOL_KEYWORDS),
@@ -292,6 +368,71 @@ def tool_selection(payload: dict[str, object]) -> ToolSelection:
         tool_input_key_count=len(keys),
         tool_input_keys=keys,
         command_verb=command_verb(tool_input),
+    )
+
+
+def normalized_tool_name(tool_name: str) -> str:
+    """Return a normalized tool name without namespace prefixes."""
+    normalized = tool_name.strip()
+    if "." in normalized:
+        normalized = normalized.rsplit(".", 1)[-1]
+    return normalized
+
+
+def tool_input_dict(payload: dict[str, object]) -> dict[str, object]:
+    """Return the tool input object when it is a mapping."""
+    value = payload.get("tool_input")
+    return value if isinstance(value, dict) else {}
+
+
+def string_input_field(tool_input: dict[str, object], *keys: str) -> str:
+    """Return the first non-empty string value from tool input keys."""
+    for key in keys:
+        value = tool_input.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def string_sequence_input_field(tool_input: dict[str, object], *keys: str) -> tuple[str, ...]:
+    """Return string values from the first list-like tool input key."""
+    for key in keys:
+        value = tool_input.get(key)
+        if isinstance(value, list):
+            return tuple(item for item in value if isinstance(item, str) and item)
+    return ()
+
+
+def subagent_prompt_text(tool_input: dict[str, object]) -> str:
+    """Return subagent prompt-like text for fingerprint-only logging."""
+    value = tool_input.get("message")
+    if isinstance(value, str):
+        return value
+    return "\n".join(text_values(tool_input.get("items")))
+
+
+def subagent_selection(payload: dict[str, object]) -> SubagentSelection:
+    """Return subagent selection or lifecycle evidence from a PostToolUse payload."""
+    tool_name = str(payload.get("tool_name") or "")
+    normalized_name = normalized_tool_name(tool_name).casefold()
+    tool_input = tool_input_dict(payload)
+    action = SUBAGENT_TOOL_ACTIONS.get(normalized_name, "")
+    prompt = subagent_prompt_text(tool_input)
+    targets = string_sequence_input_field(tool_input, "targets")
+    target = string_input_field(tool_input, "target", "id")
+    return SubagentSelection(
+        invoked=bool(action),
+        action=action,
+        tool_name=tool_name,
+        agent_type=string_input_field(tool_input, "agent_type", "subagent_type"),
+        target=target,
+        targets=targets,
+        model=string_input_field(tool_input, "model"),
+        reasoning_effort=string_input_field(tool_input, "reasoning_effort"),
+        fork_context=tool_input.get("fork_context") is True,
+        prompt_fingerprint=sha256(prompt.encode("utf-8")).hexdigest()[:16] if prompt else "",
+        prompt_char_count=len(prompt),
+        item_count=len(tool_input.get("items")) if isinstance(tool_input.get("items"), list) else 0,
     )
 
 
@@ -386,23 +527,20 @@ def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> 
     return skill_event_count, feedback_event_count
 
 
-def main() -> int:
+def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
     """Append one skill usage hook log entry."""
-    payload = load_payload()
-    root = repo_root()
-    signals = prompt_intake_signals(payload)
-    prompt = prompt_capture(payload)
-    tool = tool_selection(payload)
-    if not (signals.should_log() or prompt.should_log() or tool.should_log()):
-        return 0
-    text_sources = observed_text_sources(payload)
-    text_values_seen = observed_text(payload)
-    workflow_event_count, workflow_feedback_count = append_workflow_monitor_events(root, signals)
+    payload = inputs.payload
+    signals = inputs.signals
+    prompt = inputs.prompt
+    tool = inputs.tool
+    subagent = inputs.subagent
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
-    context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
+    context = HookLogContext(inputs.root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
+    text_sources = observed_text_sources(payload)
+    text_values_seen = observed_text(payload)
     _log_append_log(
-        root,
+        inputs.root,
         {
             "hook_run_id": context.run_id(timestamp, payload_fingerprint),
             "hook_log_namespace": context.runtime_namespace(),
@@ -410,7 +548,15 @@ def main() -> int:
             "event": hook_event_name(payload),
             "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
             "skills": list(signals.skills),
+            "selected_skills": list(signals.skills),
+            "skill_selection_kind": "declared_skill" if signals.skills else "",
             "skill_count": len(signals.skills),
+            "selected_workflow": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "selected_workflows": list(signals.selected_workflows),
+            "workflow": list(signals.selected_workflows),
+            "workflow_family": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "workflow_selection_kind": "declared_workflow" if signals.selected_workflows else "",
+            "selected_workflow_count": len(signals.selected_workflows),
             "candidate_skills": list(signals.candidate_skills),
             "candidate_skill_count": len(signals.candidate_skills),
             "candidate_workflows": list(signals.candidate_workflows),
@@ -428,6 +574,19 @@ def main() -> int:
             "tool_input_key_count": tool.tool_input_key_count,
             "tool_input_keys": list(tool.tool_input_keys),
             "tool_command_verb": tool.command_verb,
+            "subagent_invoked": subagent.invoked,
+            "subagent_event_kind": subagent.action,
+            "subagent_tool_name": subagent.tool_name,
+            "subagent_agent_type": subagent.agent_type,
+            "subagent_target": subagent.target,
+            "subagent_targets": list(subagent.targets),
+            "subagent_target_count": len(subagent.targets) + int(bool(subagent.target)),
+            "subagent_model": subagent.model,
+            "subagent_reasoning_effort": subagent.reasoning_effort,
+            "subagent_fork_context": subagent.fork_context,
+            "subagent_prompt_fingerprint": subagent.prompt_fingerprint,
+            "subagent_prompt_char_count": subagent.prompt_char_count,
+            "subagent_item_count": subagent.item_count,
             "prompt_feedback_detected": bool(signals.feedback_labels),
             "feedback_labels": list(signals.feedback_labels),
             "feedback_targets": list(signals.feedback_targets()),
@@ -438,11 +597,36 @@ def main() -> int:
             "payload_key_count": len(payload),
             "payload_fingerprint": payload_fingerprint,
             "status": "pass",
-            "workflow_monitor_event_count": workflow_event_count,
-            "workflow_monitor_feedback_count": workflow_feedback_count,
+            "workflow_monitor_event_count": inputs.workflow_event_count,
+            "workflow_monitor_feedback_count": inputs.workflow_feedback_count,
             "workflow_monitor_report_dir": workflow_monitor_report_dir(),
-            "root": str(root),
+            "root": str(inputs.root),
         },
+    )
+
+
+def main() -> int:
+    """Append one skill usage hook log entry."""
+    payload = load_payload()
+    root = repo_root()
+    signals = prompt_intake_signals(payload)
+    prompt = prompt_capture(payload)
+    tool = tool_selection(payload)
+    subagent = subagent_selection(payload)
+    if not (signals.should_log() or prompt.should_log() or tool.should_log() or subagent.should_log()):
+        return 0
+    workflow_event_count, workflow_feedback_count = append_workflow_monitor_events(root, signals)
+    append_skill_usage_entry(
+        SkillUsageLogInputs(
+            payload=payload,
+            root=root,
+            signals=signals,
+            prompt=prompt,
+            tool=tool,
+            subagent=subagent,
+            workflow_event_count=workflow_event_count,
+            workflow_feedback_count=workflow_feedback_count,
+        )
     )
     return 0
 

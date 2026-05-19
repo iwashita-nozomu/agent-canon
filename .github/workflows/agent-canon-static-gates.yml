@@ -4,8 +4,10 @@
 # upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
 # upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
+# upstream implementation ../../tools/agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../rust/agent-canon/src/local_llm.rs validates local LLM Rust CLI routing
 # upstream implementation ../../tools/agent_tools/local_llm_eval.py validates local LLM eval prompts
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist prompts
@@ -39,6 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: false
           persist-credentials: false
 
@@ -55,14 +58,23 @@ jobs:
       - name: Install static gate dependencies
         run: python3 -m pip install --upgrade pyyaml tomli
 
+      - name: Install Rust gate components
+        run: rustup component add rustfmt clippy
+
       - name: Run static gates
         run: |
+          cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
+          cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path rust/agent-canon/Cargo.toml
           python3 tools/agent_tools/tool_catalog.py
           python3 tools/agent_tools/tool_drift.py
           python3 tools/agent_tools/responsibility_scope.py
+          BASE_REF="${GITHUB_BASE_REF:-main}"
+          git fetch origin "${BASE_REF}" --depth=1 || true
+          python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
           python3 tools/agent_tools/issue_sync.py
           python3 tools/agent_tools/eval_accumulation_check.py
-          python3 tools/agent_tools/local_llm_eval.py
+          tools/bin/agent-canon local-llm eval
           python3 tools/agent_tools/evaluate_workflow_selection.py
           python3 tools/agent_tools/evaluate_report_quality.py
           bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing

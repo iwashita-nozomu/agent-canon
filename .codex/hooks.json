@@ -5,10 +5,16 @@
     "upstream implementation config.toml enables project-local Codex hooks",
     "upstream design README.md documents hook wiring and optional MCP checks",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
-    "downstream implementation hooks/skill_usage_logger.py logs observed skill usage",
+    "downstream implementation hooks/skill_usage_logger.py logs observed skill, workflow, tool, and subagent routing usage",
+    "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
+    "downstream implementation hooks/cause_investigation_guard.py blocks code edits before cause investigation evidence",
     "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
     "downstream implementation hooks/oop_readability_guard.py blocks current changed-source OOP readability failures",
+    "downstream implementation hooks/module_boundary_guard.py blocks forced module-internal rewrites without boundary evidence",
+    "downstream implementation hooks/library_implementation_guard.py blocks direct vendored library implementation rewrites",
     "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
+    "downstream implementation hooks/helper_first_guard.py blocks helper-function-first implementation drift",
+    "downstream implementation hooks/style_checker_guard.py runs changed-file style checks and logs unchecked edits",
     "downstream implementation hooks/log_surface_inventory_guard.py blocks hook/tool/skill log-surface inventory drift",
     "downstream implementation hooks/notebook_quality_guard.py blocks changed notebooks that behave like tests",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
@@ -29,19 +35,44 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
             "statusMessage": "Logging observed skill usage"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 10,
+            "statusMessage": "Logging reference capture requirements"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|python|python3",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/cause_investigation_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking cause investigation evidence before code edit"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|apply_patch|python|python3",
+        "matcher": "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
             "timeout": 10,
-            "statusMessage": "Logging tool selection"
+            "statusMessage": "Logging tool and subagent selection"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 15,
+            "statusMessage": "Checking referenced source capture"
           },
           {
             "type": "command",
@@ -51,9 +82,33 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking Python module boundaries"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking library implementation ownership"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking helper-first implementation drift"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/style_checker_guard.py\"",
+            "timeout": 90,
+            "statusMessage": "Checking changed-file style"
           },
           {
             "type": "command",
@@ -87,9 +142,33 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking Python module boundaries"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking library implementation ownership"
+          },
+          {
+            "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed helper inventory"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking helper-first implementation drift"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/style_checker_guard.py\"",
+            "timeout": 90,
+            "statusMessage": "Checking changed-file style"
           },
           {
             "type": "command",
@@ -102,6 +181,12 @@
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
             "timeout": 60,
             "statusMessage": "Checking changed notebooks"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
+            "timeout": 15,
+            "statusMessage": "Checking referenced source capture"
           },
           {
             "type": "command",
