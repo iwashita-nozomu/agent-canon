@@ -380,6 +380,22 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
+      "line": 284,
+      "path": ".codex/hooks/hook_dispatcher.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 344,
+      "path": ".codex/hooks/hook_dispatcher.py",
+      "surface": "hook"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
       "line": 59,
       "path": ".codex/hooks/hook_event_log.py",
       "surface": "hook"
@@ -9421,6 +9437,7 @@
     ".codex/hooks/goal_completion_guard.py",
     ".codex/hooks/helper_first_guard.py",
     ".codex/hooks/helper_inventory_guard.py",
+    ".codex/hooks/hook_dispatcher.py",
     ".codex/hooks/hook_event_log.py",
     ".codex/hooks/library_implementation_guard.py",
     ".codex/hooks/log_surface_inventory_guard.py",

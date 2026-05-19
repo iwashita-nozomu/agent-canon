@@ -33,6 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
+HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
@@ -368,6 +369,20 @@ class CodexHooksTest(unittest.TestCase):
         self.assertNotIn("codex_hooks", config_text)
         self.assertTrue(HOOKS_JSON.exists())
         self.assertTrue(HOOK_SCRIPT.exists())
+        self.assertTrue(HOOK_DISPATCHER.exists())
+
+    def _dispatcher_scripts(self, event: str) -> list[str]:
+        """Return the child hook scripts configured for one dispatcher event."""
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "--list", event],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        events = cast("dict[str, list[dict[str, object]]]", payload["events"])
+        return [cast(str, row["script"]) for row in events[event]]
 
     def test_hooks_json_does_not_wire_mcp_context_hook(self) -> None:
         """MCP context is not a startup hook; active hooks stay guardrail-only."""
@@ -387,40 +402,276 @@ class CodexHooksTest(unittest.TestCase):
         post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
+        prompt_scripts = self._dispatcher_scripts("UserPromptSubmit")
+        pre_tool_scripts = self._dispatcher_scripts("PreToolUse")
+        post_tool_scripts = self._dispatcher_scripts("PostToolUse")
+        stop_scripts = self._dispatcher_scripts("Stop")
 
         self.assertFalse(
             any("mcp_session_context.sh" in command for command in session_start_commands)
         )
         self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
-        self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
-        self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in prompt_commands))
+        self.assertEqual(len(prompt_commands), 1)
+        self.assertIn("hook_dispatcher.py", prompt_commands[0])
+        self.assertEqual(
+            prompt_scripts,
+            [
+                "prompt_secret_guard.py",
+                "skill_usage_logger.py",
+                "reference_capture_guard.py",
+            ],
+        )
         self.assertIn("apply_patch", pre_tool["matcher"])
-        self.assertTrue(any("cause_investigation_guard.py" in command for command in pre_tool_commands))
+        self.assertEqual(len(pre_tool_commands), 1)
+        self.assertIn("hook_dispatcher.py", pre_tool_commands[0])
+        self.assertEqual(pre_tool_scripts, ["cause_investigation_guard.py"])
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertIn("spawn_agent", post_tool["matcher"])
         self.assertIn("close_agent", post_tool["matcher"])
-        self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("module_boundary_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("library_implementation_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("helper_first_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("module_boundary_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("library_implementation_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("helper_first_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("notebook_quality_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("notebook_quality_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("style_checker_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("style_checker_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in stop_commands))
+        self.assertEqual(len(post_tool_commands), 1)
+        self.assertIn("hook_dispatcher.py", post_tool_commands[0])
+        self.assertEqual(
+            post_tool_scripts,
+            [
+                "skill_usage_logger.py",
+                "reference_capture_guard.py",
+                "oop_readability_guard.py",
+                "module_boundary_guard.py",
+                "library_implementation_guard.py",
+                "helper_inventory_guard.py",
+                "helper_first_guard.py",
+                "style_checker_guard.py",
+                "log_surface_inventory_guard.py",
+                "notebook_quality_guard.py",
+            ],
+        )
+        self.assertEqual(len(stop_commands), 1)
+        self.assertIn("hook_dispatcher.py", stop_commands[0])
+        self.assertEqual(
+            stop_scripts,
+            [
+                "goal_completion_guard.py",
+                "oop_readability_guard.py",
+                "module_boundary_guard.py",
+                "library_implementation_guard.py",
+                "helper_inventory_guard.py",
+                "helper_first_guard.py",
+                "style_checker_guard.py",
+                "log_surface_inventory_guard.py",
+                "notebook_quality_guard.py",
+                "reference_capture_guard.py",
+                "skill_usage_logger.py",
+            ],
+        )
+
+    def test_hooks_json_command_counts_contract(self) -> None:
+        """Active hook configuration should stay collapsed to one command per event."""
+        hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
+        counts = {
+            event: sum(len(group.get("hooks", [])) for group in groups)
+            for event, groups in hooks["hooks"].items()
+        }
+        commands_by_event = {
+            event: [
+                hook["command"]
+                for group in groups
+                for hook in group.get("hooks", [])
+            ]
+            for event, groups in hooks["hooks"].items()
+        }
+
+        self.assertEqual(
+            counts,
+            {
+                "UserPromptSubmit": 1,
+                "PreToolUse": 1,
+                "PostToolUse": 1,
+                "Stop": 1,
+            },
+        )
+        self.assertEqual(sum(counts.values()), 4)
+        for event, commands in commands_by_event.items():
+            self.assertEqual(len(commands), len(set(commands)), event)
+            self.assertTrue(all("hook_dispatcher.py" in command for command in commands))
+
+    def test_hook_dispatcher_runs_all_children_and_returns_first_block(self) -> None:
+        """Dispatcher should preserve order while still giving every child a log chance."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            child_payloads = {
+                "prompt_secret_guard.py": {"decision": "block", "reason": "first block"},
+                "skill_usage_logger.py": None,
+                "reference_capture_guard.py": {"decision": "block", "reason": "later block"},
+            }
+            for script_name, output_payload in child_payloads.items():
+                output_json = json.dumps(output_payload) if output_payload else ""
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "import sys",
+                            f"script_name = {script_name!r}",
+                            "payload = sys.stdin.read()",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write(f'{script_name}:{len(payload)}\\n')",
+                            f"output = {output_json!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            invocations = log_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["reason"], "first block")
+        self.assertEqual(
+            invocations,
+            [
+                "prompt_secret_guard.py:12",
+                "skill_usage_logger.py:12",
+                "reference_capture_guard.py:12",
+            ],
+        )
+
+    def test_hook_dispatcher_child_launch_failure_returns_block_after_later_hooks(self) -> None:
+        """Dispatcher should report child launch failures without skipping later hooks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "import sys",
+                        "payload = sys.stdin.read()",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write(f'skill_usage_logger.py:{len(payload)}\\n')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (hook_dir / "reference_capture_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "import sys",
+                        "payload = sys.stdin.read()",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write(f'reference_capture_guard.py:{len(payload)}\\n')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            invocations = log_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("prompt_secret_guard.py", cast(str, payload["reason"]))
+        self.assertEqual(
+            invocations,
+            [
+                "skill_usage_logger.py:12",
+                "reference_capture_guard.py:12",
+            ],
+        )
+
+    def test_hook_dispatcher_combines_non_blocking_visible_outputs(self) -> None:
+        """Dispatcher should not drop later non-blocking child diagnostics."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            outputs = {
+                "prompt_secret_guard.py": {
+                    "decision": "approve",
+                    "reason": "first warning",
+                    "next_action": "first_action",
+                    "remediation": ["first remediation"],
+                },
+                "skill_usage_logger.py": "plain diagnostic",
+                "reference_capture_guard.py": "",
+            }
+            for script_name, output_payload in outputs.items():
+                if isinstance(output_payload, dict):
+                    output_text = json.dumps(output_payload)
+                else:
+                    output_text = output_payload
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            f"output = {output_text!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+
+        self.assertEqual(payload["decision"], "approve")
+        self.assertEqual(payload["child_output_count"], 2)
+        self.assertIn("first warning", cast(str, payload["reason"]))
+        self.assertIn("plain diagnostic", cast(str, payload["reason"]))
+        self.assertEqual(payload["next_action"], "first_action")
 
     def test_style_checker_guard_logs_markdown_and_unchecked_files(self) -> None:
         """Style hook should select Markdown checks and log changed files without a checker."""
