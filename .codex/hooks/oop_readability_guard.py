@@ -476,7 +476,13 @@ def emit_warning(results: list[AnalyzerResult]) -> None:
                 "run the listed checker(s) before closeout and either fix the findings or "
                 "record the approved OOP boundary.\n\n"
                 + "\n\n".join(snippets)
-            )
+            ),
+            "next_action": "fix_oop_readability_findings_or_record_boundary_approval",
+            "remediation": [
+                "Run the listed OOP readability checker command.",
+                "Fix readability findings before closeout when they are in the intended edit scope.",
+                "If findings are accepted, record the owning boundary and approval evidence.",
+            ],
         },
         sys.stdout,
     )

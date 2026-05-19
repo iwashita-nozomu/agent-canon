@@ -477,6 +477,12 @@ def block_payload(results: tuple[StyleResult, ...]) -> dict[str, object]:
             "Style checker hook blocked changed files. Fix the selected style "
             f"checker findings before continuing.\n{detail}"
         ).strip(),
+        "next_action": "run_selected_style_checkers_and_fix_findings",
+        "remediation": [
+            "Run the checker family shown in the reason for each changed file group.",
+            "Fix the formatting or style findings before retrying the tool action.",
+            "If a changed file type is unsupported, add checker coverage or record explicit unchecked-file evidence.",
+        ],
     }
 
 

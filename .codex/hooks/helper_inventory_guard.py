@@ -442,10 +442,33 @@ def main() -> int:
         },
     )
     if returncode != 0:
-        json.dump({"decision": "block", "reason": output}, sys.stdout)
+        json.dump(
+            {
+                "decision": "block",
+                "reason": output,
+                "next_action": "fix_helper_inventory_command_then_retry",
+                "remediation": [
+                    "Run `python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD`.",
+                    "Fix the inventory command failure before continuing helper-like edits.",
+                ],
+            },
+            sys.stdout,
+        )
         sys.stdout.write("\n")
     elif violations:
-        json.dump({"decision": "block", "reason": _reason(command, violations, counts)}, sys.stdout)
+        json.dump(
+            {
+                "decision": "block",
+                "reason": _reason(command, violations, counts),
+                "next_action": "reuse_or_justify_helper_like_additions",
+                "remediation": [
+                    "Reuse or extend existing helper surfaces when possible.",
+                    "Add ownership and boundary evidence for remaining helper-like additions.",
+                    "Re-run helper inventory before continuing.",
+                ],
+            },
+            sys.stdout,
+        )
         sys.stdout.write("\n")
     return 0
 

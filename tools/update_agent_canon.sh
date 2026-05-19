@@ -138,7 +138,33 @@ restore_original_submodule_ref() {
   git -C "$ROOT_DIR/$PREFIX" checkout --detach "$original_head" >/dev/null
 }
 
+stash_ref_for_sha() {
+  local stash_sha="$1"
+  git -C "$ROOT_DIR/$PREFIX" stash list --format='%gd %H' \
+    | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
+}
+
+drop_stash_sha_if_present() {
+  local stash_sha="$1"
+  local stash_ref=""
+  stash_ref="$(stash_ref_for_sha "$stash_sha")"
+  [ -n "$stash_ref" ] || return 0
+  git -C "$ROOT_DIR/$PREFIX" stash drop "$stash_ref" >/dev/null
+}
+
+remove_eval_log_worktree() {
+  local worktree_path="$1"
+  local branch="$2"
+  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
+    git -C "$ROOT_DIR/$PREFIX" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" branch -D "$branch" >/dev/null 2>&1 || true
+  fi
+}
+
 resolve_eval_jsonl_conflicts() {
+  local worktree_root="$1"
   local conflict_path=""
   local tmp_dir=""
   local unresolved=""
@@ -150,15 +176,15 @@ resolve_eval_jsonl_conflicts() {
       return 1
     fi
     tmp_dir="$(mktemp -d)"
-    git -C "$ROOT_DIR/$PREFIX" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
-    git -C "$ROOT_DIR/$PREFIX" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
-    mkdir -p "$(dirname "$ROOT_DIR/$PREFIX/$conflict_path")"
-    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$ROOT_DIR/$PREFIX/$conflict_path"
+    git -C "$worktree_root" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
+    git -C "$worktree_root" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
+    mkdir -p "$(dirname "$worktree_root/$conflict_path")"
+    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$worktree_root/$conflict_path"
     rm -rf "$tmp_dir"
-    git -C "$ROOT_DIR/$PREFIX" add "$conflict_path"
-  done < <(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U)
+    git -C "$worktree_root" add "$conflict_path"
+  done < <(git -C "$worktree_root" diff --name-only --diff-filter=U)
 
-  unresolved="$(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U)"
+  unresolved="$(git -C "$worktree_root" diff --name-only --diff-filter=U)"
   [ -z "$unresolved" ]
 }
 
@@ -169,10 +195,13 @@ park_eval_log_dirty_state_if_safe() {
   local current_branch=""
   local current_head=""
   local log_branch=""
+  local log_start_ref=""
   local stash_sha=""
-  local pop_log=""
-  local pop_rc=0
+  local apply_log=""
+  local apply_rc=0
   local commit_sha=""
+  local tmp_worktree=""
+  local tmp_branch=""
   local -a paths=()
 
   ensure_agent_canon_submodule
@@ -196,6 +225,7 @@ park_eval_log_dirty_state_if_safe() {
   current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   current_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
   log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
+  tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 
   echo "AGENT_CANON_EVAL_LOG_PARK=started"
   echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
@@ -203,44 +233,42 @@ park_eval_log_dirty_state_if_safe() {
   stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
 
   git -C "$ROOT_DIR/$PREFIX" fetch origin "$log_branch" >/dev/null 2>&1 || true
-  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
-    git -C "$ROOT_DIR/$PREFIX" switch "$log_branch" >/dev/null
-  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
-    git -C "$ROOT_DIR/$PREFIX" switch --track -c "$log_branch" "origin/$log_branch" >/dev/null
+  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
+    log_start_ref="origin/$log_branch"
+  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
+    log_start_ref="$log_branch"
   else
-    git -C "$ROOT_DIR/$PREFIX" switch -c "$log_branch" "$current_head" >/dev/null
+    log_start_ref="$current_head"
   fi
-  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch" \
-    && git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor HEAD "origin/$log_branch"; then
-    git -C "$ROOT_DIR/$PREFIX" merge --ff-only "origin/$log_branch" >/dev/null
-  fi
+  tmp_worktree="$(mktemp -d)"
+  git -C "$ROOT_DIR/$PREFIX" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
 
-  pop_log="$(mktemp)"
-  git -C "$ROOT_DIR/$PREFIX" stash pop >"$pop_log" 2>&1 || pop_rc=$?
-  if [ "$pop_rc" -ne 0 ]; then
-    if ! resolve_eval_jsonl_conflicts; then
-      cat "$pop_log" >&2
-      rm -f "$pop_log"
-      return "$pop_rc"
-    fi
-    if [ "$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash 2>/dev/null || true)" = "$stash_sha" ]; then
-      git -C "$ROOT_DIR/$PREFIX" stash drop stash@{0} >/dev/null
+  apply_log="$(mktemp)"
+  git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
+  if [ "$apply_rc" -ne 0 ]; then
+    if ! resolve_eval_jsonl_conflicts "$tmp_worktree"; then
+      cat "$apply_log" >&2
+      rm -f "$apply_log"
+      remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+      return "$apply_rc"
     fi
   fi
-  rm -f "$pop_log"
+  rm -f "$apply_log"
 
-  git -C "$ROOT_DIR/$PREFIX" add -- "${paths[@]}"
-  if git -C "$ROOT_DIR/$PREFIX" diff --cached --quiet; then
+  git -C "$tmp_worktree" add -- "${paths[@]}"
+  if git -C "$tmp_worktree" diff --cached --quiet; then
     echo "AGENT_CANON_EVAL_LOG_PARK=noop"
-    restore_original_submodule_ref "$current_branch" "$current_head"
+    drop_stash_sha_if_present "$stash_sha"
+    remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
     return 0
   fi
-  git -C "$ROOT_DIR/$PREFIX" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
-  commit_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
-  git -C "$ROOT_DIR/$PREFIX" push -u origin "$log_branch" >/dev/null
+  git -C "$tmp_worktree" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
+  git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
+  drop_stash_sha_if_present "$stash_sha"
+  remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
   echo "AGENT_CANON_EVAL_LOG_PARK=committed"
   echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
-  restore_original_submodule_ref "$current_branch" "$current_head"
 }
 
 parent_pin() {

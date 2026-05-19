@@ -542,6 +542,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("public-surface-change-without-evidence", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn("next_action", payload)
+        self.assertIn("remediation", payload)
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["changed_module_count"], 1)
 
@@ -1085,6 +1087,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("Style checker hook", cast(str, payload["reason"]))
+        self.assertEqual(payload["next_action"], "run_selected_style_checkers_and_fix_findings")
+        self.assertTrue(payload["remediation"])
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["selected_checkers"], ["ruff"])
         self.assertEqual(log_entry["unchecked_count"], 0)
@@ -1147,6 +1151,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("API key", payload["reason"])
+        self.assertEqual(payload["next_action"], "remove_secret_or_use_redacted_placeholder_then_retry")
+        self.assertTrue(payload["remediation"])
 
     def test_goal_completion_guard_blocks_active_goal_completion(self) -> None:
         """Stop hook should continue when a completion-like answer races active goal state."""
@@ -1176,6 +1182,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])
+        self.assertEqual(payload["next_action"], "run_next_goal_iteration_or_update_goal_evidence")
+        self.assertTrue(payload["remediation"])
 
     def test_oop_readability_guard_warns_changed_python_findings(self) -> None:
         """OOP guard should warn after source edits when changed Python fails."""
@@ -2170,6 +2178,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("reference_materializer.py", payload["reason"])
+        self.assertEqual(payload["next_action"], "materialize_external_references_then_retry")
+        self.assertTrue(payload["remediation"])
         self.assertEqual(entry["missing_count"], 1)
         self.assertEqual(entry["status"], "fail")
 

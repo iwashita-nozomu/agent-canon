@@ -402,6 +402,12 @@ def block_payload(
             "responsibility checks, add tests or boundary evidence, or reduce "
             "the edit to the owning scope before continuing."
         ),
+        "next_action": "run_import_responsibility_and_add_boundary_evidence",
+        "remediation": [
+            "Run `python3 tools/agent_tools/import_responsibility.py --root . <changed-python-files>`.",
+            "Move the change to the owning module or reduce it to the current module boundary.",
+            "Add tests or boundary evidence before retrying broad module edits.",
+        ],
         "findings": details,
     }
 

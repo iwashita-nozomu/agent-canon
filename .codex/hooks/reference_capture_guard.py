@@ -277,6 +277,12 @@ def block_payload(missing_urls: tuple[str, ...]) -> dict[str, object]:
             "--input <downloaded.pdf-or.html>\n"
             f"{shown}"
         ).strip(),
+        "next_action": "materialize_external_references_then_retry",
+        "remediation": [
+            "Download or capture the referenced PDF/HTML source.",
+            "Run `python3 tools/agent_tools/reference_materializer.py --url <url> --input <downloaded.pdf-or-html>`.",
+            "Commit the resulting references/ Markdown artifact or cite an existing registered reference.",
+        ],
     }
 
 
