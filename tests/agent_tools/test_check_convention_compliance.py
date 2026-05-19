@@ -15,7 +15,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.check_convention_compliance import AGENT_CANON_PUSH_REMOTE_MARKERS
+from tools.agent_tools.check_convention_compliance import (
+    AGENT_CANON_PUSH_REMOTE_MARKERS,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
