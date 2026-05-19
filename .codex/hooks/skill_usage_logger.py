@@ -27,6 +27,11 @@ WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
+WORKFLOW_FIELD_RE = re.compile(
+    r"(?:^|[^A-Za-z0-9_-])(?:workflow|workflow_family|selected_workflow)="
+    r"([^\n\r]+?)(?=\s+(?:skills|skill_invocation|review|status|source|request_kind|"
+    r"tool_preflight_required|mcp_inventory_required)=|$)"
+)
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -73,6 +78,7 @@ class PromptIntakeSignals:
     """Classified prompt signals written by the skill usage hook."""
 
     skills: tuple[str, ...]
+    selected_workflows: tuple[str, ...]
     candidate_skills: tuple[str, ...]
     candidate_workflows: tuple[str, ...]
     candidate_tools: tuple[str, ...]
@@ -83,6 +89,7 @@ class PromptIntakeSignals:
         """Return whether this payload contains durable prompt-intake evidence."""
         return bool(
             self.skills
+            or self.selected_workflows
             or self.candidate_skills
             or self.candidate_workflows
             or self.candidate_tools
@@ -192,6 +199,22 @@ def extract_skill_ids(text: str) -> set[str]:
     return {skill for skill in skills if SKILL_ID_RE.fullmatch(skill)}
 
 
+def clean_routing_value(value: str) -> str:
+    """Return a display-safe routing field value."""
+    return value.strip().strip("`'\"[](){}<>.,;")
+
+
+def extract_workflow_names(text: str) -> set[str]:
+    """Extract declared workflow names from one text payload."""
+    workflows: set[str] = set()
+    for match in WORKFLOW_FIELD_RE.finditer(text):
+        for raw_value in re.split(r"[,;|]", match.group(1)):
+            value = clean_routing_value(raw_value)
+            if value and value.casefold() not in {"family", "unspecified"}:
+                workflows.add(value)
+    return workflows
+
+
 def observed_text(payload: dict[str, object]) -> list[str]:
     """Return hook payload text fields relevant for skill-use discovery."""
     texts: list[str] = []
@@ -248,6 +271,14 @@ def observed_skills(payload: dict[str, object]) -> list[str]:
     return sorted(skills)
 
 
+def observed_workflows(payload: dict[str, object]) -> list[str]:
+    """Return sorted unique declared workflow names observed in a hook payload."""
+    workflows: set[str] = set()
+    for text in observed_text(payload):
+        workflows.update(extract_workflow_names(text))
+    return sorted(workflows)
+
+
 def keyword_matches(texts: list[str], mapping: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
     """Return mapping keys whose keywords appear in observed prompt text."""
     haystack = "\n".join(texts).lower()
@@ -273,6 +304,7 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     labels = keyword_matches(texts, FEEDBACK_KEYWORDS)
     return PromptIntakeSignals(
         skills=tuple(observed_skills(payload)),
+        selected_workflows=tuple(observed_workflows(payload)),
         candidate_skills=keyword_matches(texts, SKILL_KEYWORDS),
         candidate_workflows=keyword_matches(texts, WORKFLOW_KEYWORDS),
         candidate_tools=keyword_matches(texts, TOOL_KEYWORDS),
@@ -410,7 +442,15 @@ def main() -> int:
             "event": hook_event_name(payload),
             "event_fallback": hook_event_name(payload) == "UnknownHookEvent",
             "skills": list(signals.skills),
+            "selected_skills": list(signals.skills),
+            "skill_selection_kind": "declared_skill" if signals.skills else "",
             "skill_count": len(signals.skills),
+            "selected_workflow": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "selected_workflows": list(signals.selected_workflows),
+            "workflow": list(signals.selected_workflows),
+            "workflow_family": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "workflow_selection_kind": "declared_workflow" if signals.selected_workflows else "",
+            "selected_workflow_count": len(signals.selected_workflows),
             "candidate_skills": list(signals.candidate_skills),
             "candidate_skill_count": len(signals.candidate_skills),
             "candidate_workflows": list(signals.candidate_workflows),

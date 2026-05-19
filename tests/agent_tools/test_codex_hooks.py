@@ -1687,6 +1687,14 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(entries[1]["event"], "Stop")
         self.assertEqual(entries[1]["skills"], ["change-review"])
+        self.assertEqual(entries[1]["selected_skills"], ["change-review"])
+        self.assertEqual(entries[1]["skill_selection_kind"], "declared_skill")
+        self.assertEqual(entries[1]["selected_workflow"], "Scoped Change")
+        self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
+        self.assertEqual(entries[1]["workflow"], ["Scoped Change"])
+        self.assertEqual(entries[1]["workflow_family"], "Scoped Change")
+        self.assertEqual(entries[1]["workflow_selection_kind"], "declared_workflow")
+        self.assertEqual(entries[1]["selected_workflow_count"], 1)
         self.assertEqual(entries[2]["skills"], ["skill-creator"])
         self.assertTrue(all(entry["hook_run_id"].startswith("hook-") for entry in entries))
         self.assertTrue(all(entry["payload_fingerprint"] for entry in entries))
@@ -1825,6 +1833,38 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["tool_command_verb"], "python3")
         self.assertEqual(entry["tool_input_keys"], ["cmd"])
         self.assertTrue(entry["tool_input_fingerprint"])
+
+    def test_skill_usage_logger_records_start_declaration_selection(self) -> None:
+        """Selection logging should parse workflow and skills from start declarations."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": (
+                            "START_DECLARATION=workflow=Comprehensive Development, "
+                            "skills=$agent-orchestration,$codex-task-workflow, "
+                            "review=local"
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["selected_workflow"], "Comprehensive Development")
+        self.assertEqual(entry["selected_workflows"], ["Comprehensive Development"])
+        self.assertEqual(entry["workflow_selection_kind"], "declared_workflow")
+        self.assertEqual(entry["selected_skills"], ["agent-orchestration", "codex-task-workflow"])
 
     def test_skill_usage_logger_records_markdown_docs_signals(self) -> None:
         """Markdown prompts and docs-check commands should be measurable later."""
