@@ -73,7 +73,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
 
     def test_stale_github_copy_fails(self) -> None:
-        """GitHub path constraint copies must match their AgentCanon source."""
+        """Copied GitHub path constraint files must match their AgentCanon source."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
