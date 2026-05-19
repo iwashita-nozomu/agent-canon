@@ -8,6 +8,7 @@ upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/mcp_session_context.sh provides optional MCP context text
+downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
 downstream implementation ./hooks/cause_investigation_guard.py blocks code edits without cause investigation evidence
 downstream implementation ./hooks/module_boundary_guard.py blocks forced module rewrites
@@ -132,6 +133,7 @@ or high-risk review. Profiles do not waive workflow gates.
 ## Hook Context
 
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
+- `hooks.json` は active lifecycle event ごとに `hooks/hook_dispatcher.py` を 1 回だけ起動し、dispatcher が既存 guard scripts を順番に実行します。これにより hook 設定は少数の event entry に保ちつつ、個別 guard の責務、ログ、環境変数 override は維持します。
 - `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
 - `hooks/mcp_session_context.sh` は互換用の手動 context helper として残します。通常の Codex session startup / resume では呼び出しません。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
@@ -146,6 +148,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `Stop` は `hooks/goal_completion_guard.py` で、`goal.md` が `NEXT_ACTION=run_next_iteration` のまま完了報告しそうな turn を継続させます。
 - `Stop` でも `hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` を再実行し、hook を迂回した変更が残っていれば completion を block します。
 - OOP hook の既定 mode は `full` です。ユーザーが明示的に差分だけを見たい場合だけ `AGENT_CANON_OOP_HOOK_MODE=diff` を設定し、必要に応じて `AGENT_CANON_OOP_HOOK_BASELINE_REF` で比較 ref を指定します。未指定時の diff baseline は `HEAD` です。
+- dispatcher は元の stdin payload を各 child hook に渡し、block payload があっても後続 hook を実行してログ機会を保ちます。Codex に返す出力は、元の順序で最初の `decision=block`、block がなければ最初の non-block JSON / stdout です。
 - `hooks/cause_investigation_guard.py`、`hooks/oop_readability_guard.py`、`hooks/module_boundary_guard.py`、`hooks/library_implementation_guard.py`、`hooks/helper_first_guard.py`、`hooks/style_checker_guard.py`、`hooks/notebook_quality_guard.py` は実行ごとに AgentCanon-owned `agents/evals/results/hook-runs/<runtime-namespace>/` 配下へ `hook_run_id`、`hook_log_namespace`、`payload_fingerprint`、status fields 付き JSONL を追記します。`<runtime-namespace>` は `AGENT_CANON_HOOK_RUN_NAMESPACE`、`DEVCONTAINER_PROJECT_NAME`、`COMPOSE_PROJECT_NAME`、generated Compose `name:`、host/repo hash fallback の順で決まります。OOP score threshold は analyzer の `tools/oop/shared/readability_core.py` を正本にします。`AGENT_CANON_HOOK_RESULTS_DIR` / `AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH` / `AGENT_CANON_OOP_HOOK_LOG_PATH` / `AGENT_CANON_MODULE_BOUNDARY_HOOK_LOG_PATH` / `AGENT_CANON_LIBRARY_IMPLEMENTATION_HOOK_LOG_PATH` / `AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH` / `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH` / `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH` / `AGENT_CANON_SKILL_LOG_PATH` で出力先を差し替えられます。
 - hook の役割は「MCP preflight が必要な workflow、または MCP surface を変更する task では inventory を明示実行する」ことを session 開始時に思い出させることです。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection を repo task に変換してはいけません。local Cargo が lockfile を読めない環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior が scope でない限り Python / shell gate で検証を続けます。完了 gate は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache`、または run bundle evidence が必要な場合の `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` で判定します。
 - hook context は `repo_mcp_server` の canonical launcher を `.codex/config.toml` -> `bash mcp/repo_mcp_server.sh` に固定し、ad hoc local process への silent fallback を禁止します。

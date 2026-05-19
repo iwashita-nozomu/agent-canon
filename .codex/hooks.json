@@ -4,6 +4,7 @@
     "responsibility Configures Codex hook entrypoints for repo guardrails.",
     "upstream implementation config.toml enables project-local Codex hooks",
     "upstream design README.md documents hook wiring and optional MCP checks",
+    "downstream implementation hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts",
     "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
     "downstream implementation hooks/skill_usage_logger.py logs observed skill, workflow, tool, and subagent routing usage",
     "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
@@ -26,21 +27,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/prompt_secret_guard.py\"",
-            "timeout": 10,
-            "statusMessage": "Checking prompt for obvious secrets"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
-            "timeout": 10,
-            "statusMessage": "Logging observed skill usage"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
-            "timeout": 10,
-            "statusMessage": "Logging reference capture requirements"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" UserPromptSubmit",
+            "timeout": 40,
+            "statusMessage": "Running prompt guard suite"
           }
         ]
       }
@@ -51,9 +40,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/cause_investigation_guard.py\"",
-            "timeout": 30,
-            "statusMessage": "Checking cause investigation evidence before code edit"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PreToolUse",
+            "timeout": 35,
+            "statusMessage": "Running pre-tool guard suite"
           }
         ]
       }
@@ -64,63 +53,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
-            "timeout": 10,
-            "statusMessage": "Logging tool and subagent selection"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
-            "timeout": 15,
-            "statusMessage": "Checking referenced source capture"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking current OOP findings"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking Python module boundaries"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking library implementation ownership"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking changed helper inventory"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking helper-first implementation drift"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/style_checker_guard.py\"",
-            "timeout": 90,
-            "statusMessage": "Checking changed-file style"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/log_surface_inventory_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking log surface inventory"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking changed notebooks"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PostToolUse",
+            "timeout": 600,
+            "statusMessage": "Running post-tool guard suite"
           }
         ]
       }
@@ -130,69 +65,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/goal_completion_guard.py\"",
-            "timeout": 15,
-            "statusMessage": "Checking goal-loop completion state"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/oop_readability_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking current OOP findings"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/module_boundary_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking Python module boundaries"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/library_implementation_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking library implementation ownership"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_inventory_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking changed helper inventory"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/helper_first_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking helper-first implementation drift"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/style_checker_guard.py\"",
-            "timeout": 90,
-            "statusMessage": "Checking changed-file style"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/log_surface_inventory_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking log surface inventory"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/notebook_quality_guard.py\"",
-            "timeout": 60,
-            "statusMessage": "Checking changed notebooks"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/reference_capture_guard.py\"",
-            "timeout": 15,
-            "statusMessage": "Checking referenced source capture"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/skill_usage_logger.py\"",
-            "timeout": 10,
-            "statusMessage": "Logging observed skill usage"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" Stop",
+            "timeout": 600,
+            "statusMessage": "Running stop guard suite"
           }
         ]
       }
