@@ -1,6 +1,22 @@
 {
   "records": [
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 261,
+      "path": "tools/experiments/html_artifact_access.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_stdout",
+      "field": "<dynamic>",
+      "line": 261,
+      "path": "tools/experiments/html_artifact_access.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
@@ -988,7 +1004,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 77,
+      "line": 104,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -996,7 +1012,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 78,
+      "line": 105,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1004,7 +1020,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 75,
+      "line": 102,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1012,7 +1028,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 74,
+      "line": 101,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1020,7 +1036,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_summary_artifact",
-      "line": 76,
+      "line": 103,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1028,7 +1044,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 73,
+      "line": 100,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1924,7 +1940,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 601,
+      "line": 608,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },

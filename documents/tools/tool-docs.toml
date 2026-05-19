@@ -16,6 +16,13 @@ language = "python"
 summary = "Short task-routing tool documentation."
 
 [[tool]]
+id = "html-artifact-access"
+tool = "tools/experiments/html_artifact_access.py"
+doc = "documents/tools/html_artifact_access.md"
+language = "python"
+summary = "Remote HTML artifact browser-access command documentation."
+
+[[tool]]
 id = "oop-python-readability"
 tool = "tools/oop/python/readability.py"
 doc = "documents/tools/oop/python/readability.md"

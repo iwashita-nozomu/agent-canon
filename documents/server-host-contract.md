@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents Server Host Contract for this repository.
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+downstream design ./tools/html_artifact_access.md documents remote HTML artifact access commands
 @dependency-end
 -->
 
@@ -46,6 +47,14 @@ remote execution contract が「repo が外部 server から実行される条�
 - `getent group docker` にユーザーが出ても `id` に `docker` が出ない場合は、新しい login shell を開くか group refresh が必要です
 - 一時確認だけなら `sg docker -c 'docker version'` で daemon 到達性を切り分けられます
 - main server host では、`make docker-build-check` と `make docker-build-check-host-docker` を実行できる状態を推奨します
+
+## Remote Browser Artifact Rule
+
+- local PC から SSH で HPC host に入り、その上の container で HTML report を生成する場合、local browser は container 内の `127.0.0.1` を直接見られません
+- HTML artifact は、ファイルが見えている shell で `python3 -m http.server` を立て、local PC から HPC host への SSH tunnel で見る導線を既定にします
+- canonical command generator は `python3 tools/experiments/html_artifact_access.py <report.html>` です。`AGENT_CANON_SSH_HOST` または `SSH_CONNECTION` から SSH target を推定し、推定できない場合だけ tunnel command 内の `<ssh-host>` を置き換えます
+- container 内だけにある report では `--use-container-ip` を使い、出力された server、tunnel、local URL を closeout evidence に残します
+- default bind は `127.0.0.1` です。container-direct mode では container IP へ tunnel するため、container 内の server は `0.0.0.0` bind を使います
 
 ## WSL / Shared Mount Rule
 

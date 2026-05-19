@@ -99,9 +99,12 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
     読むだけなら `agent-canon mcp-preflight-policy --request-kind
     github-actions-read` が `MCP_PREFLIGHT_DECISION=skip` を返します。
   - `mcp-inventory` は Rust 実装の repo MCP inventory checker です。
-    repository task では `agent-canon mcp-inventory --root . --require
-    repo_mcp_server --session-cache` を使い、同じ session / unchanged MCP
-    surface での繰り返し確認を cache hit にします。
+    MCP evidence が必要な workflow、または MCP surface を変更する task
+    で `agent-canon mcp-inventory --root . --require repo_mcp_server
+    --session-cache` を使い、同じ session / unchanged MCP surface での
+    繰り返し確認を cache hit にします。local Cargo が lockfile を読めない
+    環境では `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime
+    behavior が scope でない限り Python / shell gate で検証を続けます。
   - `local-llm classify-responsibility` は単一 file 責務分析の Rust CLI
     入口です。`search`、`build-index`、`eval` もこの CLI surface から呼び、
     Python 実装は互換 engine として残します。
@@ -124,6 +127,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - registry の branch / worktree metadata を同期します。
 - `tools/experiments/run_managed_experiment.py`
   - shared managed-runner として server 上の実験 run artifact を初期化します。
+- `tools/experiments/html_artifact_access.py`
+  - SSH 越しの HPC / container 上にある HTML artifact を手元 PC のブラウザで見るため、`python3 -m http.server`、SSH tunnel、local URL の command を出します。
 - `tools/run_comprehensive_review.sh`
   - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
 - `tools/run_pytest_with_logs.sh`

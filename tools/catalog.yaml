@@ -1410,6 +1410,25 @@ entries:
     tests:
       - tests/tools/test_run_managed_experiment.py
 
+  - id: html-artifact-access
+    summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
+    path: tools/experiments/html_artifact_access.py
+    family: experiments
+    role: helper
+    status: canonical
+    command: python3 tools/experiments/html_artifact_access.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/html_artifact_access.md
+      - documents/result-log-retention-and-visualization.md
+    tests:
+      - tests/tools/test_html_artifact_access.py
+
   - id: update-latest-result
     summary: Updates LATEST pointers for experiment result roots.
     path: tools/experiments/update_latest_result.py

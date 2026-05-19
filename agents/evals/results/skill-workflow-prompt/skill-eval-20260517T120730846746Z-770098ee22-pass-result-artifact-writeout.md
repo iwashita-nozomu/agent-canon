@@ -1,0 +1,2121 @@
+# Skill Workflow Prompt Eval
+<!--
+@dependency-start
+responsibility Records skill/workflow prompt eval results.
+upstream implementation ../../../../tools/agent_tools/evaluate_skill_workflow_prompts.py generates this report
+upstream design ../../skill_workflow_prompt_eval.toml defines frozen evals
+@dependency-end
+-->
+
+## Summary
+
+- created_at: `2026-05-17T12:07:30.846746+00:00`
+- eval_run_id: `skill-eval-20260517T120730846746Z-770098ee22`
+- run_id: `-`
+- used_skills: `result-artifact-writeout`
+- EVAL_STATUS=pass
+- EVAL_CHECKS_TOTAL=520
+- EVAL_CHECKS_PASSED=520
+- EVAL_CRITICAL_TOTAL=520
+- EVAL_CRITICAL_FAILED=0
+- EVAL_AUDIT_STATUS=pass
+- EVAL_DUPLICATE_EVAL_IDS=0
+- EVAL_DUPLICATE_TARGETS=0
+- EVAL_DUPLICATE_CHECKLIST_IDS=0
+- EVAL_GROWTH_CANDIDATES=0
+- EVAL_RUN_ID=skill-eval-20260517T120730846746Z-770098ee22
+- EVAL_USED_SKILLS=result-artifact-writeout
+- EVAL_GIT_BRANCH=codex/fix-legacy-oop-support-tools
+
+## Run Manifest
+
+- argv: `tools/agent_tools/evaluate_skill_workflow_prompts.py --root . --skill-used result-artifact-writeout --accumulate`
+- cwd: `/workspace/vendor/agent-canon`
+- root: `/workspace/vendor/agent-canon`
+- manifest: `agents/evals/skill_workflow_prompt_eval.toml`
+- git_branch: `codex/fix-legacy-oop-support-tools`
+- git_commit: `2f455d160c8155f8f20419dbeaa0ccb50d18a810`
+- git_dirty: `yes`
+
+## Results
+
+- `all-discoverable-skill-shims:.agents/skills/academic-writing/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/academic-writing/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/academic-writing/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/adaptive-improvement-loop/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/adaptive-improvement-loop/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/adaptive-improvement-loop/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/agent-learning/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/agent-learning/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/agent-learning/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/agent-orchestration/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/agent-orchestration/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/agent-orchestration/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/agent-update-branch/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/agent-update-branch/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/agent-update-branch/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/behavior-preserving-refactor/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/behavior-preserving-refactor/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/behavior-preserving-refactor/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/change-review/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/change-review/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/change-review/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/codex-task-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/codex-task-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/codex-task-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/comprehensive-development/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/comprehensive-development/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/comprehensive-development/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/cpp-review/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/cpp-review/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/cpp-review/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/dependency-analysis/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/dependency-analysis/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/dependency-analysis/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/document-canon-cleanup/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/document-canon-cleanup/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/document-canon-cleanup/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/environment-maintenance/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/environment-maintenance/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/environment-maintenance/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/experiment-lifecycle/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/experiment-lifecycle/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/experiment-lifecycle/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/literature-survey/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/literature-survey/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/literature-survey/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/long-form-writing/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/long-form-writing/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/long-form-writing/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/md-style-check/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/md-style-check/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/md-style-check/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/oop-readability-check/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/oop-readability-check/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/oop-readability-check/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/paper-writing/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/paper-writing/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/paper-writing/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/python-review/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/python-review/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/python-review/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/repo-onboarding/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/repo-onboarding/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/repo-onboarding/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/research-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/research-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/research-workflow/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/result-artifact-writeout/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/result-artifact-writeout/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/result-artifact-writeout/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/start-repository/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/start-repository/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/start-repository/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/subagent-bootstrap/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/subagent-bootstrap/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/subagent-bootstrap/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/task-routing/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/task-routing/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/task-routing/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/test-design/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/test-design/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/test-design/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/user-preference-sync/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/user-preference-sync/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/user-preference-sync/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/worktree-health/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/worktree-health/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/worktree-health/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-discoverable-skill-shims:.agents/skills/worktree-start/SKILL.md` / `SKILL-SHIM-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-discoverable-skill-shims:.agents/skills/worktree-start/SKILL.md` / `SKILL-SHIM-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-discoverable-skill-shims:.agents/skills/worktree-start/SKILL.md` / `SKILL-SHIM-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-human-skill-docs:agents/skills/README.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/README.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/README.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/README.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/academic-writing.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/academic-writing.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/academic-writing.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/academic-writing.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/adaptive-improvement-loop.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/adaptive-improvement-loop.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/agent-learning.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-learning.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/agent-learning.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-learning.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/agent-orchestration.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-orchestration.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/agent-orchestration.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-orchestration.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/agent-update-branch.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-update-branch.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/agent-update-branch.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-update-branch.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/artifact-placement.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/artifact-placement.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/artifact-placement.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/artifact-placement.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/behavior-preserving-refactor.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/behavior-preserving-refactor.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/behavior-preserving-refactor.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/behavior-preserving-refactor.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/change-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/change-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/change-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/change-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/citation-evidence-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/citation-evidence-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/citation-evidence-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/citation-evidence-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/claude-code-cli.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/claude-code-cli.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/claude-code-cli.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/claude-code-cli.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/code-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/code-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/code-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/code-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/codex-cli.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/codex-cli.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/codex-cli.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/codex-cli.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/codex-task-workflow.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/codex-task-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/codex-task-workflow.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/codex-task-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/comprehensive-development.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/comprehensive-development.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/comprehensive-development.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/comprehensive-development.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/comprehensive-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/comprehensive-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/comprehensive-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/comprehensive-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/copilot-cli.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/copilot-cli.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/copilot-cli.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/copilot-cli.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/cpp-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/cpp-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/cpp-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/cpp-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/critical-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/critical-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/critical-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/critical-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/dependency-analysis.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/dependency-analysis.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/dependency-analysis.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/dependency-analysis.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/docs-completeness-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/docs-completeness-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/docs-completeness-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/docs-completeness-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/docs-consistency-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/docs-consistency-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/docs-consistency-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/docs-consistency-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/document-canon-cleanup.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/document-canon-cleanup.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/document-canon-cleanup.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/document-canon-cleanup.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/environment-maintenance.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/environment-maintenance.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/environment-maintenance.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/environment-maintenance.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/experiment-change-loop.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-change-loop.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/experiment-change-loop.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-change-loop.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/experiment-lifecycle.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-lifecycle.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/experiment-lifecycle.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-lifecycle.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/experiment-workflow.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/experiment-workflow.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/experiment-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/from_another_agent.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/from_another_agent.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/from_another_agent.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/from_another_agent.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/literature-survey.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/literature-survey.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/literature-survey.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/literature-survey.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/logic-gap-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/logic-gap-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/logic-gap-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/logic-gap-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/long-form-writing.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/long-form-writing.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/long-form-writing.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/long-form-writing.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/md-style-check.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/md-style-check.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/md-style-check.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/md-style-check.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/notation-definition-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/notation-definition-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/notation-definition-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/notation-definition-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/oop-readability-check.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/oop-readability-check.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/oop-readability-check.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/oop-readability-check.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/paper-writing.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/paper-writing.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/paper-writing.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/paper-writing.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/project-health.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/project-health.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/project-health.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/project-health.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/project-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/project-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/project-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/project-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/python-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/python-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/python-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/python-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/repo-onboarding.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/repo-onboarding.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/repo-onboarding.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/repo-onboarding.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/report-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/report-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/report-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/report-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/research-perspective-review.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/research-perspective-review.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/research-perspective-review.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/research-perspective-review.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/research-workflow.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/research-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/research-workflow.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/research-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/result-artifact-writeout.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/result-artifact-writeout.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/result-artifact-writeout.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/result-artifact-writeout.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/start-repository.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/start-repository.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/start-repository.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/start-repository.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/static-check.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/static-check.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/static-check.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/static-check.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/static-validation.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/static-validation.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/static-validation.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/static-validation.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/subagent-bootstrap.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/subagent-bootstrap.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/subagent-bootstrap.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/subagent-bootstrap.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/task-routing.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/task-routing.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/task-routing.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/task-routing.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/test-design.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/test-design.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/test-design.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/test-design.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/user-preference-sync.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/user-preference-sync.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/user-preference-sync.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/user-preference-sync.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/worktree-health.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/worktree-health.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/worktree-health.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/worktree-health.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-human-skill-docs:agents/skills/worktree-start.md` / `SKILL-DOC-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/worktree-start.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-human-skill-docs:agents/skills/worktree-start.md` / `SKILL-DOC-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/worktree-start.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/README.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/README.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/README.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/README.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/README.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/README.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/academic-writing-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/academic-writing-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/academic-writing-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/academic-writing-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/academic-writing-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/academic-writing-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/adaptive-improvement-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/adaptive-improvement-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/adaptive-improvement-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/agent-canon-pr-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/agent-canon-pr-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/agent-canon-pr-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/agent-learning-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/agent-learning-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/agent-learning-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/agent-update-branch-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-update-branch-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/agent-update-branch-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-update-branch-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/agent-update-branch-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-update-branch-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/codex-goals-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/codex-goals-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/codex-goals-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/comprehensive-refactoring-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/comprehensive-refactoring-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/comprehensive-refactoring-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/derived-agent-canon-diff-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/derived-agent-canon-diff-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/derived-agent-canon-diff-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/derived-agent-canon-diff-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/experiment-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/experiment-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/experiment-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/experiment-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/experiment-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/experiment-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/github-copilot-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/github-copilot-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/github-copilot-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/github-copilot-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/github-copilot-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/github-copilot-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/goal-plan-implementation-loop.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/goal-plan-implementation-loop.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/goal-plan-implementation-loop.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/goal-plan-implementation-loop.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/goal-plan-implementation-loop.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/goal-plan-implementation-loop.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/hypothesis-validation-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/hypothesis-validation-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/hypothesis-validation-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/implementation-waterfall-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/implementation-waterfall-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/implementation-waterfall-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/long-form-writing-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/long-form-writing-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/long-form-writing-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/long-form-writing-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/long-form-writing-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/long-form-writing-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/main-integration-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/main-integration-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/main-integration-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/main-integration-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/main-integration-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/main-integration-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/paper-writing-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/paper-writing-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/paper-writing-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/paper-writing-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/paper-writing-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/paper-writing-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/pr-queue-cleanup-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/pr-queue-cleanup-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/pr-queue-cleanup-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/pr-queue-cleanup-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/pr-queue-cleanup-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/pr-queue-cleanup-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/research-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/research-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/research-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/research-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/research-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/research-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/slide-production-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/slide-production-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/slide-production-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/token-efficient-codex-workflow.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/token-efficient-codex-workflow.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/token-efficient-codex-workflow.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-workflow-docs:agents/workflows/workflow-references.md` / `WORKFLOW-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/workflow-references.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-workflow-docs:agents/workflows/workflow-references.md` / `WORKFLOW-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/workflow-references.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-workflow-docs:agents/workflows/workflow-references.md` / `CONVENTION-WORKFLOW-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/workflow-references.md`
+  - critical: `true`
+  - description: Every workflow calls the convention compliance verifier before closeout or handoff.
+- `all-claude-skill-mirrors:.claude/skills/academic-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/academic-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/academic-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/academic-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/adaptive-improvement-loop/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/adaptive-improvement-loop/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/adaptive-improvement-loop/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/agent-learning/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/agent-learning/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/agent-learning/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/agent-orchestration/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/agent-orchestration/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/agent-orchestration/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/agent-update-branch/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/agent-update-branch/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/agent-update-branch/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/agent-update-branch/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/behavior-preserving-refactor/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/behavior-preserving-refactor/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/behavior-preserving-refactor/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/behavior-preserving-refactor/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/change-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/change-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/change-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/change-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/codex-task-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/codex-task-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/codex-task-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/comprehensive-development/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/comprehensive-development/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/comprehensive-development/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/comprehensive-development/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/cpp-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/cpp-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/cpp-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/cpp-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/dependency-analysis/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/dependency-analysis/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/dependency-analysis/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/document-canon-cleanup/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/document-canon-cleanup/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/document-canon-cleanup/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/document-canon-cleanup/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/environment-maintenance/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/environment-maintenance/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/environment-maintenance/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/environment-maintenance/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/experiment-lifecycle/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/experiment-lifecycle/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/experiment-lifecycle/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/experiment-lifecycle/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/literature-survey/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/literature-survey/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/literature-survey/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/literature-survey/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/long-form-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/long-form-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/long-form-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/long-form-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/md-style-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/md-style-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/md-style-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/md-style-check/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/oop-readability-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/oop-readability-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/oop-readability-check/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/paper-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/paper-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/paper-writing/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/paper-writing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/python-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/python-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/python-review/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/python-review/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/repo-onboarding/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/repo-onboarding/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/repo-onboarding/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/repo-onboarding/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/research-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/research-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/research-workflow/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/research-workflow/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/result-artifact-writeout/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/result-artifact-writeout/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/result-artifact-writeout/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/start-repository/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/start-repository/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/start-repository/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/start-repository/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/subagent-bootstrap/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/subagent-bootstrap/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/subagent-bootstrap/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/subagent-bootstrap/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/task-routing/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/task-routing/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/task-routing/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/task-routing/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/test-design/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/test-design/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/test-design/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/test-design/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/user-preference-sync/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/user-preference-sync/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/user-preference-sync/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/user-preference-sync/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/worktree-health/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/worktree-health/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/worktree-health/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-health/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `all-claude-skill-mirrors:.claude/skills/worktree-start/SKILL.md` / `CLAUDE-SKILL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Starts with YAML frontmatter and includes required name/description fields.
+- `all-claude-skill-mirrors:.claude/skills/worktree-start/SKILL.md` / `CLAUDE-SKILL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers near the top of the file.
+- `all-claude-skill-mirrors:.claude/skills/worktree-start/SKILL.md` / `CLAUDE-SKILL-GENERIC-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/worktree-start/SKILL.md`
+  - critical: `true`
+  - description: Provides an executable numbered instruction list.
+- `result-artifact-writeout-skill` / `RESULT-WRITEOUT-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Requires raw source result and summary artifact separation.
+- `result-artifact-writeout-skill` / `RESULT-WRITEOUT-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Requires manifest, unique artifact path, and overwrite policy.
+- `result-artifact-writeout-skill` / `RESULT-WRITEOUT-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/result-artifact-writeout/SKILL.md`
+  - critical: `true`
+  - description: Requires failed or partial runs to remain durable routing evidence with status and exit code.
+- `all-canonical-routing-docs:agents/canonical/ARTIFACT_PLACEMENT.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/ARTIFACT_PLACEMENT.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/ARTIFACT_PLACEMENT.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/ARTIFACT_PLACEMENT.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-canonical-routing-docs:agents/canonical/CLI_ENTRYPOINTS.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/CLI_ENTRYPOINTS.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-canonical-routing-docs:agents/canonical/CODEX_SUBAGENTS.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/CODEX_SUBAGENTS.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-canonical-routing-docs:agents/canonical/CODEX_WORKFLOW.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/CODEX_WORKFLOW.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-canonical-routing-docs:agents/canonical/README.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/README.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/README.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/README.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-canonical-routing-docs:agents/canonical/skills.md` / `CANONICAL-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/skills.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-canonical-routing-docs:agents/canonical/skills.md` / `CANONICAL-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/skills.md`
+  - critical: `true`
+  - description: Includes a top-level Markdown title.
+- `all-codex-subagent-prompts:.codex/agents/artifact_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/artifact_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/artifact_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/artifact_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/benchmark_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/benchmark_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/benchmark_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/benchmark_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/citation_evidence_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/citation_evidence_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/citation_evidence_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/citation_evidence_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/cpp_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/cpp_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/cpp_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/cpp_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/detailed_design_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/detailed_design_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/detailed_design_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/detailed_design_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/detailed_designer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/detailed_designer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/detailed_designer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/detailed_designer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/docs_workflow_steward.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/docs_workflow_steward.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/docs_workflow_steward.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/docs_workflow_steward.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/document_flow_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/document_flow_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/document_flow_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/document_flow_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/execution_planner.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/execution_planner.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/execution_planner.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/execution_planner.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/explorer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/explorer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/explorer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/explorer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/fair_data_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/fair_data_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/fair_data_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/fair_data_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/literature_researcher.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/literature_researcher.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/literature_researcher.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/literature_researcher.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/logic_gap_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/logic_gap_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/logic_gap_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/logic_gap_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/long_form_writer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/long_form_writer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/long_form_writer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/long_form_writer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/manager_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/manager_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/manager_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/manager_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/ml_science_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/ml_science_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/ml_science_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/ml_science_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/notation_definition_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/notation_definition_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/notation_definition_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/notation_definition_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/oop_readability_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/oop_readability_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/oop_readability_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/oop_readability_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/plan_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/plan_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/plan_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/plan_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/project_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/project_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/project_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/project_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/python_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/python_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/python_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/python_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/report_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/report_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/report_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/report_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/reproducibility_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/reproducibility_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/reproducibility_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/reproducibility_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/requirements_organizer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/requirements_organizer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/requirements_organizer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/requirements_organizer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/scientific_computing_reviewer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/scientific_computing_reviewer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/scientific_computing_reviewer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/scientific_computing_reviewer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/spark_worker.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/spark_worker.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/spark_worker.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/spark_worker.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/test_designer.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/test_designer.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/test_designer.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/test_designer.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `all-codex-subagent-prompts:.codex/agents/worker.toml` / `CODEX-AGENT-GENERIC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/worker.toml`
+  - critical: `true`
+  - description: Includes dependency manifest markers.
+- `all-codex-subagent-prompts:.codex/agents/worker.toml` / `CODEX-AGENT-GENERIC-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/agents/worker.toml`
+  - critical: `true`
+  - description: Declares an agent model.
+- `root-agent-entrypoint` / `ROOT-AGENTS-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/AGENTS.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers and a title.
+- `shared-root-agent-entrypoint` / `ROOT-AGENTS-SHARED-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/ROOT_AGENTS.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers and a title.
+- `agents-readme-routing-entrypoint` / `AGENTS-README-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/README.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers and a title.
+- `task-workflows-routing-entrypoint` / `TASK-WORKFLOWS-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/TASK_WORKFLOWS.md`
+  - critical: `true`
+  - description: Includes dependency manifest markers and a title.
+- `task-workflows-routing-entrypoint` / `CONVENTION-SKILL-ROUTING-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/TASK_WORKFLOWS.md`
+  - critical: `true`
+  - description: Routes skill selection through agent-orchestration first and keeps convention compliance as a tool gate.
+- `agent-orchestration-skill-call-routing` / `CONVENTION-SKILL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-orchestration/SKILL.md`
+  - critical: `true`
+  - description: Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate.
+- `codex-task-workflow-convention-gate` / `CONVENTION-SKILL-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/codex-task-workflow/SKILL.md`
+  - critical: `true`
+  - description: Requires convention compliance verifier during repo task closeout.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Mentions the top-level goal contract and goal loop tool.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Requires frozen eval definitions before prompt or workflow tuning.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Blocks loop closeout while eval drift remains.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Requires behavior-event monitoring and agent behavior eval before closeout.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-6`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Routes runtime user/reviewer feedback into prompt, eval, or memory updates.
+- `adaptive-improvement-loop-skill-shim` / `AIL-SHIM-5`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/adaptive-improvement-loop/SKILL.md`
+  - critical: `true`
+  - description: Uses MCP goal.loop_status as the mechanical iteration gate.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires goal.md and goal_loop.py for repo-level loops.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires an eval per tested skill and workflow.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires prompt repair and rerun until no eval deviation remains.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires behavior-event capture and behavior eval repair for agent behavior tuning.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-8`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Routes runtime feedback to a concrete prompt, eval, memory, or no-op decision.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-5`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires MCP goal.loop_status to keep iterations mechanical.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-6`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires static-analysis feedback and two-run path comparison to feed back into prompts.
+- `adaptive-improvement-loop-human-skill` / `AIL-HUMAN-7`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/adaptive-improvement-loop.md`
+  - critical: `true`
+  - description: Requires code-improvement iterations to carry hypothesis validation evidence.
+- `adaptive-improvement-workflow` / `AIL-WF-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Defines evals before choosing or changing an iteration.
+- `adaptive-improvement-workflow` / `AIL-WF-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Runs the mechanical eval tool, audit status, and growth-candidate gate as evidence.
+- `adaptive-improvement-workflow` / `AIL-WF-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Repairs prompts and reruns the same eval until drift is gone.
+- `adaptive-improvement-workflow` / `AIL-WF-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Repairs behavior eval feedback and reruns until agent behavior monitoring passes.
+- `adaptive-improvement-workflow` / `AIL-WF-9`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Turns observed runtime feedback into structured monitoring plus prompt/eval/memory repair.
+- `adaptive-improvement-workflow` / `AIL-WF-5`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Requires MCP goal.loop_status to decide whether to continue or close.
+- `adaptive-improvement-workflow` / `AIL-WF-7`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Requires duplicate eval coverage to be consolidated instead of leaving parallel entries.
+- `adaptive-improvement-workflow` / `AIL-WF-6`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Treats Codex goals as a session view, not the durable goal source.
+- `adaptive-improvement-workflow` / `AIL-WF-8`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/adaptive-improvement-workflow.md`
+  - critical: `true`
+  - description: Requires two-run execution path comparison and static-analysis feedback repair.
+- `hypothesis-validation-workflow` / `HV-WF-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Requires separate code and header dependency evidence before hypothesis selection.
+- `hypothesis-validation-workflow` / `HV-WF-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Requires the core hypothesis lifecycle fields before editing.
+- `hypothesis-validation-workflow` / `HV-WF-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Requires alternative fix-surface comparison instead of first-candidate edits.
+- `hypothesis-validation-workflow` / `HV-WF-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Blocks implementation until the fix surface is validated.
+- `hypothesis-validation-workflow` / `HV-WF-5`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/hypothesis-validation-workflow.md`
+  - critical: `true`
+  - description: Requires post-change support/reject/inconclusive decisions and a next-hypothesis path.
+- `dependency-analysis-code-improvement-skill` / `DA-SKILL-HV-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/dependency-analysis.md`
+  - critical: `true`
+  - description: Requires hypothesis-validation artifacts for code-improvement fix-surface selection.
+- `dependency-analysis-shim-code-improvement` / `DA-SHIM-HV-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/dependency-analysis/SKILL.md`
+  - critical: `true`
+  - description: Requires implementation to wait for hypothesis fields and fix-surface validation.
+- `codex-goals-workflow` / `CODEX-GOALS-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Defines the role split between goal.md, Codex goals, MCP, and goal_loop.py.
+- `codex-goals-workflow` / `CODEX-GOALS-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Requires feature and MCP preflight commands.
+- `codex-goals-workflow` / `CODEX-GOALS-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Blocks closeout while MCP or goal.md says to continue.
+- `codex-goals-workflow` / `CODEX-GOALS-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Requires goal-specified tasks to enter Plan mode before implementation.
+- `codex-goals-workflow` / `CODEX-GOALS-5`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Documents the supported TUI goal command surface and status ownership.
+- `codex-goals-workflow` / `CODEX-GOALS-6`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Prevents Goal setup from shrinking the first iteration to a single micro-fix.
+- `codex-goals-workflow` / `CODEX-GOALS-7`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/codex-goals-workflow.md`
+  - critical: `true`
+  - description: Separates default active goal items from optional non-default catalog items.
+- `token-efficient-codex-workflow` / `TOKEN-WF-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Defines the three token profiles.
+- `token-efficient-codex-workflow` / `TOKEN-WF-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Defines agent modes for delegation control.
+- `token-efficient-codex-workflow` / `TOKEN-WF-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Keeps validation and closeout gates mandatory.
+- `token-efficient-codex-workflow` / `TOKEN-WF-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/token-efficient-codex-workflow.md`
+  - critical: `true`
+  - description: Requires measurable token footprint comparison with a 50 percent target.
+- `slide-production-workflow` / `SLIDE-WF-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Requires a fixed PPT template and a recorded template path.
+- `slide-production-workflow` / `SLIDE-WF-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Requires slots for text, equations, generated images, and references.
+- `slide-production-workflow` / `SLIDE-WF-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/slide-production-workflow.md`
+  - critical: `true`
+  - description: Requires a layout review before closeout.
+- `codex-config-shared-features` / `CODEX-CONFIG-TOKEN-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/config.toml`
+  - critical: `true`
+  - description: Keeps reusable token profiles out of project-local config.
+- `codex-config-shared-features` / `CODEX-CONFIG-GOALS-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.codex/config.toml`
+  - critical: `true`
+  - description: Enables the goals feature in the shared config.
+- `codex-workflow-runtime-preflight` / `CODEX-WF-TOKEN-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
+  - critical: `true`
+  - description: Mentions token profiles, agent modes, and profile/risk-selected gates.
+- `codex-workflow-runtime-preflight` / `CODEX-WF-GOALS-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
+  - critical: `true`
+  - description: Mentions the goals feature preflight and durable goal source.
+- `codex-workflow-runtime-preflight` / `CODEX-WF-GOALS-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
+  - critical: `true`
+  - description: Requires Plan-mode contract output for user-specified goals.
+- `repo-mcp-server-goal-loop-tool` / `MCP-GOAL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/mcp/repo_mcp_server.py`
+  - critical: `true`
+  - description: Declares the goal.loop_status tool and calls goal_loop.py status.
+- `mcp-readme-goal-loop-tool` / `MCP-README-GOAL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/mcp/README.md`
+  - critical: `true`
+  - description: Documents goal.loop_status and run_next_iteration behavior.
+- `oop-readability-external-repo-route` / `OOP-ROUTE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Requires read-only snapshot analysis for external and bare repositories.
+- `oop-readability-external-repo-route` / `OOP-ROUTE-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Requires explicit analyzer scope, excludes, reports, and reviewer prompt evidence.
+- `oop-readability-external-repo-route` / `OOP-ROUTE-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/comprehensive-refactoring-workflow.md`
+  - critical: `true`
+  - description: Separates survey execution from closeout score-gate execution.
+- `oop-readability-skill-artifact` / `OOP-RUNTIME-SKILL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested.
+- `oop-readability-skill-artifact` / `OOP-RUNTIME-SKILL-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Requires the final response to include the artifact path.
+- `oop-readability-claude-skill-artifact` / `OOP-CLAUDE-SKILL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested.
+- `oop-readability-claude-skill-artifact` / `OOP-CLAUDE-SKILL-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.claude/skills/oop-readability-check/SKILL.md`
+  - critical: `true`
+  - description: Requires the final response to include the artifact path.
+- `oop-readability-canonical-artifact` / `OOP-CANONICAL-SKILL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/oop-readability-check.md`
+  - critical: `true`
+  - description: Requires Markdown artifacts by default and a single tool result as the source of truth.
+- `oop-readability-canonical-artifact` / `OOP-CANONICAL-SKILL-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/oop-readability-check.md`
+  - critical: `true`
+  - description: Requires the durable report path and user-facing artifact path evidence.
+- `oop-readability-tool-docs` / `OOP-DOC-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/documents/object-oriented-design.md`
+  - critical: `true`
+  - description: Documents exclude usage for vendored snapshots and generated reports.
+- `oop-refactor-skill-route` / `OOP-SKILL-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/behavior-preserving-refactor.md`
+  - critical: `true`
+  - description: Requires external OOP surveys to record commit, paths, excludes, and reports.
+- `agent-learning-workflow-behavior-eval` / `ALW-BEHAVIOR-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Defines behavior eval rubric ownership.
+- `agent-learning-workflow-behavior-eval` / `ALW-BEHAVIOR-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Requires behavior events in workflow monitoring.
+- `agent-learning-workflow-behavior-eval` / `ALW-BEHAVIOR-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Lists observable agent behavior families.
+- `agent-learning-workflow-behavior-eval` / `ALW-BEHAVIOR-4`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/workflows/agent-learning-workflow.md`
+  - critical: `true`
+  - description: Requires runtime feedback capture and routing to prompt/eval/memory updates.
+- `workflow-monitoring-template-behavior-events` / `WMT-BEHAVIOR-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/templates/workflow_monitoring.md`
+  - critical: `true`
+  - description: Includes a Behavior Events section and mechanical accumulation command.
+- `workflow-monitoring-template-behavior-events` / `WMT-BEHAVIOR-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/templates/workflow_monitoring.md`
+  - critical: `true`
+  - description: Mentions observable event families required by the behavior eval.
+- `workflow-monitoring-template-behavior-events` / `WMT-BEHAVIOR-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/templates/workflow_monitoring.md`
+  - critical: `true`
+  - description: Exposes runtime feedback as a structured behavior event.
+- `agent-behavior-eval-manifest` / `ABEM-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/agent_behavior_eval.toml`
+  - critical: `true`
+  - description: Defines criteria tables for behavior scoring.
+- `agent-behavior-eval-manifest` / `ABEM-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/agent_behavior_eval.toml`
+  - critical: `true`
+  - description: Covers prompt eval, review feedback, subagent lifecycle, and diff-check behavior.
+- `agent-behavior-eval-manifest` / `ABEM-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/agent_behavior_eval.toml`
+  - critical: `true`
+  - description: Covers runtime feedback capture for prompt/eval/memory update loops.
+- `agent-learning-skill-shim-behavior-eval` / `ALS-BEHAVIOR-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Requires behavior-event recording before closeout.
+- `agent-learning-skill-shim-behavior-eval` / `ALS-BEHAVIOR-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Requires behavior-manifest based run evaluation.
+- `agent-learning-skill-shim-behavior-eval` / `ALS-BEHAVIOR-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/.agents/skills/agent-learning/SKILL.md`
+  - critical: `true`
+  - description: Requires runtime feedback to be routed to update surfaces.
+- `agent-learning-human-skill-behavior-eval` / `ALH-BEHAVIOR-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-learning.md`
+  - critical: `true`
+  - description: Names workflow monitor behavior-event recording.
+- `agent-learning-human-skill-behavior-eval` / `ALH-BEHAVIOR-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-learning.md`
+  - critical: `true`
+  - description: Names behavior manifest and pass status.
+- `agent-learning-human-skill-behavior-eval` / `ALH-BEHAVIOR-3`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/skills/agent-learning.md`
+  - critical: `true`
+  - description: Documents runtime feedback capture and prompt/eval/memory routing.
+- `evals-readme-behavior-eval` / `EVALS-README-BEHAVIOR-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Documents behavior eval command and manifest.
+- `evals-readme-behavior-eval` / `EVALS-README-BEHAVIOR-2`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Requires behavior events to be recorded during the run.
+- `evals-readme-behavior-eval` / `EVALS-README-AUDIT-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Documents prompt eval manifest duplicate and growth-candidate audit gates.
+- `evals-readme-behavior-eval` / `EVALS-README-ACCUMULATE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Documents accumulated prompt eval results for skill use.
+- `evals-readme-behavior-eval` / `EVALS-README-HOOK-GUIDE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Documents hook result accumulation and PR/push improvement guide generation.
+- `evals-readme-behavior-eval` / `EVALS-README-PROMPT-FEEDBACK-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/README.md`
+  - critical: `true`
+  - description: Documents prompt-derived candidate routing and human feedback evidence.
+- `hook-runs-prompt-feedback-routing` / `HOOK-RUNS-PROMPT-FEEDBACK-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/agents/evals/results/hook-runs/README.md`
+  - critical: `true`
+  - description: Requires skill_usage prompt candidate routing and human feedback fields.
+- `tools-readme-prompt-eval-audit` / `TOOLS-README-EVAL-AUDIT-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/tools/README.md`
+  - critical: `true`
+  - description: Requires prompt eval audit status and growth-candidate zero closeout condition.
+- `tools-readme-prompt-eval-audit` / `TOOLS-README-EVAL-ACCUMULATE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/tools/README.md`
+  - critical: `true`
+  - description: Requires unique accumulated prompt eval report naming.
+- `tools-readme-prompt-eval-audit` / `TOOLS-README-IMPROVEMENT-GUIDE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/tools/README.md`
+  - critical: `true`
+  - description: Documents the PR and branch-push improvement guide tool.
+- `documents-tools-readme-prompt-eval-audit` / `DOCS-TOOLS-EVAL-AUDIT-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/documents/tools/README.md`
+  - critical: `true`
+  - description: Requires prompt eval audit status and duplicate-growth candidate wording.
+- `documents-tools-readme-prompt-eval-audit` / `DOCS-TOOLS-EVAL-ACCUMULATE-1`: `pass`
+  - target: `/workspace/vendor/agent-canon/documents/tools/README.md`
+  - critical: `true`
+  - description: Requires unique accumulated prompt eval report naming.
