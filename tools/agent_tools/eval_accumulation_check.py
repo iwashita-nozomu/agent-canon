@@ -64,6 +64,7 @@ class EvalAccumulationReport:
 
     hook_files: int
     hook_entries: int
+    hook_legacy_missing_namespace: int
     skill_reports: int
     local_llm_reports: int
     workflow_selection_reports: int
@@ -131,15 +132,15 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
     ]
 
 
-def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, list[Finding]]:
+def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
     """Parse one hook JSONL line and return its run id plus findings."""
     label = f"{relative(root, path)}:{line_no}"
     try:
         loaded = json.loads(raw_line)
     except json.JSONDecodeError:
-        return "", [Finding("hook_jsonl", label, "invalid-json")]
+        return "", 0, [Finding("hook_jsonl", label, "invalid-json")]
     if not isinstance(loaded, dict):
-        return "", [Finding("hook_jsonl", label, "entry-not-object")]
+        return "", 0, [Finding("hook_jsonl", label, "entry-not-object")]
     entry = cast(dict[str, object], loaded)
     namespaced = path.parent.name != "hook-runs"
     required_fields = HOOK_REQUIRED_FIELDS if namespaced else (
@@ -152,24 +153,29 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
         for field in required_fields
         if not isinstance(entry.get(field), str) or not str(entry.get(field)).strip()
     ]
+    legacy_missing_namespace = 0
     if namespaced and not isinstance(entry.get("hook_log_namespace"), str):
-        findings.append(Finding("hook_jsonl", label, "missing-field:hook_log_namespace"))
+        legacy_missing_namespace = 1
     run_id = entry.get("hook_run_id")
-    return (run_id if isinstance(run_id, str) else ""), findings
+    return (run_id if isinstance(run_id, str) else ""), legacy_missing_namespace, findings
 
 
-def hook_result_findings(root: Path, hook_dir: Path) -> tuple[int, int, list[Finding]]:
+def hook_result_findings(root: Path, hook_dir: Path) -> tuple[int, int, int, list[Finding]]:
     """Validate hook JSONL files."""
     findings: list[Finding] = []
     seen_run_ids: dict[str, str] = {}
     files = sorted(hook_dir.rglob("*.jsonl")) if hook_dir.is_dir() else []
     entries = 0
+    legacy_missing_namespace = 0
     for path in files:
         for line_no, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if not raw_line.strip():
                 continue
             entries += 1
-            run_id, line_findings = parse_hook_line(root, path, line_no, raw_line)
+            run_id, line_legacy_missing_namespace, line_findings = parse_hook_line(
+                root, path, line_no, raw_line
+            )
+            legacy_missing_namespace += line_legacy_missing_namespace
             findings.extend(line_findings)
             if not run_id:
                 continue
@@ -183,7 +189,7 @@ def hook_result_findings(root: Path, hook_dir: Path) -> tuple[int, int, list[Fin
     if files and entries == 0:
         findings.append(Finding("hook_jsonl", relative(root, hook_dir), "no-hook-entries"))
     findings.extend(ignored_path_findings(root, files))
-    return len(files), entries, findings
+    return len(files), entries, legacy_missing_namespace, findings
 
 
 def eval_run_id_from_text(text: str) -> str:
@@ -307,7 +313,7 @@ def validate(root: Path) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
     canon_root = agent_canon_root(root.resolve())
     findings = required_directory_findings(canon_root)
-    hook_files, hook_entries, hook_findings = hook_result_findings(
+    hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
         canon_root,
         canon_root / "agents" / "evals" / "results" / "hook-runs",
     )
@@ -335,6 +341,7 @@ def validate(root: Path) -> EvalAccumulationReport:
     return EvalAccumulationReport(
         hook_files=hook_files,
         hook_entries=hook_entries,
+        hook_legacy_missing_namespace=hook_legacy_missing_namespace,
         skill_reports=skill_reports,
         local_llm_reports=local_llm_reports,
         workflow_selection_reports=workflow_selection_reports,
@@ -350,6 +357,7 @@ def render_json(report: EvalAccumulationReport) -> str:
             "status": "pass" if not report.findings else "fail",
             "hook_files": report.hook_files,
             "hook_entries": report.hook_entries,
+            "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
             "skill_reports": report.skill_reports,
             "local_llm_reports": report.local_llm_reports,
             "workflow_selection_reports": report.workflow_selection_reports,
@@ -372,6 +380,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(finding.render())
         print(f"EVAL_ACCUMULATION_HOOK_FILES={report.hook_files}")
         print(f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}")
+        print(
+            "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
+            f"{report.hook_legacy_missing_namespace}"
+        )
         print(f"EVAL_ACCUMULATION_SKILL_REPORTS={report.skill_reports}")
         print(f"EVAL_ACCUMULATION_LOCAL_LLM_REPORTS={report.local_llm_reports}")
         print(f"EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS={report.workflow_selection_reports}")

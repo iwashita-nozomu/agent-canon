@@ -3164,7 +3164,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3172,7 +3172,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_entries",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3180,7 +3180,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_files",
-      "line": 348,
+      "line": 355,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "hook_legacy_missing_namespace",
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3188,7 +3196,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "local_llm_reports",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3196,7 +3204,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_quality_reports",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3204,7 +3212,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "skill_reports",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3212,7 +3220,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3220,7 +3228,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_selection_reports",
-      "line": 348,
+      "line": 355,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3228,7 +3236,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION",
-      "line": 380,
+      "line": 392,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3236,7 +3244,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_FINDINGS",
-      "line": 379,
+      "line": 391,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3244,7 +3252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_HOOK_ENTRIES",
-      "line": 374,
+      "line": 382,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3252,7 +3260,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_HOOK_FILES",
-      "line": 373,
+      "line": 381,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE",
+      "line": 383,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3260,7 +3276,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS",
-      "line": 376,
+      "line": 388,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3268,7 +3284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS",
-      "line": 378,
+      "line": 390,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3276,7 +3292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_SKILL_REPORTS",
-      "line": 375,
+      "line": 387,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -3284,7 +3300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS",
-      "line": 377,
+      "line": 389,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
