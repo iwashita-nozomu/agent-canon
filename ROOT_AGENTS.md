@@ -81,6 +81,12 @@ contract listed in `documents/README.md`.
 - Template-default environment and runtime guidance live in `docker/`.
 - Repo-wide durable rules live in `documents/`.
 
+## Execution Priorities
+
+- 規定の実行 target は GPU です。CPU 実行は user request、環境制約、または task scope 上の明示理由がある場合だけ使い、その理由と影響を validation evidence に残します。
+- 数値的 test / experiment / benchmark の緑化は禁止です。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU fallback などで pass させる前に、code・数学仕様・文書 contract のどこを直すべきかを判定し、必要なら failure として残します。
+- すべての変更では、コードと文書それぞれの責務を第一に考えます。実行できることや説明できることだけで完了扱いにせず、実装 surface と document surface が担うべき責務、境界、読者への契約に合っているかを優先して確認します。
+
 ## Runtime Profiles And Risk
 
 - Runtime surface が存在することと、その task で active であることを分けます。
