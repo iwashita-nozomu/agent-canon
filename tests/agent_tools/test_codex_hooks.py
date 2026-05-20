@@ -1344,6 +1344,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["selected_checkers"], ["ruff"])
         self.assertEqual(log_entry["unchecked_count"], 0)
 
+    def test_style_checker_guard_skips_read_only_bash_payloads(self) -> None:
+        """Bash tool names alone should not run style checks for read-only commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' sample.py",
+            "python3 -m ruff format sample.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "sample.py"
+                source.write_text("import os\n\nVALUE = 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(STYLE_CHECKER_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
+
     def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
         """Log surface guard should not consume tokens on a passing inventory check."""
         result = subprocess.run(
@@ -1739,6 +1777,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_skips_read_only_bash_payloads(self) -> None:
+        """Helper inventory guard should not block read-only Bash commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' changed.py",
+            "python3 -m ruff check changed.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "changed.py"
+                source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(HELPER_INVENTORY_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
 
     def test_helper_inventory_guard_uses_agentcanon_default_policy(self) -> None:
         """Missing repo-local policy should fall back to the AgentCanon default policy."""

@@ -164,7 +164,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "changed_python_count",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -172,7 +172,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "checked",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -180,7 +180,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "command",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -188,7 +188,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "domain_counts",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -196,7 +196,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "event",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -204,7 +204,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "inventory_returncode",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -212,7 +212,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "mode",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -220,7 +220,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "payload_status",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -228,7 +228,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "policy_path",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -236,7 +236,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "policy_status",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -244,7 +244,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "records",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -252,7 +252,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "status",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -260,7 +260,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "timestamp",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -268,7 +268,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "tool_name",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -276,7 +276,7 @@
       "certainty": "static",
       "emitter": "json_log_helper",
       "field": "violations",
-      "line": 424,
+      "line": 430,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -284,7 +284,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 382,
+      "line": 388,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -292,7 +292,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 392,
+      "line": 398,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -300,7 +300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
-      "line": 445,
+      "line": 451,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -308,7 +308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "decision",
-      "line": 459,
+      "line": 465,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -316,7 +316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "next_action",
-      "line": 445,
+      "line": 451,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -324,7 +324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "next_action",
-      "line": 459,
+      "line": 465,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -332,7 +332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "reason",
-      "line": 445,
+      "line": 451,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -340,7 +340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "reason",
-      "line": 459,
+      "line": 465,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -348,7 +348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "records",
-      "line": 276,
+      "line": 282,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -356,7 +356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "remediation",
-      "line": 445,
+      "line": 451,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -364,7 +364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "remediation",
-      "line": 459,
+      "line": 465,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },
@@ -372,7 +372,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "tool_status",
-      "line": 276,
+      "line": 282,
       "path": ".codex/hooks/helper_inventory_guard.py",
       "surface": "hook"
     },

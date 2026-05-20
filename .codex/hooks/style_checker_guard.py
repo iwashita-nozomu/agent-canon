@@ -31,7 +31,7 @@ PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
 TOOL_EVENT_FALLBACK = "PostToolUse"
 LOG_PATH_ENV = "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
-EDIT_TOOL_NAMES = {"apply_patch", "python", "python3", "Bash", "bash"}
+EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
 EDIT_COMMAND_PATTERN = re.compile(
     r"(?is)(apply_patch|python3?\s+-m\s+ruff\s+.*--fix|ruff\s+.*--fix|"
     r"python3?\s+(?:-c\b|-(?:\s|$)|<<)|jupyter\s+nbconvert|"
@@ -41,7 +41,7 @@ CHECKER_COMMAND_RE = re.compile(
     r"(?is)(style_checker_guard\.py|check_markdown_lint\.py|check_markdown_math\.py|"
     r"tools/validation/notebook_quality\.py|notebook_quality(?:_guard)?\.py|"
     r"tools/oop/python/readability\.py|tools/oop/cpp/readability\.py|"
-    r"python3?\s+-m\s+ruff\s+check|ruff\s+check)"
+    r"python3?\s+-m\s+ruff\s+(?:check|format)|ruff\s+(?:check|format))"
 )
 GIT_TIMEOUT_SECONDS = 10
 CHECK_TIMEOUT_SECONDS = 90
