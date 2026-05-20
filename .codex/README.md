@@ -134,6 +134,7 @@ or high-risk review. Profiles do not waive workflow gates.
 
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
 - `hooks.json` は active lifecycle event ごとに `hooks/hook_dispatcher.py` を 1 回だけ起動し、dispatcher が既存 guard scripts を順番に実行します。これにより hook 設定は少数の event entry に保ちつつ、個別 guard の責務、ログ、環境変数 override は維持します。
+- dispatcher は `GitStatus` tool、read-only な file / Git inspection、AgentCanon plan/status/latest-check を含む既知の validation command では child guard を起動しません。読み取りや検証のために `hooks.json` を退避したり hook 設定を一時無効化したりしてはいけません。
 - `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
 - `hooks/mcp_session_context.sh` は互換用の手動 context helper として残します。通常の Codex session startup / resume では呼び出しません。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。

@@ -79,14 +79,13 @@ case "$route" in
     ;;
   *)
     if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" && "${submodule_worktree_clean}" == "yes" ]]; then
-      git add "$PREFIX"
       echo "AGENT_CANON_LATEST=pass"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
       echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
-      echo "AGENT_CANON_LATEST_AUTO_REPAIR=staged_updated_submodule_pin"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=continue_checks_then_commit_updated_submodule_pin"
-      echo "AgentCanon submodule worktree is clean and already at remote main; staged the parent gitlink pin and continuing checks." >&2
+      echo "AGENT_CANON_LATEST_AUTO_REPAIR=skipped_read_only_check"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin"
+      echo "AgentCanon submodule worktree is clean and already at remote main; run 'make agent-canon-ensure-latest' to stage the parent gitlink pin." >&2
       exit 0
     fi
     if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" ]]; then

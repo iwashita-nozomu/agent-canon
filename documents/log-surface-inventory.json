@@ -380,7 +380,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 284,
+      "line": 583,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -388,7 +388,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 344,
+      "line": 645,
       "path": ".codex/hooks/hook_dispatcher.py",
       "surface": "hook"
     },
@@ -6380,7 +6380,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST",
-      "line": 83,
+      "line": 82,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6388,7 +6388,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST",
-      "line": 93,
+      "line": 92,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6396,7 +6396,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST",
-      "line": 101,
+      "line": 100,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6404,7 +6404,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_AUTO_REPAIR",
-      "line": 87,
+      "line": 86,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6436,7 +6436,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_MERGE_COMMAND",
-      "line": 107,
+      "line": 106,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6468,7 +6468,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_NEXT_ACTION",
-      "line": 88,
+      "line": 87,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6476,46 +6476,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_NEXT_ACTION",
-      "line": 97,
-      "path": "tools/ci/check_agent_canon_latest.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
-      "line": 106,
-      "path": "tools/ci/check_agent_canon_latest.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
-      "line": 112,
-      "path": "tools/ci/check_agent_canon_latest.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
-      "line": 116,
-      "path": "tools/ci/check_agent_canon_latest.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_PARENT_PIN_PENDING",
-      "line": 86,
-      "path": "tools/ci/check_agent_canon_latest.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_LATEST_PARENT_PIN_PENDING",
       "line": 96,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
@@ -6523,8 +6483,48 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
+      "line": 105,
+      "path": "tools/ci/check_agent_canon_latest.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
+      "line": 111,
+      "path": "tools/ci/check_agent_canon_latest.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_NEXT_ACTION",
+      "line": 115,
+      "path": "tools/ci/check_agent_canon_latest.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_PARENT_PIN_PENDING",
+      "line": 85,
+      "path": "tools/ci/check_agent_canon_latest.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LATEST_PARENT_PIN_PENDING",
+      "line": 95,
+      "path": "tools/ci/check_agent_canon_latest.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_POST_MERGE_COMMAND",
-      "line": 108,
+      "line": 107,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6564,7 +6564,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_ROUTE",
-      "line": 84,
+      "line": 83,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6572,7 +6572,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_ROUTE",
-      "line": 94,
+      "line": 93,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6580,7 +6580,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_ROUTE",
-      "line": 102,
+      "line": 101,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6636,7 +6636,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_WORKFLOW",
-      "line": 105,
+      "line": 104,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6644,7 +6644,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_WORKFLOW",
-      "line": 111,
+      "line": 110,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
@@ -6652,7 +6652,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LATEST_WORKFLOW",
-      "line": 115,
+      "line": 114,
       "path": "tools/ci/check_agent_canon_latest.sh",
       "surface": "tool"
     },
