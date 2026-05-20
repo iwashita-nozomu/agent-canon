@@ -27,6 +27,11 @@ POLICY_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_POLICY"
 MODE_ENV = "AGENT_CANON_HELPER_INVENTORY_GUARD_MODE"
 LOG_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+READ_ONLY_COMMAND_PATTERN = re.compile(
+    r"(?is)^\s*(git(?:\s+-C\s+\S+)?\s+(?:status|diff|show|log|branch|remote|"
+    r"rev-parse|ls-files|submodule\s+status|fetch\b)|rg\b|sed\s+-n\b|cat\b|"
+    r"ls\b|find\b|pwd\b|python3?\s+-m\s+ruff\s+(?:check|format)\b)"
+)
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_VALID = "valid"
@@ -138,14 +143,15 @@ def _tool_name(payload: dict[str, object]) -> str:
 def _should_check(payload: dict[str, object]) -> bool:
     if _uses_event_fallback(payload) and not _has_tool_signal(payload):
         return True
+    command = _tool_command(payload)
+    if READ_ONLY_COMMAND_PATTERN.search(command):
+        return False
     event = _hook_event_name(payload)
     if event == "Stop":
         return True
     if event != "PostToolUse":
         return False
-    return _tool_name(payload) in EDIT_TOOL_NAMES or bool(
-        EDIT_COMMAND_PATTERN.search(_tool_command(payload))
-    )
+    return _tool_name(payload) in EDIT_TOOL_NAMES or bool(EDIT_COMMAND_PATTERN.search(command))
 
 
 def _agentcanon_default_policy_path() -> Path:
