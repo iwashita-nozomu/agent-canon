@@ -1376,10 +1376,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn(f"agent_canon_plan_remote_url={old_bare_repo}", plan.stdout)
             self.assertIn("agent_canon_plan_route=already_current_submodule", plan.stdout)
 
-    def test_latest_check_stages_clean_submodule_worktree_at_remote_with_stale_parent_pin(
+    def test_latest_check_reports_clean_submodule_worktree_at_remote_with_stale_parent_pin(
         self,
     ) -> None:
-        """Latest gate should repair a stale parent gitlink when the submodule is clean."""
+        """Latest gate should report a stale parent gitlink without mutating the index."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -1415,11 +1415,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertIn("AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes", result.stdout)
             self.assertIn(
-                "AGENT_CANON_LATEST_AUTO_REPAIR=staged_updated_submodule_pin",
+                "AGENT_CANON_LATEST_AUTO_REPAIR=skipped_read_only_check",
                 result.stdout,
             )
             self.assertIn(
-                "AGENT_CANON_LATEST_NEXT_ACTION=continue_checks_then_commit_updated_submodule_pin",
+                "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin",
                 result.stdout,
             )
             staged = subprocess.run(
@@ -1429,7 +1429,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(staged.stdout.strip(), "vendor/agent-canon")
+            self.assertEqual(staged.stdout.strip(), "")
 
     def test_latest_check_fails_local_ahead_submodule_pin_as_pr_required(self) -> None:
         """A parent pin ahead of shared canon main is AgentCanon PR work, not latest."""

@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -21,6 +23,79 @@ from pathlib import Path
 DISPATCHER_DIR_ENV = "AGENT_CANON_HOOK_DISPATCHER_DIR"
 GIT_ROOT_TIMEOUT_SECONDS = 5
 MAX_REASON_LINES = 20
+READ_ONLY_TOOL_NAMES = {"gitstatus", "read", "grep", "glob", "list", "ls"}
+SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES = {
+    "-C",
+    "-c",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+}
+SAFE_GIT_GLOBAL_OPTION_PREFIXES = (
+    "--git-dir=",
+    "--work-tree=",
+    "--namespace=",
+)
+SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
+READ_ONLY_COMMANDS = {"cat", "head", "tail", "wc", "ls", "pwd", "nl", "stat", "rg", "grep"}
+SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
+SAFE_GIT_BRANCH_LIST_OPTIONS = {
+    "--all",
+    "--color",
+    "--list",
+    "--no-color",
+    "--remotes",
+    "--show-current",
+    "--verbose",
+    "-a",
+    "-r",
+    "-v",
+    "-vv",
+}
+GIT_BRANCH_MUTATING_OPTIONS = {
+    "--copy",
+    "--delete",
+    "--edit-description",
+    "--move",
+    "--set-upstream-to",
+    "--unset-upstream",
+    "-C",
+    "-D",
+    "-M",
+    "-c",
+    "-d",
+    "-m",
+}
+GIT_BRANCH_MUTATING_OPTION_PREFIXES = ("--set-upstream-to=",)
+GIT_WRITE_OUTPUT_OPTIONS = {"--output", "-o"}
+GIT_WRITE_OUTPUT_OPTION_PREFIXES = ("--output=",)
+SAFE_PYTHON_MODULE_CHECKS = {
+    "json.tool",
+    "pydocstyle",
+    "py_compile",
+    "pyright",
+    "pytest",
+    "ruff",
+}
+SAFE_MAKE_VALIDATION_TARGETS = {
+    "agent-canon-pr-check",
+    "agent-canon-latest-check",
+    "agent-checks",
+    "agent-surface-checks",
+    "ci",
+    "ci-quick",
+    "docs-check",
+    "github-workflow-check",
+    "test",
+}
+SAFE_TOOL_SCRIPT_PREFIXES = (
+    "check_",
+    "evaluate_",
+    "run_repo_dependency_review",
+    "scan_dependency_headers",
+    "tool_rejection_preflight",
+)
+SAFE_SED_PRINT_SCRIPT = re.compile(r"^(?:\d+|\$)(?:,(?:\d+|\$))?p$")
 
 
 @dataclass(frozen=True)
@@ -116,6 +191,230 @@ EVENT_ALIASES = {
 def load_raw_payload() -> bytes:
     """Read the hook payload once so every child receives identical stdin."""
     return sys.stdin.buffer.read()
+
+
+def json_payload(raw_payload: bytes) -> dict[str, object]:
+    """Return decoded hook payload JSON when available."""
+    if not raw_payload.strip():
+        return {}
+    try:
+        loaded = json.loads(raw_payload.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def tool_name(payload: dict[str, object]) -> str:
+    """Return the tool name from a hook payload."""
+    value = payload.get("tool_name")
+    return value if isinstance(value, str) else ""
+
+
+def tool_command(payload: dict[str, object]) -> str:
+    """Return command text from a hook payload."""
+    tool_input = payload.get("tool_input")
+    if isinstance(tool_input, dict):
+        command = tool_input.get("command") or tool_input.get("cmd")
+        if isinstance(command, str):
+            return command
+    for key in ("command", "cmd"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            return value
+    return ""
+
+
+def compact_tool_name(name: str) -> str:
+    """Return a comparison key for tool names across runtime spellings."""
+    return "".join(character for character in name.casefold() if character.isalnum())
+
+
+def git_subcommand_tokens(command: str) -> tuple[str, ...]:
+    """Return Git subcommand tokens for simple one-command invocations."""
+    stripped = command.strip()
+    if not stripped or any(marker in stripped for marker in SHELL_COMPOUND_MARKERS):
+        return ()
+    try:
+        tokens = shlex.split(stripped)
+    except ValueError:
+        return ()
+    if not tokens or tokens[0] != "git":
+        return ()
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES:
+            index += 2
+            continue
+        if any(token.startswith(prefix) for prefix in SAFE_GIT_GLOBAL_OPTION_PREFIXES):
+            index += 1
+            continue
+        break
+    return tuple(tokens[index:])
+
+
+def simple_shell_tokens(command: str) -> tuple[str, ...]:
+    """Return tokens for a simple one-command shell payload."""
+    stripped = command.strip()
+    if not stripped or any(marker in stripped for marker in SHELL_COMPOUND_MARKERS):
+        return ()
+    try:
+        return tuple(shlex.split(stripped))
+    except ValueError:
+        return ()
+
+
+def read_only_git_command(command: str) -> bool:
+    """Return whether a Bash command is only Git inspection."""
+    tokens = git_subcommand_tokens(command)
+    if not tokens:
+        return False
+    subcommand = tokens[0]
+    arguments = tokens[1:]
+    if any(git_write_output_argument(argument) for argument in arguments):
+        return False
+    if subcommand == "status":
+        return True
+    if subcommand == "diff":
+        return "--ext-diff" not in arguments
+    if subcommand == "branch":
+        return read_only_git_branch_arguments(arguments)
+    if subcommand == "remote":
+        return read_only_git_remote_arguments(arguments)
+    if len(tokens) >= 2 and tokens[:2] == ("submodule", "status"):
+        return True
+    return subcommand in SAFE_GIT_READ_SUBCOMMANDS
+
+
+def git_write_output_argument(argument: str) -> bool:
+    """Return whether a Git argument writes command output to a file."""
+    return (
+        argument in GIT_WRITE_OUTPUT_OPTIONS
+        or argument.startswith(GIT_WRITE_OUTPUT_OPTION_PREFIXES)
+        or (argument.startswith("-o") and not argument.startswith("--"))
+    )
+
+
+def read_only_git_branch_arguments(arguments: tuple[str, ...]) -> bool:
+    """Return whether `git branch` arguments only list branch state."""
+    if any(git_branch_mutating_argument(argument) for argument in arguments):
+        return False
+    if not arguments:
+        return True
+    if arguments == ("--show-current",):
+        return True
+    if arguments[0] == "--list":
+        return all(git_branch_list_argument(argument) for argument in arguments)
+    return all(argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=") for argument in arguments)
+
+
+def git_branch_mutating_argument(argument: str) -> bool:
+    """Return whether a `git branch` argument mutates branch metadata."""
+    return argument in GIT_BRANCH_MUTATING_OPTIONS or argument.startswith(GIT_BRANCH_MUTATING_OPTION_PREFIXES)
+
+
+def git_branch_list_argument(argument: str) -> bool:
+    """Return whether a `git branch --list` argument is list-only."""
+    return argument in SAFE_GIT_BRANCH_LIST_OPTIONS or argument.startswith("--format=") or not argument.startswith("-")
+
+
+def read_only_git_remote_arguments(arguments: tuple[str, ...]) -> bool:
+    """Return whether `git remote` arguments only inspect remote state."""
+    if not arguments or arguments in {("-v",), ("--verbose",)}:
+        return True
+    return arguments[0] in {"get-url", "show"}
+
+
+def read_only_shell_command(command: str) -> bool:
+    """Return whether a Bash command is a simple read-only inspection."""
+    if read_only_git_command(command):
+        return True
+    tokens = simple_shell_tokens(command)
+    if not tokens:
+        return False
+    if tokens[0] == "sed":
+        return read_only_sed_arguments(tokens[1:])
+    return tokens[0] in READ_ONLY_COMMANDS
+
+
+def read_only_sed_arguments(arguments: tuple[str, ...]) -> bool:
+    """Return whether `sed` arguments are limited to range printing."""
+    if any(sed_in_place_argument(argument) for argument in arguments):
+        return False
+    script_candidates = [
+        argument
+        for argument in arguments
+        if argument not in {"-n", "--quiet", "--silent", "--"}
+    ]
+    return bool(script_candidates) and bool(SAFE_SED_PRINT_SCRIPT.fullmatch(script_candidates[0]))
+
+
+def sed_in_place_argument(argument: str) -> bool:
+    """Return whether a sed argument enables in-place writes."""
+    if argument == "--in-place" or argument.startswith("--in-place="):
+        return True
+    return argument.startswith("-") and not argument.startswith("--") and "i" in argument[1:]
+
+
+def safe_python_validation(tokens: tuple[str, ...]) -> bool:
+    """Return whether tokens invoke a Python validation command."""
+    if len(tokens) >= 3 and tokens[1] == "-m":
+        module = tokens[2]
+        if module == "ruff":
+            return len(tokens) >= 4 and tokens[3] == "check"
+        return module in SAFE_PYTHON_MODULE_CHECKS
+    if len(tokens) >= 2:
+        script = Path(tokens[1])
+        if script.parts[:2] == ("tools", "agent_tools"):
+            return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
+        if script.parts[:2] == ("tools", "docs") and script.name.startswith("check_"):
+            return True
+        if script.parts[:2] in {("tools", "validation"), ("tools", "oop")}:
+            return True
+    return False
+
+
+def safe_bash_validation(tokens: tuple[str, ...]) -> bool:
+    """Return whether tokens invoke a Bash validation script."""
+    if len(tokens) < 2:
+        return False
+    script = Path(tokens[1])
+    if script.as_posix() == "tools/sync_agent_canon.sh":
+        return len(tokens) >= 3 and tokens[2] in {"check", "plan", "status"}
+    if script.as_posix() == "tools/update_agent_canon.sh":
+        return len(tokens) >= 3 and tokens[2] in {"plan", "status"}
+    if script.parts[:2] == ("tools", "agent_tools"):
+        return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
+    if script.parts[:2] == ("tools", "ci"):
+        return script.name.startswith(("check_", "run_"))
+    return False
+
+
+def validation_command(command: str) -> bool:
+    """Return whether a Bash command is a known validation/check command."""
+    tokens = simple_shell_tokens(command)
+    if not tokens:
+        return False
+    if tokens[0] in {"pytest", "pyright", "pydocstyle"}:
+        return True
+    if tokens[0] == "ruff":
+        return len(tokens) >= 2 and tokens[1] == "check"
+    if tokens[0] in {"python", "python3"}:
+        return safe_python_validation(tokens)
+    if tokens[0] == "bash":
+        return safe_bash_validation(tokens)
+    if tokens[0] == "make":
+        return bool(tokens[1:]) and all(token in SAFE_MAKE_VALIDATION_TARGETS for token in tokens[1:])
+    return False
+
+
+def bypass_child_guards_payload(raw_payload: bytes) -> bool:
+    """Return whether this hook payload should skip child guard execution."""
+    payload = json_payload(raw_payload)
+    if compact_tool_name(tool_name(payload)) in READ_ONLY_TOOL_NAMES:
+        return True
+    command = tool_command(payload)
+    return read_only_shell_command(command) or validation_command(command)
 
 
 def repo_root() -> Path:
@@ -287,6 +586,8 @@ def emit_json_payload(payload: dict[str, object]) -> None:
 
 def dispatch_event(event: str, raw_payload: bytes) -> int:
     """Run every child hook for one event and emit the highest-priority output."""
+    if bypass_child_guards_payload(raw_payload):
+        return 0
     root = repo_root()
     hooks_dir = hook_directory()
     results = [
