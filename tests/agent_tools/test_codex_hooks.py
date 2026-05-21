@@ -2468,6 +2468,37 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["skill_source_fields"], ["tool_input"])
         self.assertTrue(entry["tool_input_fingerprint"])
 
+    def test_skill_usage_logger_does_not_count_prompt_shell_variables_as_skills(self) -> None:
+        """Prompt dollar tokens should be known skills, not shell variable lookalikes."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "Use $latest and $PID and $USER, then decide skill routing.",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["skills"], [])
+        self.assertEqual(entry["selected_skills"], [])
+        self.assertNotIn("skill:latest", entry["feedback_targets"])
+        self.assertNotIn("latest", entry["candidate_skills"])
+        self.assertIn("agent-orchestration", entry["candidate_skills"])
+        self.assertEqual(entry["skill_source_fields"], ["prompt"])
+
     def test_skill_usage_logger_records_subagent_lifecycle_selection(self) -> None:
         """Subagent lifecycle logging should record spawn metadata without prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2665,6 +2696,8 @@ class CodexHooksTest(unittest.TestCase):
             entry["workflow_monitor_feedback_count"], EXPECTED_PROMPT_FEEDBACK_MIN
         )
         self.assertIn("runtime_feedback=observed", monitoring)
+        self.assertIn("skill_candidate=$agent-learning", monitoring)
+        self.assertIn("skill_candidate=$result-artifact-writeout", monitoring)
         self.assertIn("target=skill:result-artifact-writeout", monitoring)
         self.assertIn("target=tool:workflow_monitor.py", monitoring)
 

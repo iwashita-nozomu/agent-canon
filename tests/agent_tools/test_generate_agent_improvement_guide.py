@@ -66,6 +66,8 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("prompt", guide)
         self.assertIn("prompt_candidate_skill_counts:", guide)
         self.assertIn("result-artifact-writeout", guide)
+        self.assertIn("Skill Routing Gaps", guide)
+        self.assertIn("`result-artifact-writeout`: gap=`2` selected=`0` candidate=`1` feedback=`1`", guide)
         self.assertIn("prompt_candidate_workflow_counts:", guide)
         self.assertIn("codex-task-workflow", guide)
         self.assertIn("prompt_candidate_tool_counts:", guide)

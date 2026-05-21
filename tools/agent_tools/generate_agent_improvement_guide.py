@@ -543,6 +543,7 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     """Return all detailed guide sections after the summary."""
     sections: list[str] = []
     sections.extend(named_section("Improvement Guidance", guidance(summary)))
+    sections.extend(named_section("Skill Routing Gaps", skill_routing_gap_lines(summary.hook_counts)))
     sections.extend(named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills)))
     sections.extend(named_section("Prompt Candidate Skills", counter_lines(summary.hook_counts.candidate_skills)))
     sections.extend(named_section("Prompt Candidate Workflows", counter_lines(summary.hook_counts.candidate_workflows)))
@@ -644,6 +645,10 @@ def guidance(summary: EvidenceSummary) -> list[str]:
         lines.append(
             "- Review repeated code-checker target files and decide whether the tool, skill, or target code owns the repair."
         )
+    if skill_routing_gap_lines(summary.hook_counts) != ["- none"]:
+        lines.append(
+            "- Repair skill-selection routing for skills with high candidate or feedback pressure but low selected-skill evidence."
+        )
     if summary.hook_counts.quality:
         lines.append(
             "- Treat hook quality counters as instrumentation debt; repair unknown events, empty skill signals, or missing workflow monitor events."
@@ -680,6 +685,40 @@ def counter_lines(counter: Counter[str]) -> list[str]:
     return [
         f"- `{name}`: `{count}`"
         for name, count in counter.most_common(MAX_COUNTER_LINES)
+    ]
+
+
+def skill_feedback_counts(feedback_targets: Counter[str]) -> Counter[str]:
+    """Return feedback target counts keyed by skill id."""
+    counts: Counter[str] = Counter()
+    for target, count in feedback_targets.items():
+        if target.startswith("skill:"):
+            counts[target.removeprefix("skill:")] += count
+    return counts
+
+
+def skill_routing_gap_lines(counts: HookEvidenceCounts) -> list[str]:
+    """Return bullets for skills whose candidate/feedback pressure exceeds selection."""
+    feedback = skill_feedback_counts(counts.feedback_targets)
+    rows: list[tuple[int, str, int, int, int]] = []
+    for skill in set(counts.candidate_skills) | set(feedback) | set(counts.skills):
+        selected = counts.skills[skill]
+        candidate = counts.candidate_skills[skill]
+        feedback_count = feedback[skill]
+        pressure = candidate + feedback_count
+        gap = max(pressure - selected, 0)
+        if gap:
+            rows.append((gap, skill, selected, candidate, feedback_count))
+    if not rows:
+        return ["- none"]
+    return [
+        (
+            f"- `{skill}`: gap=`{gap}` selected=`{selected}` "
+            f"candidate=`{candidate}` feedback=`{feedback_count}`"
+        )
+        for gap, skill, selected, candidate, feedback_count in sorted(rows, reverse=True)[
+            :MAX_COUNTER_LINES
+        ]
     ]
 
 

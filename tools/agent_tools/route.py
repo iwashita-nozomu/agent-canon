@@ -21,8 +21,10 @@ SKILL_NAME = "task-routing"
 TOOL_NAME = "route.py"
 RISK_VALUES = ("routine", "focused", "profile", "shared", "large")
 FORMAT_VALUES = ("text", "json", "markdown")
+MODE_VALUES = ("routing-only", "repo-changing")
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
+SkillRuleData = tuple[str, str, tuple[tuple[str, ...], ...]]
 
 AREA_DATA: tuple[AreaData, ...] = (
     (
@@ -248,6 +250,101 @@ AREA_DATA: tuple[AreaData, ...] = (
     ),
 )
 
+SKILL_RULES: tuple[SkillRuleData, ...] = (
+    (
+        "agent-orchestration",
+        "workflow, skill, subagent, or stage routing is part of the request",
+        (
+            ("どのスキル",),
+            ("どのskill",),
+            ("スキル選択",),
+            ("skill selection",),
+            ("routing", "skill"),
+            ("ルーティング", "スキル"),
+            ("マルチエージェント",),
+            ("サブエージェント", "起動"),
+            ("subagent", "routing"),
+            ("workflow=", "skills="),
+        ),
+    ),
+    (
+        "subagent-bootstrap",
+        "explicit subagent or multi-agent execution requires run-local specialist routing",
+        (
+            ("マルチエージェント",),
+            ("サブエージェント",),
+            ("subagent",),
+            ("multi-agent",),
+        ),
+    ),
+    (
+        "agent-learning",
+        "user feedback or recurrence prevention should become durable agent learning",
+        (
+            ("人間からのフィードバック",),
+            ("runtime feedback",),
+            ("再発防止",),
+            ("こういう止まり方",),
+            ("フィードバック", "修正"),
+            ("feedback", "repair"),
+            ("memory", "feedback"),
+        ),
+    ),
+    (
+        "md-style-check",
+        "Markdown style, links, headings, or docs lint are in scope",
+        (
+            ("md-style",),
+            ("docs-check",),
+            ("markdownlint",),
+            ("markdown", "lint"),
+            ("markdown", "heading"),
+            ("markdown", "link"),
+            ("マークダウン", "体裁"),
+            ("マークダウン", "リンク"),
+        ),
+    ),
+    (
+        "oop-readability-check",
+        "OOP readability or readability guard evidence is in scope",
+        (
+            ("oop", "readability"),
+            ("oop", "可読"),
+            ("オブジェクト指向", "可読"),
+            ("readability", "guard"),
+            ("readability", "check"),
+            ("可読性", "class"),
+            ("可読性", "method"),
+        ),
+    ),
+    (
+        "result-artifact-writeout",
+        "raw results, reports, manifests, or accumulated evidence must be written out",
+        (
+            ("結果書き出し",),
+            ("結果を書き出",),
+            ("result writeout",),
+            ("artifact", "evidence"),
+            ("artifact", "report"),
+            ("run bundle", "evidence"),
+            ("蓄積分析", "レポート"),
+            ("ログ", "レポート", "残"),
+        ),
+    ),
+)
+REPO_CHANGING_TERMS = (
+    "修正",
+    "実装",
+    "リファクタ",
+    "変更",
+    "直して",
+    "見直",
+    "fix",
+    "implement",
+    "refactor",
+    "repo-changing",
+)
+
 
 @dataclass(frozen=True)
 class RouteArea:
@@ -282,6 +379,26 @@ class RouteDecision:
 
 
 @dataclass(frozen=True)
+class SkillRouteMatch:
+    """One prompt-derived public skill route."""
+
+    skill: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class SkillRouteDecision:
+    """Prompt-derived public skill selection decision."""
+
+    route: str
+    mode: str
+    skills: tuple[str, ...]
+    matched_skills: tuple[str, ...]
+    reasons: tuple[str, ...]
+    evidence: str
+
+
+@dataclass(frozen=True)
 class NameResolution:
     """Compatibility resolution for one proposed tool or skill name."""
 
@@ -301,11 +418,12 @@ class RouteCatalog:
     """Catalog of short routing areas and long-name aliases."""
 
     def __init__(self, areas: Sequence[RouteArea]) -> None:
+        """Initialize route areas and aliases."""
         self._areas = {area.key: area for area in areas}
         self._aliases = self._build_aliases(areas)
 
     @classmethod
-    def default(cls) -> "RouteCatalog":
+    def default(cls) -> RouteCatalog:
         """Build the default catalog."""
         return cls(build_default_areas())
 
@@ -354,6 +472,8 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--area", choices=[area.key for area in catalog.areas()])
     parser.add_argument("--name", action="append", default=[], help="long tool or skill name")
+    parser.add_argument("--prompt", default="", help="prompt text to route into public skills")
+    parser.add_argument("--mode", choices=MODE_VALUES, default="repo-changing")
     parser.add_argument("--list", action="store_true", help="list short routing areas")
     parser.add_argument("--format", choices=FORMAT_VALUES, default="text")
     parser.add_argument("--risk", choices=RISK_VALUES, default="focused")
@@ -376,10 +496,68 @@ def decide(area: RouteArea, risk: str, changed_paths: Sequence[str]) -> RouteDec
     )
 
 
+def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
+    """Return whether all group terms appear in text."""
+    return all(term.lower() in text for term in group)
+
+
+def matched_skill_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
+    """Return public skill matches for one prompt."""
+    text = prompt.lower()
+    matches: list[SkillRouteMatch] = []
+    for skill, reason, groups in SKILL_RULES:
+        if any(text_matches_group(text, group) for group in groups):
+            matches.append(SkillRouteMatch(skill, reason))
+    return tuple(matches)
+
+
+def infer_mode(prompt: str, requested_mode: str) -> str:
+    """Return repo-changing mode when the prompt clearly asks for edits."""
+    if requested_mode == "repo-changing":
+        return requested_mode
+    text = prompt.lower()
+    if any(term.lower() in text for term in REPO_CHANGING_TERMS):
+        return "repo-changing"
+    return requested_mode
+
+
+def ordered_unique(values: Iterable[str]) -> tuple[str, ...]:
+    """Return values in first-seen order without duplicates."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return tuple(result)
+
+
+def decide_skills(prompt: str, mode: str) -> SkillRouteDecision:
+    """Create a prompt-derived public skill route decision."""
+    active_mode = infer_mode(prompt, mode)
+    matches = matched_skill_routes(prompt)
+    matched_skills = tuple(match.skill for match in matches)
+    base_skills = ["agent-orchestration"]
+    if active_mode == "repo-changing":
+        base_skills.append("codex-task-workflow")
+    skills = ordered_unique((*base_skills, *matched_skills))
+    evidence = f"mode={active_mode};matched={','.join(matched_skills) if matched_skills else 'none'}"
+    return SkillRouteDecision(
+        route="skill-selection",
+        mode=active_mode,
+        skills=skills,
+        matched_skills=matched_skills,
+        reasons=tuple(f"{match.skill}:{match.reason}" for match in matches),
+        evidence=evidence,
+    )
+
+
 class RouteRenderer:
     """Render route catalog outputs."""
 
     def __init__(self, output_format: str) -> None:
+        """Initialize the renderer for one output format."""
         self._format = output_format
 
     def render_areas(self, areas: Sequence[RouteArea]) -> str:
@@ -416,6 +594,34 @@ class RouteRenderer:
                 f"NEXT_ACTION={decision.next_action}",
                 f"COMMANDS={' && '.join(decision.commands)}",
                 f"SKIP_REASON={decision.skip_reason}",
+                f"EVIDENCE={decision.evidence}",
+            ]
+        )
+
+    def render_skill_decision(self, decision: SkillRouteDecision) -> str:
+        """Render one prompt-derived skill selection decision."""
+        if self._format == "json":
+            return json.dumps(asdict(decision), indent=2, sort_keys=True)
+        if self._format == "markdown":
+            skills = ", ".join(f"`${skill}`" for skill in decision.skills)
+            reasons = "<br>".join(f"`{reason}`" for reason in decision.reasons) or "`none`"
+            return "\n".join(
+                [
+                    f"- Route: `{decision.route}`",
+                    f"- Mode: `{decision.mode}`",
+                    f"- Skills: {skills}",
+                    f"- Matched skills: `{','.join(decision.matched_skills) or 'none'}`",
+                    f"- Reasons: {reasons}",
+                    f"- Evidence: `{decision.evidence}`",
+                ]
+            )
+        return "\n".join(
+            [
+                f"ROUTE={decision.route}",
+                f"MODE={decision.mode}",
+                f"SKILLS={','.join(f'${skill}' for skill in decision.skills)}",
+                f"MATCHED_SKILLS={','.join(decision.matched_skills) or '-'}",
+                f"REASONS={';'.join(decision.reasons) or '-'}",
                 f"EVIDENCE={decision.evidence}",
             ]
         )
@@ -476,6 +682,10 @@ def main() -> int:
     parser = build_parser(catalog)
     args = parser.parse_args()
     renderer = RouteRenderer(args.format)
+
+    if args.prompt:
+        print(renderer.render_skill_decision(decide_skills(str(args.prompt), str(args.mode))))
+        return 0
 
     if args.name:
         resolutions = [catalog.resolve_name(name) for name in args.name]

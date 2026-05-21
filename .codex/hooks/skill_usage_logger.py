@@ -34,13 +34,100 @@ WORKFLOW_FIELD_RE = re.compile(
 )
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 IGNORED_SKILL_IDS = frozenset(("skill-name",))
+KNOWN_SKILL_IDS = frozenset(
+    (
+        "academic-writing",
+        "adaptive-improvement-loop",
+        "agent-learning",
+        "agent-orchestration",
+        "agent-update-branch",
+        "behavior-preserving-refactor",
+        "change-review",
+        "codex-task-workflow",
+        "comprehensive-development",
+        "cpp-review",
+        "dependency-analysis",
+        "document-canon-cleanup",
+        "empirical-prompt-tuning",
+        "environment-maintenance",
+        "experiment-lifecycle",
+        "imagegen",
+        "literature-survey",
+        "long-form-writing",
+        "md-style-check",
+        "openai-docs",
+        "oop-readability-check",
+        "paper-writing",
+        "plugin-creator",
+        "python-review",
+        "repo-onboarding",
+        "report-writing",
+        "research-workflow",
+        "result-artifact-writeout",
+        "skill-creator",
+        "skill-installer",
+        "start-repository",
+        "subagent-bootstrap",
+        "task-routing",
+        "test-design",
+        "user-preference-sync",
+        "worktree-health",
+        "worktree-start",
+    )
+)
 GIT_ROOT_TIMEOUT_SECONDS = 5
-SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
-    "agent-orchestration": ("どのスキル", "どのskill", "workflow=", "routing", "フロー"),
-    "md-style-check": ("markdown", "マークダウン", "md-style", "docs-check", "markdownlint"),
-    "result-artifact-writeout": ("結果書き出し", "結果を書き出", "result writeout", "artifact"),
-    "oop-readability-check": ("oop", "readability", "オブジェクト指向"),
+SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "agent-learning": (
+        ("人間からのフィードバック",),
+        ("runtime feedback",),
+        ("再発防止",),
+        ("こういう止まり方",),
+        ("フィードバック", "修正"),
+        ("feedback", "repair"),
+        ("memory", "feedback"),
+        ("学習", "agent"),
+    ),
+    "agent-orchestration": (
+        ("どのスキル",),
+        ("どのskill",),
+        ("スキル選択",),
+        ("skill selection",),
+        ("routing", "skill"),
+        ("ルーティング", "スキル"),
+        ("マルチエージェント",),
+        ("サブエージェント", "起動"),
+        ("subagent", "routing"),
+        ("workflow=", "skills="),
+    ),
+    "md-style-check": (
+        ("md-style",),
+        ("docs-check",),
+        ("markdownlint",),
+        ("markdown", "lint"),
+        ("markdown", "heading"),
+        ("markdown", "link"),
+        ("マークダウン", "体裁"),
+        ("マークダウン", "リンク"),
+    ),
+    "result-artifact-writeout": (
+        ("結果書き出し",),
+        ("結果を書き出",),
+        ("result writeout",),
+        ("artifact", "evidence"),
+        ("artifact", "report"),
+        ("run bundle", "evidence"),
+        ("蓄積分析", "レポート"),
+        ("ログ", "レポート", "残"),
+    ),
+    "oop-readability-check": (
+        ("oop", "readability"),
+        ("oop", "可読"),
+        ("オブジェクト指向", "可読"),
+        ("readability", "guard"),
+        ("readability", "check"),
+        ("可読性", "class"),
+        ("可読性", "method"),
+    ),
 }
 WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "adaptive-improvement-loop": ("goal.md", "next_action", "backlog", "iteration", "改善ループ"),
@@ -246,7 +333,9 @@ def extract_skill_ids(text: str) -> set[str]:
     return {
         skill
         for skill in skills
-        if SKILL_ID_RE.fullmatch(skill) and skill not in IGNORED_SKILL_IDS
+        if SKILL_ID_RE.fullmatch(skill)
+        and skill not in IGNORED_SKILL_IDS
+        and skill in KNOWN_SKILL_IDS
     }
 
 
@@ -350,6 +439,19 @@ def keyword_matches(texts: list[str], mapping: dict[str, tuple[str, ...]]) -> tu
     )
 
 
+def grouped_keyword_matches(
+    texts: list[str],
+    mapping: dict[str, tuple[tuple[str, ...], ...]],
+) -> tuple[str, ...]:
+    """Return keys whose keyword groups all appear in observed prompt text."""
+    haystack = "\n".join(texts).lower()
+    return tuple(
+        key
+        for key, groups in sorted(mapping.items())
+        if any(all(needle.lower() in haystack for needle in group) for group in groups)
+    )
+
+
 def feedback_action(labels: tuple[str, ...]) -> str:
     """Return the workflow-monitor action for observed human feedback."""
     if not labels:
@@ -367,7 +469,7 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     return PromptIntakeSignals(
         skills=tuple(observed_skills(payload)),
         selected_workflows=tuple(observed_workflows(payload)),
-        candidate_skills=keyword_matches(skill_texts, SKILL_KEYWORDS),
+        candidate_skills=grouped_keyword_matches(skill_texts, SKILL_KEYWORD_GROUPS),
         candidate_workflows=keyword_matches(skill_texts, WORKFLOW_KEYWORDS),
         candidate_tools=keyword_matches(candidate_texts, TOOL_KEYWORDS),
         feedback_labels=labels,
@@ -511,6 +613,25 @@ def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> 
                 report_dir,
                 "--behavior-event",
                 f"skill_invocation=${skill} status=observed source=codex_hook",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_ROOT_TIMEOUT_SECONDS,
+        )
+        if result.returncode == 0:
+            skill_event_count += 1
+    for skill in signals.candidate_skills:
+        if skill in signals.skills:
+            continue
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(monitor),
+                "--report-dir",
+                report_dir,
+                "--behavior-event",
+                f"skill_candidate=${skill} status=observed source=codex_hook",
             ],
             check=False,
             capture_output=True,

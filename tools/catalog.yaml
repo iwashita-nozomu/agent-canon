@@ -357,7 +357,7 @@ entries:
       - tests/agent_tools/test_search_index.py
 
   - id: route
-    summary: Maps long proposed tool and skill names to short task-routing areas.
+    summary: Maps long proposed tool/skill names and broad prompts to short task-routing areas and public skill sets.
     path: tools/agent_tools/route.py
     family: agent_tools
     role: workflow
