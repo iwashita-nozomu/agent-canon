@@ -59,21 +59,21 @@ upstream design README.md durable document index
 .PHONY: experiment-check experiment-smoke experiment-formal
 
 experiment-check:
-	python3 tools/ci/check_experiment_registry.py
+  python3 tools/ci/check_experiment_registry.py
 
 experiment-smoke:
-	python3 tools/experiments/run_managed_experiment.py \
-	  --topic $(TOPIC) \
-	  --variant smoke \
-	  --config-json experiments/$(TOPIC)/config.json \
-	  --use-registered-command smoke
+  python3 tools/experiments/run_managed_experiment.py \
+    --topic $(TOPIC) \
+    --variant smoke \
+    --config-json experiments/$(TOPIC)/config.json \
+    --use-registered-command smoke
 
 experiment-formal:
-	python3 tools/experiments/run_managed_experiment.py \
-	  --topic $(TOPIC) \
-	  --variant formal \
-	  --config-json experiments/$(TOPIC)/config.json \
-	  --use-registered-command formal
+  python3 tools/experiments/run_managed_experiment.py \
+    --topic $(TOPIC) \
+    --variant formal \
+    --config-json experiments/$(TOPIC)/config.json \
+    --use-registered-command formal
 ```
 
 YAML を checked-in 正本にする repo では、上の `--config-json` は
@@ -88,10 +88,10 @@ topic 固有の target 名を置く場合も、内側では同じ managed runner
 .PHONY: demand-site-battery-smoke demand-site-battery-formal
 
 demand-site-battery-smoke:
-	$(MAKE) experiment-smoke TOPIC=demand_site_battery_control
+  $(MAKE) experiment-smoke TOPIC=demand_site_battery_control
 
 demand-site-battery-formal:
-	$(MAKE) experiment-formal TOPIC=demand_site_battery_control
+  $(MAKE) experiment-formal TOPIC=demand_site_battery_control
 ```
 
 直接許可するのは、開発中の `--help`、import check、単一 case の debugger 起動だけです。

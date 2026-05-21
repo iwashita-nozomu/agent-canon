@@ -16,6 +16,7 @@
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
+# upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
 # @dependency-end
 
 from __future__ import annotations
@@ -672,6 +673,251 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("first warning", cast(str, payload["reason"]))
         self.assertIn("plain diagnostic", cast(str, payload["reason"]))
         self.assertEqual(payload["next_action"], "first_action")
+
+    def test_hook_dispatcher_skips_git_status_tool_payloads(self) -> None:
+        """GitStatus-style tool checks should not run blocking hook children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "cause_investigation_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "GitStatus",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_read_only_git_status_bash_commands(self) -> None:
+        """Read-only git status Bash commands should not trigger blocking children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "cmd": "git -C vendor/agent-canon status --short --branch --untracked-files=all",
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_read_only_file_inspection_commands(self) -> None:
+        """Read-only file inspection should not require disabling hook config."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "sed -n '1,120p' .codex/hooks.json"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_validation_commands(self) -> None:
+        """Validation commands should not be blocked by post-tool hook children."""
+        commands = [
+            "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+            "bash tools/ci/check_agent_canon_latest.sh",
+            "bash tools/update_agent_canon.sh plan",
+            "bash tools/sync_agent_canon.sh status",
+            "make agent-canon-latest-check agent-surface-checks",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "style_checker_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertEqual(result.stdout, "")
+                self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_runs_children_for_mutating_lookalikes(self) -> None:
+        """Write-capable lookalikes should not use the read-only bypass."""
+        commands = [
+            "cat AGENTS.md > /tmp/out",
+            "sed -ni '1,120p' .codex/hooks.json",
+            "sed --in-place=.bak -n '1,120p' .codex/hooks.json",
+            "git branch -D main",
+            "git branch --list --delete main",
+            "git remote add x y",
+            "git diff --output=/tmp/out",
+            "git diff -o/tmp/out",
+            "make ci deploy",
+            "bash tools/update_agent_canon.sh latest",
+            "bash tools/update_agent_canon.sh merge-main-into-current",
+            "bash tools/sync_agent_canon.sh ensure-latest",
+            "bash tools/sync_agent_canon.sh link-root",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "cause_investigation_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"child ran\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertIn("child ran", result.stdout)
+                self.assertEqual(log_path.read_text(encoding="utf-8"), "called\n")
 
     def test_style_checker_guard_logs_markdown_and_unchecked_files(self) -> None:
         """Style hook should select Markdown checks and log changed files without a checker."""
@@ -1344,6 +1590,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["selected_checkers"], ["ruff"])
         self.assertEqual(log_entry["unchecked_count"], 0)
 
+    def test_style_checker_guard_skips_read_only_bash_payloads(self) -> None:
+        """Bash tool names alone should not run style checks for read-only commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' sample.py",
+            "python3 -m ruff format sample.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "sample.py"
+                source.write_text("import os\n\nVALUE = 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(STYLE_CHECKER_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
+
     def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
         """Log surface guard should not consume tokens on a passing inventory check."""
         result = subprocess.run(
@@ -1739,6 +2023,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_skips_read_only_bash_payloads(self) -> None:
+        """Helper inventory guard should not block read-only Bash commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' changed.py",
+            "python3 -m ruff check changed.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "changed.py"
+                source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(HELPER_INVENTORY_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
 
     def test_helper_inventory_guard_uses_agentcanon_default_policy(self) -> None:
         """Missing repo-local policy should fall back to the AgentCanon default policy."""

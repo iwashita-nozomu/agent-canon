@@ -535,6 +535,10 @@ Template-specific hook behavior:
   event. The dispatcher replays the original stdin payload to the child guard
   scripts in the configured order and returns the first blocking JSON payload,
   or the first non-blocking visible output when no guard blocks.
+- The dispatcher bypasses child guards for `GitStatus`, read-only file / Git
+  inspection, and known validation commands including AgentCanon
+  plan/status/latest-check inspection. Do not rename, move, or temporarily
+  disable `hooks.json` to inspect hook state or run validation.
 - `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
   reference capture checks.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
