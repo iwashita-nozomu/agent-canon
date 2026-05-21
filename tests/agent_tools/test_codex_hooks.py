@@ -2426,6 +2426,48 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(entry["tool_input_fingerprint"])
         self.assertFalse(entry["subagent_invoked"])
 
+    def test_skill_usage_logger_does_not_count_shell_variables_as_skills(self) -> None:
+        """Bash variables in tool input should not become selected skills."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            command = (
+                "latest=$(ls reports/*.md | tail -n 1); "
+                "pid=$!; for f in reports/*.json; do run=$f; done; "
+                "echo $latest $pid $f $run"
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["event"], "PostToolUse")
+        self.assertEqual(entry["tool_name"], "Bash")
+        self.assertEqual(entry["tool_selection_kind"], "executed_tool")
+        self.assertEqual(entry["skills"], [])
+        self.assertEqual(entry["selected_skills"], [])
+        self.assertNotIn("skill:latest", entry["feedback_targets"])
+        self.assertNotIn("skill:pid", entry["feedback_targets"])
+        self.assertNotIn("skill:f", entry["feedback_targets"])
+        self.assertNotIn("skill:run", entry["feedback_targets"])
+        self.assertEqual(entry["skill_source_fields"], ["tool_input"])
+        self.assertTrue(entry["tool_input_fingerprint"])
+
     def test_skill_usage_logger_records_subagent_lifecycle_selection(self) -> None:
         """Subagent lifecycle logging should record spawn metadata without prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:

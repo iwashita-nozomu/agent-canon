@@ -51,6 +51,12 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("failed_skill_eval_reports: `1`", guide)
         self.assertIn("skill_usage_counts:", guide)
         self.assertIn("agent-orchestration", guide)
+        self.assertNotIn("- `latest`: `1`", guide)
+        self.assertNotIn("- `skill-name`: `1`", guide)
+        self.assertNotIn("skill:latest", guide)
+        self.assertNotIn("skill:skill-name", guide)
+        self.assertIn("tool_input_skill_usage_ignored", guide)
+        self.assertIn("noncanonical_skill_usage_ignored", guide)
         self.assertIn("agent-orchestration@UserPromptSubmit", guide)
         self.assertIn("hook_tool_counts:", guide)
         self.assertIn("apply_patch", guide)
@@ -107,7 +113,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"evidence_root: `{canon_root.resolve().as_posix()}`", guide)
         self.assertIn("open_issues: `1`", guide)
-        self.assertIn("hook_status_counts: `{'fail': 1, 'pass': 2}`", guide)
+        self.assertIn("hook_status_counts: `{'fail': 1, 'pass': 4}`", guide)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -135,6 +141,13 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             "# User Preferences\n\n- durable preference\n",
             encoding="utf-8",
         )
+        for skill in ("agent-orchestration", "codex-task-workflow", "result-artifact-writeout"):
+            skill_path = root / ".agents" / "skills" / skill / "SKILL.md"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            skill_path.write_text(
+                f"---\nname: {skill}\ndescription: test skill\n---\n\n# {skill}\n",
+                encoding="utf-8",
+            )
         (skill_results / "skill-eval-test-fail-agent-orchestration.md").write_text(
             "EVAL_STATUS=fail\n",
             encoding="utf-8",
@@ -187,6 +200,42 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                     "feedback_targets": ["skill:result-artifact-writeout", "tool:workflow_monitor.py"],
                     "feedback_action": "prompt_repair",
                     "skill_source_fields": ["prompt"],
+                    "observed_text_field_count": 1,
+                    "observed_text_value_count": 1,
+                    "workflow_monitor_event_count": 0,
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "skill-hook-shell-vars",
+                    "event": "PostToolUse",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-shell-vars",
+                    "hook_log_namespace": "test-container",
+                    "skills": ["latest"],
+                    "skill_count": 1,
+                    "feedback_targets": ["skill:latest"],
+                    "skill_source_fields": ["tool_input"],
+                    "observed_text_field_count": 1,
+                    "observed_text_value_count": 1,
+                    "tool_name": "Bash",
+                    "tool_command_verb": "latest=$(ls",
+                    "workflow_monitor_event_count": 0,
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "skill-hook-placeholder",
+                    "event": "Stop",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-placeholder",
+                    "hook_log_namespace": "test-container",
+                    "skills": ["skill-name"],
+                    "skill_count": 1,
+                    "feedback_targets": ["skill:skill-name"],
+                    "skill_source_fields": ["last_assistant_message"],
                     "observed_text_field_count": 1,
                     "observed_text_value_count": 1,
                     "workflow_monitor_event_count": 0,

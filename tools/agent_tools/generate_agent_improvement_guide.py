@@ -43,6 +43,7 @@ OPTION_VALUE_FLAGS = {
     "--report-dir",
     "--root",
 }
+TRUSTED_SKILL_SOURCE_FIELDS = frozenset(("prompt", "last_assistant_message", "message"))
 
 
 @dataclass(frozen=True)
@@ -208,9 +209,10 @@ def is_code_checker_executable(token: str) -> bool:
 class HookEvidenceCounter:
     """Count hook statuses, tool results, skills, and checker surfaces."""
 
-    def __init__(self) -> None:
+    def __init__(self, known_skills: frozenset[str] = frozenset()) -> None:
         """Initialize empty counters."""
         self.state = HookCounterState.empty()
+        self.known_skills = known_skills
 
     def add_line(self, path: Path, raw_line: str) -> None:
         """Add one hook JSONL line to the counters."""
@@ -299,14 +301,20 @@ class HookEvidenceCounter:
             self.state.candidate_tools[tool] += 1
         for label in self.normalized_strings(entry.get("feedback_labels")):
             self.state.feedback_labels[label] += 1
+        trusted_skill_source = self.trusted_skill_source(sources)
         for target in self.normalized_strings(entry.get("feedback_targets")):
-            self.state.feedback_targets[target] += 1
+            if self.countable_feedback_target(target, trusted_skill_source):
+                self.state.feedback_targets[target] += 1
         action = str(entry.get("feedback_action") or "")
         if action:
             self.state.feedback_actions[action] += 1
         if entry.get("prompt_feedback_detected") is True and not self.normalized_strings(entry.get("feedback_labels")):
             self.state.quality["feedback_detected_without_labels"] += 1
-        skills = self.normalized_strings(entry.get("skills"))
+        skills = tuple(
+            skill
+            for skill in self.normalized_strings(entry.get("skills"))
+            if self.countable_skill(skill, trusted_skill_source)
+        )
         candidate_seen = any(
             (
                 self.normalized_strings(entry.get("candidate_skills")),
@@ -326,6 +334,35 @@ class HookEvidenceCounter:
             self.state.quality["skill_without_workflow_monitor_event"] += 1
         if not str(entry.get("workflow_monitor_report_dir") or ""):
             self.state.quality["missing_workflow_monitor_report_dir"] += 1
+
+    def trusted_skill_source(self, sources: tuple[str, ...]) -> bool:
+        """Return whether source fields are trusted for explicit skill ids."""
+        return not sources or any(source in TRUSTED_SKILL_SOURCE_FIELDS for source in sources)
+
+    def countable_feedback_target(self, target: str, trusted_skill_source: bool) -> bool:
+        """Return whether a feedback target should be counted as actionable."""
+        if target.startswith("skill:"):
+            skill = target.removeprefix("skill:")
+            if not trusted_skill_source:
+                self.state.quality["tool_input_skill_feedback_target_ignored"] += 1
+                return False
+            if self.known_skills and skill not in self.known_skills:
+                self.state.quality["noncanonical_skill_feedback_target_ignored"] += 1
+                self.state.quality[f"noncanonical_skill_feedback_target_ignored:{skill}"] += 1
+                return False
+        return True
+
+    def countable_skill(self, skill: str, trusted_skill_source: bool) -> bool:
+        """Return whether a skill id should be counted as an actual skill use."""
+        if not trusted_skill_source:
+            self.state.quality["tool_input_skill_usage_ignored"] += 1
+            self.state.quality[f"tool_input_skill_usage_ignored:{skill}"] += 1
+            return False
+        if self.known_skills and skill not in self.known_skills:
+            self.state.quality["noncanonical_skill_usage_ignored"] += 1
+            self.state.quality[f"noncanonical_skill_usage_ignored:{skill}"] += 1
+            return False
+        return True
 
     def add_checker_targets(self, entry: dict[str, object]) -> None:
         """Record files checked by code-checker hook commands."""
@@ -437,7 +474,7 @@ class AgentImprovementGuide:
 
     def hook_counts(self) -> HookEvidenceCounts:
         """Return hook counters."""
-        counter = HookEvidenceCounter()
+        counter = HookEvidenceCounter(known_skill_ids(self.root))
         for path in self.hook_result_paths():
             for raw_line in path.read_text(encoding="utf-8").splitlines():
                 counter.add_line(path, raw_line)
@@ -575,6 +612,17 @@ def is_agentcanon_root(root: Path) -> bool:
         (root / "agents" / "evals" / "results").exists()
         or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
     )
+
+
+def known_skill_ids(root: Path) -> frozenset[str]:
+    """Return AgentCanon-owned skill ids from shim and human docs."""
+    skills: set[str] = set()
+    for path in (root / ".agents" / "skills").glob("*/SKILL.md"):
+        skills.add(path.parent.name)
+    for path in (root / "agents" / "skills").glob("*.md"):
+        if path.name != "README.md":
+            skills.add(path.stem)
+    return frozenset(skills)
 
 
 def guidance(summary: EvidenceSummary) -> list[str]:

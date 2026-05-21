@@ -33,6 +33,7 @@ WORKFLOW_FIELD_RE = re.compile(
     r"tool_preflight_required|mcp_inventory_required)=|$)"
 )
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+IGNORED_SKILL_IDS = frozenset(("skill-name",))
 GIT_ROOT_TIMEOUT_SECONDS = 5
 SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
@@ -79,6 +80,8 @@ FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "repair_request": ("直して", "修正", "改善", "見直", "組み込み", "入れたい"),
     "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
 }
+SKILL_TEXT_FIELDS = ("prompt", "last_assistant_message", "message")
+TOOL_CANDIDATE_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
 
 
 @dataclass(frozen=True)
@@ -240,7 +243,11 @@ def extract_skill_ids(text: str) -> set[str]:
             value = value.removeprefix("$").strip("-_")
             if value and value != "-":
                 skills.add(value)
-    return {skill for skill in skills if SKILL_ID_RE.fullmatch(skill)}
+    return {
+        skill
+        for skill in skills
+        if SKILL_ID_RE.fullmatch(skill) and skill not in IGNORED_SKILL_IDS
+    }
 
 
 def clean_routing_value(value: str) -> str:
@@ -259,13 +266,23 @@ def extract_workflow_names(text: str) -> set[str]:
     return workflows
 
 
-def observed_text(payload: dict[str, object]) -> list[str]:
-    """Return hook payload text fields relevant for skill-use discovery."""
+def observed_text_for_fields(payload: dict[str, object], fields: tuple[str, ...]) -> list[str]:
+    """Return hook payload text fields from selected payload keys."""
     texts: list[str] = []
-    for key in ("prompt", "last_assistant_message", "message", "tool_input"):
+    for key in fields:
         if key in payload:
             texts.extend(text_values(payload[key]))
     return texts
+
+
+def observed_text(payload: dict[str, object]) -> list[str]:
+    """Return hook payload text fields relevant for general evidence discovery."""
+    return observed_text_for_fields(payload, TOOL_CANDIDATE_TEXT_FIELDS)
+
+
+def observed_skill_text(payload: dict[str, object]) -> list[str]:
+    """Return text fields trusted for explicit skill and workflow declarations."""
+    return observed_text_for_fields(payload, SKILL_TEXT_FIELDS)
 
 
 def prompt_text(payload: dict[str, object]) -> str:
@@ -310,7 +327,7 @@ def observed_text_sources(payload: dict[str, object]) -> list[str]:
 def observed_skills(payload: dict[str, object]) -> list[str]:
     """Return sorted unique skill ids observed in a hook payload."""
     skills: set[str] = set()
-    for text in observed_text(payload):
+    for text in observed_skill_text(payload):
         skills.update(extract_skill_ids(text))
     return sorted(skills)
 
@@ -318,7 +335,7 @@ def observed_skills(payload: dict[str, object]) -> list[str]:
 def observed_workflows(payload: dict[str, object]) -> list[str]:
     """Return sorted unique declared workflow names observed in a hook payload."""
     workflows: set[str] = set()
-    for text in observed_text(payload):
+    for text in observed_skill_text(payload):
         workflows.update(extract_workflow_names(text))
     return sorted(workflows)
 
@@ -344,14 +361,15 @@ def feedback_action(labels: tuple[str, ...]) -> str:
 
 def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     """Classify prompt text into explicit and candidate routing signals."""
-    texts = observed_text(payload)
-    labels = keyword_matches(texts, FEEDBACK_KEYWORDS)
+    skill_texts = observed_skill_text(payload)
+    candidate_texts = observed_text(payload)
+    labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
     return PromptIntakeSignals(
         skills=tuple(observed_skills(payload)),
         selected_workflows=tuple(observed_workflows(payload)),
-        candidate_skills=keyword_matches(texts, SKILL_KEYWORDS),
-        candidate_workflows=keyword_matches(texts, WORKFLOW_KEYWORDS),
-        candidate_tools=keyword_matches(texts, TOOL_KEYWORDS),
+        candidate_skills=keyword_matches(skill_texts, SKILL_KEYWORDS),
+        candidate_workflows=keyword_matches(skill_texts, WORKFLOW_KEYWORDS),
+        candidate_tools=keyword_matches(candidate_texts, TOOL_KEYWORDS),
         feedback_labels=labels,
         feedback_action=feedback_action(labels),
     )
