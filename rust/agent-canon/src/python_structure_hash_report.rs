@@ -595,7 +595,7 @@ fn collect_import_facts(root: &Path, relative_path: &str) -> Vec<String> {
                 .next()
                 .unwrap_or("");
             for item in rest.split(',') {
-                let name = item.trim().split_whitespace().next().unwrap_or("");
+                let name = item.split_whitespace().next().unwrap_or("");
                 if !name.is_empty() {
                     facts.push(format!("import:{name}"));
                 }
@@ -627,7 +627,7 @@ fn add_from_import_names(facts: &mut Vec<String>, module: &str, names: &str) {
         .trim_end_matches(')')
         .trim();
     for item in cleaned.split(',') {
-        let name = item.trim().split_whitespace().next().unwrap_or("");
+        let name = item.split_whitespace().next().unwrap_or("");
         if !module.is_empty() && !name.is_empty() && name != "(" && name != ")" {
             facts.push(format!("from:{module}:{name}"));
         }
@@ -784,14 +784,13 @@ fn integration_candidates_json(
         let mut features = base_features.clone();
         features.extend(similar_caller_features(similar));
         features.extend(similar_dependency_features(similar, import_target_counts));
-        let candidate = candidate_json(
+        candidate_json(
             "consolidate_owner_with_similar_responsibility_caller",
             target,
             caller,
             Some(similar),
             &features,
-        );
-        candidate
+        )
     }));
     candidates
 }
@@ -1895,13 +1894,12 @@ mod tests {
                 .len(),
             0
         );
-        assert_eq!(
+        assert!(
             payload["findings"][0]["caller_analysis"]["integration_candidates"][0]["features"]
                 .as_array()
                 .expect("features")
                 .iter()
-                .any(|feature| feature["code"] == "ast_structural_type_target"),
-            true
+                .any(|feature| feature["code"] == "ast_structural_type_target")
         );
     }
 

@@ -833,7 +833,7 @@ fn collect_import_facts(text: &str) -> Vec<String> {
                 .next()
                 .unwrap_or("");
             for item in rest.split(',') {
-                let name = item.trim().split_whitespace().next().unwrap_or("");
+                let name = item.split_whitespace().next().unwrap_or("");
                 if !name.is_empty() {
                     facts.push(format!("import:{name}"));
                 }
@@ -865,7 +865,7 @@ fn add_from_import_names(facts: &mut Vec<String>, module: &str, names: &str) {
         .trim_end_matches(')')
         .trim();
     for item in cleaned.split(',') {
-        let name = item.trim().split_whitespace().next().unwrap_or("");
+        let name = item.split_whitespace().next().unwrap_or("");
         if !module.is_empty() && !name.is_empty() && name != "(" && name != ")" {
             facts.push(format!("from:{module}:{name}"));
         }
