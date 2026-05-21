@@ -17,9 +17,11 @@ duplicate analysis.
 ## Purpose
 
 `python-structure-hash` finds structurally duplicated Python functions,
-classes, and type aliases using normalized AST shape. It intentionally avoids
-name-only matching. Names can appear in the report as evidence, but they are not
-the primary duplicate criterion.
+classes, and type aliases using normalized AST shape. It also reports
+single-caller structural helpers when an implementation function or class is
+owned by exactly one enclosing caller block. It intentionally avoids name-only
+matching. Names can appear in the report as evidence, but they are not the
+primary duplicate or single-caller criterion.
 
 The tool is intended to support refactoring order, not to automatically delete
 code. Its output is mechanical evidence that an agent or reviewer can inspect.
@@ -30,7 +32,9 @@ The analyzer starts from the requested paths. If no path is given, the analysis
 population is the repository root after default excludes.
 
 For each Python file in the starting population, repo-local imports are resolved
-and added to the analysis population. Import expansion is transitive. External
+and added to the analysis population. Reverse repo-local dependents are also
+added so single-caller counts can see caller-side usage instead of only imported
+dependencies. Expansion is transitive over this import neighborhood. External
 libraries are recorded as advisory metadata only and are not rewrite targets.
 
 Repo-local import resolution recognizes:
@@ -39,6 +43,10 @@ Repo-local import resolution recognizes:
 - `python/` package roots,
 - `src/` package roots,
 - relative imports such as `from .x import Y` and `from ..base import Scalar`.
+
+`__init__.py` is normalized to the package module, not a synthetic
+`pkg.__init__` module, so package re-export surfaces participate in dependency
+and caller analysis.
 
 ## Structural Identity
 
@@ -54,6 +62,25 @@ Import facts, decorators, bases, module, and owner are kept as context. They do
 not prevent duplicate grouping by default; instead they explain whether a group
 is same-module, cross-module, same-import, mixed-import, same-base, or
 mixed-base.
+
+## Single-Caller Ownership
+
+Single-caller analysis uses call/reference facts extracted from Python AST and
+resolved in Rust against the analyzed symbol table. The count is based on unique
+enclosing caller blocks, not raw call site count. A helper called twice from the
+same function still has `caller_count=1` and `call_site_count=2`.
+
+The structured report preserves both counts plus caller evidence:
+
+- `caller_count`: number of unique owning caller blocks;
+- `call_site_count`: number of call expressions inside that owner;
+- `caller_analysis.callers[*].call_lines`: source lines where the target is
+  called.
+
+Single-caller findings are mechanical evidence for ownership review. They are
+not automatic deletion instructions. Non-production single-caller findings are
+review-blocked in `repair_slice`; production findings can be prioritized with
+the same module/file dependency signals used for structural duplicates.
 
 ## Module Groups
 
@@ -146,11 +173,12 @@ mechanical and uses this order of evidence:
 1. module-group incoming dependency count;
 2. file-level incoming dependency count;
 3. fewer module-group outgoing dependencies;
-4. production surface membership;
-5. implementation role before protocol and alias;
-6. cross-module duplicate scope;
-7. impact size from instance count and token count;
-8. structural hash as the stable tie-breaker.
+4. single-caller ownership signal;
+5. production surface membership;
+6. implementation role before protocol and alias;
+7. cross-module duplicate scope;
+8. impact size from instance count and token count;
+9. structural hash as the stable tie-breaker.
 
 This means low-level repository code is preferred over high-level callers.
 External libraries never increase refactor priority except as advisory context.

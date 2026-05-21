@@ -36,6 +36,8 @@ import sys
 def module_name(root, path):
     relative = pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())
     without_suffix = relative.with_suffix("")
+    if without_suffix.name == "__init__":
+        without_suffix = without_suffix.parent
     return ".".join(without_suffix.parts)
 
 
@@ -172,6 +174,36 @@ def body_without_docstring(body):
     return body
 
 
+class BlockCallVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.calls = []
+
+    def visit_FunctionDef(self, node):
+        return
+
+    def visit_AsyncFunctionDef(self, node):
+        return
+
+    def visit_ClassDef(self, node):
+        return
+
+    def visit_Call(self, node):
+        self.calls.append(
+            {
+                "name": ref_name(node.func),
+                "line": getattr(node, "lineno", 0),
+            }
+        )
+        self.generic_visit(node)
+
+
+def block_calls(node):
+    visitor = BlockCallVisitor()
+    for child in body_without_docstring(node.body):
+        visitor.visit(child)
+    return sorted(visitor.calls, key=lambda item: (item["line"], item["name"]))
+
+
 def canonical(value):
     if isinstance(value, ast.AST):
         fields = []
@@ -271,6 +303,7 @@ class Collector(ast.NodeVisitor):
             "decorators": decorator_facts(node),
             "bases": base_facts(node),
             "imports": self.imports,
+            "calls": block_calls(node),
             "canonical": canonical(body_without_docstring(node.body)),
         }
         self.blocks.append(payload)
@@ -303,6 +336,7 @@ class Collector(ast.NodeVisitor):
                 "decorators": [],
                 "bases": [],
                 "imports": self.imports,
+                "calls": [],
                 "canonical": canonical(canonical_node),
             }
         )
@@ -388,6 +422,13 @@ struct Block {
     structure_hash: String,
     context_hash: String,
     token_count: usize,
+    calls: Vec<CallRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallRef {
+    name: String,
+    line: usize,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -407,7 +448,26 @@ struct DuplicateGroup {
 #[derive(Debug, PartialEq, Eq)]
 struct Analysis {
     groups: Vec<DuplicateGroup>,
+    single_callers: Vec<SingleCallerFinding>,
     analyzed_files: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SingleCallerFinding {
+    target: Block,
+    caller: CallerEvidence,
+    call_site_count: usize,
+    hash: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CallerEvidence {
+    path: String,
+    module: String,
+    qualname: String,
+    line: usize,
+    end_line: usize,
+    call_lines: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -530,15 +590,17 @@ fn positive_usize(value: &str) -> Result<usize, String> {
 fn analyze(args: &Args) -> Result<Analysis, String> {
     let root = resolve_like_cwd(&args.root);
     let files = source_files(&root, &args.paths, &args.excludes);
-    let files = expand_with_repo_import_dependencies(&root, files, &args.excludes);
+    let files = expand_with_repo_import_neighborhood(&root, files, &args.excludes);
     let analyzed_files = files
         .iter()
         .map(|path| relative_path(&root, path))
         .collect::<Vec<_>>();
     let ast_blocks = extract_ast_blocks(&root, &files)?;
+    let mut all_blocks = Vec::new();
     let mut buckets: BTreeMap<String, Vec<Block>> = BTreeMap::new();
     for value in ast_blocks {
         let block = block_from_ast_value(value)?;
+        all_blocks.push(block.clone());
         if block.token_count < args.min_tokens {
             continue;
         }
@@ -578,8 +640,18 @@ fn analyze(args: &Args) -> Result<Analysis, String> {
             .then_with(|| left.structure_hash.cmp(&right.structure_hash))
     });
     groups.truncate(args.max_findings);
+    let mut single_callers = single_caller_findings(&all_blocks, args.min_tokens);
+    single_callers.sort_by(|left, right| {
+        right
+            .target
+            .token_count
+            .cmp(&left.target.token_count)
+            .then_with(|| left.hash.cmp(&right.hash))
+    });
+    single_callers.truncate(args.max_findings);
     Ok(Analysis {
         groups,
+        single_callers,
         analyzed_files,
     })
 }
@@ -607,7 +679,7 @@ fn source_files(root: &Path, raw_paths: &[String], excludes: &[String]) -> Vec<P
     files.into_iter().collect()
 }
 
-fn expand_with_repo_import_dependencies(
+fn expand_with_repo_import_neighborhood(
     root: &Path,
     initial_files: Vec<PathBuf>,
     excludes: &[String],
@@ -616,21 +688,36 @@ fn expand_with_repo_import_dependencies(
         .into_iter()
         .map(|path| fs::canonicalize(&path).unwrap_or(path))
         .collect::<BTreeSet<_>>();
-    let mut scanned = BTreeSet::new();
+    let all_repo_files = source_files(root, &[], excludes);
+    let import_targets = all_repo_files
+        .iter()
+        .map(|path| {
+            (
+                fs::canonicalize(path).unwrap_or_else(|_| path.clone()),
+                repo_import_targets(root, path, excludes)
+                    .into_iter()
+                    .collect::<BTreeSet<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
     loop {
-        let pending = files
-            .iter()
-            .filter(|path| !scanned.contains(*path))
-            .cloned()
-            .collect::<Vec<_>>();
-        if pending.is_empty() {
-            break;
-        }
-        for path in pending {
-            scanned.insert(path.clone());
-            for target in repo_import_targets(root, &path, excludes) {
-                files.insert(target);
+        let before = files.len();
+        for path in files.clone() {
+            if let Some(targets) = import_targets.get(&path) {
+                files.extend(targets.iter().cloned());
             }
+        }
+        for (path, targets) in &import_targets {
+            if files.contains(path) {
+                continue;
+            }
+            if targets.iter().any(|target| files.contains(target)) {
+                files.insert(path.clone());
+            }
+        }
+        if files.len() == before {
+            break;
         }
     }
     files.into_iter().collect()
@@ -762,7 +849,10 @@ fn resolve_import_module(current_module: &str, module: &str) -> Option<String> {
 }
 
 fn module_name_from_path(root: &Path, path: &Path) -> Option<String> {
-    let relative = path.strip_prefix(root).ok()?.with_extension("");
+    let mut relative = path.strip_prefix(root).ok()?.with_extension("");
+    if relative.file_name().and_then(|value| value.to_str()) == Some("__init__") {
+        relative = relative.parent()?.to_path_buf();
+    }
     Some(
         relative
             .components()
@@ -917,6 +1007,7 @@ fn block_from_ast_value(value: Value) -> Result<Block, String> {
     let bases = value
         .get("bases")
         .ok_or_else(|| "AST block missing bases payload".to_string())?;
+    let calls = call_refs_field(&value, "calls")?;
     let kind = string_field(&value, "kind")?;
     let role = string_field(&value, "role")?;
     let parameter_count = usize_field(&value, "parameter_count")?;
@@ -954,6 +1045,7 @@ fn block_from_ast_value(value: Value) -> Result<Block, String> {
         structure_hash: stable_hash(&format!("{role}:{kind}:{parameter_count}:{canonical_text}")),
         context_hash: stable_hash(&context_text),
         token_count: ast_token_count(canonical),
+        calls,
     })
 }
 
@@ -975,6 +1067,22 @@ fn usize_field(value: &Value, field: &str) -> Result<usize, String> {
         .and_then(Value::as_u64)
         .and_then(|number| usize::try_from(number).ok())
         .ok_or_else(|| format!("AST block field {field} must be a positive integer"))
+}
+
+fn call_refs_field(value: &Value, field: &str) -> Result<Vec<CallRef>, String> {
+    let calls = value
+        .get(field)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("AST block field {field} must be an array"))?;
+    calls
+        .iter()
+        .map(|call| {
+            Ok(CallRef {
+                name: string_field(call, "name")?,
+                line: usize_field(call, "line")?,
+            })
+        })
+        .collect()
 }
 
 fn ast_token_count(value: &Value) -> usize {
@@ -1039,6 +1147,161 @@ fn base_scope(blocks: &[Block]) -> BaseScope {
     }
 }
 
+fn single_caller_findings(blocks: &[Block], min_tokens: usize) -> Vec<SingleCallerFinding> {
+    let mut by_name = BTreeMap::<String, Vec<usize>>::new();
+    let mut by_qualname = BTreeMap::<String, usize>::new();
+    for (index, block) in blocks.iter().enumerate() {
+        by_name.entry(block.name.clone()).or_default().push(index);
+        by_qualname.insert(block.qualname.clone(), index);
+    }
+
+    let mut target_callers = BTreeMap::<String, BTreeMap<String, CallerAccumulator>>::new();
+    for caller in blocks {
+        for call in &caller.calls {
+            let Some(target_index) =
+                resolve_call_target(blocks, &by_name, &by_qualname, caller, call)
+            else {
+                continue;
+            };
+            let target = &blocks[target_index];
+            if !single_caller_target_eligible(target, min_tokens) {
+                continue;
+            }
+            let target_key = block_key(target);
+            let caller_key = block_key(caller);
+            if target_key == caller_key {
+                continue;
+            }
+            target_callers
+                .entry(target_key)
+                .or_default()
+                .entry(caller_key)
+                .or_insert_with(|| CallerAccumulator::new(caller))
+                .call_lines
+                .insert(call.line);
+        }
+    }
+
+    let block_by_key = blocks
+        .iter()
+        .map(|block| (block_key(block), block))
+        .collect::<BTreeMap<_, _>>();
+    target_callers
+        .into_iter()
+        .filter_map(|(target_key, callers)| {
+            if callers.len() != 1 {
+                return None;
+            }
+            let target = (*block_by_key.get(&target_key)?).clone();
+            let caller = callers.into_values().next()?;
+            let call_lines = caller.call_lines.into_iter().collect::<Vec<_>>();
+            Some(SingleCallerFinding {
+                hash: stable_hash(&format!(
+                    "single-caller:{}:{}:{}:{}",
+                    target.kind, target.role, target.structure_hash, caller.qualname
+                )),
+                target,
+                call_site_count: call_lines.len(),
+                caller: CallerEvidence {
+                    path: caller.path,
+                    module: caller.module,
+                    qualname: caller.qualname,
+                    line: caller.line,
+                    end_line: caller.end_line,
+                    call_lines,
+                },
+            })
+        })
+        .collect()
+}
+
+#[derive(Debug)]
+struct CallerAccumulator {
+    path: String,
+    module: String,
+    qualname: String,
+    line: usize,
+    end_line: usize,
+    call_lines: BTreeSet<usize>,
+}
+
+impl CallerAccumulator {
+    fn new(block: &Block) -> Self {
+        Self {
+            path: block.path.clone(),
+            module: block.module.clone(),
+            qualname: block.qualname.clone(),
+            line: block.line,
+            end_line: block.end_line,
+            call_lines: BTreeSet::new(),
+        }
+    }
+}
+
+fn single_caller_target_eligible(block: &Block, min_tokens: usize) -> bool {
+    block.role == "implementation"
+        && matches!(block.kind.as_str(), "Function" | "Class")
+        && block.token_count >= min_tokens
+}
+
+fn resolve_call_target(
+    blocks: &[Block],
+    by_name: &BTreeMap<String, Vec<usize>>,
+    by_qualname: &BTreeMap<String, usize>,
+    caller: &Block,
+    call: &CallRef,
+) -> Option<usize> {
+    if let Some(index) = by_qualname.get(&call.name) {
+        let target = &blocks[*index];
+        if target.module == caller.module {
+            return Some(*index);
+        }
+    }
+    if let Some(method_name) = call
+        .name
+        .strip_prefix("self.")
+        .or_else(|| call.name.strip_prefix("cls."))
+    {
+        if method_name.contains('.') {
+            return None;
+        }
+        let class_name = caller.parent_name.as_deref()?;
+        return unique_candidate(blocks, by_name.get(method_name)?, |target| {
+            target.module == caller.module
+                && target.parent_kind.as_deref() == Some("Class")
+                && target.parent_name.as_deref() == Some(class_name)
+        });
+    }
+    if call.name.contains('.') {
+        return None;
+    }
+    unique_candidate(blocks, by_name.get(&call.name)?, |target| {
+        target.module == caller.module
+    })
+}
+
+fn unique_candidate<F>(blocks: &[Block], candidates: &[usize], predicate: F) -> Option<usize>
+where
+    F: Fn(&Block) -> bool,
+{
+    let mut matching = candidates
+        .iter()
+        .copied()
+        .filter(|index| predicate(&blocks[*index]))
+        .collect::<Vec<_>>();
+    matching.sort_unstable();
+    matching.dedup();
+    if matching.len() == 1 {
+        matching.first().copied()
+    } else {
+        None
+    }
+}
+
+fn block_key(block: &Block) -> String {
+    format!("{}:{}", block.path, block.qualname)
+}
+
 fn render(analysis: Analysis, args: &Args) -> i32 {
     match args.format {
         OutputFormat::Json => render_json(&analysis),
@@ -1085,6 +1348,20 @@ fn render_text(analysis: &Analysis) {
             symbols
         );
     }
+    for finding in &analysis.single_callers {
+        let target = &finding.target;
+        println!(
+            "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role={}:{}:params={}:tokens={}:hash={}:count=1:caller_count=1:call_site_count={}:caller={}:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:{}",
+            target.role,
+            target.kind,
+            target.parameter_count,
+            target.token_count,
+            finding.hash,
+            finding.call_site_count,
+            caller_label(&finding.caller),
+            instance_label(target)
+        );
+    }
     println!(
         "PY_STRUCTURE_HASH_ANALYZED_FILES={}",
         analysis.analyzed_files.len()
@@ -1092,15 +1369,56 @@ fn render_text(analysis: &Analysis) {
     for path in &analysis.analyzed_files {
         println!("PY_STRUCTURE_HASH_ANALYZED_FILE={path}");
     }
-    println!("PY_STRUCTURE_HASH_GROUPS={}", analysis.groups.len());
+    println!(
+        "PY_STRUCTURE_HASH_DUPLICATE_GROUPS={}",
+        analysis.groups.len()
+    );
+    println!(
+        "PY_STRUCTURE_HASH_SINGLE_CALLER_FINDINGS={}",
+        analysis.single_callers.len()
+    );
+    println!(
+        "PY_STRUCTURE_HASH_GROUPS={}",
+        analysis.groups.len() + analysis.single_callers.len()
+    );
     println!(
         "PY_STRUCTURE_HASH={}",
-        if analysis.groups.is_empty() {
+        if analysis.groups.is_empty() && analysis.single_callers.is_empty() {
             "pass"
         } else {
             "fail"
         }
     );
+}
+
+fn instance_label(block: &Block) -> String {
+    format!(
+        "{}:{}-{}:{}:{}:{}:context={}",
+        block.path,
+        block.line,
+        block.end_line,
+        block.module,
+        block.qualname,
+        compatibility_label(block),
+        block.context_hash
+    )
+}
+
+fn caller_label(caller: &CallerEvidence) -> String {
+    format!(
+        "{}@{}-{}@{}@{}@sites={}",
+        caller.path,
+        caller.line,
+        caller.end_line,
+        caller.module,
+        caller.qualname,
+        caller
+            .call_lines
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join("|")
+    )
 }
 
 fn parent_label(block: &Block) -> String {
@@ -1121,43 +1439,85 @@ fn compatibility_label(block: &Block) -> String {
 }
 
 fn render_json(analysis: &Analysis) {
+    let duplicate_findings = analysis.groups.iter().map(|group| {
+        json!({
+            "kind": "duplicate_structural_hash",
+            "hash": group.structure_hash,
+            "block_kind": group.kind,
+            "role": group.role,
+            "parameter_count": group.parameter_count,
+            "token_count": group.token_count,
+            "module_scope": format!("{:?}", group.module_scope),
+            "import_scope": format!("{:?}", group.import_scope),
+            "decorator_scope": format!("{:?}", group.decorator_scope),
+            "base_scope": format!("{:?}", group.base_scope),
+            "instances": group.blocks.iter().map(|block| {
+                json!({
+                    "path": block.path,
+                    "line": block.line,
+                    "end_line": block.end_line,
+                    "module": block.module,
+                    "name": block.name,
+                    "qualname": block.qualname,
+                    "parent_kind": block.parent_kind,
+                    "parent_name": block.parent_name,
+                    "import_hash": block.import_hash,
+                    "decorators_hash": block.decorators_hash,
+                    "bases_hash": block.bases_hash,
+                    "context_hash": block.context_hash,
+                })
+            }).collect::<Vec<_>>(),
+        })
+    });
+    let single_caller_findings = analysis.single_callers.iter().map(|finding| {
+        let block = &finding.target;
+        json!({
+            "kind": "single_caller_structural_helper",
+            "hash": finding.hash,
+            "block_kind": block.kind,
+            "role": block.role,
+            "parameter_count": block.parameter_count,
+            "token_count": block.token_count,
+            "module_scope": "SameModule",
+            "import_scope": "SameImports",
+            "decorator_scope": "SameDecorators",
+            "base_scope": "SameBases",
+            "caller_count": 1,
+            "call_site_count": finding.call_site_count,
+            "caller": {
+                "path": finding.caller.path,
+                "line": finding.caller.line,
+                "end_line": finding.caller.end_line,
+                "module": finding.caller.module,
+                "qualname": finding.caller.qualname,
+                "call_lines": finding.caller.call_lines,
+            },
+            "instances": [json!({
+                "path": block.path,
+                "line": block.line,
+                "end_line": block.end_line,
+                "module": block.module,
+                "name": block.name,
+                "qualname": block.qualname,
+                "parent_kind": block.parent_kind,
+                "parent_name": block.parent_name,
+                "import_hash": block.import_hash,
+                "decorators_hash": block.decorators_hash,
+                "bases_hash": block.bases_hash,
+                "context_hash": block.context_hash,
+            })],
+        })
+    });
     let payload = json!({
         "summary": {
-            "groups": analysis.groups.len(),
-            "status": if analysis.groups.is_empty() { "pass" } else { "fail" },
+            "groups": analysis.groups.len() + analysis.single_callers.len(),
+            "duplicate_groups": analysis.groups.len(),
+            "single_caller_findings": analysis.single_callers.len(),
+            "status": if analysis.groups.is_empty() && analysis.single_callers.is_empty() { "pass" } else { "fail" },
             "analyzed_file_count": analysis.analyzed_files.len(),
             "analyzed_files": analysis.analyzed_files,
         },
-        "findings": analysis.groups.iter().map(|group| {
-            json!({
-                "kind": "duplicate_structural_hash",
-                "hash": group.structure_hash,
-                "block_kind": group.kind,
-                "role": group.role,
-                "parameter_count": group.parameter_count,
-                "token_count": group.token_count,
-                "module_scope": format!("{:?}", group.module_scope),
-                "import_scope": format!("{:?}", group.import_scope),
-                "decorator_scope": format!("{:?}", group.decorator_scope),
-                "base_scope": format!("{:?}", group.base_scope),
-                "instances": group.blocks.iter().map(|block| {
-                    json!({
-                        "path": block.path,
-                        "line": block.line,
-                        "end_line": block.end_line,
-                        "module": block.module,
-                        "name": block.name,
-                        "qualname": block.qualname,
-                        "parent_kind": block.parent_kind,
-                        "parent_name": block.parent_name,
-                        "import_hash": block.import_hash,
-                        "decorators_hash": block.decorators_hash,
-                        "bases_hash": block.bases_hash,
-                        "context_hash": block.context_hash,
-                    })
-                }).collect::<Vec<_>>(),
-            })
-        }).collect::<Vec<_>>(),
+        "findings": duplicate_findings.chain(single_caller_findings).collect::<Vec<_>>(),
     });
     println!(
         "{}",
@@ -1191,7 +1551,7 @@ mod tests {
     }
 
     #[test]
-    fn source_files_expand_repo_import_dependencies() {
+    fn source_files_expand_repo_import_neighborhood() {
         let root = std::env::temp_dir().join(format!(
             "agent-canon-python-structure-hash-{}",
             std::process::id()
@@ -1211,7 +1571,7 @@ mod tests {
         fs::write(python_pkg.join("d.py"), "class D: pass\n").expect("d.py");
 
         let initial = source_files(&root, &["pkg/a.py".to_string()], &[]);
-        let expanded = expand_with_repo_import_dependencies(&root, initial, &[]);
+        let expanded = expand_with_repo_import_neighborhood(&root, initial, &[]);
         let relative = expanded
             .iter()
             .map(|path| {
@@ -1253,6 +1613,66 @@ mod tests {
             structure_hash: stable_hash("Function:0:[]"),
             context_hash: stable_hash(module),
             token_count: 8,
+            calls: Vec::new(),
         }
+    }
+
+    #[test]
+    fn single_caller_groups_multiple_call_sites_by_enclosing_block() {
+        let helper = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 1,
+            end_line: 2,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "_helper".to_string(),
+            qualname: "_helper".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("helper"),
+            context_hash: stable_hash("sample"),
+            token_count: 12,
+            calls: Vec::new(),
+        };
+        let caller = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 4,
+            end_line: 7,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "public_api".to_string(),
+            qualname: "public_api".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("caller"),
+            context_hash: stable_hash("sample"),
+            token_count: 20,
+            calls: vec![
+                CallRef {
+                    name: "_helper".to_string(),
+                    line: 5,
+                },
+                CallRef {
+                    name: "_helper".to_string(),
+                    line: 6,
+                },
+            ],
+        };
+        let findings = single_caller_findings(&[helper, caller], 8);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].target.qualname, "_helper");
+        assert_eq!(findings[0].caller.qualname, "public_api");
+        assert_eq!(findings[0].call_site_count, 2);
+        assert_eq!(findings[0].caller.call_lines, vec![5, 6]);
     }
 }

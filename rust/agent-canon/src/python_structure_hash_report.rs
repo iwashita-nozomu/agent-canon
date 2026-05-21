@@ -36,6 +36,9 @@ struct Finding {
     decorator_scope: String,
     base_scope: String,
     instances: Vec<Instance>,
+    caller_count: usize,
+    call_site_count: usize,
+    callers: Vec<CallerEvidence>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -52,6 +55,17 @@ struct Instance {
     bases_hash: String,
     context_hash: String,
     import_facts: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CallerEvidence {
+    raw_caller: String,
+    path: String,
+    line_start: usize,
+    line_end: usize,
+    module: String,
+    qualname: String,
+    call_lines: Vec<usize>,
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -143,6 +157,8 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
     let mut findings = Vec::new();
     let mut status = None;
     let mut group_count = None;
+    let mut duplicate_group_count = None;
+    let mut single_caller_finding_count = None;
     let mut analyzed_file_count = None;
     let mut analyzed_files = Vec::new();
     let mut ignored_lines = Vec::new();
@@ -153,6 +169,14 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
         }
         if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_GROUPS=") {
             group_count = value.parse::<usize>().ok();
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_DUPLICATE_GROUPS=") {
+            duplicate_group_count = value.parse::<usize>().ok();
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_SINGLE_CALLER_FINDINGS=") {
+            single_caller_finding_count = value.parse::<usize>().ok();
             continue;
         }
         if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_ANALYZED_FILES=") {
@@ -216,6 +240,8 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
         "summary": {
             "status": status,
             "reported_group_count": group_count,
+            "reported_duplicate_group_count": duplicate_group_count,
+            "reported_single_caller_finding_count": single_caller_finding_count,
             "parsed_group_count": findings.len(),
             "reported_analyzed_file_count": analyzed_file_count,
             "parsed_analyzed_file_count": analyzed_files.len(),
@@ -231,7 +257,7 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
                 "path": crate::python_module_groups::DEFAULT_CONTRACT_PATH,
                 "loaded": module_group_contract.is_some(),
             },
-            "priority_rule": "deep_dependency_first: module-group incoming dependency count, file incoming dependency count, fewer module-group outgoing dependencies, production surface, implementation role, cross-module scope, impact tokens, stable hash; external libraries are advisory only",
+            "priority_rule": "deep_dependency_first: module-group incoming dependency count, file incoming dependency count, fewer module-group outgoing dependencies, single-caller ownership, production surface, implementation role, cross-module scope, impact tokens, stable hash; external libraries are advisory only",
             "priority_order": priority_order.iter().map(priority_json).collect::<Vec<_>>(),
             "repair_slice": repair_slice_json(&priority_order, &group_graph),
         },
@@ -245,6 +271,11 @@ fn parse_finding(
     root: &Path,
     import_cache: &mut BTreeMap<String, Vec<String>>,
 ) -> Result<Finding, String> {
+    if let Some(body) =
+        line.strip_prefix("PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:")
+    {
+        return parse_single_caller_finding(line, body, root, import_cache);
+    }
     let body = line
         .strip_prefix("PY_STRUCTURE_HASH_FINDING=duplicate_structural_hash:")
         .ok_or_else(|| format!("unsupported finding line: {line}"))?;
@@ -277,6 +308,53 @@ fn parse_finding(
         decorator_scope,
         base_scope,
         instances,
+        caller_count: 0,
+        call_site_count: 0,
+        callers: Vec::new(),
+    })
+}
+
+fn parse_single_caller_finding(
+    line: &str,
+    body: &str,
+    root: &Path,
+    import_cache: &mut BTreeMap<String, Vec<String>>,
+) -> Result<Finding, String> {
+    let (role, rest) = take_field(body, "role")?;
+    let (block_kind, rest) = take_until_colon(rest)?;
+    let (params, rest) = take_field(rest, "params")?;
+    let (tokens, rest) = take_field(rest, "tokens")?;
+    let (hash, rest) = take_field(rest, "hash")?;
+    let (count, rest) = take_field(rest, "count")?;
+    let (caller_count, rest) = take_field(rest, "caller_count")?;
+    let (call_site_count, rest) = take_field(rest, "call_site_count")?;
+    let (caller, rest) = take_field(rest, "caller")?;
+    let (module_scope, rest) = take_field(rest, "module_scope")?;
+    let (import_scope, rest) = take_field(rest, "import_scope")?;
+    let (decorator_scope, rest) = take_field(rest, "decorator_scope")?;
+    let (base_scope, instances_text) = take_field(rest, "base_scope")?;
+    let instances = instances_text
+        .split(',')
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_instance(value, root, import_cache))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Finding {
+        raw_line: line.to_string(),
+        kind: "single_caller_structural_helper".to_string(),
+        role,
+        block_kind,
+        parameter_count: parse_usize(&params, "params")?,
+        token_count: parse_usize(&tokens, "tokens")?,
+        hash,
+        instance_count: parse_usize(&count, "count")?,
+        module_scope,
+        import_scope,
+        decorator_scope,
+        base_scope,
+        instances,
+        caller_count: parse_usize(&caller_count, "caller_count")?,
+        call_site_count: parse_usize(&call_site_count, "call_site_count")?,
+        callers: vec![parse_caller(&caller)?],
     })
 }
 
@@ -344,6 +422,30 @@ fn parse_instance(
         bases_hash: bases_hash.to_string(),
         context_hash: context_hash.to_string(),
         import_facts,
+    })
+}
+
+fn parse_caller(text: &str) -> Result<CallerEvidence, String> {
+    let parts = text.split('@').collect::<Vec<_>>();
+    if parts.len() != 5 {
+        return Err(format!("invalid caller evidence {text}"));
+    }
+    let (line_start, line_end) = parse_line_range(parts[1])?;
+    let call_lines = parts[4]
+        .strip_prefix("sites=")
+        .ok_or_else(|| format!("missing caller sites= in {text}"))?
+        .split('|')
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_usize(value, "call_line"))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(CallerEvidence {
+        raw_caller: text.to_string(),
+        path: parts[0].to_string(),
+        line_start,
+        line_end,
+        module: parts[2].to_string(),
+        qualname: parts[3].to_string(),
+        call_lines,
     })
 }
 
@@ -463,7 +565,7 @@ fn finding_json(
             "reason_codes": priority_reasons,
         },
         "why": {
-            "primary": "duplicate_structural_hash",
+            "primary": finding.kind,
             "same_role": finding.role,
             "same_block_kind": finding.block_kind,
             "same_parameter_count": finding.parameter_count,
@@ -479,6 +581,23 @@ fn finding_json(
             "import_analysis": import_analysis,
         },
         "instances": finding.instances.iter().map(instance_json).collect::<Vec<_>>(),
+        "caller_analysis": {
+            "caller_count": finding.caller_count,
+            "call_site_count": finding.call_site_count,
+            "callers": finding.callers.iter().map(caller_json).collect::<Vec<_>>(),
+        },
+    })
+}
+
+fn caller_json(caller: &CallerEvidence) -> Value {
+    json!({
+        "raw_caller": caller.raw_caller,
+        "path": caller.path,
+        "line_start": caller.line_start,
+        "line_end": caller.line_end,
+        "module": caller.module,
+        "qualname": caller.qualname,
+        "call_lines": caller.call_lines,
     })
 }
 
@@ -486,6 +605,7 @@ fn finding_json(
 struct PriorityItem {
     rank: usize,
     score: usize,
+    kind: String,
     hash: String,
     role: String,
     block_kind: String,
@@ -570,6 +690,12 @@ fn priority_item(
     let repo_target_count = import_analysis_targets(finding, root).len();
     let impact = finding.instance_count.saturating_mul(finding.token_count);
     let mut reason_codes = Vec::new();
+    let single_caller_weight = if finding.kind == "single_caller_structural_helper" {
+        reason_codes.push("single_caller_structural_helper".to_string());
+        750_000
+    } else {
+        0
+    };
     let group_deep_dependency_weight = group_imported_by_count * 10_000_000;
     if group_imported_by_count > 0 {
         reason_codes.push("deep_module_group_dependency".to_string());
@@ -623,6 +749,7 @@ fn priority_item(
     let score = group_deep_dependency_weight
         + file_deep_dependency_weight
         + fewer_group_dependencies_weight
+        + single_caller_weight
         + production_weight
         + role_weight
         + module_scope_weight
@@ -632,6 +759,7 @@ fn priority_item(
     PriorityItem {
         rank: 0,
         score,
+        kind: finding.kind.clone(),
         hash: finding.hash.clone(),
         role: finding.role.clone(),
         block_kind: finding.block_kind.clone(),
@@ -672,6 +800,7 @@ fn priority_json(item: &PriorityItem) -> Value {
     json!({
         "rank": item.rank,
         "score": item.score,
+        "kind": item.kind,
         "hash": item.hash,
         "role": item.role,
         "block_kind": item.block_kind,
@@ -826,7 +955,11 @@ fn repair_blockers(item: &PriorityItem) -> Vec<String> {
     {
         blockers.push("unassigned_only_scope".to_string());
     }
-    if item.production_instance_count < 2 {
+    if item.kind == "single_caller_structural_helper" {
+        if item.production_instance_count == 0 {
+            blockers.push("non_production_single_caller".to_string());
+        }
+    } else if item.production_instance_count < 2 {
         blockers.push("insufficient_production_instances".to_string());
     }
     blockers
@@ -1281,11 +1414,35 @@ mod tests {
 
     #[test]
     fn structures_summary_lines() {
-        let text = "PY_STRUCTURE_HASH_FINDING=duplicate_structural_hash:role=alias:Alias:params=0:tokens=13:hash=h:count=1:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-1:pkg.a:Name:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_ANALYZED_FILES=1\nPY_STRUCTURE_HASH_ANALYZED_FILE=pkg/a.py\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let text = "PY_STRUCTURE_HASH_FINDING=duplicate_structural_hash:role=alias:Alias:params=0:tokens=13:hash=h:count=1:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-1:pkg.a:Name:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_ANALYZED_FILES=1\nPY_STRUCTURE_HASH_ANALYZED_FILE=pkg/a.py\nPY_STRUCTURE_HASH_DUPLICATE_GROUPS=1\nPY_STRUCTURE_HASH_SINGLE_CALLER_FINDINGS=0\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
         let payload = structure_text(text, Path::new(".")).expect("report structures");
+        assert_eq!(payload["summary"]["reported_duplicate_group_count"], 1);
+        assert_eq!(
+            payload["summary"]["reported_single_caller_finding_count"],
+            0
+        );
         assert_eq!(payload["summary"]["parsed_group_count"], 1);
         assert_eq!(payload["summary"]["parsed_analyzed_file_count"], 1);
         assert_eq!(payload["findings"][0]["instances"][0]["qualname"], "Name");
+    }
+
+    #[test]
+    fn parses_single_caller_finding_with_call_site_evidence() {
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Function:params=1:tokens=24:hash=h:count=1:caller_count=1:call_site_count=2:caller=pkg/a.py@10-14@pkg.a@public_api@sites=11|12:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-3:pkg.a:_helper:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, Path::new(".")).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["kind"],
+            "single_caller_structural_helper"
+        );
+        assert_eq!(
+            payload["findings"][0]["why"]["primary"],
+            "single_caller_structural_helper"
+        );
+        assert_eq!(payload["findings"][0]["caller_analysis"]["caller_count"], 1);
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["callers"][0]["call_lines"][1],
+            12
+        );
     }
 
     #[test]
@@ -1293,6 +1450,7 @@ mod tests {
         let item = PriorityItem {
             rank: 1,
             score: 1,
+            kind: "duplicate_structural_hash".to_string(),
             hash: "h".to_string(),
             role: "implementation".to_string(),
             block_kind: "Function".to_string(),
@@ -1327,6 +1485,7 @@ mod tests {
         let item = PriorityItem {
             rank: 1,
             score: 1,
+            kind: "duplicate_structural_hash".to_string(),
             hash: "h".to_string(),
             role: "implementation".to_string(),
             block_kind: "Function".to_string(),
@@ -1360,6 +1519,7 @@ mod tests {
         let item = PriorityItem {
             rank: 1,
             score: 1,
+            kind: "duplicate_structural_hash".to_string(),
             hash: "h".to_string(),
             role: "implementation".to_string(),
             block_kind: "Function".to_string(),
