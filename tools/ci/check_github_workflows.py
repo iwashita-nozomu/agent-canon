@@ -48,6 +48,11 @@ AGENT_CANON_CREDENTIALS = (
 TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "Validation Evidence",
     "Plan Mode Evidence",
+    "Agent Orchestration Evidence",
+    "workflow=<family>",
+    "skills=$agent-orchestration",
+    "review=<...>",
+    "route.py --prompt",
     "PR Mutation Authority",
     "Authority / blocker notes",
     "Copilot / Automation Output",
@@ -71,6 +76,11 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "make agent-canon-pr-check",
     "make agent-canon-ensure-latest",
     "Plan Mode Evidence",
+    "Agent Orchestration Evidence",
+    "workflow=<family>",
+    "skills=$agent-orchestration",
+    "review=<...>",
+    "route.py --prompt",
     "PR Mutation Authority",
     "Authority / blocker notes",
     "Copilot / Automation Output",
@@ -96,6 +106,11 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
 STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "Validation Evidence",
     "Plan Mode Evidence",
+    "Agent Orchestration Evidence",
+    "workflow=<family>",
+    "skills=$agent-orchestration",
+    "review=<...>",
+    "route.py --prompt",
     "PR Mutation Authority",
     "Authority / blocker notes",
     "Copilot / Automation Output",
@@ -593,7 +608,7 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
 def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
     """Return PR-template requirement checks for the active repository mode."""
     if is_template_or_derived_repo(root):
-        return [
+        specs: list[tuple[Path, Sequence[str]]] = [
             (
                 root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
                 TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
@@ -603,6 +618,10 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
                 STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
             ),
         ]
+        root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+        if root_template.exists():
+            specs.append((root_template, TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS))
+        return specs
     return [
         (
             root / ".github" / "PULL_REQUEST_TEMPLATE.md",

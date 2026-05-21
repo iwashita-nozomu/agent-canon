@@ -66,6 +66,14 @@ Authority / blocker notes:
 
 Plan / exception:
 
+## Agent Orchestration Evidence
+
+- [ ] First work update, run bundle, or linked PR comment recorded `workflow=<family>`, `skills=$agent-orchestration,...`, and `review=<...>` before implementation.
+- [ ] `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` was reviewed, or the no-repo-task / routing-only exception is recorded below.
+- [ ] If `$agent-orchestration` was not selected first, this PR is paused until the exception is explicit and reviewed.
+
+Orchestration evidence:
+
 ## Operational Findings / Issues
 
 - [ ] `vendor/agent-canon/issues/README.md` was reviewed.

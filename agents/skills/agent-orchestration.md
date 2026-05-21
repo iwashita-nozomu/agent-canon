@@ -62,6 +62,7 @@ mode の意味:
 - review と handoff の最小構成
 - repo-editing task なら、requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation の順序
 - 最初の作業 update 用の `workflow=<family>`, `skills=<...>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置く
+- PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
 - parallel write が要るなら file 単位の write-scope 方針
