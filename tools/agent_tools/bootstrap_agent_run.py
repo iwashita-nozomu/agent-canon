@@ -51,7 +51,7 @@ def suggested_skills(
     elif workflow_family_id == "adaptive_improvement_loop":
         selected.append("$adaptive-improvement-loop")
     if task_id == "T6":
-        selected.append("$behavior-preserving-refactor")
+        selected.append("$refactor-loop")
     if task_id == "T10":
         selected.append("$paper-writing")
     return tuple(dict.fromkeys(selected))

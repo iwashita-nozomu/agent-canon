@@ -570,7 +570,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$behavior-preserving-refactor",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
                 result.stdout,
             )
 

@@ -30,7 +30,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - README, workflow, guide, migration, or other long reader-facing docs -> `$long-form-writing`
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
-     - large refactor -> `$behavior-preserving-refactor`
+     - large refactor -> `$refactor-loop`
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`

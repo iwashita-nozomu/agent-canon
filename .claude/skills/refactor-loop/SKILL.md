@@ -1,18 +1,18 @@
 ---
-name: behavior-preserving-refactor
-description: Use when a large refactor should be treated as behavior-preserving structural change with explicit path mapping, semantic-delta controls, and strong review gates.
+name: refactor-loop
+description: Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates.
 ---
 <!--
 @dependency-start
-responsibility Documents Behavior Preserving Refactor for this repository.
+responsibility Documents Refactor Loop for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 @dependency-end
 -->
 
 
-# Behavior Preserving Refactor
+# Refactor Loop
 
-1. Read `agents/skills/behavior-preserving-refactor.md`.
+1. Read `agents/skills/refactor-loop.md`.
 1. Fix `Behavior Contract`, `Allowed Structural Delta`, and `Forbidden Semantic Delta` before editing.
 1. Record delete, move, rename, and split targets before implementation.
 1. Keep feature additions out of the same pass.

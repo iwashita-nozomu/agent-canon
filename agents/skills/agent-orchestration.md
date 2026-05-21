@@ -90,7 +90,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
 - scope が paper draft と broader academic prose をまたぐなら、`paper-writing` を優先し、必要なときだけ `academic-writing` を追加します
 - research-backed implementation や比較改善では `research-workflow` を使います
-- large refactor では `behavior-preserving-refactor`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
+- large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較が task の中心にある場合は `dependency-analysis` を足し、`agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - 関係のない family skill は足しません
 - tool 化済みの規約検証は task-shape skill として増やさず、`check_convention_compliance.py` の gate に委譲します

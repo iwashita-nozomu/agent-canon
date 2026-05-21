@@ -292,7 +292,7 @@ concurrent spawn budget:
 - chunk completion は umbrella request の completion ではない
 - 各 chunk で checkpoint review を複数回に増やせる
 - 逐次 review と最終 review を分ける
-- 大規模 refactor では `$behavior-preserving-refactor` を追加します
+- 大規模 refactor では `$refactor-loop` を追加します
 - refactor pass では feature 追加を同じ pass に混ぜません
 - refactor pass では `refactor_safety_case.md` を起こし、挙動保存契約、削除対象、path mapping、merge structure check を先に固定します
 - refactor pass では `project_reviewer` と `docs_workflow_steward` を default specialist にし、cross-module drift と stale route を落とします

@@ -865,9 +865,9 @@ required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bu
 
 [[evals]]
 id = "oop-refactor-skill-route"
-target = "agents/skills/behavior-preserving-refactor.md"
+target = "agents/skills/refactor-loop.md"
 kind = "skill"
-description = "The behavior-preserving refactor skill must preserve OOP analyzer scope evidence."
+description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
 
 [[evals.checklist]]
 id = "OOP-SKILL-1"
