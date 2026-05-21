@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -116,6 +117,68 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn(f"evidence_root: `{canon_root.resolve().as_posix()}`", guide)
         self.assertIn("open_issues: `1`", guide)
         self.assertIn("hook_status_counts: `{'fail': 1, 'pass': 4}`", guide)
+
+    def test_skill_routing_gap_ignores_pre_cutover_skill_logs(self) -> None:
+        """Skill source updates should archive older routing signals from gap math."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_cutover_fixture(root)
+            output = root / "reports" / "guide.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            guide = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("`agent-orchestration`: gap=", guide)
+        self.assertIn("skill_routing_signal_before_cutover_ignored", guide)
+        self.assertIn(
+            "skill_routing_signal_before_cutover_ignored:agent-orchestration",
+            guide,
+        )
+
+    def test_skill_routing_gap_keeps_post_cutover_skill_logs(self) -> None:
+        """Skill source cutover should not hide current routing pressure."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_cutover_fixture(root, include_post_cutover=True)
+            output = root / "reports" / "guide.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            guide = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "`agent-orchestration`: gap=`1` selected=`1` candidate=`1` feedback=`1`",
+            guide,
+        )
+        self.assertNotIn(
+            "`agent-orchestration`: gap=`3` selected=`1` candidate=`2` feedback=`2`",
+            guide,
+        )
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -256,6 +319,98 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                 }
             )
             + "\n",
+            encoding="utf-8",
+        )
+
+    def write_cutover_fixture(
+        self,
+        root: Path,
+        *,
+        include_post_cutover: bool = False,
+    ) -> None:
+        """Write a Git-backed fixture with hook evidence older than skill source."""
+        root.mkdir(parents=True, exist_ok=True)
+        skill_path = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+        skill_path.parent.mkdir(parents=True, exist_ok=True)
+        skill_path.write_text(
+            "---\nname: agent-orchestration\ndescription: test skill\n---\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "add", ".agents/skills/agent-orchestration/SKILL.md"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        commit_env = os.environ.copy()
+        commit_env.update(
+            {
+                "GIT_AUTHOR_DATE": "2026-05-21T10:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2026-05-21T10:00:00+00:00",
+            }
+        )
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=AgentCanon Test",
+                "-c",
+                "user.email=agentcanon-test@example.invalid",
+                "commit",
+                "-m",
+                "update agent orchestration skill",
+            ],
+            cwd=root,
+            env=commit_env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        hook_results = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
+        hook_results.mkdir(parents=True)
+        entries: list[dict[str, object]] = [
+            {
+                "hook_run_id": "skill-hook-before-cutover",
+                "event": "UserPromptSubmit",
+                "timestamp": "2026-05-20T10:00:00Z",
+                "status": "pass",
+                "payload_fingerprint": "payload-before-cutover",
+                "hook_log_namespace": "test-container",
+                "candidate_skills": ["agent-orchestration"],
+                "feedback_targets": ["skill:agent-orchestration"],
+                "feedback_labels": ["repair_request"],
+                "skill_source_fields": ["prompt"],
+                "observed_text_field_count": 1,
+                "observed_text_value_count": 1,
+                "workflow_monitor_event_count": 1,
+                "workflow_monitor_report_dir": "reports/agents/test",
+            }
+        ]
+        if include_post_cutover:
+            entries.append(
+                {
+                    "hook_run_id": "skill-hook-after-cutover",
+                    "event": "UserPromptSubmit",
+                    "timestamp": "2026-05-22T10:00:00Z",
+                    "status": "pass",
+                    "payload_fingerprint": "payload-after-cutover",
+                    "hook_log_namespace": "test-container",
+                    "skills": ["agent-orchestration"],
+                    "skill_count": 1,
+                    "candidate_skills": ["agent-orchestration"],
+                    "feedback_targets": ["skill:agent-orchestration"],
+                    "feedback_labels": ["repair_request"],
+                    "skill_source_fields": ["prompt"],
+                    "observed_text_field_count": 1,
+                    "observed_text_value_count": 1,
+                    "workflow_monitor_event_count": 1,
+                    "workflow_monitor_report_dir": "reports/agents/test",
+                }
+            )
+        (hook_results / "skill_usage.jsonl").write_text(
+            "".join(json.dumps(entry) + "\n" for entry in entries),
             encoding="utf-8",
         )
 

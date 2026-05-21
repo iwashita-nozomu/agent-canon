@@ -13,13 +13,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
+COMMIT_TIME_FORMAT = "%ct"
+GIT_LOG_TIMEOUT_SECONDS = 5
 MAX_HOOK_FAILURE_LINES = 20
 MAX_COUNTER_LINES = 20
+NO_RESET_EPOCH = -1
 CHECKER_TARGET_SUFFIXES = (
     ".c",
     ".cc",
@@ -209,10 +214,16 @@ def is_code_checker_executable(token: str) -> bool:
 class HookEvidenceCounter:
     """Count hook statuses, tool results, skills, and checker surfaces."""
 
-    def __init__(self, known_skills: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        known_skills: frozenset[str] = frozenset(),
+        root: Path | None = None,
+    ) -> None:
         """Initialize empty counters."""
         self.state = HookCounterState.empty()
         self.known_skills = known_skills
+        self.root = root
+        self.skill_reset_epochs: dict[str, int] = {}
 
     def add_line(self, path: Path, raw_line: str) -> None:
         """Add one hook JSONL line to the counters."""
@@ -294,6 +305,8 @@ class HookEvidenceCounter:
         if "observed_text_field_count" not in entry:
             self.state.quality["missing_observed_text_field_count"] += 1
         for skill in self.normalized_strings(entry.get("candidate_skills")):
+            if not self.skill_signal_in_active_window(skill, entry):
+                continue
             self.state.candidate_skills[skill] += 1
         for workflow in self.normalized_strings(entry.get("candidate_workflows")):
             self.state.candidate_workflows[workflow] += 1
@@ -304,6 +317,8 @@ class HookEvidenceCounter:
         trusted_skill_source = self.trusted_skill_source(sources)
         for target in self.normalized_strings(entry.get("feedback_targets")):
             if self.countable_feedback_target(target, trusted_skill_source):
+                if not self.feedback_target_in_active_window(target, entry):
+                    continue
                 self.state.feedback_targets[target] += 1
         action = str(entry.get("feedback_action") or "")
         if action:
@@ -327,6 +342,8 @@ class HookEvidenceCounter:
             self.state.quality["empty_skill_usage"] += 1
             return
         for skill in skills:
+            if not self.skill_signal_in_active_window(skill, entry):
+                continue
             self.state.skills[skill] += 1
             self.state.skill_events[f"{skill}@{event}"] += 1
         monitor_count = self.integer_value(entry.get("workflow_monitor_event_count"))
@@ -363,6 +380,38 @@ class HookEvidenceCounter:
             self.state.quality[f"noncanonical_skill_usage_ignored:{skill}"] += 1
             return False
         return True
+
+    def feedback_target_in_active_window(
+        self,
+        target: str,
+        entry: dict[str, object],
+    ) -> bool:
+        """Return whether a feedback target belongs to the current skill-analysis window."""
+        if not target.startswith("skill:"):
+            return True
+        return self.skill_signal_in_active_window(target.removeprefix("skill:"), entry)
+
+    def skill_signal_in_active_window(self, skill: str, entry: dict[str, object]) -> bool:
+        """Return whether one skill signal is not archived by a source-path cutover."""
+        reset_epoch = self.skill_reset_epoch(skill)
+        entry_epoch = hook_entry_epoch(entry)
+        if (
+            reset_epoch == NO_RESET_EPOCH
+            or entry_epoch == NO_RESET_EPOCH
+            or entry_epoch >= reset_epoch
+        ):
+            return True
+        self.state.quality["skill_routing_signal_before_cutover_ignored"] += 1
+        self.state.quality[f"skill_routing_signal_before_cutover_ignored:{skill}"] += 1
+        return False
+
+    def skill_reset_epoch(self, skill: str) -> int:
+        """Return the latest source-path commit epoch for one skill."""
+        if skill in self.skill_reset_epochs:
+            return self.skill_reset_epochs[skill]
+        epoch = latest_skill_source_epoch(self.root, skill)
+        self.skill_reset_epochs[skill] = epoch
+        return epoch
 
     def add_checker_targets(self, entry: dict[str, object]) -> None:
         """Record files checked by code-checker hook commands."""
@@ -474,7 +523,7 @@ class AgentImprovementGuide:
 
     def hook_counts(self) -> HookEvidenceCounts:
         """Return hook counters."""
-        counter = HookEvidenceCounter(known_skill_ids(self.root))
+        counter = HookEvidenceCounter(known_skill_ids(self.root), root=self.root)
         for path in self.hook_result_paths():
             for raw_line in path.read_text(encoding="utf-8").splitlines():
                 counter.add_line(path, raw_line)
@@ -624,6 +673,70 @@ def known_skill_ids(root: Path) -> frozenset[str]:
         if path.name != "README.md":
             skills.add(path.stem)
     return frozenset(skills)
+
+
+def hook_entry_epoch(entry: dict[str, object]) -> int:
+    """Return UTC epoch seconds parsed from one hook timestamp."""
+    timestamp = entry.get("timestamp")
+    if not isinstance(timestamp, str) or not timestamp:
+        return NO_RESET_EPOCH
+    normalized = timestamp.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return NO_RESET_EPOCH
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())
+
+
+def latest_skill_source_epoch(root: Path | None, skill: str) -> int:
+    """Return latest Git commit epoch for source paths that define one skill."""
+    if root is None:
+        return NO_RESET_EPOCH
+    paths = [
+        path.as_posix()
+        for path in skill_source_path_candidates(skill)
+        if (root / path).exists()
+    ]
+    if not paths:
+        return NO_RESET_EPOCH
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                root.as_posix(),
+                "log",
+                "-1",
+                f"--format={COMMIT_TIME_FORMAT}",
+                "--",
+                *paths,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_LOG_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return NO_RESET_EPOCH
+    output = result.stdout.strip()
+    if result.returncode != 0 or not output:
+        return NO_RESET_EPOCH
+    try:
+        return int(output.splitlines()[0])
+    except ValueError:
+        return NO_RESET_EPOCH
+
+
+def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
+    """Return likely source paths that define one skill id."""
+    slug = skill.removeprefix("$")
+    return (
+        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path("agents") / "skills" / f"{slug}.md",
+        Path(".claude") / "skills" / slug / "SKILL.md",
+    )
 
 
 def guidance(summary: EvidenceSummary) -> list[str]:

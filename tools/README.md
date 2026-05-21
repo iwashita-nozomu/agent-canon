@@ -333,6 +333,10 @@ in `reports/hooks/` only when a task explicitly overrides the destination with
 durable hook results, and `issues/open|closed/` to produce the PR /
 branch-push improvement guide artifact; it does not mutate skills, workflows,
 tools, or memory.
+For skill routing gaps, the guide treats the latest Git commit touching the
+affected skill source paths as the cutover point. Older hook JSONL remains
+append-only evidence, but pre-cutover skill signals are archived out of current
+gap calculations after a repair lands.
 `generate_agent_runtime_dashboard.py` is the read-only viewing entrypoint for
 that same evidence tree. It writes a Markdown dashboard showing the canonical
 log locations, hook namespaces, hook entry counts, skill usage, prompt routing

@@ -53,3 +53,11 @@ AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES=756
 This confirms that structural accumulation exists, but the log schema still
 needs better workflow attribution, prompt capture coverage after deployment,
 and token footprint comparison evidence.
+
+## 2026-05-21 Routing Cutover Evidence
+
+Accumulated skill routing logs remain append-only after routing prompt repairs,
+but current gap analysis now cuts over at the latest Git commit for the
+affected skill source paths. This prevents already-fixed skill routing misses
+from staying in the active `Skill Routing Gaps` backlog while preserving the raw
+JSONL chronology for audit and repeated-failure analysis.

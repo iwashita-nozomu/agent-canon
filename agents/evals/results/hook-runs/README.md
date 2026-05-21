@@ -78,6 +78,12 @@ retention/compaction task that preserves the chronology according to the eval
 result policy. If a hook is writing unhelpful no-op events, fix the hook filter
 in a follow-up change; do not silently hide already-written evidence.
 
+After a skill / workflow / tool routing repair lands, current analysis should
+cut over at the repaired source path's latest Git commit instead of physically
+moving JSONL. Improvement-guide and dashboard tooling may ignore older skill
+routing signals for gap calculations, but the JSONL lines remain in this tree
+for audit and repeated-failure history.
+
 ## File Naming
 
 Each hook writes one JSONL file named after the hook inside a runtime namespace:
