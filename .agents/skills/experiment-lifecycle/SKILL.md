@@ -15,7 +15,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Read `agents/skills/experiment-lifecycle.md`.
 1. Keep execution steps, result paths, and report locations consistent with the canonical experiment workflow.
 1. Treat `experiments/registry.toml` as the canonical topic registry for entrypoints and registered smoke/formal commands.
-1. For formal or server-side runs, use `tools/experiments/run_managed_experiment.py` so `run_manifest.json` and `run.log` are captured automatically.
-1. Require experiment settings to be exported as a JSON-object/dict artifact, normally `result/<run_name>/config.json`; registered commands must consume `{config_path}`.
+1. For formal or server-side runs, use a project `Makefile` target that calls `tools/experiments/run_managed_experiment.py` so `run_manifest.json` and `run.log` are captured automatically.
+1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a `config.json` or YAML snapshot, and registered commands must consume `{config_path}`.
 1. Use `$result-artifact-writeout` for result/report generation so raw run output, Markdown summary, manifest, run name, and overwrite policy are recorded separately.
 1. If code changes must iterate with explicit decision states, also use `experiment-change-loop`.

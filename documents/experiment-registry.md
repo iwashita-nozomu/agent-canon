@@ -41,8 +41,9 @@ durable な正本は常に topic 名です。
 - 必要なら `optional_eval_artifacts`
 
 `smoke_inner_command` と `formal_inner_command` は `{run_dir}` に加えて `{config_path}` を含めます。
-managed runner は run 開始前に `result/<run_name>/config.json` を書き出し、
-inner command はその JSON object を今回 run の設定正本として読みます。
+checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は run 開始前に
+`result/<run_name>/config.json` または YAML snapshot を書き出し、inner command はその snapshot
+から今回 run の設定を復元します。
 
 ## branch-only topics
 
@@ -96,10 +97,11 @@ python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
 
 ## server 実行ルール
 
+- project `Makefile` は registry の smoke / formal command へ到達する target を持ちます。標準名は `make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` です。
 - formal run は `tools/experiments/run_managed_experiment.py` を使います。
-- 可能なら `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
+- 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
-- `config.json` には run 開始前に固定した設定 dictionary を残し、`run_manifest.json` からも `config_path` と snapshot を辿れるようにします。
+- checked-in 設定正本は topic の `config.yaml` に置きます。`config.json` または `config.yaml` snapshot には run 開始前に固定した設定 dictionary を残し、`run_manifest.json` からも `config_path` と snapshot を辿れるようにします。
 - `required_eval_artifacts` と `optional_eval_artifacts` は `result/<run_name>/` から自動収集したい eval artifact pattern を表します。`summary.json` と `cases.jsonl` は managed runner の既定 required eval とし、topic 固有の追加 artifact だけを registry に書き足します。top-level managed file (`run_manifest.json`、`eval_manifest.json`、`run.log`) は reserved で、pattern に指定してはいけません。
 
 ## validation

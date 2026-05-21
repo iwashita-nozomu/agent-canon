@@ -107,6 +107,37 @@ upstream design README.md durable document index
 
 実験ごとに worker class や scheduler class を増やすことを既定にしません。まずは `StandardWorker` と `StandardFullResourceScheduler` を使います。
 
+## 3.1 topic の公開入口
+
+実験 topic は、研究ロジックを単発実行できる Python entrypoint と、正式実行用の
+Make target の両方を持ちます。
+
+- Python entrypoint
+  - `experiments/<topic>/experimentcode.py`
+  - `--config experiments/<topic>/config.yaml`
+  - `--run-dir experiments/<topic>/result/<run_name>`
+  - 必要なら `--limit`、`--site`、`--day` などの入力範囲指定
+- checked-in config
+  - `experiments/<topic>/config.yaml`
+  - worker 数、case 範囲、backend、dtype、timeout、allocator、feature flag、比較対象をここへ集約
+- Make target
+  - `make experiment-smoke TOPIC=<topic>`
+  - `make experiment-formal TOPIC=<topic>`
+  - topic 固有 alias を置く場合も、内側では managed runner を呼ぶ
+
+Python entrypoint は、debug のために直接 1 case を回せる程度にしてよいです。
+ただし、正式な smoke / formal / server-side run は `Makefile` の target から
+`tools/experiments/run_managed_experiment.py` を通して起動します。
+
+topic README には、少なくとも次を書きます。
+
+- config 正本の path
+- smoke / formal の Make command
+- 代表的な direct single-case command
+- 出力先の `result/<run_name>/`
+- 主要 artifact の一覧
+- report / notebook を再生成する command
+
 ## 4. 標準の組み立て方
 
     from experiment_runner import StandardFullResourceScheduler
@@ -139,6 +170,16 @@ upstream design README.md durable document index
 - `initialize_context`
 - `skip_controller`
 - `cases`
+
+CLI 側では、この組み立てを 1 回だけ行います。case loop、process spawn、
+GPU assignment、timeout、signal cleanup を CLI で重ねて実装しません。
+CLI が行うのは次だけです。
+
+- YAML config を読む
+- case list を展開する
+- result directory と writer を初期化する
+- `StandardWorker`、`StandardFullResourceScheduler`、`StandardRunner` を接続する
+- summary を最後に書く
 
 ## 5. `ExecutionResult` を正本にする
 
