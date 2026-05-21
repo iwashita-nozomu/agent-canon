@@ -132,6 +132,12 @@ critical = true
 description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
 required_regex = ["failed", "partial", "status", "exit code"]
 
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-4"
+critical = true
+description = "Routes reader-facing tool or JSON result reports to report-writing instead of treating writeout as the narrative report skill."
+required_regex = ["reader-facing report", "\\$report-writing", "source packet", "limitations", "quality checklist"]
+
 [[evals]]
 id = "report-writing-skill"
 target = ".agents/skills/report-writing/SKILL.md"
@@ -368,6 +374,24 @@ critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
 required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-SKILL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and pairs raw machine result storage with result-artifact-writeout."
+required_regex = ["PR body", "reader-facing report", "\\$report-writing", "JSON/JSONL", "\\$result-artifact-writeout", "evidence-backed"]
+
+[[evals]]
+id = "agent-orchestration-canonical-report-routing"
+target = "agents/skills/agent-orchestration.md"
+kind = "skill"
+description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
+required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
 
 [[evals]]
 id = "codex-task-workflow-convention-gate"

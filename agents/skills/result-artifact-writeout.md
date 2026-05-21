@@ -51,6 +51,11 @@ evidence.
 
 1. Choose the destination class before writing.
 1. Preserve the raw machine-readable result before writing a prose summary.
+1. If the user asks for a reader-facing report from tool, JSON / JSONL, hook,
+   eval, checker, experiment, review, or audit evidence, also use
+   `report-writing`. This skill owns raw / summary artifact writeout, not the
+   report source packet, interpretation, limitations, next action, or quality
+   checklist.
 1. Derive tables and Markdown from the same raw result; do not rerun a checker
    just to get nicer prose unless the rerun is explicitly recorded as a new
    source result.

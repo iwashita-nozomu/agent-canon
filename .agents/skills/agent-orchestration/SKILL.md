@@ -30,6 +30,8 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - README, workflow, guide, migration, or other long reader-facing docs -> `$long-form-writing`
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
+     - PR body, PR evidence comment, status update, decision brief, or reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence -> `$report-writing`; if raw machine results are written or copied, also add `$result-artifact-writeout`
+     - README, workflow, guide, migration, or specification docs keep their domain writing skill; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
      - large refactor -> `$refactor-loop`
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
