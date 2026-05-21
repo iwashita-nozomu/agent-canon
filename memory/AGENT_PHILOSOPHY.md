@@ -85,6 +85,12 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User asked whether Actions or local Agent should inspect evidence and accepted the hybrid PR/push guide policy
 
+- 2026-05-18 | work-principle | 数値実験や solver failure の診断では、最後の `NaN`、`Inf`、巨大 residual を原因扱いせず、run log を時系列に追って最初の破綻点と直前の finite state を特定してから原因を述べる
+  - source: chat
+  - scope: repo-wide
+  - confidence: stable
+  - evidence: User corrected a PDIPM/KKT diagnosis that relied on the final failed log state instead of the first divergence point.
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

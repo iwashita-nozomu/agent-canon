@@ -3,19 +3,20 @@
 # @dependency-start
 # responsibility Tests test codex hooks behavior.
 # upstream implementation ../../.codex/config.toml enables hooks
-# upstream implementation ../../.codex/hooks.json declares MCP context hooks
-# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits hook JSON
+# upstream implementation ../../.codex/hooks.json declares active guardrail hooks
+# upstream implementation ../../.codex/hooks/mcp_session_context.sh emits optional MCP context JSON
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
-# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and blocks OOP findings
+# upstream implementation ../../.codex/hooks/oop_readability_guard.py logs and warns on OOP findings
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
+# upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
 # @dependency-end
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
+HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 PROMPT_SECRET_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "prompt_secret_guard.py"
 GOAL_COMPLETION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "goal_completion_guard.py"
 OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_guard.py"
@@ -368,12 +370,31 @@ class CodexHooksTest(unittest.TestCase):
         self.assertNotIn("codex_hooks", config_text)
         self.assertTrue(HOOKS_JSON.exists())
         self.assertTrue(HOOK_SCRIPT.exists())
+        self.assertTrue(HOOK_DISPATCHER.exists())
 
-    def test_hooks_json_wires_mcp_context_hook(self) -> None:
-        """Only session startup should point at the repo-local MCP context script."""
+    def _dispatcher_scripts(self, event: str) -> list[str]:
+        """Return the child hook scripts configured for one dispatcher event."""
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "--list", event],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        events = cast("dict[str, list[dict[str, object]]]", payload["events"])
+        return [cast(str, row["script"]) for row in events[event]]
+
+    def test_hooks_json_does_not_wire_mcp_context_hook(self) -> None:
+        """MCP context is not a startup hook; active hooks stay guardrail-only."""
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
 
-        session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
+        session_start_hooks = hooks["hooks"].get("SessionStart", [])
+        session_start_commands = [
+            hook["command"]
+            for group in session_start_hooks
+            for hook in group.get("hooks", [])
+        ]
         prompt_hooks = hooks["hooks"]["UserPromptSubmit"][0]["hooks"]
         prompt_commands = [hook["command"] for hook in prompt_hooks]
         pre_tool = hooks["hooks"]["PreToolUse"][0]
@@ -382,39 +403,521 @@ class CodexHooksTest(unittest.TestCase):
         post_tool_commands = [hook["command"] for hook in post_tool["hooks"]]
         stop_hooks = hooks["hooks"]["Stop"][0]["hooks"]
         stop_commands = [hook["command"] for hook in stop_hooks]
+        prompt_scripts = self._dispatcher_scripts("UserPromptSubmit")
+        pre_tool_scripts = self._dispatcher_scripts("PreToolUse")
+        post_tool_scripts = self._dispatcher_scripts("PostToolUse")
+        stop_scripts = self._dispatcher_scripts("Stop")
 
-        self.assertIn("SessionStart", session_start["command"])
-        self.assertIn("mcp_session_context.sh", session_start["command"])
+        self.assertFalse(
+            any("mcp_session_context.sh" in command for command in session_start_commands)
+        )
         self.assertFalse(any("mcp_session_context.sh" in command for command in prompt_commands))
-        self.assertTrue(any("prompt_secret_guard.py" in command for command in prompt_commands))
-        self.assertTrue(any("skill_usage_logger.py" in command for command in prompt_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in prompt_commands))
+        self.assertEqual(len(prompt_commands), 1)
+        self.assertIn("hook_dispatcher.py", prompt_commands[0])
+        self.assertEqual(
+            prompt_scripts,
+            [
+                "prompt_secret_guard.py",
+                "skill_usage_logger.py",
+                "reference_capture_guard.py",
+            ],
+        )
         self.assertIn("apply_patch", pre_tool["matcher"])
-        self.assertTrue(any("cause_investigation_guard.py" in command for command in pre_tool_commands))
+        self.assertEqual(len(pre_tool_commands), 1)
+        self.assertIn("hook_dispatcher.py", pre_tool_commands[0])
+        self.assertEqual(pre_tool_scripts, ["cause_investigation_guard.py"])
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertIn("spawn_agent", post_tool["matcher"])
         self.assertIn("close_agent", post_tool["matcher"])
-        self.assertTrue(any("skill_usage_logger.py" in command for command in post_tool_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("oop_readability_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("module_boundary_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("library_implementation_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("helper_first_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("goal_completion_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("oop_readability_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("module_boundary_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("library_implementation_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("helper_first_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("helper_inventory_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("helper_inventory_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("log_surface_inventory_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("notebook_quality_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("notebook_quality_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("style_checker_guard.py" in command for command in post_tool_commands))
-        self.assertTrue(any("style_checker_guard.py" in command for command in stop_commands))
-        self.assertTrue(any("skill_usage_logger.py" in command for command in stop_commands))
-        self.assertTrue(any("reference_capture_guard.py" in command for command in stop_commands))
+        self.assertEqual(len(post_tool_commands), 1)
+        self.assertIn("hook_dispatcher.py", post_tool_commands[0])
+        self.assertEqual(
+            post_tool_scripts,
+            [
+                "skill_usage_logger.py",
+                "reference_capture_guard.py",
+                "oop_readability_guard.py",
+                "module_boundary_guard.py",
+                "library_implementation_guard.py",
+                "helper_inventory_guard.py",
+                "helper_first_guard.py",
+                "style_checker_guard.py",
+                "log_surface_inventory_guard.py",
+                "notebook_quality_guard.py",
+            ],
+        )
+        self.assertEqual(len(stop_commands), 1)
+        self.assertIn("hook_dispatcher.py", stop_commands[0])
+        self.assertEqual(
+            stop_scripts,
+            [
+                "goal_completion_guard.py",
+                "oop_readability_guard.py",
+                "module_boundary_guard.py",
+                "library_implementation_guard.py",
+                "helper_inventory_guard.py",
+                "helper_first_guard.py",
+                "style_checker_guard.py",
+                "log_surface_inventory_guard.py",
+                "notebook_quality_guard.py",
+                "reference_capture_guard.py",
+                "skill_usage_logger.py",
+            ],
+        )
+
+    def test_hooks_json_command_counts_contract(self) -> None:
+        """Active hook configuration should stay collapsed to one command per event."""
+        hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
+        counts = {
+            event: sum(len(group.get("hooks", [])) for group in groups)
+            for event, groups in hooks["hooks"].items()
+        }
+        commands_by_event = {
+            event: [
+                hook["command"]
+                for group in groups
+                for hook in group.get("hooks", [])
+            ]
+            for event, groups in hooks["hooks"].items()
+        }
+
+        self.assertEqual(
+            counts,
+            {
+                "UserPromptSubmit": 1,
+                "PreToolUse": 1,
+                "PostToolUse": 1,
+                "Stop": 1,
+            },
+        )
+        self.assertEqual(sum(counts.values()), 4)
+        for event, commands in commands_by_event.items():
+            self.assertEqual(len(commands), len(set(commands)), event)
+            self.assertTrue(all("hook_dispatcher.py" in command for command in commands))
+
+    def test_hook_dispatcher_runs_all_children_and_returns_first_block(self) -> None:
+        """Dispatcher should preserve order while still giving every child a log chance."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            child_payloads = {
+                "prompt_secret_guard.py": {"decision": "block", "reason": "first block"},
+                "skill_usage_logger.py": None,
+                "reference_capture_guard.py": {"decision": "block", "reason": "later block"},
+            }
+            for script_name, output_payload in child_payloads.items():
+                output_json = json.dumps(output_payload) if output_payload else ""
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "import sys",
+                            f"script_name = {script_name!r}",
+                            "payload = sys.stdin.read()",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write(f'{script_name}:{len(payload)}\\n')",
+                            f"output = {output_json!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            invocations = log_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["reason"], "first block")
+        self.assertEqual(
+            invocations,
+            [
+                "prompt_secret_guard.py:12",
+                "skill_usage_logger.py:12",
+                "reference_capture_guard.py:12",
+            ],
+        )
+
+    def test_hook_dispatcher_child_launch_failure_returns_block_after_later_hooks(self) -> None:
+        """Dispatcher should report child launch failures without skipping later hooks."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "import sys",
+                        "payload = sys.stdin.read()",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write(f'skill_usage_logger.py:{len(payload)}\\n')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (hook_dir / "reference_capture_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "import sys",
+                        "payload = sys.stdin.read()",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write(f'reference_capture_guard.py:{len(payload)}\\n')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            invocations = log_path.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("prompt_secret_guard.py", cast(str, payload["reason"]))
+        self.assertEqual(
+            invocations,
+            [
+                "skill_usage_logger.py:12",
+                "reference_capture_guard.py:12",
+            ],
+        )
+
+    def test_hook_dispatcher_combines_non_blocking_visible_outputs(self) -> None:
+        """Dispatcher should not drop later non-blocking child diagnostics."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            outputs = {
+                "prompt_secret_guard.py": {
+                    "decision": "approve",
+                    "reason": "first warning",
+                    "next_action": "first_action",
+                    "remediation": ["first remediation"],
+                },
+                "skill_usage_logger.py": "plain diagnostic",
+                "reference_capture_guard.py": "",
+            }
+            for script_name, output_payload in outputs.items():
+                if isinstance(output_payload, dict):
+                    output_text = json.dumps(output_payload)
+                else:
+                    output_text = output_payload
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            f"output = {output_text!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+
+        self.assertEqual(payload["decision"], "approve")
+        self.assertEqual(payload["child_output_count"], 2)
+        self.assertIn("first warning", cast(str, payload["reason"]))
+        self.assertIn("plain diagnostic", cast(str, payload["reason"]))
+        self.assertEqual(payload["next_action"], "first_action")
+
+    def test_hook_dispatcher_skips_git_status_tool_payloads(self) -> None:
+        """GitStatus-style tool checks should not run blocking hook children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "cause_investigation_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "GitStatus",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_read_only_git_status_bash_commands(self) -> None:
+        """Read-only git status Bash commands should not trigger blocking children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {
+                            "cmd": "git -C vendor/agent-canon status --short --branch --untracked-files=all",
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_read_only_file_inspection_commands(self) -> None:
+        """Read-only file inspection should not require disabling hook config."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "skill_usage_logger.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "sed -n '1,120p' .codex/hooks.json"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_validation_commands(self) -> None:
+        """Validation commands should not be blocked by post-tool hook children."""
+        commands = [
+            "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+            "bash tools/ci/check_agent_canon_latest.sh",
+            "bash tools/update_agent_canon.sh plan",
+            "bash tools/sync_agent_canon.sh status",
+            "make agent-canon-latest-check agent-surface-checks",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "style_checker_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertEqual(result.stdout, "")
+                self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_runs_children_for_mutating_lookalikes(self) -> None:
+        """Write-capable lookalikes should not use the read-only bypass."""
+        commands = [
+            "cat AGENTS.md > /tmp/out",
+            "sed -ni '1,120p' .codex/hooks.json",
+            "sed --in-place=.bak -n '1,120p' .codex/hooks.json",
+            "git branch -D main",
+            "git branch --list --delete main",
+            "git remote add x y",
+            "git diff --output=/tmp/out",
+            "git diff -o/tmp/out",
+            "make ci deploy",
+            "bash tools/update_agent_canon.sh latest",
+            "bash tools/update_agent_canon.sh merge-main-into-current",
+            "bash tools/sync_agent_canon.sh ensure-latest",
+            "bash tools/sync_agent_canon.sh link-root",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "cause_investigation_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"child ran\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertIn("child ran", result.stdout)
+                self.assertEqual(log_path.read_text(encoding="utf-8"), "called\n")
 
     def test_style_checker_guard_logs_markdown_and_unchecked_files(self) -> None:
         """Style hook should select Markdown checks and log changed files without a checker."""
@@ -536,6 +1039,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("public-surface-change-without-evidence", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn("next_action", payload)
+        self.assertIn("remediation", payload)
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["changed_module_count"], 1)
 
@@ -1079,9 +1584,49 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("Style checker hook", cast(str, payload["reason"]))
+        self.assertEqual(payload["next_action"], "run_selected_style_checkers_and_fix_findings")
+        self.assertTrue(payload["remediation"])
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["selected_checkers"], ["ruff"])
         self.assertEqual(log_entry["unchecked_count"], 0)
+
+    def test_style_checker_guard_skips_read_only_bash_payloads(self) -> None:
+        """Bash tool names alone should not run style checks for read-only commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' sample.py",
+            "python3 -m ruff format sample.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "sample.py"
+                source.write_text("import os\n\nVALUE = 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(STYLE_CHECKER_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
 
     def test_log_surface_inventory_guard_is_quiet_when_baseline_matches(self) -> None:
         """Log surface guard should not consume tokens on a passing inventory check."""
@@ -1114,7 +1659,8 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("Do not run check_mcp_inventory.py", hook_output["additionalContext"])
         self.assertIn("repo_mcp_server", hook_output["additionalContext"])
         self.assertIn("check_mcp_inventory.py", hook_output["additionalContext"])
-        self.assertIn("even when the user did not mention MCP", hook_output["additionalContext"])
+        self.assertIn("manual context helper only", hook_output["additionalContext"])
+        self.assertIn("mcp_preflight_unavailable", hook_output["additionalContext"])
         self.assertIn("prefer repo MCP tools", hook_output["additionalContext"])
         self.assertIn("goal.loop_status", hook_output["additionalContext"])
         self.assertIn("NEXT_ACTION=run_next_iteration", hook_output["additionalContext"])
@@ -1140,6 +1686,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("API key", payload["reason"])
+        self.assertEqual(payload["next_action"], "remove_secret_or_use_redacted_placeholder_then_retry")
+        self.assertTrue(payload["remediation"])
 
     def test_goal_completion_guard_blocks_active_goal_completion(self) -> None:
         """Stop hook should continue when a completion-like answer races active goal state."""
@@ -1169,9 +1717,11 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("NEXT_ACTION=run_next_iteration", payload["reason"])
+        self.assertEqual(payload["next_action"], "run_next_goal_iteration_or_update_goal_evidence")
+        self.assertTrue(payload["remediation"])
 
-    def test_oop_readability_guard_blocks_changed_python_findings(self) -> None:
-        """OOP guard should block after source edits when changed Python fails."""
+    def test_oop_readability_guard_warns_changed_python_findings(self) -> None:
+        """OOP guard should warn after source edits when changed Python fails."""
         payload, log_entry = self._run_oop_guard_with_changed_python(
             json.dumps(
                 {
@@ -1188,11 +1738,12 @@ class CodexHooksTest(unittest.TestCase):
                 "raise SystemExit(1)\n"
             ),
         )
-        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["decision"], "approve")
         reason = payload["reason"]
         if not isinstance(reason, str):
             self.fail("OOP guard reason must be a string")
         self.assertIn("OOP readability hook", reason)
+        self.assertIn("warning", reason)
         self.assertIn("--min-score 95", reason)
         self.assertNotIn("--baseline-ref HEAD", reason)
         self.assertEqual(log_entry["event"], "PostToolUse")
@@ -1266,7 +1817,7 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertIn("decision", json.loads(result.stdout))
         self.assertTrue(durable_log_exists)
-        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(log_entry["status"], "warn")
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
 
@@ -1344,7 +1895,7 @@ class CodexHooksTest(unittest.TestCase):
         payload, log_entry = self._run_oop_guard_with_changed_python(
             json.dumps({"tool_name": "apply_patch"})
         )
-        self.assertEqual(payload["decision"], "block")
+        self.assertEqual(payload["decision"], "approve")
         self.assertEqual(log_entry["event"], "PostToolUse")
         self.assertEqual(log_entry["tool_name"], "apply_patch")
         self.assertEqual(log_entry["payload_status"], "valid")
@@ -1355,12 +1906,12 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("payload_fingerprint", log_entry)
         self.assertIn("failure_fingerprint", log_entry)
 
-    def test_oop_readability_guard_blocks_preexisting_findings_by_default(self) -> None:
-        """OOP guard should block current changed-source findings by default."""
+    def test_oop_readability_guard_warns_preexisting_findings_by_default(self) -> None:
+        """OOP guard should warn on current changed-source findings by default."""
         payload, log_entry = self._run_oop_guard_with_preexisting_finding()
 
-        self.assertEqual(payload["decision"], "block")
-        self.assertEqual(log_entry["status"], "fail")
+        self.assertEqual(payload["decision"], "approve")
+        self.assertEqual(log_entry["status"], "warn")
         self.assertEqual(log_entry["mode"], "full")
         self.assertEqual(log_entry["baseline_ref"], "")
         self.assertEqual(log_entry["failed_count"], 1)
@@ -1472,6 +2023,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(log_entry["checked"])
         self.assertEqual(log_entry["records"], 1)
         self.assertEqual(log_entry["violations"], 1)
+
+    def test_helper_inventory_guard_skips_read_only_bash_payloads(self) -> None:
+        """Helper inventory guard should not block read-only Bash commands."""
+        commands = (
+            "git status --short --branch",
+            "git -C /tmp status --short",
+            "sed -n '1,20p' changed.py",
+            "python3 -m ruff check changed.py",
+        )
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+                source = temp_root / "changed.py"
+                source.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+                log_path = temp_root / "reports" / "hooks" / "helper.jsonl"
+
+                result = subprocess.run(
+                    [sys.executable, str(HELPER_INVENTORY_GUARD)],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH": str(log_path),
+                    },
+                )
+
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(log_path.exists())
 
     def test_helper_inventory_guard_uses_agentcanon_default_policy(self) -> None:
         """Missing repo-local policy should fall back to the AgentCanon default policy."""
@@ -2162,6 +2751,8 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("reference_materializer.py", payload["reason"])
+        self.assertEqual(payload["next_action"], "materialize_external_references_then_retry")
+        self.assertTrue(payload["remediation"])
         self.assertEqual(entry["missing_count"], 1)
         self.assertEqual(entry["status"], "fail")
 

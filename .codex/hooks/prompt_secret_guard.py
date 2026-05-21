@@ -65,6 +65,12 @@ def emit_block(secret_kind: str) -> None:
                 "Prompt appears to include a "
                 f"{secret_kind}. Remove the secret or replace it with a redacted placeholder."
             ),
+            "next_action": "remove_secret_or_use_redacted_placeholder_then_retry",
+            "remediation": [
+                "Remove the secret material from the prompt.",
+                "Replace examples with redacted placeholders such as `[REDACTED_TOKEN]`.",
+                "Rotate the secret if it was pasted into the session by mistake.",
+            ],
         },
         sys.stdout,
     )

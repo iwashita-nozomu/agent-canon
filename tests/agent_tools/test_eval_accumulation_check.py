@@ -55,6 +55,22 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("duplicate", result.stdout)
 
+    def test_legacy_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
+        """Legacy accumulated hook logs missing namespaces stay readable."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_path = root / "agents" / "evals" / "results" / "hook-runs" / "test" / "hook.jsonl"
+            entry = self.hook_entry("hook-legacy")
+            entry.pop("hook_log_namespace")
+            hook_path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
     def test_missing_skill_eval_report_fails(self) -> None:
         """At least one accumulated skill eval report is required."""
         with tempfile.TemporaryDirectory() as temp_dir:

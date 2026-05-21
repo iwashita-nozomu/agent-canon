@@ -90,7 +90,13 @@ contract listed in `documents/README.md`.
 - AgentCanon-owned path、root shared views、hooks、skills、workflows、tools、submodule pin を触る場合は Shared canon profile として扱い、AgentCanon PR gate を通します。
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn は repository task ではありません。その場合は repo state 確認、MCP inventory、repo MCP tool、shell / GitHub check を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させません。`agent-canon mcp-preflight-policy --request-kind github-actions-read` は `MCP_PREFLIGHT_DECISION=skip` を返します。
-- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。その場合、MCP inventory check は現行 runtime requirement なので維持します。これは optional profile 化しません。
+- local repo state 確認、file edit、validation、PR / issue mutation、local CI 実行、または実装作業へ切り替わった時だけ repository task として扱います。MCP inventory は常時 hook / 常時必須 gate ではなく、workflow evidence が必要な場合、または `.codex/config.toml`、`mcp/`、repo MCP tools、MCP-dependent goal-loop gate を編集する場合に明示実行します。
+
+## Experiment And Log Diagnostics
+
+- 数値実験、収束、optimizer、KKT / linear solver、preconditioner の失敗を診断するときは、最後の `NaN`、`Inf`、巨大 residual だけで原因を断定してはいけません。
+- run log は時系列で追い、最初に悪化した iteration / step、直前の finite state、RHS / reference norm、tolerance、residual、preconditioner summary、converged flag を分けて確認します。
+- user-facing diagnosis では、観測された最終状態、最初の破綻点、推定原因、未確認仮説を明確に分離します。
 
 ## AgentCanon Submodule Update Flow
 
@@ -104,7 +110,7 @@ contract listed in `documents/README.md`.
 - For shared-canon tasks, closeout evidence must include `git submodule status vendor/agent-canon`, the AgentCanon GitHub `main` SHA or PR head SHA, and the template submodule pin SHA.
 - Local bare mirror status is required only when the user request, goal, or workflow scope mentions `/mnt/git` or local mirror propagation.
 - Root `AGENTS.md` is an allowed edit target during workflow-wide reviews, but the edit must be applied to its AgentCanon source file when `AGENTS.md` is a shared root view.
-- Before judging AgentCanon submodule drift by parent-tree diff, inspect `vendor/agent-canon/` directly. If it contains local commits on a branch, treat that local checkout branch as valid shared-canon work: run `bash tools/update_agent_canon.sh merge-main-into-current`, resolve conflicts inside the submodule, validate, push that AgentCanon branch to GitHub, and open or update the AgentCanon PR. Local branches are allowed, but `merge-main-into-current` must prove that fetched remote `main` is contained by emitting `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`. Do not discard or overwrite the local checkout just to make the parent pin look clean. If GitHub `main` already contains the work, use `bash tools/update_agent_canon.sh apply` or `make agent-canon-ensure-latest` to update the parent submodule pin. Removed local proposal, local bare, and safe-align compatibility commands are not normal user-facing routes.
+- Before judging AgentCanon submodule drift by parent-tree diff, inspect `vendor/agent-canon/` directly. If it contains local commits on a branch, treat that local checkout branch as valid shared-canon work: run `bash tools/update_agent_canon.sh merge-main-into-current`, resolve conflicts inside the submodule, validate, push that AgentCanon branch to GitHub, and open or update the AgentCanon PR. Local branches are allowed, but `merge-main-into-current` must prove that fetched remote `main` is contained by emitting `agent_canon_merge_remote_main_in_post_head=yes` and `agent_canon_merge_remote_main_verified=yes`. Do not discard or overwrite the local checkout just to make the parent pin look clean. If GitHub `main` already contains the work, use `make agent-canon-ensure-latest` or `bash tools/update_agent_canon.sh latest` to update the parent submodule pin. Removed local proposal, local bare, safe-align, and direct `apply` compatibility commands are not normal user-facing routes.
 
 ## PR Mutation Authority
 
@@ -120,9 +126,10 @@ contract listed in `documents/README.md`.
 ## Required Before Implementation
 
 - task 開始時とは repository task の開始時を指します。普通の相談、壁打ち、routing-only advice、説明だけの turn や GitHub-only read inspection では `make agent-canon-ensure-latest`、MCP inventory、repo MCP tools、local CI / GitHub checks を実行しません。
-- repository task で MCP preflight が必要な場合は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を既定にし、run bundle の `workflow_monitoring.md` へ evidence を直接追記する必要がある場合だけ `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。
-- repository task 開始時、AgentCanon update surface が clean なら `make agent-canon-ensure-latest` を実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
-- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/sync_agent_canon.sh ensure-latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
+- repository task で MCP preflight が必要な場合は `agent-canon mcp-inventory --root . --require repo_mcp_server --session-cache` を既定にし、run bundle の `workflow_monitoring.md` へ evidence を直接追記する必要がある場合だけ `python3 tools/agent_tools/check_mcp_inventory.py --require repo_mcp_server --report-dir <run>` を併用します。Rust CLI または local Cargo が AgentCanon の lockfile を読めない場合は `mcp_preflight_unavailable=<reason>` を記録し、MCP runtime behavior そのものが task scope でない限り既存 Python / shell gate で検証を続けます。
+- repository task 開始時、`make agent-canon-ensure-latest` を high-level latest route として実行し、`vendor/agent-canon/` submodule pin を upstream AgentCanon の最新にします。親 repo の無関係な dirty path だけを理由に skip しません。
+- `vendor/agent-canon/` の dirty state が AgentCanon-owned eval / hook result under `agents/evals/results/` だけなら、latest route は `agent-logs/<parent-repo>` branch へ退避してから続行します。runtime source、workflow、skill、tool、document、test の dirty state は自動退避せず、AgentCanon branch / PR workflow に送ります。
+- task 開始時に AgentCanon update surface が dirty で `make agent-canon-ensure-latest` が実行できない場合は、`bash tools/update_agent_canon.sh latest` の未実行理由を最初の作業 update に書き、AgentCanon branch / PR / pin commit 後に再実行します。shared-canon task では再実行後の submodule pin evidence を closeout に残します。
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`issues/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - raw `rg` hit で編集対象を決めず、必要な場合は `rg -l "<topic>" > reports/search_hits.txt` のあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。

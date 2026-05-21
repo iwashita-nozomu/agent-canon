@@ -271,7 +271,20 @@ def main() -> int:
         )
     append_log(root, payload, result, notebooks)
     if result.returncode:
-        print(json.dumps({"decision": "block", "reason": blocked_reason(result)}))
+        print(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": blocked_reason(result),
+                    "next_action": "fix_notebook_quality_findings_then_retry",
+                    "remediation": [
+                        "Move fine-grained assertions and heavy checks from notebooks into tests/.",
+                        "Keep changed notebooks readable and runnable as demos.",
+                        "Run `python3 tools/validation/notebook_quality.py --root . --changed` after fixes.",
+                    ],
+                }
+            )
+        )
     return 0
 
 

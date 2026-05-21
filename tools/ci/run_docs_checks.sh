@@ -56,6 +56,7 @@ fi
 "$PYTHON_BIN" tools/docs/check_markdown_math.py "${EXISTING_MARKDOWN_TARGETS[@]}"
 "$PYTHON_BIN" tools/docs/audit_and_fix_links.py --check "${EXISTING_MARKDOWN_TARGETS[@]}"
 "$PYTHON_BIN" tools/docs/check_bootstrap_docs.py
+"$PYTHON_BIN" tools/agent_tools/check_runtime_profile_inventory.py
 
 echo ""
 echo "Documentation checks completed successfully"

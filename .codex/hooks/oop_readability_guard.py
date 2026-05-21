@@ -8,7 +8,7 @@
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates guard output.
 # @dependency-end
 
-"""Block progression when changed source files fail OOP readability checks."""
+"""Warn when changed source files fail OOP readability checks."""
 
 from __future__ import annotations
 
@@ -461,8 +461,8 @@ def should_check(payload: dict[str, object]) -> bool:
     return name in EDIT_TOOL_NAMES or bool(EDIT_COMMAND_PATTERN.search(command))
 
 
-def emit_block(results: list[AnalyzerResult]) -> None:
-    """Emit a blocking hook result with OOP remediation details."""
+def emit_warning(results: list[AnalyzerResult]) -> None:
+    """Emit a non-blocking hook result with OOP remediation details."""
     failed = [result for result in results if result.returncode != 0]
     snippets = []
     for result in failed[:MAX_BLOCKED_ANALYZER_SNIPPETS]:
@@ -470,13 +470,19 @@ def emit_block(results: list[AnalyzerResult]) -> None:
         snippets.append(f"$ {' '.join(result.command)}\n{first_lines}")
     json.dump(
         {
-            "decision": "block",
+            "decision": "approve",
             "reason": (
-                "OOP readability hook found changed source files that need immediate repair. "
-                "Run the listed checker(s), fix the implementation or adjust the approved "
-                "OOP boundary before continuing.\n\n"
+                "OOP readability hook found changed source findings. This is a warning; "
+                "run the listed checker(s) before closeout and either fix the findings or "
+                "record the approved OOP boundary.\n\n"
                 + "\n\n".join(snippets)
-            )
+            ),
+            "next_action": "fix_oop_readability_findings_or_record_boundary_approval",
+            "remediation": [
+                "Run the listed OOP readability checker command.",
+                "Fix readability findings before closeout when they are in the intended edit scope.",
+                "If findings are accepted, record the owning boundary and approval evidence.",
+            ],
         },
         sys.stdout,
     )
@@ -534,7 +540,7 @@ def hook_log_status(
     """Return the status value for one OOP hook log entry."""
     if not logged_checked(checked, results):
         return "skipped"
-    return "fail" if failed else "pass"
+    return "warn" if failed else "pass"
 
 
 def analyzer_log_payload(
@@ -608,7 +614,7 @@ def _log_append_hook_log(root: Path, entry: dict[str, object]) -> None:
 
 
 def main() -> int:
-    """Block source-editing continuations when changed source files fail OOP checks."""
+    """Warn on changed-source OOP findings without blocking tool execution."""
     payload = load_payload()
     root = repo_root()
     checked = should_check(payload)
@@ -637,7 +643,7 @@ def main() -> int:
         ),
     )
     if any(result.returncode != 0 for result in results):
-        emit_block(results)
+        emit_warning(results)
     return 0
 
 

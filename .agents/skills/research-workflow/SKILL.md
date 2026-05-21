@@ -16,5 +16,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Read `agents/workflows/research-workflow.md`.
 1. If the task includes paper search or prior-art mapping, also read `agents/skills/literature-survey.md`.
 1. Fix the question, comparison targets, and exit criteria before implementing.
+1. Before using external references, inspect existing repo reference notes and leave or update a durable source packet; claims based on browser/download context alone are not accepted.
 1. Keep one change per loop iteration.
 1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, or `rerun_required` remains.

@@ -87,6 +87,190 @@ sanitize_ref_component() {
   printf '%s\n' "$raw"
 }
 
+parent_repo_log_slug() {
+  local raw="${AGENT_CANON_LOG_REPO_SLUG:-}"
+  if [ -z "$raw" ]; then
+    raw="$(basename "$ROOT_DIR")"
+  fi
+  sanitize_ref_component "$raw"
+}
+
+status_porcelain_path() {
+  local line="$1"
+  local path="${line:3}"
+  case "$path" in
+    *" -> "*)
+      path="${path##* -> }"
+      ;;
+  esac
+  printf '%s\n' "$path"
+}
+
+is_accumulated_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_jsonl_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*.jsonl|agents/evals/results/*/*.jsonl|agents/evals/results/*/*/*.jsonl|agents/evals/results/*/*/*/*.jsonl)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+restore_original_submodule_ref() {
+  local original_branch="$1"
+  local original_head="$2"
+  if [ -n "$original_branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" switch "$original_branch" >/dev/null
+    return
+  fi
+  git -C "$ROOT_DIR/$PREFIX" checkout --detach "$original_head" >/dev/null
+}
+
+stash_ref_for_sha() {
+  local stash_sha="$1"
+  git -C "$ROOT_DIR/$PREFIX" stash list --format='%gd %H' \
+    | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
+}
+
+drop_stash_sha_if_present() {
+  local stash_sha="$1"
+  local stash_ref=""
+  stash_ref="$(stash_ref_for_sha "$stash_sha")"
+  [ -n "$stash_ref" ] || return 0
+  git -C "$ROOT_DIR/$PREFIX" stash drop "$stash_ref" >/dev/null
+}
+
+remove_eval_log_worktree() {
+  local worktree_path="$1"
+  local branch="$2"
+  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
+    git -C "$ROOT_DIR/$PREFIX" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" branch -D "$branch" >/dev/null 2>&1 || true
+  fi
+}
+
+resolve_eval_jsonl_conflicts() {
+  local worktree_root="$1"
+  local conflict_path=""
+  local tmp_dir=""
+  local unresolved=""
+
+  while IFS= read -r conflict_path; do
+    [ -n "$conflict_path" ] || continue
+    if ! is_jsonl_eval_result_path "$conflict_path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK_CONFLICT_UNSAFE=$conflict_path"
+      return 1
+    fi
+    tmp_dir="$(mktemp -d)"
+    git -C "$worktree_root" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
+    git -C "$worktree_root" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
+    mkdir -p "$(dirname "$worktree_root/$conflict_path")"
+    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$worktree_root/$conflict_path"
+    rm -rf "$tmp_dir"
+    git -C "$worktree_root" add "$conflict_path"
+  done < <(git -C "$worktree_root" diff --name-only --diff-filter=U)
+
+  unresolved="$(git -C "$worktree_root" diff --name-only --diff-filter=U)"
+  [ -z "$unresolved" ]
+}
+
+park_eval_log_dirty_state_if_safe() {
+  local status_output=""
+  local line=""
+  local path=""
+  local current_branch=""
+  local current_head=""
+  local log_branch=""
+  local log_start_ref=""
+  local stash_sha=""
+  local apply_log=""
+  local apply_rc=0
+  local commit_sha=""
+  local tmp_worktree=""
+  local tmp_branch=""
+  local -a paths=()
+
+  ensure_agent_canon_submodule
+  status_output="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
+  if [ -z "$status_output" ]; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=clean"
+    return 0
+  fi
+
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="$(status_porcelain_path "$line")"
+    if ! is_accumulated_eval_result_path "$path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK=skipped_non_log_dirty"
+      echo "AGENT_CANON_EVAL_LOG_PARK_BLOCKING_PATH=$path"
+      return 1
+    fi
+    paths+=("$path")
+  done <<< "$status_output"
+
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  current_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
+  tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+
+  echo "AGENT_CANON_EVAL_LOG_PARK=started"
+  echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
+  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
+  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+
+  git -C "$ROOT_DIR/$PREFIX" fetch origin "$log_branch" >/dev/null 2>&1 || true
+  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
+    log_start_ref="origin/$log_branch"
+  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
+    log_start_ref="$log_branch"
+  else
+    log_start_ref="$current_head"
+  fi
+  tmp_worktree="$(mktemp -d)"
+  git -C "$ROOT_DIR/$PREFIX" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
+
+  apply_log="$(mktemp)"
+  git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
+  if [ "$apply_rc" -ne 0 ]; then
+    if ! resolve_eval_jsonl_conflicts "$tmp_worktree"; then
+      cat "$apply_log" >&2
+      rm -f "$apply_log"
+      remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+      return "$apply_rc"
+    fi
+  fi
+  rm -f "$apply_log"
+
+  git -C "$tmp_worktree" add -- "${paths[@]}"
+  if git -C "$tmp_worktree" diff --cached --quiet; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=noop"
+    drop_stash_sha_if_present "$stash_sha"
+    remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+    return 0
+  fi
+  git -C "$tmp_worktree" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
+  git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
+  drop_stash_sha_if_present "$stash_sha"
+  remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+  echo "AGENT_CANON_EVAL_LOG_PARK=committed"
+  echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
+}
+
 parent_pin() {
   git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
@@ -185,7 +369,7 @@ acknowledge_update_todos_if_available() {
 
   if [ "${pending_count:-0}" != "0" ]; then
     echo "AGENT_CANON_LATEST_TODOS=pending"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=todo_workflow_required"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos"
     echo "NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest"
     return 2
   fi
@@ -225,6 +409,15 @@ cmd_latest() {
   local submodule_worktree_status=""
   local latest_log=""
   local latest_rc=0
+  local park_rc=0
+  local todo_rc=0
+
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
+  fi
 
   plan_output="$(cmd_plan "$branch")"
   printf '%s\n' "$plan_output"
@@ -263,7 +456,13 @@ cmd_latest() {
 
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
   rebuild_agent_tools_if_available
-  acknowledge_update_todos_if_available || return $?
+  acknowledge_update_todos_if_available || todo_rc=$?
+  if [ "$todo_rc" -eq 2 ]; then
+    return 0
+  fi
+  if [ "$todo_rc" -ne 0 ]; then
+    return "$todo_rc"
+  fi
   echo "AGENT_CANON_LATEST_TOOL_RESULT=updated"
   echo "NEXT_ACTION=run_validation_then_push_parent_repo"
 }
@@ -272,6 +471,14 @@ cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local latest_log=""
   local latest_rc=0
+  local park_rc=0
+
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
+  fi
 
   latest_log="$(mktemp)"
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?

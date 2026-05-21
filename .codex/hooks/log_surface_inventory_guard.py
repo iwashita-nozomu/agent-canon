@@ -173,6 +173,12 @@ def block(reason: str) -> None:
         {
             "decision": "block",
             "reason": reason,
+            "next_action": "regenerate_log_surface_inventory_then_retry",
+            "remediation": [
+                "Review the added or removed hook/tool/skill output fields.",
+                "Run `python3 tools/agent_tools/log_surface_inventory.py --root . --output documents/log-surface-inventory.json` from AgentCanon.",
+                "Re-run the blocked command after committing the regenerated inventory with the field change.",
+            ],
         },
         sys.stdout,
     )

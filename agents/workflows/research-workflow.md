@@ -37,13 +37,21 @@ downstream design ../../documents/algorithm-implementation-boundary.md equation-
 - runtime success や smoke pass は acceptance の十分条件ではありません。本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と一致しているかを別に確認します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や narrow smoke だけで close しません。
+- 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
+  `references/`、`notes/`、`documents/`、topic report に同じ source / claim があるか
+  を確認します。既存 source note がある場合は、そこを更新または引用します。
+- 外部 source を answer、report、design、benchmark 比較、claim に使った場合は、
+  `references/`、`notes/`、または run-local `source_packet.md` に URL / DOI、access date、
+  採用 claim、limitation、download artifact の保存場所を残します。browser tab、
+  download cache、chat 要約だけを provenance として close しません。
 
 ## 2.5 Research-Driven Change の canonical loop
 
 外部調査つき実装、性能改善、比較検証では、次の outer loop を正本にします。
 
 1. 問い、比較対象、exit criteria を固定する
-1. 外部調査を行い、採用候補と反証候補を残す
+1. 既存 source note を確認してから外部調査を行い、採用候補と反証候補を
+   durable source packet に残す
 1. 比較プロトコルと run layout を固定する
 1. baseline または current state を記録する
 1. 1 つの code change を入れる

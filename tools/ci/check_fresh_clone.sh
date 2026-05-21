@@ -17,7 +17,7 @@ echo "fresh-clone target: ${CLONE_DIR}"
 
 overlay_current_tree() {
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete --exclude .git "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+    rsync -a --delete --exclude .git --exclude .state --exclude .cache/huggingface --exclude .cache/llama.cpp --exclude '*.gguf' --exclude '*.safetensors' --exclude 'pytorch_model*.bin' --exclude 'model-*.bin' --exclude vendor/local-llm-server/llama-cpp/cache --exclude vendor/local-llm-server/llama-cpp/models --exclude vendor/local-llm-server/llama-cpp/runtime "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
     return
   fi
 
@@ -26,7 +26,7 @@ overlay_current_tree() {
   find "${CLONE_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   (
     cd "${ROOT_DIR}"
-    tar --exclude='./.git' --exclude='*/.git' -cf - .
+    tar --exclude='./.git' --exclude='*/.git' --exclude='./.state' --exclude='./.cache/huggingface' --exclude='./.cache/llama.cpp' --exclude='*.gguf' --exclude='*.safetensors' --exclude='pytorch_model*.bin' --exclude='model-*.bin' --exclude='./vendor/local-llm-server/llama-cpp/cache' --exclude='./vendor/local-llm-server/llama-cpp/models' --exclude='./vendor/local-llm-server/llama-cpp/runtime' -cf - .
   ) | (
     cd "${CLONE_DIR}"
     tar -xf -

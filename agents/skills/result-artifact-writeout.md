@@ -64,6 +64,33 @@ evidence.
 1. Include the artifact path in the final response or handoff.
 1. If the result is reader-facing, separate observation, interpretation,
    limitations, and next action.
+1. If multiple reader-facing formats are generated, such as Markdown and HTML,
+   derive them from the same report content model or run a mechanical parity
+   check. Do not allow a thin Markdown file that only points to the HTML report
+   unless the task explicitly chooses HTML as the only reader-facing report.
+1. For experiment reports where Markdown is the canonical reader report and
+   HTML is a rendered artifact, the Markdown must contain the same substantive
+   sections as HTML: method, summary table, item glossary, figure reading
+   guides or backing data, comparison tables, case table, limitations, evidence
+   trace, skill trace, report-quality eval, and artifact list.
+1. Write reader-facing explanations, item glossary entries, figure/table
+   reading guides, and report-quality eval descriptions in the repository's
+   human-facing primary language unless the user asks otherwise; for this
+   template root that means Japanese, while code identifiers and metric keys
+   may remain literal.
+1. If the report uses domain-specific item names, table columns, case IDs,
+   metric names, abbreviations, or score labels, include an item glossary that
+   defines each displayed item, unit, source artifact or measurement method,
+   and how to interpret high/low or pass/fail values.
+1. If the report includes figures or comparison tables, add a short reading
+   guide for each one: axes or columns, units, whether higher/lower is better,
+   the comparison baseline, and any metric-source caveat.
+1. If the report includes a report-quality eval, make it strict and
+   evidence-based: do not pass checks for mere section presence; require
+   concrete glossary coverage, figure/table reading guides, source artifact
+   traceability, metric-source caveats, limitations, and claim-to-artifact
+   support. Missing required explanations, Markdown/HTML section parity, or
+   Markdown standalone substance must fail the eval.
 
 ## Closeout Tokens
 

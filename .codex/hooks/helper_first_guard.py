@@ -368,6 +368,12 @@ def block_payload(findings: tuple[HelperFirstFinding, ...]) -> dict[str, object]
             "Define the owning object/module contract first, reuse existing helpers, "
             "or add boundary evidence before continuing."
         ),
+        "next_action": "add_boundary_or_reuse_evidence_then_retry",
+        "remediation": [
+            "Identify the owning module or object before adding helper-like functions.",
+            "Search for existing helpers and extend them when possible.",
+            "Add issue, design, docs, or test evidence showing why the new helper is owned here.",
+        ],
         "findings": [finding.render() for finding in findings],
     }
 
@@ -403,7 +409,19 @@ def main() -> int:
         context,
     )
     if inventory_run.returncode != 0:
-        print(json.dumps({"decision": "block", "reason": inventory_run.output}))
+        print(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": inventory_run.output,
+                    "next_action": "fix_helper_inventory_command_then_retry",
+                    "remediation": [
+                        "Run `python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD`.",
+                        "Fix the inventory command failure before continuing the edit.",
+                    ],
+                }
+            )
+        )
     elif inventory_run.findings:
         print(json.dumps(block_payload(inventory_run.findings), indent=2, sort_keys=True))
     return 0

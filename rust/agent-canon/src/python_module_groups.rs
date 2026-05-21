@@ -316,7 +316,7 @@ fn collect_python_submodules(root: &Path, path: &Path, submodules: &mut BTreeSet
         return;
     }
     if path.join("__init__.py").is_file() {
-        submodules.insert(relative_path(&root.parent().unwrap_or(root), path));
+        submodules.insert(relative_path(root.parent().unwrap_or(root), path));
     }
     for entry in entries.flatten() {
         let path = entry.path();

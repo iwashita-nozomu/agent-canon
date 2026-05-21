@@ -367,6 +367,12 @@ def block_payload(intent: EditIntent, decision: EvidenceDecision) -> dict[str, o
             "design note with Observation, Hypothesis/Root Cause, Expected Fix "
             "Surface/Selected Surface, and Validation Before Edit/Support Evidence."
         ),
+        "next_action": "write_cause_investigation_evidence_then_retry_edit",
+        "remediation": [
+            "Record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit.",
+            "Use `reports/agents/<run-id>/cause_investigation.md`, an issue, or a design note as the durable evidence path.",
+            "Retry the edit only after the evidence exists in the worktree.",
+        ],
         "findings": [
             "CAUSE_INVESTIGATION_FINDING="
             f"missing_or_incomplete:{','.join(intent.code_paths[:MAX_RECORDED_PATHS])}:"

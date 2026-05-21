@@ -86,6 +86,12 @@ def emit_block() -> None:
                 "goal.md still reports NEXT_ACTION=run_next_iteration. "
                 "Continue the next backlog iteration or update goal evidence before final completion."
             ),
+            "next_action": "run_next_goal_iteration_or_update_goal_evidence",
+            "remediation": [
+                "Run the next unchecked goal.md work unit.",
+                "If the goal is actually complete, update goal evidence so NEXT_ACTION is no longer run_next_iteration.",
+                "Do not send a user-facing completion report until the goal loop gate allows closeout.",
+            ],
         },
         sys.stdout,
     )

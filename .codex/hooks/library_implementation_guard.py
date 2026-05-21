@@ -400,6 +400,12 @@ def block_payload(findings: tuple[LibraryFinding, ...]) -> dict[str, object]:
             "installed dependency paths. Use a wrapper/adapter, fork/upstream patch, "
             "or a manifest-backed vendor import instead of rewriting library internals."
         ),
+        "next_action": "move_change_to_wrapper_fork_or_owned_vendor_surface",
+        "remediation": [
+            "Do not edit installed dependency or vendored third-party internals in place.",
+            "Use an adapter/wrapper, an upstream patch branch, or a manifest-backed vendor import.",
+            "If the path is misclassified, update the protected-path policy with evidence before retrying.",
+        ],
         "findings": [finding.render() for finding in findings],
     }
 

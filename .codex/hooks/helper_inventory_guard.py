@@ -18,15 +18,20 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-EDIT_TOOL_NAMES = {"apply_patch", "Bash", "bash", "python", "python3"}
+EDIT_TOOL_NAMES = {"apply_patch", "python", "python3"}
 EDIT_COMMAND_PATTERN = re.compile(
-    r"(?is)(apply_patch|python3?\s+|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
+    r"(?is)(apply_patch|ruff\s+--fix|python3?\s+-m\s+ruff\s+.*--fix|"
     r"git\s+mv|mv\s+|cp\s+|touch\s+|rm\s+|sed\s+-i|perl\s+-pi)"
 )
 POLICY_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_POLICY"
 MODE_ENV = "AGENT_CANON_HELPER_INVENTORY_GUARD_MODE"
 LOG_PATH_ENV = "AGENT_CANON_HELPER_INVENTORY_HOOK_LOG_PATH"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+READ_ONLY_COMMAND_PATTERN = re.compile(
+    r"(?is)^\s*(git(?:\s+-C\s+\S+)?\s+(?:status|diff|show|log|branch|remote|"
+    r"rev-parse|ls-files|submodule\s+status|fetch\b)|rg\b|sed\s+-n\b|cat\b|"
+    r"ls\b|find\b|pwd\b|python3?\s+-m\s+ruff\s+(?:check|format)\b)"
+)
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_EMPTY = "empty"
 PAYLOAD_STATUS_VALID = "valid"
@@ -138,14 +143,15 @@ def _tool_name(payload: dict[str, object]) -> str:
 def _should_check(payload: dict[str, object]) -> bool:
     if _uses_event_fallback(payload) and not _has_tool_signal(payload):
         return True
+    command = _tool_command(payload)
+    if READ_ONLY_COMMAND_PATTERN.search(command):
+        return False
     event = _hook_event_name(payload)
     if event == "Stop":
         return True
     if event != "PostToolUse":
         return False
-    return _tool_name(payload) in EDIT_TOOL_NAMES or bool(
-        EDIT_COMMAND_PATTERN.search(_tool_command(payload))
-    )
+    return _tool_name(payload) in EDIT_TOOL_NAMES or bool(EDIT_COMMAND_PATTERN.search(command))
 
 
 def _agentcanon_default_policy_path() -> Path:
@@ -442,10 +448,33 @@ def main() -> int:
         },
     )
     if returncode != 0:
-        json.dump({"decision": "block", "reason": output}, sys.stdout)
+        json.dump(
+            {
+                "decision": "block",
+                "reason": output,
+                "next_action": "fix_helper_inventory_command_then_retry",
+                "remediation": [
+                    "Run `python3 tools/agent_tools/helper_function_inventory.py --root . --changed --baseline-ref HEAD`.",
+                    "Fix the inventory command failure before continuing helper-like edits.",
+                ],
+            },
+            sys.stdout,
+        )
         sys.stdout.write("\n")
     elif violations:
-        json.dump({"decision": "block", "reason": _reason(command, violations, counts)}, sys.stdout)
+        json.dump(
+            {
+                "decision": "block",
+                "reason": _reason(command, violations, counts),
+                "next_action": "reuse_or_justify_helper_like_additions",
+                "remediation": [
+                    "Reuse or extend existing helper surfaces when possible.",
+                    "Add ownership and boundary evidence for remaining helper-like additions.",
+                    "Re-run helper inventory before continuing.",
+                ],
+            },
+            sys.stdout,
+        )
         sys.stdout.write("\n")
     return 0
 

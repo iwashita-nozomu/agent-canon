@@ -531,11 +531,23 @@ Hook output may include hook-specific structured results. Treat hook failures as
 
 Template-specific hook behavior:
 
-- `UserPromptSubmit` runs MCP context injection, prompt secret scanning, and `skill_usage_logger.py`.
-- `PostToolUse` runs `oop_readability_guard.py` for source-editing tool calls, `style_checker_guard.py` for changed-file style selection, and `notebook_quality_guard.py` for changed notebook checks.
-- `Stop` reruns `oop_readability_guard.py`, `style_checker_guard.py`, and `notebook_quality_guard.py`, then records a final skill usage observation.
-- The OOP hook defaults to blocking all current findings in changed source files,
-  including findings that already existed in the file. Use
+- `hooks.json` wires one `hook_dispatcher.py` command per active lifecycle
+  event. The dispatcher replays the original stdin payload to the child guard
+  scripts in the configured order and returns the first blocking JSON payload,
+  or the first non-blocking visible output when no guard blocks.
+- The dispatcher bypasses child guards for `GitStatus`, read-only file / Git
+  inspection, and known validation commands including AgentCanon
+  plan/status/latest-check inspection. Do not rename, move, or temporarily
+  disable `hooks.json` to inspect hook state or run validation.
+- `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
+  reference capture checks.
+- `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
+  module boundary, library implementation, helper inventory, helper-first,
+  style, log-surface inventory, and notebook quality checks.
+- `Stop` runs goal completion, the post-edit guard suite, reference capture,
+  and final skill usage logging.
+- The OOP hook emits warning/approve output for readability findings and keeps
+  explicit OOP validation available as a closeout gate. Use
   `AGENT_CANON_OOP_HOOK_MODE=diff` only when the user explicitly requests
   baseline-only checking; `AGENT_CANON_OOP_HOOK_BASELINE_REF` overrides the
   diff baseline when needed.

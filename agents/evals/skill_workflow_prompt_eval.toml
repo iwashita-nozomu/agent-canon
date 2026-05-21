@@ -156,6 +156,114 @@ critical = true
 description = "Separates raw result writeout from report narrative and requires reviewer routing."
 required_regex = ["\\$result-artifact-writeout", "raw", "reader report", "report_reviewer"]
 
+[[evals.checklist]]
+id = "REPORT-SOURCE-SHIM-1"
+critical = true
+description = "Requires existing reference-note inspection and durable source packets."
+required_regex = ["external references", "existing repo reference notes", "durable source packets"]
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-SHIM-2"
+critical = true
+description = "Rejects transient browser, temporary download, and chat-only summaries as provenance."
+required_regex = ["browser tab", "downloaded temp file", "chat-only source summary"]
+
+[[evals]]
+id = "literature-survey-source-record-shim"
+target = ".agents/skills/literature-survey/SKILL.md"
+kind = "skill"
+description = "Literature survey runtime skill must inspect existing references before external lookup and leave durable source records."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-1"
+critical = true
+description = "Requires an existing-reference sweep before web search, PDF download, or citation lookup."
+required_regex = ["Before web search", "existing `references/`", "same source or claim"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-2"
+critical = true
+description = "Requires durable source notes or source packets with provenance fields."
+required_regex = ["durable tracked reference note", "URL/DOI", "access date", "artifact location"]
+
+[[evals]]
+id = "literature-survey-source-record-doc"
+target = "agents/skills/literature-survey.md"
+kind = "skill"
+description = "Human literature survey skill must define existing-reference sweep and durable source packet deliverables."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-1"
+critical = true
+description = "Requires checking existing references, notes, documents, and topic reports before external lookup."
+required_regex = ["web search", "既存の `references/`", "topic report"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-2"
+critical = true
+description = "Requires tracked artifacts and durable source record fields."
+required_regex = ["tracked artifact", "durable source record", "URL / DOI", "download artifact"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-3"
+critical = true
+description = "Defines reader-facing source sweep and adoption/exclusion sections."
+required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "research-workflow-source-record"
+target = "agents/workflows/research-workflow.md"
+kind = "workflow"
+description = "Research workflow must check existing source notes and persist external-source provenance."
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-1"
+critical = true
+description = "Requires checking existing source notes before external research."
+required_regex = ["既存 source note", "外部調査", "durable source packet"]
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-2"
+critical = true
+description = "Requires durable provenance for external sources and rejects transient browser/download context."
+required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
+
+[[evals]]
+id = "report-writing-source-provenance-doc"
+target = "agents/skills/report-writing.md"
+kind = "skill"
+description = "Human report-writing skill must require durable source provenance for external references."
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-DOC-1"
+critical = true
+description = "Requires durable source notes or source packets before publishing reports with external references."
+required_regex = ["External Source Provenance", "existing durable source notes", "source packets"]
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-DOC-2"
+critical = true
+description = "Requires source fields and rejects transient provenance."
+required_regex = ["URL/DOI", "adoption/exclusion decision", "chat-only summaries"]
+
+[[evals]]
+id = "references-readme-existing-source-policy"
+target = "references/README.md"
+kind = "reference"
+description = "References index must require checking existing source notes and writing durable source records."
+
+[[evals.checklist]]
+id = "REFERENCES-README-1"
+critical = true
+description = "Requires searching existing durable reference surfaces before adding a source note."
+required_regex = ["Before adding a new source note", "existing `references/`", "same title, DOI, URL, or claim"]
+
+[[evals.checklist]]
+id = "REFERENCES-README-2"
+critical = true
+description = "Requires durable source records with provenance and artifact-retention fields."
+required_regex = ["leave a durable source record", "URL or DOI", "access date", "downloaded artifact"]
+
 [[evals]]
 id = "all-canonical-routing-docs"
 target_glob = "agents/canonical/*.md"
