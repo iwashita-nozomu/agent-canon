@@ -15,6 +15,8 @@ Markdown の体裁、見出し、リンク、可読性を崩さずに保ちま�
 
 - `.md` を触る
 - 文書整理や report 整備を行う
+- user request が plain `md-style-check` または `$md-style-check` を挙げている
+- docs lint、link check、heading hierarchy、markdown math、docs-check failure、Markdown style drift を直す
 
 ## Required Checks
 

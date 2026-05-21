@@ -118,6 +118,22 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("oop-readability-check", decision["skills"])
 
+    def test_prompt_routes_plain_public_skill_names(self) -> None:
+        """Plain public skill ids in user text should count as explicit skill routing."""
+        result = self.run_route(
+            "--prompt",
+            "md-style-check と agent-learning の routing gap を直して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("md-style-check", decision["skills"])
+        self.assertIn("agent-learning", decision["skills"])
+        self.assertIn("md-style-check", decision["matched_skills"])
+        self.assertIn("agent-learning", decision["matched_skills"])
+
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""
         result = self.run_route("--name", "unknown_super_router.py")

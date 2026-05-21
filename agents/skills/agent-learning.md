@@ -13,7 +13,9 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 
 ## Use When
 
+- user request が plain `agent-learning` または `$agent-learning` を挙げている
 - user が agent の人格形成、作業哲学、対話からの継続学習を求めている
+- user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、または agent-side memory update を要求している
 - task closeout で、次回以降の agent 行動を変える観測がある
 - run bundle を評価し、agent feedback action を closeout 前に潰したい
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい

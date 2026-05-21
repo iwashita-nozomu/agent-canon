@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -501,13 +502,26 @@ def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     return all(term.lower() in text for term in group)
 
 
+def public_skill_name_mentioned(text: str, skill: str) -> bool:
+    """Return whether prompt text explicitly names one public skill id."""
+    return (
+        re.search(
+            rf"(?<![A-Za-z0-9_-])\$?{re.escape(skill)}(?![A-Za-z0-9_-])",
+            text,
+        )
+        is not None
+    )
+
+
 def matched_skill_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
     """Return public skill matches for one prompt."""
     text = prompt.lower()
     matches: list[SkillRouteMatch] = []
     for skill, reason, groups in SKILL_RULES:
-        if any(text_matches_group(text, group) for group in groups):
-            matches.append(SkillRouteMatch(skill, reason))
+        explicit = public_skill_name_mentioned(text, skill)
+        if explicit or any(text_matches_group(text, group) for group in groups):
+            match_reason = "prompt explicitly names public skill" if explicit else reason
+            matches.append(SkillRouteMatch(skill, match_reason))
     return tuple(matches)
 
 

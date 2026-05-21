@@ -156,6 +156,7 @@ SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
     "resume_agent": "resume",
 }
 PROMPT_EXCERPT_LIMIT = 600
+PROMPT_FINGERPRINT_HEX_LENGTH = 16
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
@@ -320,7 +321,18 @@ def text_values(value: object) -> list[str]:
     return []
 
 
-def extract_skill_ids(text: str) -> set[str]:
+def known_skill_id_mentioned(text: str, skill: str) -> bool:
+    """Return whether prompt text explicitly names one known public skill id."""
+    return (
+        re.search(
+            rf"(?<![A-Za-z0-9_-]){re.escape(skill)}(?![A-Za-z0-9_-])",
+            text.lower(),
+        )
+        is not None
+    )
+
+
+def extract_skill_ids(text: str, *, include_plain_names: bool = False) -> set[str]:
     """Extract normalized skill ids from one text payload."""
     skills = {match.group(1).strip("-_") for match in SKILL_TOKEN_RE.finditer(text)}
     for match in SKILLS_FIELD_RE.finditer(text):
@@ -330,6 +342,10 @@ def extract_skill_ids(text: str) -> set[str]:
             value = value.removeprefix("$").strip("-_")
             if value and value != "-":
                 skills.add(value)
+    if include_plain_names:
+        for skill in KNOWN_SKILL_IDS:
+            if known_skill_id_mentioned(text, skill):
+                skills.add(skill)
     return {
         skill
         for skill in skills
@@ -390,7 +406,7 @@ def prompt_capture(payload: dict[str, object]) -> PromptCapture:
     return PromptCapture(
         status="present",
         excerpt_redacted=excerpt,
-        fingerprint=sha256(text.encode("utf-8")).hexdigest()[:16],
+        fingerprint=sha256(text.encode("utf-8")).hexdigest()[:PROMPT_FINGERPRINT_HEX_LENGTH],
         char_count=len(text),
         truncated=len(redacted) > PROMPT_EXCERPT_LIMIT,
     )
@@ -416,8 +432,9 @@ def observed_text_sources(payload: dict[str, object]) -> list[str]:
 def observed_skills(payload: dict[str, object]) -> list[str]:
     """Return sorted unique skill ids observed in a hook payload."""
     skills: set[str] = set()
-    for text in observed_skill_text(payload):
-        skills.update(extract_skill_ids(text))
+    for key in SKILL_TEXT_FIELDS:
+        for text in text_values(payload.get(key)):
+            skills.update(extract_skill_ids(text, include_plain_names=key == "prompt"))
     return sorted(skills)
 
 
@@ -465,11 +482,16 @@ def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     """Classify prompt text into explicit and candidate routing signals."""
     skill_texts = observed_skill_text(payload)
     candidate_texts = observed_text(payload)
+    skills = tuple(observed_skills(payload))
     labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
+    candidate_skills = tuple(
+        skill for skill in grouped_keyword_matches(skill_texts, SKILL_KEYWORD_GROUPS)
+        if skill not in skills
+    )
     return PromptIntakeSignals(
-        skills=tuple(observed_skills(payload)),
+        skills=skills,
         selected_workflows=tuple(observed_workflows(payload)),
-        candidate_skills=grouped_keyword_matches(skill_texts, SKILL_KEYWORD_GROUPS),
+        candidate_skills=candidate_skills,
         candidate_workflows=keyword_matches(skill_texts, WORKFLOW_KEYWORDS),
         candidate_tools=keyword_matches(candidate_texts, TOOL_KEYWORDS),
         feedback_labels=labels,
@@ -550,7 +572,11 @@ def subagent_selection(payload: dict[str, object]) -> SubagentSelection:
         model=string_input_field(tool_input, "model"),
         reasoning_effort=string_input_field(tool_input, "reasoning_effort"),
         fork_context=tool_input.get("fork_context") is True,
-        prompt_fingerprint=sha256(prompt.encode("utf-8")).hexdigest()[:16] if prompt else "",
+        prompt_fingerprint=(
+            sha256(prompt.encode("utf-8")).hexdigest()[:PROMPT_FINGERPRINT_HEX_LENGTH]
+            if prompt
+            else ""
+        ),
         prompt_char_count=len(prompt),
         item_count=len(tool_input.get("items")) if isinstance(tool_input.get("items"), list) else 0,
     )

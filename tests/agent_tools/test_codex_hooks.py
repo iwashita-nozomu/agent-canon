@@ -2647,6 +2647,35 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
         self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
 
+    def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
+        """Plain public skill ids in user prompts should become selected skill evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "md-style-check と agent-learning の routing gap を直して",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["skills"], ["agent-learning", "md-style-check"])
+        self.assertEqual(entry["selected_skills"], ["agent-learning", "md-style-check"])
+        self.assertEqual(entry["candidate_skills"], [])
+        self.assertEqual(entry["skill_selection_kind"], "declared_skill")
+        self.assertEqual(entry["skill_source_fields"], ["prompt"])
+
     def test_skill_usage_logger_records_prompt_feedback_routing(self) -> None:
         """Prompt feedback should be classified with bounded redacted prompt text."""
         with tempfile.TemporaryDirectory() as temp_dir:
