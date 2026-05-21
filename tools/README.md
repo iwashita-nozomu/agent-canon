@@ -127,6 +127,11 @@ under `agents/evals/results/report-quality/`.
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
     Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
     呼び、現在の Python engine は内部互換実装として扱います。
+    `python-structure-hash` は normalized AST duplicate、single-caller
+    ownership、similar-responsibility caller evidence を Rust で検出します。
+    `python-structure-hash-report` は text output を structured JSON に変換し、
+    dependency-tree / AST / usage-profile feature から
+    `caller_analysis.integration_candidates` を生成します。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。

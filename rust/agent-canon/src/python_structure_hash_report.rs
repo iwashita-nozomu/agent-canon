@@ -39,6 +39,7 @@ struct Finding {
     caller_count: usize,
     call_site_count: usize,
     callers: Vec<CallerEvidence>,
+    similar_callers: Vec<SimilarCallerEvidence>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -66,6 +67,23 @@ struct CallerEvidence {
     module: String,
     qualname: String,
     call_lines: Vec<usize>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SimilarCallerEvidence {
+    raw_caller: String,
+    path: String,
+    line_start: usize,
+    line_end: usize,
+    module: String,
+    qualname: String,
+    token_count: usize,
+    structure_hash: String,
+    parent_scope: String,
+    score: usize,
+    shared_call_count: usize,
+    shared_profile: Vec<String>,
+    reason_codes: Vec<String>,
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -261,7 +279,7 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
             "priority_order": priority_order.iter().map(priority_json).collect::<Vec<_>>(),
             "repair_slice": repair_slice_json(&priority_order, &group_graph),
         },
-        "findings": findings.iter().map(|finding| finding_json(finding, root, &priority_by_hash)).collect::<Vec<_>>(),
+        "findings": findings.iter().map(|finding| finding_json(finding, root, &priority_by_hash, &import_target_counts)).collect::<Vec<_>>(),
         "ignored_lines": ignored_lines,
     }))
 }
@@ -311,6 +329,7 @@ fn parse_finding(
         caller_count: 0,
         call_site_count: 0,
         callers: Vec::new(),
+        similar_callers: Vec::new(),
     })
 }
 
@@ -329,6 +348,12 @@ fn parse_single_caller_finding(
     let (caller_count, rest) = take_field(rest, "caller_count")?;
     let (call_site_count, rest) = take_field(rest, "call_site_count")?;
     let (caller, rest) = take_field(rest, "caller")?;
+    let (similar_callers, rest) = if let Some(rest) = rest.strip_prefix("similar_callers=") {
+        let (value, rest) = take_until_colon(rest)?;
+        (parse_similar_callers(&value)?, rest)
+    } else {
+        (Vec::new(), rest)
+    };
     let (module_scope, rest) = take_field(rest, "module_scope")?;
     let (import_scope, rest) = take_field(rest, "import_scope")?;
     let (decorator_scope, rest) = take_field(rest, "decorator_scope")?;
@@ -355,6 +380,7 @@ fn parse_single_caller_finding(
         caller_count: parse_usize(&caller_count, "caller_count")?,
         call_site_count: parse_usize(&call_site_count, "call_site_count")?,
         callers: vec![parse_caller(&caller)?],
+        similar_callers,
     })
 }
 
@@ -449,6 +475,103 @@ fn parse_caller(text: &str) -> Result<CallerEvidence, String> {
     })
 }
 
+fn parse_similar_callers(text: &str) -> Result<Vec<SimilarCallerEvidence>, String> {
+    if text == "none" || text.is_empty() {
+        return Ok(Vec::new());
+    }
+    text.split(';').map(parse_similar_caller).collect()
+}
+
+fn parse_similar_caller(text: &str) -> Result<SimilarCallerEvidence, String> {
+    let parts = text.split('@').collect::<Vec<_>>();
+    if parts.len() == 7 {
+        let (line_start, line_end) = parse_line_range(parts[1])?;
+        let score = parts[4]
+            .strip_prefix("score=")
+            .ok_or_else(|| format!("missing score= in similar caller evidence {text}"))
+            .and_then(|value| parse_usize(value, "similar_caller_score"))?;
+        let shared_call_count = parts[5]
+            .strip_prefix("shared=")
+            .ok_or_else(|| format!("missing shared= in similar caller evidence {text}"))
+            .and_then(|value| parse_usize(value, "similar_caller_shared"))?;
+        let reason_codes = parts[6]
+            .strip_prefix("reasons=")
+            .ok_or_else(|| format!("missing reasons= in similar caller evidence {text}"))?
+            .split('|')
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        return Ok(SimilarCallerEvidence {
+            raw_caller: text.to_string(),
+            path: parts[0].to_string(),
+            line_start,
+            line_end,
+            module: parts[2].to_string(),
+            qualname: parts[3].to_string(),
+            token_count: 0,
+            structure_hash: String::new(),
+            parent_scope: String::new(),
+            score,
+            shared_call_count,
+            shared_profile: Vec::new(),
+            reason_codes,
+        });
+    }
+    if parts.len() != 11 {
+        return Err(format!("invalid similar caller evidence {text}"));
+    }
+    let (line_start, line_end) = parse_line_range(parts[1])?;
+    let token_count = parts[4]
+        .strip_prefix("tokens=")
+        .ok_or_else(|| format!("missing tokens= in similar caller evidence {text}"))
+        .and_then(|value| parse_usize(value, "similar_caller_tokens"))?;
+    let structure_hash = parts[5]
+        .strip_prefix("structure=")
+        .ok_or_else(|| format!("missing structure= in similar caller evidence {text}"))?
+        .to_string();
+    let parent_scope = parts[6]
+        .strip_prefix("parent=")
+        .ok_or_else(|| format!("missing parent= in similar caller evidence {text}"))?
+        .to_string();
+    let score = parts[7]
+        .strip_prefix("score=")
+        .ok_or_else(|| format!("missing score= in similar caller evidence {text}"))
+        .and_then(|value| parse_usize(value, "similar_caller_score"))?;
+    let shared_call_count = parts[8]
+        .strip_prefix("shared=")
+        .ok_or_else(|| format!("missing shared= in similar caller evidence {text}"))
+        .and_then(|value| parse_usize(value, "similar_caller_shared"))?;
+    let shared_profile = parts[9]
+        .strip_prefix("profile=")
+        .ok_or_else(|| format!("missing profile= in similar caller evidence {text}"))?
+        .split('|')
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let reason_codes = parts[10]
+        .strip_prefix("reasons=")
+        .ok_or_else(|| format!("missing reasons= in similar caller evidence {text}"))?
+        .split('|')
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    Ok(SimilarCallerEvidence {
+        raw_caller: text.to_string(),
+        path: parts[0].to_string(),
+        line_start,
+        line_end,
+        module: parts[2].to_string(),
+        qualname: parts[3].to_string(),
+        token_count,
+        structure_hash,
+        parent_scope,
+        score,
+        shared_call_count,
+        shared_profile,
+        reason_codes,
+    })
+}
+
 fn collect_import_facts(root: &Path, relative_path: &str) -> Vec<String> {
     let path = root.join(relative_path);
     let Ok(text) = fs::read_to_string(path) else {
@@ -540,6 +663,7 @@ fn finding_json(
     finding: &Finding,
     root: &Path,
     priority_by_hash: &BTreeMap<String, (usize, usize, Vec<String>)>,
+    import_target_counts: &BTreeMap<String, usize>,
 ) -> Value {
     let import_analysis = import_analysis_json(finding, root);
     let (priority_rank, priority_score, priority_reasons) = priority_by_hash
@@ -585,6 +709,8 @@ fn finding_json(
             "caller_count": finding.caller_count,
             "call_site_count": finding.call_site_count,
             "callers": finding.callers.iter().map(caller_json).collect::<Vec<_>>(),
+            "similar_responsibility_callers": finding.similar_callers.iter().map(similar_caller_json).collect::<Vec<_>>(),
+            "integration_candidates": integration_candidates_json(finding, &import_analysis, import_target_counts),
         },
     })
 }
@@ -598,6 +724,278 @@ fn caller_json(caller: &CallerEvidence) -> Value {
         "module": caller.module,
         "qualname": caller.qualname,
         "call_lines": caller.call_lines,
+    })
+}
+
+fn similar_caller_json(caller: &SimilarCallerEvidence) -> Value {
+    json!({
+        "raw_caller": caller.raw_caller,
+        "path": caller.path,
+        "line_start": caller.line_start,
+        "line_end": caller.line_end,
+        "module": caller.module,
+        "qualname": caller.qualname,
+        "token_count": caller.token_count,
+        "structure_hash": caller.structure_hash,
+        "parent_scope": caller.parent_scope,
+        "score": caller.score,
+        "shared_call_count": caller.shared_call_count,
+        "shared_profile": caller.shared_profile,
+        "reason_codes": caller.reason_codes,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CandidateFeature {
+    code: &'static str,
+    weight: usize,
+    detail: String,
+}
+
+fn integration_candidates_json(
+    finding: &Finding,
+    import_analysis: &Value,
+    import_target_counts: &BTreeMap<String, usize>,
+) -> Vec<Value> {
+    if finding.kind != "single_caller_structural_helper" {
+        return Vec::new();
+    }
+    let Some(target) = finding.instances.first() else {
+        return Vec::new();
+    };
+    let Some(caller) = finding.callers.first() else {
+        return Vec::new();
+    };
+    let base_features = base_single_owner_features(
+        finding,
+        target,
+        caller,
+        import_analysis,
+        import_target_counts,
+    );
+    let mut candidates = vec![candidate_json(
+        single_owner_candidate_kind(&finding.block_kind),
+        target,
+        caller,
+        None,
+        &base_features,
+    )];
+    candidates.extend(finding.similar_callers.iter().map(|similar| {
+        let mut features = base_features.clone();
+        features.extend(similar_caller_features(similar));
+        features.extend(similar_dependency_features(similar, import_target_counts));
+        let candidate = candidate_json(
+            "consolidate_owner_with_similar_responsibility_caller",
+            target,
+            caller,
+            Some(similar),
+            &features,
+        );
+        candidate
+    }));
+    candidates
+}
+
+fn base_single_owner_features(
+    finding: &Finding,
+    target: &Instance,
+    caller: &CallerEvidence,
+    import_analysis: &Value,
+    import_target_counts: &BTreeMap<String, usize>,
+) -> Vec<CandidateFeature> {
+    let mut features = vec![
+        CandidateFeature {
+            code: "unique_owner",
+            weight: 40,
+            detail: format!("caller_count={}", finding.caller_count),
+        },
+        CandidateFeature {
+            code: "module_local_ownership",
+            weight: if target.module == caller.module {
+                20
+            } else {
+                0
+            },
+            detail: format!(
+                "target_module={},caller_module={}",
+                target.module, caller.module
+            ),
+        },
+        CandidateFeature {
+            code: "usage_site_count",
+            weight: finding.call_site_count.min(5) * 4,
+            detail: format!("call_site_count={}", finding.call_site_count),
+        },
+        CandidateFeature {
+            code: "target_structure_size",
+            weight: finding.token_count.min(50),
+            detail: format!(
+                "block_kind={},token_count={}",
+                finding.block_kind, finding.token_count
+            ),
+        },
+    ];
+    features.extend(dependency_tree_features(
+        import_analysis,
+        target,
+        import_target_counts,
+    ));
+    features.extend(ast_shape_features(finding, target));
+    features
+}
+
+fn dependency_tree_features(
+    import_analysis: &Value,
+    target: &Instance,
+    import_target_counts: &BTreeMap<String, usize>,
+) -> Vec<CandidateFeature> {
+    let file_incoming_count = import_target_counts
+        .get(&target.path)
+        .copied()
+        .unwrap_or_default();
+    let repo_dependency_count = import_analysis
+        .get("repo_dependency_count")
+        .and_then(Value::as_u64)
+        .or_else(|| {
+            import_analysis
+                .get("repo_import_targets")
+                .and_then(Value::as_array)
+                .map(|items| items.len() as u64)
+        })
+        .unwrap_or_default() as usize;
+    vec![
+        CandidateFeature {
+            code: "dependency_tree_file_incoming",
+            weight: file_incoming_count.min(10) * 3,
+            detail: format!("file_incoming_count={file_incoming_count}"),
+        },
+        CandidateFeature {
+            code: "dependency_tree_repo_dependencies",
+            weight: repo_dependency_count.min(10),
+            detail: format!("repo_dependency_count={repo_dependency_count}"),
+        },
+    ]
+}
+
+fn ast_shape_features(finding: &Finding, target: &Instance) -> Vec<CandidateFeature> {
+    let mut features = Vec::new();
+    features.push(CandidateFeature {
+        code: "ast_block_kind",
+        weight: match finding.block_kind.as_str() {
+            "Function" => 8,
+            "Class" => 8,
+            "Alias" => 4,
+            _ => 1,
+        },
+        detail: finding.block_kind.clone(),
+    });
+    if target.parent == "<module>" {
+        features.push(CandidateFeature {
+            code: "ast_module_level_target",
+            weight: 6,
+            detail: target.parent.clone(),
+        });
+    } else {
+        features.push(CandidateFeature {
+            code: "ast_nested_target",
+            weight: 3,
+            detail: target.parent.clone(),
+        });
+    }
+    if finding.block_kind == "Class" {
+        features.push(CandidateFeature {
+            code: "ast_structural_type_target",
+            weight: 8,
+            detail: format!("parameter_count={}", finding.parameter_count),
+        });
+    }
+    features
+}
+
+fn similar_caller_features(similar: &SimilarCallerEvidence) -> Vec<CandidateFeature> {
+    let mut features = vec![
+        CandidateFeature {
+            code: "similar_responsibility_caller",
+            weight: 30,
+            detail: format!("similar={}", similar.qualname),
+        },
+        CandidateFeature {
+            code: "shared_call_profile_count",
+            weight: similar.shared_call_count * 8,
+            detail: format!("shared_call_count={}", similar.shared_call_count),
+        },
+    ];
+    features.extend(similar.reason_codes.iter().map(|reason| CandidateFeature {
+        code: "similarity_reason",
+        weight: similarity_reason_weight(reason),
+        detail: reason.clone(),
+    }));
+    features
+}
+
+fn similar_dependency_features(
+    similar: &SimilarCallerEvidence,
+    import_target_counts: &BTreeMap<String, usize>,
+) -> Vec<CandidateFeature> {
+    let file_incoming_count = import_target_counts
+        .get(&similar.path)
+        .copied()
+        .unwrap_or_default();
+    vec![CandidateFeature {
+        code: "similar_caller_dependency_tree_file_incoming",
+        weight: file_incoming_count.min(10) * 2,
+        detail: format!(
+            "similar_caller={},file_incoming_count={file_incoming_count}",
+            similar.qualname
+        ),
+    }]
+}
+
+fn similarity_reason_weight(reason: &str) -> usize {
+    match reason {
+        "same_caller_structure" => 20,
+        "same_parent_scope" => 12,
+        "shared_call_profile" => 10,
+        "similar_token_band" => 4,
+        _ => 1,
+    }
+}
+
+fn candidate_json(
+    candidate_kind: &str,
+    target: &Instance,
+    caller: &CallerEvidence,
+    similar: Option<&SimilarCallerEvidence>,
+    features: &[CandidateFeature],
+) -> Value {
+    let mut payload = json!({
+        "candidate_kind": candidate_kind,
+        "candidate_schema_scope": "dependency_enriched",
+        "target": instance_json(target),
+        "destination_caller": caller_json(caller),
+        "score": features.iter().map(|feature| feature.weight).sum::<usize>(),
+        "features": features.iter().map(candidate_feature_json).collect::<Vec<_>>(),
+        "reason_codes": features.iter().map(|feature| feature.code).collect::<Vec<_>>(),
+    });
+    if let Some(similar) = similar {
+        payload["similar_caller"] = similar_caller_json(similar);
+    }
+    payload
+}
+
+fn single_owner_candidate_kind(block_kind: &str) -> &'static str {
+    match block_kind {
+        "Class" => "move_or_nest_single_owner_type",
+        "Alias" => "inline_single_owner_alias",
+        _ => "inline_target_into_owner",
+    }
+}
+
+fn candidate_feature_json(feature: &CandidateFeature) -> Value {
+    json!({
+        "code": feature.code,
+        "weight": feature.weight,
+        "detail": feature.detail,
     })
 }
 
@@ -1212,6 +1610,7 @@ fn import_analysis_json(finding: &Finding, root: &Path) -> Value {
         "common_import_facts": common.into_iter().collect::<Vec<_>>(),
         "varying_import_facts": varying,
         "all_external_libraries": external_libraries(&union.into_iter().collect::<Vec<_>>()),
+        "repo_dependency_count": repo_targets.len(),
         "repo_import_targets": repo_targets.into_iter().collect::<Vec<_>>(),
         "by_instance": by_instance,
     })
@@ -1428,7 +1827,7 @@ mod tests {
 
     #[test]
     fn parses_single_caller_finding_with_call_site_evidence() {
-        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Function:params=1:tokens=24:hash=h:count=1:caller_count=1:call_site_count=2:caller=pkg/a.py@10-14@pkg.a@public_api@sites=11|12:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-3:pkg.a:_helper:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Function:params=1:tokens=24:hash=h:count=1:caller_count=1:call_site_count=2:caller=pkg/a.py@10-14@pkg.a@public_api@sites=11|12:similar_callers=pkg/a.py@20-24@pkg.a@other_api@tokens=18@structure=peerhash@parent=<module>@score=6@shared=2@profile=load_config|validate_inputs@reasons=shared_call_profile:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-3:pkg.a:_helper:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
         let payload = structure_text(text, Path::new(".")).expect("report structures");
         assert_eq!(
             payload["findings"][0]["kind"],
@@ -1442,6 +1841,67 @@ mod tests {
         assert_eq!(
             payload["findings"][0]["caller_analysis"]["callers"][0]["call_lines"][1],
             12
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["similar_responsibility_callers"][0]
+                ["qualname"],
+            "other_api"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["similar_responsibility_callers"][0]
+                ["shared_call_count"],
+            2
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["similar_responsibility_callers"][0]
+                ["token_count"],
+            18
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["similar_responsibility_callers"][0]
+                ["shared_profile"][1],
+            "validate_inputs"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][0]
+                ["candidate_kind"],
+            "inline_target_into_owner"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][0]
+                ["candidate_schema_scope"],
+            "dependency_enriched"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][1]
+                ["candidate_kind"],
+            "consolidate_owner_with_similar_responsibility_caller"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][1]["features"][0]
+                ["code"],
+            "unique_owner"
+        );
+    }
+
+    #[test]
+    fn parses_legacy_single_caller_without_similar_callers() {
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Class:params=0:tokens=30:hash=h:count=1:caller_count=1:call_site_count=1:caller=pkg/a.py@10-14@pkg.a@build_api@sites=11:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:1-8:pkg.a:_Carry:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, Path::new(".")).expect("legacy report structures");
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["similar_responsibility_callers"]
+                .as_array()
+                .expect("similar caller list")
+                .len(),
+            0
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][0]["features"]
+                .as_array()
+                .expect("features")
+                .iter()
+                .any(|feature| feature["code"] == "ast_structural_type_target"),
+            true
         );
     }
 

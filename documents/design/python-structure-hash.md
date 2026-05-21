@@ -82,6 +82,31 @@ not automatic deletion instructions. Non-production single-caller findings are
 review-blocked in `repair_slice`; production findings can be prioritized with
 the same module/file dependency signals used for structural duplicates.
 
+For each single-caller finding, the analyzer also computes deterministic
+similar-responsibility caller evidence. This is not based on the target or
+caller names alone. Candidate caller peers must be in the same module and have
+the same block kind, then satisfy at least one stronger usage-shape rule:
+
+- same normalized caller AST structure;
+- at least two shared qualified call/reference profile entries;
+- same non-module parent scope plus at least one shared qualified
+  call/reference profile entry.
+
+The call/reference profile keeps qualified names and `self.` / `cls.` receiver
+shape instead of collapsing everything to the leaf method name. This prevents a
+single unrelated shared leaf name from creating a merge suggestion.
+
+The structured report converts these facts into
+`caller_analysis.integration_candidates`. Candidate generation is feature based:
+single-owner usage, AST block shape, target size, dependency-tree evidence, and
+similar-caller shared profile evidence are emitted as weighted feature rows.
+Class targets use `move_or_nest_single_owner_type` instead of a function-style
+inline candidate. The raw `python-structure-hash --format json` output marks
+candidate rows with `candidate_schema_scope=ast_use_graph_only`; it does not
+have the full dependency graph. `python-structure-hash-report` marks rows with
+`candidate_schema_scope=dependency_enriched` and adds dependency-tree features
+from the structured report.
+
 ## Module Groups
 
 Module-group definitions are parent-repository design state. AgentCanon owns the
