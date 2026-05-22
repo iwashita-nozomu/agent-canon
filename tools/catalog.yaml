@@ -1254,7 +1254,7 @@ entries:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
 
   - id: generate-agent-runtime-dashboard
-    summary: Generates read-only dashboards for AgentCanon runtime logs and eval results.
+    summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
     path: tools/agent_tools/generate_agent_runtime_dashboard.py
     family: agent_tools
     role: docs

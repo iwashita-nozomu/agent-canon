@@ -36,6 +36,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, or multi-candidate comparison -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay
      - Markdown file edits, docs lint/link/heading repair, docs-check failures, or Markdown style drift -> `$md-style-check`
+     - accumulated skill/tool/workflow/hook/eval log analysis, routing misses, selection gaps, or weak-skill diagnosis -> `$agent-log-analysis`
      - user/reviewer feedback about agent behavior, repeated routing misses, recurrence prevention, task retrospectives, or agent-side memory updates -> `$agent-learning`
    - do not add unrelated family skills just because they are nearby in the catalog
 1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, or repo-changing-only skills. Ordinary consultation, brainstorming, and explanation-only turns stay conversational until the user asks to inspect repo state, edit files, run validation, process PRs/issues, check CI, or execute implementation work.

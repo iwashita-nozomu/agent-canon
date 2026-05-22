@@ -28,6 +28,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             output = root / "reports" / "dashboard.md"
+            compact_output = root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -37,20 +38,43 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     str(root),
                     "--out",
                     str(output),
+                    "--compact-out",
+                    str(compact_output),
                 ],
                 check=False,
                 capture_output=True,
                 text=True,
             )
             dashboard = output.read_text(encoding="utf-8")
+            compact_dashboard = compact_output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_STATUS=pass", result.stdout)
+        self.assert_compact_dashboard(compact_dashboard)
         self.assert_problem_component_section(dashboard)
         self.assert_next_action_section(dashboard)
         self.assert_overview_sections(dashboard)
         self.assert_selection_and_prompt_sections(dashboard)
         self.assert_reference_and_log_sections(dashboard)
+
+    def assert_compact_dashboard(self, dashboard: str) -> None:
+        """Verify the token-light summary omits full dashboard-only sections."""
+        required = (
+            "# Agent Runtime Compact Summary",
+            "## Machine Summary",
+            "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
+            "## Priority Problems",
+            "| `skill` | `agent-orchestration` | `fail` | `1 failed eval report(s)` |",
+            "## Priority Next Actions",
+            "`repair failed skill eval for agent-orchestration`",
+            "## Selection Misses",
+            "| `skill` | `md-style-check` | `0` | `1` | `1` | `100.0%` |",
+            "Read raw JSONL only for the specific evidence paths named above.",
+        )
+        for expected in required:
+            self.assertIn(expected, dashboard)
+        self.assertNotIn("## Where Logs Accumulate", dashboard)
+        self.assertNotIn("```mermaid", dashboard)
 
     def assert_problem_component_section(self, dashboard: str) -> None:
         """Verify glanceable problem component rows."""
@@ -58,11 +82,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Problem Components",
             "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=7",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
-            "`5 hook entries lack workflow attribution` | `reference_capture_guard.jsonl` | "
+            "`5 hook entries lack workflow attribution` | "
+            "`agents/evals/results/hook-runs/test-container/reference_capture_guard.jsonl` | "
             "`repair workflow attribution logging` |",
             "| `tool` | `run_docs_checks.sh` | `attention` | "
             "`1 candidate miss(es); miss rate 100.0%` | "
-            "`## Selection Accuracy By Responsibility` | `repair tool selection or logging` |",
+            "`compact report Selection Misses table; "
+            "agents/evals/results/hook-runs/*/skill_usage.jsonl` | "
+            "`repair tool selection or logging` |",
             "| `hook` | `reference_capture_guard` | `attention` | "
             "`1 referenced URLs are unregistered` | "
             "`agents/evals/results/hook-runs/*/reference_capture_guard.jsonl` | "

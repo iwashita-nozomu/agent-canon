@@ -345,7 +345,9 @@ prompt/tool-selection evidence, token comparison coverage, human feedback
 labels, eval report families, and open/closed issue counts. The standalone
 AgentCanon GitHub Actions workflow publishes the dashboard to the workflow Step
 Summary and uploads it as an artifact; template and derived repositories do not
-publish their own runtime dashboard copies.
+publish their own runtime dashboard copies. Pass `--compact-out` to also write
+a token-light summary for agent log analysis; agents should read that compact
+summary before opening raw JSONL evidence.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules
@@ -577,7 +579,8 @@ For log visibility rather than repair guidance, use:
 ```bash
 python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   --root . \
-  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md
+  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md \
+  --compact-out reports/agent-runtime-dashboard/agent-runtime-compact.md
 ```
 
 The dashboard also includes local LLM and workflow-selection eval families when

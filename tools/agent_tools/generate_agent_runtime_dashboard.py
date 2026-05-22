@@ -48,6 +48,7 @@ TOKEN_MARKDOWN_RE = re.compile(
     re.DOTALL,
 )
 MAX_REPORT_LINES = 20
+MAX_COMPACT_REPORT_LINES = 8
 UNKNOWN_SORT_ORDER = 9
 NO_RESET_EPOCH = 0
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -64,6 +65,15 @@ MARKDOWN_TOOL_IDS = (
     "fix_markdown_headers.py",
     "run_docs_checks.sh",
 )
+SELECTION_EVIDENCE_TARGET = (
+    "compact report Selection Misses table; "
+    "agents/evals/results/hook-runs/*/skill_usage.jsonl"
+)
+MARKDOWN_EVIDENCE_TARGET = (
+    "agents/evals/results/skill-workflow-prompt/*md-style-check*.md; "
+    "agents/evals/results/hook-runs/*/skill_usage.jsonl"
+)
+PROMPT_TOOL_EVIDENCE_TARGET = "agents/evals/results/hook-runs/*/skill_usage.jsonl"
 SELECTION_RESPONSIBILITIES = ("skill", "workflow", "tool")
 SELECTED_WORKFLOW_FIELDS = (
     "workflows",
@@ -317,7 +327,7 @@ class HookWorkflowBreakdownReader:
     WORKFLOW_FIELDS = ("candidate_workflows", *SELECTED_WORKFLOW_FIELDS)
 
     @classmethod
-    def read(cls, hook_files: Sequence[Path]) -> HookWorkflowBreakdown:
+    def read(cls, hook_files: Sequence[Path], root: Path) -> HookWorkflowBreakdown:
         """Return workflow attribution for hook entries."""
         workflows: Counter[str] = Counter()
         workflow_events: Counter[str] = Counter()
@@ -329,7 +339,7 @@ class HookWorkflowBreakdownReader:
                 names = cls.workflow_names(entry)
                 if not names:
                     entries_without_workflow += 1
-                    missing_by_file[hook_file.name] += 1
+                    missing_by_file[relative_path_label(hook_file, root)] += 1
                     continue
                 entries_with_workflow += 1
                 event = str(entry.get("event") or "missing_event")
@@ -827,7 +837,7 @@ class AgentRuntimeDashboard:
             hook_entries=sum(non_empty_line_count(path) for path in hook_files),
             result_families=result_families,
             skill_eval_breakdown=skill_eval_breakdown,
-            hook_workflow_breakdown=HookWorkflowBreakdownReader.read(hook_files),
+            hook_workflow_breakdown=HookWorkflowBreakdownReader.read(hook_files, self.root),
             token_usage_breakdown=TokenUsageBreakdownReader.read(self.root),
             prompt_tool_breakdown=read_prompt_tool_breakdown(hook_files),
             markdown_docs_breakdown=read_markdown_docs_breakdown(
@@ -856,6 +866,141 @@ def render_dashboard_lines(summary: RuntimeDashboardSummary) -> list[str]:
 def render_dashboard(summary: RuntimeDashboardSummary) -> str:
     """Render the dashboard as Markdown."""
     return "\n".join(render_dashboard_lines(summary)) + "\n"
+
+
+def render_compact_dashboard_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return token-light dashboard lines for agent log analysis."""
+    return [
+        "# Agent Runtime Compact Summary",
+        "",
+        "## Machine Summary",
+        "",
+        "```text",
+        *machine_summary_lines(summary),
+        "```",
+        "",
+        "## Priority Problems",
+        "",
+        *compact_problem_component_lines(summary),
+        "",
+        "## Priority Next Actions",
+        "",
+        *compact_next_action_lines(summary),
+        "",
+        "## Selection Misses",
+        "",
+        *compact_selection_miss_lines(summary),
+        "",
+        "## Reading Rule",
+        "",
+        "- Use this compact summary as the default input for agent log analysis.",
+        "- Read raw JSONL only for the specific evidence paths named above.",
+    ]
+
+
+def render_compact_dashboard(summary: RuntimeDashboardSummary) -> str:
+    """Render a compact dashboard as Markdown."""
+    return "\n".join(render_compact_dashboard_lines(summary)) + "\n"
+
+
+def compact_problem_component_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return the top dashboard problems without the full dashboard context."""
+    components = dashboard_problem_components(summary)[:MAX_COMPACT_REPORT_LINES]
+    lines = [
+        "| type | component | status | problem | evidence |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    if not components:
+        return [
+            *lines,
+            "| `none` | `none` | `healthy` | `no problem components detected` | `dashboard` |",
+        ]
+    lines.extend(
+        "| "
+        + " | ".join(
+            table_cell(value)
+            for value in (
+                component.component_type,
+                component.name,
+                component.status,
+                component.problem,
+                component.evidence,
+            )
+        )
+        + " |"
+        for component in components
+    )
+    return lines
+
+
+def compact_next_action_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return the highest-priority generated next actions."""
+    actions = dashboard_next_actions(summary)[:MAX_COMPACT_REPORT_LINES]
+    lines = [
+        "| priority | action | reason | evidence | owner surface | command |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    if not actions:
+        return [
+            *lines,
+            "| `none` | no immediate dashboard action | all observed dashboard signals are healthy | `dashboard` | `none` | `none` |",
+        ]
+    lines.extend(
+        "| "
+        + " | ".join(
+            table_cell(value)
+            for value in (
+                action.priority,
+                action.action,
+                action.reason,
+                action.evidence,
+                action.owner_surface,
+                action.command,
+            )
+        )
+        + " |"
+        for action in actions
+    )
+    return lines
+
+
+def compact_selection_miss_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return top skill, workflow, and tool selection misses."""
+    missed = sorted(
+        (
+            row
+            for row in summary.selection_metrics_breakdown.metrics
+            if row.missed_count > 0
+        ),
+        key=lambda row: (-row.missed_count, row.responsibility, row.name),
+    )[:MAX_COMPACT_REPORT_LINES]
+    lines = [
+        "| responsibility | name | selected | candidate | missed | miss rate | reset basis |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    if not missed:
+        return [
+            *lines,
+            "| `none` | `none` | `0` | `0` | `0` | `0.0%` | `none` |",
+        ]
+    lines.extend(
+        "| "
+        + " | ".join(
+            table_cell(value)
+            for value in (
+                row.responsibility,
+                row.name,
+                str(row.selected_count),
+                str(row.candidate_count),
+                str(row.missed_count),
+                failure_rate(row.missed_count, row.candidate_count),
+                selection_reset_label(row),
+            )
+        )
+        + " |"
+        for row in missed
+    )
+    return lines
 
 
 def read_prompt_tool_breakdown(hook_files: Sequence[Path]) -> PromptToolBreakdown:
@@ -1517,7 +1662,7 @@ def hook_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemCo
                 name="hook evidence",
                 status="fail",
                 problem=f"{failed} hook entries report status=fail",
-                evidence=top_counter_key(summary.evidence.hook_counts.failures, "hook failure fingerprints"),
+                evidence=top_hook_failure_evidence(summary),
                 next_action="repair failing hook evidence",
             )
         )
@@ -1623,7 +1768,7 @@ def selection_problem_components(
                 name=row.name,
                 status="attention",
                 problem=f"{row.missed_count} candidate miss(es); miss rate {failure_rate(row.missed_count, row.candidate_count)}",
-                evidence="## Selection Accuracy By Responsibility",
+                evidence=SELECTION_EVIDENCE_TARGET,
                 next_action=f"repair {responsibility} selection or logging",
             )
         )
@@ -1691,7 +1836,7 @@ def hook_failure_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboar
     failed = summary.evidence.hook_counts.statuses.get("fail", 0)
     if failed <= 0:
         return ()
-    evidence = top_counter_key(summary.evidence.hook_counts.failures, "hook failure fingerprints")
+    evidence = top_hook_failure_evidence(summary)
     return (DashboardNextAction(
         priority="P0",
         action="repair failing hook evidence",
@@ -1703,6 +1848,24 @@ def hook_failure_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboar
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
     ),)
+
+
+def top_hook_failure_evidence(summary: RuntimeDashboardSummary) -> str:
+    """Return a bounded hook JSONL file target for the top failure fingerprint."""
+    fingerprint = top_counter_key(summary.evidence.hook_counts.failures, "hook failure fingerprints")
+    if fingerprint == "none":
+        return "agents/evals/results/hook-runs/*/*.jsonl"
+    files: Counter[str] = Counter()
+    for hook_file in summary.hook_files:
+        for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+            if (
+                str(entry.get("status") or "") == "fail"
+                and str(entry.get("failure_fingerprint") or "") == fingerprint
+            ):
+                files[relative_path_label(hook_file, summary.root)] += 1
+    if not files:
+        return f"agents/evals/results/hook-runs/*/*.jsonl fingerprint={fingerprint}"
+    return f"{files.most_common(1)[0][0]} fingerprint={fingerprint}"
 
 
 def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
@@ -1764,7 +1927,7 @@ def selection_metrics_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
         priority="P1",
         action=f"repair {row.responsibility} selection for {row.name}",
         reason=f"{missed} candidate selections were not confirmed",
-        evidence="## Selection Accuracy By Responsibility",
+        evidence=SELECTION_EVIDENCE_TARGET,
         owner_surface=row.reset_path,
         command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
         done_condition=f"{row.responsibility}:{row.name} miss rate is 0% after its reset window",
@@ -1807,7 +1970,7 @@ def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         priority=priority,
         action="repair Markdown/docs checking signal",
         reason=reason,
-        evidence="## Markdown Docs Hook Signals",
+        evidence=MARKDOWN_EVIDENCE_TARGET,
         owner_surface=".agents/skills/md-style-check/SKILL.md and tools/docs/",
         command="bash tools/ci/run_docs_checks.sh",
         done_condition="markdown eval failures are 0 and markdown hook signal is present",
@@ -1829,7 +1992,7 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         priority="P2",
         action="repair prompt and tool selection evidence",
         reason="prompt excerpts or tool selection entries are missing",
-        evidence="## Prompt And Tool Selection Evidence",
+        evidence=PROMPT_TOOL_EVIDENCE_TARGET,
         owner_surface=".codex/hooks/skill_usage_logger.py",
         command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
         done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
@@ -1932,6 +2095,14 @@ def issue_label_by_slug(summary: RuntimeDashboardSummary, slug: str) -> str:
     if issue is None:
         return "missing-local-issue"
     return issue.relative_to(summary.root).as_posix()
+
+
+def relative_path_label(path: Path, root: Path) -> str:
+    """Return a root-relative path label when possible."""
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
@@ -2325,6 +2496,15 @@ def build_parser() -> argparse.ArgumentParser:
         default="reports/agent-runtime-dashboard/agent-runtime-dashboard.md",
         help="Markdown output path.",
     )
+    parser.add_argument(
+        "--compact-out",
+        type=Path,
+        help=(
+            "Optional token-light Markdown summary path for agent log analysis. "
+            "The compact report contains machine summary, priority problems, "
+            "next actions, and selection misses without raw JSONL excerpts."
+        ),
+    )
     return parser
 
 
@@ -2336,6 +2516,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(render_dashboard(summary), encoding="utf-8")
+    if args.compact_out is not None:
+        args.compact_out.parent.mkdir(parents=True, exist_ok=True)
+        args.compact_out.write_text(render_compact_dashboard(summary), encoding="utf-8")
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")

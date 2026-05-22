@@ -94,6 +94,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - large refactor では `behavior-preserving-refactor`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較が task の中心にある場合は `dependency-analysis` を足し、`agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します
+- skill / tool / workflow / hook / eval の蓄積ログ分析、routing miss、selection gap、弱い skill の調査が scope にある場合は `agent-log-analysis` を足します
 - user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、agent-side memory update を要求する場合は `agent-learning` を足します
 - 関係のない family skill は足しません
 - tool 化済みの規約検証は task-shape skill として増やさず、`check_convention_compliance.py` の gate に委譲します
