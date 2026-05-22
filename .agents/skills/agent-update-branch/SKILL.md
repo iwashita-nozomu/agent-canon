@@ -15,7 +15,7 @@ upstream implementation ../../../tools/agent_tools/agent_update_branch.sh valida
 1. Read `agents/workflows/agent-update-branch-workflow.md`.
 1. Classify the update lane:
    - `memory-eval`: only `memory/`, `agents/evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts intended for feedback capture
-   - `canon-pin`: `.gitmodules`, `vendor/agent-canon`, and root AgentCanon symlink/copy surfaces
+   - `canon-pin`: `.gitmodules`, `.agent-canon/update-state.toml`, `vendor/agent-canon`, and root AgentCanon symlink/copy surfaces
    - `integration`: a branch that merges one or more `agent-updates/*` branches back toward `main`
 1. Use a template-derived branch name:
    - `agent-updates/memory-eval/<slug>`

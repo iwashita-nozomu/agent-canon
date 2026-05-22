@@ -14,7 +14,7 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 ## Branch Lanes
 
 - `agent-updates/memory-eval/<slug>`: memory and eval-only updates.
-- `agent-updates/canon-pin/<slug>`: AgentCanon submodule pin and root runtime view updates.
+- `agent-updates/canon-pin/<slug>`: AgentCanon submodule pin, AgentCanon update-state, and root runtime view updates.
 - `agent-updates/integration/<slug>`: merges update branches and validates them before `main`.
 
 ## Memory/Eval Branch
@@ -30,7 +30,7 @@ memory feedback, and eval feedback without mixing those updates into feature bra
 
 1. Start from `template/main`.
 1. Create `agent-updates/canon-pin/<slug>`.
-1. Update the AgentCanon submodule pin and root runtime links.
+1. Update the AgentCanon submodule pin, `.agent-canon/update-state.toml`, and root runtime links.
 1. Run `bash tools/sync_agent_canon.sh plan`, `bash tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
 1. Commit with the AgentCanon target commit in the message.
 1. Push the branch.
