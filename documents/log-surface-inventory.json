@@ -1164,7 +1164,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 104,
+      "line": 109,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1172,7 +1172,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 105,
+      "line": 110,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1180,7 +1180,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 102,
+      "line": 107,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1188,7 +1188,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 101,
+      "line": 106,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1196,7 +1196,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_summary_artifact",
-      "line": 103,
+      "line": 108,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1204,7 +1204,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 100,
+      "line": 105,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1516,7 +1516,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH",
-      "line": 442,
+      "line": 573,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1524,7 +1524,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH",
-      "line": 448,
+      "line": 579,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1532,7 +1532,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_ANALYZED_FILE",
-      "line": 1093,
+      "line": 1623,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1540,7 +1540,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_FINDING",
-      "line": 443,
+      "line": 574,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1548,15 +1548,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_FINDING",
-      "line": 449,
-      "path": "rust/agent-canon/src/python_structure_hash.rs",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "rust_key_value_stdout",
-      "field": "PY_STRUCTURE_HASH_GROUPS",
-      "line": 1095,
+      "line": 580,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1564,7 +1556,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_PARSE_ERRORS",
-      "line": 898,
+      "line": 1059,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -1596,7 +1588,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT",
-      "line": 61,
+      "line": 93,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -1604,7 +1596,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_FINDING",
-      "line": 62,
+      "line": 94,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -1612,7 +1604,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_OUTPUT",
-      "line": 123,
+      "line": 155,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -7276,7 +7268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 593,
+      "line": 597,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7284,7 +7276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 593,
+      "line": 597,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7292,7 +7284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 593,
+      "line": 597,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7300,7 +7292,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 593,
+      "line": 597,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7308,7 +7300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 618,
+      "line": 622,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7316,7 +7308,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 616,
+      "line": 620,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7324,7 +7316,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 617,
+      "line": 621,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -7332,7 +7324,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 610,
+      "line": 614,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },

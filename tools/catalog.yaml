@@ -588,6 +588,24 @@ entries:
     tests:
       - tests/tools/test_check_github_workflows.py
 
+  - id: scan-secrets
+    summary: Runs gitleaks, trufflehog, and detect-secrets against current tree and git history.
+    path: tools/ci/scan_secrets.sh
+    family: ci
+    role: checker
+    status: canonical
+    command: bash tools/ci/scan_secrets.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - CONTAINER_OPERATIONS.md
+    tests: []
+    test_exempt_reason: Thin wrapper over third-party scanners; validated by command help and local security-audit runs.
+
   - id: run-all-checks
     summary: Runs the main shared quick CI and static validation suite.
     path: tools/ci/run_all_checks.sh
