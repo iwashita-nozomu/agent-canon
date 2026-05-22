@@ -1908,7 +1908,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_BASE",
-      "line": 91,
+      "line": 92,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -1916,7 +1916,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_DISALLOWED",
-      "line": 80,
+      "line": 81,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -1924,7 +1924,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_LANE",
-      "line": 90,
+      "line": 91,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -1932,7 +1932,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_PUSHED",
-      "line": 102,
+      "line": 103,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -1940,7 +1940,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_VALIDATE",
-      "line": 86,
+      "line": 87,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -1948,7 +1948,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_UPDATE_BRANCH_VALIDATE",
-      "line": 89,
+      "line": 90,
       "path": "tools/agent_tools/agent_update_branch.sh",
       "surface": "tool"
     },
@@ -7473,6 +7473,70 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN",
+      "line": 80,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN",
+      "line": 191,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_DETECT_SECRETS_FINDINGS",
+      "line": 156,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_TOOL",
+      "line": 111,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_TOOL",
+      "line": 117,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_TOOL",
+      "line": 131,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_TOOL",
+      "line": 135,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SECRET_SCAN_TOOL",
+      "line": 160,
+      "path": "tools/ci/scan_secrets.sh",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
@@ -9610,6 +9674,7 @@
     "tools/ci/run_in_repo_container.py",
     "tools/ci/run_python_in_dockerfile.py",
     "tools/ci/run_repo_program.py",
+    "tools/ci/scan_secrets.sh",
     "tools/data/jsonl_to_md.py",
     "tools/docker_dependency_validator.sh",
     "tools/docs/audit_and_fix_links.py",
