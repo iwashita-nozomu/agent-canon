@@ -50,6 +50,7 @@ path_allowed() {
       ;;
     canon-pin)
       [[ "$path" == .gitmodules ]] && return 0
+      [[ "$path" == .agent-canon/* ]] && return 0
       [[ "$path" == vendor/agent-canon ]] && return 0
       [[ "$path" == AGENTS.md || "$path" == CLAUDE.md ]] && return 0
       [[ "$path" == .agents || "$path" == .claude || "$path" == agents ]] && return 0
