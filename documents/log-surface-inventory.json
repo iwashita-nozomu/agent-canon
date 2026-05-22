@@ -3644,7 +3644,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 2522,
+      "line": 2750,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -3652,7 +3652,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 2524,
+      "line": 2752,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -3660,7 +3660,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 2526,
+      "line": 2754,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -3668,7 +3668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 2525,
+      "line": 2753,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -3676,7 +3676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 2523,
+      "line": 2751,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -9381,6 +9381,7 @@
     ".agents/skills/academic-writing/SKILL.md",
     ".agents/skills/adaptive-improvement-loop/SKILL.md",
     ".agents/skills/agent-learning/SKILL.md",
+    ".agents/skills/agent-log-analysis/SKILL.md",
     ".agents/skills/agent-orchestration/SKILL.md",
     ".agents/skills/agent-update-branch/SKILL.md",
     ".agents/skills/behavior-preserving-refactor/SKILL.md",
@@ -9412,6 +9413,7 @@
     ".claude/skills/academic-writing/SKILL.md",
     ".claude/skills/adaptive-improvement-loop/SKILL.md",
     ".claude/skills/agent-learning/SKILL.md",
+    ".claude/skills/agent-log-analysis/SKILL.md",
     ".claude/skills/agent-orchestration/SKILL.md",
     ".claude/skills/agent-update-branch/SKILL.md",
     ".claude/skills/behavior-preserving-refactor/SKILL.md",
@@ -9462,6 +9464,7 @@
     "agents/skills/academic-writing.md",
     "agents/skills/adaptive-improvement-loop.md",
     "agents/skills/agent-learning.md",
+    "agents/skills/agent-log-analysis.md",
     "agents/skills/agent-orchestration.md",
     "agents/skills/agent-update-branch.md",
     "agents/skills/artifact-placement.md",

@@ -346,8 +346,11 @@ labels, eval report families, and open/closed issue counts. The standalone
 AgentCanon GitHub Actions workflow publishes the dashboard to the workflow Step
 Summary and uploads it as an artifact; template and derived repositories do not
 publish their own runtime dashboard copies. Pass `--compact-out` to also write
-a token-light summary for agent log analysis; agents should read that compact
-summary before opening raw JSONL evidence.
+a token-light summary for agent log analysis. Agents should use that compact
+summary and its generated evidence drilldowns as the normal analysis input; if
+the summary lacks a needed detail, extend or rerun the dashboard tool for a more
+specific generated summary. Raw JSONL is reserved for tool implementation,
+schema debugging, or corruption audits with an explicit rationale.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules

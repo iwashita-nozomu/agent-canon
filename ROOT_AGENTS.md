@@ -93,7 +93,7 @@ contract listed in `documents/README.md`.
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
 - 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
 - 通常の code / docs / routing 調査では、`agents/evals/results/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
-- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む前に compact summary を生成して分析対象を絞ります。
+- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary と generated drilldown を生成して分析します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
 - 検索で見つけた既存 skill、tool、workflow を使わない場合は、run bundle、PR body、または作業 update に理由を残します。
 
 ## Runtime Profiles And Risk

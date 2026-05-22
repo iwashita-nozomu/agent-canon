@@ -69,12 +69,26 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "`repair failed skill eval for agent-orchestration`",
             "## Selection Misses",
             "| `skill` | `md-style-check` | `0` | `1` | `1` | `100.0%` |",
-            "Read raw JSONL only for the specific evidence paths named above.",
+            "## Evidence Drilldown",
+            "### Hook Failure Drilldown",
+            "### Skill Eval Failure Drilldown",
+            "### Selection Evidence Drilldown",
+            "### Token Consumption Drilldown",
+            "| `agent-orchestration` | `1` | `1` | `100.0%` |",
+            "| `comparison_count` | `1` |",
+            "| `missing_namespaces` | `test-container=5` |",
+            "| `missing_urls` | `https://example.com/paper.pdf=1` |",
+            "| `registered_urls` | `https://example.com/reference.html=1` |",
+            "Do not read raw JSONL during normal agent log analysis.",
+            "extend or rerun the dashboard tool",
         )
         for expected in required:
             self.assertIn(expected, dashboard)
         self.assertNotIn("## Where Logs Accumulate", dashboard)
         self.assertNotIn("```mermaid", dashboard)
+        self.assertNotIn("reference_capture_guard.jsonl", dashboard)
+        self.assertNotIn("skill_usage.jsonl", dashboard)
+        self.assertNotIn("reports/agents/**", dashboard)
 
     def assert_problem_component_section(self, dashboard: str) -> None:
         """Verify glanceable problem component rows."""
@@ -83,24 +97,22 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=7",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
             "`5 hook entries lack workflow attribution` | "
-            "`agents/evals/results/hook-runs/test-container/reference_capture_guard.jsonl` | "
+            "`compact report Workflow Attribution Drilldown` | "
             "`repair workflow attribution logging` |",
             "| `tool` | `run_docs_checks.sh` | `attention` | "
             "`1 candidate miss(es); miss rate 100.0%` | "
-            "`compact report Selection Misses table; "
-            "agents/evals/results/hook-runs/*/skill_usage.jsonl` | "
+            "`compact report Selection Evidence Drilldown` | "
             "`repair tool selection or logging` |",
             "| `hook` | `reference_capture_guard` | `attention` | "
             "`1 referenced URLs are unregistered` | "
-            "`agents/evals/results/hook-runs/*/reference_capture_guard.jsonl` | "
+            "`compact report Reference Capture Drilldown` | "
             "`materialize references or repair hook logging` |",
         )
         for expected in required:
             self.assertIn(expected, dashboard)
         self.assertIn(
             "| `skill` | `agent-orchestration` | `fail` | `1 failed eval report(s)` | "
-            "`agents/evals/results/skill-workflow-prompt/"
-            "skill-eval-test-fail-agent-orchestration.md` | "
+            "`compact report Skill Eval Failure Drilldown skill=agent-orchestration` | "
             "`repair failed skill eval for agent-orchestration` |",
             dashboard,
         )
@@ -403,6 +415,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "url_count": 1,
                     "registered_count": 0,
                     "missing_count": 1,
+                    "urls": ["https://example.com/paper.pdf"],
+                    "registered_urls": [],
+                    "missing_urls": ["https://example.com/paper.pdf"],
                     "decision": "pass",
                     "source_fields": ["prompt"],
                 }
@@ -418,6 +433,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "url_count": 1,
                     "registered_count": 1,
                     "missing_count": 0,
+                    "urls": ["https://example.com/reference.html"],
+                    "registered_urls": ["https://example.com/reference.html"],
+                    "missing_urls": [],
                     "decision": "pass",
                     "source_fields": ["last_assistant_message"],
                 }
