@@ -127,6 +127,11 @@ under `agents/evals/results/report-quality/`.
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
     Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
     呼び、現在の Python engine は内部互換実装として扱います。
+    `python-structure-hash` は normalized AST duplicate、single-caller
+    ownership、similar-responsibility caller evidence を Rust で検出します。
+    `python-structure-hash-report` は text output を structured JSON に変換し、
+    dependency-tree / AST / usage-profile feature から
+    `caller_analysis.integration_candidates` を生成します。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
   - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
@@ -635,6 +640,8 @@ Use code dependency evidence to understand import/include/source reachability, a
 - `check_hardcoded_numbers.py` checks Python and C++ sources for unexplained numeric literals. It allows only small universal literals by default, accepts uppercase Python module constants and C++ `constexpr` constants, and supports line-local `hardcoded-number-ok` allowances for formula or standard-derived values.
 - `analyze_refactor_surface.py` scores Python refactor surfaces for long functions, long classes, long files, and wide public method surfaces.
 - `helper_function_inventory.py` inventories Python helper functions/classes and infers roles from AST body facts, calls, side effects, path domain, internal call graph evidence, single-caller or file-local specialization, and functional candidate rules. It reports high-confidence `auto_helper` verdicts separately from `needs_user_judgment` symbols, with `--only-auto-helpers` and `--only-user-judgment` filters for review loops.
+- `agent-canon python-structure-hash` emits normalized AST duplicate findings and Rust-side `single_caller_structural_helper` findings. SingleCaller counts unique enclosing caller blocks, not raw call sites, so construction/use repeated inside one function remains `caller_count=1` with a larger `call_site_count`.
+- `agent-canon python-structure-hash-report` converts those findings to JSON, keeps `caller_analysis` evidence, and ranks duplicate and SingleCaller findings with dependency-aware `priority_order` and `repair_slice` data.
 - `tools/oop/python/readability.py` scores Python OOP readability risks. It checks vague class/helper names, oversized classes/functions, wide public surfaces, excessive instance state/parameters, static-method namespace classes, `None` runtime routing, mixed transform/effect boundaries, cognitive-complexity signals, redundant wrappers, stateless callable classes, pass-through functions, identity functions, and trivial formatting functions.
 - `tools/oop/cpp/readability.py` scores C/C++ OOP readability risks. It checks vague type names, oversized classes/functions, wide public fields/methods, excessive parameters/base classes, `nullptr` runtime routing, mixed transform/effect boundaries, pass-through wrappers, identity functions, and trivial formatting functions. It also preserves intentional C++ boundaries for schema/value-object aggregates, annotated primitive ABI functions, `__nad_` exported ABI functions, expression-DSL identity terminals, and compact numeric scalar wrappers.
 - `tools/oop/*/readability.py --format markdown --include-snippets` writes a deterministic mechanical report that explains each finding by OOP dimension and line number.

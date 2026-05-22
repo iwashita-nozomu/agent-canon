@@ -44,7 +44,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
 | `report-writing` | evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
-| `behavior-preserving-refactor` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/behavior-preserving-refactor.md` | `.agents/skills/behavior-preserving-refactor/SKILL.md` |
+| `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
@@ -88,7 +88,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
 - 文書整理で正本、mirror、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory を確認するときは `dependency-analysis` を使います。
-- 大規模 refactor では `behavior-preserving-refactor` を追加し、semantic delta を別管理にします。
+- 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。
 - C / C++ 差分では `cpp-review` を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。

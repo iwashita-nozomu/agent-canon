@@ -4,7 +4,7 @@ responsibility Documents 包括的リファクタリングワークフロー for
 upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
-upstream design ../skills/behavior-preserving-refactor.md behavior-preserving refactor contract
+upstream design ../skills/refactor-loop.md refactor loop contract
 upstream design ../../documents/object-oriented-design.md OOP boundary policy
 upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
 downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
