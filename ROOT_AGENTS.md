@@ -29,6 +29,7 @@ contract listed in `documents/README.md`.
 - repo-changing task では、task の risk class を先に決めます。trivial / Routine docs / Focused code は parent-direct を許可し、Shared canon / Large delivery / high-risk では requirements / planning / detailed design / review / implementation を stage ごとに分けます。
 - subagent は task の複雑さ、review 独立性、write scope 分離で使います。使わない場合は user update または run bundle に parent-direct rationale を短く残します。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
+- subagent handoff は workspace 全体を scope として渡しません。role ごとに bounded path list、対象 checker / compact artifact、読むべき canon 節、読まない surface、expected output を明示します。bounded path list は編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。`/workspace` や repo root は作業場所であり、入力 packet の代替ではありません。
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
