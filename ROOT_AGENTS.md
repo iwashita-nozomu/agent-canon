@@ -96,7 +96,7 @@ contract listed in `documents/README.md`.
 - 当面は検索 Eval 収集のため、semantic-index の bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
 - 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
 - 通常の code / docs / routing 調査では、`agents/evals/results/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
-- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary と generated drilldown を生成して分析します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
+- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary、generated drilldown、prompt/token rolling trend を生成して分析します。token 利用は lifetime total だけで判断せず、recent moving average と coverage status を優先します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
 - 検索で見つけた既存 skill、tool、workflow を使わない場合は、run bundle、PR body、または作業 update に理由を残します。
 
 ## Runtime Profiles And Risk
