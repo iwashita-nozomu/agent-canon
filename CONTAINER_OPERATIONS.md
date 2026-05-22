@@ -107,6 +107,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling, and
   post-create bootstrap belong in `.devcontainer/post-create.sh`.
+- Public-repository security scanners used by agents, including `gitleaks`,
+  `trufflehog`, and `detect-secrets`, belong in `.devcontainer/post-create.sh`.
+  They are audit tooling, not project runtime dependencies, and must not be
+  installed in the project Dockerfile unless a project explicitly needs them at
+  runtime.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.

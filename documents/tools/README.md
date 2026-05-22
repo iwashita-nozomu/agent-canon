@@ -80,6 +80,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - repo 定義の runtime pack を build / smoke します。
 - `tools/ci/container_config.py`
   - repo-local Dockerfile / runtime pack と AgentCanon-owned devcontainer 生成導線の静的整合を検査します。`docker/` が無くても `.devcontainer/` があれば shared devcontainer source を検査します。
+- `tools/ci/scan_secrets.sh`
+  - `gitleaks`、`trufflehog`、`detect-secrets` をまとめて実行する公開 repo 向けの secret audit 入口です。既定では current tree と full git history を走査します。scanner は shared devcontainer の `post-create.sh` で導入されます。
+  - 例: `bash tools/ci/scan_secrets.sh --root .`、submodule 側は `bash tools/ci/scan_secrets.sh --root vendor/agent-canon`。
 - `tools/bin/agent-canon`
   - AgentCanon Rust CLI の stable wrapper です。
     `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon`

@@ -5,6 +5,7 @@
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream environment devcontainer.json postCreateCommand entrypoint
 # upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
+# upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
 # @dependency-end
 
 set -euo pipefail
@@ -15,6 +16,9 @@ rust_toolchain="${RUST_TOOLCHAIN:-stable}"
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 llama_cpp_ref="${AGENT_CANON_LLAMA_CPP_REF:-master}"
 local_llm_model="${AGENT_CANON_LOCAL_LLM_MODEL:-ggml-org/SmolLM3-3B-GGUF:Q4_K_M}"
+gitleaks_version="${AGENT_CANON_GITLEAKS_VERSION:-8.30.1}"
+trufflehog_version="${AGENT_CANON_TRUFFLEHOG_VERSION:-3.95.3}"
+detect_secrets_version="${AGENT_CANON_DETECT_SECRETS_VERSION:-1.5.0}"
 
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
@@ -90,6 +94,120 @@ install_codex_cli() {
   install_node_for_codex
   run_as_root env "PATH=${PATH}" npm install -g @openai/codex
   run_as_root env "PATH=${PATH}" npm cache clean --force
+}
+
+linux_arch() {
+  case "$(uname -m)" in
+    x86_64 | amd64)
+      printf '%s\n' "amd64"
+      ;;
+    aarch64 | arm64)
+      printf '%s\n' "arm64"
+      ;;
+    *)
+      echo "Unsupported secret scanner architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+download_release_asset() {
+  local repo="$1"
+  local tag="$2"
+  local asset="$3"
+  local output="$4"
+  curl -fsSL "https://github.com/${repo}/releases/download/${tag}/${asset}" -o "$output"
+}
+
+verify_release_checksum() {
+  local repo="$1"
+  local tag="$2"
+  local asset="$3"
+  local archive="$4"
+  local checksum_file
+  local checksum_asset
+  local work_dir
+
+  work_dir="$(dirname "$archive")"
+  checksum_file="${work_dir}/checksums.txt"
+  checksum_asset="${asset%%_linux_*}_checksums.txt"
+  curl -fsSL "https://github.com/${repo}/releases/download/${tag}/${checksum_asset}" \
+    -o "$checksum_file"
+  if ! grep -F "  $(basename "$archive")" "$checksum_file" >/dev/null 2>&1; then
+    echo "Checksum entry for $(basename "$archive") not found in ${repo} ${tag}" >&2
+    return 1
+  fi
+  (cd "$work_dir" && grep -F "  $(basename "$archive")" checksums.txt | sha256sum -c -)
+}
+
+install_tar_binary() {
+  local repo="$1"
+  local tag="$2"
+  local asset="$3"
+  local binary="$4"
+  local archive
+  local work_dir
+
+  work_dir="$(mktemp -d)"
+  archive="${work_dir}/${asset}"
+  download_release_asset "$repo" "$tag" "$asset" "$archive"
+  verify_release_checksum "$repo" "$tag" "$asset" "$archive"
+  tar -xzf "$archive" -C "$work_dir" "$binary"
+  install -d -m 755 "${tools_home}/bin"
+  install -m 755 "${work_dir}/${binary}" "${tools_home}/bin/${binary}"
+  run_as_root ln -sf "${tools_home}/bin/${binary}" "/usr/local/bin/${binary}"
+  rm -rf "$work_dir"
+}
+
+install_detect_secrets() {
+  local detector
+
+  if command -v detect-secrets >/dev/null 2>&1; then
+    return
+  fi
+  apt_install python3-pip
+  PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install --user --upgrade "detect-secrets==${detect_secrets_version}"
+  detector="${HOME}/.local/bin/detect-secrets"
+  if [ ! -x "$detector" ]; then
+    echo "detect-secrets install completed but ${detector} is missing" >&2
+    return 1
+  fi
+  install -d -m 755 "${tools_home}/bin"
+  ln -sf "$detector" "${tools_home}/bin/detect-secrets"
+  run_as_root ln -sf "${tools_home}/bin/detect-secrets" /usr/local/bin/detect-secrets
+}
+
+install_secret_scanners() {
+  local arch
+  local gitleaks_arch
+
+  apt_install ca-certificates curl tar
+  arch="$(linux_arch)"
+  if [ "$arch" = "amd64" ]; then
+    gitleaks_arch="x64"
+  else
+    gitleaks_arch="$arch"
+  fi
+
+  if ! command -v gitleaks >/dev/null 2>&1; then
+    install_tar_binary \
+      "gitleaks/gitleaks" \
+      "v${gitleaks_version}" \
+      "gitleaks_${gitleaks_version}_linux_${gitleaks_arch}.tar.gz" \
+      "gitleaks"
+  fi
+  if ! command -v trufflehog >/dev/null 2>&1; then
+    install_tar_binary \
+      "trufflesecurity/trufflehog" \
+      "v${trufflehog_version}" \
+      "trufflehog_${trufflehog_version}_linux_${arch}.tar.gz" \
+      "trufflehog"
+  fi
+  install_detect_secrets
+
+  gitleaks version
+  trufflehog --version
+  detect-secrets --version
 }
 
 agent_canon_source_root() {
@@ -199,6 +317,7 @@ else
 fi
 install_github_cli
 install_codex_cli
+install_secret_scanners
 install_agent_canon_cli
 install_llama_cpp
 gh --version

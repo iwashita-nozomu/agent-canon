@@ -75,6 +75,10 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "tools/install_llama_cpp.sh",
     "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
     "${tools_home}/bin/llama-cli",
+    "install_secret_scanners",
+    "gitleaks",
+    "trufflehog",
+    "detect-secrets",
     "gh --version",
     "codex --version",
 )
