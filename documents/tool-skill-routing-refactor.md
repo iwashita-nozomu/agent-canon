@@ -26,6 +26,8 @@ evidence, not an AgentCanon product dependency.
 - Public skill names describe the user action, not the implementation pattern.
 - Long candidate names are compatibility aliases, not new files.
 - Repeated routing decisions go through `route.py --area <area>`.
+- Prompt-derived public skill selection goes through `route.py --prompt <text>`
+  so candidate evidence and selected skill routing share one operator surface.
 - The public skill for this family is `$task-routing`.
 
 ## Canonical Short Surface
@@ -59,3 +61,8 @@ specialized checkers. Existing tools remain canonical when they perform real
 validation or repair. `route.py` only decides which specialized path to use and
 prints compact `ROUTE`, `AREA`, `NEXT_ACTION`, `COMMANDS`, and `EVIDENCE`
 tokens.
+
+For broad user prompts, `route.py --prompt "<request>"` prints `ROUTE=skill-selection`,
+`MODE`, `SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
+`SKILLS` keeps `$agent-orchestration` first, adds `$codex-task-workflow` for
+repo-changing prompts, and then appends matched public task-shape skills.

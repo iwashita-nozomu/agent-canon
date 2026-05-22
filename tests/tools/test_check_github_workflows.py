@@ -167,6 +167,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Validation Evidence", result.stdout)
+            self.assertIn("missing_text:Agent Orchestration Evidence", result.stdout)
             self.assertIn(
                 "missing_text:expected template submodule SHA:",
                 result.stdout,
@@ -316,6 +317,11 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                     "# Template / derived project PR",
                     "Validation Evidence",
                     "Plan Mode Evidence",
+                    "Agent Orchestration Evidence",
+                    "workflow=<family>",
+                    "skills=$agent-orchestration",
+                    "review=<...>",
+                    "route.py --prompt",
                     "PR Mutation Authority",
                     "Authority / blocker notes",
                     "Copilot / Automation Output",
@@ -328,6 +334,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                     "Issue Mirror artifact",
                     "run_repo_dependency_review.sh --search-hits-file",
                     "Copilot Configuration Impact",
+                    "vendor/agent-canon/documents/github-copilot-configuration.md",
                     "documents/github-copilot-configuration.md",
                     "Template / derived project PR",
                     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
@@ -518,6 +525,40 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "path=.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
                 result.stdout,
             )
+
+    def test_template_root_pr_template_evidence_fails_when_present(self) -> None:
+        """Optional template-root PR templates must keep orchestration evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            self.write_template_root_pr_template(root)
+            self.copy_template_agent_canon_template(root)
+            (root / ".gitmodules").write_text(
+                "[submodule \"vendor/agent-canon\"]\n"
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+            path = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "Agent Orchestration Evidence",
+                    "Routing Evidence",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing_text:Agent Orchestration Evidence", result.stdout)
 
     def test_template_mode_uses_vendor_copilot_config(self) -> None:
         """Template roots should not require standalone-only root docs or PR templates."""

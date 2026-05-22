@@ -49,6 +49,10 @@ skill_families:
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
     shim: .agents/skills/result-artifact-writeout/SKILL.md
+  - id: agent-log-analysis
+    purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
+    canonical_doc: agents/skills/agent-log-analysis.md
+    shim: .agents/skills/agent-log-analysis/SKILL.md
   - id: report-writing
     purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md

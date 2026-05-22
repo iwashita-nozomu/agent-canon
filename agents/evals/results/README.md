@@ -48,6 +48,12 @@ python3 tools/agent_tools/eval_accumulation_check.py --root .
 
 The checker is structural. It accepts legacy readable reports, but namespaced
 new hook logs must carry the required fields documented under `hook-runs/`.
+Raw hook and eval logs stay append-only after a prompt, skill, workflow, or
+tool repair. Do not move or delete them to make a new report look green. Tools
+that turn accumulated evidence into routing guidance use the latest Git commit
+time of the affected source paths as the analysis cutover: pre-cutover skill
+routing signals are archived out of current gap math while remaining available
+as raw chronology.
 For a human-readable view, generate the runtime dashboard. It shows not only
 aggregate counts, but also Mermaid evidence flow, per-skill eval failure rates,
 workflow attribution for hook firing, prompt/tool-selection evidence, token

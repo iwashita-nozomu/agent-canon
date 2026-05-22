@@ -79,6 +79,61 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=search", result.stdout)
         self.assertIn("CANONICAL_TOOL=route.py --area search", result.stdout)
 
+    def test_prompt_routes_repo_changing_skill_set(self) -> None:
+        """Prompt routing should expose concrete public skills, not only area aliases."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "スキル選択ルーティングも含めて修正してください。"
+                "マルチエージェントでログのレポートを残す。"
+            ),
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["route"], "skill-selection")
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertEqual(decision["skills"][0], "agent-orchestration")
+        self.assertIn("codex-task-workflow", decision["skills"])
+        self.assertIn("subagent-bootstrap", decision["skills"])
+        self.assertIn("agent-orchestration", decision["matched_skills"])
+        self.assertIn("result-artifact-writeout", decision["matched_skills"])
+
+    def test_prompt_routes_agent_learning_and_oop_readability(self) -> None:
+        """Weak historical skill surfaces should be recommended from contextual prompts."""
+        result = self.run_route(
+            "--prompt",
+            "こういう止まり方の再発防止と OOP readability check を見直す",
+            "--mode",
+            "routing-only",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertIn("agent-learning", decision["skills"])
+        self.assertIn("oop-readability-check", decision["skills"])
+
+    def test_prompt_routes_plain_public_skill_names(self) -> None:
+        """Plain public skill ids in user text should count as explicit skill routing."""
+        result = self.run_route(
+            "--prompt",
+            "md-style-check と agent-learning の routing gap を直して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("md-style-check", decision["skills"])
+        self.assertIn("agent-learning", decision["skills"])
+        self.assertIn("md-style-check", decision["matched_skills"])
+        self.assertIn("agent-learning", decision["matched_skills"])
+
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""
         result = self.run_route("--name", "unknown_super_router.py")

@@ -134,7 +134,7 @@ under `agents/evals/results/report-quality/`.
   - `search.py` は `--purpose` から text / LLM card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers llm,tool,vector` のように絞れます。
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
-  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。
+  - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
@@ -333,6 +333,10 @@ in `reports/hooks/` only when a task explicitly overrides the destination with
 durable hook results, and `issues/open|closed/` to produce the PR /
 branch-push improvement guide artifact; it does not mutate skills, workflows,
 tools, or memory.
+For skill routing gaps, the guide treats the latest Git commit touching the
+affected skill source paths as the cutover point. Older hook JSONL remains
+append-only evidence, but pre-cutover skill signals are archived out of current
+gap calculations after a repair lands.
 `generate_agent_runtime_dashboard.py` is the read-only viewing entrypoint for
 that same evidence tree. It writes a Markdown dashboard showing the canonical
 log locations, hook namespaces, hook entry counts, skill usage, prompt routing
@@ -341,7 +345,12 @@ prompt/tool-selection evidence, token comparison coverage, human feedback
 labels, eval report families, and open/closed issue counts. The standalone
 AgentCanon GitHub Actions workflow publishes the dashboard to the workflow Step
 Summary and uploads it as an artifact; template and derived repositories do not
-publish their own runtime dashboard copies.
+publish their own runtime dashboard copies. Pass `--compact-out` to also write
+a token-light summary for agent log analysis. Agents should use that compact
+summary and its generated evidence drilldowns as the normal analysis input; if
+the summary lacks a needed detail, extend or rerun the dashboard tool for a more
+specific generated summary. Raw JSONL is reserved for tool implementation,
+schema debugging, or corruption audits with an explicit rationale.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules
@@ -573,7 +582,8 @@ For log visibility rather than repair guidance, use:
 ```bash
 python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   --root . \
-  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md
+  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md \
+  --compact-out reports/agent-runtime-dashboard/agent-runtime-compact.md
 ```
 
 The dashboard also includes local LLM and workflow-selection eval families when

@@ -357,7 +357,7 @@ entries:
       - tests/agent_tools/test_search_index.py
 
   - id: route
-    summary: Maps long proposed tool and skill names to short task-routing areas.
+    summary: Maps long proposed tool/skill names and broad prompts to short task-routing areas and public skill sets.
     path: tools/agent_tools/route.py
     family: agent_tools
     role: workflow
@@ -1254,7 +1254,7 @@ entries:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
 
   - id: generate-agent-runtime-dashboard
-    summary: Generates read-only dashboards for AgentCanon runtime logs and eval results.
+    summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
     path: tools/agent_tools/generate_agent_runtime_dashboard.py
     family: agent_tools
     role: docs

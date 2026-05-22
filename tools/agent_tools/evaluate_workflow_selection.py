@@ -66,7 +66,8 @@ class WorkflowSelectionResult:
 
     case: WorkflowSelectionCase
     observed_workflows: tuple[str, ...]
-    observed_skills: tuple[str, ...]
+    selected_skills: tuple[str, ...]
+    candidate_skills: tuple[str, ...]
     observed_tools: tuple[str, ...]
     missing_workflows: tuple[str, ...]
     forbidden_workflows_seen: tuple[str, ...]
@@ -183,12 +184,15 @@ def evaluate_case(logger: SkillUsageLoggerProtocol, case: WorkflowSelectionCase)
         {"hookEventName": "UserPromptSubmit", "prompt": case.prompt}
     )
     observed_workflows = tuple(signals.candidate_workflows)
-    observed_skills = tuple(signals.skills + signals.candidate_skills)
+    selected_skills = tuple(signals.skills)
+    candidate_skills = tuple(signals.candidate_skills)
+    observed_skills = tuple(dict.fromkeys(selected_skills + candidate_skills))
     observed_tools = tuple(signals.candidate_tools)
     return WorkflowSelectionResult(
         case=case,
         observed_workflows=observed_workflows,
-        observed_skills=observed_skills,
+        selected_skills=selected_skills,
+        candidate_skills=candidate_skills,
         observed_tools=observed_tools,
         missing_workflows=tuple(
             workflow for workflow in case.expected_workflows if workflow not in observed_workflows
@@ -208,6 +212,8 @@ def run_id_for(manifest: Path, results: tuple[WorkflowSelectionResult, ...]) -> 
         [
             manifest.as_posix(),
             *(f"{item.case.case_id}:{item.passed}:{item.observed_workflows}" for item in results),
+            *(f"{item.case.case_id}:selected:{item.selected_skills}" for item in results),
+            *(f"{item.case.case_id}:candidate:{item.candidate_skills}" for item in results),
             timestamp,
         ]
     )
@@ -249,8 +255,11 @@ def render_report(bundle: WorkflowSelectionBundle) -> str:
         f"WORKFLOW_SELECTION_EVAL_FAILED={bundle.failed_count}",
         f"manifest: `{bundle.manifest.relative_to(bundle.root).as_posix()}`",
         "",
-        "| case | status | expected workflows | observed workflows | missing | forbidden seen |",
-        "| --- | --- | --- | --- | --- | --- |",
+        (
+            "| case | status | expected workflows | observed workflows | selected skills | "
+            "candidate skills | missing | forbidden seen |"
+        ),
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for result in bundle.results:
         lines.append(
@@ -261,6 +270,8 @@ def render_report(bundle: WorkflowSelectionBundle) -> str:
                     "`pass`" if result.passed else "`fail`",
                     comma(result.case.expected_workflows),
                     comma(result.observed_workflows),
+                    comma(result.selected_skills),
+                    comma(result.candidate_skills),
                     comma(result.missing_workflows),
                     comma(result.forbidden_workflows_seen),
                 ]

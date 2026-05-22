@@ -81,6 +81,21 @@ contract listed in `documents/README.md`.
 - Template-default environment and runtime guidance live in `docker/`.
 - Repo-wide durable rules live in `documents/`.
 
+## Execution Priorities
+
+- 規定の実行 target は GPU です。CPU 実行は user request、環境制約、または task scope 上の明示理由がある場合だけ使い、その理由と影響を validation evidence に残します。
+- 数値的 test / experiment / benchmark の緑化は禁止です。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU fallback などで pass させる前に、code・数学仕様・文書 contract のどこを直すべきかを判定し、必要なら failure として残します。
+- すべての変更では、コードと文書それぞれの責務を第一に考えます。実行できることや説明できることだけで完了扱いにせず、実装 surface と document surface が担うべき責務、境界、読者への契約に合っているかを優先して確認します。
+
+## Default Search And Routing
+
+- AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
+- 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
+- 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
+- 通常の code / docs / routing 調査では、`agents/evals/results/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
+- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary と generated drilldown を生成して分析します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
+- 検索で見つけた既存 skill、tool、workflow を使わない場合は、run bundle、PR body、または作業 update に理由を残します。
+
 ## Runtime Profiles And Risk
 
 - Runtime surface が存在することと、その task で active であることを分けます。

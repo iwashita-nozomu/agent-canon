@@ -13,13 +13,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
+COMMIT_TIME_FORMAT = "%ct"
+GIT_LOG_TIMEOUT_SECONDS = 5
 MAX_HOOK_FAILURE_LINES = 20
 MAX_COUNTER_LINES = 20
+NO_RESET_EPOCH = -1
 CHECKER_TARGET_SUFFIXES = (
     ".c",
     ".cc",
@@ -43,6 +48,7 @@ OPTION_VALUE_FLAGS = {
     "--report-dir",
     "--root",
 }
+TRUSTED_SKILL_SOURCE_FIELDS = frozenset(("prompt", "last_assistant_message", "message"))
 
 
 @dataclass(frozen=True)
@@ -208,9 +214,16 @@ def is_code_checker_executable(token: str) -> bool:
 class HookEvidenceCounter:
     """Count hook statuses, tool results, skills, and checker surfaces."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        known_skills: frozenset[str] = frozenset(),
+        root: Path | None = None,
+    ) -> None:
         """Initialize empty counters."""
         self.state = HookCounterState.empty()
+        self.known_skills = known_skills
+        self.root = root
+        self.skill_reset_epochs: dict[str, int] = {}
 
     def add_line(self, path: Path, raw_line: str) -> None:
         """Add one hook JSONL line to the counters."""
@@ -292,6 +305,8 @@ class HookEvidenceCounter:
         if "observed_text_field_count" not in entry:
             self.state.quality["missing_observed_text_field_count"] += 1
         for skill in self.normalized_strings(entry.get("candidate_skills")):
+            if not self.skill_signal_in_active_window(skill, entry):
+                continue
             self.state.candidate_skills[skill] += 1
         for workflow in self.normalized_strings(entry.get("candidate_workflows")):
             self.state.candidate_workflows[workflow] += 1
@@ -299,14 +314,22 @@ class HookEvidenceCounter:
             self.state.candidate_tools[tool] += 1
         for label in self.normalized_strings(entry.get("feedback_labels")):
             self.state.feedback_labels[label] += 1
+        trusted_skill_source = self.trusted_skill_source(sources)
         for target in self.normalized_strings(entry.get("feedback_targets")):
-            self.state.feedback_targets[target] += 1
+            if self.countable_feedback_target(target, trusted_skill_source):
+                if not self.feedback_target_in_active_window(target, entry):
+                    continue
+                self.state.feedback_targets[target] += 1
         action = str(entry.get("feedback_action") or "")
         if action:
             self.state.feedback_actions[action] += 1
         if entry.get("prompt_feedback_detected") is True and not self.normalized_strings(entry.get("feedback_labels")):
             self.state.quality["feedback_detected_without_labels"] += 1
-        skills = self.normalized_strings(entry.get("skills"))
+        skills = tuple(
+            skill
+            for skill in self.normalized_strings(entry.get("skills"))
+            if self.countable_skill(skill, trusted_skill_source)
+        )
         candidate_seen = any(
             (
                 self.normalized_strings(entry.get("candidate_skills")),
@@ -319,6 +342,8 @@ class HookEvidenceCounter:
             self.state.quality["empty_skill_usage"] += 1
             return
         for skill in skills:
+            if not self.skill_signal_in_active_window(skill, entry):
+                continue
             self.state.skills[skill] += 1
             self.state.skill_events[f"{skill}@{event}"] += 1
         monitor_count = self.integer_value(entry.get("workflow_monitor_event_count"))
@@ -326,6 +351,67 @@ class HookEvidenceCounter:
             self.state.quality["skill_without_workflow_monitor_event"] += 1
         if not str(entry.get("workflow_monitor_report_dir") or ""):
             self.state.quality["missing_workflow_monitor_report_dir"] += 1
+
+    def trusted_skill_source(self, sources: tuple[str, ...]) -> bool:
+        """Return whether source fields are trusted for explicit skill ids."""
+        return not sources or any(source in TRUSTED_SKILL_SOURCE_FIELDS for source in sources)
+
+    def countable_feedback_target(self, target: str, trusted_skill_source: bool) -> bool:
+        """Return whether a feedback target should be counted as actionable."""
+        if target.startswith("skill:"):
+            skill = target.removeprefix("skill:")
+            if not trusted_skill_source:
+                self.state.quality["tool_input_skill_feedback_target_ignored"] += 1
+                return False
+            if self.known_skills and skill not in self.known_skills:
+                self.state.quality["noncanonical_skill_feedback_target_ignored"] += 1
+                self.state.quality[f"noncanonical_skill_feedback_target_ignored:{skill}"] += 1
+                return False
+        return True
+
+    def countable_skill(self, skill: str, trusted_skill_source: bool) -> bool:
+        """Return whether a skill id should be counted as an actual skill use."""
+        if not trusted_skill_source:
+            self.state.quality["tool_input_skill_usage_ignored"] += 1
+            self.state.quality[f"tool_input_skill_usage_ignored:{skill}"] += 1
+            return False
+        if self.known_skills and skill not in self.known_skills:
+            self.state.quality["noncanonical_skill_usage_ignored"] += 1
+            self.state.quality[f"noncanonical_skill_usage_ignored:{skill}"] += 1
+            return False
+        return True
+
+    def feedback_target_in_active_window(
+        self,
+        target: str,
+        entry: dict[str, object],
+    ) -> bool:
+        """Return whether a feedback target belongs to the current skill-analysis window."""
+        if not target.startswith("skill:"):
+            return True
+        return self.skill_signal_in_active_window(target.removeprefix("skill:"), entry)
+
+    def skill_signal_in_active_window(self, skill: str, entry: dict[str, object]) -> bool:
+        """Return whether one skill signal is not archived by a source-path cutover."""
+        reset_epoch = self.skill_reset_epoch(skill)
+        entry_epoch = hook_entry_epoch(entry)
+        if (
+            reset_epoch == NO_RESET_EPOCH
+            or entry_epoch == NO_RESET_EPOCH
+            or entry_epoch >= reset_epoch
+        ):
+            return True
+        self.state.quality["skill_routing_signal_before_cutover_ignored"] += 1
+        self.state.quality[f"skill_routing_signal_before_cutover_ignored:{skill}"] += 1
+        return False
+
+    def skill_reset_epoch(self, skill: str) -> int:
+        """Return the latest source-path commit epoch for one skill."""
+        if skill in self.skill_reset_epochs:
+            return self.skill_reset_epochs[skill]
+        epoch = latest_skill_source_epoch(self.root, skill)
+        self.skill_reset_epochs[skill] = epoch
+        return epoch
 
     def add_checker_targets(self, entry: dict[str, object]) -> None:
         """Record files checked by code-checker hook commands."""
@@ -437,7 +523,7 @@ class AgentImprovementGuide:
 
     def hook_counts(self) -> HookEvidenceCounts:
         """Return hook counters."""
-        counter = HookEvidenceCounter()
+        counter = HookEvidenceCounter(known_skill_ids(self.root), root=self.root)
         for path in self.hook_result_paths():
             for raw_line in path.read_text(encoding="utf-8").splitlines():
                 counter.add_line(path, raw_line)
@@ -506,6 +592,7 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     """Return all detailed guide sections after the summary."""
     sections: list[str] = []
     sections.extend(named_section("Improvement Guidance", guidance(summary)))
+    sections.extend(named_section("Skill Routing Gaps", skill_routing_gap_lines(summary.hook_counts)))
     sections.extend(named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills)))
     sections.extend(named_section("Prompt Candidate Skills", counter_lines(summary.hook_counts.candidate_skills)))
     sections.extend(named_section("Prompt Candidate Workflows", counter_lines(summary.hook_counts.candidate_workflows)))
@@ -577,6 +664,81 @@ def is_agentcanon_root(root: Path) -> bool:
     )
 
 
+def known_skill_ids(root: Path) -> frozenset[str]:
+    """Return AgentCanon-owned skill ids from shim and human docs."""
+    skills: set[str] = set()
+    for path in (root / ".agents" / "skills").glob("*/SKILL.md"):
+        skills.add(path.parent.name)
+    for path in (root / "agents" / "skills").glob("*.md"):
+        if path.name != "README.md":
+            skills.add(path.stem)
+    return frozenset(skills)
+
+
+def hook_entry_epoch(entry: dict[str, object]) -> int:
+    """Return UTC epoch seconds parsed from one hook timestamp."""
+    timestamp = entry.get("timestamp")
+    if not isinstance(timestamp, str) or not timestamp:
+        return NO_RESET_EPOCH
+    normalized = timestamp.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return NO_RESET_EPOCH
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())
+
+
+def latest_skill_source_epoch(root: Path | None, skill: str) -> int:
+    """Return latest Git commit epoch for source paths that define one skill."""
+    if root is None:
+        return NO_RESET_EPOCH
+    paths = [
+        path.as_posix()
+        for path in skill_source_path_candidates(skill)
+        if (root / path).exists()
+    ]
+    if not paths:
+        return NO_RESET_EPOCH
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                root.as_posix(),
+                "log",
+                "-1",
+                f"--format={COMMIT_TIME_FORMAT}",
+                "--",
+                *paths,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_LOG_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return NO_RESET_EPOCH
+    output = result.stdout.strip()
+    if result.returncode != 0 or not output:
+        return NO_RESET_EPOCH
+    try:
+        return int(output.splitlines()[0])
+    except ValueError:
+        return NO_RESET_EPOCH
+
+
+def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
+    """Return likely source paths that define one skill id."""
+    slug = skill.removeprefix("$")
+    return (
+        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path("agents") / "skills" / f"{slug}.md",
+        Path(".claude") / "skills" / slug / "SKILL.md",
+    )
+
+
 def guidance(summary: EvidenceSummary) -> list[str]:
     """Return actionable guidance lines."""
     lines: list[str] = []
@@ -595,6 +757,10 @@ def guidance(summary: EvidenceSummary) -> list[str]:
     if summary.hook_counts.checker_targets:
         lines.append(
             "- Review repeated code-checker target files and decide whether the tool, skill, or target code owns the repair."
+        )
+    if skill_routing_gap_lines(summary.hook_counts) != ["- none"]:
+        lines.append(
+            "- Repair skill-selection routing for skills with high candidate or feedback pressure but low selected-skill evidence."
         )
     if summary.hook_counts.quality:
         lines.append(
@@ -632,6 +798,40 @@ def counter_lines(counter: Counter[str]) -> list[str]:
     return [
         f"- `{name}`: `{count}`"
         for name, count in counter.most_common(MAX_COUNTER_LINES)
+    ]
+
+
+def skill_feedback_counts(feedback_targets: Counter[str]) -> Counter[str]:
+    """Return feedback target counts keyed by skill id."""
+    counts: Counter[str] = Counter()
+    for target, count in feedback_targets.items():
+        if target.startswith("skill:"):
+            counts[target.removeprefix("skill:")] += count
+    return counts
+
+
+def skill_routing_gap_lines(counts: HookEvidenceCounts) -> list[str]:
+    """Return bullets for skills whose candidate/feedback pressure exceeds selection."""
+    feedback = skill_feedback_counts(counts.feedback_targets)
+    rows: list[tuple[int, str, int, int, int]] = []
+    for skill in set(counts.candidate_skills) | set(feedback) | set(counts.skills):
+        selected = counts.skills[skill]
+        candidate = counts.candidate_skills[skill]
+        feedback_count = feedback[skill]
+        pressure = candidate + feedback_count
+        gap = max(pressure - selected, 0)
+        if gap:
+            rows.append((gap, skill, selected, candidate, feedback_count))
+    if not rows:
+        return ["- none"]
+    return [
+        (
+            f"- `{skill}`: gap=`{gap}` selected=`{selected}` "
+            f"candidate=`{candidate}` feedback=`{feedback_count}`"
+        )
+        for gap, skill, selected, candidate, feedback_count in sorted(rows, reverse=True)[
+            :MAX_COUNTER_LINES
+        ]
     ]
 
 

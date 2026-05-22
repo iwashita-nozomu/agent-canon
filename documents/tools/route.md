@@ -17,6 +17,7 @@ small command surface:
 ```bash
 python3 tools/agent_tools/route.py --area checks --changed README.md
 python3 tools/agent_tools/route.py --name profile_surface_resolver.py
+python3 tools/agent_tools/route.py --prompt "fix skill routing with multi-agent evidence" --format json
 python3 tools/agent_tools/route.py --list --format markdown
 ```
 
@@ -30,6 +31,12 @@ SKILL=task-routing
 NEXT_ACTION=run_selected_checks
 COMMANDS=make check-matrix
 ```
+
+Prompt routing output returns the minimal public skill set for a task-shaped
+request. It always starts with `$agent-orchestration`, adds
+`$codex-task-workflow` for repo-changing prompts, and then appends matched
+task-shape skills such as `$result-artifact-writeout`, `$agent-learning`, or
+`$oop-readability-check`.
 
 Use this tool when a task needs a short answer to "which profile, check,
 runtime, skill, or closeout path applies?" Use the specialized checker or

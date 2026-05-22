@@ -33,13 +33,101 @@ WORKFLOW_FIELD_RE = re.compile(
     r"tool_preflight_required|mcp_inventory_required)=|$)"
 )
 SKILL_ID_RE = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+IGNORED_SKILL_IDS = frozenset(("skill-name",))
+KNOWN_SKILL_IDS = frozenset(
+    (
+        "academic-writing",
+        "adaptive-improvement-loop",
+        "agent-learning",
+        "agent-orchestration",
+        "agent-update-branch",
+        "behavior-preserving-refactor",
+        "change-review",
+        "codex-task-workflow",
+        "comprehensive-development",
+        "cpp-review",
+        "dependency-analysis",
+        "document-canon-cleanup",
+        "empirical-prompt-tuning",
+        "environment-maintenance",
+        "experiment-lifecycle",
+        "imagegen",
+        "literature-survey",
+        "long-form-writing",
+        "md-style-check",
+        "openai-docs",
+        "oop-readability-check",
+        "paper-writing",
+        "plugin-creator",
+        "python-review",
+        "repo-onboarding",
+        "report-writing",
+        "research-workflow",
+        "result-artifact-writeout",
+        "skill-creator",
+        "skill-installer",
+        "start-repository",
+        "subagent-bootstrap",
+        "task-routing",
+        "test-design",
+        "user-preference-sync",
+        "worktree-health",
+        "worktree-start",
+    )
+)
 GIT_ROOT_TIMEOUT_SECONDS = 5
-SKILL_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "agent-learning": ("人間からのフィードバック", "feedback", "runtime feedback", "学習"),
-    "agent-orchestration": ("どのスキル", "どのskill", "workflow=", "routing", "フロー"),
-    "md-style-check": ("markdown", "マークダウン", "md-style", "docs-check", "markdownlint"),
-    "result-artifact-writeout": ("結果書き出し", "結果を書き出", "result writeout", "artifact"),
-    "oop-readability-check": ("oop", "readability", "オブジェクト指向"),
+SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "agent-learning": (
+        ("人間からのフィードバック",),
+        ("runtime feedback",),
+        ("再発防止",),
+        ("こういう止まり方",),
+        ("フィードバック", "修正"),
+        ("feedback", "repair"),
+        ("memory", "feedback"),
+        ("学習", "agent"),
+    ),
+    "agent-orchestration": (
+        ("どのスキル",),
+        ("どのskill",),
+        ("スキル選択",),
+        ("skill selection",),
+        ("routing", "skill"),
+        ("ルーティング", "スキル"),
+        ("マルチエージェント",),
+        ("サブエージェント", "起動"),
+        ("subagent", "routing"),
+        ("workflow=", "skills="),
+    ),
+    "md-style-check": (
+        ("md-style",),
+        ("docs-check",),
+        ("markdownlint",),
+        ("markdown", "lint"),
+        ("markdown", "heading"),
+        ("markdown", "link"),
+        ("マークダウン", "体裁"),
+        ("マークダウン", "リンク"),
+    ),
+    "result-artifact-writeout": (
+        ("結果書き出し",),
+        ("結果を書き出",),
+        ("result writeout",),
+        ("artifact", "evidence"),
+        ("artifact", "report"),
+        ("run bundle", "evidence"),
+        ("蓄積分析", "レポート"),
+        ("ログ", "レポート", "残"),
+    ),
+    "oop-readability-check": (
+        ("oop", "readability"),
+        ("oop", "可読"),
+        ("オブジェクト指向", "可読"),
+        ("readability", "guard"),
+        ("readability", "check"),
+        ("可読性", "class"),
+        ("可読性", "method"),
+    ),
 }
 WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "adaptive-improvement-loop": ("goal.md", "next_action", "backlog", "iteration", "改善ループ"),
@@ -68,6 +156,7 @@ SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
     "resume_agent": "resume",
 }
 PROMPT_EXCERPT_LIMIT = 600
+PROMPT_FINGERPRINT_HEX_LENGTH = 16
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
@@ -79,6 +168,8 @@ FEEDBACK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "repair_request": ("直して", "修正", "改善", "見直", "組み込み", "入れたい"),
     "missing_mechanism": ("機構", "仕組み", "メカニズム", "ログに積む"),
 }
+SKILL_TEXT_FIELDS = ("prompt", "last_assistant_message", "message")
+TOOL_CANDIDATE_TEXT_FIELDS = (*SKILL_TEXT_FIELDS, "tool_input")
 
 
 @dataclass(frozen=True)
@@ -230,7 +321,18 @@ def text_values(value: object) -> list[str]:
     return []
 
 
-def extract_skill_ids(text: str) -> set[str]:
+def known_skill_id_mentioned(text: str, skill: str) -> bool:
+    """Return whether prompt text explicitly names one known public skill id."""
+    return (
+        re.search(
+            rf"(?<![A-Za-z0-9_-]){re.escape(skill)}(?![A-Za-z0-9_-])",
+            text.lower(),
+        )
+        is not None
+    )
+
+
+def extract_skill_ids(text: str, *, include_plain_names: bool = False) -> set[str]:
     """Extract normalized skill ids from one text payload."""
     skills = {match.group(1).strip("-_") for match in SKILL_TOKEN_RE.finditer(text)}
     for match in SKILLS_FIELD_RE.finditer(text):
@@ -240,7 +342,17 @@ def extract_skill_ids(text: str) -> set[str]:
             value = value.removeprefix("$").strip("-_")
             if value and value != "-":
                 skills.add(value)
-    return {skill for skill in skills if SKILL_ID_RE.fullmatch(skill)}
+    if include_plain_names:
+        for skill in KNOWN_SKILL_IDS:
+            if known_skill_id_mentioned(text, skill):
+                skills.add(skill)
+    return {
+        skill
+        for skill in skills
+        if SKILL_ID_RE.fullmatch(skill)
+        and skill not in IGNORED_SKILL_IDS
+        and skill in KNOWN_SKILL_IDS
+    }
 
 
 def clean_routing_value(value: str) -> str:
@@ -259,13 +371,23 @@ def extract_workflow_names(text: str) -> set[str]:
     return workflows
 
 
-def observed_text(payload: dict[str, object]) -> list[str]:
-    """Return hook payload text fields relevant for skill-use discovery."""
+def observed_text_for_fields(payload: dict[str, object], fields: tuple[str, ...]) -> list[str]:
+    """Return hook payload text fields from selected payload keys."""
     texts: list[str] = []
-    for key in ("prompt", "last_assistant_message", "message", "tool_input"):
+    for key in fields:
         if key in payload:
             texts.extend(text_values(payload[key]))
     return texts
+
+
+def observed_text(payload: dict[str, object]) -> list[str]:
+    """Return hook payload text fields relevant for general evidence discovery."""
+    return observed_text_for_fields(payload, TOOL_CANDIDATE_TEXT_FIELDS)
+
+
+def observed_skill_text(payload: dict[str, object]) -> list[str]:
+    """Return text fields trusted for explicit skill and workflow declarations."""
+    return observed_text_for_fields(payload, SKILL_TEXT_FIELDS)
 
 
 def prompt_text(payload: dict[str, object]) -> str:
@@ -284,7 +406,7 @@ def prompt_capture(payload: dict[str, object]) -> PromptCapture:
     return PromptCapture(
         status="present",
         excerpt_redacted=excerpt,
-        fingerprint=sha256(text.encode("utf-8")).hexdigest()[:16],
+        fingerprint=sha256(text.encode("utf-8")).hexdigest()[:PROMPT_FINGERPRINT_HEX_LENGTH],
         char_count=len(text),
         truncated=len(redacted) > PROMPT_EXCERPT_LIMIT,
     )
@@ -310,15 +432,16 @@ def observed_text_sources(payload: dict[str, object]) -> list[str]:
 def observed_skills(payload: dict[str, object]) -> list[str]:
     """Return sorted unique skill ids observed in a hook payload."""
     skills: set[str] = set()
-    for text in observed_text(payload):
-        skills.update(extract_skill_ids(text))
+    for key in SKILL_TEXT_FIELDS:
+        for text in text_values(payload.get(key)):
+            skills.update(extract_skill_ids(text, include_plain_names=key == "prompt"))
     return sorted(skills)
 
 
 def observed_workflows(payload: dict[str, object]) -> list[str]:
     """Return sorted unique declared workflow names observed in a hook payload."""
     workflows: set[str] = set()
-    for text in observed_text(payload):
+    for text in observed_skill_text(payload):
         workflows.update(extract_workflow_names(text))
     return sorted(workflows)
 
@@ -333,6 +456,19 @@ def keyword_matches(texts: list[str], mapping: dict[str, tuple[str, ...]]) -> tu
     )
 
 
+def grouped_keyword_matches(
+    texts: list[str],
+    mapping: dict[str, tuple[tuple[str, ...], ...]],
+) -> tuple[str, ...]:
+    """Return keys whose keyword groups all appear in observed prompt text."""
+    haystack = "\n".join(texts).lower()
+    return tuple(
+        key
+        for key, groups in sorted(mapping.items())
+        if any(all(needle.lower() in haystack for needle in group) for group in groups)
+    )
+
+
 def feedback_action(labels: tuple[str, ...]) -> str:
     """Return the workflow-monitor action for observed human feedback."""
     if not labels:
@@ -344,14 +480,20 @@ def feedback_action(labels: tuple[str, ...]) -> str:
 
 def prompt_intake_signals(payload: dict[str, object]) -> PromptIntakeSignals:
     """Classify prompt text into explicit and candidate routing signals."""
-    texts = observed_text(payload)
-    labels = keyword_matches(texts, FEEDBACK_KEYWORDS)
+    skill_texts = observed_skill_text(payload)
+    candidate_texts = observed_text(payload)
+    skills = tuple(observed_skills(payload))
+    labels = keyword_matches(skill_texts, FEEDBACK_KEYWORDS)
+    candidate_skills = tuple(
+        skill for skill in grouped_keyword_matches(skill_texts, SKILL_KEYWORD_GROUPS)
+        if skill not in skills
+    )
     return PromptIntakeSignals(
-        skills=tuple(observed_skills(payload)),
+        skills=skills,
         selected_workflows=tuple(observed_workflows(payload)),
-        candidate_skills=keyword_matches(texts, SKILL_KEYWORDS),
-        candidate_workflows=keyword_matches(texts, WORKFLOW_KEYWORDS),
-        candidate_tools=keyword_matches(texts, TOOL_KEYWORDS),
+        candidate_skills=candidate_skills,
+        candidate_workflows=keyword_matches(skill_texts, WORKFLOW_KEYWORDS),
+        candidate_tools=keyword_matches(candidate_texts, TOOL_KEYWORDS),
         feedback_labels=labels,
         feedback_action=feedback_action(labels),
     )
@@ -430,7 +572,11 @@ def subagent_selection(payload: dict[str, object]) -> SubagentSelection:
         model=string_input_field(tool_input, "model"),
         reasoning_effort=string_input_field(tool_input, "reasoning_effort"),
         fork_context=tool_input.get("fork_context") is True,
-        prompt_fingerprint=sha256(prompt.encode("utf-8")).hexdigest()[:16] if prompt else "",
+        prompt_fingerprint=(
+            sha256(prompt.encode("utf-8")).hexdigest()[:PROMPT_FINGERPRINT_HEX_LENGTH]
+            if prompt
+            else ""
+        ),
         prompt_char_count=len(prompt),
         item_count=len(tool_input.get("items")) if isinstance(tool_input.get("items"), list) else 0,
     )
@@ -493,6 +639,25 @@ def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> 
                 report_dir,
                 "--behavior-event",
                 f"skill_invocation=${skill} status=observed source=codex_hook",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_ROOT_TIMEOUT_SECONDS,
+        )
+        if result.returncode == 0:
+            skill_event_count += 1
+    for skill in signals.candidate_skills:
+        if skill in signals.skills:
+            continue
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(monitor),
+                "--report-dir",
+                report_dir,
+                "--behavior-event",
+                f"skill_candidate=${skill} status=observed source=codex_hook",
             ],
             check=False,
             capture_output=True,

@@ -65,6 +65,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         self.assertEqual(len(reports), 1)
         self.assertIn("WORKFLOW_SELECTION_EVAL_RUN_ID=", report_text)
         self.assertIn("environment-maintenance-container-ci", report_text)
+        self.assertIn("selected skills", report_text)
+        self.assertIn("candidate skills", report_text)
         self.assertNotIn("Docker devcontainer GitHub Actions", report_text)
 
     def test_missing_expected_workflow_fails(self) -> None:
