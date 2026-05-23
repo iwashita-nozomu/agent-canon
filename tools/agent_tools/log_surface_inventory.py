@@ -21,6 +21,7 @@ from typing import Literal, cast
 
 SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]
+FieldIdentity = tuple[str, SurfaceKind, str, str, Certainty]
 
 DEFAULT_BASELINE = Path("documents") / "log-surface-inventory.json"
 KEY_VALUE_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*)=")
@@ -571,11 +572,29 @@ def parse_certainty(value: object) -> Certainty:
 
 def diff_inventory(current: Inventory, baseline: Inventory) -> BaselineDiff:
     """Return records added and removed relative to a baseline."""
-    current_records = set(current.records)
-    baseline_records = set(baseline.records)
+    current_records = records_by_identity(current.records)
+    baseline_records = records_by_identity(baseline.records)
+    current_keys = set(current_records)
+    baseline_keys = set(baseline_records)
     return BaselineDiff(
-        added=tuple(sorted(current_records - baseline_records)),
-        removed=tuple(sorted(baseline_records - current_records)),
+        added=tuple(sorted(current_records[key] for key in current_keys - baseline_keys)),
+        removed=tuple(sorted(baseline_records[key] for key in baseline_keys - current_keys)),
+    )
+
+
+def records_by_identity(records: tuple[FieldRecord, ...]) -> dict[FieldIdentity, FieldRecord]:
+    """Return records keyed by emitted field identity, ignoring line-only movement."""
+    return {record_identity(record): record for record in records}
+
+
+def record_identity(record: FieldRecord) -> FieldIdentity:
+    """Return the stable field identity used for drift detection."""
+    return (
+        record.path,
+        record.surface,
+        record.emitter,
+        record.field,
+        record.certainty,
     )
 
 

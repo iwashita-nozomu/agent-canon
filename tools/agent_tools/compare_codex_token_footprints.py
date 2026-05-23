@@ -11,13 +11,17 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from workflow_monitor import append_monitoring
 
 TARGET_RATIO = 0.5
+DEFAULT_MOVING_AVERAGE_WINDOW = 5
 
 
 @dataclass(frozen=True)
@@ -30,26 +34,40 @@ class TokenFootprint:
     output_tokens: int
     reasoning_output_tokens: int
     total_tokens: int
+    token_event_count: int
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
-        description="Compare two Codex session token footprints."
+        description="Compare or summarize Codex session token footprints."
     )
     parser.add_argument(
         "--baseline-session",
-        required=True,
         help="Baseline Codex session JSONL file.",
     )
     parser.add_argument(
         "--candidate-session",
-        required=True,
         help="Candidate Codex session JSONL file.",
     )
     parser.add_argument(
+        "--session-glob",
+        action="append",
+        default=[],
+        help=(
+            "Session JSONL glob for summary mode. May be repeated. "
+            "When set, the tool emits token usage moving-average evidence."
+        ),
+    )
+    parser.add_argument(
+        "--moving-average-window",
+        type=int,
+        default=DEFAULT_MOVING_AVERAGE_WINDOW,
+        help="Session window size for token summary moving averages.",
+    )
+    parser.add_argument(
         "--report-out",
-        help="Optional Markdown report path for the comparison.",
+        help="Optional Markdown report path for the comparison or summary.",
     )
     parser.add_argument(
         "--report-dir",
@@ -63,34 +81,60 @@ def parse_token_usage(session_file: Path) -> TokenFootprint:
     if not session_file.is_file():
         raise FileNotFoundError(session_file)
     last: dict[str, int] | None = None
+    token_event_count = 0
     for raw_line in session_file.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        event = json.loads(line)
+        loaded: object = json.loads(line)
+        event = object_mapping(loaded)
+        if event is None:
+            continue
         if event.get("type") != "event_msg":
             continue
-        payload = event.get("payload")
-        if not isinstance(payload, dict) or payload.get("type") != "token_count":
+        payload = object_mapping(event.get("payload"))
+        if payload is None or payload.get("type") != "token_count":
             continue
-        info = payload.get("info")
-        if not isinstance(info, dict):
+        info = object_mapping(payload.get("info"))
+        if info is None:
             continue
-        total_usage = info.get("total_token_usage")
-        if not isinstance(total_usage, dict):
+        total_usage = object_mapping(info.get("total_token_usage"))
+        if total_usage is None:
             continue
+        token_event_count += 1
         last = {
-            "input_tokens": int(total_usage.get("input_tokens", 0)),
-            "cached_input_tokens": int(total_usage.get("cached_input_tokens", 0)),
-            "output_tokens": int(total_usage.get("output_tokens", 0)),
+            "input_tokens": token_int(total_usage, "input_tokens"),
+            "cached_input_tokens": token_int(total_usage, "cached_input_tokens"),
+            "output_tokens": token_int(total_usage, "output_tokens"),
             "reasoning_output_tokens": int(
-                total_usage.get("reasoning_output_tokens", 0)
+                token_int(total_usage, "reasoning_output_tokens")
             ),
-            "total_tokens": int(total_usage.get("total_tokens", 0)),
+            "total_tokens": token_int(total_usage, "total_tokens"),
         }
     if last is None:
         raise ValueError(f"no token_count event found in {session_file}")
-    return TokenFootprint(session_file=session_file, **last)
+    return TokenFootprint(
+        session_file=session_file,
+        token_event_count=token_event_count,
+        **last,
+    )
+
+
+def object_mapping(value: object) -> Mapping[str, object] | None:
+    """Return a string-key mapping when decoded JSON has object shape."""
+    if not isinstance(value, dict):
+        return None
+    return cast(Mapping[str, object], value)
+
+
+def token_int(mapping: Mapping[str, object], key: str) -> int:
+    """Return an integer token field from a decoded JSON object."""
+    value = mapping.get(key)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return 0
 
 
 def ratio(candidate: TokenFootprint, baseline: TokenFootprint) -> float:
@@ -152,6 +196,114 @@ def row(label: str, footprint: TokenFootprint) -> str:
     )
 
 
+def session_glob_paths(patterns: Sequence[str]) -> tuple[Path, ...]:
+    """Return deterministic session paths from one or more glob patterns."""
+    paths: set[Path] = set()
+    for pattern in patterns:
+        paths.update(Path(path).resolve() for path in glob.glob(pattern) if Path(path).is_file())
+    return tuple(sorted(paths, key=lambda path: path.as_posix()))
+
+
+def read_session_globs(patterns: Sequence[str]) -> tuple[TokenFootprint, ...]:
+    """Return token footprints for all parseable sessions in the requested globs."""
+    footprints: list[TokenFootprint] = []
+    for path in session_glob_paths(patterns):
+        try:
+            footprints.append(parse_token_usage(path))
+        except ValueError:
+            continue
+    if not footprints:
+        raise ValueError("no session files with token_count events matched --session-glob")
+    return tuple(footprints)
+
+
+def moving_average(values: Sequence[int], window: int) -> tuple[float, ...]:
+    """Return rolling averages over positive-width windows."""
+    width = max(1, window)
+    averages: list[float] = []
+    for index in range(len(values)):
+        start = max(0, index - width + 1)
+        segment = values[start : index + 1]
+        averages.append(sum(segment) / len(segment))
+    return tuple(averages)
+
+
+def token_total(footprints: Sequence[TokenFootprint]) -> int:
+    """Return total tokens across sessions."""
+    return sum(footprint.total_tokens for footprint in footprints)
+
+
+def token_event_total(footprints: Sequence[TokenFootprint]) -> int:
+    """Return token_count event count across sessions."""
+    return sum(footprint.token_event_count for footprint in footprints)
+
+
+def tokens_per_event(footprints: Sequence[TokenFootprint]) -> float:
+    """Return the average total-token footprint per token_count event."""
+    events = token_event_total(footprints)
+    if events <= 0:
+        return 0.0
+    return token_total(footprints) / events
+
+
+def latest_moving_average(footprints: Sequence[TokenFootprint], window: int) -> float:
+    """Return the latest rolling average for session total tokens."""
+    values = [footprint.total_tokens for footprint in footprints]
+    return moving_average(values, window)[-1]
+
+
+def render_summary_report(footprints: Sequence[TokenFootprint], window: int) -> str:
+    """Render a Markdown token usage summary with moving averages."""
+    averages = moving_average([footprint.total_tokens for footprint in footprints], window)
+    lines = [
+        "# Codex Token Usage Summary",
+        "<!--",
+        "@dependency-start",
+        "responsibility Records Codex token usage moving-average evidence.",
+        "upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py generates this report",
+        "@dependency-end",
+        "-->",
+        "",
+        "## Summary",
+        "",
+        "- token_usage_summary_status: present",
+        f"- token_session_count: {len(footprints)}",
+        f"- token_event_count: {token_event_total(footprints)}",
+        f"- total_tokens: {token_total(footprints)}",
+        f"- average_tokens_per_event: {tokens_per_event(footprints):.3f}",
+        f"- moving_average_window: {max(1, window)}",
+        f"- latest_moving_average_total_tokens: {latest_moving_average(footprints, window):.3f}",
+        "",
+        "## Sessions",
+        "",
+        "| Session File | token events | input | cached input | output | reasoning output | total | moving average total |",
+        "| ------------ | ------------ | ----- | ------------ | ------ | ---------------- | ----- | -------------------- |",
+    ]
+    for footprint, average in zip(footprints, averages, strict=True):
+        lines.append(
+            f"| {footprint.session_file} | {footprint.token_event_count} | "
+            f"{footprint.input_tokens} | {footprint.cached_input_tokens} | "
+            f"{footprint.output_tokens} | {footprint.reasoning_output_tokens} | "
+            f"{footprint.total_tokens} | {average:.3f} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Machine Status",
+            "",
+            "- TOKEN_USAGE_SUMMARY=pass",
+            f"- TOKEN_USAGE_SESSION_COUNT={len(footprints)}",
+            f"- TOKEN_USAGE_TOKEN_EVENT_COUNT={token_event_total(footprints)}",
+            f"- TOKEN_USAGE_TOTAL_TOKENS={token_total(footprints)}",
+            f"- TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT={tokens_per_event(footprints):.3f}",
+            f"- TOKEN_USAGE_MOVING_AVERAGE_WINDOW={max(1, window)}",
+            f"- TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL={latest_moving_average(footprints, window):.3f}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def print_machine_status(baseline: TokenFootprint, candidate: TokenFootprint) -> None:
     """Print grep-friendly status lines."""
     value = ratio(candidate, baseline)
@@ -197,9 +349,65 @@ def append_report_dir(report_dir: Path, baseline: TokenFootprint, candidate: Tok
     )
 
 
+def append_summary_report_dir(
+    report_dir: Path,
+    footprints: Sequence[TokenFootprint],
+    window: int,
+) -> None:
+    """Append token moving-average evidence to one run bundle."""
+    append_monitoring(
+        report_dir,
+        behavior_events=[
+            (
+                "token_usage_summary=present "
+                f"session_count={len(footprints)} "
+                f"token_event_count={token_event_total(footprints)} "
+                f"total_tokens={token_total(footprints)} "
+                f"moving_average_window={max(1, window)} "
+                f"latest_moving_average_total={latest_moving_average(footprints, window):.3f} "
+                f"average_tokens_per_event={tokens_per_event(footprints):.3f}"
+            ),
+        ],
+        interventions=[
+            "token usage moving average measured from Codex session logs",
+        ],
+    )
+
+
+def print_summary_status(footprints: Sequence[TokenFootprint], window: int) -> None:
+    """Print grep-friendly token summary status lines."""
+    print("TOKEN_USAGE_SUMMARY=pass")
+    print(f"TOKEN_USAGE_SESSION_COUNT={len(footprints)}")
+    print(f"TOKEN_USAGE_TOKEN_EVENT_COUNT={token_event_total(footprints)}")
+    print(f"TOKEN_USAGE_TOTAL_TOKENS={token_total(footprints)}")
+    print(f"TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT={tokens_per_event(footprints):.3f}")
+    print(f"TOKEN_USAGE_MOVING_AVERAGE_WINDOW={max(1, window)}")
+    print(f"TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL={latest_moving_average(footprints, window):.3f}")
+    print("NEXT_ACTION=record_token_usage_summary")
+
+
 def main() -> int:
     """Run the token comparison CLI."""
     args = build_parser().parse_args()
+    if args.session_glob:
+        footprints = read_session_globs(tuple(str(pattern) for pattern in args.session_glob))
+        if args.report_out:
+            report_path = Path(str(args.report_out))
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(
+                render_summary_report(footprints, args.moving_average_window),
+                encoding="utf-8",
+            )
+        if args.report_dir:
+            append_summary_report_dir(
+                Path(str(args.report_dir)).resolve(),
+                footprints,
+                args.moving_average_window,
+            )
+        print_summary_status(footprints, args.moving_average_window)
+        return 0
+    if not args.baseline_session or not args.candidate_session:
+        raise SystemExit("--baseline-session and --candidate-session are required unless --session-glob is set")
     baseline = parse_token_usage(Path(str(args.baseline_session)).resolve())
     candidate = parse_token_usage(Path(str(args.candidate_session)).resolve())
     if args.report_out:

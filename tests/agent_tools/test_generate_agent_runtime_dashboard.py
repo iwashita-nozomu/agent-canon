@@ -76,7 +76,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "### Token Consumption Drilldown",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "| `comparison_count` | `1` |",
-            "| `missing_namespaces` | `test-container=5` |",
+            "| `missing_namespaces` | `test-container=3` |",
             "| `missing_urls` | `https://example.com/paper.pdf=1` |",
             "| `registered_urls` | `https://example.com/reference.html=1` |",
             "Do not read raw JSONL during normal agent log analysis.",
@@ -94,15 +94,11 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify glanceable problem component rows."""
         required = (
             "## Problem Components",
-            "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=7",
+            "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=6",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
-            "`5 hook entries lack workflow attribution` | "
+            "`3 hook entries lack workflow attribution` | "
             "`compact report Workflow Attribution Drilldown` | "
             "`repair workflow attribution logging` |",
-            "| `tool` | `run_docs_checks.sh` | `attention` | "
-            "`1 candidate miss(es); miss rate 100.0%` | "
-            "`compact report Selection Evidence Drilldown` | "
-            "`repair tool selection or logging` |",
             "| `hook` | `reference_capture_guard` | `attention` | "
             "`1 referenced URLs are unregistered` | "
             "`compact report Reference Capture Drilldown` | "
@@ -149,7 +145,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",
             "| `environment-maintenance@UserPromptSubmit` | `1` |",
-            "hook_entries_missing_workflow_attribution: `5`",
+            "hook_entries_missing_workflow_attribution: `3`",
+            "hook_entries_context_attributed: `2`",
             "## Token Consumption Evidence",
             "token_comparison_status: `present`",
             "average_token_ratio: `0.500`",
@@ -161,16 +158,18 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify routing selection, prompt, and Markdown evidence sections."""
         required = (
             "## Selection Accuracy By Responsibility",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=6",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=4",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES=3",
-            "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES=3",
-            "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE=100.0%",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS=7",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED=6",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES=4",
+            "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES=2",
+            "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE=50.0%",
             "## Prompt And Tool Selection Evidence",
             "prompt_entries: `1`",
             "tool_selection_entries: `2`",
             "| `Bash` | `2` |",
             "| `python3` | `1` |",
+            "### Selected Repo Tools",
+            "| `run_docs_checks.sh` | `1` |",
             "## Markdown Docs Hook Signals",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1",
@@ -187,10 +186,12 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         rows = (
             "| `skill` | `md-style-check` | `0` | `1` | `1` | "
             "`100.0%` | `untracked-or-unknown` |",
+            "| `skill` | `oop-readability-check` | `1` | `1` | `0` | "
+            "`0.0%` | `untracked-or-unknown` |",
             "| `workflow` | `environment-maintenance` | `0` | `1` | `1` | "
             "`100.0%` | `untracked-or-unknown` |",
-            "| `tool` | `run_docs_checks.sh` | `0` | `1` | `1` | "
-            "`100.0%` | `untracked-or-unknown` |",
+            "| `tool` | `run_docs_checks.sh` | `1` | `1` | `0` | "
+            "`0.0%` | `untracked-or-unknown` |",
         )
         for row in rows:
             self.assertIn(row, dashboard)
@@ -354,7 +355,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "payload_fingerprint": "payload-b",
                     "skills": ["agent-orchestration"],
                     "candidate_workflows": ["environment-maintenance"],
-                    "candidate_skills": ["md-style-check"],
+                    "candidate_skills": ["md-style-check", "oop-readability-check"],
                     "candidate_tools": ["run_docs_checks.sh"],
                     "feedback_labels": ["quality_gap"],
                     "prompt_capture_status": "present",
@@ -394,6 +395,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "tool_name": "Bash",
                     "tool_selection_kind": "executed_tool",
                     "tool_command_verb": "python3",
+                    "selected_tools": ["run_docs_checks.sh"],
                     "tool_input_key_count": 1,
                     "tool_input_keys": ["cmd"],
                 }
