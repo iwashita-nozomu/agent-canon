@@ -87,6 +87,7 @@ dev container は `.devcontainer/` を使います。起動時に generated comp
 - `/mnt/git` があれば bind mount
 - `~/.codex`、`~/.config/gh`、`~/.ssh` があれば bind mount
 - `SSH_AUTH_SOCK` が有効なら agent socket を forward
+- subnet / gateway は固定せず、Docker Compose の default network 自動割当に任せる
 
 で動きます。
 

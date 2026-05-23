@@ -468,6 +468,11 @@ def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Fin
         "vendor/agent-canon",
     ):
         findings.extend(validate_generate_runtime_compose_snippet(script, snippet))
+    for snippet in ("DEVCONTAINER_SUBNET", "DEVCONTAINER_GATEWAY", "ipam:", "subnet:", "gateway:"):
+        if snippet in script:
+            findings.append(
+                Finding("inconsistency", ".devcontainer/generate-runtime-compose.sh", f"forbidden:{snippet}")
+            )
     return findings
 
 
@@ -498,11 +503,17 @@ def validate_generated_compose(devcontainer_dir: Path, pack: PackConfig) -> list
         f"working_dir: {pack.workdir}",
         f"- ..:{pack.workspace_mount}:cached",
     )
-    return [
+    findings = [
         Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"missing:{snippet}")
         for snippet in expected_snippets
         if snippet not in compose
     ]
+    for snippet in ("ipam:", "subnet:", "gateway:"):
+        if snippet in compose:
+            findings.append(
+                Finding("inconsistency", ".devcontainer/docker-compose.generated.yml", f"forbidden:{snippet}")
+            )
+    return findings
 
 
 def validate_devcontainer(root: Path) -> list[Finding]:

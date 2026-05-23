@@ -106,6 +106,8 @@ after the workspace is mounted.
 parent repository. The generated Compose file must also set a top-level project
 `name` derived from the repository path, while allowing an explicit
 `DEVCONTAINER_PROJECT_NAME` override for rare host-level collisions.
+It must not set fixed subnet, gateway, or IPAM values; Docker Compose should
+allocate the project network automatically.
 
 ## Validation
 

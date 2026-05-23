@@ -27,8 +27,6 @@ print(f"{slug}-{digest}-devcontainer")
 PY
 )"
 compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
-devcontainer_subnet="${DEVCONTAINER_SUBNET:-192.168.248.16/28}"
-devcontainer_gateway="${DEVCONTAINER_GATEWAY:-192.168.248.17}"
 
 if [ -f "$pack" ]; then
   mapfile -t pack_values < <(
@@ -144,14 +142,6 @@ fi
   fi
   printf '    environment:\n'
   printf '%s\n' "${environment_lines[@]}"
-  printf '    networks:\n'
-  printf '      default:\n'
-  printf 'networks:\n'
-  printf '  default:\n'
-  printf '    ipam:\n'
-  printf '      config:\n'
-  printf '        - subnet: %s\n' "$devcontainer_subnet"
-  printf '          gateway: %s\n' "$devcontainer_gateway"
 } > "$output"
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s subnet=%s gateway=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$devcontainer_subnet" "$devcontainer_gateway" "$pack"
+printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$pack"

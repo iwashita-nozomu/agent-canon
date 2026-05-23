@@ -6572,14 +6572,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
-      "line": 268,
-      "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "REPORT_DIR",
       "line": 266,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
@@ -6587,8 +6579,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "REPORT_DIR",
+      "line": 264,
+      "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "RUN_ID",
-      "line": 265,
+      "line": 263,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -6596,7 +6596,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SMOKE_TEST",
-      "line": 269,
+      "line": 267,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -6604,7 +6604,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKSPACE_ROOT",
-      "line": 267,
+      "line": 265,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -8868,7 +8868,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 597,
+      "line": 608,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8876,7 +8876,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 597,
+      "line": 608,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8884,7 +8884,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 597,
+      "line": 608,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8892,7 +8892,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 597,
+      "line": 608,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8908,7 +8908,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 622,
+      "line": 633,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8916,7 +8916,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 620,
+      "line": 631,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8924,7 +8924,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 621,
+      "line": 632,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8932,7 +8932,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 614,
+      "line": 625,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9046,22 +9046,6 @@
       "field": "RUNTIME_ENV",
       "line": 112,
       "path": "tools/ci/python_env_policy.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 51,
-      "path": "tools/ci/render_devcontainer_compose.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 59,
-      "path": "tools/ci/render_devcontainer_compose.py",
       "surface": "tool"
     },
     {
@@ -11523,7 +11507,6 @@
     "tools/ci/container_runtime.py",
     "tools/ci/pre_review.sh",
     "tools/ci/python_env_policy.py",
-    "tools/ci/render_devcontainer_compose.py",
     "tools/ci/run_all_checks.sh",
     "tools/ci/run_codex_in_repo_container.py",
     "tools/ci/run_container_pack.py",
