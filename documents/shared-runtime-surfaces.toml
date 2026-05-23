@@ -213,6 +213,7 @@ paths = [
   "tests/agent_tools/test_dependency_manifest_tools.py",
   "tests/agent_tools/test_compare_agent_run_paths.py",
   "tests/agent_tools/test_evaluate_agent_run.py",
+  "tests/agent_tools/test_evaluate_codex_agent_roles.py",
   "tests/agent_tools/test_evaluate_skill_workflow_prompts.py",
   "tests/agent_tools/test_evaluate_workflow_selection.py",
   "tests/agent_tools/test_evaluate_report_quality.py",

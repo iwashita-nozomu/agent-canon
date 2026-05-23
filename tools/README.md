@@ -64,6 +64,7 @@ agent-canon local-llm build-index
 python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
+python3 tools/agent_tools/evaluate_codex_agent_roles.py
 ```
 
 `tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
@@ -107,7 +108,7 @@ under `agents/evals/results/report-quality/`.
     `vendor/agent-canon/rust/agent-canon/` を使います。devcontainer では
     post-create が release binary を
     `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon` へ
-    install し、`/usr/local/bin/agent-canon` から実行できるようにします。
+    install します。権限がある環境では `/usr/local/bin/agent-canon` にも link します。
     wrapper は installed binary が checked-out Rust source より古い場合、
     stale binary ではなく source から `cargo run` します。
     `rust-migration-audit` は DevContainer / Dockerfile 境界を確認し、
@@ -150,6 +151,7 @@ under `agents/evals/results/report-quality/`.
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
+  - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を評価します。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
@@ -203,6 +205,7 @@ under `agents/evals/results/report-quality/`.
   - `rebuild_agent_tools.sh`
     - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。
     - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
+    - host で非対話 sudo が使えない場合は `/usr/local/bin` link を `skipped_no_privilege` として続行します。devcontainer や root 実行では link します。
     - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は `tools/install_llama_cpp.sh` が正本で、PostCreate では fetch/build、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
   - `install_llama_cpp.sh`
     - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin` へ公開します。

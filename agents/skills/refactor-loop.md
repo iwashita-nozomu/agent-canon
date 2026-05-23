@@ -92,7 +92,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
      実装 agent へ渡します。
 1. Write-capable implementation agent
    - 既定は `worker` または小さい slice では `spark_worker` です。
-   - 同時に write-capable agent は 1 体だけにします。
+   - 同時 write-capable agent は parent-managed write scope で disjoint path / separate worktree が証明できる場合だけ許可します。
    - repair slice、affected files、forbidden semantic delta、既存 dirty
      state の扱い、validation command を明示して渡します。
    - 実装 agent は review を完了扱いにしてはいけません。

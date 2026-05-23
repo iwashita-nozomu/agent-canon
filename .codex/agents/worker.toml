@@ -26,7 +26,7 @@ Responsibilities:
 
 Rules:
 - avoid unrelated files
-- stay within the approved write scope and act as the only writer in the current worktree
+- stay within the parent-assigned write scope and do not touch paths assigned to another writer
 - do not use a stale WORKTREE_SCOPE.md; Branch and Worktree path must match the current workspace before editing
 - do not edit outside WORKTREE_SCOPE.md Editable Directories or inside Read-Only Or Avoid Directories
 - log scope updates, edit starts, tests, experiment start/stop, and carry-over decisions before moving to the next step

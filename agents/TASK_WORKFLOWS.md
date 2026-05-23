@@ -181,7 +181,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 補足:
 - `--task-id` を使うと、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します
-- cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で足します
+- `--task-id` を基本にし、task catalog の default specialist と default review pack から始めます。full perspective や extra reviewer は必要な根拠がある場合だけ `--enable` で足します
 
 包括的開発の固定 Codex stack:
 - `requirements_organizer`
@@ -198,28 +198,30 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `cpp_reviewer`
 - `worker`
 
-single-writer ルール:
-- 同一 worktree では `worker` だけが repo file を編集します
-- 同一 worktree で複数の write-capable subagent を走らせません
-- 同一ディレクトリの並列 write も許可しません
-- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます
-- parent は worktree ごとの結果を順番に統合します
+parent-managed write-scope ルール:
+- parent は `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を明示します
+- 同一 path、同一 directory ownership、同一 public API surface を複数 writer に割り当てません
+- disjoint path または separate worktree が証明できる場合だけ、同一 stage で複数 write-capable subagent を許可します
+- write scope が重なる場合は serialize するか worktree を分けます
+- parent は writer ごとの結果を順番に統合し、scope drift を review gate へ渡します
 
 spawn budget ルール:
 - depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
 - 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
+- `Scoped Change Lite` は同時 4 体までを既定にします
 - `Scoped Change` は同時 8 体までを既定にします
 - `Large Delivery` / `Platform And Environment` は同時 10 体までを既定にします
 - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 12 体までを既定にします
 - budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
-- budget を増やしても write-capable subagent は同時 1 体までです
+- write-capable subagent の上限は family ごとの `max_write_subagents` と parent-managed write-scope ledger で縛ります
 - 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
 
 concurrent spawn budget:
 - global runtime cap は `.codex/config.toml` の `max_threads = 24`
+- `Scoped Change Lite`: parent を除いて同時 3-4 agent を目安にします。cheap-first survey / test / language review / narrow implementation を中心にします
 - `Scoped Change`: parent を除いて同時 6-8 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 5-7 まで
 - `Research-Driven Change`: parent を除いて同時 9-12 agent を目安にします。perspective reviewer は batch で回します
 - `Platform And Environment` と `Large Delivery`: parent を除いて同時 8-10 agent を目安にします。planning / design / review を wave に分けます
@@ -228,23 +230,39 @@ concurrent spawn budget:
 
 ## Workflow Families
 
-### 1. Scoped Change
+### 1. Scoped Change Lite
 
 対象:
-- 局所バグ修正
-- 小規模な docs/test 同期
-- CI failure の切り分け
+- 1 file または単一 abstraction の明白な local bug fix
+- public API 変更なし、依存追加なし、仕様解釈なし
+- 既存 test / docs の局所検証で閉じる CI or flaky test fix
+
+標準フロー:
+1. `manager` が request clause と lite 適用条件を固定する
+1. 必要なら `explorer` / `test_designer` で局所 cause と test case を確認する
+1. `spark_worker` または parent が parent-assigned write scope 内だけを編集する
+1. `python_reviewer` / `cpp_reviewer` / `diff_triage_reviewer` で cheap-first review を行う
+1. broad reviewer、document-flow、full design gate は、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ起動する
+1. lite 条件を外れた時点で `Scoped Change` へ昇格する
+1. active な subagent は同時 4 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
+
+### 2. Scoped Change
+
+対象:
+- lite 条件に収まらない局所バグ修正
+- 小規模だが public behavior、workflow、docs flow、設計判断を含む docs/test 同期
+- cross-module validation が必要な CI failure の切り分け
 
 標準フロー:
 1. 共通実装フローをそのまま 1 pass で通す
-1. 小さい変更でも `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を省略しない
+1. この full scoped route では `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を省略しない
 1. code や test を触る task では `test_designer` を省略しない
 1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
 1. active な subagent は同時 8 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる
 
-### 2. Research-Driven Change
+### 3. Research-Driven Change
 
 対象:
 - 外部調査を伴う実装
@@ -265,16 +283,16 @@ concurrent spawn budget:
 特徴:
 - research と experiment を evidence として回す
 - overclaim review を明示的に挟む
-- cost を気にしない default では、`report_reviewer` と research perspective reviewers を常時有効化します
+- default では `reproducibility_reviewer` と `artifact_reviewer` で triage し、benchmark / FAIR data / ML science / scientific-computing risk が出たときだけ該当 perspective reviewer を追加します
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じない
 - ただし、1 回の repo 変更は 1 回の waterfall pass として閉じる
 - 各 pass で計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、最終受け入れ review、audit review を省略しない
 - agent が code change と run を継続反復する場合は `adaptive-improvement-loop` を追加する
-- methodology、artifact、reporting policy を大きく変える場合は perspective reviewers を default にします
+- methodology、artifact、reporting policy を大きく変える場合は必要な perspective reviewers を triage 結果に基づいて追加します
 - active な subagent は同時 12 体までを既定にし、追加枠は read-only reviewer / researcher に使います
-- repo-wide な research cleanup では task catalog の `T9` を基準に perspective reviewers をまとめて有効化する
+- repo-wide な research cleanup では task catalog の `T9` を基準にし、full perspective pack は明示指定または triage escalation で有効化する
 
-### 3. Large Delivery
+### 4. Large Delivery
 
 対象:
 - 新機能追加
@@ -298,7 +316,7 @@ concurrent spawn budget:
 - refactor pass では `project_reviewer` と `docs_workflow_steward` を default specialist にし、cross-module drift と stale route を落とします
 - 大規模 repo の包括 refactor では `agents/workflows/comprehensive-refactoring-workflow.md` を overlay とし、設計見直し、OOP 的な最小実装方針、必要な静的解析 score gate を先に固定します
 
-### 4. Platform And Environment
+### 5. Platform And Environment
 
 対象:
 - Docker
@@ -322,7 +340,7 @@ concurrent spawn budget:
 - Docker を変える task では source-of-truth surface、同期対象、rollout / rollback、validation matrix を必ず同じ pass に残す
 - repo-wide な tool 導入案では理由、Docker 影響、validation、rollback を同時に残す
 
-### 5. Comprehensive Development
+### 6. Comprehensive Development
 
 対象:
 - code、docs、tests、workflow、tools、Docker、CI をまたぐ repo-wide な整理
@@ -355,7 +373,7 @@ concurrent spawn budget:
 - 同一 worktree では `worker` だけが repo file を編集する
 - 同一 worktree では parallel write を許可しない
 
-### 6. Adaptive Improvement Loop
+### 7. Adaptive Improvement Loop
 
 対象:
 - benchmark を見ながらの性能改善
@@ -382,15 +400,16 @@ concurrent spawn budget:
 - 1 iteration は 1 extension、1 waterfall run-id、1 change pass、1 decision state に固定します
 - 2 つ目の extension に入る前に、直前 extension の waterfall gate check、final review、`task-close`、commit / push を終えます。ただし、outer backlog 全体の completion と iteration completion を混同しません
 - `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
-- tuning 中でも `test_designer`、`document_flow_reviewer`、`report_reviewer` を省略しません
+- tuning 中でも `test_designer` と `report_reviewer` を省略しません。`document_flow_reviewer` は reader-facing report / workflow / design doc を更新する場合に起動します
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
-- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置く
+- 複数 writer が必要な場合は disjoint path / separate worktree を parent-managed write-scope ledger に明記する
 - `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
 - 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する
 
 ## 選び方
 
-1. task が局所修正なら `Scoped Change`
+1. task が 1 file または単一 abstraction の明白な局所修正なら `Scoped Change Lite`
+1. lite 条件を外れる局所修正なら `Scoped Change`
 1. 外部調査や比較実験が必要なら `Research-Driven Change`
 1. chunk 設計が必要なら `Large Delivery`
 1. 環境や automation を触るなら `Platform And Environment`

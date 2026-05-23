@@ -50,6 +50,21 @@ CPP_PATH_MARKERS = (
     "include/",
     "lib/",
 )
+DOC_SUFFIXES = {".md", ".rst", ".txt"}
+CONFIG_SUFFIXES = {".json", ".toml", ".yaml", ".yml"}
+DOC_OR_RUNTIME_PATH_MARKERS = (
+    ".agents/",
+    ".claude/",
+    ".codex/",
+    ".devcontainer/",
+    ".github/",
+    "agents/",
+    "documents/",
+    "memory/",
+    "notes/",
+    "tools/catalog.yaml",
+)
+CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
@@ -304,9 +319,9 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     )
 
 
-def load_task_catalog(config: TeamConfig) -> TaskCatalog:
+def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
     """Load the task catalog referenced by the team config."""
-    catalog_path = ROOT / str(config.team["task_catalog"])
+    catalog_path = root / str(config.team["task_catalog"])
     raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise RuntimeError(f"task catalog must parse as a mapping: {catalog_path}")
@@ -321,6 +336,43 @@ def load_task_catalog(config: TeamConfig) -> TaskCatalog:
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
+
+
+def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
+    """Return known review pack ids."""
+    return tuple(str(pack["id"]) for pack in catalog.review_packs)
+
+
+def enable_choices(config: TeamConfig, catalog: TaskCatalog) -> tuple[str, ...]:
+    """Return valid --enable values for specialist roles and review packs."""
+    return tuple(sorted((*specialist_role_ids(config), *review_pack_ids(catalog))))
+
+
+def expand_enabled_specialists(
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    enabled_names: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Expand specialist role ids and named review packs into role ids."""
+    specialist_ids = set(specialist_role_ids(config))
+    review_packs = {str(pack["id"]): pack for pack in catalog.review_packs}
+    expanded: list[str] = []
+    for name in enabled_names:
+        if name in specialist_ids:
+            if name not in expanded:
+                expanded.append(name)
+            continue
+        if name in review_packs:
+            for role_id in _as_string_tuple(
+                review_packs[name].get("specialists"),
+                f"review_packs[{name}].specialists",
+            ):
+                resolve_role(config, role_id)
+                if role_id not in expanded:
+                    expanded.append(role_id)
+            continue
+        raise KeyError(f"unknown specialist or review pack: {name}")
+    return tuple(expanded)
 
 
 def resolve_role(config: TeamConfig, role_name: str) -> Role:
@@ -381,11 +433,17 @@ def auto_language_specialists(
         or any(normalized == marker or normalized.startswith(marker) for marker in CPP_PATH_MARKERS)
         for normalized in normalized_paths
     )
+    has_docs_or_runtime = any(
+        Path(normalized).suffix.lower() in DOC_SUFFIXES | CONFIG_SUFFIXES
+        or any(normalized == marker or normalized.startswith(marker) for marker in DOC_OR_RUNTIME_PATH_MARKERS)
+        for normalized in normalized_paths
+    )
     return tuple(
         role_id
         for role_id, enabled in (
             ("python_reviewer", has_python),
             ("cpp_reviewer", has_cpp),
+            ("docs_workflow_steward", has_docs_or_runtime),
         )
         if enabled
     )
@@ -485,11 +543,20 @@ def select_roles(
     config: TeamConfig,
     enabled_specialists: list[str],
     full_team: bool,
+    catalog: TaskCatalog | None = None,
+    workflow_family_id: str | None = None,
 ) -> tuple[Role, ...]:
     """Return the active roles for one run."""
     if full_team:
         return config.always_on_roles + config.specialist_roles
+    always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
     enabled_roles = tuple(resolve_role(config, name) for name in enabled_specialists)
+    selected_roles = list(always_on_roles)
+    selected_ids = {role.id for role in selected_roles}
+    for role in enabled_roles:
+        if role.id not in selected_ids:
+            selected_roles.append(role)
+            selected_ids.add(role.id)
     enabled_set = {role.id for role in enabled_roles}
     enabled_activations = {
         role.activation for role in enabled_roles if role in config.specialist_roles
@@ -498,8 +565,56 @@ def select_roles(
         role
         for role in config.specialist_roles
         if role.id in enabled_set or role.activation in enabled_activations
+        if role.id not in selected_ids
     )
-    return config.always_on_roles + selected_specialists
+    return tuple(selected_roles) + selected_specialists
+
+
+def workflow_always_on_roles(
+    config: TeamConfig,
+    catalog: TaskCatalog | None,
+    workflow_family_id: str | None,
+) -> tuple[Role, ...]:
+    """Return family-specific always-on roles when a workflow family declares them."""
+    if catalog is None or not workflow_family_id:
+        return config.always_on_roles
+    family = resolve_workflow_family(catalog, workflow_family_id)
+    family_roles = family.get("roles", {})
+    if not isinstance(family_roles, dict):
+        return config.always_on_roles
+    role_ids = _as_string_tuple(
+        family_roles.get("always_on"),
+        f"workflow_families[{workflow_family_id}].roles.always_on",
+    )
+    if not role_ids:
+        return config.always_on_roles
+    return tuple(resolve_role(config, role_id) for role_id in role_ids)
+
+
+def load_codex_agent_configs() -> dict[str, dict[str, object]]:
+    """Load Codex custom agent TOML files by declared agent name."""
+    configs: dict[str, dict[str, object]] = {}
+    for path in sorted(CODEX_AGENT_ROOT.glob("*.toml")):
+        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+        name = parsed.get("name", path.stem)
+        configs[str(name)] = parsed
+    return configs
+
+
+def codex_agent_model_matrix_for_roles(
+    roles: tuple[Role, ...],
+    configs: dict[str, dict[str, object]] | None = None,
+) -> tuple[str, ...]:
+    """Return role:agent:model:effort rows for active Codex agents."""
+    agent_configs = configs if configs is not None else load_codex_agent_configs()
+    rows: list[str] = []
+    for role in roles:
+        for agent_id in role.codex_agents:
+            agent_config = agent_configs.get(agent_id, {})
+            model = str(agent_config.get("model", "inherit"))
+            effort = str(agent_config.get("model_reasoning_effort", "inherit"))
+            rows.append(f"{role.id}:{agent_id}:{model}:{effort}")
+    return tuple(dict.fromkeys(rows))
 
 
 def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ...]:
@@ -691,6 +806,15 @@ def manifest_run_lines(
     if communication_protocol is not None:
         lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
     if workflow_family is not None:
+        lines.append("  write_scope_policy:")
+        lines.append("    parent_managed: true")
+        lines.append("    disjoint_write_scopes_required: true")
+        lines.append("    overlapping_write_scopes: serialize_or_split_worktree")
+        _, max_write_subagents = workflow_spawn_budget(
+            load_task_catalog(spec.config),
+            spec.workflow_family_id,
+        )
+        lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append("  workflow_family:")
         lines.append(f"    id: {spec.workflow_family_id}")
         lines.append(f"    name: {str(workflow_family['name'])!r}")
@@ -867,7 +991,7 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "the selected workflow"
     )
     write_scope = (
-        "write only in the manifest write_policy scope"
+        "write only in the manifest write_policy scope and avoid paths assigned to other writers"
         if role.write_policy.mode != "read_only"
         else "do not edit repository files"
     )

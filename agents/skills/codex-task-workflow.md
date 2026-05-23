@@ -30,9 +30,9 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 1. workflow selection
 1. artifact placement
 1. explicit subagent bootstrap
-1. execution plan and plan review
-1. detailed design and detailed design review
-1. document flow review
+1. execution plan and plan review for full staged routes
+1. detailed design and detailed design review for full staged routes
+1. document flow review for reader-facing docs, new terms, public APIs, or full staged routes
 1. implementation
 1. validation
 1. closeout
@@ -41,6 +41,7 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - Shared canon / Large delivery / high-risk / multi-step task では `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` から始める
+- `Scoped Change Lite` では cheap-first local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
 - Routine docs / Focused code では parent-direct を許可し、必要な targeted validation を通す
 - repo-changing task では `$agent-orchestration` を先頭に置き、`$subagent-bootstrap` は subagent が必要な risk class でだけ併用する
 - AgentCanon update surface が repairable なら `make agent-canon-ensure-latest` を実行する。submodule repo では親 repo の無関係な dirty state はこの実行を block しない。update surface 自体が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon PR / proposal merge 後に `make agent-canon-ensure-latest` と `bash tools/sync_agent_canon.sh link-root` で template / derived repo へ持ち帰る

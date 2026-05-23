@@ -154,6 +154,12 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
+if "$PYTHON_BIN" tools/agent_tools/evaluate_codex_agent_roles.py 2>&1; then
+  echo "✅ Codex agent role eval 成功"
+else
+  echo "❌ Codex agent role eval 失敗"
+  EXIT_CODE=1
+fi
 if "$PYTHON_BIN" tools/agent_tools/check_dependency_headers.py --changed 2>&1; then
   echo "✅ dependency header checks 成功"
 else

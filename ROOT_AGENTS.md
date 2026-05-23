@@ -32,8 +32,8 @@ contract listed in `documents/README.md`.
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
-- active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change` で同時 8 体まで、`Large Delivery` / `Platform And Environment` で同時 10 体まで、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
-- 同時に write-capable な subagent は常に 1 体までです。追加分は read-only review / research / survey に限ります。
+- active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
+- write-capable subagent は parent が `team_manifest.yaml` の write policy と handoff で disjoint path / separate worktree を割り当てて管理します。同一 path や同一 ownership surface が重なる場合は serialize するか worktree を分けます。
 - 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起動します。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません。
@@ -172,7 +172,7 @@ contract listed in `documents/README.md`.
 
 - Shared workflow, skills, subagents, docs, and support scripts are maintained in the vendored canon, not in this wrapper.
 - role behavior, stage prohibitions, and review separation rules は `.codex/agents/*.toml` を正本にします。この file は薄い entrypoint のまま保ちます
-- Repo-changing tasks follow the staged flow in `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
+- Repo-changing tasks follow the workflow family selected from `agents/task_catalog.yaml`. `Scoped Change Lite` uses cheap-first local routing; full staged routes follow `agents/canonical/CODEX_WORKFLOW.md`: requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation.
 - code-changing tasks add `test_designer` before implementation and fix nasty cases into tests in the same pass.
 - Keep `plan_reviewer`, `detailed_design_reviewer`, and `document_flow_reviewer` as separate agent instances.
 - Repo-changing task では run bundle と explicit stage activation を先に作ります。

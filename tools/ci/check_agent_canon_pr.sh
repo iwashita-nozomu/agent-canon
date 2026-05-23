@@ -48,6 +48,7 @@ run_direct_agent_checks() {
   bash tools/sync_agent_canon.sh check
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
+  python3 tools/agent_tools/evaluate_codex_agent_roles.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
 }
 

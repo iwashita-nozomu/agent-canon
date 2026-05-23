@@ -38,8 +38,22 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            python_tool = root / "tools" / "sample.py"
+            python_tool.parent.mkdir(parents=True)
+            python_tool.write_text(
+                "\n".join(
+                    [
+                        "lines = [f'LIST_STATUS={1}']",
+                        "lines.append('APPEND_STATUS=1')",
+                        "def render():",
+                        "    return f'RETURN_STATUS={1}'",
+                        "print('\\n'.join(lines))",
+                        "print(render())",
+                    ]
+                ),
+                encoding="utf-8",
+            )
             shell = root / "tools" / "sample.sh"
-            shell.parent.mkdir(parents=True)
             shell.write_text("echo TOOL_STATUS=pass\n", encoding="utf-8")
             rust_tool = root / "rust" / "agent-canon" / "src" / "sample.rs"
             rust_tool.parent.mkdir(parents=True)
@@ -72,6 +86,9 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         fields = {record["field"] for record in payload["records"]}
         self.assertIn("SAMPLE_STATUS", fields)
+        self.assertIn("LIST_STATUS", fields)
+        self.assertIn("APPEND_STATUS", fields)
+        self.assertIn("RETURN_STATUS", fields)
         self.assertIn("status", fields)
         self.assertIn("hook_run_id", fields)
         self.assertIn("TOOL_STATUS", fields)

@@ -51,6 +51,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
 - `tools/agent_tools/evaluate_report_quality.py`
   - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
+- `tools/agent_tools/evaluate_codex_agent_roles.py`
+  - `.codex/agents/*.toml` の期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を role 単位で eval します。
 - `agent-canon local-llm search`
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
 - `agent-canon local-llm build-index`
@@ -287,6 +289,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary と generated drilldown を生成し、通常分析では raw JSONL を開かずそれを読みます。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。
   - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `agents/evals/results/workflow-selection/` に詳細結果を蓄積します。
+  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。

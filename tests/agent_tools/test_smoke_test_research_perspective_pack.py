@@ -231,7 +231,46 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertTrue((report_dir / "report_review.md").is_file())
             self.assertTrue((report_dir / "python_review.md").is_file())
             self.assertTrue((report_dir / "reproducibility_review.md").is_file())
+            self.assertTrue((report_dir / "artifact_review.md").is_file())
+            self.assertFalse((report_dir / "benchmark_review.md").is_file())
+
+    def test_run_bundle_can_enable_full_research_perspective_pack(self) -> None:
+        """Named optional review packs should expand to all pack specialists."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-full-research-perspective-pack"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT_PATH),
+                    "--task",
+                    "full research perspective smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--enable",
+                    "research_perspective_review",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            report_dir = report_root / run_id
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("benchmark_reviewer", result.stdout)
+            self.assertTrue((report_dir / "reproducibility_review.md").is_file())
+            self.assertTrue((report_dir / "scientific_computing_review.md").is_file())
             self.assertTrue((report_dir / "benchmark_review.md").is_file())
+            self.assertTrue((report_dir / "artifact_review.md").is_file())
+            self.assertTrue((report_dir / "fair_data_review.md").is_file())
+            self.assertTrue((report_dir / "ml_science_review.md").is_file())
 
     def test_run_bundle_can_enable_cpp_reviewer(self) -> None:
         """C++ reviewer should create its review artifact when enabled."""

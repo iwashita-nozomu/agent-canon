@@ -819,6 +819,25 @@ entries:
     tests:
       - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
+  - id: evaluate-codex-agent-roles
+    summary: Evaluates Codex subagent role behavior, routing, cost buckets, and optional runtime metrics.
+    path: tools/agent_tools/evaluate_codex_agent_roles.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_codex_agent_roles.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - agents/evals/README.md
+      - agents/canonical/CODEX_SUBAGENTS.md
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_codex_agent_roles.py
+
   - id: mirror-skill-shims
     summary: Mirrors canonical skill files into runtime-specific skill shims.
     path: tools/docs/mirror_skill_shims.py

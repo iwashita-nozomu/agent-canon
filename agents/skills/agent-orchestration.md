@@ -60,7 +60,7 @@ mode の意味:
 - request mode (`repo-changing execution` or `routing-only/advisory`)
 - 必要な role / specialist
 - review と handoff の最小構成
-- repo-editing task なら、requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation の順序
+- repo-editing task なら、workflow family ごとの順序。`Scoped Change Lite` は cheap-first local route、full staged route は requirements -> research -> execution plan -> plan review -> detailed design -> detailed design review -> document flow review -> implementation
 - 最初の作業 update 用の `workflow=<family>`, `skills=<...>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置く
 - PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
@@ -71,7 +71,8 @@ mode の意味:
 
 | Task Shape | Primary Family | Notes |
 | ---------- | -------------- | ----- |
-| local bug fix, CI fix, docs/test sync | `Scoped Change` | `T1`-`T3` |
+| one-file / single-abstraction local bug fix or CI/flaky-test fix | `Scoped Change Lite` | `T1`, `T2` |
+| local change that needs design, public behavior, workflow, or cross-module validation | `Scoped Change` | `T3` |
 | research-backed implementation, benchmark/experiment optimization, academic paper/thesis/scholarly note | `Research-Driven Change` | `T4`, `T5`, `T9`, `T10` |
 | large refactor or large multi-surface delivery | `Large Delivery` | `T6`, `T7` |
 | environment, CI, Docker, dependency rollout | `Platform And Environment` | `T8` |

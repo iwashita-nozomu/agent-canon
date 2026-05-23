@@ -38,6 +38,7 @@ from agent_team import (
     resolve_role,
     resolve_role_document_packet,
     task_ids,
+    workflow_always_on_roles,
     workflow_spawn_budget,
 )
 from vendor_skill_adapters import VendorSkillValidator
@@ -47,10 +48,12 @@ HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTIER_MODEL = "gpt-5.5"
+MINI_MODEL = "gpt-5.4-mini"
 SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
 SPARK_REASONING_EFFORT = "low"
+MINI_REASONING_EFFORT = "medium"
 FRONTMATTER_OPEN_MARKER = "---\n"
-WRITING_AND_REVIEW_ROLE_IDS = {
+FRONTIER_REQUIRED_ROLE_IDS = {
     "requirements_organizer",
     "manager_reviewer",
     "execution_planner",
@@ -58,33 +61,36 @@ WRITING_AND_REVIEW_ROLE_IDS = {
     "long_form_writer",
     "plan_reviewer",
     "detailed_design_reviewer",
-    "document_flow_reviewer",
     "citation_evidence_reviewer",
     "notation_definition_reviewer",
     "logic_gap_reviewer",
-    "oop_readability_reviewer",
     "reviewer",
     "project_reviewer",
-    "report_reviewer",
-    "docs_workflow_steward",
-    "reproducibility_reviewer",
-    "scientific_computing_reviewer",
-    "benchmark_reviewer",
-    "artifact_reviewer",
-    "fair_data_reviewer",
-    "ml_science_reviewer",
     "literature_researcher",
+    "ship_reviewer",
+    "worker",
 }
 SPARK_READ_ROLE_IDS = {
     "explorer",
     "test_designer",
     "python_reviewer",
     "cpp_reviewer",
+    "diff_triage_reviewer",
 }
-FRONTIER_IMPLEMENTATION_ROLE_IDS = {
-    "worker",
+CONDITIONAL_FRONTIER_ROLE_IDS = {
+    "artifact_reviewer",
+    "benchmark_reviewer",
+    "docs_workflow_steward",
+    "document_flow_reviewer",
+    "fair_data_reviewer",
+    "ml_science_reviewer",
+    "oop_readability_reviewer",
+    "report_reviewer",
+    "reproducibility_reviewer",
+    "scientific_computing_reviewer",
 }
 SPARK_CODING_ROLE_IDS = {
+    "experiment_runner",
     "spark_worker",
 }
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
@@ -119,7 +125,11 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
     """Load every Codex agent config."""
     parsed: dict[str, dict[str, object]] = {}
     for path in sorted(CODEX_AGENT_ROOT.glob("*.toml")):
-        parsed[path.stem] = tomllib.loads(path.read_text(encoding="utf-8"))
+        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        name = str(payload.get("name", path.stem))
+        payload["__file_name"] = path.name
+        payload["__file_stem"] = path.stem
+        parsed[name] = payload
     return parsed
 
 
@@ -133,6 +143,40 @@ def validate_project_config() -> None:
     ensure(features.get("goals") is True, "features.goals must be true")
     ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
     ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    agents = config.get("agents", {})
+    ensure(isinstance(agents, dict), "agents must be a mapping")
+    ensure(agents.get("max_threads") == 24, "agents.max_threads must remain 24")
+    ensure(agents.get("max_depth") == 1, "agents.max_depth must remain 1")
+    ensure(
+        agents.get("job_max_runtime_seconds") == 3600,
+        "agents.job_max_runtime_seconds must remain 3600",
+    )
+    codex_agents = parse_codex_agents()
+    registry = {
+        key: value
+        for key, value in agents.items()
+        if isinstance(value, dict)
+    }
+    missing_registry = sorted(set(codex_agents) - set(registry))
+    extra_registry = sorted(set(registry) - set(codex_agents))
+    ensure(
+        not missing_registry,
+        f"missing .codex/config.toml agent registry: {', '.join(missing_registry)}",
+    )
+    ensure(
+        not extra_registry,
+        f"stale .codex/config.toml agent registry: {', '.join(extra_registry)}",
+    )
+    for role_id, agent_config in codex_agents.items():
+        registered = registry[role_id]
+        ensure(
+            registered.get("config_file") == f"agents/{agent_config['__file_name']}",
+            f"{role_id} config_file must point at agents/{agent_config['__file_name']}",
+        )
+        ensure(
+            registered.get("description") == agent_config.get("description"),
+            f"{role_id} registry description must match agent TOML",
+        )
 
 
 def validate_project_hooks() -> None:
@@ -171,15 +215,17 @@ def validate_codex_agent_settings() -> None:
     """Check that Codex agent settings use the expected model split."""
     configs = parse_codex_agents()
     required_role_ids = (
-        WRITING_AND_REVIEW_ROLE_IDS
+        FRONTIER_REQUIRED_ROLE_IDS
         | SPARK_READ_ROLE_IDS
-        | FRONTIER_IMPLEMENTATION_ROLE_IDS
+        | CONDITIONAL_FRONTIER_ROLE_IDS
         | SPARK_CODING_ROLE_IDS
     )
     missing = sorted(required_role_ids - set(configs))
     ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
+    unclassified = sorted(set(configs) - required_role_ids)
+    ensure(not unclassified, f"unclassified Codex agent model policy: {', '.join(unclassified)}")
 
-    for role_id in sorted(WRITING_AND_REVIEW_ROLE_IDS):
+    for role_id in sorted(FRONTIER_REQUIRED_ROLE_IDS):
         config = configs[role_id]
         ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
         ensure(
@@ -187,6 +233,15 @@ def validate_codex_agent_settings() -> None:
             f"{role_id} model_reasoning_effort must be high",
         )
         ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
+
+    for role_id in sorted(CONDITIONAL_FRONTIER_ROLE_IDS):
+        config = configs[role_id]
+        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
+        ensure(
+            config.get("model_reasoning_effort") == MINI_REASONING_EFFORT,
+            f"{role_id} model_reasoning_effort must be {MINI_REASONING_EFFORT}",
+        )
+        ensure(config.get("model") == MINI_MODEL, f"{role_id} model must be {MINI_MODEL}")
 
     for role_id in sorted(SPARK_READ_ROLE_IDS):
         config = configs[role_id]
@@ -199,15 +254,6 @@ def validate_codex_agent_settings() -> None:
             config.get("model") == SPARK_CODING_MODEL,
             f"{role_id} model must be {SPARK_CODING_MODEL}",
         )
-
-    for role_id in sorted(FRONTIER_IMPLEMENTATION_ROLE_IDS):
-        config = configs[role_id]
-        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        ensure(
-            config.get("model_reasoning_effort") == "high",
-            f"{role_id} model_reasoning_effort must be high",
-        )
-        ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
 
     for role_id in sorted(SPARK_CODING_ROLE_IDS):
         config = configs[role_id]
@@ -338,8 +384,12 @@ def validate_task_catalog_references() -> None:
             f"family {family['id']} active_subagents exceeds runtime max_threads",
         )
         ensure(
-            max_write_budget == 1,
-            f"family {family['id']} max_write_subagents must remain 1",
+            max_write_budget >= 1,
+            f"family {family['id']} max_write_subagents must be >= 1",
+        )
+        ensure(
+            max_write_budget <= active_budget,
+            f"family {family['id']} max_write_subagents exceeds active_subagents",
         )
 
     for task_id in task_ids(catalog):
@@ -468,7 +518,9 @@ def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tu
         task_id=task_id,
         include_default_review_packs=True,
     )
-    return tuple(config.always_on_roles) + tuple(
+    task = task_by_id(catalog, task_id)
+    always_on = workflow_always_on_roles(config, catalog, str(task["family"]))
+    return tuple(always_on) + tuple(
         resolve_role(config, role_id) for role_id in enabled
     )
 

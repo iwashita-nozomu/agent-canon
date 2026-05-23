@@ -65,7 +65,7 @@ maybe_link_usr_local() {
     echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
     return
   fi
-  if command -v sudo >/dev/null 2>&1; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
     sudo ln -sf "$binary" /usr/local/bin/agent-canon
     echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
     return

@@ -9,6 +9,7 @@ downstream implementation ../../rust/agent-canon/src/local_llm.rs routes local L
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility evals
 downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
+downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py runs Codex subagent role evals
 @dependency-end
 -->
 
@@ -28,6 +29,10 @@ prompt-intake route from user wording to candidate workflow labels.
 Report quality evals live in `report_quality_eval.toml` and cover the
 reader-facing report-writing checklist, artifact separation, and reviewer
 routing surfaces.
+Codex subagent role evals are implemented by `evaluate_codex_agent_roles.py`
+and cover each `.codex/agents/*.toml` role's expected behavior, forbidden
+behavior, model / reasoning bucket, task-routing defaults, optional runtime
+metrics, and whether output-use evidence is available.
 
 Use these evals when changing a skill, workflow, or routing prompt:
 
@@ -140,6 +145,20 @@ Use `--accumulate` when the report-writing checklist measurement itself should
 become durable AgentCanon evidence under `agents/evals/results/report-quality/`.
 Reports list checklist IDs and missing patterns; they do not store raw report
 drafts or prompts.
+Codex subagent role evals are configured separately:
+
+```bash
+python3 tools/agent_tools/evaluate_codex_agent_roles.py
+```
+
+The role eval fails when a role TOML is unregistered, over-costed for its bucket,
+missing a read-only or findings-first prohibition, or routed before cheaper
+language / diff-triage reviewers. Optional JSONL runtime metrics can be supplied
+with `--runtime-log <path>` using fields such as `agent`, `tokens`,
+`latency_ms`, `retry_count`, `parent_intervention`, `format_violation`, and
+`output_used`. When no runtime metric log exists, the eval reports
+`ROLE_RUNTIME_METRICS_STATUS=missing` without failing; this keeps old logs
+append-only while making the measurement gap visible.
 GitHub Actions reads these hook results recursively, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 That guide must not stop at raw pass/fail counts: it summarizes skill usage,
