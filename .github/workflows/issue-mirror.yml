@@ -77,4 +77,5 @@ jobs:
             --root . \
             --repo "${GITHUB_REPOSITORY}" \
             --github-check \
+            --allow-github-auth-unavailable \
             --summary-file "${GITHUB_STEP_SUMMARY}"

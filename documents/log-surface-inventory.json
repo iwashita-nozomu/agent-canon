@@ -5084,7 +5084,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 336,
+      "line": 342,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5092,7 +5092,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5100,7 +5100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "github_checked",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5108,7 +5108,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "github_drift",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5116,7 +5116,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "github_missing_links",
-      "line": 507,
+      "line": 534,
+      "path": "tools/agent_tools/issue_sync.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "github_unavailable",
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5124,7 +5132,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "issues",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5132,7 +5140,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5140,7 +5148,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "sync_plan",
-      "line": 507,
+      "line": 534,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5148,7 +5156,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 337,
+      "line": 343,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5164,7 +5172,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC",
-      "line": 592,
+      "line": 628,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5172,7 +5180,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_CREATED",
-      "line": 567,
+      "line": 596,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5180,7 +5188,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_CREATED_ITEM",
-      "line": 569,
+      "line": 598,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5188,7 +5196,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_FINDINGS",
-      "line": 591,
+      "line": 627,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5196,7 +5204,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_GITHUB_CHECKED",
-      "line": 589,
+      "line": 624,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5204,7 +5212,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_GITHUB_DRIFT",
-      "line": 590,
+      "line": 625,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5212,7 +5220,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_GITHUB_MISSING_LINKS",
-      "line": 588,
+      "line": 623,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5220,7 +5228,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_GITHUB_SYNCED",
-      "line": 573,
+      "line": 602,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5228,7 +5236,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_GITHUB_SYNCED_ITEM",
-      "line": 575,
+      "line": 604,
+      "path": "tools/agent_tools/issue_sync.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "ISSUE_SYNC_GITHUB_UNAVAILABLE",
+      "line": 626,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5236,7 +5252,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_LOCAL_ISSUES",
-      "line": 587,
+      "line": 622,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
@@ -5244,7 +5260,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ISSUE_SYNC_PLAN",
-      "line": 586,
+      "line": 621,
       "path": "tools/agent_tools/issue_sync.py",
       "surface": "tool"
     },
