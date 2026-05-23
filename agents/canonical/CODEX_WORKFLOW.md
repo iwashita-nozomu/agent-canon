@@ -431,17 +431,18 @@ goal-driven task では `/goal` 確定前でも provisional bundle を作り、r
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-とくに、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer`、`test_designer` は repo-changing task の標準構成とします。
-Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`worker` を stage ごとに明示します。
+full staged route では、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer`、`test_designer` を標準構成とします。
+lite scoped route では、公開 API、reader-facing docs、新用語、cross-surface risk がある場合だけ full staged route へ昇格します。
+Codex subagent では、`requirements_organizer`、`manager_reviewer`、`execution_planner`、`plan_reviewer`、`detailed_designer`、`detailed_design_reviewer`、`document_flow_reviewer`、`test_designer`、`spark_worker`、`worker` を workflow family に応じて stage ごとに明示します。
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model split は、`gpt-5.5` が planning、writing、research、review、final judgment、broad / ambiguous implementation を担当し、`gpt-5.3-codex-spark` が code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして設計packetで完全に切れる狭い実装sliceを担当する形です。設計判断、scope判断、重要 review は `gpt-5.5` 側に残し、Spark 側は reasoning effort を `low` に抑えて token usage と tool compatibility の両方を守ります。
+default の model split は、`gpt-5.5` が frontier-required planning、design、synthesis、ship decision、broad / ambiguous implementation を担当し、`gpt-5.4-mini` が conditional specialist review、`gpt-5.3-codex-spark` が code survey、tool drift survey、static validation triage、language-specific code review、diff triage、機械 report 要約、execution-only experiment、そして設計packetで完全に切れる狭い実装sliceを担当する形です。設計判断、scope判断、重要 review は `gpt-5.5` 側に残し、Spark 側は reasoning effort を `low` に抑えて token usage と tool compatibility の両方を守ります。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
-- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
+- active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
-- write-capable subagent は同時 1 体までに固定し、追加分は read-only review / research / survey role だけにします。
+- write-capable subagent は parent-managed write scope で制御します。`team_manifest.yaml` の write policy が disjoint path / separate worktree を割り当てた場合だけ複数 writer を許可し、重なる場合は serialize します。
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 
@@ -505,7 +506,7 @@ parent は subagent handoff でこの packet path 群と `team_manifest.yaml` �
 Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
 次の extension へ進む前に、直前 extension の中間 `waterfall-gate-check`、final review、`task-close`、commit / push を完了させます。
 
-`--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。cost を気にしない run では `--task-id` を基本にし、狭い例外だけ `--enable` で補います。
+`--task-id` を指定すると、`agents/task_catalog.yaml` にある task-default specialist と `default_for_tasks` review pack を自動で有効化します。まず catalog default を使い、full perspective や extra reviewer は必要な根拠がある場合だけ `--enable` で補います。
 language-specific reviewer は task catalog に固定せず、`bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
 run bundle を起こしたら、`intent_brief.md` だけで進めず、`user_request_contract.md` を planning 前に埋めます。stage artifact、handoff、review では clause ID を明示します。
 各 waterfall gate を次段へ進める前に `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <gate>"` で中間 gate を確認します。
@@ -565,8 +566,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
 - role ごとの model policy は `agents/canonical/CODEX_SUBAGENTS.md` に従う
-- broad worker は `gpt-5.5` で、design-traced narrow slice の first candidate は `gpt-5.3-codex-spark` とする
-- same-worktree single-writer rule は `worker.toml` と planning/reviewer TOML を正本にする
+- broad worker は `gpt-5.5` で、design-traced narrow slice と execution-only experiment/log work の first candidate は `gpt-5.3-codex-spark` とする
+- parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ
 - skill は repo 正本を置き換えず、導線だけを担う
@@ -634,8 +635,8 @@ cost を無視して review coverage を優先する run では、research-drive
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は別 instance にする
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
 - 論文 draft では `citation_evidence_reviewer` も別 instance にする
-- 包括的開発では、同一 worktree の write role を `worker` 1 人に固定する
-- 複数 writer を要する場合は、同一 worktree ではなく複数 worktree に分ける
+- 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理する
+- write scope が重なる場合は serialize するか worktree を分ける
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。止めるのは user が明示的に止めた場合か external block がある場合だけとする

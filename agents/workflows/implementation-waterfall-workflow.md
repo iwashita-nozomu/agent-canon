@@ -107,7 +107,7 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
   - `escalate` は Gate 1 または Gate 2 へ戻して scope / research を修正します
 - 完了条件:
   - stage 順序、handoff、rollback、validation sequence が hidden step なしで実行できる
-  - review 分離と single-writer discipline が崩れていない
+  - review 分離と parent-managed write-scope discipline が崩れていない
 
 ### Cycle B. 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー
 
@@ -175,8 +175,8 @@ make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <req
 - active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を run bundle に固定し、許可が出るまでその specialist review を完了扱いにしません
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 agent instance で行います
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなします
-- 包括的開発では、同一 worktree の writer を 1 人に固定します
-- 包括的開発では、同一 worktree の parallel write を許可しません
+- 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
+- 包括的開発では、same directory / same public API surface の parallel write を許可しません
 
 ### Gate 1. 要件整理
 
@@ -290,8 +290,8 @@ exit 条件:
 ルール:
 - 実行計画は詳細設計の前に必ず確定させます
 - どの subagent / role がどの stage を担当するか明記します
-- 包括的開発では、`Single Writer Worktree:` と `Integration Order:` を書きます
-- 複数 writer が必要な場合は、worktree ごとの writer を明記します
+- 包括的開発では、`Write Scope Ledger:` と `Integration Order:` を書きます
+- 複数 writer が必要な場合は、writer ごとの disjoint path / separate worktree を明記します
 
 exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
@@ -711,11 +711,11 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - code、docs、tests、workflow、tools、runtime をまたぐ umbrella pass に使います
 - 背骨は 1 本の waterfall pass のままにし、surface ごとの差分を `schedule.md` の stage owner と write scope で切ります
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
-- Gate 3 では `Single Writer Worktree:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
+- Gate 3 では `Write Scope Ledger:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
 - Gate 8-9 では言語差分に応じて `python_reviewer` や `cpp_reviewer` と `project_reviewer` を通し、slice 単位ではなく全体整合を見ます
-- 同一 worktree では `worker` だけが repo file を編集します
-- 複数 writer が必要な場合は、writer ごとに worktree を分けてから統合します
+- parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
+- write scope が重なる場合は、writer ごとに serialize するか worktree を分けてから統合します
 
 ## 8. reuse-first の必須ルール
 

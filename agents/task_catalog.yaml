@@ -7,6 +7,41 @@
 version: 2
 
 workflow_families:
+  - id: scoped_change_lite
+    name: Scoped Change Lite
+    subagent_prompt:
+      purpose: Prompt packet for one-file or single-abstraction fixes with cheap-first triage and local validation.
+      prompt_preamble:
+        - Treat this as a local bounded fix; upgrade to `scoped_change` when public API, dependency, workflow, or specification interpretation is involved.
+        - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
+        - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
+      workflow_focus:
+        - Use `explorer`, `test_designer`, `spark_worker`, and language-specific reviewers before high-cost generic review.
+        - Keep this route only for one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Omit document-flow and broad design review unless reader-facing docs, new terms, public APIs, or workflow surfaces changed.
+        - Escalate to `scoped_change` when the fix surface is non-obvious, validation is cross-module, or the cheap reviewer returns escalate.
+      reviewer_prompt:
+        - Prefer language-specific and diff-triage findings before broad review.
+        - Block completion if validation is missing, request clauses are not mapped, or write scope expanded beyond the lite route.
+    spawn_budget:
+      active_subagents: 4
+      max_write_subagents: 2
+    roles:
+      always_on:
+        - manager
+        - implementer
+        - change_reviewer
+        - verifier
+        - auditor
+      specialists:
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - docs_workflow_steward
+    tasks:
+      - T1
+      - T2
+
   - id: scoped_change
     name: Scoped Change
     subagent_prompt:
@@ -14,11 +49,11 @@ workflow_families:
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; do not route work to another repository unless the parent explicitly says so.
         - Start from the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml; do not rely on chat-only summaries.
-        - Include request_clause_ids, expected artifact path, write scope, validation command, and next review gate in every handoff.
+        - Include request_clause_ids, expected artifact path, parent-assigned write scope, validation command, and next review gate in every handoff.
       workflow_focus:
         - Route repo inventory, tool drift survey, static validation triage, diff-local language review, machine-report summarization, and eligible narrow implementation slices to `gpt-5.3-codex-spark` `low` roles first; reserve `gpt-5.5` for synthesis, design judgment, conflict resolution, and final approval.
         - Treat a narrow implementation slice as Spark-eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-        - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates.
+        - Keep the diff narrow, but do not skip requirements, plan, design, document-flow, test-design, review, validation, or closeout gates when this full scoped route is active.
         - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
         - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
@@ -27,7 +62,7 @@ workflow_families:
         - Block completion if validation is only partial or if review findings were recorded but not integrated.
     spawn_budget:
       active_subagents: 8
-      max_write_subagents: 1
+      max_write_subagents: 2
     roles:
       always_on:
         - manager
@@ -48,8 +83,6 @@ workflow_families:
         - python_reviewer
         - cpp_reviewer
     tasks:
-      - T1
-      - T2
       - T3
 
   - id: research_driven_change
@@ -72,7 +105,7 @@ workflow_families:
         - For paper-like work, keep citation/evidence, notation, logic, and document-flow review as separate passes.
     spawn_budget:
       active_subagents: 12
-      max_write_subagents: 1
+      max_write_subagents: 3
     roles:
       always_on:
         - manager
@@ -131,7 +164,7 @@ workflow_families:
         - Verify every chunk maps back to the umbrella completion boundary.
     spawn_budget:
       active_subagents: 10
-      max_write_subagents: 1
+      max_write_subagents: 3
     roles:
       always_on:
         - manager
@@ -175,7 +208,7 @@ workflow_families:
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
     spawn_budget:
       active_subagents: 10
-      max_write_subagents: 1
+      max_write_subagents: 2
     roles:
       always_on:
         - manager
@@ -215,13 +248,13 @@ workflow_families:
         - For AgentCanon tasks, classify whether the change is standalone AgentCanon source, template parent gitlink, root shared-surface sync, or derived repo proposal before editing.
         - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
-        - Preserve single-writer discipline; additional agents are read-only unless a separate worktree is explicitly planned.
+        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths or separate worktrees.
       reviewer_prompt:
         - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
         - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
     spawn_budget:
       active_subagents: 12
-      max_write_subagents: 1
+      max_write_subagents: 4
     roles:
       always_on:
         - manager
@@ -271,7 +304,7 @@ workflow_families:
         - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
     spawn_budget:
       active_subagents: 12
-      max_write_subagents: 1
+      max_write_subagents: 3
     roles:
       always_on:
         - manager
@@ -307,18 +340,14 @@ workflow_families:
 tasks:
   - id: T1
     name: local bug fix
-    family: scoped_change
+    family: scoped_change_lite
     specialists:
-      - scheduler
-      - schedule_reviewer
       - test_designer
       - python_reviewer
   - id: T2
     name: CI or flaky test fix
-    family: scoped_change
+    family: scoped_change_lite
     specialists:
-      - scheduler
-      - schedule_reviewer
       - test_designer
       - python_reviewer
   - id: T3
@@ -397,11 +426,7 @@ tasks:
       - experiment_reviewer
       - report_reviewer
       - reproducibility_reviewer
-      - scientific_computing_reviewer
-      - benchmark_reviewer
       - artifact_reviewer
-      - fair_data_reviewer
-      - ml_science_reviewer
   - id: T10
     name: academic paper, thesis chapter, or scholarly note
     family: research_driven_change
@@ -456,11 +481,7 @@ tasks:
       - test_designer
       - python_reviewer
       - reproducibility_reviewer
-      - scientific_computing_reviewer
-      - benchmark_reviewer
       - artifact_reviewer
-      - fair_data_reviewer
-      - ml_science_reviewer
 
 review_packs:
   - id: research_perspective_review
@@ -472,12 +493,24 @@ review_packs:
       - artifact_reviewer
       - fair_data_reviewer
       - ml_science_reviewer
+    default_for_tasks: []
+    optional_for_tasks:
+      - T4
+      - T5
+      - T9
+      - T13
+    when: full research perspective review is explicitly requested, or triage shows methodology, benchmark, FAIR-data, ML-science, or scientific-computing risk
+  - id: research_perspective_triage
+    name: Research Perspective Triage
+    specialists:
+      - reproducibility_reviewer
+      - artifact_reviewer
     default_for_tasks:
       - T4
       - T5
       - T9
       - T13
-    when: methodology, artifact policy, benchmark protocol, or reporting policy changes substantially
+    when: experiment logs, runtime artifacts, or reporting evidence need a minimum reproducibility and artifact-readiness check before selecting extra perspective reviewers
   - id: academic_writing_review
     name: Academic Writing Review
     specialists:

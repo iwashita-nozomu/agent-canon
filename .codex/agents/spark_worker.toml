@@ -23,7 +23,7 @@ Responsibilities:
 - return the slice when design, naming, scope, or validation judgment is nontrivial
 
 Rules:
-- stay within the approved write scope and act as the only writer in the current worktree
+- stay within the parent-assigned write scope and do not touch paths assigned to another writer
 - do not start without approved requirements, plan, detailed design, design review, document flow review, and test plan when the task requires them
 - before editing, read the Implementation Source Packet and Design-To-Implementation Trace
 - before each implementation slice, cite the design artifact path and section, test plan item, and request clause IDs

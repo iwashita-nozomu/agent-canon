@@ -98,6 +98,7 @@ class IssueSyncReport:
     github_checked: int = 0
     github_missing_links: int = 0
     github_drift: int = 0
+    github_unavailable: int = 0
 
 
 @dataclass
@@ -204,6 +205,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo", default="", help="GitHub repository owner/name.")
     parser.add_argument("--require-github-link", action="store_true")
     parser.add_argument("--github-check", action="store_true", help="Read linked GitHub Issues and report mirror drift.")
+    parser.add_argument(
+        "--allow-github-auth-unavailable",
+        action="store_true",
+        help="Report GitHub auth failures as unavailable instead of failing the read-only check.",
+    )
     parser.add_argument("--apply", action="store_true", help="Create missing GitHub Issues with gh.")
     parser.add_argument("--sync-github", action="store_true", help="Update linked GitHub Issues to match local issue files.")
     parser.add_argument("--summary-file", type=Path, help="Append a Markdown summary to this path.")
@@ -365,15 +371,24 @@ def expected_github_state(issue: IssueRecord) -> str:
     return "OPEN"
 
 
+def is_github_auth_unavailable(error: Exception) -> bool:
+    """Return whether a gh failure is an authentication infrastructure problem."""
+    text = str(error)
+    return "HTTP 401" in text or "Bad credentials" in text or "gh auth login" in text
+
+
 def github_mirror_findings(
     root: Path,
     issues: Sequence[IssueRecord],
     repo: str,
-) -> tuple[list[Finding], int, int]:
+    *,
+    allow_auth_unavailable: bool = False,
+) -> tuple[list[Finding], int, int, int]:
     """Return findings from read-only GitHub Issue mirror checks."""
     findings: list[Finding] = []
     checked = 0
     drift = 0
+    unavailable = 0
     client = GitHubIssueClient(repo)
     for issue in issues:
         reference = github_issue_reference(issue.github_issue, repo)
@@ -383,6 +398,9 @@ def github_mirror_findings(
         try:
             snapshot = client.read(reference)
         except (RuntimeError, json.JSONDecodeError) as error:
+            if allow_auth_unavailable and is_github_auth_unavailable(error):
+                unavailable += 1
+                continue
             findings.append(Finding("github", rel_path, f"gh-read-failed:{error}"))
             drift += 1
             continue
@@ -405,7 +423,7 @@ def github_mirror_findings(
         if snapshot.body != expected_body:
             findings.append(Finding("github", rel_path, "body-drift"))
             drift += 1
-    return findings, checked, drift
+    return findings, checked, drift, unavailable
 
 
 def github_missing_link_count(issues: Sequence[IssueRecord]) -> int:
@@ -462,6 +480,7 @@ def validate(
     require_github_link: bool,
     repo: str = "",
     github_check: bool = False,
+    allow_github_auth_unavailable: bool = False,
 ) -> IssueSyncReport:
     """Validate local issue sync state."""
     canon_root = agent_canon_root(root.resolve())
@@ -476,8 +495,14 @@ def validate(
     findings.extend(duplicate_id_findings(canon_root, issues))
     github_checked = 0
     github_drift = 0
+    github_unavailable = 0
     if github_check and not findings:
-        github_findings, github_checked, github_drift = github_mirror_findings(canon_root, issues, repo)
+        github_findings, github_checked, github_drift, github_unavailable = github_mirror_findings(
+            canon_root,
+            issues,
+            repo,
+            allow_auth_unavailable=allow_github_auth_unavailable,
+        )
         findings.extend(github_findings)
     return IssueSyncReport(
         issues=issues,
@@ -486,6 +511,7 @@ def validate(
         github_checked=github_checked,
         github_missing_links=github_missing_link_count(issues),
         github_drift=github_drift,
+        github_unavailable=github_unavailable,
     )
 
 
@@ -499,6 +525,7 @@ def report_with_plan(report: IssueSyncReport, root: Path, repo: str) -> IssueSyn
         github_checked=report.github_checked,
         github_missing_links=report.github_missing_links,
         github_drift=report.github_drift,
+        github_unavailable=report.github_unavailable,
     )
 
 
@@ -521,6 +548,7 @@ def render_json(report: IssueSyncReport) -> str:
             "github_checked": report.github_checked,
             "github_missing_links": report.github_missing_links,
             "github_drift": report.github_drift,
+            "github_unavailable": report.github_unavailable,
         },
         indent=2,
         sort_keys=True,
@@ -538,6 +566,7 @@ def render_markdown_summary(report: IssueSyncReport) -> str:
         f"- missing_github_links: `{report.github_missing_links}`",
         f"- github_checked: `{report.github_checked}`",
         f"- github_drift: `{report.github_drift}`",
+        f"- github_unavailable: `{report.github_unavailable}`",
         f"- findings: `{len(report.findings)}`",
         f"- planned_sync_commands: `{len(report.sync_plan)}`",
     ]
@@ -573,7 +602,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
         for item in synced:
             print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
-    report = validate(args.root, args.require_github_link, args.repo, args.github_check or args.sync_github)
+    report = validate(
+        args.root,
+        args.require_github_link,
+        args.repo,
+        args.github_check or args.sync_github,
+        allow_github_auth_unavailable=args.allow_github_auth_unavailable and not args.sync_github,
+    )
     report = report_with_plan(report, args.root, args.repo)
     if args.summary_file:
         append_summary(args.summary_file, report)
@@ -588,6 +623,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ISSUE_SYNC_GITHUB_MISSING_LINKS={report.github_missing_links}")
         print(f"ISSUE_SYNC_GITHUB_CHECKED={report.github_checked}")
         print(f"ISSUE_SYNC_GITHUB_DRIFT={report.github_drift}")
+        print(f"ISSUE_SYNC_GITHUB_UNAVAILABLE={report.github_unavailable}")
         print(f"ISSUE_SYNC_FINDINGS={len(report.findings)}")
         print(f"ISSUE_SYNC={'pass' if not report.findings else 'fail'}")
     return 1 if report.findings else 0

@@ -76,8 +76,10 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 ## Team Shape
 
-- Always-on roles:
+- Full staged always-on roles:
   - `manager`, `manager_reviewer`, `designer`, `design_reviewer`, `document_flow_reviewer`, `implementer`, `change_reviewer`, `final_reviewer`, `verifier`, `auditor`
+- Lite scoped always-on roles:
+  - `manager`, `implementer`, `change_reviewer`, `verifier`, `auditor`
 - Specialist roles:
   - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
 - `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
@@ -86,7 +88,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
 - code 変更では `test_designer` を実装前に立て、最も意地の悪い case を `test_plan.md` に固定します。
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
-- `implementer` だけが repo file を編集します。
+- repo file edit は parent-managed write scope で割り当て、同一 path / ownership / public API surface を複数 writer に割り当てません。
 - `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。
 
 ## Startup Contract
@@ -159,7 +161,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-包括的開発では、同一 worktree の writer は常に 1 人です。複数 writer が必要な場合は worktree を分けます。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は serialize するか worktree を分けます。
 
 `--task-id` を使うと、task catalog の default specialist と default review pack をそのまま bundle に展開できます。狭い例外だけ `--enable` を追加します。
 

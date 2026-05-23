@@ -335,6 +335,24 @@ def test_devcontainer_only_requires_source_fallback(tmp_path: Path) -> None:
     assert "missing:agent-canon-source-only" in result.stdout
 
 
+def test_devcontainer_generator_rejects_fixed_ipam(tmp_path: Path) -> None:
+    """Devcontainer generator should rely on Docker Compose automatic network selection."""
+    write_valid_devcontainer_only(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.write_text(
+        script.read_text(encoding="utf-8")
+        + "\nDEVCONTAINER_SUBNET=192.168.248.16/28\n"
+        + "printf '    ipam:\\n'\n",
+        encoding="utf-8",
+    )
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "forbidden:DEVCONTAINER_SUBNET" in result.stdout
+    assert "forbidden:ipam:" in result.stdout
+
+
 def test_valid_runtime_config_passes(tmp_path: Path) -> None:
     """A coherent Dockerfile, pack, and devcontainer entrypoint should pass."""
     write_valid_runtime(tmp_path)
@@ -392,6 +410,43 @@ def test_generated_compose_mismatch_fails(tmp_path: Path) -> None:
     assert result.returncode == 1, result.stdout + result.stderr
     assert "CONTAINER_CONFIG=fail" in result.stdout
     assert "missing:dockerfile: docker/Dockerfile" in result.stdout
+
+
+def test_generated_compose_fixed_ipam_fails(tmp_path: Path) -> None:
+    """Generated devcontainer compose should not pin subnet or gateway values."""
+    write_valid_runtime(tmp_path)
+    write_file(
+        tmp_path,
+        ".devcontainer/docker-compose.generated.yml",
+        "\n".join(
+            [
+                "name: fixture-devcontainer",
+                "services:",
+                "  workspace:",
+                "    build:",
+                "      context: ..",
+                "      dockerfile: docker/Dockerfile",
+                "    working_dir: /workspace",
+                "    volumes:",
+                "      - ..:/workspace:cached",
+                "networks:",
+                "  default:",
+                "    ipam:",
+                "      config:",
+                "        - subnet: 192.168.248.16/28",
+                "          gateway: 192.168.248.17",
+                "",
+            ]
+        ),
+    )
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG=fail" in result.stdout
+    assert "forbidden:ipam:" in result.stdout
+    assert "forbidden:subnet:" in result.stdout
+    assert "forbidden:gateway:" in result.stdout
 
 
 def test_invalid_requirements_fail(tmp_path: Path) -> None:

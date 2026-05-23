@@ -75,7 +75,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertEqual(globs["agents/skills/*.md"], 54)
         self.assertEqual(globs["agents/workflows/*.md"], 22)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
-        self.assertEqual(globs[".codex/agents/*.toml"], 29)
+        self.assertEqual(globs[".codex/agents/*.toml"], 32)
 
     def test_default_manifest_includes_convention_compliance_eval_coverage(
         self,

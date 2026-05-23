@@ -97,12 +97,14 @@ or high-risk review. Profiles do not waive workflow gates.
   - runtime hard ceiling として使います
 - `job_max_runtime_seconds = 3600`
   - 長めの review / repo scan / validation を含む subagent job を 1 時間まで許容します
-- depth は repo config で固定しません
+- `max_depth = 1`
+  - recursive fan-out は既定で止めます
 - 同時 spawn の既定 budget は workflow family 側で決めます
+  - `Scoped Change Lite`: 4
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
-- 同時 write-capable subagent は常に 1 体までです
+- write-capable subagent は parent-managed write scope で制御します。`team_manifest.yaml` の write policy が disjoint path / separate worktree を割り当てた場合だけ複数 writer を許可し、重なる場合は serialize します。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
@@ -158,71 +160,83 @@ or high-risk review. Profiles do not waive workflow gates.
 
 ## Model Policy
 
-- `gpt-5.5` + `high`
+- `gpt-5.5` + `high`: frontier-required planning, synthesis, broad implementation, and ship decision
   - `requirements_organizer`
   - `manager_reviewer`
   - `execution_planner`
   - `detailed_designer`
   - `long_form_writer`
-  - `notation_definition_reviewer`
-  - `logic_gap_reviewer`
   - `literature_researcher`
-  - `docs_workflow_steward`
   - `worker`
   - `reviewer`
   - `plan_reviewer`
   - `detailed_design_reviewer`
-  - `document_flow_reviewer`
+  - `citation_evidence_reviewer`
+  - `notation_definition_reviewer`
+  - `logic_gap_reviewer`
   - `project_reviewer`
+  - `ship_reviewer`
+- `gpt-5.4-mini` + `medium`: conditional specialist review
+  - `document_flow_reviewer`
+  - `docs_workflow_steward`
   - `report_reviewer`
-  - perspective reviewer 全般
-- `gpt-5.3-codex-spark` + `low`
+  - `reproducibility_reviewer`
+  - `scientific_computing_reviewer`
+  - `benchmark_reviewer`
+  - `artifact_reviewer`
+  - `fair_data_reviewer`
+  - `ml_science_reviewer`
+  - `oop_readability_reviewer`
+- `gpt-5.3-codex-spark` + `low`: cheap-first survey, test, diff review, and execution-only work
   - `explorer`
   - `test_designer`
   - `python_reviewer`
   - `cpp_reviewer`
-- design-traced narrow implementation default
-  - `gpt-5.3-codex-spark`
-    - `spark_worker`
+  - `diff_triage_reviewer`
+  - `spark_worker`
+  - `experiment_runner`
 - code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `low` reasoning effort to keep output bounded
-- broad or ambiguous implementation fallback
-  - `gpt-5.5`
-    - `worker`
-    - 設計解釈、conflict resolution、architecture-sensitive edit
 - repo default は `high`
   - `xhigh` は parent が必要と判断したときだけ manual escalation として使う
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
+- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model override の正本です
 
 ## Current Agents
 
-- `requirements_organizer`
-- `manager_reviewer`
-- `execution_planner`
-- `plan_reviewer`
-- `detailed_designer`
-- `long_form_writer`
-- `detailed_design_reviewer`
-- `document_flow_reviewer`
-- `notation_definition_reviewer`
-- `logic_gap_reviewer`
-- `explorer`
-- `reviewer`
-- `worker`
-- `spark_worker`
-- `docs_workflow_steward`
-- `project_reviewer`
-- `literature_researcher`
-- `python_reviewer`
+- `artifact_reviewer`
+- `benchmark_reviewer`
+- `citation_evidence_reviewer`
 - `cpp_reviewer`
+- `detailed_design_reviewer`
+- `detailed_designer`
+- `diff_triage_reviewer`
+- `docs_workflow_steward`
+- `document_flow_reviewer`
+- `execution_planner`
+- `experiment_runner`
+- `explorer`
+- `fair_data_reviewer`
+- `literature_researcher`
+- `logic_gap_reviewer`
+- `long_form_writer`
+- `manager_reviewer`
+- `ml_science_reviewer`
+- `notation_definition_reviewer`
+- `oop_readability_reviewer`
+- `plan_reviewer`
+- `project_reviewer`
+- `python_reviewer`
 - `report_reviewer`
 - `reproducibility_reviewer`
+- `requirements_organizer`
+- `reviewer`
 - `scientific_computing_reviewer`
-- `benchmark_reviewer`
-- `artifact_reviewer`
-- `fair_data_reviewer`
-- `ml_science_reviewer`
+- `ship_reviewer`
+- `spark_worker`
+- `test_designer`
+- `worker`
 
 ## Smoke Test
 

@@ -173,6 +173,33 @@ class IssueSyncTest(unittest.TestCase):
             self.assertIn("body-drift", result.stdout)
             self.assertIn("ISSUE_SYNC_GITHUB_DRIFT=1", result.stdout)
 
+    def test_github_check_can_treat_auth_failure_as_unavailable(self) -> None:
+        """Actions read-only checks should not block when GitHub auth is unavailable."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_issue(
+                root,
+                "open",
+                "AC-20260517-test-issue",
+                github_issue="https://github.com/owner/repo/issues/7",
+            )
+            bin_dir = self.write_failing_gh(root, "HTTP 401: Bad credentials (https://api.github.com/graphql)")
+
+            result = self.run_checker_with_env(
+                root,
+                self.env_with_path(bin_dir),
+                "--repo",
+                "owner/repo",
+                "--github-check",
+                "--allow-github-auth-unavailable",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("ISSUE_SYNC_GITHUB_CHECKED=0", result.stdout)
+            self.assertIn("ISSUE_SYNC_GITHUB_DRIFT=0", result.stdout)
+            self.assertIn("ISSUE_SYNC_GITHUB_UNAVAILABLE=1", result.stdout)
+            self.assertIn("ISSUE_SYNC=pass", result.stdout)
+
     def test_summary_file_records_issue_mirror_status(self) -> None:
         """The checker can append a readable issue mirror summary."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -242,6 +269,26 @@ class IssueSyncTest(unittest.TestCase):
                     "))",
                     "    raise SystemExit(0)",
                     "raise SystemExit('unexpected gh command: ' + ' '.join(sys.argv[1:]))",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        gh.chmod(0o755)
+        return bin_dir
+
+    def write_failing_gh(self, root: Path, message: str) -> Path:
+        """Write a fake gh executable that fails with one message."""
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        gh = bin_dir / "gh"
+        gh.write_text(
+            "\n".join(
+                [
+                    "#!/usr/bin/env python3",
+                    "import sys",
+                    f"print({message!r}, file=sys.stderr)",
+                    "raise SystemExit(1)",
                 ]
             )
             + "\n",

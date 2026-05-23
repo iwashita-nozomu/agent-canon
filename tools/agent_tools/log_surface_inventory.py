@@ -45,6 +45,7 @@ TOOL_PATTERNS = ("tools/*.py", "tools/*.sh", "tools/**/*.py", "tools/**/*.sh", "
 RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20
+OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}
 
 
 @dataclass(frozen=True, order=True)
@@ -109,12 +110,15 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
         """Record simple dict assignments that later logging calls may emit."""
         fields = self._dict_fields(node.value)
-        if not fields:
-            self.generic_visit(node)
-            return
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                self.dict_assignments[target.id] = fields
+        if fields:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    self.dict_assignments[target.id] = fields
+        if self.surface == "tool" and any(
+            isinstance(target, ast.Name) and target.id in OUTPUT_LINE_VARIABLES
+            for target in node.targets
+        ):
+            self._record_key_value_literals(node.value)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
@@ -123,6 +127,8 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
             fields = self._dict_fields(node.value)
             if fields:
                 self.dict_assignments[node.target.id] = fields
+            if self.surface == "tool" and node.target.id in OUTPUT_LINE_VARIABLES:
+                self._record_key_value_literals(node.value)
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
@@ -134,6 +140,15 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
             self._record_json_arg(node, "json_object")
         if "log" in call_name and call_name not in {"logging.getLogger"}:
             self._record_structured_helper_args(node)
+        if self.surface == "tool" and self._is_output_line_mutator(node.func):
+            for arg in node.args:
+                self._record_key_value_literals(arg)
+        self.generic_visit(node)
+
+    def visit_Return(self, node: ast.Return) -> None:  # noqa: N802
+        """Record returned key-value strings from render helpers."""
+        if self.surface == "tool" and node.value is not None:
+            self._record_key_value_literals(node.value)
         self.generic_visit(node)
 
     def _record_print_call(self, node: ast.Call) -> None:
@@ -159,6 +174,34 @@ class PythonLogSurfaceVisitor(ast.NodeVisitor):
             ):
                 for field, certainty in self._fields_from_node(arg):
                     self._add_record("json_log_helper", field, node.lineno, certainty)
+
+    def _record_key_value_literals(self, node: ast.AST) -> None:
+        """Record key-value literals used to build emitted text lines."""
+        for value in self._literal_key_value_nodes(node):
+            for field, certainty in self._key_value_fields(value):
+                self._add_record(
+                    "key_value_literal",
+                    field,
+                    getattr(value, "lineno", getattr(node, "lineno", 1)),
+                    certainty,
+                )
+
+    def _literal_key_value_nodes(self, node: ast.AST) -> tuple[ast.AST, ...]:
+        if isinstance(node, ast.Constant | ast.JoinedStr):
+            return (node,)
+        if isinstance(node, ast.List | ast.Tuple | ast.Set):
+            values: list[ast.AST] = []
+            for element in node.elts:
+                values.extend(self._literal_key_value_nodes(element))
+            return tuple(values)
+        return ()
+
+    def _is_output_line_mutator(self, node: ast.AST) -> bool:
+        if not isinstance(node, ast.Attribute):
+            return False
+        if node.attr not in {"append", "extend"}:
+            return False
+        return isinstance(node.value, ast.Name) and node.value.id in OUTPUT_LINE_VARIABLES
 
     def _fields_from_node(self, node: ast.AST) -> tuple[tuple[str, Certainty], ...]:
         if isinstance(node, ast.Dict):

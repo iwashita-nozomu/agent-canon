@@ -509,13 +509,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=12", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=4", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
@@ -568,7 +569,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=3", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
                 result.stdout,
@@ -663,10 +664,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
             manifest_text = (
                 report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
+            self.assertIn("write_scope_policy:", manifest_text)
+            self.assertIn("parent_managed: true", manifest_text)
             self.assertIn("workflow_family:", manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("subagent_lifecycle_policy:", manifest_text)

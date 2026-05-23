@@ -59,12 +59,12 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 1. `worker` は bounded slice だけを担当し、親が 1 本ずつ統合します。
 1. `project_reviewer` を closeout に再投入し、slice ごとではなく全体の integration risk を閉じます。
 
-## Single-Writer Rule
+## Parent-Managed Write Scope
 
-- 同一 worktree の writer は `worker` 1 人に固定します。
-- same directory の parallel write を許可しません。
-- 複数 writer が必要な場合は worktree を分け、各 worktree に writer を 1 人だけ置きます。
-- reviewer は read-only を保ち、single-writer rule の確認は `plan_reviewer` と `project_reviewer` が行います。
+- parent は writer ごとの allowed path / directory を `team_manifest.yaml` の write policy で固定します。
+- same directory / same public API surface の parallel write を許可しません。
+- write scope が重なる場合は serialize するか worktree を分けます。
+- reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary
 

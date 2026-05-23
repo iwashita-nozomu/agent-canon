@@ -137,6 +137,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - The generated Docker Compose file must set a top-level project `name` derived
   from the repository path, with `DEVCONTAINER_PROJECT_NAME` reserved as an
   explicit override for rare host-level collisions.
+- The generated Docker Compose file must not pin subnet, gateway, or other
+  IPAM values. Let Docker Compose allocate the default network automatically so
+  multiple checkouts and host networks do not collide.
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and

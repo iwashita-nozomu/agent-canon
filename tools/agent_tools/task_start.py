@@ -17,9 +17,12 @@ from agent_team import (
     RunBundleSpec,
     TeamConfig,
     auto_language_specialists,
+    codex_agent_model_matrix_for_roles,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
+    enable_choices,
+    expand_enabled_specialists,
     load_task_catalog,
     load_team_config,
     make_run_id,
@@ -29,7 +32,6 @@ from agent_team import (
     resolve_task_spec,
     resolve_workflow_family,
     select_roles,
-    specialist_role_ids,
     task_ids,
     workflow_spawn_budget,
 )
@@ -68,10 +70,7 @@ def cross_cutting_document_packet_output(workspace_root: Path) -> str:
     )
 
 
-def build_parser(
-    specialist_choices: tuple[str, ...],
-    task_choices: tuple[str, ...],
-) -> argparse.ArgumentParser:
+def build_parser(enable_names: tuple[str, ...], task_choices: tuple[str, ...]) -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
@@ -104,9 +103,9 @@ def build_parser(
     parser.add_argument(
         "--enable",
         action="append",
-        choices=specialist_choices,
+        choices=enable_names,
         default=[],
-        help="Enable a specialist role. Repeat the flag to enable multiple roles.",
+        help="Enable a specialist role or review pack. Repeat the flag to enable multiple entries.",
     )
     parser.add_argument(
         "--full-team",
@@ -188,7 +187,7 @@ def main() -> int:
     """Run the task-start command."""
     config = load_team_config()
     catalog = load_task_catalog(config)
-    args = build_parser(specialist_role_ids(config), task_ids(catalog)).parse_args()
+    args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
     workspace_root = Path(args.workspace_root).resolve()
     try:
         preflight = run_agent_canon_preflight(
@@ -228,7 +227,9 @@ def main() -> int:
             include_default_review_packs=not args.no_default_review_packs,
         )
 
-    enabled_specialists = list(args.enable)
+    enabled_specialists = list(
+        expand_enabled_specialists(config, catalog, tuple(args.enable))
+    )
     for role_id in task_default_specialists:
         if role_id not in enabled_specialists:
             enabled_specialists.append(role_id)
@@ -243,7 +244,13 @@ def main() -> int:
             if role_id not in enabled_specialists:
                 enabled_specialists.append(role_id)
 
-    roles = select_roles(config, enabled_specialists, args.full_team)
+    roles = select_roles(
+        config,
+        enabled_specialists,
+        args.full_team,
+        catalog=catalog,
+        workflow_family_id=workflow_family_id,
+    )
     created_files: tuple[str, ...] = ()
     if not args.dry_run:
         created_files = create_run_bundle(
@@ -309,6 +316,7 @@ def main() -> int:
         "IMPLEMENTATION_CODEX_AGENTS="
         f"{','.join(codex_agents_for_role(config, 'implementer'))}"
     )
+    print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(roles))}")
     print(
         "CROSS_CUTTING_DOCUMENT_PACKET="
         f"{cross_cutting_document_packet_output(workspace_root)}"

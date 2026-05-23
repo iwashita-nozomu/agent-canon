@@ -6,17 +6,17 @@
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"
   ],
-  "version": 17,
+  "version": 18,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
     "branch_prefix": "agent",
     "worktree_scope_required": true,
-    "default_runtime_policy": "design_first_single_writer_team",
+    "default_runtime_policy": "design_first_parent_managed_write_scope_team",
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "tools/agent_tools/agent_team.py",
-    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow of requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks default to independent research, experiment, report, reproducibility, scientific-computing, benchmark, artifact, and FAIR-style review roles. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are all separate agents, every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate. Detailed design fixes identifier naming before implementation. Only implementer may modify repository source files."
+    "summary": "The manager is the single front-door role for intake, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability. Repo-changing tasks use an explicit staged flow scaled by workflow family: lite scoped fixes use cheap-first triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> adversarial test design -> implementation. Research and scientific-software tasks use evidence-driven perspective review instead of always enabling every frontier reviewer. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated. Every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate for non-lite work. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently only when their manifest write policies and handoffs assign disjoint paths or separate worktrees; review roles remain artifact-only."
   },
   "always_on_roles": [
     {
@@ -205,15 +205,16 @@
           "work_log"
         ],
         "requires_worktree_scope": true,
-        "notes": "The implementer is the only role allowed to modify repository files, and only inside WORKTREE_SCOPE.md editable directories. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
+        "notes": "The implementer may modify repository files only inside its parent-assigned WORKTREE_SCOPE.md editable directories and only for paths allocated to its implementation slice. Multiple write-capable roles require disjoint scopes or separate worktrees. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
       }
     },
     {
       "id": "change_reviewer",
       "codex_agents": [
-        "reviewer",
         "python_reviewer",
-        "cpp_reviewer"
+        "cpp_reviewer",
+        "diff_triage_reviewer",
+        "reviewer"
       ],
       "owns": [
         "implementation_review",
@@ -234,6 +235,7 @@
     {
       "id": "final_reviewer",
       "codex_agents": [
+        "ship_reviewer",
         "reviewer",
         "project_reviewer"
       ],
@@ -346,6 +348,7 @@
     {
       "id": "experimenter",
       "codex_agents": [
+        "experiment_runner",
         "worker"
       ],
       "activation": "benchmark_or_experiment_loop_needed",
