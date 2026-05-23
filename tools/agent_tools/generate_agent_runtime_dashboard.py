@@ -18,7 +18,7 @@ import json
 import re
 import subprocess
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -45,6 +45,24 @@ TOKEN_MARKDOWN_RE = re.compile(
     r"baseline_total_tokens:\s*(?P<baseline>\d+).*?"
     r"candidate_total_tokens:\s*(?P<candidate>\d+).*?"
     r"token_ratio:\s*(?P<ratio>[0-9.]+)",
+    re.DOTALL,
+)
+TOKEN_SUMMARY_RE = re.compile(
+    r"token_usage_summary=present\s+"
+    r"session_count=(?P<sessions>\d+)\s+"
+    r"token_event_count=(?P<events>\d+)\s+"
+    r"total_tokens=(?P<total>\d+)\s+"
+    r"moving_average_window=(?P<window>\d+)\s+"
+    r"latest_moving_average_total=(?P<moving>[0-9.]+)\s+"
+    r"average_tokens_per_event=(?P<average>[0-9.]+)"
+)
+TOKEN_SUMMARY_MARKDOWN_RE = re.compile(
+    r"TOKEN_USAGE_SESSION_COUNT=(?P<sessions>\d+).*?"
+    r"TOKEN_USAGE_TOKEN_EVENT_COUNT=(?P<events>\d+).*?"
+    r"TOKEN_USAGE_TOTAL_TOKENS=(?P<total>\d+).*?"
+    r"TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT=(?P<average>[0-9.]+).*?"
+    r"TOKEN_USAGE_MOVING_AVERAGE_WINDOW=(?P<window>\d+).*?"
+    r"TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=(?P<moving>[0-9.]+)",
     re.DOTALL,
 )
 MAX_REPORT_LINES = 20
@@ -78,6 +96,12 @@ SELECTED_WORKFLOW_FIELDS = (
     "workflow",
     "workflow_family",
     "selected_workflow",
+)
+ALL_SELECTION_NAMESPACES = "*"
+CROSS_NAMESPACE_SELECTION_COMPONENTS = frozenset(
+    {
+        ("skill", "oop-readability-check"),
+    }
 )
 
 
@@ -115,6 +139,7 @@ class HookWorkflowBreakdown:
     missing_workflow_tools: Counter[str]
     entries_with_workflow: int
     entries_without_workflow: int
+    context_attributed_entries: int
 
 
 @dataclass(frozen=True)
@@ -123,9 +148,16 @@ class TokenUsageBreakdown:
 
     comparison_files: tuple[Path, ...]
     comparison_count: int
+    summary_files: tuple[Path, ...]
+    summary_count: int
     baseline_total_tokens: int
     candidate_total_tokens: int
     token_ratios: tuple[float, ...]
+    session_count: int
+    token_event_count: int
+    total_tokens: int
+    latest_moving_average_total: float
+    average_tokens_per_event: float
 
 
 @dataclass(frozen=True)
@@ -139,6 +171,7 @@ class PromptToolBreakdown:
     tool_selection_entries: int
     tools: Counter[str]
     command_verbs: Counter[str]
+    selected_tools: Counter[str]
 
 
 @dataclass(frozen=True)
@@ -343,28 +376,34 @@ class HookWorkflowBreakdownReader:
         missing_tools: Counter[str] = Counter()
         entries_with_workflow = 0
         entries_without_workflow = 0
-        for hook_file in hook_files:
-            for entry in cls.iter_entries(hook_file):
-                names = cls.workflow_names(entry)
-                if not names:
-                    entries_without_workflow += 1
-                    missing_by_file[relative_path_label(hook_file, root)] += 1
-                    missing_events[str(entry.get("event") or "missing_event")] += 1
-                    missing_namespaces[
-                        str(entry.get("hook_log_namespace") or "missing_namespace")
-                    ] += 1
-                    missing_statuses[str(entry.get("status") or "missing_status")] += 1
-                    tool_name = str(
-                        entry.get("tool_name") or entry.get("tool_command_verb") or ""
-                    )
-                    if tool_name:
-                        missing_tools[tool_name] += 1
-                    continue
-                entries_with_workflow += 1
-                event = str(entry.get("event") or "missing_event")
-                for name in names:
-                    workflows[name] += 1
-                    workflow_events[f"{name}@{event}"] += 1
+        context_attributed_entries = 0
+        latest_by_namespace: dict[str, tuple[str, ...]] = {}
+        for _entry_epoch, _sequence, hook_file, entry in cls.sorted_entries(hook_files):
+            namespace = str(entry.get("hook_log_namespace") or "missing_namespace")
+            names = cls.workflow_names(entry)
+            if names:
+                latest_by_namespace[namespace] = names
+                attributed_names = names
+            else:
+                attributed_names = latest_by_namespace.get(namespace, ())
+                context_attributed_entries += int(bool(attributed_names))
+            if not attributed_names:
+                entries_without_workflow += 1
+                missing_by_file[relative_path_label(hook_file, root)] += 1
+                missing_events[str(entry.get("event") or "missing_event")] += 1
+                missing_namespaces[namespace] += 1
+                missing_statuses[str(entry.get("status") or "missing_status")] += 1
+                tool_name = str(
+                    entry.get("tool_name") or entry.get("tool_command_verb") or ""
+                )
+                if tool_name:
+                    missing_tools[tool_name] += 1
+                continue
+            entries_with_workflow += 1
+            event = str(entry.get("event") or "missing_event")
+            for name in attributed_names:
+                workflows[name] += 1
+                workflow_events[f"{name}@{event}"] += 1
         return HookWorkflowBreakdown(
             workflows=workflows,
             workflow_events=workflow_events,
@@ -375,7 +414,29 @@ class HookWorkflowBreakdownReader:
             missing_workflow_tools=missing_tools,
             entries_with_workflow=entries_with_workflow,
             entries_without_workflow=entries_without_workflow,
+            context_attributed_entries=context_attributed_entries,
         )
+
+    @classmethod
+    def sorted_entries(
+        cls,
+        hook_files: Sequence[Path],
+    ) -> tuple[tuple[int, int, Path, dict[str, object]], ...]:
+        """Return hook entries in a stable approximate runtime order."""
+        rows: list[tuple[int, int, Path, dict[str, object]]] = []
+        sequence = 0
+        for hook_file in hook_files:
+            for entry in cls.iter_entries(hook_file):
+                rows.append(
+                    (
+                        parse_hook_timestamp(entry.get("timestamp")),
+                        sequence,
+                        hook_file,
+                        entry,
+                    )
+                )
+                sequence += 1
+        return tuple(sorted(rows, key=lambda row: (row[0] or row[1], row[1])))
 
     @staticmethod
     def iter_entries(hook_file: Path) -> tuple[dict[str, object], ...]:
@@ -408,9 +469,16 @@ class TokenUsageBreakdownReader:
     def read(cls, root: Path) -> TokenUsageBreakdown:
         """Return accumulated token comparison stats."""
         files: set[Path] = set()
+        summary_files: set[Path] = set()
         ratios: list[float] = []
         baseline_total = 0
         candidate_total = 0
+        summary_count = 0
+        session_count = 0
+        token_event_count = 0
+        total_tokens = 0
+        latest_moving_average_total = 0.0
+        average_tokens_per_event = 0.0
         for path in cls.candidate_paths(root):
             text = path.read_text(encoding="utf-8")
             for baseline, candidate, ratio in cls.comparisons(text):
@@ -418,12 +486,27 @@ class TokenUsageBreakdownReader:
                 baseline_total += baseline
                 candidate_total += candidate
                 ratios.append(ratio)
+            for sessions, events, total, moving, average in cls.summaries(text):
+                summary_files.add(path)
+                summary_count += 1
+                session_count += sessions
+                token_event_count += events
+                total_tokens += total
+                latest_moving_average_total = moving
+                average_tokens_per_event = average
         return TokenUsageBreakdown(
             comparison_files=tuple(sorted(files)),
             comparison_count=len(ratios),
+            summary_files=tuple(sorted(summary_files)),
+            summary_count=summary_count,
             baseline_total_tokens=baseline_total,
             candidate_total_tokens=candidate_total,
             token_ratios=tuple(ratios),
+            session_count=session_count,
+            token_event_count=token_event_count,
+            total_tokens=total_tokens,
+            latest_moving_average_total=latest_moving_average_total,
+            average_tokens_per_event=average_tokens_per_event,
         )
 
     @staticmethod
@@ -432,6 +515,7 @@ class TokenUsageBreakdownReader:
         patterns = (
             "reports/agents/**/workflow_monitoring.md",
             "reports/agents/**/*token*.md",
+            "reports/**/*token*.md",
             "agents/evals/results/**/*.md",
         )
         paths: set[Path] = set()
@@ -450,6 +534,23 @@ class TokenUsageBreakdownReader:
                         int(match.group("baseline")),
                         int(match.group("candidate")),
                         float(match.group("ratio")),
+                    )
+                )
+        return tuple(matches)
+
+    @staticmethod
+    def summaries(text: str) -> tuple[tuple[int, int, int, float, float], ...]:
+        """Return token moving-average summaries found in one text blob."""
+        matches: list[tuple[int, int, int, float, float]] = []
+        for pattern in (TOKEN_SUMMARY_RE, TOKEN_SUMMARY_MARKDOWN_RE):
+            for match in pattern.finditer(text):
+                matches.append(
+                    (
+                        int(match.group("sessions")),
+                        int(match.group("events")),
+                        int(match.group("total")),
+                        float(match.group("moving")),
+                        float(match.group("average")),
                     )
                 )
         return tuple(matches)
@@ -566,21 +667,45 @@ class SelectionMetricsReader:
         entries_with_candidates = 0
         entries_with_selection = 0
         filtered_observations = 0
+        events: list[
+            tuple[
+                int,
+                int,
+                str,
+                dict[str, tuple[str, ...]],
+                dict[str, tuple[str, ...]],
+            ]
+        ] = []
+        sequence = 0
         for hook_file in hook_files:
             for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
-                entries_seen += 1
-                entry_epoch = parse_hook_timestamp(entry.get("timestamp"))
-                selected = selected_by_responsibility(entry)
+                selected = selected_by_responsibility(entry, hook_file)
                 candidates = candidates_by_responsibility(entry)
-                entries_with_selection += int(any(selected.values()))
-                entries_with_candidates += int(any(candidates.values()))
-                filtered_observations += self.add_selected_components(store, selected, entry_epoch)
-                filtered_observations += self.add_candidate_components(
-                    store,
-                    candidates,
-                    selected,
-                    entry_epoch,
+                events.append(
+                    (
+                        sequence,
+                        parse_hook_timestamp(entry.get("timestamp")),
+                        selection_namespace(entry, hook_file),
+                        selected,
+                        candidates,
+                    )
                 )
+                sequence += 1
+        future_selected = future_selected_positions(events)
+        for sequence, entry_epoch, namespace, selected, candidates in events:
+            entries_seen += 1
+            entries_with_selection += int(any(selected.values()))
+            entries_with_candidates += int(any(candidates.values()))
+            filtered_observations += self.add_selected_components(store, selected, entry_epoch)
+            filtered_observations += self.add_candidate_components(
+                store,
+                candidates,
+                selected,
+                entry_epoch,
+                future_selected,
+                namespace,
+                sequence,
+            )
         return SelectionMetricsBreakdown(
             metrics=store.to_metrics(),
             entries_seen=entries_seen,
@@ -609,13 +734,22 @@ class SelectionMetricsReader:
         candidates: dict[str, tuple[str, ...]],
         selected: dict[str, tuple[str, ...]],
         entry_epoch: int,
+        future_selected: dict[tuple[str, str, str], tuple[int, ...]],
+        namespace: str,
+        sequence: int,
     ) -> int:
         """Add candidate components and return filtered observation count."""
         filtered = 0
         for responsibility, names in candidates.items():
             selected_names = set(selected.get(responsibility, ()))
             for name in names:
-                missed = name not in selected_names
+                missed = name not in selected_names and not has_future_selection(
+                    future_selected,
+                    namespace,
+                    responsibility,
+                    name,
+                    sequence,
+                )
                 if not store.add_candidate(responsibility, name, entry_epoch, missed):
                     filtered += 1
         return filtered
@@ -638,7 +772,7 @@ class RuntimeDashboardVisuals:
             f"  SkillEval[\"Skill prompt evals<br/>reports: {family_count(summary, 'skill-workflow-prompt')}\"]",
             f"  SkillFailures[\"Skill failure attribution<br/>skills: {len(summary.skill_eval_breakdown.failed)}\"]",
             f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
-            f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}\"]",
+            f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}<br/>summaries: {summary.token_usage_breakdown.summary_count}\"]",
             f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
             f"  Selection[\"Selection accuracy<br/>items: {len(summary.selection_metrics_breakdown.metrics)}<br/>misses: {selection_missed_total(summary)}\"]",
             f"  MarkdownDocs[\"Markdown/docs signals<br/>eval fails: {summary.markdown_docs_breakdown.failed_eval_reports}<br/>hook signals: {markdown_hook_signal_count(summary)}\"]",
@@ -758,9 +892,9 @@ class RuntimeDashboardVisuals:
         breakdown = self.summary.token_usage_breakdown
         return action_map_row(
             "token consumption",
-            "record token_count comparisons when token use drives workflow design",
-            breakdown.comparison_count,
-            breakdown.comparison_count == 0,
+            "record token_count comparisons or moving averages when token use drives workflow design",
+            breakdown.comparison_count + breakdown.summary_count,
+            breakdown.comparison_count == 0 and breakdown.summary_count == 0,
         )
 
     def prompt_tool_row(self) -> str:
@@ -1115,6 +1249,7 @@ def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummar
         "| --- | --- |",
         f"| `entries_with_workflow` | `{breakdown.entries_with_workflow}` |",
         f"| `entries_missing_workflow` | `{breakdown.entries_without_workflow}` |",
+        f"| `entries_context_attributed` | `{breakdown.context_attributed_entries}` |",
         f"| `missing_events` | `{compact_counter_summary(breakdown.missing_workflow_events)}` |",
         f"| `missing_namespaces` | `{compact_counter_summary(breakdown.missing_workflow_namespaces)}` |",
         f"| `missing_statuses` | `{compact_counter_summary(breakdown.missing_workflow_statuses)}` |",
@@ -1178,6 +1313,7 @@ def compact_markdown_prompt_drilldown_lines(summary: RuntimeDashboardSummary) ->
         f"| `tool_selection_entries` | `{prompt.tool_selection_entries}` |",
         f"| `top_tools` | `{compact_counter_summary(prompt.tools)}` |",
         f"| `top_command_verbs` | `{compact_counter_summary(prompt.command_verbs)}` |",
+        f"| `top_selected_repo_tools` | `{compact_counter_summary(prompt.selected_tools)}` |",
     ]
 
 
@@ -1188,10 +1324,16 @@ def compact_token_consumption_drilldown_lines(summary: RuntimeDashboardSummary) 
         "| metric | value |",
         "| --- | --- |",
         f"| `comparison_count` | `{breakdown.comparison_count}` |",
-        f"| `comparison_files` | `{len(breakdown.comparison_files)}` |",
+        f"| `summary_count` | `{breakdown.summary_count}` |",
+        f"| `evidence_files` | `{len(set(breakdown.comparison_files + breakdown.summary_files))}` |",
         f"| `baseline_total_tokens` | `{breakdown.baseline_total_tokens}` |",
         f"| `candidate_total_tokens` | `{breakdown.candidate_total_tokens}` |",
         f"| `average_token_ratio` | `{average_ratio(breakdown.token_ratios)}` |",
+        f"| `summary_session_count` | `{breakdown.session_count}` |",
+        f"| `summary_token_event_count` | `{breakdown.token_event_count}` |",
+        f"| `summary_total_tokens` | `{breakdown.total_tokens}` |",
+        f"| `latest_moving_average_total_tokens` | `{breakdown.latest_moving_average_total:.3f}` |",
+        f"| `average_tokens_per_event` | `{breakdown.average_tokens_per_event:.3f}` |",
     ]
 
 
@@ -1273,6 +1415,7 @@ class PromptToolAccumulator:
     tool_selection_entries: int = 0
     tools: Counter[str] = field(default_factory=lambda: Counter[str]())
     command_verbs: Counter[str] = field(default_factory=lambda: Counter[str]())
+    selected_tools: Counter[str] = field(default_factory=lambda: Counter[str]())
 
     def add_entry(self, entry: dict[str, object]) -> None:
         """Add prompt and tool-selection evidence from one hook entry."""
@@ -1299,6 +1442,8 @@ class PromptToolAccumulator:
         command_verb = str(entry.get("tool_command_verb") or "")
         if command_verb:
             self.command_verbs[command_verb] += 1
+        for selected_tool in normalized_text_values(entry.get("selected_tools")):
+            self.selected_tools[selected_tool] += 1
 
     def to_breakdown(self) -> PromptToolBreakdown:
         """Return immutable prompt/tool evidence."""
@@ -1310,6 +1455,7 @@ class PromptToolAccumulator:
             tool_selection_entries=self.tool_selection_entries,
             tools=self.tools,
             command_verbs=self.command_verbs,
+            selected_tools=self.selected_tools,
         )
 
 
@@ -1602,6 +1748,7 @@ def hook_workflow_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return [
         f"- hook_entries_with_workflow_attribution: `{breakdown.entries_with_workflow}`",
         f"- hook_entries_missing_workflow_attribution: `{breakdown.entries_without_workflow}`",
+        f"- hook_entries_context_attributed: `{breakdown.context_attributed_entries}`",
         "",
         "| workflow | hook entries |",
         "| --- | ---: |",
@@ -1624,7 +1771,7 @@ def hook_workflow_lines(summary: RuntimeDashboardSummary) -> list[str]:
 def token_usage_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return token consumption evidence lines."""
     breakdown = summary.token_usage_breakdown
-    if breakdown.comparison_count == 0:
+    if breakdown.comparison_count == 0 and breakdown.summary_count == 0:
         return [
             "- token_comparison_status: `missing`",
             "- token_comparison_reason: `no token footprint comparison evidence found`",
@@ -1633,9 +1780,15 @@ def token_usage_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return [
         "- token_comparison_status: `present`",
         f"- token_comparison_count: `{breakdown.comparison_count}`",
+        f"- token_summary_count: `{breakdown.summary_count}`",
         f"- baseline_total_tokens: `{breakdown.baseline_total_tokens}`",
         f"- candidate_total_tokens: `{breakdown.candidate_total_tokens}`",
         f"- average_token_ratio: `{average_ratio(breakdown.token_ratios)}`",
+        f"- token_summary_session_count: `{breakdown.session_count}`",
+        f"- token_summary_event_count: `{breakdown.token_event_count}`",
+        f"- token_summary_total_tokens: `{breakdown.total_tokens}`",
+        f"- latest_moving_average_total_tokens: `{breakdown.latest_moving_average_total:.3f}`",
+        f"- average_tokens_per_event: `{breakdown.average_tokens_per_event:.3f}`",
         "",
         "| evidence file |",
         "| --- |",
@@ -1664,6 +1817,12 @@ def prompt_tool_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "| command verb | entries |",
         "| --- | ---: |",
         *counter_table_rows(breakdown.command_verbs),
+        "",
+        "### Selected Repo Tools",
+        "",
+        "| repo tool | entries |",
+        "| --- | ---: |",
+        *counter_table_rows(breakdown.selected_tools),
     ]
 
 
@@ -1831,7 +1990,10 @@ def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
     """Return whether the dashboard found missing runtime evidence."""
     return (
         summary.hook_workflow_breakdown.entries_without_workflow > 0
-        or summary.token_usage_breakdown.comparison_count == 0
+        or (
+            summary.token_usage_breakdown.comparison_count == 0
+            and summary.token_usage_breakdown.summary_count == 0
+        )
         or summary.prompt_tool_breakdown.prompt_entries == 0
     )
 
@@ -1857,7 +2019,14 @@ def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> Path | None:
 
 def token_file_rows(summary: RuntimeDashboardSummary) -> list[str]:
     """Return bounded token evidence file rows."""
-    files = summary.token_usage_breakdown.comparison_files[:MAX_REPORT_LINES]
+    files = tuple(
+        sorted(
+            set(
+                summary.token_usage_breakdown.comparison_files
+                + summary.token_usage_breakdown.summary_files
+            )
+        )
+    )[:MAX_REPORT_LINES]
     return [f"| `{path.relative_to(summary.root).as_posix()}` |" for path in files]
 
 
@@ -1978,15 +2147,18 @@ def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
             next_action="repair prompt/tool evidence logging",
         )
         )
-    if summary.token_usage_breakdown.comparison_count == 0:
+    if (
+        summary.token_usage_breakdown.comparison_count == 0
+        and summary.token_usage_breakdown.summary_count == 0
+    ):
         components.append(
             ProblemComponent(
                 component_type="workflow",
                 name="token_consumption_evidence",
                 status="missing",
-                problem="no token footprint comparison evidence found",
+                problem="no token footprint comparison or moving-average evidence found",
                 evidence=TOKEN_USAGE_EVIDENCE_TARGET,
-                next_action="record token comparison evidence",
+                next_action="record token usage evidence",
             )
         )
     return tuple(components)
@@ -2239,16 +2411,19 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
 
 def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
     """Return the next action for missing token evidence."""
-    if summary.token_usage_breakdown.comparison_count > 0:
+    if (
+        summary.token_usage_breakdown.comparison_count > 0
+        or summary.token_usage_breakdown.summary_count > 0
+    ):
         return ()
     return (DashboardNextAction(
         priority="P2",
-        action="add token consumption comparison evidence",
-        reason="no token footprint comparison evidence found",
+        action="add token consumption moving-average evidence",
+        reason="no token footprint comparison or moving-average evidence found",
         evidence=TOKEN_USAGE_EVIDENCE_TARGET,
         owner_surface="workflow_monitoring.md and token logging hooks",
-        command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
-        done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0",
+        command="python3 tools/agent_tools/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
+        done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="human-review-then-agent-fix",
     ),)
@@ -2347,7 +2522,11 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS={len(summary.skill_eval_breakdown.failed)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED={summary.hook_workflow_breakdown.entries_with_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING={summary.hook_workflow_breakdown.entries_without_workflow}",
+        f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED={summary.hook_workflow_breakdown.context_attributed_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS={summary.token_usage_breakdown.comparison_count}",
+        f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES={summary.token_usage_breakdown.summary_count}",
+        f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_SESSIONS={summary.token_usage_breakdown.session_count}",
+        f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_EVENTS={summary.token_usage_breakdown.token_event_count}",
         f"AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES={summary.prompt_tool_breakdown.prompt_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES={summary.prompt_tool_breakdown.tool_selection_entries}",
         f"AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS={len(summary.selection_metrics_breakdown.metrics)}",
@@ -2487,10 +2666,61 @@ def integer_field(entry: dict[str, object], key: str) -> int:
     return value if isinstance(value, int) else 0
 
 
-def selected_by_responsibility(entry: dict[str, object]) -> dict[str, tuple[str, ...]]:
+def selection_namespace(entry: dict[str, object], hook_file: Path) -> str:
+    """Return the runtime namespace used for cross-entry selection matching."""
+    return str(entry.get("hook_log_namespace") or hook_file.parent.name or "missing_namespace")
+
+
+def future_selected_positions(
+    events: Sequence[
+        tuple[
+            int,
+            int,
+            str,
+            dict[str, tuple[str, ...]],
+            dict[str, tuple[str, ...]],
+        ]
+    ],
+) -> dict[tuple[str, str, str], tuple[int, ...]]:
+    """Return selected component positions keyed by namespace and responsibility."""
+    positions: defaultdict[tuple[str, str, str], list[int]] = defaultdict(list)
+    for sequence, _epoch, namespace, selected, _candidates in events:
+        for responsibility, names in selected.items():
+            for name in names:
+                positions[(namespace, responsibility, name)].append(sequence)
+                positions[(ALL_SELECTION_NAMESPACES, responsibility, name)].append(sequence)
+    return {key: tuple(value) for key, value in positions.items()}
+
+
+def has_future_selection(
+    positions: dict[tuple[str, str, str], tuple[int, ...]],
+    namespace: str,
+    responsibility: str,
+    name: str,
+    sequence: int,
+) -> bool:
+    """Return whether a candidate is confirmed later in the same runtime namespace."""
+    namespace_match = any(
+        selected_sequence >= sequence
+        for selected_sequence in positions.get((namespace, responsibility, name), ())
+    )
+    if namespace_match:
+        return True
+    if (responsibility, name) in CROSS_NAMESPACE_SELECTION_COMPONENTS:
+        return bool(positions.get((ALL_SELECTION_NAMESPACES, responsibility, name), ()))
+    return False
+
+
+def selected_by_responsibility(
+    entry: dict[str, object],
+    hook_file: Path | None = None,
+) -> dict[str, tuple[str, ...]]:
     """Return selected skills, workflows, and tools from one hook entry."""
+    skills = list(normalized_text_values(entry.get("skills")))
+    if hook_file is not None and hook_file.name == "oop_readability_guard.jsonl":
+        skills.append("oop-readability-check")
     return {
-        "skill": normalized_text_values(entry.get("skills")),
+        "skill": unique_text_values(skills),
         "workflow": selected_workflow_values(entry),
         "tool": selected_tool_values(entry),
     }
@@ -2518,6 +2748,7 @@ def selected_tool_values(entry: dict[str, object]) -> tuple[str, ...]:
     names: list[str] = []
     names.extend(normalized_text_values(entry.get("tool_name")))
     names.extend(normalized_text_values(entry.get("tool_command_verb")))
+    names.extend(normalized_text_values(entry.get("selected_tools")))
     names.extend(command_tool_values(entry.get("commands")))
     return unique_text_values(names)
 

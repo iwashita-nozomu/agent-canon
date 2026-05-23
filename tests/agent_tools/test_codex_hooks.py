@@ -2422,6 +2422,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["tool_name"], "Bash")
         self.assertEqual(entry["tool_selection_kind"], "executed_tool")
         self.assertEqual(entry["tool_command_verb"], "python3")
+        self.assertEqual(entry["selected_tools"], [])
         self.assertEqual(entry["tool_input_keys"], ["cmd"])
         self.assertTrue(entry["tool_input_fingerprint"])
         self.assertFalse(entry["subagent_invoked"])
@@ -2646,6 +2647,51 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("md-style-check", entries[0]["candidate_skills"])
         self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
         self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
+        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+
+    def test_skill_usage_logger_carries_recent_workflow_to_tool_events(self) -> None:
+        """Tool events should inherit the latest declared workflow in the same log shard."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            env = {**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)}
+            subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": "workflow=Scoped Change skills=$agent-orchestration",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "bash tools/ci/run_docs_checks.sh"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
+        self.assertEqual(entries[1]["workflow_selection_kind"], "context_workflow")
+        self.assertEqual(entries[1]["workflow_context_source"], "recent_log")
+        self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
 
     def test_skill_usage_logger_treats_plain_prompt_skill_names_as_selected(self) -> None:
         """Plain public skill ids in user prompts should become selected skill evidence."""

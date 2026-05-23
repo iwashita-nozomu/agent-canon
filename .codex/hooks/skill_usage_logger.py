@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import deque
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -157,6 +158,7 @@ SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
 }
 PROMPT_EXCERPT_LIMIT = 600
 PROMPT_FINGERPRINT_HEX_LENGTH = 16
+ACTIVE_WORKFLOW_LOOKBACK_LINES = 200
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
@@ -230,6 +232,7 @@ class ToolSelection:
     tool_input_key_count: int
     tool_input_keys: tuple[str, ...]
     command_verb: str
+    selected_tools: tuple[str, ...]
 
     def should_log(self) -> bool:
         """Return whether tool selection evidence exists."""
@@ -510,6 +513,7 @@ def tool_selection(payload: dict[str, object]) -> ToolSelection:
         tool_input_key_count=len(keys),
         tool_input_keys=keys,
         command_verb=command_verb(tool_input),
+        selected_tools=command_selected_tools(tool_input),
     )
 
 
@@ -592,10 +596,58 @@ def command_verb(tool_input: object) -> str:
     return command.strip().split()[0]
 
 
+def command_selected_tools(tool_input: object) -> tuple[str, ...]:
+    """Return repo tool script names observed in shell-like tool input."""
+    if not isinstance(tool_input, dict):
+        return ()
+    command = tool_input.get("cmd") or tool_input.get("command")
+    if not isinstance(command, str) or not command.strip():
+        return ()
+    observed: list[str] = []
+    haystack = command.lower()
+    for tool_name in sorted(TOOL_KEYWORDS):
+        if tool_name.lower() in haystack:
+            observed.append(tool_name)
+    return tuple(dict.fromkeys(observed))
+
+
 def default_log_path(root: Path) -> Path:
     """Return the skill usage log path."""
     override = os.environ.get(LOG_PATH_ENV, "").strip()
     return HookLogContext(root, "skill_usage", override).result_path()
+
+
+def active_workflows_from_log(root: Path) -> tuple[str, ...]:
+    """Return the most recent declared workflow for this hook log shard."""
+    path = default_log_path(root)
+    if not path.is_file():
+        return ()
+    try:
+        with path.open(encoding="utf-8") as stream:
+            lines = deque(stream, maxlen=ACTIVE_WORKFLOW_LOOKBACK_LINES)
+    except OSError:
+        return ()
+    for raw_line in reversed(lines):
+        try:
+            entry = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        workflows = tuple(text_values(entry.get("selected_workflows")))
+        if workflows:
+            return tuple(dict.fromkeys(workflows))
+    return ()
+
+
+def workflow_context(root: Path, signals: PromptIntakeSignals) -> tuple[tuple[str, ...], str]:
+    """Return declared or recently active workflow context for one log entry."""
+    if signals.selected_workflows:
+        return signals.selected_workflows, "declared"
+    active = active_workflows_from_log(root)
+    if active:
+        return active, "recent_log"
+    return (), ""
 
 
 def _log_append_log(root: Path, entry: dict[str, object]) -> None:
@@ -630,6 +682,23 @@ def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> 
         return 0, 0
     skill_event_count = 0
     feedback_event_count = 0
+    for workflow in signals.selected_workflows:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(monitor),
+                "--report-dir",
+                report_dir,
+                "--behavior-event",
+                f"workflow_selection={workflow} status=observed source=codex_hook",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_ROOT_TIMEOUT_SECONDS,
+        )
+        if result.returncode == 0:
+            skill_event_count += 1
     for skill in signals.skills:
         result = subprocess.run(
             [
@@ -704,6 +773,14 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
     context = HookLogContext(inputs.root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
     text_sources = observed_text_sources(payload)
     text_values_seen = observed_text(payload)
+    workflows, workflow_source = workflow_context(inputs.root, signals)
+    workflow_kind = (
+        "declared_workflow"
+        if workflow_source == "declared"
+        else "context_workflow"
+        if workflow_source == "recent_log"
+        else ""
+    )
     _log_append_log(
         inputs.root,
         {
@@ -716,12 +793,13 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "selected_skills": list(signals.skills),
             "skill_selection_kind": "declared_skill" if signals.skills else "",
             "skill_count": len(signals.skills),
-            "selected_workflow": signals.selected_workflows[0] if signals.selected_workflows else "",
-            "selected_workflows": list(signals.selected_workflows),
-            "workflow": list(signals.selected_workflows),
-            "workflow_family": signals.selected_workflows[0] if signals.selected_workflows else "",
-            "workflow_selection_kind": "declared_workflow" if signals.selected_workflows else "",
-            "selected_workflow_count": len(signals.selected_workflows),
+            "selected_workflow": workflows[0] if workflows else "",
+            "selected_workflows": list(workflows),
+            "workflow": list(workflows),
+            "workflow_family": workflows[0] if workflows else "",
+            "workflow_selection_kind": workflow_kind,
+            "workflow_context_source": workflow_source,
+            "selected_workflow_count": len(workflows),
             "candidate_skills": list(signals.candidate_skills),
             "candidate_skill_count": len(signals.candidate_skills),
             "candidate_workflows": list(signals.candidate_workflows),
@@ -739,6 +817,8 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "tool_input_key_count": tool.tool_input_key_count,
             "tool_input_keys": list(tool.tool_input_keys),
             "tool_command_verb": tool.command_verb,
+            "selected_tools": list(tool.selected_tools),
+            "selected_tool_count": len(tool.selected_tools),
             "subagent_invoked": subagent.invoked,
             "subagent_event_kind": subagent.action,
             "subagent_tool_name": subagent.tool_name,

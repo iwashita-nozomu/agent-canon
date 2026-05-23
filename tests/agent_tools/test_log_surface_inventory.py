@@ -159,6 +159,29 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             self.assertEqual(clean.returncode, 0)
             self.assertEqual(clean.stdout, "")
 
+            hook.write_text(
+                "\nprint('FIRST_FIELD=1')\nprint('SECOND_FIELD=2')\n",
+                encoding="utf-8",
+            )
+            line_only_move = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--check",
+                    "--baseline",
+                    str(baseline),
+                    "--quiet",
+                    ".codex",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(line_only_move.returncode, 0)
+            self.assertEqual(line_only_move.stdout, "")
+
 
 if __name__ == "__main__":
     unittest.main()
