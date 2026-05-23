@@ -122,6 +122,8 @@ class SkillEvalBreakdown:
 
     evaluated: Counter[str]
     failed: Counter[str]
+    active_failed: Counter[str]
+    resolved_failed: Counter[str]
     reports_missing_used_skills: int
     failed_reports_missing_used_skills: int
 
@@ -330,6 +332,7 @@ class SkillEvalBreakdownReader:
         """Return per-skill pass/fail attribution from one result family."""
         evaluated: Counter[str] = Counter()
         failed: Counter[str] = Counter()
+        latest_status: dict[str, str] = {}
         missing = 0
         failed_missing = 0
         for report in family.reports:
@@ -341,11 +344,24 @@ class SkillEvalBreakdownReader:
                 continue
             for skill in skills:
                 evaluated[skill] += 1
+                latest_status[skill] = status
                 if status == "fail":
                     failed[skill] += 1
+        active_failed = Counter(
+            {skill: 1 for skill, status in latest_status.items() if status == "fail"}
+        )
+        resolved_failed = Counter(
+            {
+                skill: count
+                for skill, count in failed.items()
+                if latest_status.get(skill) not in {"fail", None}
+            }
+        )
         return SkillEvalBreakdown(
             evaluated=evaluated,
             failed=failed,
+            active_failed=active_failed,
+            resolved_failed=resolved_failed,
             reports_missing_used_skills=missing,
             failed_reports_missing_used_skills=failed_missing,
         )
@@ -770,7 +786,7 @@ class RuntimeDashboardVisuals:
             "flowchart LR",
             f"  Hooks[\"Hook JSONL<br/>files: {len(summary.hook_files)}<br/>entries: {summary.hook_entries}\"]",
             f"  SkillEval[\"Skill prompt evals<br/>reports: {family_count(summary, 'skill-workflow-prompt')}\"]",
-            f"  SkillFailures[\"Skill failure attribution<br/>skills: {len(summary.skill_eval_breakdown.failed)}\"]",
+            f"  SkillFailures[\"Skill failure attribution<br/>active failed skills: {len(summary.skill_eval_breakdown.active_failed)}\"]",
             f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
             f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}<br/>summaries: {summary.token_usage_breakdown.summary_count}\"]",
             f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
@@ -862,14 +878,16 @@ class RuntimeDashboardVisuals:
             "skill prompt eval",
             "repair skills or prompts with failed eval reports",
             len(family_by_name(self.summary, "skill-workflow-prompt").reports),
-            bool(family_by_name(self.summary, "skill-workflow-prompt").failed_reports),
+            bool(self.summary.skill_eval_breakdown.active_failed),
         )
 
     def skill_failure_row(self) -> str:
         """Return the skill-failure analysis action-map row."""
         breakdown = self.summary.skill_eval_breakdown
         evidence_count = sum(breakdown.evaluated.values())
-        needs_attention = bool(breakdown.failed or breakdown.failed_reports_missing_used_skills)
+        needs_attention = bool(
+            breakdown.active_failed or breakdown.failed_reports_missing_used_skills
+        )
         return action_map_row(
             "skill eval failure attribution",
             "repair failed skills; missing attribution means eval reports need used_skills",
@@ -1264,11 +1282,11 @@ def compact_skill_eval_failure_drilldown_lines(summary: RuntimeDashboardSummary)
         "| skill | evaluated reports | failed reports | failure rate |",
         "| --- | ---: | ---: | ---: |",
     ]
-    if not breakdown.failed:
+    if not breakdown.active_failed:
         return [*lines, "| `none` | `0` | `0` | `0.0%` |"]
     lines.extend(
         skill_eval_failure_row(breakdown, skill)
-        for skill, _count in breakdown.failed.most_common(MAX_COMPACT_REPORT_LINES)
+        for skill, _count in breakdown.active_failed.most_common(MAX_COMPACT_REPORT_LINES)
     )
     if breakdown.failed_reports_missing_used_skills:
         lines.append(
@@ -1388,7 +1406,9 @@ def read_markdown_docs_breakdown(
     )
     return MarkdownDocsBreakdown(
         eval_reports=sum(skill_eval.evaluated.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
-        failed_eval_reports=sum(skill_eval.failed.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
+        failed_eval_reports=sum(
+            skill_eval.active_failed.get(skill, 0) for skill in MARKDOWN_SKILL_IDS
+        ),
         candidate_skill_entries=sum(hook_counts.candidate_skills.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
         candidate_tool_entries=sum(markdown_tools.values()),
         candidate_tools=markdown_tools,
@@ -1730,6 +1750,8 @@ def skill_eval_failure_lines(summary: RuntimeDashboardSummary) -> list[str]:
             "",
             f"- reports_missing_used_skills: `{breakdown.reports_missing_used_skills}`",
             f"- failed_reports_missing_used_skills: `{breakdown.failed_reports_missing_used_skills}`",
+            f"- historical_failed_skill_reports: `{sum(breakdown.failed.values())}`",
+            f"- resolved_failed_skill_reports: `{sum(breakdown.resolved_failed.values())}`",
         )
     )
     return lines
@@ -1738,7 +1760,7 @@ def skill_eval_failure_lines(summary: RuntimeDashboardSummary) -> list[str]:
 def skill_eval_failure_row(breakdown: SkillEvalBreakdown, skill: str) -> str:
     """Return one per-skill eval failure table row."""
     total = breakdown.evaluated[skill]
-    failed = breakdown.failed.get(skill, 0)
+    failed = breakdown.active_failed.get(skill, 0)
     return f"| `{skill}` | `{total}` | `{failed}` | `{failure_rate(failed, total)}` |"
 
 
@@ -2098,7 +2120,9 @@ def hook_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemCo
 def skill_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
     """Return skill components that need attention."""
     components: list[ProblemComponent] = []
-    for skill, failed in summary.skill_eval_breakdown.failed.most_common(MAX_REPORT_LINES):
+    for skill, failed in summary.skill_eval_breakdown.active_failed.most_common(
+        MAX_REPORT_LINES
+    ):
         components.append(
             ProblemComponent(
                 component_type="skill",
@@ -2346,7 +2370,7 @@ def selection_metrics_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
 
 def skill_eval_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
     """Return the next action for failed skill evals."""
-    failed = summary.skill_eval_breakdown.failed
+    failed = summary.skill_eval_breakdown.active_failed
     if not failed:
         return ()
     skill = failed.most_common(1)[0][0]
@@ -2519,7 +2543,7 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={family_count(summary, 'local-llm-responsibility')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
         f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
-        f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS={len(summary.skill_eval_breakdown.failed)}",
+        f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS={len(summary.skill_eval_breakdown.active_failed)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED={summary.hook_workflow_breakdown.entries_with_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING={summary.hook_workflow_breakdown.entries_without_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED={summary.hook_workflow_breakdown.context_attributed_entries}",
