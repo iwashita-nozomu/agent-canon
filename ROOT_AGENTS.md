@@ -91,6 +91,9 @@ contract listed in `documents/README.md`.
 
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
+- 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、`agent-canon semantic-index thin-docs --top-k <N> --format text`、または該当する bounded semantic-index command を試します。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。
+- semantic-index の JSON が必要な場合は、`--top-k` を必ず小さくし、全体 JSON を agent が読むのではなく `--format jsonl` または `jq -r '.results[] | ...'` で必要 field だけ取り出します。JSONL / compact text で足りない場合だけ、tool 実装や schema debugging の根拠を残して full JSON を開きます。
+- 当面は検索 Eval 収集のため、semantic-index の bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
 - 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
 - 通常の code / docs / routing 調査では、`agents/evals/results/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
 - skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary と generated drilldown を生成して分析します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。

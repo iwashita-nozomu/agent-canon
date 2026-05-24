@@ -1689,6 +1689,86 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_BUILD",
+      "line": 201,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CLI",
+      "line": 260,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CLI_ERROR",
+      "line": 261,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_DB",
+      "line": 202,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_EMBEDDINGS",
+      "line": 205,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_ERROR",
+      "line": 2442,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_FILES",
+      "line": 203,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_NODES",
+      "line": 204,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_SEARCH",
+      "line": 1959,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_THIN_DOCS",
+      "line": 2049,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
@@ -2060,7 +2140,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1310,
+      "line": 1362,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2068,7 +2148,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1344,
+      "line": 1396,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2076,7 +2156,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 972,
+      "line": 1024,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2084,7 +2164,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 975,
+      "line": 1027,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2092,7 +2172,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 980,
+      "line": 1032,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2100,7 +2180,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 982,
+      "line": 1034,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2108,7 +2188,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1203,
+      "line": 1255,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -8884,7 +8964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8892,7 +8972,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8900,7 +8980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8908,7 +8988,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8916,7 +8996,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONTAINER_CONFIG_FINDING",
-      "line": 109,
+      "line": 111,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8924,7 +9004,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 633,
+      "line": 635,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8932,7 +9012,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 631,
+      "line": 633,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8940,7 +9020,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 632,
+      "line": 634,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8948,7 +9028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 625,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -11435,6 +11515,7 @@
     "rust/agent-canon/src/python_structure_hash_impact.rs",
     "rust/agent-canon/src/python_structure_hash_report.rs",
     "rust/agent-canon/src/rust_migration_plan.rs",
+    "rust/agent-canon/src/semantic_index.rs",
     "tools/__init__.py",
     "tools/agent_tools/agent_canon_preflight.py",
     "tools/agent_tools/agent_canon_update_todos.py",

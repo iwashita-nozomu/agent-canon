@@ -15,6 +15,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod rust_migration_plan;
+mod semantic_index;
 
 use std::env;
 
@@ -46,6 +47,10 @@ fn main() {
         std::process::exit(local_llm::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "semantic-index" {
+        std::process::exit(semantic_index::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "python-structure-hash" {
         std::process::exit(python_structure_hash::run(&args[2..]));
     }
@@ -64,7 +69,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|search|similar|merge-candidates|eval> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

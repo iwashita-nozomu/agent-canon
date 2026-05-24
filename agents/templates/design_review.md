@@ -11,10 +11,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Findings
-
-| Area | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+{{>findings_area_table}}
 
 ## Document Completeness Review
 
@@ -56,6 +53,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Record what the designer must revise, whether the issue stays in detailed design, or whether the task must return to planning. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

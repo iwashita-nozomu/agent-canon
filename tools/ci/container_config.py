@@ -79,6 +79,8 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "gitleaks",
     "trufflehog",
     "detect-secrets",
+    "apt_install jq",
+    "jq --version",
     "gh --version",
     "codex --version",
 )

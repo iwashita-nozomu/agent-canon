@@ -96,6 +96,13 @@ install_codex_cli() {
   run_as_root env "PATH=${PATH}" npm cache clean --force
 }
 
+install_json_cli_tools() {
+  if command -v jq >/dev/null 2>&1; then
+    return
+  fi
+  apt_install jq
+}
+
 linux_arch() {
   case "$(uname -m)" in
     x86_64 | amd64)
@@ -317,8 +324,10 @@ else
 fi
 install_github_cli
 install_codex_cli
+install_json_cli_tools
 install_secret_scanners
 install_agent_canon_cli
 install_llama_cpp
+jq --version
 gh --version
 codex --version

@@ -85,6 +85,63 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertNotIn("leak.txt", stale_output)
             self.assertIn("STALE_WORDING_SEARCH=no-matches", stale_output)
 
+    def test_semantic_index_check_writes_review_artifacts(self) -> None:
+        """Semantic review check should write merge, thin-doc, and search JSONL."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            docs = root / "documents"
+            docs.mkdir()
+            repeated = (
+                "# Duplicate\n"
+                "semantic review responsibility candidate phrase\n"
+                "semantic review responsibility candidate phrase\n"
+                "semantic review responsibility candidate phrase\n"
+            )
+            (docs / "one.md").write_text(repeated, encoding="utf-8")
+            (docs / "two.md").write_text(repeated, encoding="utf-8")
+            query = root / "query.txt"
+            query.write_text("semantic review responsibility candidate", encoding="utf-8")
+            report_dir = root / "reports"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "semantic-index",
+                    "--semantic-query-file",
+                    str(query),
+                    "--semantic-top-k",
+                    "5",
+                    "--semantic-min-score",
+                    "0.80",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((report_dir / "semantic_index_root.sqlite").is_file())
+            merge_jsonl = (
+                report_dir / "semantic_index_merge_candidates_root.jsonl"
+            ).read_text(encoding="utf-8")
+            self.assertIn("semantic_index_pairs", merge_jsonl)
+            self.assertIn("candidate_bucket", merge_jsonl)
+            self.assertIn("responsibility_bucket", merge_jsonl)
+            self.assertTrue((report_dir / "semantic_index_thin_docs_root.jsonl").is_file())
+            search_jsonl = (report_dir / "semantic_index_search_root.jsonl").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('"query_chars"', search_jsonl)
+            self.assertNotIn("semantic review responsibility candidate phrase", search_jsonl)
+
 
 if __name__ == "__main__":
     unittest.main()

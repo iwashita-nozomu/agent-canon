@@ -143,7 +143,12 @@ upstream design README.md memory surface index
 
 ## Task Retrospectives
 
-- まだなし
+
+- 2026-05-24 | task-retrospective | For large implementation tasks that intentionally grow agent skills, keep product eval metrics and agent-routing eval metrics in separate artifacts, and send post-fix diffs back through read-only reviewers before closeout.
+  - source: run:20260524-064200-rust-semantic-index-mvp-with-eval-harnes
+  - scope: shared-canon-workflows
+  - confidence: likely
+  - evidence: Semantic-index MVP run separated semantic_index_eval.json from workflow_monitoring.md/agent_evaluation.md and reran reviewer/docs checks after fix-now findings.
 
 ## Promotion Candidates
 

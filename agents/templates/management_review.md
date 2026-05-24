@@ -43,6 +43,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Check whether the intake package identifies existing code, docs, and installed libraries that implementation must follow, and whether it records why reuse or extension is insufficient before any new path is proposed. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

@@ -7,6 +7,7 @@ upstream design local-llm-responsibility-analysis.md local LLM runtime boundary
 downstream implementation ../tools/agent_tools/search.py coordinates search providers from one purpose string
 downstream implementation ../tools/agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation ../rust/agent-canon/src/local_llm.rs exposes local LLM search and index commands through the Rust CLI
+downstream implementation ../rust/agent-canon/src/semantic_index.rs builds SQLite-backed semantic vector candidate indexes
 downstream implementation ../tests/agent_tools/test_search.py validates provider coordination
 downstream implementation ../tests/agent_tools/test_search_index.py validates index generation
 @dependency-end
@@ -34,8 +35,18 @@ agent-canon local-llm search \
 ```
 
 Use `rg` first when the input is an exact path, symbol, literal error message,
-or short unique token. Use coordinated search when the input is ambiguous,
-goal-oriented, or asks for likely files to edit.
+or short unique token. For broad concepts, long user requests, reuse surveys,
+document consolidation, or thin-document discovery, run bounded semantic search
+before broad `rg`:
+
+```bash
+agent-canon semantic-index search --query-file reports/query.txt --top-k 20 --format text
+agent-canon semantic-index thin-docs --top-k 20 --format text
+```
+
+During search-routing Eval collection, run `rg -l` after the bounded semantic
+result so the two surfaces can be compared. Do not use broad raw `rg` output as
+edit authority.
 
 `agent-canon local-llm build-index` writes generated cards under
 `.agent-canon/search-index/`. That directory is repo-local ignored state. Do
@@ -49,6 +60,25 @@ Local LLM output can rank ambiguous candidates, but it is not a correctness
 authority and must not replace dependency review, `rg`, tests, or static
 analysis evidence.
 
-For template and derived repositories, keep generated indexes in the parent
-repo. AgentCanon owns the search tools and provider contract; each parent repo
-owns the current search index that reflects its own files and submodule pin.
+For template and derived repositories, keep generated indexes in an operator
+home cache or an explicit run artifact, not as tracked repository state.
+AgentCanon owns the search tools and provider contract; each parent repo owns
+the current search index that reflects its own files and submodule pin.
+
+`agent-canon semantic-index` is a separate Rust-native semantic-vector cache
+for search, similarity, merge-candidate, thin-document, and Eval reports. It
+writes generated SQLite state under
+`~/.cache/agent-canon/semantic-index/<repo-key>/` by default and remains
+advisory. It does not replace exact `rg`, dependency review, strict structure
+analysis, tests, or static analysis evidence. Use `--query-file` or
+`--query-stdin` for long natural-language prompts, and prefer bounded `--top-k`
+plus `--format text` or `--format jsonl` so agents do not read full JSON
+payloads or long query echoes unnecessarily.
+
+Review workflows should use the same cache as an advisory evidence source.
+`review_backlog_scan.sh` runs semantic-index by default and writes bounded
+JSONL artifacts for responsibility-scoped merge candidates, thin documents, and
+optional long-query search results. Reviewers use those artifacts to find
+possible duplicate responsibility or consolidation surfaces, then confirm with
+dependency manifests, exact text search, structure checks, and the normal
+review gates.

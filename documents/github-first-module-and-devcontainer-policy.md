@@ -84,6 +84,7 @@ The shared devcontainer owns:
 
 - post-create installation of Codex, npm/Node when needed for Codex, and
   GitHub CLI / `gh`;
+- post-create installation of agent-side JSON inspection helpers such as `jq`;
 - post-create installation of the Rust toolchain, rustfmt, clippy,
   rust-analyzer, and the AgentCanon CLI when the AgentCanon source tree contains
   `rust/agent-canon/Cargo.toml`;

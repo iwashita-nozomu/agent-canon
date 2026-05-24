@@ -7,10 +7,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 -->
 
 
-## Findings
-
-| Finding | Severity | Required Change | Evidence | Status |
-| ------- | -------- | --------------- | -------- | ------ |
+{{>findings_required_change_table}}
 
 ## Review Focus
 

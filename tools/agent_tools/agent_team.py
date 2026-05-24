@@ -28,6 +28,14 @@ ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
+TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
+TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
+GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
+GIT_STATUS_SHORT_PATH_START = 3
+DEPENDENCY_MANIFEST_CLOSE_MARKER = "-->"
+RUN_ID_TASK_SLUG_MAX_CHARS = 40
+SHA256_READ_CHUNK_BYTES = 65_536
+NEWLINE = "\n"
 PYTHON_SUFFIXES = {".py", ".pyi"}
 CPP_SUFFIXES = {
     ".c",
@@ -402,9 +410,9 @@ def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
     changed: list[str] = []
     for raw_line in result.stdout.splitlines():
         line = raw_line.rstrip()
-        if len(line) < 4:
+        if len(line) < GIT_STATUS_SHORT_MIN_LINE_LENGTH:
             continue
-        path_part = line[3:]
+        path_part = line[GIT_STATUS_SHORT_PATH_START:]
         if " -> " in path_part:
             _, path_part = path_part.split(" -> ", 1)
         normalized = path_part.strip()
@@ -689,11 +697,55 @@ def resolve_role_document_packet(
     )
 
 
+def strip_dependency_manifest(text: str) -> str:
+    """Remove a dependency manifest block from text included inside another template."""
+    trimmed = text.lstrip()
+    leading = text[: len(text) - len(trimmed)]
+    if not trimmed.startswith("<!--") or "@dependency-start" not in trimmed:
+        return text
+    end = trimmed.find(DEPENDENCY_MANIFEST_CLOSE_MARKER)
+    if end == -1:
+        return text
+    return leading + trimmed[end + len(DEPENDENCY_MANIFEST_CLOSE_MARKER) :].lstrip(
+        NEWLINE
+    )
+
+
+def render_template_partial(partial_name: str, seen: tuple[str, ...] = ()) -> str:
+    """Load one reusable template partial without leaking its manifest into output."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", partial_name):
+        raise RuntimeError(f"invalid template partial name: {partial_name}")
+    if partial_name in seen:
+        chain = " -> ".join((*seen, partial_name))
+        raise RuntimeError(f"recursive template partial include: {chain}")
+    path = TEMPLATE_PARTIAL_ROOT / f"{partial_name}.md"
+    if not path.is_file():
+        raise RuntimeError(f"template partial not found: {partial_name}")
+    content = strip_dependency_manifest(path.read_text(encoding="utf-8"))
+    return expand_template_partials(content, (*seen, partial_name))
+
+
+def expand_template_partials(content: str, seen: tuple[str, ...] = ()) -> str:
+    """Expand reusable partial markers in one template body."""
+    return TEMPLATE_PARTIAL_RE.sub(
+        lambda match: render_template_partial(match.group(1), seen),
+        content,
+    )
+
+
+def apply_template_replacements(content: str, replacements: dict[str, str]) -> str:
+    """Apply run-specific replacements to one rendered template."""
+    for key, value in replacements.items():
+        content = content.replace(f"{{{{{key}}}}}", value)
+        content = content.replace(f"{{\\{{{key}}}}}", value)
+    return content
+
+
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
     """Load and fill a text template from agents/templates."""
     content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
-    for key, value in replacements.items():
-        content = content.replace(f"{{{{{key}}}}}", value)
+    content = expand_template_partials(content)
+    content = apply_template_replacements(content, replacements)
     return content
 
 
@@ -873,7 +925,7 @@ def manifest_prompt_contract_lines(
     lines = ["    prompt_contract:"]
     lines.append(
         "      assignment_prompt: "
-        f"{role_prompt_contract(role, workflow_family).replace(chr(10), ' ')!r}"
+        f"{role_prompt_contract(role, workflow_family).replace(NEWLINE, ' ')!r}"
     )
     lines.append("      prompt_must_include:")
     for item in role_prompt_must_include(role):
@@ -1200,7 +1252,7 @@ def slugify(value: str) -> str:
 def make_run_id(task: str, created_at: datetime) -> str:
     """Build a stable default run id."""
     timestamp = created_at.strftime("%Y%m%d-%H%M%S")
-    return f"{timestamp}-{slugify(task)[:40]}"
+    return f"{timestamp}-{slugify(task)[:RUN_ID_TASK_SLUG_MAX_CHARS]}"
 
 
 def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
@@ -1407,7 +1459,7 @@ def _file_sha256(path: Path) -> str:
     """Return the sha256 digest for one file."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
+        for chunk in iter(lambda: handle.read(SHA256_READ_CHUNK_BYTES), b""):
             digest.update(chunk)
     return digest.hexdigest()
 

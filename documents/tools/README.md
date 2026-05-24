@@ -10,6 +10,7 @@ downstream implementation ../../tools/agent_tools/responsibility_scope.py valida
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
+downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
@@ -57,6 +58,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
 - `agent-canon local-llm build-index`
   - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
+- `agent-canon semantic-index`
+  - text-like file を安定 node に分け、dense semantic vector を SQLite に保存します。
+  - `build`、`search`、`similar`、`merge-candidates`、`thin-docs`、`eval` を持つ候補生成 tool です。
+  - `search` は `--query`、`--query-file`、`--query-stdin` を受けます。長い user request は file / stdin で渡し、agent が JSON 全体や長い query echo を読む必要がないように `--top-k` と `--format text` または `--format jsonl` を使います。
+  - `similar` は横断 alignment evidence を許可し、`merge-candidates` は full repo 入力のまま同じ responsibility scope / surface kind / document topic / node kind 内だけを候補化します。runtime mirror と eval/report log は統合候補にしません。
+  - `thin-docs` は低内容量、高い単一 target 類似度、参照密度、wrapper 語彙から薄い文書候補を出し、root entrypoint は `keep_entrypoint` として削除候補から分けます。
+  - 生成 DB の既定は `~/.cache/agent-canon/semantic-index/<repo-key>/` です。repo-local cache が必要な場合だけ `--db` で明示し、commit しません。削除・統合の authority にはしません。
 - `tools/agent_tools/route.py --area search`
   - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
 - `documents/tools/tool-docs.toml`
@@ -208,6 +216,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
   - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
   - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
+  - SQLite-backed semantic candidates が必要な場合は `agent-canon semantic-index` を使います。
   - 例:
 
 ```bash
@@ -251,6 +260,7 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
   - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
   - goal / maintainer / audit profile の tool であり、通常の small change では required gate にしません。
   - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
+  - 既定で `agent-canon semantic-index` も実行し、responsibility-scoped merge candidates、thin docs、任意の long-query search を review artifact として JSONL 保存します。
   - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。
   - PR readiness 前に、出力された inventory と dependency graph から、AgentCanon-owned source、template/root local state、synced copy、symlink view、GitHub path-constraint copy、project-owned artifact のどれを編集 / 検証するかを明示します。
   - 例:
