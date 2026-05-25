@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Checks algorithm InitializeConfig/SolveConfig ownership partition.
 # upstream design ../../documents/design/jax_util/algorithm_module_contract.md config contract
-# upstream design ../../documents/coding-conventions-solvers.md solver config partition convention
+# upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
 # downstream implementation ../../tests/agent_tools/test_check_algorithm_config_partition.py tests
 # @dependency-end
 """Check algorithm config ownership and hidden default/fallback values."""

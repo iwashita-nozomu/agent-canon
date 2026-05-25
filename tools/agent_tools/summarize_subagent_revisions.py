@@ -4,7 +4,7 @@
 # upstream design ../../agents/skills/agent-log-analysis.md requires compact summaries before log analysis
 # upstream design ../../agents/skills/result-artifact-writeout.md defines raw and summary artifact writeout
 # upstream implementation ./generate_agent_runtime_dashboard.py generates compact runtime summaries
-# downstream report ../../reports/agents/*/subagent_revision_summary.md records run-local summary output
+# downstream implementation ../../tools/README.md documents run-local summary output
 # @dependency-end
 """Summarize subagent revise/rework evidence without reading raw JSONL logs."""
 
