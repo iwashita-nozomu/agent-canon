@@ -1362,8 +1362,7 @@ fn assignment_target_name(line: &str) -> Option<String> {
     let (left, _right) = line.split_once('=')?;
     let name = left
         .split(|value: char| !(value.is_ascii_alphanumeric() || value == '_'))
-        .filter(|value| !value.is_empty())
-        .next_back()?;
+        .rfind(|value| !value.is_empty())?;
     Some(name.to_string())
 }
 
@@ -1388,8 +1387,7 @@ fn callee_instance_uses(line: &str, variable_name: &str) -> Vec<CalleeInstanceUs
         let open = cursor + offset;
         let function_name = line[..open]
             .split(|value: char| !(value.is_ascii_alphanumeric() || value == '_' || value == '.'))
-            .filter(|value| !value.is_empty())
-            .next_back()
+            .rfind(|value| !value.is_empty())
             .unwrap_or("")
             .rsplit('.')
             .next()
