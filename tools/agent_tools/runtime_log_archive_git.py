@@ -28,6 +28,7 @@ from runtime_log_paths import (  # noqa: E402
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
+EVAL_RESULT_KEEP_SOURCE_RELATIVES = frozenset((Path("README.md"), Path("hook-runs") / "README.md"))
 
 
 @dataclass(frozen=True)
@@ -98,6 +99,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--delete-source",
         action="store_true",
         help="Delete imported source JSONL after copying. Tracked files are removed with git rm.",
+    )
+
+    eval_results = subparsers.add_parser(
+        "import-eval-results",
+        help="Copy old AgentCanon in-tree eval Markdown reports into eval-results/legacy-import.",
+    )
+    eval_results.add_argument(
+        "--legacy-root",
+        type=Path,
+        help="Legacy eval results root. Defaults to <canon-root>/agents/evals/results.",
+    )
+    eval_results.add_argument(
+        "--destination-prefix",
+        default="eval-results/legacy-import",
+        help="Archive-relative destination prefix for legacy eval reports.",
+    )
+    eval_results.add_argument(
+        "--delete-source",
+        action="store_true",
+        help=(
+            "Delete imported source eval result files after copying. The root README and "
+            "hook-runs/README.md notices remain in source."
+        ),
     )
 
     push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
@@ -393,10 +417,80 @@ def command_import_legacy(context: ArchiveContext, args: argparse.Namespace) -> 
     return 0
 
 
+def should_import_eval_result(relative: Path) -> bool:
+    """Return whether one legacy eval result file should move to eval-results."""
+    if relative.parts and relative.parts[0] == "hook-runs":
+        return False
+    return True
+
+
+def should_delete_eval_source(relative: Path) -> bool:
+    """Return whether one imported eval source file can leave the source tree."""
+    return relative not in EVAL_RESULT_KEEP_SOURCE_RELATIVES
+
+
+def command_import_eval_results(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Import old in-tree eval Markdown reports into the archive clone."""
+    ensure_archive(context)
+    legacy_root = (
+        args.legacy_root.resolve()
+        if args.legacy_root
+        else context.canon_root / "agents" / "evals" / "results"
+    )
+    destination_prefix = safe_archive_relative_path(args.destination_prefix)
+    if context.archive_root.resolve() == legacy_root or context.archive_root.resolve() in legacy_root.parents:
+        raise ArchiveGitError("legacy root cannot be inside the archive clone")
+    if not legacy_root.exists():
+        print_context(context)
+        print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=0")
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no")
+        print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS=pass")
+        return 0
+
+    imported = 0
+    existing = 0
+    deleted = 0
+    for source in sorted(path for path in legacy_root.rglob("*") if path.is_file()):
+        relative = source.relative_to(legacy_root)
+        if not should_import_eval_result(relative):
+            continue
+        target = context.archive_root / destination_prefix / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if target.read_bytes() != source.read_bytes():
+                raise ArchiveGitError(f"archive destination already exists with different content: {target}")
+            existing += 1
+        else:
+            shutil.copy2(source, target)
+            imported += 1
+        if args.delete_source and should_delete_eval_source(relative):
+            delete_source_file(context, source)
+            deleted += 1
+
+    if (context.archive_root / destination_prefix).exists():
+        git(context.archive_root, ["add", "--", destination_prefix.as_posix()])
+
+    print_context(context)
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_ROOT={legacy_root}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DESTINATION={destination_prefix.as_posix()}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES={imported + existing}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_NEW_FILES={imported}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_EXISTING_FILES={existing}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS={deleted}")
+    print(f"RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE={'yes' if args.delete_source else 'no'}")
+    print("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS=pass")
+    return 0
+
+
 def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
     """Commit and push source repo runtime logs."""
     ensure_archive(context)
-    log_paths = [Path("hook-runs") / context.repo_key, Path("hook-runs") / "legacy-import"]
+    log_paths = [
+        Path("hook-runs") / context.repo_key,
+        Path("hook-runs") / "legacy-import",
+        Path("eval-results"),
+    ]
     message = args.message or f"Append {context.repo_key} runtime logs"
 
     for logs_path in log_paths:
@@ -432,6 +526,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_status(context, args)
         if args.command == "import-legacy":
             return command_import_legacy(context, args)
+        if args.command == "import-eval-results":
+            return command_import_eval_results(context, args)
         if args.command == "push":
             return command_push(context, args)
     except ArchiveGitError as exc:

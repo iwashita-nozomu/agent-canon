@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Resolves AgentCanon runtime hook log archive paths without mutating repositories.
+# responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
 # downstream implementation ../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
 # downstream implementation ./generate_agent_improvement_guide.py reads mounted hook log archives
 # downstream implementation ./eval_accumulation_check.py validates mounted hook log archives
+# downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
+# downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
+# downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
+# downstream implementation ./local_llm_eval.py writes accumulated eval reports through this resolver
 # @dependency-end
-"""Resolve AgentCanon runtime log archive paths."""
+"""Resolve AgentCanon runtime log and eval archive paths."""
 
 from __future__ import annotations
 
@@ -57,7 +61,7 @@ def state_log_archive_root() -> Path:
     return Path(tempfile.gettempdir()) / "agent-canon" / "log-archive"
 
 
-def log_archive_root(canon_root: Path) -> Path:
+def _log_archive_root(canon_root: Path) -> Path:
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
     if override:
@@ -70,12 +74,36 @@ def log_archive_root(canon_root: Path) -> Path:
 
 def hook_results_dir(active_root: Path, canon_root: Path) -> Path:
     """Return the hook JSONL result directory for one source repository."""
-    return log_archive_root(canon_root) / "hook-runs" / repo_log_key(active_root)
+    return _log_archive_root(canon_root) / "hook-runs" / repo_log_key(active_root)
 
 
 def legacy_hook_results_dir(canon_root: Path) -> Path:
     """Return the historical in-tree hook result directory."""
     return canon_root / "agents" / "evals" / "results" / "hook-runs"
+
+
+def legacy_eval_results_dir(canon_root: Path, family: str) -> Path:
+    """Return the historical in-tree eval result directory for one family."""
+    return canon_root / "agents" / "evals" / "results" / safe_slug(family)
+
+
+def eval_results_dir(canon_root: Path, family: str) -> Path:
+    """Return the active accumulated eval result directory for one family."""
+    mount = mounted_log_archive_root(canon_root)
+    if mount.is_dir():
+        return mount / "eval-results" / safe_slug(family)
+    return legacy_eval_results_dir(canon_root, family)
+
+
+def eval_result_search_dirs(canon_root: Path, family: str) -> tuple[Path, ...]:
+    """Return eval result directories to read for one family."""
+    family_slug = safe_slug(family)
+    candidates: list[Path] = [
+        eval_results_dir(canon_root, family_slug),
+        mounted_log_archive_root(canon_root) / "eval-results" / "legacy-import" / family_slug,
+        legacy_eval_results_dir(canon_root, family_slug),
+    ]
+    return tuple(dict.fromkeys(candidates))
 
 
 def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Path, ...]:
@@ -85,5 +113,5 @@ def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Pat
         legacy_hook_results_dir(canon_root),
     ]
     if requested_root.resolve() == canon_root.resolve():
-        candidates.append(log_archive_root(canon_root) / "hook-runs" / "legacy-import")
+        candidates.append(_log_archive_root(canon_root) / "hook-runs" / "legacy-import")
     return tuple(dict.fromkeys(candidates))

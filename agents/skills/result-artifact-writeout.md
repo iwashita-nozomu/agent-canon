@@ -37,7 +37,7 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 ## Destination Rules
 
 - run-local task evidence: `reports/agents/<run-id>/`
-- accumulated skill / workflow eval: `agents/evals/results/<eval-family>/<unique-id>.md`
+- accumulated skill / workflow eval: `.agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md`
 - hook result chronology: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`
 - experiment reader report: `experiments/report/<run_name>.md`

@@ -94,6 +94,9 @@ SPARK_CODING_ROLE_IDS = {
     "spark_worker",
 }
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
+EXPECTED_MAX_THREADS = 24
+EXPECTED_MAX_DEPTH = 1
+EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 
 
 @dataclass(frozen=True)
@@ -145,11 +148,17 @@ def validate_project_config() -> None:
     ensure("profiles" not in config, "project-local profiles must stay out of shared config")
     agents = config.get("agents", {})
     ensure(isinstance(agents, dict), "agents must be a mapping")
-    ensure(agents.get("max_threads") == 24, "agents.max_threads must remain 24")
-    ensure(agents.get("max_depth") == 1, "agents.max_depth must remain 1")
     ensure(
-        agents.get("job_max_runtime_seconds") == 3600,
-        "agents.job_max_runtime_seconds must remain 3600",
+        agents.get("max_threads") == EXPECTED_MAX_THREADS,
+        f"agents.max_threads must remain {EXPECTED_MAX_THREADS}",
+    )
+    ensure(
+        agents.get("max_depth") == EXPECTED_MAX_DEPTH,
+        f"agents.max_depth must remain {EXPECTED_MAX_DEPTH}",
+    )
+    ensure(
+        agents.get("job_max_runtime_seconds") == EXPECTED_JOB_MAX_RUNTIME_SECONDS,
+        f"agents.job_max_runtime_seconds must remain {EXPECTED_JOB_MAX_RUNTIME_SECONDS}",
     )
     codex_agents = parse_codex_agents()
     registry = {
@@ -199,6 +208,7 @@ def validate_project_hooks() -> None:
         "mcp_session_context.sh must exist as an optional context helper",
     )
     for hook_script in (
+        "log_archive_mount_warning.py",
         "prompt_secret_guard.py",
         "goal_completion_guard.py",
         "oop_readability_guard.py",

@@ -3,6 +3,7 @@
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
 # upstream design ../../agents/evals/README.md prompt eval directory contract
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml default prompt eval manifest
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end
 """Evaluate skill and workflow prompt surfaces against frozen checklist evals."""
@@ -27,7 +28,14 @@ try:
 except ModuleNotFoundError:  # Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from runtime_log_paths import eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
+
+DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
+REPORT_STATUS_LINE_LIMIT = 13
+RUN_ID_DIGEST_LENGTH = 10
+UNIQUE_REPORT_CANDIDATE_LIMIT = 1000
+GIT_COMMAND_TIMEOUT_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -149,7 +157,7 @@ class AccumulatedReportRequest:
     """Inputs for writing one accumulated eval report."""
 
     root: Path
-    results_dir: str
+    results_dir: Path
     bundle: EvalRunBundle
 
 
@@ -182,10 +190,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--results-dir",
-        default="agents/evals/results/skill-workflow-prompt",
+        default="",
         help=(
-            "Directory for accumulated detailed reports. Defaults to "
-            "agents/evals/results/skill-workflow-prompt."
+            "Directory for accumulated detailed reports. Defaults to the mounted "
+            "AgentCanon log archive eval-results/skill-workflow-prompt path, "
+            "falling back to the legacy in-tree path only when no archive is mounted."
         ),
     )
     parser.add_argument(
@@ -499,7 +508,7 @@ def render_markdown_report(
         f"- used_skills: `{', '.join(metadata.used_skills) or '-'}`",
     ]
     status_lines = render_machine_status(bundle).strip().splitlines()
-    lines.extend(f"- {line}" for line in status_lines[:13])
+    lines.extend(f"- {line}" for line in status_lines[:REPORT_STATUS_LINE_LIMIT])
     lines.extend(
         [
             "",
@@ -579,7 +588,7 @@ def unique_report_path(path: Path, metadata: EvalRunMetadata) -> Path:
     candidate = path.with_name(f"{path.stem}-{metadata.eval_run_id}{path.suffix}")
     if not candidate.exists():
         return candidate
-    for index in range(2, 1000):
+    for index in range(2, UNIQUE_REPORT_CANDIDATE_LIMIT):
         indexed = path.with_name(f"{path.stem}-{metadata.eval_run_id}-{index:03d}{path.suffix}")
         if not indexed.exists():
             return indexed
@@ -598,7 +607,7 @@ def build_eval_run_metadata(
     timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())
     digest_source = "|".join((manifest.as_posix(), run_id.strip(), ",".join(clean_skills), created_at))
-    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
     return EvalRunMetadata(
         created_at=created_at,
         eval_run_id=f"skill-eval-{timestamp}-{digest}",
@@ -622,7 +631,7 @@ def git_output(root: Path, *args: str) -> str:
             check=False,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=GIT_COMMAND_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired):
         return "-"
@@ -634,7 +643,7 @@ def git_output(root: Path, *args: str) -> str:
 def write_accumulated_report(request: AccumulatedReportRequest) -> Path:
     """Write one non-overwriting accumulated eval report."""
     status = eval_status(request.bundle.results, request.bundle.audit)
-    output_dir = request.root / request.results_dir
+    output_dir = request.results_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / report_slug(
         request.bundle.manifest,
@@ -642,6 +651,15 @@ def write_accumulated_report(request: AccumulatedReportRequest) -> Path:
         status,
     )
     return write_report(ReportWriteRequest(path=str(report_path), root=request.root, bundle=request.bundle))
+
+
+def resolve_results_dir(root: Path, value: str) -> Path:
+    """Resolve the CLI results directory or the default archive location."""
+    stripped = value.strip()
+    if stripped:
+        path = Path(stripped)
+        return path if path.is_absolute() else root / path
+    return eval_results_dir(root, DEFAULT_RESULTS_FAMILY)
 
 
 def eval_status(results: tuple[ChecklistResult, ...], audit: ManifestAudit) -> str:
@@ -715,7 +733,7 @@ def run(args: argparse.Namespace) -> int:
         accumulated_report = write_accumulated_report(
             AccumulatedReportRequest(
                 root=root,
-                results_dir=str(args.results_dir),
+                results_dir=resolve_results_dir(root, str(args.results_dir)),
                 bundle=bundle,
             )
         )

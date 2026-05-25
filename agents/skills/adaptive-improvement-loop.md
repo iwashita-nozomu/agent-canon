@@ -41,7 +41,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
 - skill を使う run では `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`EVAL_RUN_ID` と `EVAL_ACCUMULATED_REPORT` を evidence にします。
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定します。
-- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `agents/evals/results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
+- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
 - eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
 - agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
 - 利用中に得られた user / reviewer feedback は、raw prose のまま放置せず `workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、同じ iteration 内で対象 skill prompt、workflow prompt、eval、memory のいずれかへ還元します。

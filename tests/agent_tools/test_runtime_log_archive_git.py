@@ -219,6 +219,61 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
 
+    def test_import_eval_results_moves_reports_but_keeps_source_notices(self) -> None:
+        """import-eval-results should archive legacy reports and retain source notices."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+
+            results = canon / "agents" / "evals" / "results"
+            skill_dir = results / "skill-workflow-prompt"
+            hook_dir = results / "hook-runs"
+            skill_dir.mkdir(parents=True)
+            hook_dir.mkdir(parents=True)
+            root_notice = results / "README.md"
+            hook_notice = hook_dir / "README.md"
+            family_notice = skill_dir / "README.md"
+            report = skill_dir / "skill-eval-20260517T010203040506Z-1234567890-pass-agent-orchestration.md"
+            root_notice.write_text("source notice\n", encoding="utf-8")
+            hook_notice.write_text("hook notice\n", encoding="utf-8")
+            family_notice.write_text("family notice\n", encoding="utf-8")
+            report.write_text("EVAL_RUN_ID=skill-eval-20260517T010203040506Z-1234567890\n", encoding="utf-8")
+
+            imported = self.run_tool(
+                "import-eval-results",
+                "--delete-source",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=3", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=2", imported.stdout)
+            self.assertTrue(root_notice.exists())
+            self.assertTrue(hook_notice.exists())
+            self.assertFalse(family_notice.exists())
+            self.assertFalse(report.exists())
+
+            archive = canon / ".agent-canon" / "log-archive" / "eval-results" / "legacy-import"
+            self.assertTrue((archive / "README.md").exists())
+            self.assertTrue((archive / "skill-workflow-prompt" / family_notice.name).exists())
+            self.assertTrue((archive / "skill-workflow-prompt" / report.name).exists())
+
+            pushed = self.run_tool(
+                "push",
+                "--message",
+                "Import legacy eval results",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

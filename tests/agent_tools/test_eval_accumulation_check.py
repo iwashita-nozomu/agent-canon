@@ -101,6 +101,51 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
+    def test_external_eval_archive_entries_are_counted(self) -> None:
+        """Mounted eval archive reports should satisfy eval accumulation evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            for family in (
+                "skill-workflow-prompt",
+                "local-llm-responsibility",
+                "workflow-selection",
+                "report-quality",
+            ):
+                legacy_dir = root / "agents" / "evals" / "results" / family
+                archive_dir = root / ".agent-canon" / "log-archive" / "eval-results" / family
+                archive_dir.mkdir(parents=True)
+                for report in legacy_dir.glob("*.md"):
+                    if report.name == "README.md":
+                        continue
+                    (archive_dir / report.name).write_text(report.read_text(encoding="utf-8"), encoding="utf-8")
+                    report.unlink()
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_SKILL_REPORTS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_LOCAL_LLM_REPORTS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
+    def test_unmounted_archive_without_legacy_eval_dirs_is_nonblocking(self) -> None:
+        """Fresh CI checkouts without the external archive should not fail."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            results_dir = root / "agents" / "evals" / "results"
+            hook_dir = results_dir / "hook-runs"
+            hook_dir.mkdir(parents=True)
+            (results_dir / "README.md").write_text("archive notice\n", encoding="utf-8")
+            (hook_dir / "README.md").write_text("hook archive notice\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_SKILL_REPORTS=0", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
     def test_missing_skill_eval_report_fails(self) -> None:
         """At least one accumulated skill eval report is required."""
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -125,6 +125,29 @@ the cells plus the exact follow-up task to the subagent. Do not paste full
 AGENTS/read-packet files when the bounded cells identify the relevant path and
 line ranges; use the source files only for follow-up reads.
 
+Build a directory responsibility tree and verify DB coverage:
+
+```bash
+agent-canon semantic-index responsibility-tree \
+  --root . \
+  --include documents \
+  --include agents \
+  --db reports/semantic-index.sqlite \
+  --check-directory-coverage \
+  --report reports/semantic_index_responsibility_tree.json
+```
+
+`responsibility-tree` reads the current SQLite `files`, `nodes`, and
+`embeddings` tables. It aggregates node vectors into every parent directory,
+stores a vector hash for each directory, and can include full directory vectors
+with `--include-vector`. The JSON report also contains two mechanically
+comparable directory inventories: `repo_tree_directories` from the current
+indexable filesystem tree and `db_tree_directories` from DB file paths.
+`--check-directory-coverage` exits nonzero when either missing or stale
+directories exist. This check uses the same include, exclude, and
+`--max-file-bytes` rules as `build`, so non-indexable binary/cache directories
+are not expected to appear in the DB.
+
 List semantic similarity candidates:
 
 ```bash

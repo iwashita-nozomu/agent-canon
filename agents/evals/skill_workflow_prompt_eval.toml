@@ -1386,7 +1386,7 @@ required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate
 id = "EVALS-README-ACCUMULATE-1"
 critical = true
 description = "Documents accumulated prompt eval results for skill use."
-required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "agents/evals/results/skill-workflow-prompt/"]
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/"]
 
 [[evals.checklist]]
 id = "EVALS-README-HOOK-GUIDE-1"
@@ -1452,4 +1452,4 @@ required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplica
 id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
 critical = true
 description = "Requires unique accumulated prompt eval report naming."
-required_regex = ["--accumulate", "agents/evals/results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
+required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]

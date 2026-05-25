@@ -9,6 +9,7 @@ upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/mcp_session_context.sh provides optional MCP context text
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
+downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
 downstream implementation ./hooks/cause_investigation_guard.py blocks code edits without cause investigation evidence
 downstream implementation ./hooks/module_boundary_guard.py blocks forced module rewrites
@@ -139,6 +140,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - dispatcher は `GitStatus` tool、read-only な file / Git inspection、AgentCanon plan/status/latest-check を含む既知の validation command では child guard を起動しません。読み取りや検証のために `hooks.json` を退避したり hook 設定を一時無効化したりしてはいけません。
 - `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
 - `hooks/mcp_session_context.sh` は互換用の手動 context helper として残します。通常の Codex session startup / resume では呼び出しません。
+- `UserPromptSubmit` と `PreToolUse` は `hooks/log_archive_mount_warning.py` で `.agent-canon/log-archive/` が mounted Git clone として見えるか確認します。missing / invalid の場合も block せず、先に `python3 tools/agent_tools/runtime_log_archive_git.py ensure` を実行してから hook / eval logs を蓄積するよう促す警告だけを返します。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。

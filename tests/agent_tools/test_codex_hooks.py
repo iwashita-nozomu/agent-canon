@@ -15,6 +15,7 @@
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
+# upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
 # @dependency-end
@@ -47,11 +48,13 @@ LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_i
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
+LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
 NOTEBOOK_MINOR_VERSION = 5
 OOP_READABILITY_MIN_SCORE = 95
 EXPECTED_PROMPT_FEEDBACK_MIN = 3
+EXPECTED_HOOK_EVENT_COUNT = 4
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -417,6 +420,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             prompt_scripts,
             [
+                "log_archive_mount_warning.py",
                 "prompt_secret_guard.py",
                 "skill_usage_logger.py",
                 "reference_capture_guard.py",
@@ -425,7 +429,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("apply_patch", pre_tool["matcher"])
         self.assertEqual(len(pre_tool_commands), 1)
         self.assertIn("hook_dispatcher.py", pre_tool_commands[0])
-        self.assertEqual(pre_tool_scripts, ["cause_investigation_guard.py"])
+        self.assertEqual(pre_tool_scripts, ["log_archive_mount_warning.py", "cause_investigation_guard.py"])
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertIn("spawn_agent", post_tool["matcher"])
         self.assertIn("close_agent", post_tool["matcher"])
@@ -465,6 +469,55 @@ class CodexHooksTest(unittest.TestCase):
             ],
         )
 
+    def test_log_archive_mount_warning_is_non_blocking_when_missing(self) -> None:
+        """Missing log archive mount should warn without blocking the hook chain."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            canon_root = Path(temp_dir) / "agent-canon"
+            canon_root.mkdir()
+
+            result = subprocess.run(
+                [sys.executable, str(LOG_ARCHIVE_MOUNT_WARNING)],
+                cwd=canon_root,
+                input=json.dumps({"hookEventName": "UserPromptSubmit"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_LOG_ARCHIVE_WARNING_CANON_ROOT": str(canon_root),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+
+        self.assertEqual(payload["decision"], "approve")
+        self.assertIn("LOG_ARCHIVE_MOUNT_STATUS=missing", cast(str, payload["reason"]))
+        self.assertEqual(
+            payload["next_action"],
+            "ensure_agent_canon_log_archive_mount_before_accumulating_logs",
+        )
+
+    def test_log_archive_mount_warning_is_quiet_when_mounted(self) -> None:
+        """Mounted archive clone should produce no visible hook output."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            canon_root = Path(temp_dir) / "agent-canon"
+            archive_git = canon_root / ".agent-canon" / "log-archive" / ".git"
+            archive_git.mkdir(parents=True)
+
+            result = subprocess.run(
+                [sys.executable, str(LOG_ARCHIVE_MOUNT_WARNING)],
+                cwd=canon_root,
+                input=json.dumps({"hookEventName": "UserPromptSubmit"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_LOG_ARCHIVE_WARNING_CANON_ROOT": str(canon_root),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+
     def test_hooks_json_command_counts_contract(self) -> None:
         """Active hook configuration should stay collapsed to one command per event."""
         hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
@@ -490,7 +543,7 @@ class CodexHooksTest(unittest.TestCase):
                 "Stop": 1,
             },
         )
-        self.assertEqual(sum(counts.values()), 4)
+        self.assertEqual(sum(counts.values()), EXPECTED_HOOK_EVENT_COUNT)
         for event, commands in commands_by_event.items():
             self.assertEqual(len(commands), len(set(commands)), event)
             self.assertTrue(all("hook_dispatcher.py" in command for command in commands))
@@ -503,6 +556,7 @@ class CodexHooksTest(unittest.TestCase):
             hook_dir.mkdir()
             log_path = temp_root / "invocations.txt"
             child_payloads = {
+                "log_archive_mount_warning.py": None,
                 "prompt_secret_guard.py": {"decision": "block", "reason": "first block"},
                 "skill_usage_logger.py": None,
                 "reference_capture_guard.py": {"decision": "block", "reason": "later block"},
@@ -550,6 +604,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(
             invocations,
             [
+                "log_archive_mount_warning.py:12",
                 "prompt_secret_guard.py:12",
                 "skill_usage_logger.py:12",
                 "reference_capture_guard.py:12",
@@ -610,7 +665,7 @@ class CodexHooksTest(unittest.TestCase):
             invocations = log_path.read_text(encoding="utf-8").splitlines()
 
         self.assertEqual(payload["decision"], "block")
-        self.assertIn("prompt_secret_guard.py", cast(str, payload["reason"]))
+        self.assertIn("log_archive_mount_warning.py", cast(str, payload["reason"]))
         self.assertEqual(
             invocations,
             [
@@ -626,6 +681,7 @@ class CodexHooksTest(unittest.TestCase):
             hook_dir = temp_root / "hooks"
             hook_dir.mkdir()
             outputs = {
+                "log_archive_mount_warning.py": "",
                 "prompt_secret_guard.py": {
                     "decision": "approve",
                     "reason": "first warning",

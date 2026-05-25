@@ -4,9 +4,7 @@
 # upstream design ../../agents/evals/README.md eval usage contract
 # upstream design ../../agents/evals/results/README.md eval result storage contract
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
-# upstream design ../../agents/evals/results/local-llm-responsibility/README.md local LLM eval result accumulation contract
-# upstream design ../../agents/evals/results/workflow-selection/README.md workflow selection eval result accumulation contract
-# upstream design ../../agents/evals/results/report-quality/README.md report quality eval result accumulation contract
+# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/ci/run_all_checks.sh runs eval accumulation checks
@@ -29,7 +27,11 @@ from typing import cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from runtime_log_paths import hook_result_search_dirs  # noqa: E402
+from runtime_log_paths import (  # noqa: E402
+    eval_result_search_dirs,
+    hook_result_search_dirs,
+    mounted_log_archive_root,
+)
 
 HOOK_REQUIRED_FIELDS = (
     "hook_run_id",
@@ -119,10 +121,6 @@ def required_directory_findings(root: Path) -> list[Finding]:
     for path in (
         root / "agents" / "evals" / "results",
         root / "agents" / "evals" / "results" / "hook-runs",
-        root / "agents" / "evals" / "results" / "skill-workflow-prompt",
-        root / "agents" / "evals" / "results" / "local-llm-responsibility",
-        root / "agents" / "evals" / "results" / "workflow-selection",
-        root / "agents" / "evals" / "results" / "report-quality",
     ):
         if not path.is_dir():
             findings.append(Finding("directory", relative(root, path), "missing"))
@@ -219,13 +217,43 @@ def eval_run_id_from_text(text: str) -> str:
     return legacy.group(1) if legacy else ""
 
 
-def skill_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Finding]]:
+def markdown_reports(results_dirs: Sequence[Path]) -> tuple[Path, ...]:
+    """Return unique Markdown reports from multiple result directories."""
+    return tuple(
+        sorted(
+            {
+                path
+                for results_dir in results_dirs
+                if results_dir.is_dir()
+                for path in results_dir.glob("*.md")
+                if path.name != "README.md"
+            }
+        )
+    )
+
+
+def missing_reports_label(root: Path, results_dirs: Sequence[Path]) -> str:
+    """Return a bounded path label for a missing report family."""
+    return ",".join(relative(root, path) for path in results_dirs)
+
+
+def reports_required(results_dirs: Sequence[Path], *, archive_mounted: bool) -> bool:
+    """Return whether absence of a report family is a validation failure."""
+    return archive_mounted or any(results_dir.is_dir() for results_dir in results_dirs)
+
+
+def skill_eval_findings(
+    root: Path,
+    results_dirs: Sequence[Path],
+    *,
+    require_reports: bool,
+) -> tuple[int, list[Finding]]:
     """Validate accumulated skill/workflow prompt eval reports."""
     findings: list[Finding] = []
-    reports = sorted(path for path in results_dir.glob("*.md") if path.name != "README.md")
+    reports = markdown_reports(results_dirs)
     seen_run_ids: dict[str, str] = {}
-    if not reports:
-        findings.append(Finding("skill_eval", relative(root, results_dir), "no-skill-eval-reports"))
+    if not reports and require_reports:
+        findings.append(Finding("skill_eval", missing_reports_label(root, results_dirs), "no-skill-eval-reports"))
     for path in reports:
         rel_path = relative(root, path)
         if not SKILL_REPORT_RE.fullmatch(path.name):
@@ -243,13 +271,18 @@ def skill_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Findin
     return len(reports), findings
 
 
-def local_llm_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Finding]]:
+def local_llm_eval_findings(
+    root: Path,
+    results_dirs: Sequence[Path],
+    *,
+    require_reports: bool,
+) -> tuple[int, list[Finding]]:
     """Validate accumulated local LLM responsibility eval reports."""
     findings: list[Finding] = []
-    reports = sorted(path for path in results_dir.glob("*.md") if path.name != "README.md")
+    reports = markdown_reports(results_dirs)
     seen_run_ids: dict[str, str] = {}
-    if not reports:
-        findings.append(Finding("local_llm_eval", relative(root, results_dir), "no-local-llm-eval-reports"))
+    if not reports and require_reports:
+        findings.append(Finding("local_llm_eval", missing_reports_label(root, results_dirs), "no-local-llm-eval-reports"))
     for path in reports:
         rel_path = relative(root, path)
         if not LOCAL_LLM_REPORT_RE.fullmatch(path.name):
@@ -267,13 +300,24 @@ def local_llm_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Fi
     return len(reports), findings
 
 
-def workflow_selection_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Finding]]:
+def workflow_selection_eval_findings(
+    root: Path,
+    results_dirs: Sequence[Path],
+    *,
+    require_reports: bool,
+) -> tuple[int, list[Finding]]:
     """Validate accumulated workflow selection eval reports."""
     findings: list[Finding] = []
-    reports = sorted(path for path in results_dir.glob("*.md") if path.name != "README.md")
+    reports = markdown_reports(results_dirs)
     seen_run_ids: dict[str, str] = {}
-    if not reports:
-        findings.append(Finding("workflow_selection_eval", relative(root, results_dir), "no-workflow-selection-eval-reports"))
+    if not reports and require_reports:
+        findings.append(
+            Finding(
+                "workflow_selection_eval",
+                missing_reports_label(root, results_dirs),
+                "no-workflow-selection-eval-reports",
+            )
+        )
     for path in reports:
         rel_path = relative(root, path)
         if not WORKFLOW_SELECTION_REPORT_RE.fullmatch(path.name):
@@ -297,13 +341,18 @@ def workflow_selection_eval_findings(root: Path, results_dir: Path) -> tuple[int
     return len(reports), findings
 
 
-def report_quality_eval_findings(root: Path, results_dir: Path) -> tuple[int, list[Finding]]:
+def report_quality_eval_findings(
+    root: Path,
+    results_dirs: Sequence[Path],
+    *,
+    require_reports: bool,
+) -> tuple[int, list[Finding]]:
     """Validate accumulated report quality eval reports."""
     findings: list[Finding] = []
-    reports = sorted(path for path in results_dir.glob("*.md") if path.name != "README.md")
+    reports = markdown_reports(results_dirs)
     seen_run_ids: dict[str, str] = {}
-    if not reports:
-        findings.append(Finding("report_quality_eval", relative(root, results_dir), "no-report-quality-eval-reports"))
+    if not reports and require_reports:
+        findings.append(Finding("report_quality_eval", missing_reports_label(root, results_dirs), "no-report-quality-eval-reports"))
     for path in reports:
         rel_path = relative(root, path)
         if not REPORT_QUALITY_REPORT_RE.fullmatch(path.name):
@@ -336,21 +385,33 @@ def validate(root: Path) -> EvalAccumulationReport:
         canon_root,
         hook_result_search_dirs(requested_root, canon_root),
     )
+    archive_mounted = mounted_log_archive_root(canon_root).is_dir()
+    skill_results_dirs = eval_result_search_dirs(canon_root, "skill-workflow-prompt")
     skill_reports, skill_findings = skill_eval_findings(
         canon_root,
-        canon_root / "agents" / "evals" / "results" / "skill-workflow-prompt",
+        skill_results_dirs,
+        require_reports=reports_required(skill_results_dirs, archive_mounted=archive_mounted),
     )
+    local_llm_results_dirs = eval_result_search_dirs(canon_root, "local-llm-responsibility")
     local_llm_reports, local_llm_findings = local_llm_eval_findings(
         canon_root,
-        canon_root / "agents" / "evals" / "results" / "local-llm-responsibility",
+        local_llm_results_dirs,
+        require_reports=reports_required(local_llm_results_dirs, archive_mounted=archive_mounted),
     )
+    workflow_selection_results_dirs = eval_result_search_dirs(canon_root, "workflow-selection")
     workflow_selection_reports, workflow_selection_findings = workflow_selection_eval_findings(
         canon_root,
-        canon_root / "agents" / "evals" / "results" / "workflow-selection",
+        workflow_selection_results_dirs,
+        require_reports=reports_required(
+            workflow_selection_results_dirs,
+            archive_mounted=archive_mounted,
+        ),
     )
+    report_quality_results_dirs = eval_result_search_dirs(canon_root, "report-quality")
     report_quality_reports, report_quality_findings = report_quality_eval_findings(
         canon_root,
-        canon_root / "agents" / "evals" / "results" / "report-quality",
+        report_quality_results_dirs,
+        require_reports=reports_required(report_quality_results_dirs, archive_mounted=archive_mounted),
     )
     findings.extend(hook_findings)
     findings.extend(skill_findings)

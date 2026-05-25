@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests AgentCanon runtime dashboard generation.
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
-# downstream design ../../agents/evals/results/README.md documents result families shown by dashboard
+# upstream design ../../agents/evals/results/README.md documents result families shown by dashboard
 # @dependency-end
 
 """Tests for generated AgentCanon runtime dashboards."""
@@ -17,6 +17,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
+DASHBOARD_PROMPT_CHAR_COUNT = 27
 
 
 class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
@@ -397,8 +398,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "feedback_labels": ["quality_gap"],
                     "prompt_capture_status": "present",
                     "prompt_excerpt_redacted": "Use environment maintenance",
-                    "prompt_char_count": 27,
                     "timestamp": "2026-05-17T01:02:02Z",
+                    "prompt_char_count": DASHBOARD_PROMPT_CHAR_COUNT,
                     "tool_name": "",
                     "tool_command_verb": "",
                     "skill_source_fields": ["prompt"],

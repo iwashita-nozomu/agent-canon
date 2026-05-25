@@ -34,6 +34,7 @@ const DEFAULT_EMBEDDING_BATCH: usize = 16;
 const DEFAULT_CONTEXT_CELLS: usize = 12;
 const DEFAULT_CONTEXT_CELL_CHARS: usize = 900;
 const DEFAULT_CONTEXT_TOTAL_CHARS: usize = 6000;
+const DEFAULT_TREE_NODE_KIND: &str = "document";
 const VECTOR_EPSILON: f32 = 1.0e-6;
 const MERGE_CANDIDATE_MIN_LINES: i64 = 4;
 const DEFAULT_MIN_THIN_SCORE: f32 = 0.50;
@@ -86,6 +87,25 @@ struct ContextPackArgs {
     max_cells: usize,
     max_cell_chars: usize,
     max_total_chars: usize,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct ResponsibilityTreeArgs {
+    root: PathBuf,
+    includes: Vec<PathBuf>,
+    excludes: Vec<String>,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    max_file_bytes: u64,
+    node_kind: String,
+    max_depth: Option<usize>,
+    top_k: Option<usize>,
+    include_vector: bool,
+    check_directory_coverage: bool,
+    report: Option<PathBuf>,
     format: OutputFormat,
 }
 
@@ -202,6 +222,7 @@ enum ParsedArgs {
     Build(BuildArgs),
     Search(SearchArgs),
     ContextPack(ContextPackArgs),
+    ResponsibilityTree(ResponsibilityTreeArgs),
     EmbedProvider(EmbedProviderArgs),
     Similar(SimilarArgs),
     ThinDocs(ThinDocsArgs),
@@ -296,6 +317,54 @@ struct NaturalRelation {
 }
 
 #[derive(Debug, Clone)]
+struct DirectoryCoverage {
+    status: String,
+    expected_directories: Vec<String>,
+    db_directories: Vec<String>,
+    missing_directories: Vec<String>,
+    stale_directories: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryResponsibilityNode {
+    path: String,
+    parent: Option<String>,
+    depth: usize,
+    file_count: usize,
+    node_count: usize,
+    vector: Vec<f32>,
+    vector_hash: String,
+    dominant_responsibility: String,
+    dominant_share: f64,
+    responsibility_counts: Vec<(String, usize)>,
+    node_kind_counts: Vec<(String, usize)>,
+    parent_similarity: Option<f32>,
+}
+
+#[derive(Debug, Clone)]
+struct ResponsibilityTreeReport {
+    db: PathBuf,
+    root: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    node_kind: String,
+    include_vector: bool,
+    directories: Vec<DirectoryResponsibilityNode>,
+    directory_count_total: usize,
+    coverage: DirectoryCoverage,
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryAccumulator {
+    files: HashSet<i64>,
+    node_count: usize,
+    vector_sum: Vec<f32>,
+    responsibility_counts: HashMap<String, usize>,
+    node_kind_counts: HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone)]
 struct BuildStats {
     files: usize,
     nodes: usize,
@@ -340,6 +409,23 @@ pub fn run(args: &[String]) -> i32 {
                 0
             }
             Err(error) => fail("CONTEXT_PACK", error),
+        },
+        Ok(ParsedArgs::ResponsibilityTree(tree_args)) => match responsibility_tree(&tree_args) {
+            Ok(report) => {
+                let value = responsibility_tree_report_json(&report);
+                if let Some(path) = &tree_args.report {
+                    if let Err(error) = write_pretty_report(path, &value) {
+                        return fail("RESPONSIBILITY_TREE_REPORT", error);
+                    }
+                }
+                print_responsibility_tree_results(&tree_args, &report, &value);
+                if tree_args.check_directory_coverage && report.coverage.status != "pass" {
+                    1
+                } else {
+                    0
+                }
+            }
+            Err(error) => fail("RESPONSIBILITY_TREE", error),
         },
         Ok(ParsedArgs::EmbedProvider(embed_args)) => match embed_existing_nodes(&embed_args) {
             Ok(stats) => {
@@ -468,6 +554,9 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         "context-pack" => Ok(ParsedArgs::ContextPack(parse_context_pack_args(
             &args[1..],
         )?)),
+        "responsibility-tree" | "directory-tree" => Ok(ParsedArgs::ResponsibilityTree(
+            parse_responsibility_tree_args(&args[1..])?,
+        )),
         "embed-provider" => Ok(ParsedArgs::EmbedProvider(parse_embed_provider_args(
             &args[1..],
         )?)),
@@ -744,6 +833,105 @@ fn parse_context_pack_args(args: &[String]) -> Result<ContextPackArgs, String> {
     validate_positive(parsed.max_cells, "--max-cells")?;
     validate_positive(parsed.max_cell_chars, "--max-cell-chars")?;
     validate_positive(parsed.max_total_chars, "--max-total-chars")?;
+    Ok(parsed)
+}
+
+fn parse_responsibility_tree_args(args: &[String]) -> Result<ResponsibilityTreeArgs, String> {
+    let mut parsed = ResponsibilityTreeArgs {
+        root: PathBuf::from("."),
+        includes: Vec::new(),
+        excludes: default_excludes(),
+        db: default_db_path(Path::new(".")),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        node_kind: DEFAULT_TREE_NODE_KIND.to_string(),
+        max_depth: None,
+        top_k: None,
+        include_vector: false,
+        check_directory_coverage: false,
+        report: None,
+        format: OutputFormat::Text,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--include" => {
+                parsed.includes.push(value_path(args, index, "--include")?);
+                index += 2;
+            }
+            "--exclude" => {
+                parsed
+                    .excludes
+                    .push(value_string(args, index, "--exclude")?);
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--max-file-bytes" => {
+                parsed.max_file_bytes = value_u64(args, index, "--max-file-bytes")?;
+                index += 2;
+            }
+            "--node-kind" => {
+                parsed.node_kind = value_string(args, index, "--node-kind")?;
+                index += 2;
+            }
+            "--max-depth" => {
+                parsed.max_depth = Some(value_usize(args, index, "--max-depth")?);
+                index += 2;
+            }
+            "--top-k" | "--limit" => {
+                parsed.top_k = Some(value_usize(args, index, "--top-k")?);
+                index += 2;
+            }
+            "--include-vector" | "--include-vectors" => {
+                parsed.include_vector = true;
+                index += 1;
+            }
+            "--check-directory-coverage" | "--check-coverage" => {
+                parsed.check_directory_coverage = true;
+                index += 1;
+            }
+            "--report" => {
+                parsed.report = Some(value_path(args, index, "--report")?);
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown responsibility-tree option {unknown}")),
+        }
+    }
+    if parsed.includes.is_empty() {
+        parsed.includes.push(PathBuf::from("."));
+    }
+    if parsed.node_kind.trim().is_empty() {
+        return Err("--node-kind must not be empty".to_string());
+    }
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
     Ok(parsed)
 }
 
@@ -1407,6 +1595,167 @@ fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, String> {
         });
     }
     Ok(cells)
+}
+
+fn responsibility_tree(args: &ResponsibilityTreeArgs) -> Result<ResponsibilityTreeReport, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
+    let coverage = directory_coverage(&conn, args)?;
+    let mut accumulators: HashMap<String, DirectoryAccumulator> = HashMap::new();
+    for node in nodes
+        .iter()
+        .filter(|node| tree_node_kind_matches(node, &args.node_kind))
+    {
+        for directory in directory_ancestors_for_file(&node.path) {
+            if args
+                .max_depth
+                .is_some_and(|max_depth| directory_depth(&directory) > max_depth)
+            {
+                continue;
+            }
+            accumulators
+                .entry(directory)
+                .or_insert_with(|| DirectoryAccumulator::new(dim))
+                .add(node);
+        }
+    }
+    let mut vectors_by_path: HashMap<String, Vec<f32>> = HashMap::new();
+    for (path, accumulator) in &accumulators {
+        let mut vector = accumulator.vector_sum.clone();
+        normalize_vector(&mut vector);
+        vectors_by_path.insert(path.clone(), vector);
+    }
+    let mut directories = Vec::new();
+    for (path, accumulator) in accumulators {
+        let vector = vectors_by_path
+            .get(&path)
+            .cloned()
+            .unwrap_or_else(|| vec![0.0; dim]);
+        let responsibility_counts = sorted_counts(&accumulator.responsibility_counts);
+        let node_kind_counts = sorted_counts(&accumulator.node_kind_counts);
+        let dominant_count = responsibility_counts
+            .first()
+            .map(|(_, count)| *count)
+            .unwrap_or(0);
+        let dominant_responsibility = responsibility_counts
+            .first()
+            .map(|(name, _)| name.clone())
+            .unwrap_or_else(|| "none".to_string());
+        let parent = directory_parent(&path);
+        let parent_similarity = parent.as_ref().and_then(|parent_path| {
+            vectors_by_path
+                .get(parent_path)
+                .map(|parent_vector| cosine_score(parent_vector, &vector))
+        });
+        directories.push(DirectoryResponsibilityNode {
+            path: path.clone(),
+            parent,
+            depth: directory_depth(&path),
+            file_count: accumulator.files.len(),
+            node_count: accumulator.node_count,
+            vector_hash: bytes_hex_hash(&vector_to_blob(&vector)),
+            vector,
+            dominant_responsibility,
+            dominant_share: if accumulator.node_count == 0 {
+                0.0
+            } else {
+                dominant_count as f64 / accumulator.node_count as f64
+            },
+            responsibility_counts,
+            node_kind_counts,
+            parent_similarity,
+        });
+    }
+    directories.sort_by(|left, right| {
+        left.depth
+            .cmp(&right.depth)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    let directory_count_total = directories.len();
+    if let Some(top_k) = args.top_k {
+        directories.truncate(top_k);
+    }
+    Ok(ResponsibilityTreeReport {
+        db: args.db.clone(),
+        root: args.root.clone(),
+        provider: args.provider.clone(),
+        model: args.model.clone(),
+        dim,
+        node_kind: args.node_kind.clone(),
+        include_vector: args.include_vector,
+        directories,
+        directory_count_total,
+        coverage,
+    })
+}
+
+impl DirectoryAccumulator {
+    fn new(dim: usize) -> Self {
+        Self {
+            files: HashSet::new(),
+            node_count: 0,
+            vector_sum: vec![0.0; dim],
+            responsibility_counts: HashMap::new(),
+            node_kind_counts: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, node: &IndexedNode) {
+        self.files.insert(node.file_id);
+        self.node_count += 1;
+        for (left, right) in self.vector_sum.iter_mut().zip(node.vector.iter()) {
+            *left += *right;
+        }
+        *self
+            .responsibility_counts
+            .entry(responsibility_scope_bucket(&node.path).to_string())
+            .or_insert(0) += 1;
+        *self.node_kind_counts.entry(node.kind.clone()).or_insert(0) += 1;
+    }
+}
+
+fn tree_node_kind_matches(node: &IndexedNode, node_kind: &str) -> bool {
+    node_kind == "all" || node.kind == node_kind
+}
+
+fn directory_coverage(
+    conn: &Connection,
+    args: &ResponsibilityTreeArgs,
+) -> Result<DirectoryCoverage, String> {
+    let expected_files = discover_files(
+        &args.root,
+        &args.includes,
+        &args.excludes,
+        args.max_file_bytes,
+    )?;
+    let root_for_relative = fs::canonicalize(&args.root).unwrap_or_else(|_| args.root.clone());
+    let mut expected = HashSet::new();
+    for path in expected_files {
+        let relative = relative_path(&root_for_relative, &path);
+        expected.extend(directory_ancestors_for_file(&relative));
+    }
+    let mut db = HashSet::new();
+    for path in load_file_paths(conn)? {
+        db.extend(directory_ancestors_for_file(&path));
+    }
+    let expected_directories = sorted_strings(&expected);
+    let db_directories = sorted_strings(&db);
+    let missing_directories = sorted_difference(&expected, &db);
+    let stale_directories = sorted_difference(&db, &expected);
+    let status = if missing_directories.is_empty() && stale_directories.is_empty() {
+        "pass"
+    } else {
+        "fail"
+    }
+    .to_string();
+    Ok(DirectoryCoverage {
+        status,
+        expected_directories,
+        db_directories,
+        missing_directories,
+        stale_directories,
+    })
 }
 
 fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
@@ -2571,6 +2920,20 @@ fn load_nodes(
         }
     }
     Ok(nodes)
+}
+
+fn load_file_paths(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut statement = conn
+        .prepare("SELECT path FROM files ORDER BY path")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?;
+    let mut paths = Vec::new();
+    for row in rows {
+        paths.push(row.map_err(|error| error.to_string())?);
+    }
+    Ok(paths)
 }
 
 fn provider_dimensions(
@@ -3775,6 +4138,25 @@ fn sorted_difference(left: &HashSet<String>, right: &HashSet<String>) -> Vec<Str
     output
 }
 
+fn sorted_strings(values: &HashSet<String>) -> Vec<String> {
+    let mut output: Vec<String> = values.iter().cloned().collect();
+    output.sort_by(|left, right| {
+        directory_depth(left)
+            .cmp(&directory_depth(right))
+            .then_with(|| left.cmp(right))
+    });
+    output
+}
+
+fn sorted_counts(counts: &HashMap<String, usize>) -> Vec<(String, usize)> {
+    let mut output: Vec<(String, usize)> = counts
+        .iter()
+        .map(|(key, value)| (key.clone(), *value))
+        .collect();
+    output.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    output
+}
+
 fn pair_key(pair: &SimilarPair) -> String {
     let left = node_key(&pair.left);
     let right = node_key(&pair.right);
@@ -3946,6 +4328,87 @@ fn print_context_pack_results(args: &ContextPackArgs, cells: &[ContextCell]) {
         println!("EXCERPT_BEGIN");
         println!("{}", cell.excerpt);
         println!("EXCERPT_END");
+    }
+}
+
+fn print_responsibility_tree_results(
+    args: &ResponsibilityTreeArgs,
+    report: &ResponsibilityTreeReport,
+    value: &Value,
+) {
+    if args.format == OutputFormat::Json {
+        println!("{value}");
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_responsibility_tree": "ok",
+                "provider": report.provider,
+                "model": report.model,
+                "dim": report.dim,
+                "node_kind": report.node_kind,
+                "directory_count_total": report.directory_count_total,
+                "directory_count_returned": report.directories.len(),
+                "coverage_status": report.coverage.status,
+                "missing_directories": report.coverage.missing_directories.len(),
+                "stale_directories": report.coverage.stale_directories.len()
+            })
+        );
+        for directory in &report.directories {
+            println!("{}", directory_node_json(directory, report.include_vector));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_RESPONSIBILITY_TREE=ok");
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_DB={}",
+        report.db.display()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_DIRECTORIES={}",
+        report.directory_count_total
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_RETURNED={}",
+        report.directories.len()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_COVERAGE={}",
+        report.coverage.status
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_MISSING_DIRS={}",
+        report.coverage.missing_directories.len()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_STALE_DIRS={}",
+        report.coverage.stale_directories.len()
+    );
+    if let Some(path) = &args.report {
+        println!(
+            "SEMANTIC_INDEX_RESPONSIBILITY_TREE_REPORT={}",
+            path.display()
+        );
+    }
+    for directory in &report.directories {
+        let parent_similarity = directory
+            .parent_similarity
+            .map(|value| format!("{value:.4}"))
+            .unwrap_or_else(|| "none".to_string());
+        println!(
+            "DIR path={} parent={} depth={} files={} nodes={} responsibility={} share={:.3} parent_similarity={} vector_hash={}",
+            directory.path,
+            directory.parent.as_deref().unwrap_or("none"),
+            directory.depth,
+            directory.file_count,
+            directory.node_count,
+            directory.dominant_responsibility,
+            directory.dominant_share,
+            parent_similarity,
+            directory.vector_hash
+        );
     }
 }
 
@@ -4228,6 +4691,70 @@ fn scored_node_json(result: &ScoredNode) -> Value {
     })
 }
 
+fn responsibility_tree_report_json(report: &ResponsibilityTreeReport) -> Value {
+    json!({
+        "semantic_index_responsibility_tree": "ok",
+        "root": report.root.display().to_string(),
+        "db": report.db.display().to_string(),
+        "provider": report.provider,
+        "model": report.model,
+        "dim": report.dim,
+        "node_kind": report.node_kind,
+        "directory_count_total": report.directory_count_total,
+        "directory_count_returned": report.directories.len(),
+        "include_vector": report.include_vector,
+        "coverage": coverage_json(&report.coverage),
+        "directories": report
+            .directories
+            .iter()
+            .map(|directory| directory_node_json(directory, report.include_vector))
+            .collect::<Vec<_>>()
+    })
+}
+
+fn coverage_json(coverage: &DirectoryCoverage) -> Value {
+    json!({
+        "status": coverage.status,
+        "expected_directory_count": coverage.expected_directories.len(),
+        "db_directory_count": coverage.db_directories.len(),
+        "missing_directory_count": coverage.missing_directories.len(),
+        "stale_directory_count": coverage.stale_directories.len(),
+        "repo_tree_directories": coverage.expected_directories,
+        "db_tree_directories": coverage.db_directories,
+        "missing_directories": coverage.missing_directories,
+        "stale_directories": coverage.stale_directories
+    })
+}
+
+fn directory_node_json(directory: &DirectoryResponsibilityNode, include_vector: bool) -> Value {
+    let mut value = json!({
+        "path": directory.path,
+        "parent": directory.parent,
+        "depth": directory.depth,
+        "file_count": directory.file_count,
+        "node_count": directory.node_count,
+        "vector_dim": directory.vector.len(),
+        "vector_hash": directory.vector_hash,
+        "dominant_responsibility": directory.dominant_responsibility,
+        "dominant_share": directory.dominant_share,
+        "responsibility_counts": counts_json(&directory.responsibility_counts),
+        "node_kind_counts": counts_json(&directory.node_kind_counts),
+        "parent_similarity": directory.parent_similarity
+    });
+    if include_vector {
+        value["vector"] = json!(directory.vector);
+    }
+    value
+}
+
+fn counts_json(counts: &[(String, usize)]) -> Value {
+    let mut object = serde_json::Map::new();
+    for (key, value) in counts {
+        object.insert(key.clone(), json!(value));
+    }
+    Value::Object(object)
+}
+
 fn context_cell_json(cell: &ContextCell) -> Value {
     json!({
         "rank": cell.rank,
@@ -4336,6 +4863,12 @@ fn thin_doc_metrics_json(metrics: &ThinDocMetrics) -> Value {
 fn write_report(path: &Path, report: &Value) -> Result<(), String> {
     ensure_parent_dir(path)?;
     fs::write(path, format!("{}\n", report)).map_err(|error| error.to_string())
+}
+
+fn write_pretty_report(path: &Path, report: &Value) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    let text = serde_json::to_string_pretty(report).map_err(|error| error.to_string())?;
+    fs::write(path, format!("{text}\n")).map_err(|error| error.to_string())
 }
 
 fn ensure_parent_dir(path: &Path) -> Result<(), String> {
@@ -4476,8 +5009,10 @@ fn repo_cache_key(root: &Path) -> String {
 fn default_excludes() -> Vec<String> {
     [
         ".git",
+        ".agent-canon/log-archive",
         ".agent-canon/semantic-index",
         ".agent-canon/search-index",
+        "agents/evals/results",
         "target",
         "__pycache__",
         ".pytest_cache",
@@ -4485,6 +5020,8 @@ fn default_excludes() -> Vec<String> {
         ".venv",
         "venv",
         "reports/agents",
+        "reports/hooks",
+        "reports/.cache",
     ]
     .iter()
     .map(|value| value.to_string())
@@ -4605,12 +5142,55 @@ fn relative_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
+fn directory_ancestors_for_file(path: &str) -> Vec<String> {
+    let normalized = path.replace('\\', "/");
+    let parts: Vec<&str> = normalized
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    let mut directories = vec![".".to_string()];
+    if parts.len() <= 1 {
+        return directories;
+    }
+    let mut current = String::new();
+    for part in parts.iter().take(parts.len() - 1) {
+        if !current.is_empty() {
+            current.push('/');
+        }
+        current.push_str(part);
+        directories.push(current.clone());
+    }
+    directories
+}
+
+fn directory_parent(path: &str) -> Option<String> {
+    if path == "." {
+        return None;
+    }
+    path.rsplit_once('/')
+        .map(|(parent, _)| parent.to_string())
+        .or_else(|| Some(".".to_string()))
+}
+
+fn directory_depth(path: &str) -> usize {
+    if path == "." {
+        0
+    } else {
+        path.split('/').filter(|part| !part.is_empty()).count()
+    }
+}
+
 fn count_lines(text: &str) -> usize {
     text.lines().count()
 }
 
 fn hex_hash(text: &str) -> String {
     let digest = Sha256::digest(text.as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn bytes_hex_hash(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
@@ -4633,12 +5213,13 @@ fn fail(scope: &str, message: String) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> [options]"
+        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> [options]"
     );
     eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("search: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--top-k N] [--format text|json|jsonl]");
     eprintln!("context-pack: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--max-cells N] [--max-cell-chars N] [--max-total-chars N] [--format text|json|jsonl]");
+    eprintln!("responsibility-tree: [--root repo] [--include path] [--db path] [--provider name] [--model name] [--dim N] [--node-kind document|section|block|all] [--check-directory-coverage] [--report path] [--format text|json|jsonl]");
     eprintln!("similar: [--root repo] [--db path] [--min-score S] [--cross-file-only] [--format text|json|jsonl]");
     eprintln!(
         "merge-candidates: [--root repo] [--db path] [--min-score S] [--format text|json|jsonl]"
@@ -5123,6 +5704,137 @@ mod tests {
         assert!(cells.len() <= 2);
         assert!(cells.iter().all(|cell| cell.excerpt.chars().count() <= 40));
         assert!(cells.iter().any(|cell| cell.path.ends_with("routing.md")));
+    }
+
+    #[test]
+    fn responsibility_tree_reports_vectors_and_coverage() {
+        let root = unique_temp_dir("semantic-index-responsibility-tree");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::create_dir_all(root.join("tools")).unwrap();
+        fs::write(
+            root.join("documents").join("policy.md"),
+            "# Policy\nsemantic index directory coverage responsibility tree",
+        )
+        .unwrap();
+        fs::write(
+            root.join("tools").join("scan.py"),
+            "print('semantic index directory coverage tool')\n",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let args = ResponsibilityTreeArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db,
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+            node_kind: "document".to_string(),
+            max_depth: None,
+            top_k: None,
+            include_vector: true,
+            check_directory_coverage: true,
+            report: None,
+            format: OutputFormat::Json,
+        };
+        let report = responsibility_tree(&args).unwrap();
+        assert_eq!(report.coverage.status, "pass");
+        assert!(report
+            .directories
+            .iter()
+            .any(|directory| directory.path == "documents" && directory.vector.len() == 64));
+        assert!(report
+            .directories
+            .iter()
+            .any(|directory| directory.path == "tools" && directory.vector.len() == 64));
+        let json = responsibility_tree_report_json(&report);
+        assert_eq!(
+            json["coverage"]["missing_directory_count"].as_u64(),
+            Some(0)
+        );
+        assert!(json["directories"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|directory| directory.get("vector").is_some()));
+        let output = root.join("responsibility_tree.json");
+        write_pretty_report(&output, &json).unwrap();
+        let parsed: Value = serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap();
+        assert_eq!(
+            parsed
+                .get("semantic_index_responsibility_tree")
+                .and_then(Value::as_str),
+            Some("ok")
+        );
+    }
+
+    #[test]
+    fn responsibility_tree_detects_missing_directory_coverage() {
+        let root = unique_temp_dir("semantic-index-responsibility-tree-missing");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::create_dir_all(root.join("tools")).unwrap();
+        fs::write(
+            root.join("documents").join("policy.md"),
+            "# Policy\nsemantic index coverage baseline",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("documents")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        fs::write(
+            root.join("tools").join("new_tool.py"),
+            "print('not yet indexed')\n",
+        )
+        .unwrap();
+        let report = responsibility_tree(&ResponsibilityTreeArgs {
+            root,
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db,
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+            node_kind: "document".to_string(),
+            max_depth: None,
+            top_k: None,
+            include_vector: false,
+            check_directory_coverage: true,
+            report: None,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+        assert_eq!(report.coverage.status, "fail");
+        assert!(report
+            .coverage
+            .missing_directories
+            .contains(&"tools".to_string()));
     }
 
     #[test]
