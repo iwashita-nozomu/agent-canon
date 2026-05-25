@@ -1394,6 +1394,83 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
+    def test_repo_review_skips_dependency_review_artifacts(self) -> None:
+        """Generated dependency-review outputs are not repo source inputs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            target = root / "target.md"
+            source = root / "source.md"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines target test fixture context.",
+                        "downstream design source.md source reads target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines source test fixture context.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            artifact = root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("source.md\n", encoding="utf-8")
+            subprocess.run(
+                [
+                    "git",
+                    "add",
+                    "target.md",
+                    "source.md",
+                    "reports/dependency-review/run/search_hits.txt",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
+            self.assertNotIn("reports/dependency-review/run/search_hits.txt", result.stdout)
+
     def test_repo_review_records_monitoring_when_report_dir_is_given(self) -> None:
         """The review wrapper records monitoring evidence when directed to a run."""
         with tempfile.TemporaryDirectory() as tmp_dir:
