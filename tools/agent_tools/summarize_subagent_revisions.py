@@ -29,7 +29,7 @@ WORK_LOG_RE = re.compile(
     r"(?P<kind>[^|]+)\|\s+(?P<clauses>[^|]+)\|\s+"
     r"(?P<message>.*?)(?:\s+\|\s+Next:\s+(?P<next>.*))?$"
 )
-BACKTICK_ROLE_RE = re.compile(r"`(?P<role>[a-z][a-z0-9_-]*(?:_[a-z0-9_-]+)*)`")
+BACKTICK_ROLE_RE = re.compile(r"`(?P<role>[a-z][a-z0-9_-]{0,79})`")
 
 SUBAGENT_TERMS = (
     "subagent",
