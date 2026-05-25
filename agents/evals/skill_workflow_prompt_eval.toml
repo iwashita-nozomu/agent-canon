@@ -1392,7 +1392,7 @@ required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "age
 id = "EVALS-README-HOOK-GUIDE-1"
 critical = true
 description = "Documents hook result accumulation and PR/push improvement guide generation."
-required_regex = ["agents/evals/results/hook-runs/", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+required_regex = [".agent-canon/log-archive", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
 
 [[evals.checklist]]
 id = "EVALS-README-PROMPT-FEEDBACK-1"
@@ -1434,7 +1434,7 @@ required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "<ev
 id = "TOOLS-README-IMPROVEMENT-GUIDE-1"
 critical = true
 description = "Documents the PR and branch-push improvement guide tool."
-required_regex = ["generate_agent_improvement_guide\\.py", "agents/evals/results/hook-runs/", "issues/open\\|closed/", "read-only evidence"]
+required_regex = ["generate_agent_improvement_guide\\.py", "mounted runtime hook archive", "issues/open\\|closed/", "read-only evidence"]
 
 [[evals]]
 id = "documents-tools-readme-prompt-eval-audit"

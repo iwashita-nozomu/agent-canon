@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Provides Canon-owned append-only hook event log paths and IDs.
-# upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
+# upstream design ../../documents/runtime-log-archive.md runtime log archive contract
+# upstream design ../../agents/evals/results/hook-runs/README.md legacy hook result accumulation contract
+# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 # downstream implementation ./oop_readability_guard.py records OOP hook outcomes
 # downstream implementation ./module_boundary_guard.py records module boundary outcomes
 # downstream implementation ./library_implementation_guard.py records protected library rewrite outcomes
@@ -19,10 +21,17 @@ import hashlib
 import json
 import os
 import re
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
+if TOOLS_DIR.is_dir():
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from runtime_log_paths import hook_results_dir, repo_log_key  # noqa: E402
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
 HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
@@ -82,8 +91,8 @@ class HookLogContext:
         return root
 
     def durable_results_dir(self) -> Path:
-        """Return the AgentCanon-owned durable hook-result directory."""
-        return self.canon_root() / "agents" / "evals" / "results" / "hook-runs"
+        """Return the durable hook-result archive directory."""
+        return hook_results_dir(self.active_root, self.canon_root())
 
     def results_dir(self) -> Path:
         """Return the hook-result directory."""
@@ -148,6 +157,7 @@ class HookLogContext:
         """Append one JSONL entry."""
         path = self.result_path()
         path.parent.mkdir(parents=True, exist_ok=True)
+        entry.setdefault("source_repo_key", repo_log_key(self.active_root))
         with path.open("a", encoding="utf-8") as stream:
             json.dump(entry, stream, sort_keys=True, default=str)
             stream.write("\n")

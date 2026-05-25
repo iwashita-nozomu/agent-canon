@@ -342,10 +342,15 @@ append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 When a run uses skills, prompt eval evidence is required. Run
 `evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
-Hook outcomes accumulate in AgentCanon under
-`agents/evals/results/hook-runs/` by default. Temporary local hook output belongs
-in `reports/hooks/` only when a task explicitly overrides the destination with
-`AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
+Hook outcomes accumulate in the mounted runtime log archive
+`.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
+by default. The archive remote is
+`git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
+rules live in `documents/runtime-log-archive.md`, and
+`tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
+`ensure`, `status`, `import-legacy`, and `push`. Temporary local hook output
+belongs in `reports/hooks/` only when a task explicitly overrides the destination
+with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
 `AGENT_CANON_SKILL_LOG_PATH`.
 `generate_agent_improvement_guide.py` reads memory notes, skill eval reports,
 durable hook results, and `issues/open|closed/` to produce the PR /
@@ -657,7 +662,8 @@ python3 tools/agent_tools/generate_agent_improvement_guide.py \
 ```
 
 The guide summarizes `memory/`, `agents/evals/results/skill-workflow-prompt/`,
-`agents/evals/results/hook-runs/`, `issues/open/`, and `issues/closed/`.
+the mounted runtime hook archive, legacy `agents/evals/results/hook-runs/`,
+`issues/open/`, and `issues/closed/`.
 It is read-only evidence. Local Agent or Copilot PR work applies the actual
 skill, workflow, and tool changes.
 For log visibility rather than repair guidance, use:

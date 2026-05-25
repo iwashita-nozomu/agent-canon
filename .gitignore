@@ -13,12 +13,14 @@ __pycache__/
 .ruff_cache/
 .agent-canon/search-index/
 .agent-canon/semantic-index/
+.agent-canon/log-archive/
 rust/agent-canon/target/
 
 # Local run artifacts
 reports/agents/
 reports/agent-improvement-guide/
 reports/hooks/
+reports/.cache/
 reports/*.json
 reports/*.txt
 reports/*.patch

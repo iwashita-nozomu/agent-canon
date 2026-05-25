@@ -38,7 +38,7 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 
 - run-local task evidence: `reports/agents/<run-id>/`
 - accumulated skill / workflow eval: `agents/evals/results/<eval-family>/<unique-id>.md`
-- hook result chronology: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`
+- hook result chronology: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`
 - experiment reader report: `experiments/report/<run_name>.md`
 - generated triage report: `reports/<tool-or-task>/`

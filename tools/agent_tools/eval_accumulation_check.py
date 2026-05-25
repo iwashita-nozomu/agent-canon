@@ -20,10 +20,16 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from runtime_log_paths import hook_result_search_dirs  # noqa: E402
 
 HOOK_REQUIRED_FIELDS = (
     "hook_run_id",
@@ -128,8 +134,14 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
     return [
         Finding("gitignore", relative(root, path), "ignored-result-path")
         for path in paths
-        if git_check_ignored(root, path)
+        if not intentionally_ignored_archive_path(path) and git_check_ignored(root, path)
     ]
+
+
+def intentionally_ignored_archive_path(path: Path) -> bool:
+    """Return whether the path is inside the mounted external log archive."""
+    parts = path.parts
+    return ".agent-canon" in parts and "log-archive" in parts
 
 
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
@@ -142,7 +154,7 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
     if not isinstance(loaded, dict):
         return "", 0, [Finding("hook_jsonl", label, "entry-not-object")]
     entry = cast(dict[str, object], loaded)
-    namespaced = path.parent.name != "hook-runs"
+    namespaced = path.parent.name not in ("hook-runs", "legacy-import")
     required_fields = HOOK_REQUIRED_FIELDS if namespaced else (
         "hook_run_id",
         "timestamp",
@@ -160,11 +172,18 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
     return (run_id if isinstance(run_id, str) else ""), legacy_missing_namespace, findings
 
 
-def hook_result_findings(root: Path, hook_dir: Path) -> tuple[int, int, int, list[Finding]]:
+def hook_result_findings(root: Path, hook_dirs: Sequence[Path]) -> tuple[int, int, int, list[Finding]]:
     """Validate hook JSONL files."""
     findings: list[Finding] = []
     seen_run_ids: dict[str, str] = {}
-    files = sorted(hook_dir.rglob("*.jsonl")) if hook_dir.is_dir() else []
+    files = sorted(
+        {
+            path
+            for hook_dir in hook_dirs
+            if hook_dir.is_dir()
+            for path in hook_dir.rglob("*.jsonl")
+        }
+    )
     entries = 0
     legacy_missing_namespace = 0
     for path in files:
@@ -184,10 +203,9 @@ def hook_result_findings(root: Path, hook_dir: Path) -> tuple[int, int, int, lis
             if previous is not None:
                 findings.append(Finding("hook_run_id", label, f"duplicate:{previous}"))
             seen_run_ids[run_id] = label
-    if not files:
-        findings.append(Finding("hook_jsonl", relative(root, hook_dir), "no-hook-jsonl"))
     if files and entries == 0:
-        findings.append(Finding("hook_jsonl", relative(root, hook_dir), "no-hook-entries"))
+        labels = ",".join(relative(root, hook_dir) for hook_dir in hook_dirs)
+        findings.append(Finding("hook_jsonl", labels, "no-hook-entries"))
     findings.extend(ignored_path_findings(root, files))
     return len(files), entries, legacy_missing_namespace, findings
 
@@ -311,11 +329,12 @@ def report_quality_eval_findings(root: Path, results_dir: Path) -> tuple[int, li
 
 def validate(root: Path) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
-    canon_root = agent_canon_root(root.resolve())
+    requested_root = root.resolve()
+    canon_root = agent_canon_root(requested_root)
     findings = required_directory_findings(canon_root)
     hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
         canon_root,
-        canon_root / "agents" / "evals" / "results" / "hook-runs",
+        hook_result_search_dirs(requested_root, canon_root),
     )
     skill_reports, skill_findings = skill_eval_findings(
         canon_root,

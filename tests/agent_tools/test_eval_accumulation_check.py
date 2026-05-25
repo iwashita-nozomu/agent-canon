@@ -17,6 +17,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "eval_accumulation_check.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import repo_log_key  # noqa: E402
 
 
 class EvalAccumulationCheckTest(unittest.TestCase):
@@ -69,6 +71,34 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
+    def test_external_hook_archive_entries_are_counted(self) -> None:
+        """Mounted hook archive entries should satisfy hook accumulation evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            for path in (root / "agents" / "evals" / "results" / "hook-runs").rglob("*.jsonl"):
+                path.unlink()
+            archive_hook_dir = (
+                root
+                / ".agent-canon"
+                / "log-archive"
+                / "hook-runs"
+                / repo_log_key(root)
+                / "test"
+            )
+            archive_hook_dir.mkdir(parents=True)
+            (archive_hook_dir / "hook.jsonl").write_text(
+                json.dumps(self.hook_entry("hook-external")) + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_FILES=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
     def test_missing_skill_eval_report_fails(self) -> None:

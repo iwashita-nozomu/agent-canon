@@ -14,11 +14,17 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from runtime_log_paths import hook_result_search_dirs  # noqa: E402
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -531,9 +537,12 @@ class AgentImprovementGuide:
 
     def hook_result_paths(self) -> tuple[Path, ...]:
         """Return direct and runtime-sharded hook result JSONL paths."""
-        direct = self.paths("agents/evals/results/hook-runs/*.jsonl")
-        sharded = self.paths("agents/evals/results/hook-runs/**/*.jsonl")
-        return tuple(sorted(set(direct + sharded)))
+        paths: list[Path] = []
+        for hook_dir in hook_result_search_dirs(self.requested_root, self.root):
+            direct = tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
+            sharded = tuple(sorted(hook_dir.glob("**/*.jsonl"))) if hook_dir.is_dir() else ()
+            paths.extend(direct + sharded)
+        return tuple(sorted(set(paths)))
 
     def render(self, summary: EvidenceSummary) -> str:
         """Render the improvement guide as Markdown."""

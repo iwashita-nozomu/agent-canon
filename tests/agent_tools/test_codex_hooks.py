@@ -1970,21 +1970,25 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container"},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(
+                        temp_root / ".agent-canon" / "log-archive"
+                    ),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                },
             )
-            durable_log = (
-                temp_root
-                / "agents"
-                / "evals"
-                / "results"
-                / "hook-runs"
-                / "test-container"
-                / "oop_readability_guard.jsonl"
+            durable_logs = sorted(
+                (temp_root / ".agent-canon" / "log-archive" / "hook-runs").glob(
+                    "*/test-container/oop_readability_guard.jsonl"
+                )
             )
+            durable_log = durable_logs[0]
             durable_log_exists = durable_log.exists()
             log_entry = json.loads(durable_log.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertIn("decision", json.loads(result.stdout))
+        self.assertEqual(len(durable_logs), 1)
         self.assertTrue(durable_log_exists)
         self.assertEqual(log_entry["status"], "warn")
         self.assertEqual(log_entry["mode"], "full")
@@ -2486,23 +2490,28 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container"},
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(
+                        temp_root / ".agent-canon" / "log-archive"
+                    ),
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                },
             )
-            log_path = (
-                temp_root
-                / "agents"
-                / "evals"
-                / "results"
-                / "hook-runs"
-                / "test-container"
-                / "skill_usage.jsonl"
+            log_paths = sorted(
+                (temp_root / ".agent-canon" / "log-archive" / "hook-runs").glob(
+                    "*/test-container/skill_usage.jsonl"
+                )
             )
+            log_path = log_paths[0]
             entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
 
         self.assertEqual(result.stdout, "")
+        self.assertEqual(len(log_paths), 1)
         self.assertEqual(entries[0]["skills"], ["agent-orchestration"])
         self.assertTrue(entries[0]["hook_run_id"].startswith("hook-"))
         self.assertEqual(entries[0]["hook_log_namespace"], "test-container")
+        self.assertTrue(entries[0]["source_repo_key"])
         self.assertEqual(entries[0]["skill_source_fields"], ["prompt"])
         self.assertEqual(entries[0]["observed_text_field_count"], 1)
 

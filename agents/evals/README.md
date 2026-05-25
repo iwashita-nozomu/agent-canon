@@ -104,14 +104,19 @@ Hook and tool outcomes must also close the protocol feedback loop. Record
 `protocol_feedback_reason=...` so the run shows whether parent workflow rules,
 subagent handoff rules, role TOML, evals, or memory changed because of the
 observed results.
-Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
-`hook_run_id` values. Normal hook writers shard JSONL files by runtime namespace
-under `hook-runs/<runtime-namespace>/<hook-name>.jsonl` so multiple containers
-or template-derived repositories do not append to one conflicting filename.
+Hook outcomes accumulate in the external runtime log archive documented in
+`documents/runtime-log-archive.md`, with unique `hook_run_id` values. Normal
+hook writers shard JSONL files by source repo key and runtime namespace under
+`.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
+so multiple containers or template-derived repositories do not append to one
+conflicting AgentCanon source-tree filename. The historical in-tree
+`agents/evals/results/hook-runs/` directory remains a legacy reader surface and
+README anchor only.
 Run `python3 tools/agent_tools/eval_accumulation_check.py --root .` before
 using accumulated evidence in a PR or guide. The gate validates directory
-presence, JSONL readability, unique run ids, non-ignored evidence paths, and
-legacy report readability without compacting or deleting old results.
+presence, mounted JSONL readability when available, unique run ids, non-ignored
+tracked evidence paths, intentionally ignored archive paths, and legacy report
+readability without compacting or deleting old results.
 Local LLM responsibility prompt evals are configured separately:
 
 ```bash
