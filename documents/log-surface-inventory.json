@@ -1139,6 +1139,246 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "directionality",
+      "line": 82,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "figure_name",
+      "line": 78,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_domain_authority",
+      "line": 128,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_experiment_report",
+      "line": 123,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_invalid_interpretations_recorded",
+      "line": 131,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_output",
+      "line": 129,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_primary_figure",
+      "line": 124,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_report_artifact",
+      "line": 127,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_server_mode",
+      "line": 130,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_source_artifact",
+      "line": 126,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "invalid_interpretations",
+      "line": 83,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "metric_denominator",
+      "line": 81,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "question",
+      "line": 79,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "required_data",
+      "line": 80,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 125,
+      "path": "agents/skills/html-experiment-report.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "HTML_FILE",
+      "line": 73,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "HTML_ROOT",
+      "line": 72,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "LOG",
+      "line": 92,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "PORT",
+      "line": 74,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "external_url",
+      "line": 105,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_imagegen",
+      "line": 137,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_layout_check",
+      "line": 133,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_output",
+      "line": 130,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_output_file",
+      "line": 131,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_policy_truth",
+      "line": 138,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_server_external_url",
+      "line": 136,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_server_local_url",
+      "line": 135,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_server_mode",
+      "line": 134,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "html_source_packet",
+      "line": 132,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "local_url",
+      "line": 104,
+      "path": "agents/skills/html-output.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "tool_call",
       "line": 149,
       "path": "agents/skills/oop-readability-check.md",
@@ -1147,8 +1387,16 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "report_output_format",
+      "line": 140,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "report_quality_checklist",
-      "line": 114,
+      "line": 141,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1156,7 +1404,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_reviewer",
-      "line": 116,
+      "line": 144,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1164,7 +1412,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_rule_drift",
-      "line": 117,
+      "line": 145,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1172,7 +1420,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_source_packet",
-      "line": 115,
+      "line": 142,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1180,7 +1428,15 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_writing",
-      "line": 113,
+      "line": 139,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 143,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1230,6 +1486,126 @@
       "field": "result_writeout",
       "line": 105,
       "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "audience",
+      "line": 48,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "decision_context",
+      "line": 49,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "first_artifact",
+      "line": 50,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "first_artifact_question",
+      "line": 51,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "invalid_interpretations",
+      "line": 55,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "metric_or_delta_contract",
+      "line": 53,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "ordered_structure",
+      "line": 54,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_to_structure_map",
+      "line": 52,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 106,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_first_artifact",
+      "line": 107,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_invalid_interpretations_recorded",
+      "line": 109,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_kind",
+      "line": 47,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_planning",
+      "line": 105,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_source_map",
+      "line": 108,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 56,
+      "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
@@ -6713,6 +7089,30 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 182,
+      "path": "tools/agent_tools/semantic_provider_html_report.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 189,
+      "path": "tools/agent_tools/semantic_provider_html_report.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SEMANTIC_PROVIDER_HTML_REPORT",
+      "line": 561,
+      "path": "tools/agent_tools/semantic_provider_html_report.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
@@ -9012,7 +9412,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 610,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9020,7 +9420,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 610,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9028,7 +9428,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 610,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9036,7 +9436,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 610,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9044,7 +9444,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONTAINER_CONFIG_FINDING",
-      "line": 111,
+      "line": 128,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9052,7 +9452,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 635,
+      "line": 652,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9060,7 +9460,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 633,
+      "line": 650,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9068,7 +9468,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 634,
+      "line": 651,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9076,7 +9476,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 627,
+      "line": 644,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9196,7 +9596,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 318,
+      "line": 325,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -9204,7 +9604,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 351,
+      "line": 358,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -9212,7 +9612,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 371,
+      "line": 378,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -11552,6 +11952,8 @@
     ".agents/skills/document-canon-cleanup/SKILL.md",
     ".agents/skills/environment-maintenance/SKILL.md",
     ".agents/skills/experiment-lifecycle/SKILL.md",
+    ".agents/skills/html-experiment-report/SKILL.md",
+    ".agents/skills/html-output/SKILL.md",
     ".agents/skills/literature-survey/SKILL.md",
     ".agents/skills/long-form-writing/SKILL.md",
     ".agents/skills/md-style-check/SKILL.md",
@@ -11564,6 +11966,7 @@
     ".agents/skills/research-workflow/SKILL.md",
     ".agents/skills/result-artifact-writeout/SKILL.md",
     ".agents/skills/start-repository/SKILL.md",
+    ".agents/skills/structure-planning/SKILL.md",
     ".agents/skills/subagent-bootstrap/SKILL.md",
     ".agents/skills/task-routing/SKILL.md",
     ".agents/skills/test-design/SKILL.md",
@@ -11584,6 +11987,8 @@
     ".claude/skills/document-canon-cleanup/SKILL.md",
     ".claude/skills/environment-maintenance/SKILL.md",
     ".claude/skills/experiment-lifecycle/SKILL.md",
+    ".claude/skills/html-experiment-report/SKILL.md",
+    ".claude/skills/html-output/SKILL.md",
     ".claude/skills/literature-survey/SKILL.md",
     ".claude/skills/long-form-writing/SKILL.md",
     ".claude/skills/md-style-check/SKILL.md",
@@ -11596,6 +12001,7 @@
     ".claude/skills/research-workflow/SKILL.md",
     ".claude/skills/result-artifact-writeout/SKILL.md",
     ".claude/skills/start-repository/SKILL.md",
+    ".claude/skills/structure-planning/SKILL.md",
     ".claude/skills/subagent-bootstrap/SKILL.md",
     ".claude/skills/task-routing/SKILL.md",
     ".claude/skills/test-design/SKILL.md",
@@ -11648,6 +12054,8 @@
     "agents/skills/experiment-lifecycle.md",
     "agents/skills/experiment-workflow.md",
     "agents/skills/from_another_agent.md",
+    "agents/skills/html-experiment-report.md",
+    "agents/skills/html-output.md",
     "agents/skills/literature-survey.md",
     "agents/skills/logic-gap-review.md",
     "agents/skills/long-form-writing.md",
@@ -11668,6 +12076,7 @@
     "agents/skills/start-repository.md",
     "agents/skills/static-check.md",
     "agents/skills/static-validation.md",
+    "agents/skills/structure-planning.md",
     "agents/skills/subagent-bootstrap.md",
     "agents/skills/task-routing.md",
     "agents/skills/test-design.md",
@@ -11738,6 +12147,7 @@
     "tools/agent_tools/scan_dependency_headers.sh",
     "tools/agent_tools/search.py",
     "tools/agent_tools/search_index.py",
+    "tools/agent_tools/semantic_provider_html_report.py",
     "tools/agent_tools/smoke_test_research_perspective_pack.py",
     "tools/agent_tools/surface_manifest.py",
     "tools/agent_tools/task_close.py",
