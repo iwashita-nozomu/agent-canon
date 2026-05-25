@@ -7,8 +7,8 @@ description: Use when drafting or revising reader-facing reports from tool, hook
 responsibility Documents Report Writing runtime skill for this repository.
 upstream design ../../../agents/skills/report-writing.md documents the human-facing report-writing workflow
 upstream design ../../../agents/skills/structure-planning.md defines report structure contracts
-upstream design ../../../agents/skills/html-output.md defines explicit HTML output and browser publication
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement
+downstream design ../../../agents/skills/html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../../../agents/evals/report_quality_eval.toml defines report quality checklist eval coverage
 downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py evaluates report-writing prompt surfaces
 @dependency-end

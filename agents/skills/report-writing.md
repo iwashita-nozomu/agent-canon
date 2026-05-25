@@ -5,8 +5,8 @@ responsibility Documents reader-facing report writing workflow and quality crite
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design structure-planning.md reusable structure contract skill
-upstream design html-output.md explicit HTML output and browser publication skill
 upstream design result-artifact-writeout.md raw result artifact placement skill
+downstream design html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report writing prompt surfaces
