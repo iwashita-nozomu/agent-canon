@@ -4,6 +4,7 @@
 # responsibility Tests Dockerfile, runtime pack, and devcontainer config validation.
 # upstream implementation ../../tools/ci/container_config.py validates container config
 # upstream implementation ../../tools/ci/container_runtime.py defines runtime pack fields
+# upstream environment ../../.devcontainer/post-create.sh installs shared devcontainer tools
 # @dependency-end
 
 from __future__ import annotations
@@ -14,6 +15,24 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
+POST_CREATE_TEX_SNIPPETS = (
+    "install_tex_tooling",
+    "latexmk",
+    "texlive-latex-recommended",
+    "texlive-latex-extra",
+    "texlive-fonts-recommended",
+    "texlive-pictures",
+    "texlive-xetex",
+    "texlive-extra-utils",
+    "dvisvgm",
+    "ghostscript",
+    "poppler-utils",
+    "latexmk --version",
+    "pdflatex --version",
+    "xelatex --version",
+    "dvisvgm --version",
+    "pdfcrop --version",
+)
 
 
 def run_validator(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -195,6 +214,9 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 "gitleaks",
                 "trufflehog",
                 "detect-secrets",
+                "apt_install jq",
+                "jq --version",
+                *POST_CREATE_TEX_SNIPPETS,
                 "gh --version",
                 "codex --version",
                 "",
@@ -271,6 +293,9 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 "gitleaks",
                 "trufflehog",
                 "detect-secrets",
+                "apt_install jq",
+                "jq --version",
+                *POST_CREATE_TEX_SNIPPETS,
                 "gh --version",
                 "codex --version",
                 "",

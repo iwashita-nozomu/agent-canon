@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents 学術文章 workflow for this repository.
 upstream design README.md workflow catalog
+upstream design ../skills/academic-writing.md Academic Writing skill contract and TeX output boundary
 @dependency-end
 -->
 
@@ -30,6 +31,9 @@ upstream design README.md workflow catalog
 - 結果、解釈、限界、今後の課題を混ぜない
 - wording の polish より前に、logic gap と notation gap を潰す
 - author 1 人の自己点検だけで閉じず、独立 reviewer を段階ごとに通す
+- PDF-ready draft、数式、図版が必要な学術文章では TeX output plan を明示し、
+  devcontainer の `latexmk` / pdfLaTeX / XeLaTeX / `dvisvgm` / `pdfcrop`
+  toolchain で検証する
 
 ## Standard Flow
 
@@ -112,6 +116,11 @@ draft では次を守ります。
 - 同じ concept には同じ語と同じ notation を使う
 - 結果と解釈を混ぜず、どこから inference が入るかを明示する
 - one paragraph = one main move を維持する
+
+TeX output plan が active な場合は、reader-order draft と同時に canonical
+`.tex` source を管理します。document は `latexmk -pdf`、TikZ / standalone
+図版は `latexmk -pdf` と `dvisvgm` または `pdfcrop` で検証し、生成 PDF / SVG
+/ PNG は run bundle や ignored output directory に置きます。
 
 ### 6. Reverse Outline と Dependency Check を取る
 

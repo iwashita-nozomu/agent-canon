@@ -356,6 +356,46 @@ entries:
     tests:
       - tests/agent_tools/test_search_index.py
 
+  - id: semantic-index
+    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, merge, thin-doc, provider-comparison, and Eval results.
+    path: rust/agent-canon/src/semantic_index.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon semantic-index build --include documents --include agents
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/search-coordination.md
+      - documents/semantic_index.md
+      - .gitignore
+    tests:
+      - rust/agent-canon/src/semantic_index.rs
+
+  - id: semantic-provider-html-report
+    summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
+    path: tools/agent_tools/semantic_provider_html_report.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/semantic_provider_html_report.md
+      - agents/skills/html-experiment-report.md
+      - documents/semantic_index.md
+    tests:
+      - tests/agent_tools/test_semantic_provider_html_report.py
+
   - id: route
     summary: Maps long proposed tool/skill names and broad prompts to short task-routing areas and public skill sets.
     path: tools/agent_tools/route.py
@@ -1045,7 +1085,7 @@ entries:
       - tests/agent_tools/test_oop_rule_inventory.py
 
   - id: review-backlog-scan
-    summary: Runs root plus AgentCanon cross-repo inspection into a run-bundle report.
+    summary: Runs root plus AgentCanon cross-repo inspection, semantic review artifacts, and optional provider-comparison reports into a run-bundle report.
     path: tools/agent_tools/review_backlog_scan.sh
     family: agent_tools
     role: runner

@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents long-form-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design structure-planning.md reusable document structure contract
 @dependency-end
 -->
 
@@ -26,6 +27,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Mandatory Checklist
 
 - `summary statement` で argument、purpose、reader を先に固定する
+- section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - 見出し列を roadmap として先に作る
 - section ごとに `focus`、`purpose`、`support` を固定する
 - draft 後に reverse outline を取る
@@ -37,6 +39,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Default Sequence
 
 1. `summary statement` を短く書く
+1. 必要なら `structure-planning` で first section、source-to-structure map、section order、invalid interpretation を固定する
 1. roadmap と section contract を作る
 1. 必要なら `python3 tools/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
 1. reader order で draft する

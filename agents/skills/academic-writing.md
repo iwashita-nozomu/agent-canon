@@ -3,6 +3,10 @@
 @dependency-start
 responsibility Documents academic-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design structure-planning.md reusable document structure contract
+upstream design ../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
+downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex skill shim
+downstream implementation ../../.claude/skills/academic-writing/SKILL.md generated Claude skill mirror
 @dependency-end
 -->
 
@@ -26,10 +30,12 @@ upstream design ../canonical/skills.md skill canon registry
 - `documents/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/literature-survey.md`
+- `CONTAINER_OPERATIONS.md`
 
 ## Mandatory Checklist
 
 - `claim contract` で central contribution、gap、reader、non-goal を先に固定する
+- section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
@@ -44,14 +50,19 @@ upstream design ../canonical/skills.md skill canon registry
 - 別 reviewer で docs completeness review を必ず通す
 - empirical claim や report なら critical review、必要なら report review を追加する
 - 投稿論文や thesis chapter では `paper-writing` を優先 overlay とする
+- PDF-ready な学術文章、数式密度の高い draft、または図版を作るときは TeX output plan を作り、devcontainer の `latexmk` / pdfLaTeX / XeLaTeX / `dvisvgm` / `pdfcrop` toolchain を使う
+- TeX を使う既定配線はこの skill に限る。一般 README、workflow、guide、migration doc、通常 report は TeX へ自動遷移しない
 
 ## Default Sequence
 
 1. `claim contract` を短く書く
+1. 必要なら `structure-planning` で first section / figure / table、source-to-structure map、section order、invalid interpretation を固定する
 1. `evidence map` と `notation ledger` を作る
 1. `section contract` と `paragraph claim map` を作る
+1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
 1. run bundle を作る
 1. reader order で draft する
+1. TeX output plan が active なら `.tex` source を作り、document は `latexmk -pdf`、図版は `latexmk -pdf` と `dvisvgm` / `pdfcrop` で検証する
 1. reverse outline を取る
 1. `document_flow_reviewer` を通す
 1. `notation_definition_reviewer` に notation review を通す
@@ -69,6 +80,13 @@ python3 tools/agent_tools/doc_start.py \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
+
+## TeX Output Boundary
+
+- TeX は `$academic-writing` の既定出力 route です。PDF-ready な学術文章、数式密度の高い manuscript、TikZ / standalone 図版、または reviewer に渡す図表を作るときに使います。
+- TeX toolchain は devcontainer の `.devcontainer/post-create.sh` が用意します。必要な command は `latexmk`、`pdflatex`、`xelatex`、`dvisvgm`、`pdfcrop` です。
+- 生成物は原則 run bundle や ignored output directory に置き、tracked tree には canonical `.tex` source と、ユーザーが要求した final artifact だけを残します。
+- TeX を一般の `$long-form-writing`、workflow guide、migration doc、ordinary report の既定 route にしません。それらはユーザーが明示した場合だけ TeX を使います。
 
 ## Boundary
 

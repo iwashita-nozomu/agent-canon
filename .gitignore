@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .agent-canon/search-index/
+.agent-canon/semantic-index/
 rust/agent-canon/target/
 
 # Local run artifacts

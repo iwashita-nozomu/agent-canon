@@ -10,10 +10,20 @@
 # @dependency-end
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_CANON_SOURCE_ROOT="$(realpath -m "$SCRIPT_DIR/../..")"
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORT_DIR=""
 SCOPE_MODE="submodule-aware"
 FAIL_ON_FINDINGS=0
+SEMANTIC_QUERY_FILE=""
+SEMANTIC_TOP_K=20
+SEMANTIC_MIN_SCORE=0.90
+SEMANTIC_LLM_PROVIDER="${AGENT_CANON_SEMANTIC_INDEX_LLM_PROVIDER:-}"
+SEMANTIC_LLM_MODEL="${AGENT_CANON_SEMANTIC_INDEX_LLM_MODEL:-}"
+SEMANTIC_LLM_URL="${AGENT_CANON_SEMANTIC_INDEX_EMBEDDING_URL:-}"
+SEMANTIC_LLM_DIM="${AGENT_CANON_SEMANTIC_INDEX_LLM_DIM:-0}"
+SEMANTIC_LLM_BATCH="${AGENT_CANON_SEMANTIC_INDEX_LLM_BATCH:-16}"
 declare -a REQUESTED_CHECKS=()
 
 usage() {
@@ -21,6 +31,10 @@ usage() {
 Usage:
   review_backlog_scan.sh [--root DIR] [--report-dir DIR]
                          [--submodule-aware|--root-only|--agentcanon-only]
+                         [--semantic-query-file FILE]
+                         [--semantic-top-k N] [--semantic-min-score SCORE]
+                         [--semantic-llm-provider NAME --semantic-llm-model NAME]
+                         [--semantic-embedding-url URL]
                          [--check NAME ...] [--fail-on-findings]
 
 Runs integrated review scans and writes JSON/Markdown/log artifacts under REPORT_DIR.
@@ -28,7 +42,7 @@ Default scope is --submodule-aware. Default checks are all checks.
 
 Checks:
   inventory, stale, code-dependencies, dependency-review, oop,
-  static-any, hardcoded-numbers, log-helper, convention
+  static-any, hardcoded-numbers, log-helper, convention, semantic-index
 EOF
 }
 
@@ -58,6 +72,38 @@ while [[ $# -gt 0 ]]; do
       REQUESTED_CHECKS+=("$2")
       shift 2
       ;;
+    --semantic-query-file)
+      SEMANTIC_QUERY_FILE="$2"
+      shift 2
+      ;;
+    --semantic-top-k)
+      SEMANTIC_TOP_K="$2"
+      shift 2
+      ;;
+    --semantic-min-score)
+      SEMANTIC_MIN_SCORE="$2"
+      shift 2
+      ;;
+    --semantic-llm-provider)
+      SEMANTIC_LLM_PROVIDER="$2"
+      shift 2
+      ;;
+    --semantic-llm-model)
+      SEMANTIC_LLM_MODEL="$2"
+      shift 2
+      ;;
+    --semantic-embedding-url)
+      SEMANTIC_LLM_URL="$2"
+      shift 2
+      ;;
+    --semantic-llm-dim)
+      SEMANTIC_LLM_DIM="$2"
+      shift 2
+      ;;
+    --semantic-embedding-batch)
+      SEMANTIC_LLM_BATCH="$2"
+      shift 2
+      ;;
     --fail-on-findings)
       FAIL_ON_FINDINGS=1
       shift
@@ -79,6 +125,9 @@ if [[ -z "$REPORT_DIR" ]]; then
   REPORT_DIR="$ROOT_DIR/reports/agents/review-backlog-scan"
 fi
 REPORT_DIR="$(realpath -m "$REPORT_DIR")"
+if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
+  SEMANTIC_QUERY_FILE="$(realpath -m "$SEMANTIC_QUERY_FILE")"
+fi
 mkdir -p "$REPORT_DIR"
 
 TOOL_DIR="$ROOT_DIR/tools/agent_tools"
@@ -97,6 +146,7 @@ if [[ ${#REQUESTED_CHECKS[@]} -eq 0 ]]; then
     hardcoded-numbers
     log-helper
     convention
+    semantic-index
   )
 fi
 
@@ -151,6 +201,54 @@ record_command() {
   if [[ "$status" -ne 0 ]]; then
     NONZERO_COMMANDS=$((NONZERO_COMMANDS + 1))
   fi
+}
+
+run_agent_canon() {
+  if command -v cargo >/dev/null 2>&1 && [[ -f "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" ]]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+      cargo run --quiet --manifest-path "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" -- "$@"
+    return
+  fi
+  if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/rust/agent-canon/Cargo.toml" ]]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+      cargo run --quiet --manifest-path "$ROOT_DIR/rust/agent-canon/Cargo.toml" -- "$@"
+    return
+  fi
+  if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+      cargo run --quiet --manifest-path "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" -- "$@"
+    return
+  fi
+  if command -v agent-canon >/dev/null 2>&1; then
+    if agent-canon semantic-index help 2>/dev/null \
+      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
+      agent-canon "$@"
+      return
+    fi
+  fi
+  if [[ -x "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" ]]; then
+    if "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
+      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
+      "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" "$@"
+      return
+    fi
+  fi
+  if [[ -x "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" ]]; then
+    if "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
+      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
+      "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" "$@"
+      return
+    fi
+  fi
+  if [[ -x "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" ]]; then
+    if "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
+      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
+      "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" "$@"
+      return
+    fi
+  fi
+  echo "agent-canon CLI unavailable for ROOT_DIR=$ROOT_DIR" >&2
+  return 127
 }
 
 run_inventory() {
@@ -281,6 +379,103 @@ run_scope_checks() {
   done < <(scope_roots)
 }
 
+run_semantic_index() {
+  local scope_name scope_root db eval_args compare_args embed_args
+  while IFS=$'\t' read -r scope_name scope_root; do
+    [[ -n "$scope_name" && -n "$scope_root" ]] || continue
+    db="$REPORT_DIR/semantic_index_${scope_name}.sqlite"
+    record_command \
+      "semantic-index-build:${scope_name}" \
+      "$REPORT_DIR/semantic_index_build_${scope_name}.txt" \
+      run_agent_canon semantic-index build \
+        --root "$scope_root" \
+        --db "$db"
+    if [[ -n "$SEMANTIC_LLM_PROVIDER" && -n "$SEMANTIC_LLM_MODEL" ]]; then
+      embed_args=(
+        semantic-index embed-provider
+        --root "$scope_root"
+        --db "$db"
+        --provider "$SEMANTIC_LLM_PROVIDER"
+        --model "$SEMANTIC_LLM_MODEL"
+        --dim "$SEMANTIC_LLM_DIM"
+        --embedding-batch "$SEMANTIC_LLM_BATCH"
+      )
+      if [[ -n "$SEMANTIC_LLM_URL" ]]; then
+        embed_args+=(--embedding-url "$SEMANTIC_LLM_URL")
+      fi
+      record_command \
+        "semantic-index-embed-provider:${scope_name}" \
+        "$REPORT_DIR/semantic_index_embed_provider_${scope_name}.txt" \
+        run_agent_canon "${embed_args[@]}"
+    fi
+    record_command \
+      "semantic-index-merge-candidates:${scope_name}" \
+      "$REPORT_DIR/semantic_index_merge_candidates_${scope_name}.jsonl" \
+      run_agent_canon semantic-index merge-candidates \
+        --root "$scope_root" \
+        --db "$db" \
+        --min-score "$SEMANTIC_MIN_SCORE" \
+        --top-k "$SEMANTIC_TOP_K" \
+        --format jsonl
+    record_command \
+      "semantic-index-thin-docs:${scope_name}" \
+      "$REPORT_DIR/semantic_index_thin_docs_${scope_name}.jsonl" \
+      run_agent_canon semantic-index thin-docs \
+        --root "$scope_root" \
+        --db "$db" \
+        --top-k "$SEMANTIC_TOP_K" \
+        --format jsonl
+    if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
+      record_command \
+        "semantic-index-search:${scope_name}" \
+        "$REPORT_DIR/semantic_index_search_${scope_name}.jsonl" \
+        run_agent_canon semantic-index search \
+          --root "$scope_root" \
+          --db "$db" \
+          --query-file "$SEMANTIC_QUERY_FILE" \
+          --top-k "$SEMANTIC_TOP_K" \
+          --format jsonl
+    fi
+    eval_args=(
+      semantic-index eval-output
+      --merge-candidates "$REPORT_DIR/semantic_index_merge_candidates_${scope_name}.jsonl"
+      --thin-docs "$REPORT_DIR/semantic_index_thin_docs_${scope_name}.jsonl"
+      --report "$REPORT_DIR/semantic_index_output_eval_${scope_name}.json"
+    )
+    if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
+      eval_args+=(--search "$REPORT_DIR/semantic_index_search_${scope_name}.jsonl")
+    fi
+    record_command \
+      "semantic-index-output-eval:${scope_name}" \
+      "$REPORT_DIR/semantic_index_output_eval_${scope_name}.txt" \
+      run_agent_canon "${eval_args[@]}"
+    if [[ -n "$SEMANTIC_LLM_PROVIDER" && -n "$SEMANTIC_LLM_MODEL" ]]; then
+      compare_args=(
+        semantic-index compare-providers
+        --db "$db"
+        --left-provider deterministic-dense-v1
+        --left-model hash-token-char-v1
+        --right-provider "$SEMANTIC_LLM_PROVIDER"
+        --right-model "$SEMANTIC_LLM_MODEL"
+        --right-dim "$SEMANTIC_LLM_DIM"
+        --min-score "$SEMANTIC_MIN_SCORE"
+        --top-k "$SEMANTIC_TOP_K"
+        --report "$REPORT_DIR/semantic_index_provider_compare_${scope_name}.json"
+      )
+      if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
+        compare_args+=(--query-file "$SEMANTIC_QUERY_FILE")
+      fi
+      if [[ -n "$SEMANTIC_LLM_URL" ]]; then
+        compare_args+=(--right-embedding-url "$SEMANTIC_LLM_URL")
+      fi
+      record_command \
+        "semantic-index-provider-compare:${scope_name}" \
+        "$REPORT_DIR/semantic_index_provider_compare_${scope_name}.txt" \
+        run_agent_canon "${compare_args[@]}"
+    fi
+  done < <(scope_roots)
+}
+
 run_convention() {
   record_command \
     "convention" \
@@ -310,6 +505,12 @@ upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/file_su
 
 - file_inventory_json: $REPORT_DIR/file_surface_inventory.json
 - file_inventory_markdown: $REPORT_DIR/file_surface_inventory.md
+- semantic_index_db_pattern: $REPORT_DIR/semantic_index_<scope>.sqlite
+- semantic_index_merge_candidates_pattern: $REPORT_DIR/semantic_index_merge_candidates_<scope>.jsonl
+- semantic_index_thin_docs_pattern: $REPORT_DIR/semantic_index_thin_docs_<scope>.jsonl
+- semantic_index_search_pattern: $REPORT_DIR/semantic_index_search_<scope>.jsonl
+- semantic_index_output_eval_pattern: $REPORT_DIR/semantic_index_output_eval_<scope>.json
+- semantic_index_provider_compare_pattern: $REPORT_DIR/semantic_index_provider_compare_<scope>.json
 - command_status: $COMMAND_STATUS
 
 ## Command Status
@@ -332,6 +533,9 @@ fi
 run_scope_checks
 if has_check convention; then
   run_convention
+fi
+if has_check semantic-index; then
+  run_semantic_index
 fi
 write_report
 

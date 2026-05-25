@@ -51,6 +51,7 @@ validation_commands = [
   "agent-canon rust-migration-plan --root . --limit 12",
   "agent-canon local-llm --help",
   "agent-canon local-llm classify-responsibility --root . --print-prompt rust/agent-canon/src/local_llm.rs",
+  "agent-canon semantic-index --help",
 ]
 
 [compiled_tools.llama_cpp]

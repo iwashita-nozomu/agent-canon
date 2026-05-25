@@ -1689,6 +1689,134 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_BUILD",
+      "line": 292,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CLI",
+      "line": 408,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CLI_ERROR",
+      "line": 409,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CONTEXT_PACK",
+      "line": 3526,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_CONTEXT_PACK_CELLS",
+      "line": 3527,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_DB",
+      "line": 293,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_DB",
+      "line": 318,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_EMBEDDINGS",
+      "line": 296,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_EMBEDDINGS",
+      "line": 320,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_EMBED_PROVIDER",
+      "line": 317,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_ERROR",
+      "line": 4151,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_FILES",
+      "line": 294,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_NODES",
+      "line": 295,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_NODES",
+      "line": 319,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_SEARCH",
+      "line": 3478,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_THIN_DOCS",
+      "line": 3634,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
@@ -2060,7 +2188,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1310,
+      "line": 1362,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2068,7 +2196,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1344,
+      "line": 1396,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2076,7 +2204,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 972,
+      "line": 1024,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2084,7 +2212,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 975,
+      "line": 1027,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2092,7 +2220,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 980,
+      "line": 1032,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2100,7 +2228,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 982,
+      "line": 1034,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -2108,7 +2236,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1203,
+      "line": 1255,
       "path": "tools/agent_tools/agent_team.py",
       "surface": "tool"
     },
@@ -6020,7 +6148,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN",
-      "line": 338,
+      "line": 542,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -6028,7 +6156,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_NONZERO_COMMANDS",
-      "line": 341,
+      "line": 545,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -6036,7 +6164,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_REPORT",
-      "line": 340,
+      "line": 544,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -6044,7 +6172,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_SCOPE",
-      "line": 339,
+      "line": 543,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -8884,7 +9012,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "checked",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8892,7 +9020,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8900,7 +9028,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "packs",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8908,7 +9036,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 608,
+      "line": 610,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8916,7 +9044,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CONTAINER_CONFIG_FINDING",
-      "line": 109,
+      "line": 111,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8924,7 +9052,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG",
-      "line": 633,
+      "line": 635,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8932,7 +9060,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_CHECKED",
-      "line": 631,
+      "line": 633,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8940,7 +9068,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_FINDINGS",
-      "line": 632,
+      "line": 634,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -8948,7 +9076,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTAINER_CONFIG_PACK",
-      "line": 625,
+      "line": 627,
       "path": "tools/ci/container_config.py",
       "surface": "tool"
     },
@@ -9516,7 +9644,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 34,
+      "line": 37,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9524,7 +9652,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 45,
+      "line": 48,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9532,7 +9660,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 84,
+      "line": 125,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9540,7 +9668,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 97,
+      "line": 130,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9548,7 +9676,71 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP",
-      "line": 107,
+      "line": 156,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP",
+      "line": 167,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP",
+      "line": 206,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP",
+      "line": 253,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP",
+      "line": 263,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_BUILD_JOBS",
+      "line": 244,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_CMAKE_ARGS",
+      "line": 243,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_CUDA",
+      "line": 239,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR",
+      "line": 241,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9556,7 +9748,39 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_ERROR",
-      "line": 35,
+      "line": 38,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_ERROR",
+      "line": 126,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_ERROR",
+      "line": 131,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_ERROR",
+      "line": 157,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_LLAMA_CPP_ERROR",
+      "line": 168,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9564,7 +9788,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_MISSING",
-      "line": 46,
+      "line": 49,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9572,7 +9796,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_NEXT",
-      "line": 85,
+      "line": 207,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9580,7 +9804,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_REF",
-      "line": 72,
+      "line": 194,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -9588,7 +9812,31 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_LLAMA_CPP_TOOLS_HOME",
-      "line": 71,
+      "line": 193,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "cmake_args",
+      "line": 237,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "cuda_backend",
+      "line": 235,
+      "path": "tools/install_llama_cpp.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "cuda_driver_dir",
+      "line": 236,
       "path": "tools/install_llama_cpp.sh",
       "surface": "tool"
     },
@@ -11435,6 +11683,7 @@
     "rust/agent-canon/src/python_structure_hash_impact.rs",
     "rust/agent-canon/src/python_structure_hash_report.rs",
     "rust/agent-canon/src/rust_migration_plan.rs",
+    "rust/agent-canon/src/semantic_index.rs",
     "tools/__init__.py",
     "tools/agent_tools/agent_canon_preflight.py",
     "tools/agent_tools/agent_canon_update_todos.py",

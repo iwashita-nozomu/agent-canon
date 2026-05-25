@@ -11,10 +11,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Findings
-
-| Area | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+{{>findings_area_table}}
 
 ## Symbols, Terms, And Abbreviations
 
@@ -32,6 +29,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Record concrete rewrite points needed to repair definition order and notation discipline. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

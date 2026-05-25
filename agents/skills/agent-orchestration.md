@@ -91,7 +91,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
 - scope が paper draft と broader academic prose をまたぐなら、`paper-writing` を優先し、必要なときだけ `academic-writing` を追加します
-- PR body、PR evidence comment、status update、decision brief、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
+- PR body、PR evidence comment、status update、decision brief、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
+- HTML output、HTML report、browser-readable page、dashboard、local preview server、external browser publication が明示された場合は `html-output` を使います
+- HTML の experiment / Eval report が明示された場合は `html-experiment-report` と `html-output` を併用します
+- report、experiment plan / report、Eval output、decision brief、HTML view、document、paper、refactor の構造が非自明な場合、または first figure / table / section / slice、source map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
 - README、workflow、guide、migration、specification docs は各 domain writing skill を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
 - research-backed implementation や比較改善では `research-workflow` を使います
 - large refactor では `refactor-loop`、environment task では `environment-maintenance`、repo-wide rearchitecture では `comprehensive-development`、outer loop tuning では `adaptive-improvement-loop` を使います

@@ -91,6 +91,7 @@ Keep the project `Dockerfile` focused on the project runtime.
   convenience.
 - Do not install rustup or run cargo solely for AgentCanon CLI or shared
   analysis-tool migration work.
+- Do not install TeX / LaTeX tooling solely for Academic Writing agent output.
 - Do not bake host-specific mount paths such as `/mnt/git` into the image.
 - Do not install repository Python dependencies during image build when those
   dependencies depend on the mounted workspace.
@@ -105,8 +106,9 @@ project CI path.
 
 Use the shared `.devcontainer/` surface for agent runtime setup.
 
-- Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling, and
-  post-create bootstrap belong in `.devcontainer/post-create.sh`.
+- Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
+  JSON inspection helpers such as `jq`, and post-create bootstrap belong in
+  `.devcontainer/post-create.sh`.
 - Public-repository security scanners used by agents, including `gitleaks`,
   `trufflehog`, and `detect-secrets`, belong in `.devcontainer/post-create.sh`.
   They are audit tooling, not project runtime dependencies, and must not be
@@ -115,6 +117,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
+- TeX document and image tooling used by the Academic Writing skill, including
+  `latexmk`, pdfLaTeX, XeLaTeX, TikZ packages, `dvisvgm`, `pdfcrop`,
+  Ghostscript, and PDF inspection helpers, belongs in `.devcontainer/post-create.sh`.
+  This is an agent-side writing toolchain, not a default project runtime
+  dependency.
 - llama.cpp and the default 3B-class local LLM model selector belong in
   `.devcontainer/post-create.sh` and `tools/install_llama_cpp.sh` when they are
   used only for single-file AgentCanon responsibility analysis.

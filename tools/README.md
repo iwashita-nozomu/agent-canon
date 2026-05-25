@@ -11,6 +11,7 @@ downstream implementation agent_tools/responsibility_scope.py validates responsi
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
+downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
@@ -159,7 +160,7 @@ under `agents/evals/results/report-quality/`.
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
   - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`.claude/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
   - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、skill mirror sync、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。
-  - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
+  - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans、semantic-index review artifacts、任意の provider-comparison artifact を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
@@ -209,6 +210,8 @@ under `agents/evals/results/report-quality/`.
     - Rust CLI は AgentCanon source に依存するため自動 rebuild 対象です。llama.cpp は `tools/install_llama_cpp.sh` が正本で、PostCreate では fetch/build、AgentCanon update 後の rebuild では既存 checkout を再コンパイルします。
   - `install_llama_cpp.sh`
     - llama.cpp を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下に build し、`llama-cli` と `llama-server` を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin` へ公開します。
+    - CUDA build は `AGENT_CANON_LLAMA_CPP_CUDA=auto|1|0` で制御します。`auto` は `nvcc`、GPU device、linkable `libcuda` が揃う場合だけ `-DGGML_CUDA=ON` にし、それ以外は CPU build に戻します。
+    - `AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR` は WSL / devcontainer の `libcuda.so` 探索先、`AGENT_CANON_LLAMA_CPP_CMAKE_ARGS` は追加 CMake flags、`AGENT_CANON_LLAMA_CPP_BUILD_JOBS` は build 並列数です。CUDA / CMake flag が変わると、source が新しくなくても再ビルドします。
     - 既定 model selector は `ggml-org/SmolLM3-3B-GGUF:Q4_K_M` です。model weights は llama.cpp/Hugging Face cache に lazy fetch し、repo にはコミットしません。
 
 ## AgentCanon Update Path
@@ -405,6 +408,15 @@ agent-canon local-llm search --purpose "dependency header graph tool"
 agent-canon local-llm search --purpose "github cli validation" --providers llm,tool,vector
 agent-canon local-llm search --purpose "alpha dispatch caller target" --providers header-deps,code-deps --format json
 agent-canon local-llm build-index --surface tools --surface documents
+agent-canon semantic-index build --include documents --include agents
+agent-canon semantic-index embed-provider --db reports/semantic-index.sqlite --provider llama-server-embedding --model <embedding-model>
+agent-canon semantic-index search --query "AgentCanon latest submodule workflow"
+agent-canon semantic-index search --query-file reports/search_query.txt --top-k 20 --format jsonl
+agent-canon semantic-index context-pack --query-file reports/search_query.txt --max-cells 12 --max-total-chars 6000 --format text
+agent-canon semantic-index compare-providers --db reports/semantic-index.sqlite --query-file reports/search_query.txt
+python3 tools/agent_tools/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+agent-canon semantic-index thin-docs --top-k 20 --format text
+agent-canon semantic-index eval --fixture tests/fixtures/semantic-index/basic
 python3 tools/agent_tools/route.py --area search
 ```
 
@@ -440,6 +452,41 @@ indices under `reports/` or another ignored artifact path, never commit
 embedding vectors, and do not add API keys or model choices to Dockerfile
 defaults.
 
+`agent-canon semantic-index` is the Rust-native SQLite-backed candidate
+generator for semantic search, similar pairs, merge candidates, thin-document
+wrappers, provider comparison, fixture Eval, and output-artifact Eval. Its
+default generated cache is
+`~/.cache/agent-canon/semantic-index/<repo-key>/index.sqlite`; explicit `--db`
+paths are still allowed for run-local artifacts. `search` accepts `--query`,
+`--query-file`, or `--query-stdin`; use file/stdin for long user requests and
+`--format text` or `--format jsonl` for bounded output that does not require
+reading one full JSON array or echoing the long query into context.
+`context-pack` is the prompt-handoff path: it reruns provider-scoped search and
+emits only capped evidence cells with path, line range, score, responsibility
+bucket, and excerpt, bounded by `--max-cells`, `--max-cell-chars`, and
+`--max-total-chars`. `similar`
+may cross code, docs, and config as alignment evidence. `merge-candidates`
+keeps full-repo input but only compares nodes inside the same responsibility
+scope, surface kind, document topic, and node kind, so code/document matches,
+runtime mirrors, and eval/report logs are never reported as merge evidence.
+JSONL results include `same_responsibility`, `candidate_bucket`, and per-side
+`responsibility_bucket` for review routing. `thin-docs` reports low-content,
+high-similarity document wrappers
+with advisory actions such as `inline_into_target` or `keep_entrypoint`.
+Preserved source/split guide pairs and tiny heading-only sections are filtered
+as alignment or low-evidence surfaces. Its results are candidate evidence only;
+strict structure/dependency tools remain the authority for safe deletion or
+merge decisions. `embed-provider` can add LLM-backed vectors to existing nodes,
+and `compare-providers` reports deterministic-vs-LLM provider deltas without
+creating labels or ownership decisions.
+`semantic_provider_html_report.py` renders that provider-delta JSON as a
+self-contained HTML report whose first figure is
+`Provider Delta To Shared Candidate Logic`; the HTML remains review evidence and
+does not replace candidate logic, `eval-output`, or responsibility checks.
+`eval-output` validates generated JSONL artifacts before reviewers consume
+them, including result counts, responsibility metadata, thin-doc actions, and no
+full long-query echo in search summaries.
+
 ## Log Helper Naming Tool
 
 `check_log_helper_names.py` fails Python functions that look like logging helpers but do not start with `_log`.
@@ -455,14 +502,19 @@ python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor -
 large goal iterations in the standalone AgentCanon repo, this template, and
 derived repos that pin AgentCanon as `vendor/agent-canon`. It inspects the
 parent/root surface and AgentCanon source as separate scopes, then writes a
-machine-readable inventory, a Markdown inventory, tool logs, and a
-command-status summary under the run bundle.
+machine-readable inventory, a Markdown inventory, semantic-index review
+artifacts, tool logs, and a command-status summary under the run bundle.
 
 ```bash
 make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware"
 bash tools/agent_tools/review_backlog_scan.sh \
   --report-dir reports/agents/<run-id>/cross_repo_inspection \
   --submodule-aware
+
+bash tools/agent_tools/review_backlog_scan.sh \
+  --report-dir reports/agents/<run-id>/cross_repo_inspection \
+  --submodule-aware \
+  --semantic-query-file reports/agents/<run-id>/review_query.txt
 ```
 
 Scope flags:
@@ -491,6 +543,16 @@ Minimum evidence to keep with the run bundle:
 - `oop_*_readability_*.md`, `static_any_*.txt`,
   `hardcoded_numbers_*.txt`, and `log_helper_names_*.txt` for mechanical
   implementation review signals.
+- `semantic_index_merge_candidates_*.jsonl`,
+  `semantic_index_thin_docs_*.jsonl`, and optional
+  `semantic_index_search_*.jsonl` for advisory responsibility-duplication,
+  consolidation, thin-document, and long-query review signals.
+- `semantic_index_output_eval_*.json` and
+  `semantic_index_output_eval_*.txt` for structural Eval of those semantic
+  review artifacts.
+- `semantic_index_provider_compare_*.json` and
+  `semantic_index_provider_compare_*.txt` when an LLM embedding provider is
+  explicitly configured for deterministic-vs-LLM ranking delta analysis.
 - `convention_compliance.txt` and `review_backlog_scan_status.tsv` for
   convention and command-status evidence.
 

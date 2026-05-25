@@ -6,6 +6,7 @@ description: Use when a large refactor should run as a behavior-preserving refac
 @dependency-start
 responsibility Documents Refactor Loop for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/skills/structure-planning.md defines reusable refactor structure contracts
 @dependency-end
 -->
 
@@ -13,6 +14,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 # Refactor Loop
 
 1. Read `agents/skills/refactor-loop.md`.
+1. Use `$structure-planning` before editing when file moves, module boundaries, repair slices, path mapping, responsibility maps, allowed structural delta, or forbidden semantic delta are nontrivial.
 1. Fix `Behavior Contract`, `Allowed Structural Delta`, and `Forbidden Semantic Delta` before editing.
 1. Record delete, move, rename, and split targets before implementation.
 1. Keep feature additions out of the same pass.
