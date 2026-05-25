@@ -1,5 +1,5 @@
 // @dependency-start
-// responsibility Provides Rust-native semantic vector indexing, search, similarity, thin-doc, and eval CLI support.
+// responsibility Provides Rust-native semantic vector indexing, search, similarity, natural-relation, thin-doc, and eval CLI support.
 // upstream design ../../../documents/semantic_index.md semantic index responsibility and generated-cache policy
 // upstream design ../../../documents/search-coordination.md coordinated search boundary and advisory search policy
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
@@ -38,6 +38,9 @@ const VECTOR_EPSILON: f32 = 1.0e-6;
 const MERGE_CANDIDATE_MIN_LINES: i64 = 4;
 const DEFAULT_MIN_THIN_SCORE: f32 = 0.50;
 const DEFAULT_MIN_THIN_NEIGHBOR_SCORE: f32 = 0.86;
+const DEFAULT_MIN_RELATION_SIMILARITY: f32 = 0.72;
+const DEFAULT_MIN_KIND_OF_SCORE: f32 = 0.62;
+const NATURAL_RELATION_FEATURE_FANOUT: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SemanticCommand {
@@ -125,6 +128,20 @@ struct ThinDocsArgs {
 }
 
 #[derive(Debug, Clone)]
+struct NaturalRelationsArgs {
+    root: PathBuf,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    min_similarity: f32,
+    min_kind_of_score: f32,
+    top_k: usize,
+    format: OutputFormat,
+    cross_file_only: bool,
+}
+
+#[derive(Debug, Clone)]
 struct EvalArgs {
     fixture: PathBuf,
     db: PathBuf,
@@ -188,6 +205,7 @@ enum ParsedArgs {
     EmbedProvider(EmbedProviderArgs),
     Similar(SimilarArgs),
     ThinDocs(ThinDocsArgs),
+    NaturalRelations(NaturalRelationsArgs),
     Eval(EvalArgs),
     CompareProviders(CompareProvidersArgs),
     EvalOutput(EvalOutputArgs),
@@ -264,6 +282,17 @@ struct ThinDocCandidate {
     reasons: Vec<String>,
     best_match: Option<ThinDocNeighbor>,
     metrics: ThinDocMetrics,
+}
+
+#[derive(Debug, Clone)]
+struct NaturalRelation {
+    left: IndexedNode,
+    right: IndexedNode,
+    similarity_score: f32,
+    left_is_kind_of_right_score: f32,
+    right_is_kind_of_left_score: f32,
+    relation_kind: String,
+    rank: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -344,6 +373,19 @@ pub fn run(args: &[String]) -> i32 {
             }
             Err(error) => fail("THIN_DOCS", error),
         },
+        Ok(ParsedArgs::NaturalRelations(relation_args)) => {
+            match natural_relations(&relation_args) {
+                Ok(results) => {
+                    if let Err(error) = persist_natural_relations(&relation_args, &results) {
+                        fail("NATURAL_RELATIONS_PERSIST", error)
+                    } else {
+                        print_natural_relation_results(&relation_args, &results);
+                        0
+                    }
+                }
+                Err(error) => fail("NATURAL_RELATIONS", error),
+            }
+        }
         Ok(ParsedArgs::Eval(eval_args)) => match run_eval(&eval_args) {
             Ok(report) => {
                 if let Some(path) = &eval_args.report {
@@ -438,6 +480,9 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
             SimilarKind::MergeCandidates,
         )?)),
         "thin-docs" => Ok(ParsedArgs::ThinDocs(parse_thin_docs_args(&args[1..])?)),
+        "natural-relations" | "nl-relations" => Ok(ParsedArgs::NaturalRelations(
+            parse_natural_relations_args(&args[1..])?,
+        )),
         "eval" => Ok(ParsedArgs::Eval(parse_eval_args(&args[1..])?)),
         "compare-providers" => Ok(ParsedArgs::CompareProviders(parse_compare_providers_args(
             &args[1..],
@@ -882,6 +927,79 @@ fn parse_thin_docs_args(args: &[String]) -> Result<ThinDocsArgs, String> {
     validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
     validate_min_score(parsed.min_thin_score)?;
     validate_min_score(parsed.min_neighbor_score)?;
+    Ok(parsed)
+}
+
+fn parse_natural_relations_args(args: &[String]) -> Result<NaturalRelationsArgs, String> {
+    let mut parsed = NaturalRelationsArgs {
+        root: PathBuf::from("."),
+        db: default_db_path(Path::new(".")),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        min_similarity: DEFAULT_MIN_RELATION_SIMILARITY,
+        min_kind_of_score: DEFAULT_MIN_KIND_OF_SCORE,
+        top_k: DEFAULT_TOP_K,
+        format: OutputFormat::Text,
+        cross_file_only: true,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--min-similarity" | "--min-score" => {
+                parsed.min_similarity = value_f32(args, index, "--min-similarity")?;
+                index += 2;
+            }
+            "--min-kind-of-score" => {
+                parsed.min_kind_of_score = value_f32(args, index, "--min-kind-of-score")?;
+                index += 2;
+            }
+            "--top-k" => {
+                parsed.top_k = value_usize(args, index, "--top-k")?;
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            "--cross-file-only" => {
+                parsed.cross_file_only = true;
+                index += 1;
+            }
+            "--allow-same-file" => {
+                parsed.cross_file_only = false;
+                index += 1;
+            }
+            unknown => return Err(format!("unknown natural-relations option {unknown}")),
+        }
+    }
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
+    validate_min_score(parsed.min_similarity)?;
+    validate_min_score(parsed.min_kind_of_score)?;
+    validate_positive(parsed.top_k, "--top-k")?;
     Ok(parsed)
 }
 
@@ -1438,6 +1556,97 @@ fn thin_docs(args: &ThinDocsArgs) -> Result<Vec<ThinDocCandidate>, String> {
         candidate.rank = index + 1;
     }
     Ok(candidates)
+}
+
+fn natural_relations(args: &NaturalRelationsArgs) -> Result<Vec<NaturalRelation>, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes: Vec<IndexedNode> = load_nodes(&conn, &args.provider, &args.model, dim)?
+        .into_iter()
+        .filter(is_natural_relation_node)
+        .collect();
+    let pairs = natural_relation_candidate_pairs_from_nodes(&nodes, args);
+    let mut term_cache: HashMap<i64, Vec<String>> = HashMap::new();
+    let mut relations = Vec::new();
+    for pair in pairs {
+        let left_terms = relation_terms_for_node(args, &pair.left, &mut term_cache)?;
+        let right_terms = relation_terms_for_node(args, &pair.right, &mut term_cache)?;
+        let left_is_kind_of_right = directed_kind_of_score(&left_terms, &right_terms, pair.score);
+        let right_is_kind_of_left = directed_kind_of_score(&right_terms, &left_terms, pair.score);
+        let relation_kind = classify_natural_relation(
+            left_is_kind_of_right,
+            right_is_kind_of_left,
+            args.min_kind_of_score,
+        )
+        .to_string();
+        relations.push(NaturalRelation {
+            left: pair.left,
+            right: pair.right,
+            similarity_score: pair.score,
+            left_is_kind_of_right_score: left_is_kind_of_right,
+            right_is_kind_of_left_score: right_is_kind_of_left,
+            relation_kind,
+            rank: 0,
+        });
+    }
+    sort_natural_relations(&mut relations);
+    relations.truncate(args.top_k);
+    for (index, relation) in relations.iter_mut().enumerate() {
+        relation.rank = index + 1;
+    }
+    Ok(relations)
+}
+
+fn natural_relation_candidate_pairs_from_nodes(
+    nodes: &[IndexedNode],
+    args: &NaturalRelationsArgs,
+) -> Vec<SimilarPair> {
+    let mut pairs: Vec<SimilarPair> = Vec::new();
+    let mut inverted: HashMap<(usize, bool), Vec<usize>> = HashMap::new();
+    let prune_limit = args.top_k.saturating_mul(64).max(1024);
+    for right_index in 0..nodes.len() {
+        let right = &nodes[right_index];
+        let mut candidates: HashSet<usize> = HashSet::new();
+        for (index, sign) in prefix_features(&right.vector, args.min_similarity) {
+            if let Some(indices) = inverted.get(&(index, sign)) {
+                candidates.extend(
+                    indices
+                        .iter()
+                        .rev()
+                        .take(NATURAL_RELATION_FEATURE_FANOUT)
+                        .copied(),
+                );
+            }
+        }
+        for left_index in candidates {
+            let left = &nodes[left_index];
+            if args.cross_file_only && left.file_id == right.file_id {
+                continue;
+            }
+            let score = cosine_score(&left.vector, &right.vector);
+            if score + f32::EPSILON >= args.min_similarity {
+                pairs.push(SimilarPair {
+                    left: left.clone(),
+                    right: right.clone(),
+                    score,
+                    rank: 0,
+                });
+                if pairs.len() > prune_limit {
+                    sort_pairs(&mut pairs);
+                    pairs.truncate(args.top_k.saturating_mul(16).max(args.top_k));
+                }
+            }
+        }
+        for (index, sign) in all_signed_features(&right.vector) {
+            inverted.entry((index, sign)).or_default().push(right_index);
+        }
+    }
+    sort_pairs(&mut pairs);
+    pairs.truncate(args.top_k.saturating_mul(16).max(args.top_k));
+    for (index, pair) in pairs.iter_mut().enumerate() {
+        pair.rank = index + 1;
+    }
+    pairs
 }
 
 fn run_eval(args: &EvalArgs) -> Result<Value, String> {
@@ -2128,6 +2337,60 @@ fn persist_thin_docs(args: &ThinDocsArgs, candidates: &[ThinDocCandidate]) -> Re
     Ok(())
 }
 
+fn persist_natural_relations(
+    args: &NaturalRelationsArgs,
+    relations: &[NaturalRelation],
+) -> Result<(), String> {
+    let write_db = prepare_existing_write_db(&args.db)?;
+    let conn = open_cache_connection(&write_db)?;
+    init_schema(&conn)?;
+    let run_id = run_id();
+    conn.execute(
+        "INSERT INTO analysis_runs(run_id, kind, created_at, params_json) VALUES (?1, ?2, ?3, ?4)",
+        params![
+            run_id,
+            "natural-relations",
+            unix_millis().to_string(),
+            json!({
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "top_k": args.top_k,
+                "cross_file_only": args.cross_file_only,
+                "provider": args.provider,
+                "model": args.model,
+                "dim": args.dim
+            })
+            .to_string()
+        ],
+    )
+    .map_err(|error| error.to_string())?;
+    for relation in relations {
+        conn.execute(
+            r#"
+            INSERT INTO natural_language_relations(
+                run_id, left_node_id, right_node_id, similarity_score,
+                left_is_kind_of_right_score, right_is_kind_of_left_score,
+                relation_kind, rank
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                run_id,
+                relation.left.node_id,
+                relation.right.node_id,
+                relation.similarity_score,
+                relation.left_is_kind_of_right_score,
+                relation.right_is_kind_of_left_score,
+                relation.relation_kind,
+                relation.rank as i64,
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    finish_write_db(&write_db, &args.db)?;
+    Ok(())
+}
+
 fn init_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -2184,6 +2447,16 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             target_node_id INTEGER,
             target_score REAL
         );
+        CREATE TABLE IF NOT EXISTS natural_language_relations(
+            run_id TEXT NOT NULL,
+            left_node_id INTEGER NOT NULL,
+            right_node_id INTEGER NOT NULL,
+            similarity_score REAL NOT NULL,
+            left_is_kind_of_right_score REAL NOT NULL,
+            right_is_kind_of_left_score REAL NOT NULL,
+            relation_kind TEXT NOT NULL,
+            rank INTEGER NOT NULL
+        );
         "#,
     )
     .map_err(|error| error.to_string())
@@ -2197,6 +2470,7 @@ fn clear_index(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
         DELETE FROM thin_docs;
+        DELETE FROM natural_language_relations;
         DELETE FROM similar_pairs;
         DELETE FROM analysis_runs;
         DELETE FROM embeddings;
@@ -3214,6 +3488,116 @@ fn thin_doc_action(
     "manual_review".to_string()
 }
 
+fn is_natural_relation_node(node: &IndexedNode) -> bool {
+    if is_alignment_or_log_surface(&node.path) {
+        return false;
+    }
+    if is_document_text_path(&node.path) {
+        return matches!(node.kind.as_str(), "document" | "section");
+    }
+    matches!(node.kind.as_str(), "document" | "block")
+}
+
+fn relation_terms_for_node(
+    args: &NaturalRelationsArgs,
+    node: &IndexedNode,
+    cache: &mut HashMap<i64, Vec<String>>,
+) -> Result<Vec<String>, String> {
+    if let Some(terms) = cache.get(&node.node_id) {
+        return Ok(terms.clone());
+    }
+    let text = context_excerpt(&args.root, node, DEFAULT_REMOTE_EMBEDDING_MAX_CHARS)?;
+    let terms = relation_terms(&format!("{}\n{}", node.path, text));
+    cache.insert(node.node_id, terms.clone());
+    Ok(terms)
+}
+
+fn relation_terms(text: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut terms = Vec::new();
+    for token in text_tokens(&strip_dependency_manifest(text)) {
+        if token.len() < 3 || is_relation_stop_word(&token) {
+            continue;
+        }
+        if seen.insert(token.clone()) {
+            terms.push(token);
+        }
+    }
+    terms
+}
+
+fn is_relation_stop_word(token: &str) -> bool {
+    matches!(
+        token,
+        "the"
+            | "and"
+            | "for"
+            | "with"
+            | "that"
+            | "this"
+            | "from"
+            | "into"
+            | "onto"
+            | "when"
+            | "then"
+            | "than"
+            | "must"
+            | "should"
+            | "will"
+            | "can"
+            | "are"
+            | "was"
+            | "were"
+            | "has"
+            | "have"
+            | "had"
+            | "not"
+            | "but"
+            | "one"
+            | "two"
+            | "via"
+            | "out"
+            | "all"
+            | "any"
+            | "none"
+            | "true"
+            | "false"
+    )
+}
+
+fn directed_kind_of_score(
+    specific_terms: &[String],
+    general_terms: &[String],
+    similarity_score: f32,
+) -> f32 {
+    if specific_terms.is_empty() || general_terms.is_empty() {
+        return 0.0;
+    }
+    let specific: HashSet<&str> = specific_terms.iter().map(String::as_str).collect();
+    let matched_general_terms = general_terms
+        .iter()
+        .filter(|term| specific.contains(term.as_str()))
+        .count();
+    let coverage = matched_general_terms as f32 / general_terms.len() as f32;
+    let length_balance = (specific_terms.len() as f32 / general_terms.len() as f32).min(1.0);
+    (0.85 * coverage * length_balance + 0.15 * similarity_score).clamp(0.0, 1.0)
+}
+
+fn classify_natural_relation(
+    left_is_kind_of_right_score: f32,
+    right_is_kind_of_left_score: f32,
+    min_kind_of_score: f32,
+) -> &'static str {
+    let left_high = left_is_kind_of_right_score + f32::EPSILON >= min_kind_of_score;
+    let right_high = right_is_kind_of_left_score + f32::EPSILON >= min_kind_of_score;
+    match (left_high, right_high) {
+        (true, true) => "equivalent",
+        (true, false) => "left_is_kind_of_right",
+        (false, true) => "right_is_kind_of_left",
+        (false, false) => "unrelated",
+    }
+}
+
 fn document_responsibility_bucket(path: &str) -> &'static str {
     if path == "README.md" || path.ends_with("/README.md") {
         return "readme";
@@ -3449,6 +3833,28 @@ fn sort_thin_docs(candidates: &mut [ThinDocCandidate]) {
     });
 }
 
+fn sort_natural_relations(relations: &mut [NaturalRelation]) {
+    relations.sort_by(|left, right| {
+        right
+            .left_is_kind_of_right_score
+            .max(right.right_is_kind_of_left_score)
+            .partial_cmp(
+                &left
+                    .left_is_kind_of_right_score
+                    .max(left.right_is_kind_of_left_score),
+            )
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| {
+                right
+                    .similarity_score
+                    .partial_cmp(&left.similarity_score)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| left.left.path.cmp(&right.left.path))
+            .then_with(|| left.right.path.cmp(&right.right.path))
+    });
+}
+
 fn print_search_results(args: &SearchArgs, results: &[ScoredNode]) {
     if args.format == OutputFormat::Json {
         println!(
@@ -3660,6 +4066,53 @@ fn print_thin_docs_results(args: &ThinDocsArgs, candidates: &[ThinDocCandidate])
     }
 }
 
+fn print_natural_relation_results(args: &NaturalRelationsArgs, relations: &[NaturalRelation]) {
+    if args.format == OutputFormat::Json {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_natural_relations": "ok",
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "results": relations.iter().map(natural_relation_json).collect::<Vec<_>>()
+            })
+        );
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_natural_relations": "ok",
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "result_count": relations.len()
+            })
+        );
+        for relation in relations {
+            println!("{}", natural_relation_json(relation));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_NATURAL_RELATIONS=ok");
+    for relation in relations {
+        println!(
+            "rank={} relation={} similarity={:.4} left_kind_of_right={:.4} right_kind_of_left={:.4} left={}:{}-{} right={}:{}-{}",
+            relation.rank,
+            relation.relation_kind,
+            relation.similarity_score,
+            relation.left_is_kind_of_right_score,
+            relation.right_is_kind_of_left_score,
+            relation.left.path,
+            relation.left.line_start,
+            relation.left.line_end,
+            relation.right.path,
+            relation.right.line_start,
+            relation.right.line_end
+        );
+    }
+}
+
 fn print_eval_summary(report: &Value) {
     println!(
         "SEMANTIC_INDEX_EVAL={}",
@@ -3841,6 +4294,32 @@ fn thin_doc_json(candidate: &ThinDocCandidate) -> Value {
             })
         }),
         "metrics": thin_doc_metrics_json(&candidate.metrics)
+    })
+}
+
+fn natural_relation_json(relation: &NaturalRelation) -> Value {
+    json!({
+        "rank": relation.rank,
+        "relation_kind": relation.relation_kind,
+        "similarity_score": relation.similarity_score,
+        "left_is_kind_of_right_score": relation.left_is_kind_of_right_score,
+        "right_is_kind_of_left_score": relation.right_is_kind_of_left_score,
+        "left": {
+            "path": relation.left.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.left.path),
+            "surface_kind": merge_candidate_surface_kind(&relation.left.path),
+            "node_kind": relation.left.kind,
+            "line_start": relation.left.line_start,
+            "line_end": relation.left.line_end
+        },
+        "right": {
+            "path": relation.right.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.right.path),
+            "surface_kind": merge_candidate_surface_kind(&relation.right.path),
+            "node_kind": relation.right.kind,
+            "line_start": relation.right.line_start,
+            "line_end": relation.right.line_end
+        }
     })
 }
 
@@ -4154,7 +4633,7 @@ fn fail(scope: &str, message: String) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|eval|compare-providers|eval-output> [options]"
+        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> [options]"
     );
     eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
@@ -4165,6 +4644,7 @@ fn print_usage() {
         "merge-candidates: [--root repo] [--db path] [--min-score S] [--format text|json|jsonl]"
     );
     eprintln!("thin-docs: [--root repo] [--db path] [--min-thin-score S] [--min-neighbor-score S] [--top-k N] [--format text|json|jsonl]");
+    eprintln!("natural-relations: [--root repo] [--db path] [--min-similarity S] [--min-kind-of-score S] [--top-k N] [--format text|json|jsonl]");
     eprintln!("eval: --fixture <fixture-dir> [--db path] [--report path] [--format text|json]");
     eprintln!("compare-providers: --db path [--query-file path] [--left-provider name] [--right-provider name] [--left-dim N] [--right-dim N] [--report path]");
     eprintln!("eval-output: [--merge-candidates path] [--thin-docs path] [--search path] [--report path] [--format text|json]");
@@ -4454,6 +4934,100 @@ mod tests {
         })
         .unwrap();
         assert!(!candidates.is_empty());
+    }
+
+    #[test]
+    fn directed_kind_of_score_classifies_equivalent_and_containment() {
+        let specific = relation_terms(
+            "Python reviewer checks Python diffs with ruff pyright pytest evidence.",
+        );
+        let general = relation_terms("Reviewer checks diffs and records evidence.");
+        let left = directed_kind_of_score(&specific, &general, 0.80);
+        let right = directed_kind_of_score(&general, &specific, 0.80);
+        assert_eq!(
+            classify_natural_relation(left, right, DEFAULT_MIN_KIND_OF_SCORE),
+            "left_is_kind_of_right"
+        );
+
+        let equivalent_left = relation_terms("Agent update validates submodule pin workflow.");
+        let equivalent_right = relation_terms("Submodule pin workflow validates agent update.");
+        let left = directed_kind_of_score(&equivalent_left, &equivalent_right, 0.95);
+        let right = directed_kind_of_score(&equivalent_right, &equivalent_left, 0.95);
+        assert_eq!(
+            classify_natural_relation(left, right, DEFAULT_MIN_KIND_OF_SCORE),
+            "equivalent"
+        );
+    }
+
+    #[test]
+    fn natural_relations_persist_directed_kind_of_analysis() {
+        let root = unique_temp_dir("semantic-index-natural-relations");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs").join("python_review.md"),
+            "# Python Review\nPython reviewer checks Python diffs with ruff pyright pytest evidence.",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs").join("review.md"),
+            "# Review\nReviewer checks diffs and records evidence.",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs").join("security.md"),
+            "# Security\nSecret scanner credential exposure audit.",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("docs")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let args = NaturalRelationsArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            min_similarity: 0.05,
+            min_kind_of_score: DEFAULT_MIN_KIND_OF_SCORE,
+            top_k: 20,
+            format: OutputFormat::Jsonl,
+            cross_file_only: true,
+        };
+        let relations = natural_relations(&args).unwrap();
+        let review_relation = relations
+            .iter()
+            .find(|relation| {
+                relation.left.path == "docs/python_review.md"
+                    && relation.right.path == "docs/review.md"
+                    && relation.relation_kind == "left_is_kind_of_right"
+            })
+            .expect("expected Python review to be a kind of review");
+        assert!(
+            review_relation.left_is_kind_of_right_score
+                > review_relation.right_is_kind_of_left_score
+        );
+
+        persist_natural_relations(&args, &relations).unwrap();
+        let conn = open_cache_connection(&db).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM natural_language_relations WHERE relation_kind = 'left_is_kind_of_right'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(count >= 1);
     }
 
     #[test]

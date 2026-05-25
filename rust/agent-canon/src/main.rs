@@ -69,7 +69,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|eval|compare-providers|eval-output> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

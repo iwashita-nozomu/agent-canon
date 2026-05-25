@@ -357,7 +357,7 @@ entries:
       - tests/agent_tools/test_search_index.py
 
   - id: semantic-index
-    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, merge, thin-doc, provider-comparison, and Eval results.
+    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, merge, natural-relation, thin-doc, provider-comparison, and Eval results.
     path: rust/agent-canon/src/semantic_index.rs
     family: root
     role: inventory

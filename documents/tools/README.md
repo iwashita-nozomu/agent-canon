@@ -60,11 +60,12 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
 - `agent-canon semantic-index`
   - text-like file を安定 node に分け、provider-scoped dense vector を SQLite に保存します。
-  - `build`、`embed-provider`、`search`、`context-pack`、`similar`、`merge-candidates`、`thin-docs`、`compare-providers`、`eval`、`eval-output` を持つ候補生成 tool です。
+  - `build`、`embed-provider`、`search`、`context-pack`、`similar`、`merge-candidates`、`natural-relations`、`thin-docs`、`compare-providers`、`eval`、`eval-output` を持つ候補生成 tool です。
   - `embed-provider` は既存 node に LLM embedding provider の vector を追加し、`compare-providers` は deterministic baseline と LLM provider の候補 ranking delta を診断します。LLM label や ownership authority は生成しません。
   - `search` は `--query`、`--query-file`、`--query-stdin` を受けます。長い user request は file / stdin で渡し、agent が JSON 全体や長い query echo を読む必要がないように `--top-k` と `--format text` または `--format jsonl` を使います。
   - `context-pack` は agent handoff 用に、上位候補を path、line range、score、responsibility bucket、短い excerpt の bounded evidence cell へ圧縮します。
   - `similar` は横断 alignment evidence を許可し、`merge-candidates` は full repo 入力のまま同じ responsibility scope / surface kind / document topic / node kind 内だけを候補化します。runtime mirror と eval/report log は統合候補にしません。
+  - `natural-relations` は pair の両方向で "A is a kind of B" の自然さを score 化し、`equivalent`、`unrelated`、片方向包含を SQLite に保存します。
   - `thin-docs` は低内容量、高い単一 target 類似度、参照密度、wrapper 語彙から薄い文書候補を出し、root entrypoint は `keep_entrypoint` として削除候補から分けます。
   - `eval-output` は review JSONL artifact 自体を検査し、result count、responsibility metadata、thin-doc action、long-query echo の欠落を検出します。
   - `tools/agent_tools/semantic_provider_html_report.py` は `compare-providers` JSON を self-contained HTML に描画します。先頭図は `Provider Delta To Shared Candidate Logic` で、provider 差分は診断 evidence、責務 bucket / candidate logic が authority であることを明示します。
