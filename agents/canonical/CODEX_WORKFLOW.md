@@ -9,6 +9,7 @@ downstream design ../workflows/token-efficient-codex-workflow.md token-aware run
 downstream design ../templates/closeout_gate.md closeout gate contract
 upstream design ../../documents/dependency-manifest-design.md dependency manifest design
 upstream design ../../documents/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
+upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
 downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
 @dependency-end
 -->
@@ -442,7 +443,7 @@ default の model split は、`gpt-5.5` が frontier-required planning、design�
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
-- write-capable subagent は parent-managed write scope で制御します。`team_manifest.yaml` の write policy が disjoint path / separate worktree を割り当てた場合だけ複数 writer を許可し、重なる場合は serialize します。
+- write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、先行 wave の validation と tool rerun 後に後続 wave へ回します。同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います。
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 
@@ -579,6 +580,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を通し、裸の非自明数値を名前付き定数、typed configuration、API input、または根拠付き `hardcoded-number-ok` へ解消する
 - Python のログ出力 helper を変更した場合は `python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports` を通し、ログ helper 名を `_log...` に揃える
 - Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を parent 直編集の work log または write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
+- tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
 - checkpoint では `make ci-quick` を使ってよい。final closeout は risk class に応じて `make ci`、`make agent-checks`、または targeted checks を選ぶ
 - full confidence が必要な場合は `make ci`
@@ -635,8 +637,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は別 instance にする
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
 - 論文 draft では `citation_evidence_reviewer` も別 instance にする
-- 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理する
-- write scope が重なる場合は serialize するか worktree を分ける
+- 包括的開発では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定します
+- 複数 writer を要する場合は、衝突 target を同一 wave に置かず、先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ複数 worktree に分けます
+- writer ごとの path / directory / object は `team_manifest.yaml` の write policy で管理します
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。止めるのは user が明示的に止めた場合か external block がある場合だけとする

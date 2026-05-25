@@ -94,7 +94,7 @@ entries:
     command: python3 tools/agent_tools/tool_catalog.py
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -982,6 +982,23 @@ entries:
     tests:
       - tests/agent_tools/test_check_log_helper_names.py
 
+  - id: check-run-log-contract
+    summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.
+    path: tools/agent_tools/check_run_log_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_run_log_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/coding-conventions-logging.md
+    tests:
+      - tests/agent_tools/test_check_run_log_contract.py
+
   - id: check-algorithm-module-nested-contract
     summary: Validates nested algorithm module ownership fields.
     path: tools/agent_tools/check_algorithm_module_nested_contract.py
@@ -998,6 +1015,23 @@ entries:
       - documents/algorithm-implementation-boundary.md
     tests:
       - tests/agent_tools/test_check_algorithm_module_nested_contract.py
+
+  - id: python-algorithm-contract-check
+    summary: Validates amp algorithm module public surface, callable Algorithm, nested ownership, and concrete Info schema with Rust analysis over Python AST JSON.
+    path: rust/agent-canon/src/python_algorithm_contract.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon python-algorithm-contract-check
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+      - documents/design/jax_util/algorithm_module_contract.md
+    tests:
+      - rust/agent-canon/src/python_algorithm_contract.rs
 
   - id: check-algorithm-module-public-surface
     summary: Validates algorithm module public API boundaries.

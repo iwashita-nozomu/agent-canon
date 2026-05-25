@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 35
+expected_count = 36
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 57
+expected_count = 58
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 35
+expected_count = 36
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -140,6 +140,30 @@ id = "RESULT-WRITEOUT-4"
 critical = true
 description = "Routes reader-facing tool or JSON result reports to report-writing instead of treating writeout as the narrative report skill."
 required_regex = ["reader-facing report", "\\$report-writing", "source packet", "limitations", "quality checklist"]
+
+[[evals]]
+id = "tool-finding-report-skill"
+target = ".agents/skills/tool-finding-report/SKILL.md"
+kind = "skill"
+description = "Tool finding reports must preserve raw and structured artifacts, route narrative reports separately, and feed prompt repair decisions into implementation loops."
+
+[[evals.checklist]]
+id = "TOOL-FINDING-1"
+critical = true
+description = "Requires raw result preservation, structured artifacts, and before/after impact when available."
+required_regex = ["raw", "structured", "impact", "python-structure-hash-report", "python-structure-hash-impact"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-2"
+critical = true
+description = "Separates writeout, reader report, and refactor implementation responsibilities."
+required_regex = ["\\$result-artifact-writeout", "\\$report-writing", "\\$refactor-loop"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-3"
+critical = true
+description = "Requires prompt feedback classification and prompt repair before the next write-capable subagent."
+required_regex = ["handoff_prompt_gap", "shared_skill_or_workflow_gap", "workflow_monitor\\.py --runtime-feedback", "prompt_repair", "next write-capable subagent"]
 
 [[evals]]
 id = "report-writing-skill"
@@ -660,6 +684,12 @@ critical = true
 description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
 required_regex = ["\\$structure-planning", "experiment plan/report", "document", "paper", "refactor", "source map"]
 
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-SKILL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool/checker/hook/static-analysis", "\\$tool-finding-report", "before/after impact"]
+
 [[evals]]
 id = "agent-orchestration-canonical-report-routing"
 target = "agents/skills/agent-orchestration.md"
@@ -683,6 +713,12 @@ id = "STRUCTURE-ROUTING-CANONICAL-1"
 critical = true
 description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
 required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
 
 [[evals]]
 id = "codex-task-workflow-convention-gate"
@@ -1189,6 +1225,12 @@ id = "OOP-SKILL-1"
 critical = true
 description = "Requires external OOP surveys to record commit, paths, excludes, and reports."
 required_regex = ["外部 repo", "commit SHA", "--exclude vendor --exclude reports", "Markdown / JSON report"]
+
+[[evals.checklist]]
+id = "REFACTOR-TOOL-FINDING-1"
+critical = true
+description = "Requires refactor-loop to consume tool-finding-report packets and repair prompt gaps before launching more write-capable subagents."
+required_regex = ["tool-finding-report", "finding packet", "impact", "handoff_prompt_gap", "write-capable subagent"]
 
 [[evals]]
 id = "agent-learning-workflow-behavior-eval"

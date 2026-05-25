@@ -16,15 +16,16 @@ import os
 import re
 import subprocess
 import sys
-from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now
 
 LOG_PATH_ENV = "AGENT_CANON_SKILL_LOG_PATH"
+CONTEXT_PATH_ENV = "AGENT_CANON_SKILL_CONTEXT_PATH"
 WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
+ACTIVE_RUN_POINTER_ENV = "AGENT_CANON_ACTIVE_RUN_POINTER"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
 SKILLS_FIELD_RE = re.compile(r"(?:^|\s)(?:skills|skill_invocation)=([^\s]+)")
@@ -158,7 +159,6 @@ SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
 }
 PROMPT_EXCERPT_LIMIT = 600
 PROMPT_FINGERPRINT_HEX_LENGTH = 16
-ACTIVE_WORKFLOW_LOOKBACK_LINES = 200
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
@@ -262,6 +262,20 @@ class SubagentSelection:
 
 
 @dataclass(frozen=True)
+class WorkflowContext:
+    """Short-lived workflow context inherited by later hook events."""
+
+    workflows: tuple[str, ...]
+    report_dir: str
+    timestamp: str
+    source_event: str
+
+    def has_workflow(self) -> bool:
+        """Return whether this context contains workflow attribution."""
+        return bool(self.workflows)
+
+
+@dataclass(frozen=True)
 class SkillUsageLogInputs:
     """Grouped inputs for one skill usage log append."""
 
@@ -271,8 +285,11 @@ class SkillUsageLogInputs:
     prompt: PromptCapture
     tool: ToolSelection
     subagent: SubagentSelection
+    workflow_context: WorkflowContext
+    workflow_context_kind: str
     workflow_event_count: int
     workflow_feedback_count: int
+    workflow_subagent_event_count: int
 
 
 def load_payload() -> dict[str, object]:
@@ -617,37 +634,78 @@ def default_log_path(root: Path) -> Path:
     return HookLogContext(root, "skill_usage", override).result_path()
 
 
-def active_workflows_from_log(root: Path) -> tuple[str, ...]:
-    """Return the most recent declared workflow for this hook log shard."""
-    path = default_log_path(root)
-    if not path.is_file():
-        return ()
+def default_context_path(root: Path) -> Path:
+    """Return the workflow context path paired with the skill usage log."""
+    override = os.environ.get(CONTEXT_PATH_ENV, "").strip()
+    if override:
+        return Path(override)
+    return default_log_path(root).with_name("skill_usage_context.json")
+
+
+def load_workflow_context(root: Path) -> WorkflowContext:
+    """Load inherited workflow context for later tool and subagent events."""
+    path = default_context_path(root)
     try:
-        with path.open(encoding="utf-8") as stream:
-            lines = deque(stream, maxlen=ACTIVE_WORKFLOW_LOOKBACK_LINES)
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return WorkflowContext((), "", "", "")
+    if not isinstance(value, dict):
+        return WorkflowContext((), "", "", "")
+    workflows = tuple(
+        item for item in value.get("workflows", []) if isinstance(item, str) and item
+    )
+    report_dir = value.get("report_dir")
+    timestamp = value.get("timestamp")
+    source_event = value.get("source_event")
+    return WorkflowContext(
+        workflows=workflows,
+        report_dir=report_dir if isinstance(report_dir, str) else "",
+        timestamp=timestamp if isinstance(timestamp, str) else "",
+        source_event=source_event if isinstance(source_event, str) else "",
+    )
+
+
+def save_workflow_context(
+    root: Path,
+    signals: PromptIntakeSignals,
+    payload: dict[str, object],
+) -> None:
+    """Persist workflow attribution for following PostToolUse events."""
+    report_dir = workflow_monitor_report_dir(root)
+    if not signals.selected_workflows and not report_dir:
+        return
+    context = {
+        "workflows": list(signals.selected_workflows),
+        "report_dir": report_dir,
+        "timestamp": utc_now(),
+        "source_event": hook_event_name(payload),
+    }
+    path = default_context_path(root)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(context, sort_keys=True) + "\n", encoding="utf-8")
     except OSError:
-        return ()
-    for raw_line in reversed(lines):
-        try:
-            entry = json.loads(raw_line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(entry, dict):
-            continue
-        workflows = tuple(text_values(entry.get("selected_workflows")))
-        if workflows:
-            return tuple(dict.fromkeys(workflows))
-    return ()
+        return
 
 
-def workflow_context(root: Path, signals: PromptIntakeSignals) -> tuple[tuple[str, ...], str]:
-    """Return declared or recently active workflow context for one log entry."""
+def signals_with_workflow_context(
+    signals: PromptIntakeSignals,
+    context: WorkflowContext,
+) -> tuple[PromptIntakeSignals, str]:
+    """Return effective signals plus declared/inherited workflow attribution kind."""
     if signals.selected_workflows:
-        return signals.selected_workflows, "declared"
-    active = active_workflows_from_log(root)
-    if active:
-        return active, "recent_log"
-    return (), ""
+        return signals, "declared_workflow"
+    if context.has_workflow():
+        kind = (
+            "inherited_workflow"
+            if os.environ.get(CONTEXT_PATH_ENV, "").strip()
+            else "context_workflow"
+        )
+        return (
+            replace(signals, selected_workflows=context.workflows),
+            kind,
+        )
+    return signals, ""
 
 
 def _log_append_log(root: Path, entry: dict[str, object]) -> None:
@@ -669,96 +727,145 @@ def workflow_monitor_path(root: Path) -> Path:
     return root / "tools" / "agent_tools" / "workflow_monitor.py"
 
 
-def workflow_monitor_report_dir() -> str:
+def workflow_monitor_report_dir(root: Path | None = None) -> str:
     """Return the optional run-bundle report dir for behavior evidence."""
-    return os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
+    explicit = os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
+    if explicit:
+        return explicit
+    if root is None:
+        return ""
+    pointer = os.environ.get(ACTIVE_RUN_POINTER_ENV, "").strip()
+    pointer_path = Path(pointer) if pointer else root / "reports" / "agents" / ".active_run"
+    try:
+        value = pointer_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if not value:
+        return ""
+    report_dir = Path(value)
+    if not report_dir.is_absolute():
+        report_dir = root / report_dir
+    if (report_dir / "workflow_monitoring.md").is_file():
+        return str(report_dir)
+    return ""
 
 
-def append_workflow_monitor_events(root: Path, signals: PromptIntakeSignals) -> tuple[int, int]:
-    """Append skill invocation and feedback events when a run bundle is active."""
-    report_dir = workflow_monitor_report_dir()
+def workflow_monitor_behavior_event(root: Path, report_dir: str, event: str) -> bool:
+    """Append one behavior event to the active workflow monitor artifact."""
     monitor = workflow_monitor_path(root)
     if not report_dir or not monitor.is_file():
-        return 0, 0
+        return False
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(monitor),
+            "--report-dir",
+            report_dir,
+            "--behavior-event",
+            event,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=GIT_ROOT_TIMEOUT_SECONDS,
+    )
+    return result.returncode == 0
+
+
+def workflow_monitor_runtime_feedback(root: Path, report_dir: str, event: str) -> bool:
+    """Append one runtime feedback event to the active workflow monitor artifact."""
+    monitor = workflow_monitor_path(root)
+    if not report_dir or not monitor.is_file():
+        return False
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(monitor),
+            "--report-dir",
+            report_dir,
+            "--runtime-feedback",
+            event,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=GIT_ROOT_TIMEOUT_SECONDS,
+    )
+    return result.returncode == 0
+
+
+def append_workflow_monitor_events(
+    root: Path,
+    signals: PromptIntakeSignals,
+    subagent: SubagentSelection,
+) -> tuple[int, int, int]:
+    """Append skill invocation and feedback events when a run bundle is active."""
+    report_dir = workflow_monitor_report_dir(root)
+    if not report_dir or not workflow_monitor_path(root).is_file():
+        return 0, 0, 0
     skill_event_count = 0
     feedback_event_count = 0
+    subagent_event_count = 0
     for workflow in signals.selected_workflows:
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(monitor),
-                "--report-dir",
-                report_dir,
-                "--behavior-event",
-                f"workflow_selection={workflow} status=observed source=codex_hook",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=GIT_ROOT_TIMEOUT_SECONDS,
-        )
-        if result.returncode == 0:
+        if workflow_monitor_behavior_event(
+            root,
+            report_dir,
+            f"workflow_selection={workflow} status=observed source=codex_hook",
+        ):
             skill_event_count += 1
     for skill in signals.skills:
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(monitor),
-                "--report-dir",
-                report_dir,
-                "--behavior-event",
-                f"skill_invocation=${skill} status=observed source=codex_hook",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=GIT_ROOT_TIMEOUT_SECONDS,
-        )
-        if result.returncode == 0:
+        if workflow_monitor_behavior_event(
+            root,
+            report_dir,
+            f"skill_invocation=${skill} status=observed source=codex_hook",
+        ):
             skill_event_count += 1
     for skill in signals.candidate_skills:
         if skill in signals.skills:
             continue
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(monitor),
-                "--report-dir",
-                report_dir,
-                "--behavior-event",
-                f"skill_candidate=${skill} status=observed source=codex_hook",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=GIT_ROOT_TIMEOUT_SECONDS,
-        )
-        if result.returncode == 0:
+        if workflow_monitor_behavior_event(
+            root,
+            report_dir,
+            f"skill_candidate=${skill} status=observed source=codex_hook",
+        ):
             skill_event_count += 1
+    if subagent.should_log():
+        if workflow_monitor_behavior_event(root, report_dir, subagent_monitor_event(subagent)):
+            subagent_event_count += 1
     if signals.feedback_labels and signals.feedback_action:
         for target in signals.feedback_targets():
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(monitor),
-                    "--report-dir",
-                    report_dir,
-                    "--runtime-feedback",
-                    (
-                        "source=user "
-                        f"target={target} "
-                        f"action={signals.feedback_action} "
-                        "evidence=codex_prompt_intake"
-                    ),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=GIT_ROOT_TIMEOUT_SECONDS,
-            )
-            if result.returncode == 0:
+            if workflow_monitor_runtime_feedback(
+                root,
+                report_dir,
+                (
+                    "source=user "
+                    f"target={target} "
+                    f"action={signals.feedback_action} "
+                    "evidence=codex_prompt_intake"
+                ),
+            ):
                 feedback_event_count += 1
-    return skill_event_count, feedback_event_count
+    return skill_event_count, feedback_event_count, subagent_event_count
+
+
+def subagent_monitor_event(subagent: SubagentSelection) -> str:
+    """Return one tokenized subagent lifecycle event for workflow monitoring."""
+    targets = ",".join(subagent.targets) if subagent.targets else subagent.target
+    target_count = len(subagent.targets) + int(bool(subagent.target))
+    return (
+        f"subagent_lifecycle_event={subagent.action} "
+        f"subagent_tool={subagent.tool_name or 'unknown'} "
+        f"subagent_agent_type={subagent.agent_type or 'unknown'} "
+        f"subagent_target={targets or 'unknown'} "
+        f"subagent_target_count={target_count} "
+        f"subagent_model={subagent.model or 'unspecified'} "
+        f"subagent_reasoning_effort={subagent.reasoning_effort or 'unspecified'} "
+        f"subagent_fork_context={'yes' if subagent.fork_context else 'no'} "
+        f"subagent_prompt_fingerprint={subagent.prompt_fingerprint or 'none'} "
+        f"subagent_prompt_char_count={subagent.prompt_char_count} "
+        f"subagent_item_count={subagent.item_count} "
+        "source=codex_hook"
+    )
 
 
 def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
@@ -768,19 +875,12 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
     prompt = inputs.prompt
     tool = inputs.tool
     subagent = inputs.subagent
+    workflow_context = inputs.workflow_context
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
     context = HookLogContext(inputs.root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
     text_sources = observed_text_sources(payload)
     text_values_seen = observed_text(payload)
-    workflows, workflow_source = workflow_context(inputs.root, signals)
-    workflow_kind = (
-        "declared_workflow"
-        if workflow_source == "declared"
-        else "context_workflow"
-        if workflow_source == "recent_log"
-        else ""
-    )
     _log_append_log(
         inputs.root,
         {
@@ -793,13 +893,19 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "selected_skills": list(signals.skills),
             "skill_selection_kind": "declared_skill" if signals.skills else "",
             "skill_count": len(signals.skills),
-            "selected_workflow": workflows[0] if workflows else "",
-            "selected_workflows": list(workflows),
-            "workflow": list(workflows),
-            "workflow_family": workflows[0] if workflows else "",
-            "workflow_selection_kind": workflow_kind,
-            "workflow_context_source": workflow_source,
-            "selected_workflow_count": len(workflows),
+            "selected_workflow": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "selected_workflows": list(signals.selected_workflows),
+            "workflow": list(signals.selected_workflows),
+            "workflow_family": signals.selected_workflows[0] if signals.selected_workflows else "",
+            "workflow_selection_kind": inputs.workflow_context_kind,
+            "workflow_context_kind": inputs.workflow_context_kind,
+            "workflow_context_source": (
+                "recent_log" if inputs.workflow_context_kind == "context_workflow" else ""
+            ),
+            "workflow_context_workflows": list(workflow_context.workflows),
+            "workflow_context_timestamp": workflow_context.timestamp,
+            "workflow_context_source_event": workflow_context.source_event,
+            "selected_workflow_count": len(signals.selected_workflows),
             "candidate_skills": list(signals.candidate_skills),
             "candidate_skill_count": len(signals.candidate_skills),
             "candidate_workflows": list(signals.candidate_workflows),
@@ -844,7 +950,8 @@ def append_skill_usage_entry(inputs: SkillUsageLogInputs) -> None:
             "status": "pass",
             "workflow_monitor_event_count": inputs.workflow_event_count,
             "workflow_monitor_feedback_count": inputs.workflow_feedback_count,
-            "workflow_monitor_report_dir": workflow_monitor_report_dir(),
+            "workflow_monitor_subagent_event_count": inputs.workflow_subagent_event_count,
+            "workflow_monitor_report_dir": workflow_monitor_report_dir(inputs.root),
             "root": str(inputs.root),
         },
     )
@@ -855,22 +962,35 @@ def main() -> int:
     payload = load_payload()
     root = repo_root()
     signals = prompt_intake_signals(payload)
+    workflow_context = load_workflow_context(root)
+    effective_signals, context_kind = signals_with_workflow_context(
+        signals,
+        workflow_context,
+    )
     prompt = prompt_capture(payload)
     tool = tool_selection(payload)
     subagent = subagent_selection(payload)
     if not (signals.should_log() or prompt.should_log() or tool.should_log() or subagent.should_log()):
         return 0
-    workflow_event_count, workflow_feedback_count = append_workflow_monitor_events(root, signals)
+    save_workflow_context(root, signals, payload)
+    (
+        workflow_event_count,
+        workflow_feedback_count,
+        workflow_subagent_event_count,
+    ) = append_workflow_monitor_events(root, effective_signals, subagent)
     append_skill_usage_entry(
         SkillUsageLogInputs(
             payload=payload,
             root=root,
-            signals=signals,
+            signals=effective_signals,
             prompt=prompt,
             tool=tool,
             subagent=subagent,
+            workflow_context=workflow_context,
+            workflow_context_kind=context_kind,
             workflow_event_count=workflow_event_count,
             workflow_feedback_count=workflow_feedback_count,
+            workflow_subagent_event_count=workflow_subagent_event_count,
         )
     )
     return 0

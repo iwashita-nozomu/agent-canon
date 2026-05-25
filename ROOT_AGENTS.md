@@ -33,7 +33,7 @@ contract listed in `documents/README.md`.
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
 - active な subagent 数は固定 depth ではなく spawn budget で縛ります。既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。これを超える場合は `schedule.md` と `work_log.md` に理由を書きます。
-- write-capable subagent は parent が `team_manifest.yaml` の write policy と handoff で disjoint path / separate worktree を割り当てて管理します。同一 path や同一 ownership surface が重なる場合は serialize するか worktree を分けます。
+- write-capable subagent は既定 1 体ですが、parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合は spawn budget 内で複数体を並列化できます。同一 path、同一 ownership surface、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います。
 - 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起動します。
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません。

@@ -947,12 +947,19 @@ class CodexHooksTest(unittest.TestCase):
             (docs_dir / "check_markdown_math.py").write_text(checker_text, encoding="utf-8")
             readme = temp_root / "README.md"
             data = temp_root / "data.lock"
+            root_jsonl = temp_root / "runtime.jsonl"
+            hook_jsonl = temp_root / "agents" / "evals" / "results" / "hook-runs" / "run" / "hook.jsonl"
             readme.write_text("# Title\n\nInitial text.\n", encoding="utf-8")
             data.write_text("initial\n", encoding="utf-8")
+            root_jsonl.write_text('{"event": "initial"}\n', encoding="utf-8")
+            hook_jsonl.parent.mkdir(parents=True)
+            hook_jsonl.write_text('{"event": "initial"}\n', encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
             readme.write_text("# Title\n\nChanged text.\n", encoding="utf-8")
             data.write_text("changed\n", encoding="utf-8")
+            root_jsonl.write_text('{"event": "changed"}\n', encoding="utf-8")
+            hook_jsonl.write_text('{"event": "changed"}\n', encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "style.jsonl"
 
             result = subprocess.run(
@@ -1323,6 +1330,168 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertTrue(log_entry["code_edit_detected"])
         self.assertEqual(log_entry["cause_evidence_status"], "pass")
+
+    def test_cause_investigation_guard_prioritizes_cause_evidence_over_many_logs(self) -> None:
+        """Cause guard should not drop task cause evidence when many run logs exist."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            (temp_root / "app").mkdir()
+            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            for index in range(60):
+                work_log = temp_root / "reports" / "agents" / f"run-{index:02d}" / "work_log.md"
+                work_log.parent.mkdir(parents=True)
+                work_log.write_text(f"# Work Log {index}\n", encoding="utf-8")
+            evidence = temp_root / "reports" / "agents" / "run-current" / "cause_investigation.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(
+                "Observation: app/module.py returns stale value.\n"
+                "Hypothesis: app/module.py owns the value constant.\n"
+                "Expected Fix Surface: app/module.py\n"
+                "Validation Before Edit: run unit smoke after edit.\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(CAUSE_INVESTIGATION_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "apply_patch",
+                        "tool_input": {
+                            "patch": (
+                                "*** Begin Patch\n"
+                                "*** Update File: app/module.py\n"
+                                "@@\n"
+                                "-VALUE = 1\n"
+                                "+VALUE = 2\n"
+                                "*** End Patch\n"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["cause_evidence_status"], "pass")
+        evidence_files = cast("list[dict[str, object]]", log_entry["cause_evidence_files"])
+        self.assertTrue(
+            any(file["path"] == "reports/agents/run-current/cause_investigation.md" for file in evidence_files)
+        )
+
+    def test_cause_investigation_guard_uses_only_active_workflow_monitoring(self) -> None:
+        """Cause guard should not treat stale run workflow logs as current evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            (temp_root / "app").mkdir()
+            (temp_root / "app" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            stale = temp_root / "reports" / "agents" / "run-old" / "workflow_monitoring.md"
+            stale.parent.mkdir(parents=True)
+            stale.write_text(
+                "Observation: app/module.py returns stale value.\n"
+                "Hypothesis: app/module.py owns the value constant.\n"
+                "Expected Fix Surface: app/module.py\n"
+                "Validation Before Edit: old run evidence must not authorize new edits.\n",
+                encoding="utf-8",
+            )
+            active = temp_root / "reports" / "agents" / "run-current" / "workflow_monitoring.md"
+            active.parent.mkdir(parents=True)
+            active.write_text(
+                "Observation: app/module.py returns stale value.\n"
+                "Hypothesis: app/module.py owns the value constant.\n"
+                "Expected Fix Surface: app/module.py\n"
+                "Validation Before Edit: run unit smoke after edit.\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "cause.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(CAUSE_INVESTIGATION_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "apply_patch",
+                        "tool_input": {
+                            "patch": (
+                                "*** Begin Patch\n"
+                                "*** Update File: app/module.py\n"
+                                "@@\n"
+                                "-VALUE = 1\n"
+                                "+VALUE = 2\n"
+                                "*** End Patch\n"
+                            )
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(active.parent),
+                    "AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        evidence_files = cast("list[dict[str, object]]", log_entry["cause_evidence_files"])
+        self.assertTrue(
+            any(file["path"] == "reports/agents/run-current/workflow_monitoring.md" for file in evidence_files)
+        )
+        self.assertFalse(
+            any(file["path"] == "reports/agents/run-old/workflow_monitoring.md" for file in evidence_files)
+        )
 
     def test_helper_first_guard_blocks_helper_without_boundary_evidence(self) -> None:
         """Helper-first guard should block helper-like additions before ownership evidence."""
@@ -2427,6 +2596,59 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(entry["tool_input_fingerprint"])
         self.assertFalse(entry["subagent_invoked"])
 
+    def test_skill_usage_logger_inherits_workflow_context_for_post_tool(self) -> None:
+        """PostToolUse logs should inherit the last declared workflow context."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            context_path = temp_root / "reports" / "hooks" / "skill_context.json"
+            env = {
+                **os.environ,
+                "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                "AGENT_CANON_SKILL_CONTEXT_PATH": str(context_path),
+            }
+
+            declared = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "Stop",
+                        "last_assistant_message": (
+                            "workflow=Scoped Change skills=$agent-orchestration"
+                        ),
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            post_tool = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "Bash",
+                        "tool_input": {"cmd": "python3 -m pytest tests"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            entries = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual(declared.stdout, "")
+        self.assertEqual(post_tool.stdout, "")
+        self.assertEqual(entries[0]["workflow_selection_kind"], "declared_workflow")
+        self.assertEqual(entries[1]["selected_workflows"], ["Scoped Change"])
+        self.assertEqual(entries[1]["workflow_selection_kind"], "inherited_workflow")
+        self.assertEqual(entries[1]["workflow_context_workflows"], ["Scoped Change"])
+
     def test_skill_usage_logger_does_not_count_shell_variables_as_skills(self) -> None:
         """Bash variables in tool input should not become selected skills."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2542,6 +2764,85 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(entry["subagent_prompt_char_count"], len("Design tests for the changed hook."))
         self.assertEqual(entry["subagent_item_count"], 1)
         self.assertNotIn("Design tests", json.dumps(entry, sort_keys=True))
+
+    def test_skill_usage_logger_records_subagent_workflow_monitor_event(self) -> None:
+        """Subagent lifecycle hooks should append run-bundle behavior evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_dir = root / "reports" / "agents" / "run-subagent"
+            log_path = root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "spawn_agent",
+                        "tool_input": {
+                            "agent_type": "spark_worker",
+                            "model": "gpt-5.3-codex-spark",
+                            "reasoning_effort": "low",
+                            "message": "Patch one explicit slice.",
+                        },
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report_dir),
+                },
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["workflow_monitor_subagent_event_count"], 1)
+        self.assertIn("subagent_lifecycle_event=spawn", monitoring)
+        self.assertIn("subagent_agent_type=spark_worker", monitoring)
+        self.assertIn("subagent_prompt_char_count=25", monitoring)
+
+    def test_skill_usage_logger_uses_active_run_pointer_for_monitoring(self) -> None:
+        """Run-bundle monitoring should work without per-hook report-dir env."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_dir = root / "reports" / "agents" / "run-active"
+            report_dir.mkdir(parents=True)
+            (report_dir / "workflow_monitoring.md").write_text(
+                "# Workflow Monitoring\n\n## Behavior Events\n",
+                encoding="utf-8",
+            )
+            pointer = root / "reports" / "agents" / ".active_run"
+            pointer.write_text(str(report_dir) + "\n", encoding="utf-8")
+            log_path = root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "close_agent",
+                        "tool_input": {"target": "agent-123"},
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_SKILL_LOG_PATH": str(log_path),
+                    "AGENT_CANON_ACTIVE_RUN_POINTER": str(pointer),
+                },
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(entry["workflow_monitor_subagent_event_count"], 1)
+        self.assertEqual(entry["workflow_monitor_report_dir"], str(report_dir))
+        self.assertIn("subagent_lifecycle_event=close", monitoring)
 
     def test_skill_usage_logger_records_subagent_close_selection(self) -> None:
         """Subagent close logging should record lifecycle target metadata."""

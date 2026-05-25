@@ -20,7 +20,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 399,
+      "line": 417,
       "path": ".codex/hooks/cause_investigation_guard.py",
       "surface": "hook"
     },
@@ -28,7 +28,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 399,
+      "line": 417,
       "path": ".codex/hooks/cause_investigation_guard.py",
       "surface": "hook"
     },
@@ -1612,7 +1612,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT",
-      "line": 93,
+      "line": 95,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -1620,7 +1620,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_FINDING",
-      "line": 94,
+      "line": 96,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -1628,7 +1628,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_OUTPUT",
-      "line": 155,
+      "line": 157,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -4980,7 +4980,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2247,
+      "line": 2262,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -4988,7 +4988,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 2247,
+      "line": 2262,
       "path": "tools/agent_tools/helper_function_inventory.py",
       "surface": "tool"
     },
@@ -5132,7 +5132,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 528,
+      "line": 546,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -5140,7 +5140,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 528,
+      "line": 546,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -5148,7 +5148,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "imports",
-      "line": 528,
+      "line": 546,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -5156,7 +5156,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 528,
+      "line": 546,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },

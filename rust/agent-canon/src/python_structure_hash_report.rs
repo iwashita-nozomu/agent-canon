@@ -14,6 +14,8 @@ use crate::python_module_groups::{
     fallback_group_for_path, group_for_path, load_default_contract, ModuleGroupContract,
 };
 
+const INTERNAL_STRUCT_INLINE_FIELD_LIMIT: usize = 6;
+
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
     input: Option<PathBuf>,
@@ -666,6 +668,7 @@ fn finding_json(
     import_target_counts: &BTreeMap<String, usize>,
 ) -> Value {
     let import_analysis = import_analysis_json(finding, root);
+    let internal_struct_analysis = internal_struct_analysis_json(finding, root);
     let (priority_rank, priority_score, priority_reasons) = priority_by_hash
         .get(&finding.hash)
         .cloned()
@@ -705,12 +708,13 @@ fn finding_json(
             "import_analysis": import_analysis,
         },
         "instances": finding.instances.iter().map(instance_json).collect::<Vec<_>>(),
+        "internal_struct_analysis": internal_struct_analysis.clone().unwrap_or(Value::Null),
         "caller_analysis": {
             "caller_count": finding.caller_count,
             "call_site_count": finding.call_site_count,
             "callers": finding.callers.iter().map(caller_json).collect::<Vec<_>>(),
             "similar_responsibility_callers": finding.similar_callers.iter().map(similar_caller_json).collect::<Vec<_>>(),
-            "integration_candidates": integration_candidates_json(finding, &import_analysis, import_target_counts),
+            "integration_candidates": integration_candidates_json(finding, &import_analysis, import_target_counts, internal_struct_analysis.as_ref()),
         },
     })
 }
@@ -756,6 +760,7 @@ fn integration_candidates_json(
     finding: &Finding,
     import_analysis: &Value,
     import_target_counts: &BTreeMap<String, usize>,
+    internal_struct_analysis: Option<&Value>,
 ) -> Vec<Value> {
     if finding.kind != "single_caller_structural_helper" {
         return Vec::new();
@@ -772,9 +777,10 @@ fn integration_candidates_json(
         caller,
         import_analysis,
         import_target_counts,
+        internal_struct_analysis,
     );
     let mut candidates = vec![candidate_json(
-        single_owner_candidate_kind(&finding.block_kind),
+        single_owner_candidate_kind(&finding.block_kind, internal_struct_analysis),
         target,
         caller,
         None,
@@ -801,6 +807,7 @@ fn base_single_owner_features(
     caller: &CallerEvidence,
     import_analysis: &Value,
     import_target_counts: &BTreeMap<String, usize>,
+    internal_struct_analysis: Option<&Value>,
 ) -> Vec<CandidateFeature> {
     let mut features = vec![
         CandidateFeature {
@@ -840,6 +847,7 @@ fn base_single_owner_features(
         import_target_counts,
     ));
     features.extend(ast_shape_features(finding, target));
+    features.extend(internal_struct_features(internal_struct_analysis));
     features
 }
 
@@ -909,6 +917,553 @@ fn ast_shape_features(finding: &Finding, target: &Instance) -> Vec<CandidateFeat
         });
     }
     features
+}
+
+fn internal_struct_features(internal_struct_analysis: Option<&Value>) -> Vec<CandidateFeature> {
+    let Some(analysis) = internal_struct_analysis else {
+        return Vec::new();
+    };
+    let Some(decision) = internal_struct_decision(Some(analysis)) else {
+        return Vec::new();
+    };
+    let mut features = vec![CandidateFeature {
+        code: "internal_struct_decision",
+        weight: if decision == "inline_candidate" {
+            20
+        } else {
+            0
+        },
+        detail: decision.to_string(),
+    }];
+    if let Some(reasons) = analysis.get("decision_reasons").and_then(Value::as_array) {
+        features.extend(
+            reasons
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|reason| CandidateFeature {
+                    code: "internal_struct_reason",
+                    weight: 0,
+                    detail: reason.to_string(),
+                }),
+        );
+    }
+    features
+}
+
+#[derive(Debug, Default)]
+struct ClassSourceFacts {
+    decorator_names: Vec<String>,
+    base_names: Vec<String>,
+    field_names: Vec<String>,
+    method_names: Vec<String>,
+}
+
+impl ClassSourceFacts {
+    fn is_dataclass_like(&self) -> bool {
+        self.decorator_names
+            .iter()
+            .any(|decorator| decorator.contains("dataclass"))
+    }
+
+    fn has_pytree_registration(&self) -> bool {
+        self.decorator_names
+            .iter()
+            .any(|decorator| decorator.contains("register_pytree_node_class"))
+    }
+
+    fn has_tree_methods(&self) -> bool {
+        self.method_names
+            .iter()
+            .any(|method| method == "tree_flatten" || method == "tree_unflatten")
+    }
+
+    fn has_protocol_or_generic_contract(&self) -> bool {
+        self.base_names.iter().any(|base| {
+            let leaf = base.rsplit('.').next().unwrap_or(base);
+            leaf.starts_with("Protocol") || leaf == "Generic"
+        })
+    }
+
+    fn custom_method_names(&self) -> Vec<String> {
+        self.method_names
+            .iter()
+            .filter(|method| {
+                method.as_str() != "__post_init__"
+                    && method.as_str() != "tree_flatten"
+                    && method.as_str() != "tree_unflatten"
+            })
+            .cloned()
+            .collect()
+    }
+}
+
+#[derive(Debug, Default)]
+struct InternalStructUsageFacts {
+    constructor_call_count: usize,
+    attribute_read_count: usize,
+    attribute_read_scope: String,
+    single_callee_names: Vec<String>,
+    unscoped_instance_usage_count: usize,
+    loop_carry_usage: bool,
+    public_payload_usage: bool,
+    return_usage: bool,
+}
+
+fn internal_struct_analysis_json(finding: &Finding, root: &Path) -> Option<Value> {
+    if finding.kind != "single_caller_structural_helper" || finding.block_kind != "Class" {
+        return None;
+    }
+    let target = finding.instances.first()?;
+    let leaf_name = target
+        .qualname
+        .rsplit('.')
+        .next()
+        .unwrap_or(&target.qualname);
+    if !leaf_name.starts_with('_') {
+        return None;
+    }
+    let source_facts = class_source_facts(root, target);
+    let usage_facts = internal_struct_usage_facts(root, target, finding.callers.first());
+    let custom_methods = source_facts.custom_method_names();
+    let mut preserve_reasons = Vec::<String>::new();
+    let mut review_reasons = Vec::<String>::new();
+    let mut inline_reasons = Vec::<String>::new();
+
+    if source_facts.has_pytree_registration() {
+        preserve_reasons.push("jax_pytree_registration".to_string());
+    }
+    if source_facts.has_tree_methods() {
+        preserve_reasons.push("tree_flatten_contract".to_string());
+    }
+    if source_facts.has_protocol_or_generic_contract() {
+        preserve_reasons.push("protocol_or_generic_contract".to_string());
+    }
+    if usage_facts.loop_carry_usage {
+        preserve_reasons.push("loop_or_scan_carry_usage".to_string());
+    }
+    if usage_facts.public_payload_usage {
+        preserve_reasons.push("public_algorithm_payload_usage".to_string());
+    }
+    if usage_facts.constructor_call_count != 1 {
+        review_reasons.push(format!(
+            "constructor_call_count={}",
+            usage_facts.constructor_call_count
+        ));
+    }
+    if !custom_methods.is_empty() {
+        review_reasons.push(format!("custom_methods={}", custom_methods.join("|")));
+    }
+    if usage_facts.return_usage {
+        review_reasons.push("returned_internal_struct_instance".to_string());
+    }
+    if usage_facts.attribute_read_scope == "unresolved" {
+        review_reasons.push("attribute_reads_not_closed_in_owner_or_single_callee".to_string());
+    }
+    if usage_facts.unscoped_instance_usage_count > 0 {
+        review_reasons.push(format!(
+            "unscoped_instance_usage_count={}",
+            usage_facts.unscoped_instance_usage_count
+        ));
+    }
+    if source_facts.field_names.len() > INTERNAL_STRUCT_INLINE_FIELD_LIMIT {
+        preserve_reasons.push(format!(
+            "field_count_exceeds_inline_limit={}>{}",
+            source_facts.field_names.len(),
+            INTERNAL_STRUCT_INLINE_FIELD_LIMIT
+        ));
+    }
+    if source_facts.field_names.is_empty() && !source_facts.is_dataclass_like() {
+        review_reasons.push("no_dataclass_field_surface_detected".to_string());
+    }
+    if preserve_reasons.is_empty() && review_reasons.is_empty() {
+        inline_reasons.push("single_constructor_owner".to_string());
+        inline_reasons.push("field_only_private_dataclass_surface".to_string());
+        if usage_facts.attribute_read_count > 0 {
+            inline_reasons.push(format!(
+                "attribute_reads_scope={}",
+                usage_facts.attribute_read_scope
+            ));
+        }
+    }
+
+    let (decision, decision_reasons) = if !preserve_reasons.is_empty() {
+        ("preserve_candidate", preserve_reasons)
+    } else if !review_reasons.is_empty() {
+        ("review_required", review_reasons)
+    } else {
+        ("inline_candidate", inline_reasons)
+    };
+
+    Some(json!({
+        "kind": "private_internal_struct",
+        "decision": decision,
+        "decision_reasons": decision_reasons,
+        "source_facts": {
+            "decorator_names": source_facts.decorator_names,
+            "base_names": source_facts.base_names,
+            "field_names": source_facts.field_names,
+            "field_count": source_facts.field_names.len(),
+            "method_names": source_facts.method_names,
+            "custom_method_names": custom_methods,
+            "is_dataclass_like": source_facts.is_dataclass_like(),
+            "has_pytree_registration": source_facts.has_pytree_registration(),
+            "has_tree_methods": source_facts.has_tree_methods(),
+            "has_protocol_or_generic_contract": source_facts.has_protocol_or_generic_contract(),
+        },
+        "usage_facts": {
+            "constructor_call_count": usage_facts.constructor_call_count,
+            "attribute_read_count": usage_facts.attribute_read_count,
+            "attribute_read_scope": usage_facts.attribute_read_scope,
+            "single_callee_names": usage_facts.single_callee_names,
+            "unscoped_instance_usage_count": usage_facts.unscoped_instance_usage_count,
+            "loop_carry_usage": usage_facts.loop_carry_usage,
+            "public_payload_usage": usage_facts.public_payload_usage,
+            "return_usage": usage_facts.return_usage,
+        },
+        "policy": {
+            "inline_field_limit": INTERNAL_STRUCT_INLINE_FIELD_LIMIT,
+            "constructor_call_count_required": 1,
+        }
+    }))
+}
+
+fn class_source_facts(root: &Path, target: &Instance) -> ClassSourceFacts {
+    let Ok(text) = fs::read_to_string(root.join(&target.path)) else {
+        return ClassSourceFacts::default();
+    };
+    let lines = text.lines().collect::<Vec<_>>();
+    if target.line_start == 0 || target.line_start > lines.len() {
+        return ClassSourceFacts::default();
+    }
+    let class_line = lines[target.line_start - 1];
+    let class_indent = leading_spaces(class_line);
+    let mut decorators = Vec::new();
+    let mut cursor = target.line_start.saturating_sub(1);
+    while cursor > 0 {
+        let trimmed = lines[cursor - 1].trim();
+        if trimmed.starts_with('@') {
+            decorators.push(trimmed.trim_start_matches('@').to_string());
+            cursor -= 1;
+            continue;
+        }
+        if trimmed.is_empty() {
+            cursor -= 1;
+            continue;
+        }
+        break;
+    }
+    decorators.reverse();
+
+    let base_names = class_base_names(class_line);
+    let mut field_names = Vec::new();
+    let mut method_names = Vec::new();
+    for line in lines
+        .iter()
+        .skip(target.line_start)
+        .take(target.line_end.saturating_sub(target.line_start))
+    {
+        let indent = leading_spaces(line);
+        if indent <= class_indent {
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.starts_with("def ") || trimmed.starts_with("async def ") {
+            if let Some(name) = function_name_from_line(trimmed) {
+                method_names.push(name);
+            }
+        } else if indent == class_indent + 4 {
+            if let Some(name) = annotated_field_name(trimmed) {
+                field_names.push(name);
+            }
+        }
+    }
+    field_names.sort();
+    field_names.dedup();
+    method_names.sort();
+    method_names.dedup();
+
+    ClassSourceFacts {
+        decorator_names: decorators,
+        base_names,
+        field_names,
+        method_names,
+    }
+}
+
+fn internal_struct_usage_facts(
+    root: &Path,
+    target: &Instance,
+    caller: Option<&CallerEvidence>,
+) -> InternalStructUsageFacts {
+    let Some(caller) = caller else {
+        return InternalStructUsageFacts::default();
+    };
+    let Ok(text) = fs::read_to_string(root.join(&caller.path)) else {
+        return InternalStructUsageFacts::default();
+    };
+    let lines = text.lines().collect::<Vec<_>>();
+    let target_leaf = target
+        .qualname
+        .rsplit('.')
+        .next()
+        .unwrap_or(&target.qualname);
+    let mut constructor_vars = BTreeSet::<String>::new();
+    let mut facts = InternalStructUsageFacts::default();
+    for line_number in &caller.call_lines {
+        if let Some(line) = line_at(&lines, *line_number) {
+            if line.contains(&format!("{target_leaf}(")) {
+                facts.constructor_call_count += 1;
+                if let Some(name) = assignment_target_name(line) {
+                    constructor_vars.insert(name);
+                }
+                if starts_with_returned_value(line, target_leaf) {
+                    facts.return_usage = true;
+                }
+            }
+        }
+    }
+    let mut callee_refs = Vec::<CalleeInstanceUse>::new();
+    for line in caller_lines(&lines, caller) {
+        let trimmed = line.trim();
+        let public_payload_use = public_payload_names()
+            .iter()
+            .any(|name| trimmed.contains(&format!("{name}(")))
+            && (trimmed.contains(target_leaf)
+                || constructor_vars.iter().any(|name| trimmed.contains(name)));
+        let line_loop_carry_use = (trimmed.contains("while_loop(")
+            || trimmed.contains("lax.scan(")
+            || trimmed.contains("jax.lax.scan("))
+            && (trimmed.contains(target_leaf)
+                || constructor_vars.iter().any(|name| trimmed.contains(name)));
+        if line_loop_carry_use {
+            facts.loop_carry_usage = true;
+        }
+        if public_payload_use {
+            facts.public_payload_usage = true;
+        }
+        if starts_with_returned_value(trimmed, target_leaf)
+            || constructor_vars
+                .iter()
+                .any(|name| starts_with_returned_value(trimmed, name))
+        {
+            facts.return_usage = true;
+        }
+        for name in &constructor_vars {
+            let direct_attr_reads = trimmed.matches(&format!("{name}.")).count();
+            facts.attribute_read_count += direct_attr_reads;
+            let direct_constructor_line = trimmed.contains(&format!("{target_leaf}("));
+            for callee_ref in callee_instance_uses(trimmed, name) {
+                callee_refs.push(callee_ref);
+            }
+            if trimmed.contains(name)
+                && direct_attr_reads == 0
+                && !direct_constructor_line
+                && !public_payload_use
+                && !line_loop_carry_use
+                && !trimmed.starts_with("return ")
+                && callee_instance_uses(trimmed, name).is_empty()
+            {
+                facts.unscoped_instance_usage_count += 1;
+            }
+        }
+    }
+    let mut callee_names = BTreeSet::<String>::new();
+    let mut callee_attribute_reads = 0usize;
+    for callee_ref in &callee_refs {
+        callee_names.insert(callee_ref.function_name.clone());
+        callee_attribute_reads +=
+            function_attribute_read_count(&lines, &callee_ref.function_name, &callee_ref.argument);
+    }
+    facts.single_callee_names = callee_names.iter().cloned().collect();
+    let owner_attribute_reads = facts.attribute_read_count;
+    facts.attribute_read_count += callee_attribute_reads;
+    facts.attribute_read_scope = if owner_attribute_reads > 0 && callee_attribute_reads == 0 {
+        "caller".to_string()
+    } else if owner_attribute_reads == 0 && callee_attribute_reads > 0 && callee_names.len() == 1 {
+        "single_callee".to_string()
+    } else if owner_attribute_reads == 0 && callee_attribute_reads == 0 && callee_names.is_empty() {
+        "none".to_string()
+    } else {
+        "unresolved".to_string()
+    };
+    facts
+}
+
+fn internal_struct_decision(internal_struct_analysis: Option<&Value>) -> Option<&str> {
+    internal_struct_analysis?
+        .get("decision")
+        .and_then(Value::as_str)
+}
+
+fn leading_spaces(line: &str) -> usize {
+    line.chars().take_while(|value| *value == ' ').count()
+}
+
+fn class_base_names(class_line: &str) -> Vec<String> {
+    let Some(after_open) = class_line.split_once('(').map(|(_, rest)| rest) else {
+        return Vec::new();
+    };
+    let Some(before_close) = after_open.rsplit_once(')').map(|(left, _)| left) else {
+        return Vec::new();
+    };
+    before_close
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+fn function_name_from_line(line: &str) -> Option<String> {
+    let rest = line
+        .strip_prefix("async def ")
+        .or_else(|| line.strip_prefix("def "))?;
+    rest.split_once('(')
+        .map(|(name, _)| name.trim().to_string())
+}
+
+fn annotated_field_name(line: &str) -> Option<String> {
+    if line.starts_with('#')
+        || line.starts_with("def ")
+        || line.starts_with("class ")
+        || line.starts_with("if ")
+        || line.starts_with("for ")
+        || line.starts_with("return ")
+    {
+        return None;
+    }
+    let (candidate, _rest) = line.split_once(':')?;
+    let candidate = candidate.trim();
+    if candidate.is_empty()
+        || candidate.contains(' ')
+        || candidate.contains('.')
+        || candidate.contains('[')
+        || candidate.contains('(')
+    {
+        return None;
+    }
+    Some(candidate.to_string())
+}
+
+fn line_at<'a>(lines: &'a [&str], one_based_line: usize) -> Option<&'a str> {
+    if one_based_line == 0 {
+        return None;
+    }
+    lines.get(one_based_line - 1).copied()
+}
+
+fn caller_lines<'a>(lines: &'a [&str], caller: &CallerEvidence) -> impl Iterator<Item = &'a str> {
+    let start = caller.line_start.saturating_sub(1);
+    let end = caller.line_end.min(lines.len());
+    lines[start..end].iter().copied()
+}
+
+fn assignment_target_name(line: &str) -> Option<String> {
+    let (left, _right) = line.split_once('=')?;
+    let name = left
+        .split(|value: char| !(value.is_ascii_alphanumeric() || value == '_'))
+        .filter(|value| !value.is_empty())
+        .next_back()?;
+    Some(name.to_string())
+}
+
+fn starts_with_returned_value(line: &str, value_name: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed == format!("return {value_name}")
+        || trimmed.starts_with(&format!("return {value_name},"))
+        || trimmed.starts_with(&format!("return {value_name})"))
+        || trimmed.starts_with(&format!("return {value_name}("))
+}
+
+#[derive(Debug, Clone)]
+struct CalleeInstanceUse {
+    function_name: String,
+    argument: String,
+}
+
+fn callee_instance_uses(line: &str, variable_name: &str) -> Vec<CalleeInstanceUse> {
+    let mut uses = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(offset) = line[cursor..].find('(') {
+        let open = cursor + offset;
+        let function_name = line[..open]
+            .split(|value: char| !(value.is_ascii_alphanumeric() || value == '_' || value == '.'))
+            .filter(|value| !value.is_empty())
+            .next_back()
+            .unwrap_or("")
+            .rsplit('.')
+            .next()
+            .unwrap_or("")
+            .to_string();
+        let Some(close) = line[open + 1..].find(')').map(|value| open + 1 + value) else {
+            break;
+        };
+        let args = &line[open + 1..close];
+        if !function_name.is_empty()
+            && !public_payload_names().contains(&function_name.as_str())
+            && !["fori_loop", "scan", "while_loop", "where"].contains(&function_name.as_str())
+            && args
+                .split(',')
+                .map(str::trim)
+                .any(|argument| argument == variable_name)
+        {
+            uses.push(CalleeInstanceUse {
+                function_name,
+                argument: variable_name.to_string(),
+            });
+        }
+        cursor = close + 1;
+    }
+    uses
+}
+
+fn function_attribute_read_count(lines: &[&str], function_name: &str, argument: &str) -> usize {
+    let Some((line_index, def_line)) = lines.iter().enumerate().find(|(_index, line)| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with(&format!("def {function_name}("))
+            || trimmed.starts_with(&format!("async def {function_name}("))
+    }) else {
+        return 0;
+    };
+    let Some(parameter_name) = callee_parameter_name(def_line, argument) else {
+        return 0;
+    };
+    let def_indent = leading_spaces(def_line);
+    lines
+        .iter()
+        .skip(line_index + 1)
+        .take_while(|line| line.trim().is_empty() || leading_spaces(line) > def_indent)
+        .map(|line| line.matches(&format!("{parameter_name}.")).count())
+        .sum()
+}
+
+fn callee_parameter_name(def_line: &str, argument: &str) -> Option<String> {
+    let (_prefix, after_open) = def_line.split_once('(')?;
+    let (params, _suffix) = after_open.split_once(')')?;
+    let data_params = params
+        .split(',')
+        .map(|param| param.trim().split([':', '=']).next().unwrap_or("").trim())
+        .filter(|param| !param.is_empty() && *param != "self" && *param != "cls")
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if data_params.iter().any(|param| param == argument) {
+        return Some(argument.to_string());
+    }
+    if data_params.len() == 1 {
+        return data_params.into_iter().next();
+    }
+    None
+}
+
+fn public_payload_names() -> &'static [&'static str] {
+    &[
+        "Algorithm",
+        "Answer",
+        "Info",
+        "Problem",
+        "SolveConfig",
+        "State",
+    ]
 }
 
 fn similar_caller_features(similar: &SimilarCallerEvidence) -> Vec<CandidateFeature> {
@@ -982,7 +1537,18 @@ fn candidate_json(
     payload
 }
 
-fn single_owner_candidate_kind(block_kind: &str) -> &'static str {
+fn single_owner_candidate_kind(
+    block_kind: &str,
+    internal_struct_analysis: Option<&Value>,
+) -> &'static str {
+    if block_kind == "Class" {
+        match internal_struct_decision(internal_struct_analysis) {
+            Some("inline_candidate") => return "inline_single_owner_internal_struct",
+            Some("preserve_candidate") => return "preserve_internal_struct_contract",
+            Some("review_required") => return "review_internal_struct",
+            _ => {}
+        }
+    }
     match block_kind {
         "Class" => "move_or_nest_single_owner_type",
         "Alias" => "inline_single_owner_alias",
@@ -1904,6 +2470,187 @@ mod tests {
     }
 
     #[test]
+    fn class_single_owner_struct_gets_inline_candidate_when_usage_is_local() {
+        let root = temp_report_root("inline-struct");
+        let path = root.join("pkg/a.py");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create package dir");
+        fs::write(
+            &path,
+            r#"from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class _Bundle:
+    left: int
+    right: int
+
+def build_api():
+    bundle = _Bundle(1, 2)
+    return bundle.left + bundle.right
+"#,
+        )
+        .expect("write source");
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Class:params=0:tokens=30:hash=h:count=1:caller_count=1:call_site_count=1:caller=pkg/a.py@8-10@pkg.a@build_api@sites=9:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:4-6:pkg.a:_Bundle:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, &root).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["decision"],
+            "inline_candidate"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][0]
+                ["candidate_kind"],
+            "inline_single_owner_internal_struct"
+        );
+        fs::remove_dir_all(root).expect("remove temp root");
+    }
+
+    #[test]
+    fn class_single_owner_struct_preserves_pytree_contracts() {
+        let root = temp_report_root("preserve-struct");
+        let path = root.join("pkg/a.py");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create package dir");
+        fs::write(
+            &path,
+            r#"from dataclasses import dataclass
+import jax
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class _Carry:
+    value: int
+
+    def tree_flatten(self):
+        return (self.value,), None
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        return cls(children[0])
+
+def build_api():
+    carry = _Carry(1)
+    return carry
+"#,
+        )
+        .expect("write source");
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Class:params=0:tokens=80:hash=h:count=1:caller_count=1:call_site_count=1:caller=pkg/a.py@16-18@pkg.a@build_api@sites=17:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:6-14:pkg.a:_Carry:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, &root).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["decision"],
+            "preserve_candidate"
+        );
+        assert_eq!(
+            payload["findings"][0]["caller_analysis"]["integration_candidates"][0]
+                ["candidate_kind"],
+            "preserve_internal_struct_contract"
+        );
+        fs::remove_dir_all(root).expect("remove temp root");
+    }
+
+    #[test]
+    fn class_single_owner_struct_allows_single_callee_attribute_scope() {
+        let root = temp_report_root("inline-struct-single-callee");
+        let path = root.join("pkg/a.py");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create package dir");
+        fs::write(
+            &path,
+            r#"from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class _Bundle:
+    left: int
+    right: int
+
+def consume(bundle):
+    return bundle.left + bundle.right
+
+def build_api():
+    bundle = _Bundle(1, 2)
+    return consume(bundle)
+"#,
+        )
+        .expect("write source");
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Class:params=0:tokens=30:hash=h:count=1:caller_count=1:call_site_count=1:caller=pkg/a.py@11-13@pkg.a@build_api@sites=12:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:4-6:pkg.a:_Bundle:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, &root).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["decision"],
+            "inline_candidate"
+        );
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["usage_facts"]
+                ["attribute_read_scope"],
+            "single_callee"
+        );
+        fs::remove_dir_all(root).expect("remove temp root");
+    }
+
+    #[test]
+    fn class_single_owner_struct_review_blocks_returned_private_instance() {
+        let root = temp_report_root("review-returned-struct");
+        let path = root.join("pkg/a.py");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create package dir");
+        fs::write(
+            &path,
+            r#"from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class _Bundle:
+    left: int
+
+def build_api():
+    bundle = _Bundle(1)
+    return bundle
+"#,
+        )
+        .expect("write source");
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=implementation:Class:params=0:tokens=30:hash=h:count=1:caller_count=1:call_site_count=1:caller=pkg/a.py@7-9@pkg.a@build_api@sites=8:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:4-5:pkg.a:_Bundle:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, &root).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["decision"],
+            "review_required"
+        );
+        assert!(
+            payload["findings"][0]["internal_struct_analysis"]["decision_reasons"]
+                .as_array()
+                .expect("decision reasons")
+                .iter()
+                .any(|reason| reason == "returned_internal_struct_instance")
+        );
+        fs::remove_dir_all(root).expect("remove temp root");
+    }
+
+    #[test]
+    fn class_single_owner_struct_preserves_protocol_contracts() {
+        let root = temp_report_root("preserve-protocol-struct");
+        let path = root.join("pkg/a.py");
+        fs::create_dir_all(path.parent().expect("parent")).expect("create package dir");
+        fs::write(
+            &path,
+            r#"from typing import Protocol
+
+class _SupportsValue(Protocol):
+    value: int
+
+def build_api():
+    return None
+"#,
+        )
+        .expect("write source");
+        let text = "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role=protocol:Class:params=0:tokens=30:hash=h:count=1:caller_count=1:call_site_count=0:caller=pkg/a.py@6-7@pkg.a@build_api@sites=:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:3-4:pkg.a:_SupportsValue:parent=<module>:imports=i:decorators=d:bases=Protocol:context=c\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, &root).expect("report structures");
+        assert_eq!(
+            payload["findings"][0]["internal_struct_analysis"]["decision"],
+            "preserve_candidate"
+        );
+        assert!(
+            payload["findings"][0]["internal_struct_analysis"]["decision_reasons"]
+                .as_array()
+                .expect("decision reasons")
+                .iter()
+                .any(|reason| reason == "protocol_or_generic_contract")
+        );
+        fs::remove_dir_all(root).expect("remove temp root");
+    }
+
+    #[test]
     fn same_owner_parameterless_methods_are_review_blocked() {
         let item = PriorityItem {
             rank: 1,
@@ -1936,6 +2683,17 @@ mod tests {
             repair_blockers(&item),
             vec!["same_owner_parameterless_method_variants"]
         );
+    }
+
+    fn temp_report_root(label: &str) -> PathBuf {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "agent-canon-python-structure-report-{label}-{}-{unique}",
+            std::process::id()
+        ))
     }
 
     #[test]

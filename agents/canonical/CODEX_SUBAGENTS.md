@@ -52,7 +52,8 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
 - 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
-- write-capable subagent は parent-managed write scope で制御します。disjoint path / separate worktree が証明できる場合だけ複数 writer を許可し、重なる場合は serialize します
+- write-capable subagent は既定 1 体です。budget を増やしても、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を明示しない並列 write は許可しません。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract に触れない複数 writer だけを同一 wave で並列化できます
+- 同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
@@ -141,8 +142,8 @@ Constraints:
 | `notation_definition_reviewer` | `notation_definition_reviewer` |
 | `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `implementer` | `spark_worker` first for design-traced narrow slices; `worker` fallback for broad or ambiguous implementation |
-| `change_reviewer` | `reviewer` or `python_reviewer` or `cpp_reviewer` |
-| `final_reviewer` | `reviewer`, `project_reviewer`, `python_reviewer`, `cpp_reviewer` の該当 reviewer |
+| `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
+| `final_reviewer` | `ship_reviewer`, then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `critical_guardian` | `project_reviewer` |
 | `researcher` | `literature_researcher` or `explorer` |
 | `infra_steward` | parent + `docs_workflow_steward` or infrastructure-focused `worker` planning |
@@ -172,6 +173,10 @@ Constraints:
   - README、workflow、guide、migration 文書のような長文を roadmap-first に起草する
 - `test_designer`
   - approved design と既存 code path を静的解析し、nasty case と regression case の test plan を起こす
+- `diff_triage_reviewer`
+  - 狭い diff の first-pass review を安価に行い、language-specific reviewer または broad `reviewer` へ上げるかを決める
+- `ship_reviewer`
+  - user request clause、product diff、validation、dependency review、closeout artifact を照合する最終出荷 gate を担当する
 - `explorer`
   - 読み取り専用で codebase / docs / workflow の調査を行う
 - `reviewer`
@@ -252,9 +257,11 @@ Constraints:
 
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
 - 同一 path、同一 directory ownership、同一 public API surface を複数 writer に割り当てません
-- disjoint path または separate worktree が証明できる場合だけ、同一 stage で複数 write-capable subagent を許可します
-- write scope が重なる場合は serialize するか worktree を分けます
-- review role は常に read-only とし、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` の固定責務です
+- 同一 worktree の write-capable subagent は既定 1 人ですが、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合は複数 writer を同一 wave で使えます
+- same directory / same file / same canonical surface を同時に触る writer は同一 wave に置きません
+- 衝突する target は禁止でも scope 縮小理由でもなく順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
+- 複数 worktree は、同一 worktree の wave plan で安全に分離できない場合の選択肢です
+- review role は常に read-only とし、parent-managed write-scope discipline と single-writer-default の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 ## Codex Model Policy
 
