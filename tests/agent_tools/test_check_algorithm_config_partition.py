@@ -65,7 +65,7 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(payload["summary"]["findings"], 0)
 
     def test_run_log_in_solve_config_is_flagged(self) -> None:
-        """RunLogConfig in SolveConfig is an initialization-owned sink contract."""
+        """A RunLogConfig in SolveConfig is an initialization-owned sink contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "solver.py"

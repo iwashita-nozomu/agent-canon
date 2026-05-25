@@ -2597,7 +2597,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertFalse(entry["subagent_invoked"])
 
     def test_skill_usage_logger_inherits_workflow_context_for_post_tool(self) -> None:
-        """PostToolUse logs should inherit the last declared workflow context."""
+        """The PostToolUse logs inherit the last declared workflow context."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
