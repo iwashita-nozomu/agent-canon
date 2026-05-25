@@ -13,7 +13,8 @@ downstream implementation ../tests/agent_tools/test_file_responsibility_llm.py t
 @dependency-end
 -->
 
-Local LLM responsibility analysis is advisory and single-file only.
+Local LLM responsibility analysis is advisory and single-file only. Model
+output is provider-backed diagnostic evidence, not a repository label.
 
 The deterministic sources remain primary:
 
@@ -26,6 +27,10 @@ The deterministic sources remain primary:
 The local LLM may suggest whether one file's responsibility text, ownership
 class, and protecting-tool relationship look inconsistent. It must not decide
 repo-wide ownership, dependency closure, CI pass/fail, or PR readiness.
+
+SQLite semantic-index LLM embeddings are a separate provider-vector path. They
+can compare candidate rankings against the deterministic baseline, but they do
+not extend `classify-responsibility` into repo-wide ownership analysis.
 
 ## Default Runtime
 
@@ -84,6 +89,8 @@ repo-wide analyzer.
 - Do not give it multiple files as one prompt.
 - Do not let it create issue files or edit source directly.
 - Do not treat model output as authoritative evidence.
+- Do not present embedding-provider output as file labels or classification
+  authority.
 
 If future work needs multi-file or repo-wide LLM analysis, create a separate
 issue, manifest scope, eval, and tool contract first.

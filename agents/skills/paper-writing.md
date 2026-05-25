@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents paper-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design structure-planning.md reusable paper structure contract
 @dependency-end
 -->
 
@@ -30,6 +31,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Mandatory Checklist
 
 - `paper intent brief` と `claim contract` を先に固定する
+- section order、first figure/table、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - `section contract` を `abstract`, `introduction`, `related work`, `method`, `results`, `discussion`, `limitations`, `conclusion` の粒度で決める
 - `citation and evidence matrix` を作り、主要 claim がどの citation / figure / table / derivation / appendix に支えられるかを書く
 - `notation ledger` と `paragraph claim map` を作る
@@ -40,6 +42,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Default Sequence
 
 1. `paper intent brief` と `claim contract` を書く
+1. 必要なら `structure-planning` で first section / figure / table、source-to-structure map、section order、invalid interpretation を固定する
 1. `section contract` を書く
 1. `citation and evidence matrix` と `notation ledger` を作る
 1. `paragraph claim map` を作る

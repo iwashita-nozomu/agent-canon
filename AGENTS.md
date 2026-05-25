@@ -51,4 +51,5 @@ template / derived repo では `vendor/agent-canon/` submodule pin として参�
 
 - AgentCanon tree changes は shared canon として成立するかを先に確認する
 - 広い概念、長い user request、文書統合、薄い文書洗い出しでは、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text|jsonl` または `agent-canon semantic-index thin-docs --top-k <N> --format text` を試す
+- skill、tool、workflow、HTML report、実験 script を追加または変更するときは、先に既存資産の調査、次に責務境界の解析、その後に実装へ入る。この順序と再利用しなかった候補は run bundle または work log に残す
 - root entrypoint wrapper の変更は、この tree ではなく template / 派生 repo 側の wrapper task として扱う

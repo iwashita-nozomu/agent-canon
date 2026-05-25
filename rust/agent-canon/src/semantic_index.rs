@@ -17,14 +17,23 @@ use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_PROVIDER: &str = "deterministic-dense-v1";
 const DEFAULT_MODEL: &str = "hash-token-char-v1";
+const LLAMA_SERVER_EMBEDDING_PROVIDER: &str = "llama-server-embedding";
+const OPENAI_COMPATIBLE_EMBEDDING_PROVIDER: &str = "openai-compatible-embedding";
+const DEFAULT_EMBEDDING_URL: &str = "http://127.0.0.1:8080/v1/embeddings";
+const DEFAULT_REMOTE_EMBEDDING_MAX_CHARS: usize = 3000;
 const DEFAULT_DIM: usize = 128;
 const DEFAULT_TOP_K: usize = 10;
 const DEFAULT_MIN_SCORE: f32 = 0.80;
 const DEFAULT_MAX_FILE_BYTES: u64 = 1_000_000;
+const DEFAULT_EMBEDDING_BATCH: usize = 16;
+const DEFAULT_CONTEXT_CELLS: usize = 12;
+const DEFAULT_CONTEXT_CELL_CHARS: usize = 900;
+const DEFAULT_CONTEXT_TOTAL_CHARS: usize = 6000;
 const VECTOR_EPSILON: f32 = 1.0e-6;
 const MERGE_CANDIDATE_MIN_LINES: i64 = 4;
 const DEFAULT_MIN_THIN_SCORE: f32 = 0.50;
@@ -44,6 +53,8 @@ struct BuildArgs {
     provider: String,
     model: String,
     dim: usize,
+    embedding_url: Option<String>,
+    embedding_batch: usize,
     max_file_bytes: u64,
 }
 
@@ -55,8 +66,35 @@ struct SearchArgs {
     provider: String,
     model: String,
     dim: usize,
+    embedding_url: Option<String>,
     top_k: usize,
     format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct ContextPackArgs {
+    root: PathBuf,
+    db: PathBuf,
+    query: String,
+    provider: String,
+    model: String,
+    dim: usize,
+    embedding_url: Option<String>,
+    max_cells: usize,
+    max_cell_chars: usize,
+    max_total_chars: usize,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct EmbedProviderArgs {
+    root: PathBuf,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    embedding_url: Option<String>,
+    embedding_batch: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +132,37 @@ struct EvalArgs {
     provider: String,
     model: String,
     dim: usize,
+    embedding_url: Option<String>,
     top_k: usize,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct ProviderSpec {
+    provider: String,
+    model: String,
+    dim: usize,
+    embedding_url: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct CompareProvidersArgs {
+    db: PathBuf,
+    query: Option<String>,
+    left: ProviderSpec,
+    right: ProviderSpec,
+    min_score: f32,
+    top_k: usize,
+    report: Option<PathBuf>,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct EvalOutputArgs {
+    merge_candidates: Option<PathBuf>,
+    thin_docs: Option<PathBuf>,
+    search: Option<PathBuf>,
+    report: Option<PathBuf>,
     format: OutputFormat,
 }
 
@@ -116,9 +184,13 @@ enum ParsedArgs {
     Command(SemanticCommand),
     Build(BuildArgs),
     Search(SearchArgs),
+    ContextPack(ContextPackArgs),
+    EmbedProvider(EmbedProviderArgs),
     Similar(SimilarArgs),
     ThinDocs(ThinDocsArgs),
     Eval(EvalArgs),
+    CompareProviders(CompareProvidersArgs),
+    EvalOutput(EvalOutputArgs),
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +218,18 @@ struct ScoredNode {
     node: IndexedNode,
     score: f32,
     rank: usize,
+}
+
+#[derive(Debug, Clone)]
+struct ContextCell {
+    rank: usize,
+    score: f32,
+    path: String,
+    line_start: i64,
+    line_end: i64,
+    node_kind: String,
+    responsibility_bucket: String,
+    excerpt: String,
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +274,13 @@ struct BuildStats {
     db: PathBuf,
 }
 
+#[derive(Debug, Clone)]
+struct EmbedStats {
+    nodes: usize,
+    embeddings: usize,
+    db: PathBuf,
+}
+
 pub fn run(args: &[String]) -> i32 {
     match parse_args(args) {
         Ok(ParsedArgs::Command(SemanticCommand::Help)) => {
@@ -213,6 +304,23 @@ pub fn run(args: &[String]) -> i32 {
                 0
             }
             Err(error) => fail("SEARCH", error),
+        },
+        Ok(ParsedArgs::ContextPack(context_args)) => match context_pack(&context_args) {
+            Ok(cells) => {
+                print_context_pack_results(&context_args, &cells);
+                0
+            }
+            Err(error) => fail("CONTEXT_PACK", error),
+        },
+        Ok(ParsedArgs::EmbedProvider(embed_args)) => match embed_existing_nodes(&embed_args) {
+            Ok(stats) => {
+                println!("SEMANTIC_INDEX_EMBED_PROVIDER=ok");
+                println!("SEMANTIC_INDEX_DB={}", stats.db.display());
+                println!("SEMANTIC_INDEX_NODES={}", stats.nodes);
+                println!("SEMANTIC_INDEX_EMBEDDINGS={}", stats.embeddings);
+                0
+            }
+            Err(error) => fail("EMBED_PROVIDER", error),
         },
         Ok(ParsedArgs::Similar(similar_args)) => match similar_pairs(&similar_args) {
             Ok(results) => {
@@ -256,6 +364,46 @@ pub fn run(args: &[String]) -> i32 {
             }
             Err(error) => fail("EVAL", error),
         },
+        Ok(ParsedArgs::CompareProviders(compare_args)) => match compare_providers(&compare_args) {
+            Ok(report) => {
+                if let Some(path) = &compare_args.report {
+                    if let Err(error) = write_report(path, &report) {
+                        return fail("COMPARE_PROVIDERS_REPORT", error);
+                    }
+                }
+                if compare_args.format == OutputFormat::Json {
+                    println!("{}", report);
+                } else {
+                    print_provider_compare_summary(&report);
+                }
+                0
+            }
+            Err(error) => fail("COMPARE_PROVIDERS", error),
+        },
+        Ok(ParsedArgs::EvalOutput(eval_output_args)) => match eval_output(&eval_output_args) {
+            Ok(report) => {
+                if let Some(path) = &eval_output_args.report {
+                    if let Err(error) = write_report(path, &report) {
+                        return fail("OUTPUT_EVAL_REPORT", error);
+                    }
+                }
+                if eval_output_args.format == OutputFormat::Json {
+                    println!("{}", report);
+                } else {
+                    print_output_eval_summary(&report);
+                }
+                if report
+                    .get("semantic_index_output_eval")
+                    .and_then(Value::as_str)
+                    == Some("pass")
+                {
+                    0
+                } else {
+                    1
+                }
+            }
+            Err(error) => fail("OUTPUT_EVAL", error),
+        },
         Err(message) => {
             eprintln!("SEMANTIC_INDEX_CLI=fail");
             eprintln!("SEMANTIC_INDEX_CLI_ERROR={message}");
@@ -275,6 +423,12 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
     match raw_command.as_str() {
         "build" => Ok(ParsedArgs::Build(parse_build_args(&args[1..])?)),
         "search" => Ok(ParsedArgs::Search(parse_search_args(&args[1..])?)),
+        "context-pack" => Ok(ParsedArgs::ContextPack(parse_context_pack_args(
+            &args[1..],
+        )?)),
+        "embed-provider" => Ok(ParsedArgs::EmbedProvider(parse_embed_provider_args(
+            &args[1..],
+        )?)),
         "similar" => Ok(ParsedArgs::Similar(parse_similar_args(
             &args[1..],
             SimilarKind::Similar,
@@ -285,6 +439,10 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         )?)),
         "thin-docs" => Ok(ParsedArgs::ThinDocs(parse_thin_docs_args(&args[1..])?)),
         "eval" => Ok(ParsedArgs::Eval(parse_eval_args(&args[1..])?)),
+        "compare-providers" => Ok(ParsedArgs::CompareProviders(parse_compare_providers_args(
+            &args[1..],
+        )?)),
+        "eval-output" => Ok(ParsedArgs::EvalOutput(parse_eval_output_args(&args[1..])?)),
         unknown => Err(format!("unknown semantic-index command {unknown}")),
     }
 }
@@ -298,6 +456,8 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
         dim: DEFAULT_DIM,
+        embedding_url: None,
+        embedding_batch: DEFAULT_EMBEDDING_BATCH,
         max_file_bytes: DEFAULT_MAX_FILE_BYTES,
     };
     let mut index = 0;
@@ -336,6 +496,14 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
                 parsed.dim = value_usize(args, index, "--dim")?;
                 index += 2;
             }
+            "--embedding-url" | "--embed-base-url" => {
+                parsed.embedding_url = Some(value_string(args, index, "--embedding-url")?);
+                index += 2;
+            }
+            "--embedding-batch" | "--embed-batch-size" => {
+                parsed.embedding_batch = value_usize(args, index, "--embedding-batch")?;
+                index += 2;
+            }
             "--max-file-bytes" => {
                 parsed.max_file_bytes = value_u64(args, index, "--max-file-bytes")?;
                 index += 2;
@@ -346,7 +514,8 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
     if parsed.includes.is_empty() {
         parsed.includes.push(PathBuf::from("."));
     }
-    validate_dim(parsed.dim)?;
+    validate_provider_dim(&parsed.provider, parsed.dim)?;
+    validate_embedding_batch(parsed.embedding_batch)?;
     Ok(parsed)
 }
 
@@ -358,6 +527,7 @@ fn parse_search_args(args: &[String]) -> Result<SearchArgs, String> {
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
         dim: DEFAULT_DIM,
+        embedding_url: None,
         top_k: DEFAULT_TOP_K,
         format: OutputFormat::Text,
     };
@@ -409,6 +579,10 @@ fn parse_search_args(args: &[String]) -> Result<SearchArgs, String> {
                 parsed.dim = value_usize(args, index, "--dim")?;
                 index += 2;
             }
+            "--embedding-url" | "--embed-base-url" => {
+                parsed.embedding_url = Some(value_string(args, index, "--embedding-url")?);
+                index += 2;
+            }
             "--top-k" => {
                 parsed.top_k = value_usize(args, index, "--top-k")?;
                 index += 2;
@@ -426,7 +600,158 @@ fn parse_search_args(args: &[String]) -> Result<SearchArgs, String> {
     if parsed.query.trim().is_empty() {
         return Err("--query, --query-file, or --query-stdin is required".to_string());
     }
-    validate_dim(parsed.dim)?;
+    validate_provider_dim(&parsed.provider, parsed.dim)?;
+    Ok(parsed)
+}
+
+fn parse_context_pack_args(args: &[String]) -> Result<ContextPackArgs, String> {
+    let mut parsed = ContextPackArgs {
+        root: PathBuf::from("."),
+        db: default_db_path(Path::new(".")),
+        query: String::new(),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        embedding_url: None,
+        max_cells: DEFAULT_CONTEXT_CELLS,
+        max_cell_chars: DEFAULT_CONTEXT_CELL_CHARS,
+        max_total_chars: DEFAULT_CONTEXT_TOTAL_CHARS,
+        format: OutputFormat::Text,
+    };
+    let mut query_sources = 0;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--query" => {
+                parsed.query = value_string(args, index, "--query")?;
+                query_sources += 1;
+                index += 2;
+            }
+            "--query-file" => {
+                let path = value_path(args, index, "--query-file")?;
+                parsed.query = fs::read_to_string(&path)
+                    .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+                query_sources += 1;
+                index += 2;
+            }
+            "--query-stdin" => {
+                let mut query = String::new();
+                io::stdin()
+                    .read_to_string(&mut query)
+                    .map_err(|error| format!("failed to read query from stdin: {error}"))?;
+                parsed.query = query;
+                query_sources += 1;
+                index += 1;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--embedding-url" | "--embed-base-url" => {
+                parsed.embedding_url = Some(value_string(args, index, "--embedding-url")?);
+                index += 2;
+            }
+            "--top-k" | "--max-cells" => {
+                parsed.max_cells = value_usize(args, index, "--max-cells")?;
+                index += 2;
+            }
+            "--max-cell-chars" => {
+                parsed.max_cell_chars = value_usize(args, index, "--max-cell-chars")?;
+                index += 2;
+            }
+            "--max-total-chars" => {
+                parsed.max_total_chars = value_usize(args, index, "--max-total-chars")?;
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown context-pack option {unknown}")),
+        }
+    }
+    if query_sources > 1 {
+        return Err("use only one of --query, --query-file, or --query-stdin".to_string());
+    }
+    if parsed.query.trim().is_empty() {
+        return Err("--query, --query-file, or --query-stdin is required".to_string());
+    }
+    validate_provider_dim(&parsed.provider, parsed.dim)?;
+    validate_positive(parsed.max_cells, "--max-cells")?;
+    validate_positive(parsed.max_cell_chars, "--max-cell-chars")?;
+    validate_positive(parsed.max_total_chars, "--max-total-chars")?;
+    Ok(parsed)
+}
+
+fn parse_embed_provider_args(args: &[String]) -> Result<EmbedProviderArgs, String> {
+    let mut parsed = EmbedProviderArgs {
+        root: PathBuf::from("."),
+        db: default_db_path(Path::new(".")),
+        provider: LLAMA_SERVER_EMBEDDING_PROVIDER.to_string(),
+        model: env::var("AGENT_CANON_LOCAL_LLM_EMBEDDING_MODEL")
+            .unwrap_or_else(|_| "local-embedding-model".to_string()),
+        dim: 0,
+        embedding_url: None,
+        embedding_batch: DEFAULT_EMBEDDING_BATCH,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--embedding-url" | "--embed-base-url" => {
+                parsed.embedding_url = Some(value_string(args, index, "--embedding-url")?);
+                index += 2;
+            }
+            "--embedding-batch" | "--embed-batch-size" => {
+                parsed.embedding_batch = value_usize(args, index, "--embedding-batch")?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown embed-provider option {unknown}")),
+        }
+    }
+    validate_provider_dim(&parsed.provider, parsed.dim)?;
+    validate_embedding_batch(parsed.embedding_batch)?;
     Ok(parsed)
 }
 
@@ -492,7 +817,7 @@ fn parse_similar_args(args: &[String], kind: SimilarKind) -> Result<SimilarArgs,
             unknown => return Err(format!("unknown similar option {unknown}")),
         }
     }
-    validate_dim(parsed.dim)?;
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
     validate_min_score(parsed.min_score)?;
     Ok(parsed)
 }
@@ -554,7 +879,7 @@ fn parse_thin_docs_args(args: &[String]) -> Result<ThinDocsArgs, String> {
             unknown => return Err(format!("unknown thin-docs option {unknown}")),
         }
     }
-    validate_dim(parsed.dim)?;
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
     validate_min_score(parsed.min_thin_score)?;
     validate_min_score(parsed.min_neighbor_score)?;
     Ok(parsed)
@@ -572,6 +897,7 @@ fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
         dim: DEFAULT_DIM,
+        embedding_url: None,
         top_k: DEFAULT_TOP_K,
         format: OutputFormat::Text,
     };
@@ -602,6 +928,10 @@ fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
                 parsed.dim = value_usize(args, index, "--dim")?;
                 index += 2;
             }
+            "--embedding-url" | "--embed-base-url" => {
+                parsed.embedding_url = Some(value_string(args, index, "--embedding-url")?);
+                index += 2;
+            }
             "--top-k" => {
                 parsed.top_k = value_usize(args, index, "--top-k")?;
                 index += 2;
@@ -614,9 +944,164 @@ fn parse_eval_args(args: &[String]) -> Result<EvalArgs, String> {
         }
     }
     parsed.fixture = fixture.ok_or_else(|| "--fixture is required".to_string())?;
-    validate_dim(parsed.dim)?;
+    validate_provider_dim(&parsed.provider, parsed.dim)?;
     if parsed.format == OutputFormat::Jsonl {
         return Err("--format jsonl is not supported for eval".to_string());
+    }
+    Ok(parsed)
+}
+
+fn parse_compare_providers_args(args: &[String]) -> Result<CompareProvidersArgs, String> {
+    let mut parsed = CompareProvidersArgs {
+        db: default_db_path(Path::new(".")),
+        query: None,
+        left: ProviderSpec {
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 0,
+            embedding_url: None,
+        },
+        right: ProviderSpec {
+            provider: LLAMA_SERVER_EMBEDDING_PROVIDER.to_string(),
+            model: env::var("AGENT_CANON_LOCAL_LLM_EMBEDDING_MODEL")
+                .unwrap_or_else(|_| "local-embedding-model".to_string()),
+            dim: 0,
+            embedding_url: None,
+        },
+        min_score: DEFAULT_MIN_SCORE,
+        top_k: DEFAULT_TOP_K,
+        report: None,
+        format: OutputFormat::Text,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                let root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--query" => {
+                parsed.query = Some(value_string(args, index, "--query")?);
+                index += 2;
+            }
+            "--query-file" => {
+                let path = value_path(args, index, "--query-file")?;
+                parsed.query = Some(
+                    fs::read_to_string(&path)
+                        .map_err(|error| format!("failed to read {}: {error}", path.display()))?,
+                );
+                index += 2;
+            }
+            "--left-provider" => {
+                parsed.left.provider = value_string(args, index, "--left-provider")?;
+                index += 2;
+            }
+            "--left-model" => {
+                parsed.left.model = value_string(args, index, "--left-model")?;
+                index += 2;
+            }
+            "--left-dim" => {
+                parsed.left.dim = value_usize(args, index, "--left-dim")?;
+                index += 2;
+            }
+            "--left-embedding-url" | "--left-embed-base-url" => {
+                parsed.left.embedding_url =
+                    Some(value_string(args, index, "--left-embedding-url")?);
+                index += 2;
+            }
+            "--right-provider" => {
+                parsed.right.provider = value_string(args, index, "--right-provider")?;
+                index += 2;
+            }
+            "--right-model" => {
+                parsed.right.model = value_string(args, index, "--right-model")?;
+                index += 2;
+            }
+            "--right-dim" => {
+                parsed.right.dim = value_usize(args, index, "--right-dim")?;
+                index += 2;
+            }
+            "--right-embedding-url" | "--right-embed-base-url" => {
+                parsed.right.embedding_url =
+                    Some(value_string(args, index, "--right-embedding-url")?);
+                index += 2;
+            }
+            "--min-score" => {
+                parsed.min_score = value_f32(args, index, "--min-score")?;
+                index += 2;
+            }
+            "--top-k" => {
+                parsed.top_k = value_usize(args, index, "--top-k")?;
+                index += 2;
+            }
+            "--report" => {
+                parsed.report = Some(value_path(args, index, "--report")?);
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown compare-providers option {unknown}")),
+        }
+    }
+    validate_provider_dim_or_auto(&parsed.left.provider, parsed.left.dim, "--left-dim")?;
+    validate_provider_dim_or_auto(&parsed.right.provider, parsed.right.dim, "--right-dim")?;
+    validate_min_score(parsed.min_score)?;
+    if parsed.format == OutputFormat::Jsonl {
+        return Err("--format jsonl is not supported for compare-providers".to_string());
+    }
+    Ok(parsed)
+}
+
+fn parse_eval_output_args(args: &[String]) -> Result<EvalOutputArgs, String> {
+    let mut parsed = EvalOutputArgs {
+        merge_candidates: None,
+        thin_docs: None,
+        search: None,
+        report: None,
+        format: OutputFormat::Text,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--merge-candidates" => {
+                parsed.merge_candidates = Some(value_path(args, index, "--merge-candidates")?);
+                index += 2;
+            }
+            "--thin-docs" => {
+                parsed.thin_docs = Some(value_path(args, index, "--thin-docs")?);
+                index += 2;
+            }
+            "--search" => {
+                parsed.search = Some(value_path(args, index, "--search")?);
+                index += 2;
+            }
+            "--report" => {
+                parsed.report = Some(value_path(args, index, "--report")?);
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown eval-output option {unknown}")),
+        }
+    }
+    if parsed.merge_candidates.is_none() && parsed.thin_docs.is_none() && parsed.search.is_none() {
+        return Err(
+            "at least one of --merge-candidates, --thin-docs, or --search is required".to_string(),
+        );
+    }
+    if parsed.format == OutputFormat::Jsonl {
+        return Err("--format jsonl is not supported for eval-output".to_string());
     }
     Ok(parsed)
 }
@@ -638,6 +1123,7 @@ fn build_index(args: &BuildArgs) -> Result<BuildStats, String> {
     let mut file_count = 0;
     let mut node_count = 0;
     let mut embedding_count = 0;
+    let mut remote_embedding_inputs: Vec<(i64, String)> = Vec::new();
     for path in files {
         let text = fs::read_to_string(&path).map_err(|error| {
             format!("failed to read indexable file {}: {error}", path.display())
@@ -653,14 +1139,50 @@ fn build_index(args: &BuildArgs) -> Result<BuildStats, String> {
                 .parent_index
                 .and_then(|parent| inserted_ids.get(parent).copied());
             let node_id = insert_node(&tx, file_id, parent_id, &node)?;
-            let vector = embed_text(&node.text, args.dim);
-            insert_embedding(&tx, node_id, &args.provider, &args.model, args.dim, &vector)?;
+            if is_remote_embedding_provider(&args.provider) {
+                remote_embedding_inputs.push((node_id, node.text.clone()));
+            } else {
+                let vector = embed_text(&node.text, args.dim);
+                insert_embedding(&tx, node_id, &args.provider, &args.model, args.dim, &vector)?;
+                embedding_count += 1;
+            }
             inserted_ids.push(node_id);
             node_count += 1;
-            embedding_count += 1;
         }
         if line_count == 0 {
             continue;
+        }
+    }
+    if is_remote_embedding_provider(&args.provider) {
+        let texts: Vec<String> = remote_embedding_inputs
+            .iter()
+            .map(|(_, text)| text.clone())
+            .collect();
+        let vectors = embed_texts_for_provider(
+            &args.provider,
+            &args.model,
+            args.dim,
+            args.embedding_url.as_deref(),
+            &texts,
+            args.embedding_batch,
+        )?;
+        if vectors.len() != remote_embedding_inputs.len() {
+            return Err(format!(
+                "embedding provider returned {} vectors for {} nodes",
+                vectors.len(),
+                remote_embedding_inputs.len()
+            ));
+        }
+        for ((node_id, _), vector) in remote_embedding_inputs.iter().zip(vectors.iter()) {
+            insert_embedding(
+                &tx,
+                *node_id,
+                &args.provider,
+                &args.model,
+                vector.len(),
+                vector,
+            )?;
+            embedding_count += 1;
         }
     }
     tx.commit().map_err(|error| error.to_string())?;
@@ -673,13 +1195,121 @@ fn build_index(args: &BuildArgs) -> Result<BuildStats, String> {
     })
 }
 
+fn embed_existing_nodes(args: &EmbedProviderArgs) -> Result<EmbedStats, String> {
+    let mut conn = open_cache_connection(&args.db)?;
+    let node_texts =
+        load_missing_node_texts(&conn, &args.root, &args.provider, &args.model, args.dim)?;
+    if node_texts.is_empty() {
+        return Ok(EmbedStats {
+            nodes: 0,
+            embeddings: 0,
+            db: args.db.clone(),
+        });
+    }
+    let mut embedding_count = 0;
+    for chunk in node_texts.chunks(args.embedding_batch.max(1)) {
+        let texts: Vec<String> = chunk.iter().map(|(_, text)| text.clone()).collect();
+        let vectors = embed_texts_for_provider(
+            &args.provider,
+            &args.model,
+            args.dim,
+            args.embedding_url.as_deref(),
+            &texts,
+            args.embedding_batch,
+        )?;
+        let tx = conn.transaction().map_err(|error| error.to_string())?;
+        for ((node_id, _), vector) in chunk.iter().zip(vectors.iter()) {
+            insert_embedding(
+                &tx,
+                *node_id,
+                &args.provider,
+                &args.model,
+                vector.len(),
+                vector,
+            )?;
+            embedding_count += 1;
+        }
+        tx.commit().map_err(|error| error.to_string())?;
+    }
+    Ok(EmbedStats {
+        nodes: node_texts.len(),
+        embeddings: embedding_count,
+        db: args.db.clone(),
+    })
+}
+
 fn search_index(args: &SearchArgs) -> Result<Vec<ScoredNode>, String> {
     let conn = open_cache_connection(&args.db)?;
-    let query = embed_text(&args.query, args.dim);
-    let mut results: Vec<ScoredNode> = load_nodes(&conn, &args.provider, &args.model, args.dim)?
-        .into_iter()
+    let query = embed_one_for_provider(
+        &args.provider,
+        &args.model,
+        args.dim,
+        args.embedding_url.as_deref(),
+        &args.query,
+    )?;
+    let nodes = load_nodes(&conn, &args.provider, &args.model, query.len())?;
+    Ok(score_nodes(&nodes, &query, args.top_k))
+}
+
+fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, String> {
+    let search_args = SearchArgs {
+        root: args.root.clone(),
+        db: args.db.clone(),
+        query: args.query.clone(),
+        provider: args.provider.clone(),
+        model: args.model.clone(),
+        dim: args.dim,
+        embedding_url: args.embedding_url.clone(),
+        top_k: args.max_cells,
+        format: OutputFormat::Json,
+    };
+    let hits = search_index(&search_args)?;
+    let mut cells = Vec::new();
+    let mut used_chars = 0_usize;
+    for hit in hits {
+        if cells.len() >= args.max_cells || used_chars >= args.max_total_chars {
+            break;
+        }
+        let remaining_chars = args.max_total_chars.saturating_sub(used_chars);
+        let cell_limit = args.max_cell_chars.min(remaining_chars);
+        if cell_limit == 0 {
+            break;
+        }
+        let excerpt = context_excerpt(&args.root, &hit.node, cell_limit)?;
+        used_chars += excerpt.chars().count();
+        cells.push(ContextCell {
+            rank: hit.rank,
+            score: hit.score,
+            path: hit.node.path.clone(),
+            line_start: hit.node.line_start,
+            line_end: hit.node.line_end,
+            node_kind: hit.node.kind.clone(),
+            responsibility_bucket: responsibility_scope_bucket(&hit.node.path).to_string(),
+            excerpt,
+        });
+    }
+    Ok(cells)
+}
+
+fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
+    Ok(similar_pairs_from_nodes(
+        &nodes,
+        args.kind,
+        args.min_score,
+        args.top_k,
+        args.cross_file_only,
+    ))
+}
+
+fn score_nodes(nodes: &[IndexedNode], query: &[f32], top_k: usize) -> Vec<ScoredNode> {
+    let mut results: Vec<ScoredNode> = nodes
+        .iter()
+        .cloned()
         .map(|node| {
-            let score = cosine_score(&query, &node.vector);
+            let score = cosine_score(query, &node.vector);
             ScoredNode {
                 node,
                 score,
@@ -689,20 +1319,24 @@ fn search_index(args: &SearchArgs) -> Result<Vec<ScoredNode>, String> {
         .filter(|result| result.score > 0.0)
         .collect();
     sort_scored_nodes(&mut results);
-    results.truncate(args.top_k);
+    results.truncate(top_k);
     for (index, result) in results.iter_mut().enumerate() {
         result.rank = index + 1;
     }
-    Ok(results)
+    results
 }
 
-fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
-    let conn = open_cache_connection(&args.db)?;
-    let nodes = load_nodes(&conn, &args.provider, &args.model, args.dim)?;
+fn similar_pairs_from_nodes(
+    nodes: &[IndexedNode],
+    kind: SimilarKind,
+    min_score: f32,
+    top_k: usize,
+    cross_file_only: bool,
+) -> Vec<SimilarPair> {
     let mut bucket_ids: HashMap<String, usize> = HashMap::new();
     let mut buckets: Vec<Option<usize>> = Vec::with_capacity(nodes.len());
-    for node in &nodes {
-        let bucket = comparison_bucket(args.kind, node);
+    for node in nodes {
+        let bucket = comparison_bucket(kind, node);
         let bucket_id = bucket.map(|value| {
             let next_id = bucket_ids.len();
             *bucket_ids.entry(value).or_insert(next_id)
@@ -711,25 +1345,25 @@ fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
     }
     let mut pairs: Vec<SimilarPair> = Vec::new();
     let mut inverted: HashMap<(usize, usize, bool), Vec<usize>> = HashMap::new();
-    let prune_limit = args.top_k.saturating_mul(16).max(1024);
+    let prune_limit = top_k.saturating_mul(16).max(1024);
     for right_index in 0..nodes.len() {
         let right = &nodes[right_index];
         let Some(bucket) = buckets[right_index] else {
             continue;
         };
         let mut candidates: HashSet<usize> = HashSet::new();
-        for (index, sign) in prefix_features(&right.vector, args.min_score) {
+        for (index, sign) in prefix_features(&right.vector, min_score) {
             if let Some(indices) = inverted.get(&(bucket, index, sign)) {
                 candidates.extend(indices.iter().copied());
             }
         }
         for left_index in candidates {
             let left = &nodes[left_index];
-            if args.cross_file_only && left.file_id == right.file_id {
+            if cross_file_only && left.file_id == right.file_id {
                 continue;
             }
             let score = cosine_score(&left.vector, &right.vector);
-            if score + f32::EPSILON >= args.min_score {
+            if score + f32::EPSILON >= min_score {
                 pairs.push(SimilarPair {
                     left: left.clone(),
                     right: right.clone(),
@@ -738,7 +1372,7 @@ fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
                 });
                 if pairs.len() > prune_limit {
                     sort_pairs(&mut pairs);
-                    pairs.truncate(args.top_k);
+                    pairs.truncate(top_k);
                 }
             }
         }
@@ -750,16 +1384,17 @@ fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
         }
     }
     sort_pairs(&mut pairs);
-    pairs.truncate(args.top_k);
+    pairs.truncate(top_k);
     for (index, pair) in pairs.iter_mut().enumerate() {
         pair.rank = index + 1;
     }
-    Ok(pairs)
+    pairs
 }
 
 fn thin_docs(args: &ThinDocsArgs) -> Result<Vec<ThinDocCandidate>, String> {
     let conn = open_cache_connection(&args.db)?;
-    let nodes = load_nodes(&conn, &args.provider, &args.model, args.dim)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
     let document_nodes: Vec<IndexedNode> = nodes
         .into_iter()
         .filter(|node| node.kind == "document")
@@ -820,6 +1455,8 @@ fn run_eval(args: &EvalArgs) -> Result<Value, String> {
         provider: args.provider.clone(),
         model: args.model.clone(),
         dim: args.dim,
+        embedding_url: args.embedding_url.clone(),
+        embedding_batch: DEFAULT_EMBEDDING_BATCH,
         max_file_bytes: DEFAULT_MAX_FILE_BYTES,
     };
     let started = unix_millis();
@@ -870,6 +1507,7 @@ fn eval_queries(args: &EvalArgs, expected: &Value) -> Result<Value, String> {
             provider: args.provider.clone(),
             model: args.model.clone(),
             dim: args.dim,
+            embedding_url: args.embedding_url.clone(),
             top_k: args.top_k.max(5),
             format: OutputFormat::Json,
         };
@@ -957,6 +1595,438 @@ fn eval_pairs(args: &EvalArgs, expected: &Value, must_not: bool) -> Result<Value
         "failed": failed,
         "results": results
     }))
+}
+
+fn compare_providers(args: &CompareProvidersArgs) -> Result<Value, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let left_dim =
+        resolve_provider_dim(&conn, &args.left.provider, &args.left.model, args.left.dim)?;
+    let right_dim = resolve_provider_dim(
+        &conn,
+        &args.right.provider,
+        &args.right.model,
+        args.right.dim,
+    )?;
+    let left_nodes = load_nodes(&conn, &args.left.provider, &args.left.model, left_dim)?;
+    let right_nodes = load_nodes(&conn, &args.right.provider, &args.right.model, right_dim)?;
+    let left_pairs = similar_pairs_from_nodes(
+        &left_nodes,
+        SimilarKind::MergeCandidates,
+        args.min_score,
+        args.top_k,
+        true,
+    );
+    let right_pairs = similar_pairs_from_nodes(
+        &right_nodes,
+        SimilarKind::MergeCandidates,
+        args.min_score,
+        args.top_k,
+        true,
+    );
+    let merge_delta = compare_pair_sets(&left_pairs, &right_pairs);
+    let search_delta = if let Some(query) = &args.query {
+        let left_query = embed_one_for_provider(
+            &args.left.provider,
+            &args.left.model,
+            left_dim,
+            args.left.embedding_url.as_deref(),
+            query,
+        )?;
+        let right_query = embed_one_for_provider(
+            &args.right.provider,
+            &args.right.model,
+            right_dim,
+            args.right.embedding_url.as_deref(),
+            query,
+        )?;
+        let left_hits = score_nodes(&left_nodes, &left_query, args.top_k);
+        let right_hits = score_nodes(&right_nodes, &right_query, args.top_k);
+        Some(compare_search_sets(query, &left_hits, &right_hits))
+    } else {
+        None
+    };
+    Ok(json!({
+        "semantic_index_provider_compare": "ok",
+        "db": args.db,
+        "top_k": args.top_k,
+        "min_score": args.min_score,
+        "left": {
+            "provider": args.left.provider,
+            "model": args.left.model,
+            "dim": left_dim,
+            "nodes": left_nodes.len(),
+            "merge_candidates": left_pairs.len()
+        },
+        "right": {
+            "provider": args.right.provider,
+            "model": args.right.model,
+            "dim": right_dim,
+            "nodes": right_nodes.len(),
+            "merge_candidates": right_pairs.len()
+        },
+        "merge_candidates": merge_delta,
+        "search": search_delta
+    }))
+}
+
+fn eval_output(args: &EvalOutputArgs) -> Result<Value, String> {
+    let mut artifacts = Vec::new();
+    let mut findings = Vec::new();
+    if let Some(path) = &args.merge_candidates {
+        artifacts.push(eval_merge_candidates_output(path, &mut findings)?);
+    }
+    if let Some(path) = &args.thin_docs {
+        artifacts.push(eval_thin_docs_output(path, &mut findings)?);
+    }
+    if let Some(path) = &args.search {
+        artifacts.push(eval_search_output(path, &mut findings)?);
+    }
+    let error_count = findings
+        .iter()
+        .filter(|finding| {
+            finding
+                .get("severity")
+                .and_then(Value::as_str)
+                .is_some_and(|severity| severity == "error")
+        })
+        .count();
+    Ok(json!({
+        "semantic_index_output_eval": if error_count == 0 { "pass" } else { "fail" },
+        "artifacts": artifacts,
+        "findings": findings,
+        "error_count": error_count
+    }))
+}
+
+fn eval_merge_candidates_output(path: &Path, findings: &mut Vec<Value>) -> Result<Value, String> {
+    let (summary, results) = read_jsonl_artifact(path)?;
+    let artifact = path.display().to_string();
+    expect_summary_field(findings, &artifact, &summary, "semantic_index_pairs", "ok");
+    expect_summary_field(findings, &artifact, &summary, "kind", "merge-candidates");
+    check_result_count(findings, &artifact, &summary, results.len());
+    for (index, result) in results.iter().enumerate() {
+        let context = format!("result[{index}]");
+        check_rank_score(findings, &artifact, &context, result, "score");
+        if !result
+            .get("same_responsibility")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "merge candidate is not same_responsibility=true",
+            );
+        }
+        let candidate_bucket = result
+            .get("candidate_bucket")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if candidate_bucket.is_empty() || candidate_bucket == "similar:any" {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "merge candidate is missing a concrete candidate_bucket",
+            );
+        }
+        let Some(left) = result.get("left") else {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "missing left object",
+            );
+            continue;
+        };
+        let Some(right) = result.get("right") else {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "missing right object",
+            );
+            continue;
+        };
+        let left_responsibility = json_str(left, "responsibility_bucket");
+        let right_responsibility = json_str(right, "responsibility_bucket");
+        if left_responsibility.is_empty()
+            || right_responsibility.is_empty()
+            || left_responsibility != right_responsibility
+        {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "left/right responsibility_bucket must be present and equal",
+            );
+        }
+        if left_responsibility == "eval-and-hook-evidence" {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "eval-and-hook-evidence must not be emitted as merge evidence",
+            );
+        }
+        if json_str(left, "node_kind") != json_str(right, "node_kind") {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "merge candidate node_kind differs across sides",
+            );
+        }
+        if json_str(left, "path").is_empty() || json_str(right, "path").is_empty() {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "merge candidate left/right path must be present",
+            );
+        }
+    }
+    Ok(json!({
+        "artifact": artifact,
+        "kind": "merge-candidates",
+        "results": results.len()
+    }))
+}
+
+fn eval_thin_docs_output(path: &Path, findings: &mut Vec<Value>) -> Result<Value, String> {
+    let (summary, results) = read_jsonl_artifact(path)?;
+    let artifact = path.display().to_string();
+    expect_summary_field(
+        findings,
+        &artifact,
+        &summary,
+        "semantic_index_thin_docs",
+        "ok",
+    );
+    check_result_count(findings, &artifact, &summary, results.len());
+    for (index, result) in results.iter().enumerate() {
+        let context = format!("result[{index}]");
+        check_rank_score(findings, &artifact, &context, result, "thin_score");
+        let action = json_str(result, "action");
+        if !matches!(
+            action.as_str(),
+            "keep_entrypoint"
+                | "inline_into_target"
+                | "replace_with_catalog_row"
+                | "merge_with_peer"
+                | "manual_review"
+        ) {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "thin-doc action is missing or unknown",
+            );
+        }
+        if json_str(result, "path").is_empty() {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "thin-doc path must be present",
+            );
+        }
+        let protected = result
+            .get("reasons")
+            .and_then(Value::as_array)
+            .is_some_and(|reasons| {
+                reasons
+                    .iter()
+                    .any(|reason| reason.as_str() == Some("protected_entrypoint"))
+            });
+        if protected && action != "keep_entrypoint" {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "protected_entrypoint must use keep_entrypoint action",
+            );
+        }
+    }
+    Ok(json!({
+        "artifact": artifact,
+        "kind": "thin-docs",
+        "results": results.len()
+    }))
+}
+
+fn eval_search_output(path: &Path, findings: &mut Vec<Value>) -> Result<Value, String> {
+    let (summary, results) = read_jsonl_artifact(path)?;
+    let artifact = path.display().to_string();
+    expect_summary_field(findings, &artifact, &summary, "semantic_index_search", "ok");
+    check_result_count(findings, &artifact, &summary, results.len());
+    if summary.get("query").is_some() {
+        push_output_finding(
+            findings,
+            &artifact,
+            "error",
+            "summary",
+            "search JSONL summary must not echo full query text",
+        );
+    }
+    if summary.get("query_chars").and_then(Value::as_u64).is_none() {
+        push_output_finding(
+            findings,
+            &artifact,
+            "error",
+            "summary",
+            "search JSONL summary must include query_chars",
+        );
+    }
+    for (index, result) in results.iter().enumerate() {
+        let context = format!("result[{index}]");
+        check_rank_score(findings, &artifact, &context, result, "score");
+        if json_str(result, "path").is_empty() {
+            push_output_finding(
+                findings,
+                &artifact,
+                "error",
+                &context,
+                "search result path must be present",
+            );
+        }
+    }
+    Ok(json!({
+        "artifact": artifact,
+        "kind": "search",
+        "results": results.len()
+    }))
+}
+
+fn read_jsonl_artifact(path: &Path) -> Result<(Value, Vec<Value>), String> {
+    let text = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    let mut values = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value = serde_json::from_str::<Value>(line).map_err(|error| {
+            format!(
+                "failed to parse {} line {} as JSON: {error}",
+                path.display(),
+                index + 1
+            )
+        })?;
+        values.push(value);
+    }
+    if values.is_empty() {
+        return Err(format!("{} is empty", path.display()));
+    }
+    let summary = values.remove(0);
+    Ok((summary, values))
+}
+
+fn expect_summary_field(
+    findings: &mut Vec<Value>,
+    artifact: &str,
+    summary: &Value,
+    field: &str,
+    expected: &str,
+) {
+    if summary.get(field).and_then(Value::as_str) != Some(expected) {
+        push_output_finding(
+            findings,
+            artifact,
+            "error",
+            "summary",
+            &format!("summary field {field} must equal {expected}"),
+        );
+    }
+}
+
+fn check_result_count(
+    findings: &mut Vec<Value>,
+    artifact: &str,
+    summary: &Value,
+    actual_count: usize,
+) {
+    if summary.get("result_count").and_then(Value::as_u64) != Some(actual_count as u64) {
+        push_output_finding(
+            findings,
+            artifact,
+            "error",
+            "summary",
+            "summary result_count must match JSONL result rows",
+        );
+    }
+}
+
+fn check_rank_score(
+    findings: &mut Vec<Value>,
+    artifact: &str,
+    context: &str,
+    result: &Value,
+    score_field: &str,
+) {
+    if result.get("rank").and_then(Value::as_u64).unwrap_or(0) == 0 {
+        push_output_finding(
+            findings,
+            artifact,
+            "error",
+            context,
+            "rank must be positive",
+        );
+    }
+    let Some(score) = result.get(score_field).and_then(Value::as_f64) else {
+        push_output_finding(
+            findings,
+            artifact,
+            "error",
+            context,
+            &format!("{score_field} must be present"),
+        );
+        return;
+    };
+    if !(0.0..=1.000_001).contains(&score) {
+        push_output_finding(
+            findings,
+            artifact,
+            "error",
+            context,
+            &format!("{score_field} must be in [0, 1]"),
+        );
+    }
+}
+
+fn json_str(value: &Value, key: &str) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string()
+}
+
+fn push_output_finding(
+    findings: &mut Vec<Value>,
+    artifact: &str,
+    severity: &str,
+    context: &str,
+    message: &str,
+) {
+    findings.push(json!({
+        "artifact": artifact,
+        "severity": severity,
+        "context": context,
+        "message": message
+    }));
 }
 
 fn persist_pairs(args: &SimilarArgs, pairs: &[SimilarPair]) -> Result<(), String> {
@@ -1181,7 +2251,7 @@ fn insert_embedding(
     vector: &[f32],
 ) -> Result<(), String> {
     conn.execute(
-        "INSERT INTO embeddings(node_id, provider, model, dim, dtype, vector) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT OR REPLACE INTO embeddings(node_id, provider, model, dim, dtype, vector) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![node_id, provider, model, dim as i64, "f32le", vector_to_blob(vector)],
     )
     .map_err(|error| error.to_string())?;
@@ -1227,6 +2297,133 @@ fn load_nodes(
         }
     }
     Ok(nodes)
+}
+
+fn provider_dimensions(
+    conn: &Connection,
+    provider: &str,
+    model: &str,
+) -> Result<Vec<usize>, String> {
+    let mut statement = conn
+        .prepare(
+            r#"
+            SELECT DISTINCT dim
+            FROM embeddings
+            WHERE provider = ?1 AND model = ?2
+            ORDER BY dim
+            "#,
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![provider, model], |row| {
+            let dim: i64 = row.get(0)?;
+            Ok(dim as usize)
+        })
+        .map_err(|error| error.to_string())?;
+    let mut dims = Vec::new();
+    for row in rows {
+        dims.push(row.map_err(|error| error.to_string())?);
+    }
+    Ok(dims)
+}
+
+fn resolve_provider_dim(
+    conn: &Connection,
+    provider: &str,
+    model: &str,
+    requested_dim: usize,
+) -> Result<usize, String> {
+    if requested_dim > 0 {
+        return Ok(requested_dim);
+    }
+    let dims = provider_dimensions(conn, provider, model)?;
+    match dims.as_slice() {
+        [dim] => Ok(*dim),
+        [] => Err(format!(
+            "no embeddings found for provider={provider} model={model}"
+        )),
+        _ => Err(format!(
+            "multiple embedding dimensions found for provider={provider} model={model}; pass --dim"
+        )),
+    }
+}
+
+fn load_missing_node_texts(
+    conn: &Connection,
+    root: &Path,
+    provider: &str,
+    model: &str,
+    dim: usize,
+) -> Result<Vec<(i64, String)>, String> {
+    let root_for_files = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let mut statement = conn
+        .prepare(
+            r#"
+            SELECT n.node_id, f.path, n.line_start, n.line_end
+            FROM nodes n
+            JOIN files f ON f.file_id = n.file_id
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM embeddings e
+                WHERE e.node_id = n.node_id
+                  AND e.provider = ?1
+                  AND e.model = ?2
+                  AND (?3 = 0 OR e.dim = ?3)
+            )
+            ORDER BY n.node_id
+            "#,
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![provider, model, dim as i64], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })
+        .map_err(|error| error.to_string())?;
+    let mut output = Vec::new();
+    for row in rows {
+        let (node_id, relative, line_start, line_end) = row.map_err(|error| error.to_string())?;
+        let path = root_for_files.join(&relative);
+        let text = fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read indexed file {}: {error}", path.display()))?;
+        output.push((node_id, line_range_text(&text, line_start, line_end)));
+    }
+    Ok(output)
+}
+
+fn line_range_text(text: &str, line_start: i64, line_end: i64) -> String {
+    text.lines()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let line_number = index as i64 + 1;
+            if line_number >= line_start && line_number <= line_end {
+                Some(line)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn context_excerpt(root: &Path, node: &IndexedNode, max_chars: usize) -> Result<String, String> {
+    let path = root.join(&node.path);
+    let text = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read context file {}: {error}", path.display()))?;
+    let excerpt = line_range_text(&text, node.line_start, node.line_end);
+    Ok(bound_excerpt(&excerpt, max_chars))
+}
+
+fn bound_excerpt(text: &str, max_chars: usize) -> String {
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
+    }
+    trimmed.chars().take(max_chars).collect::<String>()
 }
 
 fn discover_files(
@@ -1437,6 +2634,196 @@ fn embed_text(text: &str, dim: usize) -> Vec<f32> {
     }
     normalize_vector(&mut vector);
     vector
+}
+
+fn embed_one_for_provider(
+    provider: &str,
+    model: &str,
+    dim: usize,
+    embedding_url: Option<&str>,
+    text: &str,
+) -> Result<Vec<f32>, String> {
+    let vectors =
+        embed_texts_for_provider(provider, model, dim, embedding_url, &[text.to_string()], 1)?;
+    vectors
+        .into_iter()
+        .next()
+        .ok_or_else(|| "embedding provider returned no vector".to_string())
+}
+
+fn embed_texts_for_provider(
+    provider: &str,
+    model: &str,
+    dim: usize,
+    embedding_url: Option<&str>,
+    texts: &[String],
+    batch_size: usize,
+) -> Result<Vec<Vec<f32>>, String> {
+    if !is_remote_embedding_provider(provider) {
+        validate_dim(dim)?;
+        return Ok(texts.iter().map(|text| embed_text(text, dim)).collect());
+    }
+    let endpoint = embedding_endpoint(embedding_url);
+    let expected_dim = remote_expected_dim(dim);
+    let batch_size = batch_size.max(1);
+    let max_chars = remote_embedding_max_chars();
+    let mut output = Vec::with_capacity(texts.len());
+    for chunk in texts.chunks(batch_size) {
+        let bounded_chunk: Vec<String> = chunk
+            .iter()
+            .map(|text| bound_remote_embedding_text(text, max_chars))
+            .collect();
+        let mut vectors = request_openai_compatible_embeddings(&endpoint, model, &bounded_chunk)?;
+        for vector in &mut vectors {
+            if let Some(expected) = expected_dim {
+                if vector.len() != expected {
+                    return Err(format!(
+                        "embedding dimension mismatch: expected {expected}, got {}",
+                        vector.len()
+                    ));
+                }
+            }
+            normalize_vector(vector);
+        }
+        output.extend(vectors);
+    }
+    Ok(output)
+}
+
+fn is_remote_embedding_provider(provider: &str) -> bool {
+    matches!(
+        provider,
+        LLAMA_SERVER_EMBEDDING_PROVIDER
+            | OPENAI_COMPATIBLE_EMBEDDING_PROVIDER
+            | "llama-server"
+            | "openai-compatible"
+    )
+}
+
+fn remote_expected_dim(dim: usize) -> Option<usize> {
+    if dim == 0 || dim == DEFAULT_DIM {
+        None
+    } else {
+        Some(dim)
+    }
+}
+
+fn embedding_endpoint(explicit: Option<&str>) -> String {
+    explicit
+        .map(str::to_string)
+        .or_else(|| env::var("AGENT_CANON_SEMANTIC_INDEX_EMBEDDING_URL").ok())
+        .or_else(|| env::var("AGENT_CANON_LLAMA_EMBEDDING_URL").ok())
+        .unwrap_or_else(|| DEFAULT_EMBEDDING_URL.to_string())
+}
+
+fn remote_embedding_max_chars() -> usize {
+    env::var("AGENT_CANON_SEMANTIC_INDEX_EMBEDDING_MAX_CHARS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_REMOTE_EMBEDDING_MAX_CHARS)
+}
+
+fn bound_remote_embedding_text(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    text.chars().take(max_chars).collect()
+}
+
+fn request_openai_compatible_embeddings(
+    endpoint: &str,
+    model: &str,
+    texts: &[String],
+) -> Result<Vec<Vec<f32>>, String> {
+    let payload = json!({
+        "model": model,
+        "input": texts,
+    })
+    .to_string();
+    let curl = env::var("AGENT_CANON_EMBEDDING_CURL").unwrap_or_else(|_| "curl".to_string());
+    let output = Command::new(curl)
+        .arg("-fsS")
+        .arg("--retry")
+        .arg("2")
+        .arg("--retry-delay")
+        .arg("1")
+        .arg("-H")
+        .arg("Content-Type: application/json")
+        .arg("-d")
+        .arg(payload)
+        .arg(endpoint)
+        .output()
+        .map_err(|error| format!("embedding request failed to launch curl: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "embedding request failed for {endpoint}: status={} stderr={}",
+            output.status,
+            stderr.trim()
+        ));
+    }
+    let body = String::from_utf8(output.stdout)
+        .map_err(|error| format!("embedding response was not utf-8: {error}"))?;
+    parse_openai_embeddings_response(&body, texts.len())
+}
+
+fn parse_openai_embeddings_response(
+    body: &str,
+    expected_count: usize,
+) -> Result<Vec<Vec<f32>>, String> {
+    let value: Value = serde_json::from_str(body.trim())
+        .map_err(|error| format!("embedding response is not JSON: {error}"))?;
+    let data = value
+        .get("data")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "embedding response missing data array".to_string())?;
+    if data.len() != expected_count {
+        return Err(format!(
+            "embedding response count mismatch: expected {expected_count}, got {}",
+            data.len()
+        ));
+    }
+    let mut vectors: Vec<Option<Vec<f32>>> = vec![None; expected_count];
+    for (position, item) in data.iter().enumerate() {
+        let index = item
+            .get("index")
+            .and_then(Value::as_u64)
+            .map(|value| value as usize)
+            .unwrap_or(position);
+        if index >= expected_count {
+            return Err(format!("embedding response index {index} out of range"));
+        }
+        let array = item
+            .get("embedding")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("embedding response data[{index}] missing embedding array"))?;
+        if array.is_empty() {
+            return Err(format!(
+                "embedding response data[{index}] has empty embedding"
+            ));
+        }
+        let mut vector = Vec::with_capacity(array.len());
+        for value in array {
+            let number = value.as_f64().ok_or_else(|| {
+                format!("embedding response data[{index}] contains a non-numeric value")
+            })?;
+            if !number.is_finite() {
+                return Err(format!(
+                    "embedding response data[{index}] contains a non-finite value"
+                ));
+            }
+            vector.push(number as f32);
+        }
+        vectors[index] = Some(vector);
+    }
+    vectors
+        .into_iter()
+        .enumerate()
+        .map(|(index, vector)| {
+            vector.ok_or_else(|| format!("embedding response missing vector for index {index}"))
+        })
+        .collect()
 }
 
 fn strip_dependency_manifest(text: &str) -> String {
@@ -1950,6 +3337,77 @@ fn max_path_pair_score(nodes: &[IndexedNode], left_path: &str, right_path: &str)
     Some(best)
 }
 
+fn compare_pair_sets(left: &[SimilarPair], right: &[SimilarPair]) -> Value {
+    let left_keys: HashSet<String> = left.iter().map(pair_key).collect();
+    let right_keys: HashSet<String> = right.iter().map(pair_key).collect();
+    let shared: Vec<String> = sorted_intersection(&left_keys, &right_keys);
+    let left_only: Vec<String> = sorted_difference(&left_keys, &right_keys)
+        .into_iter()
+        .take(10)
+        .collect();
+    let right_only: Vec<String> = sorted_difference(&right_keys, &left_keys)
+        .into_iter()
+        .take(10)
+        .collect();
+    let denominator = left_keys.len().max(right_keys.len()).max(1);
+    json!({
+        "left_count": left_keys.len(),
+        "right_count": right_keys.len(),
+        "shared_count": shared.len(),
+        "overlap_ratio": shared.len() as f64 / denominator as f64,
+        "shared": shared.into_iter().take(10).collect::<Vec<_>>(),
+        "left_only": left_only,
+        "right_only": right_only
+    })
+}
+
+fn compare_search_sets(query: &str, left: &[ScoredNode], right: &[ScoredNode]) -> Value {
+    let left_keys: HashSet<String> = left.iter().map(|hit| node_key(&hit.node)).collect();
+    let right_keys: HashSet<String> = right.iter().map(|hit| node_key(&hit.node)).collect();
+    let shared: Vec<String> = sorted_intersection(&left_keys, &right_keys);
+    let denominator = left_keys.len().max(right_keys.len()).max(1);
+    json!({
+        "query_chars": query.chars().count(),
+        "left_count": left_keys.len(),
+        "right_count": right_keys.len(),
+        "shared_count": shared.len(),
+        "overlap_ratio": shared.len() as f64 / denominator as f64,
+        "left_top": left.iter().take(10).map(scored_node_json).collect::<Vec<_>>(),
+        "right_top": right.iter().take(10).map(scored_node_json).collect::<Vec<_>>(),
+        "left_only": sorted_difference(&left_keys, &right_keys).into_iter().take(10).collect::<Vec<_>>(),
+        "right_only": sorted_difference(&right_keys, &left_keys).into_iter().take(10).collect::<Vec<_>>()
+    })
+}
+
+fn sorted_intersection(left: &HashSet<String>, right: &HashSet<String>) -> Vec<String> {
+    let mut output: Vec<String> = left.intersection(right).cloned().collect();
+    output.sort();
+    output
+}
+
+fn sorted_difference(left: &HashSet<String>, right: &HashSet<String>) -> Vec<String> {
+    let mut output: Vec<String> = left.difference(right).cloned().collect();
+    output.sort();
+    output
+}
+
+fn pair_key(pair: &SimilarPair) -> String {
+    let left = node_key(&pair.left);
+    let right = node_key(&pair.right);
+    if left <= right {
+        format!("{left}|{right}")
+    } else {
+        format!("{right}|{left}")
+    }
+}
+
+fn node_key(node: &IndexedNode) -> String {
+    format!(
+        "{}:{}:{}-{}",
+        node.path, node.kind, node.line_start, node.line_end
+    )
+}
+
 fn reciprocal_rank(hits: &[ScoredNode], expected_paths: &[String]) -> f64 {
     for hit in hits.iter().take(10) {
         if expected_paths.contains(&hit.node.path) {
@@ -2028,6 +3486,60 @@ fn print_search_results(args: &SearchArgs, results: &[ScoredNode]) {
             result.node.line_end,
             result.node.kind
         );
+    }
+}
+
+fn print_context_pack_results(args: &ContextPackArgs, cells: &[ContextCell]) {
+    if args.format == OutputFormat::Json {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_context_pack": "ok",
+                "query_chars": args.query.chars().count(),
+                "provider": args.provider,
+                "model": args.model,
+                "max_cells": args.max_cells,
+                "max_cell_chars": args.max_cell_chars,
+                "max_total_chars": args.max_total_chars,
+                "cell_count": cells.len(),
+                "cells": cells.iter().map(context_cell_json).collect::<Vec<_>>()
+            })
+        );
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_context_pack": "ok",
+                "query_chars": args.query.chars().count(),
+                "provider": args.provider,
+                "model": args.model,
+                "cell_count": cells.len()
+            })
+        );
+        for cell in cells {
+            println!("{}", context_cell_json(cell));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_CONTEXT_PACK=ok");
+    println!("SEMANTIC_INDEX_CONTEXT_PACK_CELLS={}", cells.len());
+    for cell in cells {
+        println!(
+            "CELL rank={} score={:.4} responsibility={} path={} lines={}-{} kind={} chars={}",
+            cell.rank,
+            cell.score,
+            cell.responsibility_bucket,
+            cell.path,
+            cell.line_start,
+            cell.line_end,
+            cell.node_kind,
+            cell.excerpt.chars().count()
+        );
+        println!("EXCERPT_BEGIN");
+        println!("{}", cell.excerpt);
+        println!("EXCERPT_END");
     }
 }
 
@@ -2183,6 +3695,75 @@ fn print_eval_summary(report: &Value) {
     }
 }
 
+fn print_output_eval_summary(report: &Value) {
+    println!(
+        "SEMANTIC_INDEX_OUTPUT_EVAL={}",
+        report
+            .get("semantic_index_output_eval")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+    );
+    println!(
+        "SEMANTIC_INDEX_OUTPUT_EVAL_ERRORS={}",
+        report
+            .get("error_count")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    );
+    println!(
+        "SEMANTIC_INDEX_OUTPUT_EVAL_ARTIFACTS={}",
+        report
+            .get("artifacts")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0)
+    );
+}
+
+fn print_provider_compare_summary(report: &Value) {
+    println!(
+        "SEMANTIC_INDEX_PROVIDER_COMPARE={}",
+        report
+            .get("semantic_index_provider_compare")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+    );
+    if let Some(left) = report.get("left") {
+        println!(
+            "SEMANTIC_INDEX_PROVIDER_COMPARE_LEFT={}:{}:{}",
+            left.get("provider").and_then(Value::as_str).unwrap_or(""),
+            left.get("model").and_then(Value::as_str).unwrap_or(""),
+            left.get("dim").and_then(Value::as_u64).unwrap_or(0)
+        );
+    }
+    if let Some(right) = report.get("right") {
+        println!(
+            "SEMANTIC_INDEX_PROVIDER_COMPARE_RIGHT={}:{}:{}",
+            right.get("provider").and_then(Value::as_str).unwrap_or(""),
+            right.get("model").and_then(Value::as_str).unwrap_or(""),
+            right.get("dim").and_then(Value::as_u64).unwrap_or(0)
+        );
+    }
+    if let Some(merge) = report.get("merge_candidates") {
+        println!(
+            "SEMANTIC_INDEX_PROVIDER_COMPARE_MERGE_OVERLAP={:.4}",
+            merge
+                .get("overlap_ratio")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+        );
+    }
+    if let Some(search) = report.get("search").filter(|value| !value.is_null()) {
+        println!(
+            "SEMANTIC_INDEX_PROVIDER_COMPARE_SEARCH_OVERLAP={:.4}",
+            search
+                .get("overlap_ratio")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+        );
+    }
+}
+
 fn scored_node_json(result: &ScoredNode) -> Value {
     json!({
         "rank": result.rank,
@@ -2191,6 +3772,20 @@ fn scored_node_json(result: &ScoredNode) -> Value {
         "node_kind": result.node.kind,
         "line_start": result.node.line_start,
         "line_end": result.node.line_end
+    })
+}
+
+fn context_cell_json(cell: &ContextCell) -> Value {
+    json!({
+        "rank": cell.rank,
+        "score": cell.score,
+        "path": cell.path,
+        "node_kind": cell.node_kind,
+        "line_start": cell.line_start,
+        "line_end": cell.line_end,
+        "responsibility_bucket": cell.responsibility_bucket,
+        "excerpt_chars": cell.excerpt.chars().count(),
+        "excerpt": cell.excerpt
     })
 }
 
@@ -2461,6 +4056,34 @@ fn validate_dim(dim: usize) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_positive(value: usize, flag: &str) -> Result<(), String> {
+    if value == 0 {
+        return Err(format!("{flag} must be greater than zero"));
+    }
+    Ok(())
+}
+
+fn validate_provider_dim(provider: &str, dim: usize) -> Result<(), String> {
+    if is_remote_embedding_provider(provider) {
+        return Ok(());
+    }
+    validate_dim(dim)
+}
+
+fn validate_provider_dim_or_auto(provider: &str, dim: usize, flag: &str) -> Result<(), String> {
+    if dim == 0 {
+        return Ok(());
+    }
+    validate_provider_dim(provider, dim).map_err(|error| error.replace("--dim", flag))
+}
+
+fn validate_embedding_batch(batch_size: usize) -> Result<(), String> {
+    if batch_size == 0 {
+        return Err("--embedding-batch must be greater than zero".to_string());
+    }
+    Ok(())
+}
+
 fn validate_min_score(min_score: f32) -> Result<(), String> {
     if !(min_score.is_finite() && min_score > 0.0) {
         return Err("--min-score must be greater than zero".to_string());
@@ -2531,16 +4154,20 @@ fn fail(scope: &str, message: String) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon semantic-index <build|search|similar|merge-candidates|thin-docs|eval> [options]"
+        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|eval|compare-providers|eval-output> [options]"
     );
-    eprintln!("build: --root <repo-root> [--include path] [--db path] [--dim N]");
-    eprintln!("search: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--top-k N] [--format text|json|jsonl]");
+    eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
+    eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
+    eprintln!("search: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--top-k N] [--format text|json|jsonl]");
+    eprintln!("context-pack: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--max-cells N] [--max-cell-chars N] [--max-total-chars N] [--format text|json|jsonl]");
     eprintln!("similar: [--root repo] [--db path] [--min-score S] [--cross-file-only] [--format text|json|jsonl]");
     eprintln!(
         "merge-candidates: [--root repo] [--db path] [--min-score S] [--format text|json|jsonl]"
     );
     eprintln!("thin-docs: [--root repo] [--db path] [--min-thin-score S] [--min-neighbor-score S] [--top-k N] [--format text|json|jsonl]");
     eprintln!("eval: --fixture <fixture-dir> [--db path] [--report path] [--format text|json]");
+    eprintln!("compare-providers: --db path [--query-file path] [--left-provider name] [--right-provider name] [--left-dim N] [--right-dim N] [--report path]");
+    eprintln!("eval-output: [--merge-candidates path] [--thin-docs path] [--search path] [--report path] [--format text|json]");
 }
 
 #[cfg(test)]
@@ -2580,6 +4207,256 @@ mod tests {
     }
 
     #[test]
+    fn openai_embedding_response_parses_indexed_batch() {
+        let response = r#"{
+          "object": "list",
+          "data": [
+            {"object": "embedding", "embedding": [0.1, 0.2, 0.3], "index": 1},
+            {"object": "embedding", "embedding": [0.4, 0.5, 0.6], "index": 0}
+          ],
+          "model": "fixture-embedding"
+        }"#;
+        let vectors = parse_openai_embeddings_response(response, 2).unwrap();
+        assert_eq!(vectors[0], vec![0.4, 0.5, 0.6]);
+        assert_eq!(vectors[1], vec![0.1, 0.2, 0.3]);
+    }
+
+    #[test]
+    fn openai_embedding_response_rejects_bad_shapes() {
+        for response in [
+            r#"{"object":"list"}"#,
+            r#"{"data":[{"embedding":["bad"],"index":0}]}"#,
+            r#"{"data":[{"embedding":[],"index":0}]}"#,
+            "prefix noise {\"data\":[]}",
+        ] {
+            assert!(parse_openai_embeddings_response(response, 1).is_err());
+        }
+    }
+
+    #[test]
+    fn remote_embedding_text_is_bounded_without_splitting_chars() {
+        let bounded = bound_remote_embedding_text("abcdef", 3);
+        assert_eq!(bounded, "abc");
+        assert_eq!(bound_remote_embedding_text("abc", 3), "abc");
+    }
+
+    #[test]
+    fn provider_compare_reuses_existing_responsibility_buckets() {
+        let root = unique_temp_dir("semantic-index-provider-compare");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        let duplicate = "# Duplicate\nshared provider comparison phrase\nwith enough lines\nfor merge candidates";
+        fs::write(root.join("documents").join("one.md"), duplicate).unwrap();
+        fs::write(root.join("documents").join("two.md"), duplicate).unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let mut conn = open_cache_connection(&db).unwrap();
+        let tx = conn.transaction().unwrap();
+        let nodes = load_nodes(&tx, DEFAULT_PROVIDER, DEFAULT_MODEL, 64).unwrap();
+        for node in &nodes {
+            insert_embedding(
+                &tx,
+                node.node_id,
+                "fixture-llm",
+                "fixture",
+                64,
+                &node.vector,
+            )
+            .unwrap();
+        }
+        tx.commit().unwrap();
+
+        let report = compare_providers(&CompareProvidersArgs {
+            db,
+            query: Some("provider comparison phrase".to_string()),
+            left: ProviderSpec {
+                provider: DEFAULT_PROVIDER.to_string(),
+                model: DEFAULT_MODEL.to_string(),
+                dim: 64,
+                embedding_url: None,
+            },
+            right: ProviderSpec {
+                provider: "fixture-llm".to_string(),
+                model: "fixture".to_string(),
+                dim: 64,
+                embedding_url: None,
+            },
+            min_score: 0.5,
+            top_k: 10,
+            report: None,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+        assert_eq!(
+            report
+                .get("semantic_index_provider_compare")
+                .and_then(Value::as_str),
+            Some("ok")
+        );
+        assert_eq!(
+            report["merge_candidates"]["overlap_ratio"].as_f64(),
+            Some(1.0)
+        );
+        assert_eq!(report["search"]["query_chars"].as_u64(), Some(26));
+        assert!(report["search"].get("query").is_none());
+    }
+
+    #[test]
+    fn embed_provider_adds_vectors_without_rebuilding_nodes() {
+        let root = unique_temp_dir("semantic-index-embed-provider");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::write(
+            root.join("documents").join("one.md"),
+            "# One\nprovider add vector text\nwith enough lines\nfor an indexed node",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let stats = embed_existing_nodes(&EmbedProviderArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: "fixture-provider".to_string(),
+            model: "fixture-model".to_string(),
+            dim: 32,
+            embedding_url: None,
+            embedding_batch: 2,
+        })
+        .unwrap();
+        assert_eq!(stats.nodes, stats.embeddings);
+        let resumed_stats = embed_existing_nodes(&EmbedProviderArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: "fixture-provider".to_string(),
+            model: "fixture-model".to_string(),
+            dim: 32,
+            embedding_url: None,
+            embedding_batch: 2,
+        })
+        .unwrap();
+        assert_eq!(resumed_stats.nodes, 0);
+        assert_eq!(resumed_stats.embeddings, 0);
+        let different_dim_stats = embed_existing_nodes(&EmbedProviderArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: "fixture-provider".to_string(),
+            model: "fixture-model".to_string(),
+            dim: 16,
+            embedding_url: None,
+            embedding_batch: 2,
+        })
+        .unwrap();
+        assert_eq!(different_dim_stats.nodes, stats.nodes);
+        assert_eq!(different_dim_stats.embeddings, stats.embeddings);
+        let conn = open_cache_connection(&db).unwrap();
+        assert_eq!(
+            provider_dimensions(&conn, "fixture-provider", "fixture-model").unwrap(),
+            vec![16, 32]
+        );
+        assert!(!load_nodes(&conn, "fixture-provider", "fixture-model", 32)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn candidate_commands_auto_resolve_provider_dimension() {
+        let root = unique_temp_dir("semantic-index-auto-provider-dim");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::write(
+            root.join("documents").join("one.md"),
+            "# One\nshared auto provider phrase\nwith enough lines\nfor merge candidates",
+        )
+        .unwrap();
+        fs::write(
+            root.join("documents").join("two.md"),
+            "# Two\nshared auto provider phrase\nwith enough lines\nfor merge candidates",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let mut conn = open_cache_connection(&db).unwrap();
+        let tx = conn.transaction().unwrap();
+        let nodes = load_nodes(&tx, DEFAULT_PROVIDER, DEFAULT_MODEL, 64).unwrap();
+        let mut vector = vec![0.0; 32];
+        vector[0] = 1.0;
+        for node in &nodes {
+            insert_embedding(
+                &tx,
+                node.node_id,
+                "fixture-provider",
+                "fixture-model",
+                32,
+                &vector,
+            )
+            .unwrap();
+        }
+        tx.commit().unwrap();
+
+        let pairs = similar_pairs(&SimilarArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: "fixture-provider".to_string(),
+            model: "fixture-model".to_string(),
+            dim: 0,
+            min_score: 0.99,
+            top_k: 10,
+            format: OutputFormat::Jsonl,
+            cross_file_only: true,
+            kind: SimilarKind::MergeCandidates,
+        })
+        .unwrap();
+        assert!(!pairs.is_empty());
+
+        let candidates = thin_docs(&ThinDocsArgs {
+            root,
+            db,
+            provider: "fixture-provider".to_string(),
+            model: "fixture-model".to_string(),
+            dim: 0,
+            min_thin_score: 0.1,
+            min_neighbor_score: 0.99,
+            top_k: 10,
+            format: OutputFormat::Jsonl,
+        })
+        .unwrap();
+        assert!(!candidates.is_empty());
+    }
+
+    #[test]
     fn sqlite_build_and_search_roundtrip() {
         let root = unique_temp_dir("semantic-index-search");
         fs::create_dir_all(root.join("docs")).unwrap();
@@ -2602,6 +4479,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         let stats = build_index(&build_args).unwrap();
@@ -2614,11 +4493,62 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
             top_k: 3,
             format: OutputFormat::Json,
         };
         let hits = search_index(&search_args).unwrap();
         assert!(hits.iter().any(|hit| hit.node.path == "docs/update.md"));
+    }
+
+    #[test]
+    fn context_pack_returns_bounded_evidence_cells() {
+        let root = unique_temp_dir("semantic-index-context-pack");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs").join("routing.md"),
+            "# Routing\nskill workflow tool responsibility candidate context phrase\nsecond line for bounded excerpt\nthird line stays local",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs").join("other.md"),
+            "# Other\nunrelated content",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("docs")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+
+        let cells = context_pack(&ContextPackArgs {
+            root,
+            db,
+            query: "skill workflow responsibility".to_string(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            max_cells: 2,
+            max_cell_chars: 40,
+            max_total_chars: 80,
+            format: OutputFormat::Jsonl,
+        })
+        .unwrap();
+
+        assert!(!cells.is_empty());
+        assert!(cells.len() <= 2);
+        assert!(cells.iter().all(|cell| cell.excerpt.chars().count() <= 40));
+        assert!(cells.iter().any(|cell| cell.path.ends_with("routing.md")));
     }
 
     #[test]
@@ -2650,6 +4580,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 32,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -2660,6 +4592,7 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
             top_k: 5,
             format: OutputFormat::Json,
         };
@@ -2689,6 +4622,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -2729,6 +4664,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -2824,6 +4761,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -2907,6 +4846,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -2963,6 +4904,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         build_index(&build_args).unwrap();
@@ -3014,6 +4957,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         })
         .unwrap();
@@ -3075,6 +5020,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         })
         .unwrap();
@@ -3203,6 +5150,7 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
             top_k: 5,
             format: OutputFormat::Json,
         };
@@ -3275,6 +5223,7 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
             top_k: 5,
             format: OutputFormat::Json,
         };
@@ -3292,6 +5241,91 @@ mod tests {
     }
 
     #[test]
+    fn eval_output_accepts_valid_review_artifacts() {
+        let root = unique_temp_dir("semantic-index-output-eval-pass");
+        let merge_path = root.join("merge.jsonl");
+        let thin_path = root.join("thin.jsonl");
+        let search_path = root.join("search.jsonl");
+        fs::write(
+            &merge_path,
+            r#"{"semantic_index_pairs":"ok","kind":"merge-candidates","result_count":1}
+{"rank":1,"score":0.95,"same_responsibility":true,"candidate_bucket":"docs:shared-policy-documents:document","left":{"path":"documents/a.md","responsibility_bucket":"shared-policy-documents","node_kind":"document","line_start":1,"line_end":4},"right":{"path":"documents/b.md","responsibility_bucket":"shared-policy-documents","node_kind":"document","line_start":1,"line_end":4}}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            &thin_path,
+            r#"{"semantic_index_thin_docs":"ok","result_count":1}
+{"rank":1,"thin_score":0.72,"action":"keep_entrypoint","reasons":["protected_entrypoint"],"path":"README.md","node_kind":"document","line_start":1,"line_end":3}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            &search_path,
+            r#"{"semantic_index_search":"ok","query_chars":42,"result_count":1}
+{"rank":1,"score":0.61,"path":"documents/semantic_index.md","node_kind":"block","line_start":10,"line_end":12}
+"#,
+        )
+        .unwrap();
+        let report = eval_output(&EvalOutputArgs {
+            merge_candidates: Some(merge_path),
+            thin_docs: Some(thin_path),
+            search: Some(search_path),
+            report: None,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+        assert_eq!(
+            report
+                .get("semantic_index_output_eval")
+                .and_then(Value::as_str),
+            Some("pass")
+        );
+        assert_eq!(report.get("error_count").and_then(Value::as_u64), Some(0));
+    }
+
+    #[test]
+    fn eval_output_rejects_cross_responsibility_and_query_echo() {
+        let root = unique_temp_dir("semantic-index-output-eval-fail");
+        let merge_path = root.join("merge.jsonl");
+        let search_path = root.join("search.jsonl");
+        fs::write(
+            &merge_path,
+            r#"{"semantic_index_pairs":"ok","kind":"merge-candidates","result_count":1}
+{"rank":1,"score":0.95,"same_responsibility":false,"candidate_bucket":"similar:any","left":{"path":"documents/a.md","responsibility_bucket":"shared-policy-documents","node_kind":"document","line_start":1,"line_end":4},"right":{"path":"agents/a.md","responsibility_bucket":"runtime-entrypoints","node_kind":"document","line_start":1,"line_end":4}}
+"#,
+        )
+        .unwrap();
+        fs::write(
+            &search_path,
+            r#"{"semantic_index_search":"ok","query":"long user request should not echo","result_count":0}
+"#,
+        )
+        .unwrap();
+        let report = eval_output(&EvalOutputArgs {
+            merge_candidates: Some(merge_path),
+            thin_docs: None,
+            search: Some(search_path),
+            report: None,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+        assert_eq!(
+            report
+                .get("semantic_index_output_eval")
+                .and_then(Value::as_str),
+            Some("fail")
+        );
+        assert!(
+            report
+                .get("error_count")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                >= 3
+        );
+    }
+
+    #[test]
     fn absolute_include_outside_root_is_rejected() {
         let root = unique_temp_dir("semantic-index-root");
         let outside = unique_temp_dir("semantic-index-outside");
@@ -3304,6 +5338,8 @@ mod tests {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
             max_file_bytes: DEFAULT_MAX_FILE_BYTES,
         };
         let error = build_index(&args).unwrap_err();

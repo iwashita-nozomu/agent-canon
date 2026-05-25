@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Runs shared devcontainer post-create setup after workspace mount.
 # upstream design ../documents/github-first-module-and-devcontainer-policy.md devcontainer boundary
+# upstream design ../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary
 # upstream design ../documents/rust-agent-tool-migration.md Rust toolchain and CLI install boundary
 # upstream environment devcontainer.json postCreateCommand entrypoint
 # upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
@@ -101,6 +102,27 @@ install_json_cli_tools() {
     return
   fi
   apt_install jq
+}
+
+install_tex_tooling() {
+  if command -v latexmk >/dev/null 2>&1 \
+    && command -v pdflatex >/dev/null 2>&1 \
+    && command -v xelatex >/dev/null 2>&1 \
+    && command -v dvisvgm >/dev/null 2>&1 \
+    && command -v pdfcrop >/dev/null 2>&1; then
+    return
+  fi
+  apt_install \
+    latexmk \
+    texlive-latex-recommended \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-pictures \
+    texlive-xetex \
+    texlive-extra-utils \
+    dvisvgm \
+    ghostscript \
+    poppler-utils
 }
 
 linux_arch() {
@@ -296,7 +318,7 @@ install_llama_cpp() {
   local canon_root
   local installer
 
-  apt_install ca-certificates curl git cmake build-essential pkg-config libcurl4-openssl-dev
+  apt_install ca-certificates curl git cmake build-essential pkg-config libcurl4-openssl-dev libssl-dev
   canon_root="$(agent_canon_source_root)"
   installer="${canon_root}/tools/install_llama_cpp.sh"
   if [ -z "$canon_root" ] || [ ! -f "$installer" ]; then
@@ -325,9 +347,15 @@ fi
 install_github_cli
 install_codex_cli
 install_json_cli_tools
+install_tex_tooling
 install_secret_scanners
 install_agent_canon_cli
 install_llama_cpp
 jq --version
+latexmk --version | sed -n '1p'
+pdflatex --version | sed -n '1p'
+xelatex --version | sed -n '1p'
+dvisvgm --version | sed -n '1p'
+pdfcrop --version | sed -n '1p'
 gh --version
 codex --version

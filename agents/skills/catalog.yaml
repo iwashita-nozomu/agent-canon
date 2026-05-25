@@ -57,6 +57,18 @@ skill_families:
     purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
+  - id: structure-planning
+    purpose: Build structure contracts for reports, experiments, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
+    canonical_doc: agents/skills/structure-planning.md
+    shim: .agents/skills/structure-planning/SKILL.md
+  - id: html-output
+    purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
+    canonical_doc: agents/skills/html-output.md
+    shim: .agents/skills/html-output/SKILL.md
+  - id: html-experiment-report
+    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the first figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
+    canonical_doc: agents/skills/html-experiment-report.md
+    shim: .agents/skills/html-experiment-report/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md

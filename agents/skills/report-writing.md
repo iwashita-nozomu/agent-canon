@@ -4,6 +4,8 @@
 responsibility Documents reader-facing report writing workflow and quality criteria.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
+upstream design structure-planning.md reusable structure contract skill
+upstream design html-output.md explicit HTML output and browser publication skill
 upstream design result-artifact-writeout.md raw result artifact placement skill
 downstream design ../evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
@@ -14,8 +16,14 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py val
 ## Purpose
 
 `report-writing` is the skill for writing reader-facing reports from existing
-evidence. It owns report structure, claim hygiene, quality review criteria, and
-reader actionability.
+evidence. It owns report prose, claim hygiene, quality review criteria, and
+reader actionability. For nontrivial structure, call `structure-planning` first
+and use its structure contract as the report skeleton.
+
+Reports can be Markdown or HTML. The default report output is Markdown unless
+the user explicitly asks for HTML, a browser page, dashboard, web view, or
+external browser publication. When HTML is explicit, use `html-output` after the
+source packet and report structure are fixed.
 
 It does not own raw result storage. Use `result-artifact-writeout` for
 append-only hook, skill, tool, eval, experiment, and raw machine artifacts, then
@@ -29,6 +37,11 @@ use this skill to turn that evidence into a report a human can evaluate.
   synthesis.
 - A generated report may influence a workflow, skill, policy, or issue.
 - A report needs explicit quality criteria before it is accepted.
+- A report needs a first figure/table, source-to-section map, metric contract,
+  or invalid interpretation boundary; in that case use `structure-planning`
+  before drafting.
+- A report needs HTML output only when the user explicitly asks for HTML or a
+  browser-readable page; in that case use `html-output` after report planning.
 
 ## Source Packet
 
@@ -44,6 +57,10 @@ Before drafting, fix these inputs:
 - limitations: missing data, partial runs, stale sources, uncertainty, and
   blocked checks
 - next action: concrete follow-up owner, command, PR, issue, or workflow route
+- output format: `markdown` by default, or `html` only when explicitly requested
+- structure contract: required when the report has a nontrivial reader
+  structure; use `structure-planning` to fix first artifact, source-to-section
+  map, metric contract, section order, and invalid interpretations
 
 ## Report Quality Checklist
 
@@ -82,6 +99,10 @@ Use a structure that fits the report type, but keep these sections explicit:
 For compact reports, these can be short paragraphs or a table. Do not omit the
 source packet or limitations only because the report is short.
 
+When `structure-planning` is active, treat its ordered structure as the starting
+outline and do not add sections that lack a mapped source, an explicit
+inference label, or a stated limitation.
+
 ## Review Route
 
 Use `report_reviewer` when the report is claim-heavy, external-facing,
@@ -100,6 +121,11 @@ reason.
 
 - `result-artifact-writeout`: owns raw artifact, summary artifact, manifest,
   unique id, and overwrite policy.
+- `structure-planning`: owns the pre-draft structure contract, first artifact,
+  source-to-section map, metric contract, section order, and invalid
+  interpretations.
+- `html-output`: owns explicit HTML rendering, layout checks, optional
+  `$imagegen` visual assets, and local/external browser server publication.
 - `long-form-writing`: owns long guide, README, migration, or workflow prose.
 - `experiment-lifecycle`: owns experiment run protocol and rerun decisions.
 - `change-review`: owns findings-first code or document review output.
@@ -111,8 +137,10 @@ Record these in `workflow_monitoring.md`, a handoff, or the report itself:
 
 ```text
 report_writing=complete
+report_output_format=<markdown|html>
 report_quality_checklist=<pass|fail>
 report_source_packet=<path-or-inline>
+structure_contract=<path|inline|not_required>
 report_reviewer=<path|not_required>
 report_rule_drift=<none|canonical_update_required>
 ```

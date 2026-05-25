@@ -73,6 +73,178 @@ class InstallLlamaCppTest(unittest.TestCase):
             self.assertTrue((tools_home / "bin" / "llama-cli").is_symlink())
             self.assertTrue((tools_home / "bin" / "llama-server").is_symlink())
 
+    def test_force_cuda_adds_current_ggml_cmake_option(self) -> None:
+        """Explicit CUDA mode should add the current llama.cpp GGML_CUDA option."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "fake-bin"
+            tools_home = root / "tools-home"
+            cmake_log = root / "cmake.log"
+            cuda_driver = root / "cuda-driver"
+            source = tools_home / "src" / "llama.cpp"
+            (source / ".git").mkdir(parents=True)
+            (source / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8")
+            cuda_driver.mkdir()
+            (cuda_driver / "libcuda.so.1").write_text("", encoding="utf-8")
+            self.write_fake_git_and_cmake(fake_bin)
+            self.write_fake_nvcc(fake_bin)
+            self.write_fake_nvidia_smi(fake_bin)
+
+            result = subprocess.run(
+                ["bash", str(SCRIPT), "--skip-missing-source", "--force"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                    "AGENT_CANON_LLAMA_CPP_CUDA": "1",
+                    "AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR": str(cuda_driver),
+                    "AGENT_CANON_LLAMA_CPP_CMAKE_ARGS": "-DGGML_NATIVE=OFF",
+                    "AGENT_CANON_LLAMA_CPP_BUILD_JOBS": "7",
+                    "AGENT_CANON_TEST_CMAKE_LOG": str(cmake_log),
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                },
+            )
+
+            log_text = cmake_log.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=enabled", result.stdout)
+        self.assertIn(f"AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR={cuda_driver}", result.stdout)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_BUILD_JOBS=7", result.stdout)
+        self.assertIn("-DGGML_CUDA=ON", log_text)
+        self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=", log_text)
+        self.assertIn("rpath-link", log_text)
+        self.assertIn(str(cuda_driver), log_text)
+        self.assertIn("-DGGML_NATIVE=OFF", log_text)
+        self.assertIn("--build", log_text)
+        self.assertIn(" -j 7 ", f" {log_text} ")
+
+    def test_auto_cuda_requires_driver_library(self) -> None:
+        """Auto CUDA should skip GPU build when the driver library is not linkable."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "fake-bin"
+            tools_home = root / "tools-home"
+            cmake_log = root / "cmake.log"
+            missing_driver = root / "missing-driver"
+            source = tools_home / "src" / "llama.cpp"
+            (source / ".git").mkdir(parents=True)
+            (source / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8")
+            self.write_fake_git_and_cmake(fake_bin)
+            self.write_fake_nvcc(fake_bin)
+            self.write_fake_nvidia_smi(fake_bin)
+
+            result = subprocess.run(
+                ["bash", str(SCRIPT), "--skip-missing-source", "--force"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                    "AGENT_CANON_LLAMA_CPP_CUDA": "auto",
+                    "AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR": str(missing_driver),
+                    "AGENT_CANON_TEST_CMAKE_LOG": str(cmake_log),
+                    "NVIDIA_VISIBLE_DEVICES": "0",
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                },
+            )
+
+            log_text = cmake_log.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=auto_disabled_missing_cuda_driver", result.stdout)
+        self.assertNotIn("-DGGML_CUDA=ON", log_text)
+
+    def test_cuda_disable_omits_gpu_cmake_option(self) -> None:
+        """Explicit CUDA disable should win over any runtime GPU visibility."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "fake-bin"
+            tools_home = root / "tools-home"
+            cmake_log = root / "cmake.log"
+            source = tools_home / "src" / "llama.cpp"
+            (source / ".git").mkdir(parents=True)
+            (source / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8")
+            self.write_fake_git_and_cmake(fake_bin)
+
+            result = subprocess.run(
+                ["bash", str(SCRIPT), "--skip-missing-source", "--force"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                    "AGENT_CANON_LLAMA_CPP_CUDA": "0",
+                    "AGENT_CANON_TEST_CMAKE_LOG": str(cmake_log),
+                    "NVIDIA_VISIBLE_DEVICES": "0",
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                },
+            )
+
+            log_text = cmake_log.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_LLAMA_CPP_CUDA=disabled", result.stdout)
+        self.assertNotIn("-DGGML_CUDA=ON", log_text)
+
+    def test_cuda_config_change_rebuilds_current_binary_without_force(self) -> None:
+        """CUDA mode changes should invalidate an otherwise current binary."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "fake-bin"
+            tools_home = root / "tools-home"
+            cmake_log = root / "cmake.log"
+            cuda_driver = root / "cuda-driver"
+            source = tools_home / "src" / "llama.cpp"
+            build_dir = tools_home / "build" / "llama.cpp"
+            install_dir = tools_home / "bin"
+            (source / ".git").mkdir(parents=True)
+            (source / "CMakeLists.txt").write_text(
+                "cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8"
+            )
+            build_dir.mkdir(parents=True)
+            install_dir.mkdir(parents=True)
+            cuda_driver.mkdir()
+            (cuda_driver / "libcuda.so.1").write_text("", encoding="utf-8")
+            (build_dir / "agent-canon-build-config.txt").write_text(
+                "cuda_backend=disabled\n"
+                "cuda_driver_dir=\n"
+                "cmake_args=-DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON -DGGML_CUDA=OFF\n",
+                encoding="utf-8",
+            )
+            for name in ("llama-cli", "llama-server"):
+                binary = install_dir / name
+                binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
+            self.write_fake_git_and_cmake(fake_bin)
+            self.write_fake_nvcc(fake_bin)
+            self.write_fake_nvidia_smi(fake_bin)
+
+            result = subprocess.run(
+                ["bash", str(SCRIPT), "--skip-missing-source"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                    "AGENT_CANON_LLAMA_CPP_CUDA": "1",
+                    "AGENT_CANON_LLAMA_CPP_CUDA_DRIVER_LIB_DIR": str(cuda_driver),
+                    "AGENT_CANON_TEST_CMAKE_LOG": str(cmake_log),
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                },
+            )
+
+            log_text = cmake_log.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_LLAMA_CPP=rebuilt", result.stdout)
+        self.assertIn("-DGGML_CUDA=ON", log_text)
+
     def write_fake_git_and_cmake(self, fake_bin: Path) -> None:
         """Write fake git and cmake executables for installer tests."""
         fake_bin.mkdir()
@@ -82,6 +254,11 @@ class InstallLlamaCppTest(unittest.TestCase):
         cmake = fake_bin / "cmake"
         cmake.write_text(
             "#!/usr/bin/env bash\n"
+            "if [ -n \"${AGENT_CANON_TEST_CMAKE_LOG:-}\" ]; then\n"
+            "  printf 'cmake' >>\"$AGENT_CANON_TEST_CMAKE_LOG\"\n"
+            "  printf ' %q' \"$@\" >>\"$AGENT_CANON_TEST_CMAKE_LOG\"\n"
+            "  printf '\\n' >>\"$AGENT_CANON_TEST_CMAKE_LOG\"\n"
+            "fi\n"
             "if [ \"$1\" = '--build' ]; then\n"
             "  build_dir=\"$2\"\n"
             "  mkdir -p \"$build_dir/bin\"\n"
@@ -100,6 +277,25 @@ class InstallLlamaCppTest(unittest.TestCase):
             encoding="utf-8",
         )
         cmake.chmod(0o755)
+
+    def write_fake_nvcc(self, fake_bin: Path) -> None:
+        """Write a fake nvcc executable for CUDA routing tests."""
+        fake_bin.mkdir(exist_ok=True)
+        nvcc = fake_bin / "nvcc"
+        nvcc.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        nvcc.chmod(0o755)
+
+    def write_fake_nvidia_smi(self, fake_bin: Path) -> None:
+        """Write a fake nvidia-smi executable that reports one device."""
+        fake_bin.mkdir(exist_ok=True)
+        nvidia_smi = fake_bin / "nvidia-smi"
+        nvidia_smi.write_text(
+            "#!/usr/bin/env bash\n"
+            "if [ \"${1:-}\" = '-L' ]; then echo 'GPU 0: fixture'; fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        nvidia_smi.chmod(0o755)
 
 
 if __name__ == "__main__":

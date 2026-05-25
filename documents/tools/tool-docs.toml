@@ -56,3 +56,10 @@ tool = "rust/agent-canon/src/semantic_index.rs"
 doc = "documents/semantic_index.md"
 language = "rust"
 summary = "Semantic vector index and Eval harness documentation."
+
+[[tool]]
+id = "semantic-provider-html-report"
+tool = "tools/agent_tools/semantic_provider_html_report.py"
+doc = "documents/tools/semantic_provider_html_report.md"
+language = "python"
+summary = "HTML renderer for semantic-index provider comparison evidence."

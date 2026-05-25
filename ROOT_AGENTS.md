@@ -151,6 +151,7 @@ contract listed in `documents/README.md`.
 - repo-changing task では、Plan mode または同等の written plan で scope、source packet、reuse survey、validation sequence、review route を固定してから編集します。
 - 設計変更、実装、文書改訂、実験計画の前に、`documents/`、`issues/`、`memory/`、`notes/knowledge/`、`notes/guardrails/`、`notes/failures/`、`notes/themes/`、`notes/branches/`、`notes/worktrees/`、`notes/experiments/`、`references/` を topic keyword で探索します。
 - raw `rg` hit で編集対象を決めず、必要な場合は `rg -l "<topic>" > reports/search_hits.txt` のあと `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file reports/search_hits.txt` で dependency-expanded edit scope を出し、issue / PR / run bundle に残します。
+- skill、tool、workflow、HTML report、実験 script を追加または変更するときは、実装前に既存資産の調査、責務境界の解析、その後の実装という順序を固定します。調査した既存資産、再利用したもの、再利用しなかった候補と理由、責務 owner、生成 artifact の置き場所を run bundle、work log、issue、または PR body に残します。
 - 実装前に、task に効く dependency surface を見ます。少なくとも `docker/requirements.txt`、`pyproject.toml`、lockfile、build file、package manager file、必要なら `pipdeptree` / `deptry` の出力を確認し、導入済みライブラリで拡張・設定変更・薄い wrapper で済まないかを先に確認します。
 - 新しい code path、module、helper、test、script を足す前に、`python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` を topic keyword で探索し、既存実装の再利用候補と、既存実装では足りない理由を確認します。
 - ファイル横断の実装では、修正対象 file だけでなく call site、import/export surface、既存 helper、既存 test fixture、既存 workflow/tool を先に読み、既存の責務境界へ寄せます。

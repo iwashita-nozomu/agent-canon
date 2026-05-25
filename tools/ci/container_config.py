@@ -5,6 +5,7 @@
 # upstream design ../../documents/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../documents/local-llm-responsibility-analysis.md local LLM devcontainer boundary
+# upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -26,7 +27,7 @@ from pathlib import Path
 from typing import cast
 
 try:
-    import tomllib
+    import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
@@ -81,6 +82,22 @@ REQUIRED_POST_CREATE_SNIPPETS = (
     "detect-secrets",
     "apt_install jq",
     "jq --version",
+    "install_tex_tooling",
+    "latexmk",
+    "texlive-latex-recommended",
+    "texlive-latex-extra",
+    "texlive-fonts-recommended",
+    "texlive-pictures",
+    "texlive-xetex",
+    "texlive-extra-utils",
+    "dvisvgm",
+    "ghostscript",
+    "poppler-utils",
+    "latexmk --version",
+    "pdflatex --version",
+    "xelatex --version",
+    "dvisvgm --version",
+    "pdfcrop --version",
     "gh --version",
     "codex --version",
 )

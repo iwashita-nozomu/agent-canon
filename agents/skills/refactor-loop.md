@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents refactor-loop for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design structure-planning.md reusable refactor structure contract
 @dependency-end
 -->
 
@@ -29,6 +30,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Required Contract
 
 1. refactor pass では `Behavior Contract:` を先に固定します。
+1. file moves、module boundary、repair slice、path mapping、responsibility map が非自明な場合は `structure-planning` で構造 contract を先に固定します。
 1. `Allowed Structural Delta:` と `Forbidden Semantic Delta:` を分けて書きます。
 1. 新機能追加は同じ pass に混ぜません。必要なら先に分離します。
 1. delete、rename、move、module split は `Files To Remove Or Move:` として先に列挙します。
@@ -83,6 +85,8 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - `Behavior Contract`、`Allowed Structural Delta`、
      `Forbidden Semantic Delta`、scan artifact、repair slice、validation
      sequence を固定します。
+   - 非自明な構造変更では `structure-planning` の source-to-structure map、
+     ordered structure、invalid interpretations を refactor contract に取り込みます。
    - write-capable agent と read-only reviewer の入力 artifact を分けます。
    - 実装後に reviewer finding を統合する責任を持ちますが、review 判定を
      自分だけで完了扱いにしません。

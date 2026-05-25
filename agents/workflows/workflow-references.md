@@ -3,12 +3,20 @@
 @dependency-start
 responsibility Documents Workflow References for this repository.
 upstream design README.md workflow catalog
+downstream design ../../references/agent-canon-technology-bibliography.md catalogs implementation/runtime technical sources
 @dependency-end
 -->
 
 
 この文書は、workflow、review、agent system、report policy を設計するときに参照した外部資料の索引です。
 外部根拠で repo-wide な手順を更新した場合は、この文書へ出典を追記します。
+
+## Local Reference Indexes
+
+- [AgentCanon Technology Bibliography](../../references/agent-canon-technology-bibliography.md)
+  - AgentCanon implementation/runtime surfaces such as Codex runtime,
+    semantic-index, local LLM, SQLite, Rust tooling, dependency analysis,
+    devcontainer, GitHub Actions, scanners, Markdown, YAML, and TOML.
 
 ## Agent Runtime And Customization
 
