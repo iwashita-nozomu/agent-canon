@@ -35,11 +35,11 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の default は、frontier-required 判断系を `gpt-5.5` `high`、conditional review を `gpt-5.4-mini` `medium`、cheap-first survey / test / language review / narrow execution を `gpt-5.3-codex-spark` `low` に分ける
-- `gpt-5.3-codex-spark` は `spark_worker`、`experiment_runner`、cheap-first reviewer で使い、approved packet で完全に切れる低リスク slice の first candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、parent / `gpt-5.5` は統合判断、設計判断、最終責任に集中する
-- Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に `model="gpt-5.3-codex-spark"`、`reasoning_effort="low"` の fresh default subagent で再試行する
-- 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は `gpt-5.5` 側に残す
+- Codex の model / reasoning policy は `.codex/config.toml` の `agents.model_policy` を正本にする
+- approved packet で完全に切れる低リスク slice は `agents.model_policy` の Spark coding bucket を first implementation candidate とする
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier bucket は統合判断、設計判断、最終責任に集中する
+- Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に `.codex/config.toml` の Spark bucket で fresh default subagent を再試行する
+- 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier bucket に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
 
 ## Activation Budget
@@ -280,24 +280,30 @@ Constraints:
 
 ## Codex Model Policy
 
-| Role Bucket | Roles | Model | Reasoning |
-| ----------- | ----- | ----- | --------- |
-| Frontier-Required Planning / Design / Synthesis | `requirements_organizer`, `execution_planner`, `detailed_designer`, `long_form_writer`, `literature_researcher` | `gpt-5.5` | `high` |
-| Frontier-Required Review / Ship Decision | `manager_reviewer`, `plan_reviewer`, `detailed_design_reviewer`, `citation_evidence_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reviewer`, `project_reviewer`, `ship_reviewer` | `gpt-5.5` | `high` |
-| Broad Or Ambiguous Implementation | `worker` | `gpt-5.5` | `high` |
-| Conditional Frontier / Specialist Review | `document_flow_reviewer`, `docs_workflow_steward`, `report_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `oop_readability_reviewer` | `gpt-5.4-mini` | `medium` |
-| Cheap-First Survey / Test / Diff Review | `explorer`, `test_designer`, `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer` | `gpt-5.3-codex-spark` | `low` |
-| Execution-Only / Low-Latency Narrow Implementation | `spark_worker`, `experiment_runner` | `gpt-5.3-codex-spark` | `low` |
+Model policy の正本は `.codex/config.toml` の
+`[agents.model_policy.*]` です。各 bucket が `model`、
+`model_reasoning_effort`、`roles` を持ちます。
+
+`.codex/agents/*.toml` は Codex runtime が読む materialized role 定義です。
+role の `model` / `model_reasoning_effort` は設定正本ではなく、
+`.codex/config.toml` に一致しているかを
+`tools/agent_tools/check_agent_runtime_alignment.py` で検証する対象です。
+
+policy を変更するときは、先に `.codex/config.toml` の
+`agents.model_policy` を更新し、その後に該当 `.codex/agents/*.toml` を
+同期します。Python checker、workflow docs、task catalog に role list や
+model list を重複管理しません。
 
 運用メモ:
 - OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
-- この repo では、frontier 判断を `gpt-5.5`、条件付き specialist review を `gpt-5.4-mini` `medium`、cheap-first survey / static test design / language review / diff triage / execution-only task を `gpt-5.3-codex-spark` `low` に寄せます。
+- この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier bucket、bounded review / report traceability / checklist gate を mini review bucket、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark bucket に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします
-- `gpt-5.3-codex-spark` は `spark_worker`、`experiment_runner`、cheap-first reviewer で使い、詳細設計、最終判断、重要 review には使いません
+- mini review bucket は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
+- Spark bucket は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
 - `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
-- 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります
+- 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は mini review wave に切ります。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます
@@ -336,7 +342,7 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 - `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
 - `agents/agents_config.json` の required output が実テンプレートに結び付いている
 - `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
-- `.codex/agents/*.toml` の model split が frontier-required / conditional-frontier / cheap-first / execution-only bucket に揃っている
+- `.codex/agents/*.toml` の model split が `.codex/config.toml` の `agents.model_policy` に揃っている
 - temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある
