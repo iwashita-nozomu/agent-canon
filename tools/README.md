@@ -433,6 +433,7 @@ agent-canon semantic-index responsibility-tree --include documents --include age
 agent-canon semantic-index compare-providers --db reports/semantic-index.sqlite --query-file reports/search_query.txt
 python3 tools/agent_tools/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
 agent-canon semantic-index natural-relations --top-k 50 --format jsonl
+agent-canon semantic-index discourse-relations --profile experiment-report --top-k 50 --format jsonl
 agent-canon semantic-index thin-docs --top-k 20 --format text
 agent-canon semantic-index eval --fixture tests/fixtures/semantic-index/basic
 python3 tools/agent_tools/route.py --area search
@@ -473,8 +474,9 @@ defaults.
 `agent-canon semantic-index` is the Rust-native SQLite-backed candidate
 generator for semantic search, bounded context packs, directory responsibility
 trees, similar pairs, merge candidates, natural-language responsibility
-relations, thin-document wrappers, provider comparison, fixture Eval, and
-output-artifact Eval. Its default generated cache is
+relations, discourse-connective paragraph edges, thin-document wrappers,
+provider comparison, fixture Eval, and output-artifact Eval. Its default
+generated cache is
 `~/.cache/agent-canon/semantic-index/<repo-key>/index.sqlite`; explicit `--db`
 paths are still allowed for run-local artifacts. `search` accepts `--query`,
 `--query-file`, or `--query-stdin`; use file/stdin for long user requests and
@@ -498,6 +500,12 @@ left", persists the result to SQLite, and classifies pairs as `equivalent`,
 `unrelated`, or one-way containment. `thin-docs` reports low-content,
 high-similarity document wrappers
 with advisory actions such as `inline_into_target` or `keep_entrypoint`.
+`discourse-relations` scores nearby document blocks with a connective profile
+such as `experiment-report`, `academic-argument`, or `refactor-design`. It keeps
+relation primitives separate from surface phrases so paired variants such as
+`therefore` and `because` can map to the same `reason_to_result` schema while
+recording different `surface_order` and `logical_direction`. It persists edges
+to SQLite as structure-planning evidence, not as prose or policy authority.
 Preserved source/split guide pairs and tiny heading-only sections are filtered
 as alignment or low-evidence surfaces. Its results are candidate evidence only;
 strict structure/dependency tools remain the authority for safe deletion or

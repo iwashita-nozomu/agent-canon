@@ -36,8 +36,9 @@ record.
   embeddings, Model Context Protocol, JSON-RPC.
 - LLM agent methods: chain-of-thought, ReAct, Reflexion, Toolformer, Tree of
   Thoughts.
-- Semantic indexing: Transformer/BERT/SBERT, vector-space search, SQLite,
-  llama.cpp, GGUF, SHA-256, Rust crates used by the Rust CLI.
+- Semantic indexing and discourse structure: Transformer/BERT/SBERT,
+  vector-space search, discourse relations/connectives, SQLite, llama.cpp,
+  GGUF, SHA-256, Rust crates used by the Rust CLI.
 - Static/dependency analysis: Python AST, Pyright, Ruff, pytest, program
   dependence graphs, code property graphs.
 - Runtime and operations: Rust/Cargo, Dev Containers, GitHub Actions, Git
@@ -86,6 +87,17 @@ record.
 | rusqlite crate docs | <https://docs.rs/rusqlite/latest/rusqlite/> | Rust SQLite access | `rusqlite` is an ergonomic Rust wrapper around SQLite. | Crate version in AgentCanon is pinned separately in `Cargo.toml` and `Cargo.lock`. | Adopt for Rust SQLite API reference. |
 | serde_json crate docs | <https://docs.rs/serde_json/latest/serde_json/> | JSON and JSONL output from Rust tools | `serde_json` serializes/deserializes JSON and provides untyped `Value` support. | Docs describe latest crate; validate against locked version for API changes. | Adopt for JSON output implementation reference. |
 | sha2 crate docs | <https://docs.rs/sha2/latest/sha2/> | Rust SHA-256 implementation | `sha2` provides SHA-2 hash functions in Rust. | Cryptographic security depends on correct use and dependency version. | Adopt for implementation dependency reference. |
+
+## Discourse Relations, Connectives, And Structure Planning
+
+Access date for this section: 2026-05-26.
+
+| Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
+| --- | --- | --- | --- | --- | --- |
+| Rhetorical Structure Theory: Toward a Functional Theory of Text Organization | <https://doi.org/10.1515/text.1.1988.8.3.243> | `semantic-index discourse-relations`, `structure-planning`, writing skills | Text organization can be modeled through relations between text spans; this supports treating paragraphs/blocks as ordered discourse units. | RST analysis is richer and more hierarchical than the MVP edge scorer. | Use as background for span-to-span discourse edge representation, not as a full RST parser. |
+| Using Linguistic Phenomena to Motivate a Set of Coherence Relations | <https://doi.org/10.1080/01638539409544883> | Discourse connective profiles and transition evidence | Cue phrases/connectives provide linguistic evidence for coherence relations. | Cue phrases are not sufficient on their own, and relation inventories differ by theory. | Adopt the split between relation primitives and surface connective evidence. |
+| Penn Discourse Treebank 3.0 Annotation Manual | <https://catalog.ldc.upenn.edu/docs/LDC2019T05/PDTB3-Annotation-Manual.pdf> | Discourse relation schema names and connective-pair handling | PDTB-style annotation grounds relations in explicit connectives and their senses, including contingency cause reason/result variants. | The manual is an annotation guide, not a lightweight repo-review algorithm. | Use as source for keeping `because` / `therefore` surface variants separate from logical relation schemas. |
+| Logics of Conversation | <https://www.research.ed.ac.uk/en/publications/logics-of-conversation/> | Future graph and coherence-relation interpretation | SDRT treats discourse interpretation as relations over discourse segments with logical/pragmatic constraints. | The book-level theory is more formal than the MVP tool and is not implemented wholesale. | Register as related prior art for later graph optimization and relation consistency checks. |
 
 ## Static Analysis, Dependency, And Code Intelligence
 

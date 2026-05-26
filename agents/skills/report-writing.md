@@ -101,7 +101,10 @@ source packet or limitations only because the report is short.
 
 When `structure-planning` is active, treat its ordered structure as the starting
 outline and do not add sections that lack a mapped source, an explicit
-inference label, or a stated limitation.
+inference label, or a stated limitation. If the structure contract records
+`discourse_relations=<path>`, use that JSONL as paragraph-order and transition
+evidence; do not treat discourse edge scores as source evidence for factual
+claims.
 
 ## Review Route
 

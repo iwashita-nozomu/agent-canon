@@ -1,5 +1,5 @@
 // @dependency-start
-// responsibility Provides Rust-native semantic vector indexing, search, similarity, natural-relation, thin-doc, and eval CLI support.
+// responsibility Provides Rust-native semantic vector indexing, search, similarity, natural/discourse-relation, thin-doc, and eval CLI support.
 // upstream design ../../../documents/semantic_index.md semantic index responsibility and generated-cache policy
 // upstream design ../../../documents/search-coordination.md coordinated search boundary and advisory search policy
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
@@ -42,6 +42,10 @@ const DEFAULT_MIN_THIN_NEIGHBOR_SCORE: f32 = 0.86;
 const DEFAULT_MIN_RELATION_SIMILARITY: f32 = 0.72;
 const DEFAULT_MIN_KIND_OF_SCORE: f32 = 0.62;
 const NATURAL_RELATION_FEATURE_FANOUT: usize = 64;
+const DEFAULT_DISCOURSE_PROFILE: &str = "general";
+const DEFAULT_MIN_DISCOURSE_NATURALNESS: f32 = 0.40;
+const DEFAULT_DISCOURSE_WINDOW: usize = 3;
+const DISCOURSE_TEXT_CHARS: usize = 1600;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SemanticCommand {
@@ -162,6 +166,20 @@ struct NaturalRelationsArgs {
 }
 
 #[derive(Debug, Clone)]
+struct DiscourseRelationsArgs {
+    root: PathBuf,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    profile: String,
+    min_naturalness: f32,
+    window: usize,
+    top_k: usize,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
 struct EvalArgs {
     fixture: PathBuf,
     db: PathBuf,
@@ -227,6 +245,7 @@ enum ParsedArgs {
     Similar(SimilarArgs),
     ThinDocs(ThinDocsArgs),
     NaturalRelations(NaturalRelationsArgs),
+    DiscourseRelations(DiscourseRelationsArgs),
     Eval(EvalArgs),
     CompareProviders(CompareProvidersArgs),
     EvalOutput(EvalOutputArgs),
@@ -314,6 +333,37 @@ struct NaturalRelation {
     right_is_kind_of_left_score: f32,
     relation_kind: String,
     rank: usize,
+}
+
+#[derive(Debug, Clone)]
+struct DiscourseRelation {
+    left: IndexedNode,
+    right: IndexedNode,
+    similarity_score: f32,
+    connective_profile: String,
+    relation_family: String,
+    relation_schema: String,
+    surface_phrase: String,
+    inverse_surface_phrase: Option<String>,
+    surface_order: String,
+    logical_direction: String,
+    naturalness_score: f32,
+    inverse_naturalness_score: Option<f32>,
+    direction_confidence: f32,
+    ambiguity: String,
+    gap_flags: Vec<String>,
+    rank: usize,
+}
+
+#[derive(Debug, Clone)]
+struct DiscourseRealization {
+    relation_family: &'static str,
+    relation_schema: &'static str,
+    surface_phrase: &'static str,
+    inverse_surface_phrase: Option<&'static str>,
+    surface_order: &'static str,
+    logical_direction: &'static str,
+    profile_boost: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -472,6 +522,19 @@ pub fn run(args: &[String]) -> i32 {
                 Err(error) => fail("NATURAL_RELATIONS", error),
             }
         }
+        Ok(ParsedArgs::DiscourseRelations(discourse_args)) => {
+            match discourse_relations(&discourse_args) {
+                Ok(results) => {
+                    if let Err(error) = persist_discourse_relations(&discourse_args, &results) {
+                        fail("DISCOURSE_RELATIONS_PERSIST", error)
+                    } else {
+                        print_discourse_relation_results(&discourse_args, &results);
+                        0
+                    }
+                }
+                Err(error) => fail("DISCOURSE_RELATIONS", error),
+            }
+        }
         Ok(ParsedArgs::Eval(eval_args)) => match run_eval(&eval_args) {
             Ok(report) => {
                 if let Some(path) = &eval_args.report {
@@ -571,6 +634,9 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         "thin-docs" => Ok(ParsedArgs::ThinDocs(parse_thin_docs_args(&args[1..])?)),
         "natural-relations" | "nl-relations" => Ok(ParsedArgs::NaturalRelations(
             parse_natural_relations_args(&args[1..])?,
+        )),
+        "discourse-relations" | "discourse-edges" => Ok(ParsedArgs::DiscourseRelations(
+            parse_discourse_relations_args(&args[1..])?,
         )),
         "eval" => Ok(ParsedArgs::Eval(parse_eval_args(&args[1..])?)),
         "compare-providers" => Ok(ParsedArgs::CompareProviders(parse_compare_providers_args(
@@ -1188,6 +1254,76 @@ fn parse_natural_relations_args(args: &[String]) -> Result<NaturalRelationsArgs,
     validate_min_score(parsed.min_similarity)?;
     validate_min_score(parsed.min_kind_of_score)?;
     validate_positive(parsed.top_k, "--top-k")?;
+    Ok(parsed)
+}
+
+fn parse_discourse_relations_args(args: &[String]) -> Result<DiscourseRelationsArgs, String> {
+    let mut parsed = DiscourseRelationsArgs {
+        root: PathBuf::from("."),
+        db: default_db_path(Path::new(".")),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        profile: DEFAULT_DISCOURSE_PROFILE.to_string(),
+        min_naturalness: DEFAULT_MIN_DISCOURSE_NATURALNESS,
+        window: DEFAULT_DISCOURSE_WINDOW,
+        top_k: DEFAULT_TOP_K,
+        format: OutputFormat::Text,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--profile" | "--connective-profile" => {
+                parsed.profile = value_string(args, index, "--profile")?;
+                index += 2;
+            }
+            "--min-naturalness" | "--min-score" => {
+                parsed.min_naturalness = value_f32(args, index, "--min-naturalness")?;
+                index += 2;
+            }
+            "--window" | "--max-window" => {
+                parsed.window = value_usize(args, index, "--window")?;
+                index += 2;
+            }
+            "--top-k" => {
+                parsed.top_k = value_usize(args, index, "--top-k")?;
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown discourse-relations option {unknown}")),
+        }
+    }
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
+    validate_min_score(parsed.min_naturalness)?;
+    validate_positive(parsed.window, "--window")?;
+    validate_positive(parsed.top_k, "--top-k")?;
+    validate_discourse_profile(&parsed.profile)?;
     Ok(parsed)
 }
 
@@ -1998,6 +2134,410 @@ fn natural_relation_candidate_pairs_from_nodes(
     pairs
 }
 
+fn discourse_relations(args: &DiscourseRelationsArgs) -> Result<Vec<DiscourseRelation>, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let mut nodes: Vec<IndexedNode> = load_nodes(&conn, &args.provider, &args.model, dim)?
+        .into_iter()
+        .filter(is_discourse_relation_node)
+        .collect();
+    nodes.sort_by(|left, right| {
+        left.path
+            .cmp(&right.path)
+            .then_with(|| left.line_start.cmp(&right.line_start))
+            .then_with(|| left.line_end.cmp(&right.line_end))
+    });
+    let pairs = discourse_candidate_pairs_from_nodes(&nodes, args.window);
+    let mut text_cache: HashMap<i64, String> = HashMap::new();
+    let mut relations = Vec::new();
+    for pair in pairs {
+        let left_text = discourse_text_for_node(args, &pair.left, &mut text_cache)?;
+        let right_text = discourse_text_for_node(args, &pair.right, &mut text_cache)?;
+        if let Some(mut relation) =
+            score_discourse_pair(args, pair, left_text.as_str(), right_text.as_str())
+        {
+            if relation.naturalness_score + f32::EPSILON >= args.min_naturalness {
+                relation.rank = 0;
+                relations.push(relation);
+            }
+        }
+    }
+    sort_discourse_relations(&mut relations);
+    relations.truncate(args.top_k);
+    for (index, relation) in relations.iter_mut().enumerate() {
+        relation.rank = index + 1;
+    }
+    Ok(relations)
+}
+
+fn discourse_candidate_pairs_from_nodes(nodes: &[IndexedNode], window: usize) -> Vec<SimilarPair> {
+    let mut grouped: HashMap<&str, Vec<&IndexedNode>> = HashMap::new();
+    for node in nodes {
+        grouped.entry(&node.path).or_default().push(node);
+    }
+    let mut pairs = Vec::new();
+    for file_nodes in grouped.values_mut() {
+        file_nodes.sort_by(|left, right| {
+            left.line_start
+                .cmp(&right.line_start)
+                .then_with(|| left.line_end.cmp(&right.line_end))
+        });
+        for left_index in 0..file_nodes.len() {
+            let max_right = (left_index + window + 1).min(file_nodes.len());
+            for right in file_nodes.iter().take(max_right).skip(left_index + 1) {
+                let left = file_nodes[left_index];
+                let score = cosine_score(&left.vector, &right.vector);
+                pairs.push(SimilarPair {
+                    left: left.clone(),
+                    right: (*right).clone(),
+                    score,
+                    rank: 0,
+                });
+            }
+        }
+    }
+    pairs
+}
+
+fn is_discourse_relation_node(node: &IndexedNode) -> bool {
+    if is_alignment_or_log_surface(&node.path) {
+        return false;
+    }
+    if !is_document_text_path(&node.path) {
+        return false;
+    }
+    node.kind == "block"
+}
+
+fn discourse_text_for_node(
+    args: &DiscourseRelationsArgs,
+    node: &IndexedNode,
+    cache: &mut HashMap<i64, String>,
+) -> Result<String, String> {
+    if let Some(text) = cache.get(&node.node_id) {
+        return Ok(text.clone());
+    }
+    let text = context_excerpt(&args.root, node, DISCOURSE_TEXT_CHARS)?;
+    cache.insert(node.node_id, text.clone());
+    Ok(text)
+}
+
+fn score_discourse_pair(
+    args: &DiscourseRelationsArgs,
+    pair: SimilarPair,
+    left_text: &str,
+    right_text: &str,
+) -> Option<DiscourseRelation> {
+    let similarity_score = pair.score.max(0.0);
+    let term_overlap = discourse_term_overlap(left_text, right_text);
+    let mut best: Option<(DiscourseRealization, f32, f32, String, Vec<String>)> = None;
+    for realization in discourse_realizations(&args.profile) {
+        let surface_score = connective_surface_score(right_text, realization.surface_phrase);
+        if surface_score <= 0.0 {
+            continue;
+        }
+        let naturalness = (0.36 * similarity_score
+            + 0.34 * surface_score
+            + 0.18 * term_overlap
+            + 0.12 * realization.profile_boost)
+            .clamp(0.0, 1.0);
+        let direction_confidence =
+            discourse_direction_confidence(&realization, surface_score, term_overlap);
+        let ambiguity = discourse_ambiguity(&realization, surface_score, right_text);
+        let gap_flags = discourse_gap_flags(naturalness, direction_confidence, &ambiguity, true);
+        if best
+            .as_ref()
+            .is_none_or(|(_, best_score, _, _, _)| naturalness > *best_score)
+        {
+            best = Some((
+                realization,
+                naturalness,
+                direction_confidence,
+                ambiguity,
+                gap_flags,
+            ));
+        }
+    }
+    let (realization, naturalness_score, direction_confidence, ambiguity, gap_flags) = best
+        .unwrap_or_else(|| {
+            let naturalness =
+                (0.62 * similarity_score + 0.26 * term_overlap + 0.12).clamp(0.0, 1.0);
+            (
+                implicit_discourse_realization(&args.profile),
+                naturalness,
+                0.55,
+                "medium".to_string(),
+                discourse_gap_flags(naturalness, 0.55, "medium", false),
+            )
+        });
+    let inverse_naturalness_score = realization.inverse_surface_phrase.map(|_| {
+        (naturalness_score
+            * if realization.surface_phrase == "because" {
+                1.02
+            } else {
+                0.96
+            })
+        .min(1.0)
+    });
+    Some(DiscourseRelation {
+        left: pair.left,
+        right: pair.right,
+        similarity_score,
+        connective_profile: args.profile.clone(),
+        relation_family: realization.relation_family.to_string(),
+        relation_schema: realization.relation_schema.to_string(),
+        surface_phrase: realization.surface_phrase.to_string(),
+        inverse_surface_phrase: realization.inverse_surface_phrase.map(str::to_string),
+        surface_order: realization.surface_order.to_string(),
+        logical_direction: realization.logical_direction.to_string(),
+        naturalness_score,
+        inverse_naturalness_score,
+        direction_confidence,
+        ambiguity,
+        gap_flags,
+        rank: 0,
+    })
+}
+
+fn validate_discourse_profile(profile: &str) -> Result<(), String> {
+    match profile {
+        "general" | "experiment-report" | "methods-protocol" | "academic-argument"
+        | "refactor-design" => Ok(()),
+        unknown => Err(format!("unknown discourse profile {unknown}")),
+    }
+}
+
+fn discourse_realizations(profile: &str) -> Vec<DiscourseRealization> {
+    let mut realizations = vec![
+        DiscourseRealization {
+            relation_family: "causal",
+            relation_schema: "reason_to_result",
+            surface_phrase: "therefore",
+            inverse_surface_phrase: Some("because"),
+            surface_order: "reason_then_result",
+            logical_direction: "left_to_right",
+            profile_boost: 0.72,
+        },
+        DiscourseRealization {
+            relation_family: "causal",
+            relation_schema: "reason_to_result",
+            surface_phrase: "as a result",
+            inverse_surface_phrase: Some("because"),
+            surface_order: "reason_then_result",
+            logical_direction: "left_to_right",
+            profile_boost: 0.70,
+        },
+        DiscourseRealization {
+            relation_family: "causal",
+            relation_schema: "reason_to_result",
+            surface_phrase: "because",
+            inverse_surface_phrase: Some("therefore"),
+            surface_order: "result_then_reason",
+            logical_direction: "right_to_left",
+            profile_boost: 0.72,
+        },
+        DiscourseRealization {
+            relation_family: "contrast",
+            relation_schema: "contrast_peer",
+            surface_phrase: "however",
+            inverse_surface_phrase: Some("however"),
+            surface_order: "peer_then_peer",
+            logical_direction: "symmetric",
+            profile_boost: 0.64,
+        },
+        DiscourseRealization {
+            relation_family: "elaboration",
+            relation_schema: "claim_to_example",
+            surface_phrase: "for example",
+            inverse_surface_phrase: Some("for instance"),
+            surface_order: "claim_then_example",
+            logical_direction: "left_to_right",
+            profile_boost: 0.66,
+        },
+        DiscourseRealization {
+            relation_family: "evidence",
+            relation_schema: "evidence_to_claim",
+            surface_phrase: "this shows",
+            inverse_surface_phrase: Some("because"),
+            surface_order: "evidence_then_claim",
+            logical_direction: "left_to_right",
+            profile_boost: 0.68,
+        },
+        DiscourseRealization {
+            relation_family: "condition",
+            relation_schema: "condition_to_outcome",
+            surface_phrase: "if",
+            inverse_surface_phrase: Some("only if"),
+            surface_order: "condition_then_outcome",
+            logical_direction: "left_to_right",
+            profile_boost: 0.60,
+        },
+    ];
+    match profile {
+        "experiment-report" => {
+            for realization in &mut realizations {
+                if matches!(realization.relation_family, "causal" | "evidence") {
+                    realization.profile_boost = (realization.profile_boost + 0.16).min(1.0);
+                }
+            }
+        }
+        "methods-protocol" => {
+            for realization in &mut realizations {
+                if matches!(realization.relation_family, "condition" | "causal") {
+                    realization.profile_boost = (realization.profile_boost + 0.14).min(1.0);
+                }
+            }
+        }
+        "academic-argument" => {
+            for realization in &mut realizations {
+                if matches!(
+                    realization.relation_family,
+                    "causal" | "contrast" | "evidence" | "elaboration"
+                ) {
+                    realization.profile_boost = (realization.profile_boost + 0.10).min(1.0);
+                }
+            }
+        }
+        "refactor-design" => {
+            for realization in &mut realizations {
+                if matches!(realization.relation_family, "causal" | "condition") {
+                    realization.profile_boost = (realization.profile_boost + 0.12).min(1.0);
+                }
+            }
+        }
+        _ => {}
+    }
+    realizations
+}
+
+fn implicit_discourse_realization(profile: &str) -> DiscourseRealization {
+    let profile_boost = match profile {
+        "experiment-report" => 0.62,
+        "methods-protocol" => 0.58,
+        "academic-argument" => 0.60,
+        "refactor-design" => 0.56,
+        _ => 0.50,
+    };
+    DiscourseRealization {
+        relation_family: "continuation",
+        relation_schema: "implicit_neighbor",
+        surface_phrase: "implicit",
+        inverse_surface_phrase: None,
+        surface_order: "left_then_right",
+        logical_direction: "left_to_right",
+        profile_boost,
+    }
+}
+
+fn connective_surface_score(text: &str, phrase: &str) -> f32 {
+    let normalized = normalize_connective_surface(text);
+    let phrase = phrase.to_ascii_lowercase();
+    if normalized.starts_with(&phrase)
+        && normalized
+            .chars()
+            .nth(phrase.chars().count())
+            .is_none_or(|ch| ch.is_whitespace() || matches!(ch, ',' | ':' | ';' | '.'))
+    {
+        return 1.0;
+    }
+    let bounded = normalized.chars().take(220).collect::<String>();
+    if bounded.contains(&format!(" {phrase} ")) {
+        0.72
+    } else {
+        0.0
+    }
+}
+
+fn normalize_connective_surface(text: &str) -> String {
+    let lowered = text.trim_start().to_ascii_lowercase();
+    let trimmed = lowered
+        .trim_start_matches('#')
+        .trim_start_matches('-')
+        .trim_start_matches('*')
+        .trim_start_matches(|ch: char| ch.is_ascii_digit() || ch == '.' || ch == ')')
+        .trim_start();
+    trimmed
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn discourse_term_overlap(left_text: &str, right_text: &str) -> f32 {
+    let left_terms: HashSet<String> = relation_terms(left_text).into_iter().collect();
+    let right_terms: HashSet<String> = relation_terms(right_text).into_iter().collect();
+    if left_terms.is_empty() || right_terms.is_empty() {
+        return 0.0;
+    }
+    let intersection = left_terms.intersection(&right_terms).count();
+    let union = left_terms.union(&right_terms).count();
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+fn discourse_direction_confidence(
+    realization: &DiscourseRealization,
+    surface_score: f32,
+    term_overlap: f32,
+) -> f32 {
+    if realization.logical_direction == "symmetric" {
+        return 0.50;
+    }
+    (0.68 + 0.22 * surface_score + 0.10 * term_overlap).clamp(0.0, 1.0)
+}
+
+fn discourse_ambiguity(
+    realization: &DiscourseRealization,
+    surface_score: f32,
+    right_text: &str,
+) -> String {
+    if realization.logical_direction == "symmetric" {
+        return "medium".to_string();
+    }
+    if realization.surface_phrase == "if" || realization.surface_phrase == "because" {
+        return "medium".to_string();
+    }
+    let normalized = normalize_connective_surface(right_text);
+    let signal_count = discourse_realizations(DEFAULT_DISCOURSE_PROFILE)
+        .iter()
+        .filter(|candidate| connective_surface_score(&normalized, candidate.surface_phrase) > 0.0)
+        .count();
+    if signal_count > 1 {
+        "high".to_string()
+    } else if surface_score >= 0.99 {
+        "low".to_string()
+    } else {
+        "medium".to_string()
+    }
+}
+
+fn discourse_gap_flags(
+    naturalness: f32,
+    direction_confidence: f32,
+    ambiguity: &str,
+    explicit_connective: bool,
+) -> Vec<String> {
+    let mut flags = Vec::new();
+    if !explicit_connective {
+        flags.push("implicit_relation".to_string());
+    }
+    if naturalness < 0.50 {
+        flags.push("weak_transition_evidence".to_string());
+    }
+    if direction_confidence < 0.60 {
+        flags.push("low_direction_confidence".to_string());
+    }
+    if ambiguity == "high" {
+        flags.push("ambiguous_connective".to_string());
+    }
+    flags
+}
+
 fn run_eval(args: &EvalArgs) -> Result<Value, String> {
     let input_root = args.fixture.join("input");
     let expected_path = args.fixture.join("expected.json");
@@ -2740,6 +3280,71 @@ fn persist_natural_relations(
     Ok(())
 }
 
+fn persist_discourse_relations(
+    args: &DiscourseRelationsArgs,
+    relations: &[DiscourseRelation],
+) -> Result<(), String> {
+    let write_db = prepare_existing_write_db(&args.db)?;
+    let conn = open_cache_connection(&write_db)?;
+    init_schema(&conn)?;
+    let run_id = run_id();
+    conn.execute(
+        "INSERT INTO analysis_runs(run_id, kind, created_at, params_json) VALUES (?1, ?2, ?3, ?4)",
+        params![
+            run_id,
+            "discourse-relations",
+            unix_millis().to_string(),
+            json!({
+                "profile": args.profile,
+                "min_naturalness": args.min_naturalness,
+                "window": args.window,
+                "top_k": args.top_k,
+                "provider": args.provider,
+                "model": args.model,
+                "dim": args.dim
+            })
+            .to_string()
+        ],
+    )
+    .map_err(|error| error.to_string())?;
+    for relation in relations {
+        conn.execute(
+            r#"
+            INSERT INTO discourse_relations(
+                run_id, left_node_id, right_node_id, similarity_score,
+                connective_profile, relation_family, relation_schema,
+                surface_phrase, inverse_surface_phrase, surface_order,
+                logical_direction, naturalness_score, inverse_naturalness_score,
+                direction_confidence, ambiguity, gap_flags_json, rank
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            "#,
+            params![
+                run_id,
+                relation.left.node_id,
+                relation.right.node_id,
+                relation.similarity_score,
+                relation.connective_profile,
+                relation.relation_family,
+                relation.relation_schema,
+                relation.surface_phrase,
+                relation.inverse_surface_phrase,
+                relation.surface_order,
+                relation.logical_direction,
+                relation.naturalness_score,
+                relation.inverse_naturalness_score,
+                relation.direction_confidence,
+                relation.ambiguity,
+                json!(relation.gap_flags).to_string(),
+                relation.rank as i64,
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    finish_write_db(&write_db, &args.db)?;
+    Ok(())
+}
+
 fn init_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -2806,6 +3411,25 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             relation_kind TEXT NOT NULL,
             rank INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS discourse_relations(
+            run_id TEXT NOT NULL,
+            left_node_id INTEGER NOT NULL,
+            right_node_id INTEGER NOT NULL,
+            similarity_score REAL NOT NULL,
+            connective_profile TEXT NOT NULL,
+            relation_family TEXT NOT NULL,
+            relation_schema TEXT NOT NULL,
+            surface_phrase TEXT NOT NULL,
+            inverse_surface_phrase TEXT,
+            surface_order TEXT NOT NULL,
+            logical_direction TEXT NOT NULL,
+            naturalness_score REAL NOT NULL,
+            inverse_naturalness_score REAL,
+            direction_confidence REAL NOT NULL,
+            ambiguity TEXT NOT NULL,
+            gap_flags_json TEXT NOT NULL,
+            rank INTEGER NOT NULL
+        );
         "#,
     )
     .map_err(|error| error.to_string())
@@ -2819,6 +3443,7 @@ fn clear_index(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
         DELETE FROM thin_docs;
+        DELETE FROM discourse_relations;
         DELETE FROM natural_language_relations;
         DELETE FROM similar_pairs;
         DELETE FROM analysis_runs;
@@ -4237,6 +4862,24 @@ fn sort_natural_relations(relations: &mut [NaturalRelation]) {
     });
 }
 
+fn sort_discourse_relations(relations: &mut [DiscourseRelation]) {
+    relations.sort_by(|left, right| {
+        right
+            .naturalness_score
+            .partial_cmp(&left.naturalness_score)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| {
+                right
+                    .direction_confidence
+                    .partial_cmp(&left.direction_confidence)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| left.left.path.cmp(&right.left.path))
+            .then_with(|| left.left.line_start.cmp(&right.left.line_start))
+            .then_with(|| left.right.line_start.cmp(&right.right.line_start))
+    });
+}
+
 fn print_search_results(args: &SearchArgs, results: &[ScoredNode]) {
     if args.format == OutputFormat::Json {
         println!(
@@ -4576,6 +5219,67 @@ fn print_natural_relation_results(args: &NaturalRelationsArgs, relations: &[Natu
     }
 }
 
+fn print_discourse_relation_results(
+    args: &DiscourseRelationsArgs,
+    relations: &[DiscourseRelation],
+) {
+    if args.format == OutputFormat::Json {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_discourse_relations": "ok",
+                "profile": args.profile,
+                "min_naturalness": args.min_naturalness,
+                "window": args.window,
+                "results": relations.iter().map(discourse_relation_json).collect::<Vec<_>>()
+            })
+        );
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_discourse_relations": "ok",
+                "profile": args.profile,
+                "min_naturalness": args.min_naturalness,
+                "window": args.window,
+                "result_count": relations.len()
+            })
+        );
+        for relation in relations {
+            println!("{}", discourse_relation_json(relation));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_DISCOURSE_RELATIONS=ok");
+    println!("SEMANTIC_INDEX_DISCOURSE_PROFILE={}", args.profile);
+    for relation in relations {
+        println!(
+            "rank={} family={} schema={} phrase={} inverse={} naturalness={:.4} direction={} confidence={:.4} ambiguity={} left={}:{}-{} right={}:{}-{} flags={}",
+            relation.rank,
+            relation.relation_family,
+            relation.relation_schema,
+            relation.surface_phrase,
+            relation
+                .inverse_surface_phrase
+                .as_deref()
+                .unwrap_or("none"),
+            relation.naturalness_score,
+            relation.logical_direction,
+            relation.direction_confidence,
+            relation.ambiguity,
+            relation.left.path,
+            relation.left.line_start,
+            relation.left.line_end,
+            relation.right.path,
+            relation.right.line_start,
+            relation.right.line_end,
+            relation.gap_flags.join(",")
+        );
+    }
+}
+
 fn print_eval_summary(report: &Value) {
     println!(
         "SEMANTIC_INDEX_EVAL={}",
@@ -4843,6 +5547,39 @@ fn natural_relation_json(relation: &NaturalRelation) -> Value {
             "path": relation.right.path,
             "responsibility_bucket": responsibility_scope_bucket(&relation.right.path),
             "surface_kind": merge_candidate_surface_kind(&relation.right.path),
+            "node_kind": relation.right.kind,
+            "line_start": relation.right.line_start,
+            "line_end": relation.right.line_end
+        }
+    })
+}
+
+fn discourse_relation_json(relation: &DiscourseRelation) -> Value {
+    json!({
+        "rank": relation.rank,
+        "connective_profile": relation.connective_profile,
+        "relation_family": relation.relation_family,
+        "relation_schema": relation.relation_schema,
+        "surface_phrase": relation.surface_phrase,
+        "inverse_surface_phrase": relation.inverse_surface_phrase,
+        "surface_order": relation.surface_order,
+        "logical_direction": relation.logical_direction,
+        "similarity_score": relation.similarity_score,
+        "naturalness_score": relation.naturalness_score,
+        "inverse_naturalness_score": relation.inverse_naturalness_score,
+        "direction_confidence": relation.direction_confidence,
+        "ambiguity": relation.ambiguity,
+        "gap_flags": relation.gap_flags,
+        "left": {
+            "path": relation.left.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.left.path),
+            "node_kind": relation.left.kind,
+            "line_start": relation.left.line_start,
+            "line_end": relation.left.line_end
+        },
+        "right": {
+            "path": relation.right.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.right.path),
             "node_kind": relation.right.kind,
             "line_start": relation.right.line_start,
             "line_end": relation.right.line_end
@@ -5213,7 +5950,7 @@ fn fail(scope: &str, message: String) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> [options]"
+        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> [options]"
     );
     eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
@@ -5226,6 +5963,7 @@ fn print_usage() {
     );
     eprintln!("thin-docs: [--root repo] [--db path] [--min-thin-score S] [--min-neighbor-score S] [--top-k N] [--format text|json|jsonl]");
     eprintln!("natural-relations: [--root repo] [--db path] [--min-similarity S] [--min-kind-of-score S] [--top-k N] [--format text|json|jsonl]");
+    eprintln!("discourse-relations: [--root repo] [--db path] [--profile general|experiment-report|methods-protocol|academic-argument|refactor-design] [--min-naturalness S] [--window N] [--top-k N] [--format text|json|jsonl]");
     eprintln!("eval: --fixture <fixture-dir> [--db path] [--report path] [--format text|json]");
     eprintln!("compare-providers: --db path [--query-file path] [--left-provider name] [--right-provider name] [--left-dim N] [--right-dim N] [--report path]");
     eprintln!("eval-output: [--merge-candidates path] [--thin-docs path] [--search path] [--report path] [--format text|json]");
@@ -5609,6 +6347,74 @@ mod tests {
             )
             .unwrap();
         assert!(count >= 1);
+    }
+
+    #[test]
+    fn discourse_relations_pair_therefore_and_because_variants() {
+        let root = unique_temp_dir("semantic-index-discourse-relations");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs").join("flow.md"),
+            "# Flow\nThe runtime log branch may not be mounted before an AgentCanon update.\n\nTherefore the update tool should warn and continue without blocking validation.\n\nThe warning belongs in workflow guidance.\n\nBecause the same missing mount can appear before the log archive checkout exists.",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("docs")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let args = DiscourseRelationsArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            profile: "experiment-report".to_string(),
+            min_naturalness: 0.20,
+            window: 2,
+            top_k: 20,
+            format: OutputFormat::Jsonl,
+        };
+        let relations = discourse_relations(&args).unwrap();
+        let therefore = relations
+            .iter()
+            .find(|relation| {
+                relation.surface_phrase == "therefore"
+                    && relation.relation_schema == "reason_to_result"
+                    && relation.logical_direction == "left_to_right"
+            })
+            .expect("expected therefore to map reason-to-result left-to-right");
+        assert_eq!(therefore.inverse_surface_phrase.as_deref(), Some("because"));
+
+        let because = relations
+            .iter()
+            .find(|relation| {
+                relation.surface_phrase == "because"
+                    && relation.relation_schema == "reason_to_result"
+                    && relation.logical_direction == "right_to_left"
+            })
+            .expect("expected because to map the same schema with reverse logical direction");
+        assert_eq!(because.inverse_surface_phrase.as_deref(), Some("therefore"));
+
+        persist_discourse_relations(&args, &relations).unwrap();
+        let conn = open_cache_connection(&db).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM discourse_relations WHERE relation_schema = 'reason_to_result'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(count >= 2);
     }
 
     #[test]

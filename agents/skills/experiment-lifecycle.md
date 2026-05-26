@@ -44,3 +44,4 @@ upstream design structure-planning.md reusable experiment and report structure c
 - registered command は `{config_path}` を受け取ります。
 - result / report 生成では `result-artifact-writeout` を使い、raw run output、summary report、manifest、unique run_name、overwrite policy を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
+- experiment plan / report の paragraph order、causal transition、evidence-to-claim transition が非自明な場合は、`structure-planning` 側で `agent-canon semantic-index discourse-relations --profile experiment-report` または `--profile methods-protocol` を使い、discourse edge を構造 evidence として保存します。

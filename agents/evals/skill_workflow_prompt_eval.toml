@@ -297,6 +297,12 @@ critical = true
 description = "Keeps structure planning separate from storage, execution, prose, implementation, and domain authority."
 required_regex = ["owns structure", "not raw storage", "experiment execution", "report prose", "implementation", "domain authority"]
 
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-4"
+critical = true
+description = "Routes nontrivial paragraph order and connective evidence through semantic-index discourse-relations without making it authority."
+required_regex = ["discourse-relations", "--profile", "advisory structure evidence", "not as prose or policy authority"]
+
 [[evals]]
 id = "structure-planning-doc"
 target = "agents/skills/structure-planning.md"
@@ -320,6 +326,12 @@ id = "STRUCTURE-PLANNING-DOC-3"
 critical = true
 description = "Separates structure authority from raw storage, experiment execution, report prose, document drafting, implementation, and domain authority."
 required_regex = ["does not own raw result storage", "experiment execution", "report prose", "document\\s+drafting", "implementation", "domain authority"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-4"
+critical = true
+description = "Documents discourse-relations as optional paragraph-order and transition evidence."
+required_regex = ["discourse-relations", "connective profile", "therefore", "because", "structure evidence"]
 
 [[evals]]
 id = "literature-survey-source-record-shim"
@@ -519,6 +531,12 @@ critical = true
 description = "Requires structure-planning before nontrivial experiment planning or report generation."
 required_regex = ["\\$structure-planning", "experiment planning", "rerun planning", "result report generation", "HTML view generation", "validation gate"]
 
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-2"
+critical = true
+description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
+required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
+
 [[evals]]
 id = "document-writing-structure-planning"
 target = ".agents/skills/long-form-writing/SKILL.md"
@@ -531,6 +549,12 @@ critical = true
 description = "Requires structure-planning when reader path, source mapping, first section, or invalid interpretations are nontrivial."
 required_regex = ["\\$structure-planning", "section order", "reader path", "source mapping", "first section", "invalid interpretations"]
 
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-2"
+critical = true
+description = "Connects long-form paragraph flow to discourse-relations when transition evidence matters."
+required_regex = ["discourse-relations", "paragraph flow", "transition choice", "structure-planning"]
+
 [[evals]]
 id = "paper-writing-structure-planning"
 target = ".agents/skills/paper-writing/SKILL.md"
@@ -542,6 +566,12 @@ id = "PAPER-STRUCTURE-1"
 critical = true
 description = "Requires structure-planning before drafting when paper section, figure/table, or evidence layout is nontrivial."
 required_regex = ["\\$structure-planning", "section order", "first figure/table", "claim/evidence layout", "source-to-structure map"]
+
+[[evals.checklist]]
+id = "PAPER-STRUCTURE-2"
+critical = true
+description = "Connects paper paragraph claim flow and transition pairs to discourse-relations."
+required_regex = ["discourse-relations", "academic-argument", "transition pairs", "logic-gap"]
 
 [[evals]]
 id = "refactor-loop-structure-planning"

@@ -68,6 +68,12 @@ experiment scripts, or refactor edits.
 1. Define the question answered by that first artifact.
 1. Map each source artifact to the section, visual, claim, experiment slice, or
    refactor slice it supports.
+1. When block order, transition choice, or logic-gap evidence is nontrivial,
+   run `agent-canon semantic-index discourse-relations` with the matching
+   connective profile and use the JSONL edge output as structure evidence for the ordered
+   structure. The tool separates relation primitives from surface phrases, so
+   `therefore` / `because` variants can support the same logical relation while
+   recording opposite surface order.
 1. Define metric denominator, directionality, baseline, and caveat for reports
    or experiments; define allowed structural delta and forbidden semantic delta
    for refactors.
@@ -106,5 +112,6 @@ structure_planning=complete
 structure_contract=<path-or-inline>
 structure_first_artifact=<name>
 structure_source_map=<path-or-inline>
+discourse_relations=<path|not_required>
 structure_invalid_interpretations_recorded=yes
 ```
