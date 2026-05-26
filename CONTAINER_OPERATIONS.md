@@ -238,12 +238,11 @@ uses the submodule-aware checkout pattern in this rulebook.
 
 Hook output is evidence, not a decoration.
 
-- Hook invocation logs under `agents/evals/results/hook-runs/*.jsonl` are
-  AgentCanon-owned append-only evidence artifacts. They are part of the
-  AgentCanon product state when an AgentCanon hook writes them during normal
-  repository work.
-- Do not stash, drop, or revert tracked hook-run JSONL as "generated noise" to
-  make a submodule look clean. If the log is too noisy, fix the hook filter or
+- Hook invocation logs under `.agent-canon/log-archive/hook-runs/**/*.jsonl` are
+  AgentCanon-owned append-only evidence artifacts in the external log archive,
+  not product source files.
+- Do not stash, drop, or revert hook-run JSONL as "generated noise" to make a
+  submodule look clean. If the log is too noisy, fix the hook filter or
   route the observation through an AgentCanon PR; do not hide the evidence.
 - Repeated OOP readability failures must stop the implementation path until the
   changed code or the hook rule is corrected.

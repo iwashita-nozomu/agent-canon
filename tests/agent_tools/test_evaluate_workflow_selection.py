@@ -16,6 +16,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_workflow_selection.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class EvaluateWorkflowSelectionTest(unittest.TestCase):
@@ -44,6 +46,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
+            archive_root = mounted_log_archive_root(root)
+            archive_root.mkdir(parents=True)
 
             result = subprocess.run(
                 [
@@ -57,7 +61,9 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            reports = list((root / "agents" / "evals" / "results" / "workflow-selection").glob("*.md"))
+            reports = list(
+                (archive_root / "eval-results" / "workflow-selection").glob("*.md")
+            )
             report_text = reports[0].read_text(encoding="utf-8") if reports else ""
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

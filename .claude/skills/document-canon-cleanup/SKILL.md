@@ -26,7 +26,7 @@ python3 tools/agent_tools/noncanonical_document_inventory.py \
 1. Treat the report as triage, not deletion authority.
 1. Edit canonical sources, not mirrors or generated evidence:
    - `.claude/skills/*/SKILL.md` -> edit `.agents/skills/*/SKILL.md`, then run `mirror_skill_shims.py`.
-   - `agents/evals/results/*` -> edit eval definitions, workflow prompts, or generator logic.
+   - `.agent-canon/log-archive/eval-results/*` -> edit eval definitions, workflow prompts, or generator logic.
    - `reports/*` -> regenerate or cite as run evidence.
    - `issues/closed/*` -> open/update a new issue for new scope.
 1. For missing dependency headers, either add the manifest or move the file out of source docs.

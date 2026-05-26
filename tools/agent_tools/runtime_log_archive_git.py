@@ -22,13 +22,13 @@ if __package__ in (None, ""):
 
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
+    log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
 )
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
-EVAL_RESULT_KEEP_SOURCE_RELATIVES = frozenset((Path("README.md"), Path("hook-runs") / "README.md"))
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,7 @@ class ArchiveContext:
     canon_root: Path
     archive_root: Path
     repo_key: str
+    env_key: str
     branch: str
     remote: str
 
@@ -59,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--canon-root",
         type=Path,
         default=Path(__file__).resolve().parents[2],
-        help="AgentCanon root that owns .agent-canon/log-archive.",
+        help="AgentCanon root that owns .agent-canon/archive/<env-key>.",
     )
     parser.add_argument(
         "--remote",
@@ -69,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--archive-root",
         type=Path,
-        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/log-archive.",
+        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/archive/<env-key>.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -83,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     legacy = subparsers.add_parser(
         "import-legacy",
-        help="Copy old AgentCanon in-tree hook JSONL into hook-runs/legacy-import.",
+        help="Copy old AgentCanon in-tree hook JSONL into legacy-import/hook-runs.",
     )
     legacy.add_argument(
         "--legacy-root",
@@ -92,7 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     legacy.add_argument(
         "--destination-prefix",
-        default="hook-runs/legacy-import",
+        default="legacy-import/hook-runs",
         help="Archive-relative destination prefix for legacy JSONL.",
     )
     legacy.add_argument(
@@ -103,7 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     eval_results = subparsers.add_parser(
         "import-eval-results",
-        help="Copy old AgentCanon in-tree eval Markdown reports into eval-results/legacy-import.",
+        help="Copy old AgentCanon in-tree eval Markdown reports into legacy-import/eval-results.",
     )
     eval_results.add_argument(
         "--legacy-root",
@@ -112,15 +113,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eval_results.add_argument(
         "--destination-prefix",
-        default="eval-results/legacy-import",
+        default="legacy-import/eval-results",
         help="Archive-relative destination prefix for legacy eval reports.",
     )
     eval_results.add_argument(
         "--delete-source",
         action="store_true",
         help=(
-            "Delete imported source eval result files after copying. The root README and "
-            "hook-runs/README.md notices remain in source."
+            "Delete imported source eval result files after copying. AgentCanon source "
+            "keeps runtime-log policy in documents/runtime-log-archive.md, not under agents/evals/results."
         ),
     )
 
@@ -198,11 +199,13 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         else mounted_log_archive_root(canon_root).resolve()
     )
     key = repo_log_key(source_root)
+    env_key = log_environment_key(canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,
         archive_root=archive_root,
         repo_key=key,
+        env_key=env_key,
         branch=f"logs/{key}",
         remote=args.remote,
     )
@@ -327,6 +330,7 @@ def print_context(context: ArchiveContext) -> None:
     print(f"RUNTIME_LOG_ARCHIVE_SOURCE_ROOT={context.source_root}")
     print(f"RUNTIME_LOG_ARCHIVE_CANON_ROOT={context.canon_root}")
     print(f"RUNTIME_LOG_ARCHIVE_ROOT={context.archive_root}")
+    print(f"RUNTIME_LOG_ARCHIVE_ENV_KEY={context.env_key}")
     print(f"RUNTIME_LOG_ARCHIVE_REMOTE={context.remote}")
     print(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={context.repo_key}")
     print(f"RUNTIME_LOG_ARCHIVE_BRANCH={context.branch}")
@@ -426,7 +430,7 @@ def should_import_eval_result(relative: Path) -> bool:
 
 def should_delete_eval_source(relative: Path) -> bool:
     """Return whether one imported eval source file can leave the source tree."""
-    return relative not in EVAL_RESULT_KEEP_SOURCE_RELATIVES
+    return True
 
 
 def command_import_eval_results(context: ArchiveContext, args: argparse.Namespace) -> int:
@@ -468,6 +472,12 @@ def command_import_eval_results(context: ArchiveContext, args: argparse.Namespac
             delete_source_file(context, source)
             deleted += 1
 
+    if args.delete_source:
+        for notice in (legacy_root / "hook-runs" / "README.md",):
+            if notice.exists():
+                delete_source_file(context, notice)
+                deleted += 1
+
     if (context.archive_root / destination_prefix).exists():
         git(context.archive_root, ["add", "--", destination_prefix.as_posix()])
 
@@ -488,8 +498,8 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
     ensure_archive(context)
     log_paths = [
         Path("hook-runs") / context.repo_key,
-        Path("hook-runs") / "legacy-import",
         Path("eval-results"),
+        Path("legacy-import"),
     ]
     message = args.message or f"Append {context.repo_key} runtime logs"
 

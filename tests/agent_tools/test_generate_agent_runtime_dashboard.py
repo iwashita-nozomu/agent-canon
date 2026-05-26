@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests AgentCanon runtime dashboard generation.
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
-# upstream design ../../agents/evals/results/README.md documents result families shown by dashboard
+# upstream design ../../documents/runtime-log-archive.md documents result families shown by dashboard
 # @dependency-end
 
 """Tests for generated AgentCanon runtime dashboards."""
@@ -17,6 +17,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
+
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
 
@@ -213,7 +216,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_REFERENCE_BLOCKED_ENTRIES=0",
             "| `UserPromptSubmit` | `1` |",
             "| `last_assistant_message` | `1` |",
-            "agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl",
+            ".agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl",
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
@@ -232,7 +235,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir)
             canon_root = parent / "vendor" / "agent-canon"
-            self.write_fixture(canon_root)
+            self.write_fixture(canon_root, source_root=parent)
             output = parent / "reports" / "dashboard.md"
 
             result = subprocess.run(
@@ -285,12 +288,17 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("| `candidate_tokens_per_comparison_recent` | `100` |", compact_dashboard)
         self.assertIn("| `joint_trend_status` | `ready` |", compact_dashboard)
 
-    def write_fixture(self, root: Path) -> None:
+    def write_fixture(self, root: Path, *, source_root: Path | None = None) -> None:
         """Write a small AgentCanon-like evidence tree."""
-        hook_dir = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
-        skill_dir = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
-        local_llm_dir = root / "agents" / "evals" / "results" / "local-llm-responsibility"
-        workflow_dir = root / "agents" / "evals" / "results" / "workflow-selection"
+        source = source_root or root
+        archive = mounted_log_archive_root(root)
+        hook_dir = archive / "hook-runs" / repo_log_key(source) / "test-container"
+        skill_dir = archive / "eval-results" / "skill-workflow-prompt"
+        local_llm_dir = archive / "eval-results" / "local-llm-responsibility"
+        workflow_dir = archive / "eval-results" / "workflow-selection"
+        evals_dir = root / "agents" / "evals"
+        evals_dir.mkdir(parents=True)
+        (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
         self.create_fixture_dirs(root, hook_dir, skill_dir, local_llm_dir, workflow_dir)
         self.write_issue_memory_fixture(root)
         self.write_eval_report_fixture(skill_dir, local_llm_dir, workflow_dir)
@@ -498,7 +506,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def write_out_of_order_trend_fixture(self, root: Path) -> None:
         """Write trend evidence where lexical and chronological order disagree."""
-        hook_dir = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
+        hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
         (root / "reports" / "agents" / "test" / "workflow_monitoring.md").unlink()
         new_entries = [
             self.prompt_entry(f"2026-05-{day:02d}T00:00:00Z", 10)

@@ -20,7 +20,7 @@ AgentCanon runtime hook JSONL and accumulated eval reports are stored in the sep
 `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
 
 ```text
-.agent-canon/log-archive/
+.agent-canon/archive/<env-key>/
 ```
 
 The mount is intentionally ignored by AgentCanon Git. It is not a submodule and
@@ -32,13 +32,13 @@ repo AgentCanon pins.
 Normal hook writers use:
 
 ```text
-.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
 ```
 
 Normal eval writers use:
 
 ```text
-.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md
+.agent-canon/archive/<env-key>/eval-results/<family>/<eval-run-id>-<status>*.md
 ```
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
@@ -48,8 +48,8 @@ devcontainer/Compose metadata, or the existing host/repo fallback.
 The initial import from the former in-tree log surface is preserved under:
 
 ```text
-hook-runs/legacy-import/
-eval-results/legacy-import/
+legacy-import/hook-runs/
+legacy-import/eval-results/
 ```
 
 ## Branch Policy
@@ -99,8 +99,8 @@ python3 tools/agent_tools/runtime_log_archive_git.py push \
   --message "Import legacy AgentCanon hook logs"
 ```
 
-The AgentCanon source tree must keep only the README notice and non-hook eval
-reports. Raw hook streams move to `hook-runs/legacy-import/` in the log archive.
+The AgentCanon source tree must not keep hook JSONL or eval report artifacts.
+Raw hook streams move to `legacy-import/hook-runs/` in the log archive.
 
 If `agents/evals/results/` contains old accumulated eval reports, migrate them
 with:
@@ -111,9 +111,8 @@ python3 tools/agent_tools/runtime_log_archive_git.py push \
   --message "Import legacy AgentCanon eval results"
 ```
 
-The AgentCanon source tree keeps only `agents/evals/results/README.md` and
-`agents/evals/results/hook-runs/README.md`. Accumulated eval report families move
-to `eval-results/legacy-import/` in the log archive.
+The AgentCanon source tree keeps no `agents/evals/results/` tree. Accumulated
+eval report families move to `legacy-import/eval-results/` in the log archive.
 
 When invoking the helper from a wrapper repository, keep the AgentCanon
 submodule as the working directory and let the tool derive the superproject

@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Runs configurable local LLM single-file responsibility evals.
 # upstream design ../../agents/evals/README.md eval directory contract
-# upstream design ../../agents/evals/results/README.md eval result archive notice
+# upstream design ../../documents/runtime-log-archive.md eval result archive contract
 # upstream design ../../agents/evals/local_llm_responsibility_eval.toml local LLM eval manifest
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and mount policy
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
@@ -48,7 +48,7 @@ from file_responsibility_llm import (  # noqa: E402
     prompt_for_target,
     read_target,
 )
-from runtime_log_paths import eval_results_dir  # noqa: E402
+from runtime_log_paths import agent_canon_root, eval_results_dir  # noqa: E402
 
 MANIFEST_PATH = "agents/evals/local_llm_responsibility_eval.toml"
 RESULTS_FAMILY = "local-llm-responsibility"
@@ -229,14 +229,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--accumulate", action="store_true")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
-
-
-def agent_canon_root(root: Path) -> Path:
-    """Return AgentCanon source root for standalone or parent invocation."""
-    vendored = root / "vendor" / "agent-canon"
-    if (vendored / MANIFEST_PATH).is_file():
-        return vendored
-    return root
 
 
 def string_tuple(value: object) -> tuple[str, ...]:

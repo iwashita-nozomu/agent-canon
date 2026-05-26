@@ -90,8 +90,8 @@ GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
 for PR summaries.
 `eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
-reports are readable from the mounted runtime log archive, with the legacy
-`agents/evals/results/` source-tree notices kept only as fallback anchors.
+reports are readable from the mounted runtime log archive. The source tree
+must not contain `agents/evals/results/` result artifacts.
 `agent_canon_log_management_check.py` validates that dirty hook/eval JSONL
 stays on `agent-logs/*` branches and that each hook entry's
 `hook_log_namespace` matches its JSONL namespace directory.
@@ -102,10 +102,10 @@ and Python code dependency facts into ranked candidates.
 index consumed by the LLM provider under `.agent-canon/search-index/`.
 `agent-canon local-llm eval` validates the configured single-file local LLM
 responsibility prompt boundary and can optionally accumulate prompt-only or
-model-backed reports under `.agent-canon/log-archive/eval-results/local-llm-responsibility/`.
+model-backed reports under `.agent-canon/archive/<env-key>/eval-results/local-llm-responsibility/`.
 `evaluate_report_quality.py` validates the report-writing skill and report
 reviewer route against the Report Quality Checklist and can accumulate reports
-under `.agent-canon/log-archive/eval-results/report-quality/`.
+under `.agent-canon/archive/<env-key>/eval-results/report-quality/`.
 
 ## 含めるもの
 - `bin/`
@@ -153,7 +153,7 @@ under `.agent-canon/log-archive/eval-results/report-quality/`.
   - `parent_repo_readiness.py` は template / derived parent repo に AgentCanon が期待する submodule shape、root view、parent-owned document contract、update state、MCP launcher、Docker/devcontainer environment surface が揃っているかをまとめて検査します。
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
-  - `eval_accumulation_check.py` は mounted runtime log archive と legacy `agents/evals/results/` notice/fallback の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
+  - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
   - `agent_canon_log_management_check.py` は dirty hook/eval JSONL が product branch / detached checkout に残っていないこと、hook path namespace と `hook_log_namespace` が一致することを検査します。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
@@ -203,7 +203,7 @@ under `.agent-canon/log-archive/eval-results/report-quality/`.
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
     - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log dirty の退避、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。pending TODO があっても更新コマンド自体は成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出して親 repo の agent に引き継ぎます。submodule repo では `ensure-latest` の local-state evidence を必須にし、外側の GitHub / PR 照会で latest 判定を再実装しません。local shared-canon branch、dirty runtime source、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW` と `NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
-    - eval / hook result dirty state は原則として `.agent-canon/log-archive/` へ移します。legacy `agents/evals/results/` だけが dirty な古い checkout では互換 path として `agent-logs/<parent-repo>` branch へ退避できますが、新規蓄積は `runtime_log_archive_git.py ensure` 後の archive path を使います。non-log dirty state は自動退避しません。
+    - eval / hook result dirty state は原則として `.agent-canon/archive/<env-key>/` へ移します。legacy `agents/evals/results/` だけが dirty な古い checkout では `runtime_log_archive_git.py import-legacy|import-eval-results --delete-source` で `.agent-canon/archive/<env-key>/legacy-import/` へ退避します。新規蓄積は `runtime_log_archive_git.py ensure` 後の archive path を使い、source tree の `agents/evals/results/` を新規作成しません。non-log dirty state は自動退避しません。
     - `apply` は互換用の低レベル入口です。通常の task 開始、PR merge 後の持ち帰り、手動更新は `make agent-canon-ensure-latest` または `make agent-canon-latest` から `latest` に入ります。
     - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
       commit SHA が同じでも Rust source が installed binary より新しければ再ビルドします。
@@ -344,8 +344,8 @@ When a run uses skills, prompt eval evidence is required. Run
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
 Hook outcomes and accumulated eval reports live in the mounted runtime log archive.
 Hook JSONL uses
-`.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
-and eval reports use `.agent-canon/log-archive/eval-results/<family>/` by
+`.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
+and eval reports use `.agent-canon/archive/<env-key>/eval-results/<family>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
 rules live in `documents/runtime-log-archive.md`, and
@@ -386,7 +386,7 @@ before the improvement guide tries to mine them.
 `evaluate_workflow_selection.py` checks the prompt-intake classifier against
 frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
 Use `--accumulate` only when the measurement should become durable evidence
-under `.agent-canon/log-archive/eval-results/workflow-selection/`.
+under `.agent-canon/archive/<env-key>/eval-results/workflow-selection/`.
 
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
@@ -647,7 +647,7 @@ The runner also audits the manifest itself. Do not close prompt-improvement work
 `EVAL_STATUS=pass`, `EVAL_AUDIT_STATUS=pass`, and `EVAL_GROWTH_CANDIDATES=0` all appear in the
 machine-readable output.
 Detailed reports accumulate under
-`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` with this naming convention:
+`.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/` with this naming convention:
 
 ```text
 <eval_run_id>-<status>-<skill-slug>.md
@@ -670,9 +670,8 @@ python3 tools/agent_tools/generate_agent_improvement_guide.py \
 ```
 
 The guide summarizes `memory/`,
-`.agent-canon/log-archive/eval-results/skill-workflow-prompt/`,
-the mounted runtime hook archive, legacy `agents/evals/results/hook-runs/`,
-`issues/open/`, and `issues/closed/`.
+`.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/`,
+the mounted runtime hook archive, `issues/open/`, and `issues/closed/`.
 It is read-only evidence. Local Agent or Copilot PR work applies the actual
 skill, workflow, and tool changes.
 For log visibility rather than repair guidance, use:

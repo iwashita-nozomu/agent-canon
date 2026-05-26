@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Provides Canon-owned append-only hook event log paths and IDs.
 # upstream design ../../documents/runtime-log-archive.md runtime log archive contract
-# upstream design ../../agents/evals/results/hook-runs/README.md legacy hook result accumulation contract
+# upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
 # downstream implementation ./oop_readability_guard.py records OOP hook outcomes
 # downstream implementation ./module_boundary_guard.py records module boundary outcomes
@@ -31,7 +31,11 @@ TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
 if TOOLS_DIR.is_dir():
     sys.path.insert(0, str(TOOLS_DIR))
 
-from runtime_log_paths import hook_results_dir, repo_log_key  # noqa: E402
+from runtime_log_paths import (  # noqa: E402
+    agent_canon_root,
+    hook_results_dir,
+    repo_log_key,
+)
 
 HOOK_RESULTS_DIR_ENV = "AGENT_CANON_HOOK_RESULTS_DIR"
 HOOK_RUN_NAMESPACE_ENV = "AGENT_CANON_HOOK_RUN_NAMESPACE"
@@ -84,11 +88,7 @@ class HookLogContext:
 
     def canon_root(self) -> Path:
         """Return the AgentCanon checkout that owns durable hook evidence."""
-        root = self.active_root.resolve()
-        vendored = root / "vendor" / "agent-canon"
-        if (vendored / "agents" / "evals" / "results").is_dir():
-            return vendored
-        return root
+        return agent_canon_root(self.active_root)
 
     def durable_results_dir(self) -> Path:
         """Return the durable hook-result archive directory."""
