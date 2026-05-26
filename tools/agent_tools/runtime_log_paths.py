@@ -9,6 +9,7 @@
 # downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
 # downstream implementation ./local_llm_eval.py writes accumulated eval reports through this resolver
+# downstream implementation ../../tests/agent_tools/test_runtime_log_paths.py tests path resolution ordering
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""
 
@@ -110,8 +111,7 @@ def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Pat
     """Return hook result directories to read for one repository context."""
     candidates: list[Path] = [
         hook_results_dir(requested_root, canon_root),
+        _log_archive_root(canon_root) / "hook-runs" / "legacy-import",
         legacy_hook_results_dir(canon_root),
     ]
-    if requested_root.resolve() == canon_root.resolve():
-        candidates.append(_log_archive_root(canon_root) / "hook-runs" / "legacy-import")
     return tuple(dict.fromkeys(candidates))
