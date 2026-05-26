@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Runs dedicated secret scanners against current tree and git history.
 # upstream design ../../CONTAINER_OPERATIONS.md shared devcontainer security tooling policy
-# upstream environment ../../.devcontainer/post-create.sh installs scanner commands
+# downstream environment ../../.devcontainer/post-create.sh installs scanner commands
 # downstream design ../../tools/README.md documents the command surface
 # downstream design ../../documents/tools/README.md documents operator usage
 # @dependency-end

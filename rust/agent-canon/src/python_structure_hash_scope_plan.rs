@@ -312,8 +312,7 @@ fn parse_dependency_edit_scope(path: &Path) -> Result<Vec<String>, String> {
             continue;
         }
         for token in line
-            .replace('=', " ")
-            .replace(':', " ")
+            .replace(['=', ':'], " ")
             .split_whitespace()
             .map(|value| value.trim_matches(|c: char| c == '"' || c == '\'' || c == ','))
         {
