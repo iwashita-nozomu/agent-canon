@@ -2028,7 +2028,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH",
-      "line": 573,
+      "line": 629,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2036,7 +2036,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH",
-      "line": 579,
+      "line": 635,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2044,7 +2044,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_ANALYZED_FILE",
-      "line": 1623,
+      "line": 1838,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2052,7 +2052,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_FINDING",
-      "line": 574,
+      "line": 630,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2060,7 +2060,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_FINDING",
-      "line": 580,
+      "line": 636,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2068,7 +2068,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_PARSE_ERRORS",
-      "line": 1059,
+      "line": 1125,
       "path": "rust/agent-canon/src/python_structure_hash.rs",
       "surface": "tool"
     },
@@ -2100,7 +2100,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT",
-      "line": 95,
+      "line": 109,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -2108,7 +2108,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_FINDING",
-      "line": 96,
+      "line": 110,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
       "surface": "tool"
     },
@@ -2116,8 +2116,32 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "PY_STRUCTURE_HASH_REPORT_OUTPUT",
-      "line": 157,
+      "line": 171,
       "path": "rust/agent-canon/src/python_structure_hash_report.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PY_STRUCTURE_HASH_SCOPE_PLAN",
+      "line": 82,
+      "path": "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PY_STRUCTURE_HASH_SCOPE_PLAN_FINDING",
+      "line": 83,
+      "path": "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "PY_STRUCTURE_HASH_SCOPE_PLAN_OUTPUT",
+      "line": 230,
+      "path": "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
       "surface": "tool"
     },
     {
@@ -3228,7 +3252,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "default_findings",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3236,7 +3260,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "fields",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3244,7 +3268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3252,7 +3276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3260,7 +3284,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "default_findings",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3268,7 +3292,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "fields",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3276,7 +3300,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3284,7 +3308,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 1000,
+      "line": 1001,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3292,7 +3316,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ALGORITHM_CONFIG_DEFAULT_FINDING",
-      "line": 93,
+      "line": 94,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3300,7 +3324,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ALGORITHM_CONFIG_PARTITION_FINDING",
-      "line": 70,
+      "line": 71,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3308,7 +3332,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ALGORITHM_CONFIG_DEFAULT_FINDINGS",
-      "line": 1034,
+      "line": 1035,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3316,7 +3340,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ALGORITHM_CONFIG_PARTITION",
-      "line": 1040,
+      "line": 1041,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -3324,14 +3348,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ALGORITHM_CONFIG_PARTITION_FIELDS",
-      "line": 1032,
-      "path": "tools/agent_tools/check_algorithm_config_partition.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "ALGORITHM_CONFIG_PARTITION_FINDINGS",
       "line": 1033,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
@@ -3339,8 +3355,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "ALGORITHM_CONFIG_PARTITION_FINDINGS",
+      "line": 1034,
+      "path": "tools/agent_tools/check_algorithm_config_partition.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "ALGORITHM_CONFIG_RUNTIME_DEFAULT_ERRORS",
-      "line": 1038,
+      "line": 1039,
       "path": "tools/agent_tools/check_algorithm_config_partition.py",
       "surface": "tool"
     },
@@ -7060,7 +7084,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 163,
+      "line": 170,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -7068,7 +7092,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW_PATHS",
-      "line": 105,
+      "line": 106,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -7948,7 +7972,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 541,
+      "line": 542,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -7956,7 +7980,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 436,
+      "line": 437,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -7964,7 +7988,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SUBAGENT_REVISION_SUMMARY_JSON",
-      "line": 554,
+      "line": 555,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -7972,7 +7996,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SUBAGENT_REVISION_SUMMARY_MD",
-      "line": 556,
+      "line": 557,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -7980,7 +8004,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SUBAGENT_REVISION_SUMMARY_RUN_DIR",
-      "line": 552,
+      "line": 553,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -7988,7 +8012,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SUBAGENT_REVISION_SUMMARY_SCHEMA",
-      "line": 551,
+      "line": 552,
       "path": "tools/agent_tools/summarize_subagent_revisions.py",
       "surface": "tool"
     },
@@ -12819,6 +12843,7 @@
     ".agents/skills/task-routing/SKILL.md",
     ".agents/skills/test-design/SKILL.md",
     ".agents/skills/tool-finding-report/SKILL.md",
+    ".agents/skills/user-guided-debugging/SKILL.md",
     ".agents/skills/user-preference-sync/SKILL.md",
     ".agents/skills/worktree-health/SKILL.md",
     ".agents/skills/worktree-start/SKILL.md",
@@ -12855,6 +12880,7 @@
     ".claude/skills/task-routing/SKILL.md",
     ".claude/skills/test-design/SKILL.md",
     ".claude/skills/tool-finding-report/SKILL.md",
+    ".claude/skills/user-guided-debugging/SKILL.md",
     ".claude/skills/user-preference-sync/SKILL.md",
     ".claude/skills/worktree-health/SKILL.md",
     ".claude/skills/worktree-start/SKILL.md",
@@ -12932,6 +12958,7 @@
     "agents/skills/task-routing.md",
     "agents/skills/test-design.md",
     "agents/skills/tool-finding-report.md",
+    "agents/skills/user-guided-debugging.md",
     "agents/skills/user-preference-sync.md",
     "agents/skills/worktree-health.md",
     "agents/skills/worktree-start.md",
@@ -12944,6 +12971,7 @@
     "rust/agent-canon/src/python_structure_hash.rs",
     "rust/agent-canon/src/python_structure_hash_impact.rs",
     "rust/agent-canon/src/python_structure_hash_report.rs",
+    "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
     "rust/agent-canon/src/rust_migration_plan.rs",
     "rust/agent-canon/src/semantic_index.rs",
     "tools/__init__.py",

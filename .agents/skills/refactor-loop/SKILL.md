@@ -62,6 +62,8 @@ upstream design ../../../agents/skills/tool-finding-report.md tool-based finding
    tool-made `impact_blocks`, expand downstream affected files, reject
    responsibility-mixing root findings as `review_required`, and rerun the full
    scan after each batch before choosing the next batch.
+   For Python structural findings, the default planning command is
+   `agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir <dependency-review-dir> --output <change-impact-packet.json>`.
 1. After each implementation slice, join the latest `git diff` against the full
    finding packet. Produce a `diff_linked_findings` artifact that separates
    direct changed-line findings, related structural findings for changed

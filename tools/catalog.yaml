@@ -398,6 +398,26 @@ entries:
     tests:
       - rust/agent-canon/src/semantic_index.rs
 
+  - id: python-structure-hash-scope-plan
+    summary: Builds deterministic Change Impact Packets with impact blocks, scope candidates, selected scope, repair batches, and subagent handoff context from Python structural findings plus dependency-review artifacts.
+    path: rust/agent-canon/src/python_structure_hash_scope_plan.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon python-structure-hash-scope-plan --input reports/python-structure-hash-report.json --dependency-report-dir reports/dependency-review --output reports/change-impact-packet.json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/design/python-structure-hash.md
+      - agents/skills/dependency-analysis.md
+      - agents/skills/refactor-loop.md
+    tests:
+      - rust/agent-canon/src/python_structure_hash_scope_plan.rs
+
   - id: semantic-provider-html-report
     summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
     path: tools/agent_tools/semantic_provider_html_report.py

@@ -6,6 +6,7 @@ upstream design ../dependency-manifest-design.md repository dependency graph pri
 downstream implementation ../../rust/agent-canon/src/python_structure_hash.rs extracts dependency-expanded structural findings.
 downstream implementation ../../rust/agent-canon/src/python_structure_hash_report.rs structures findings and computes module-group priority order.
 downstream implementation ../../rust/agent-canon/src/python_structure_hash_impact.rs compares before/after structured reports.
+downstream implementation ../../rust/agent-canon/src/python_structure_hash_scope_plan.rs builds change-impact scope plans from structured findings and dependency evidence.
 @dependency-end
 -->
 
@@ -192,6 +193,41 @@ Each cluster includes `problem_kind`, `cluster_key`, `action_hint`,
 and a bounded list of finding references. The full finding rows remain in the
 top-level `findings` array. Clusters do not replace the full finding artifact;
 they provide a deterministic way to choose broader implementation waves.
+
+## Change Impact Scope Planning
+
+`python-structure-hash-scope-plan` consumes a full
+`python-structure-hash-report` JSON artifact plus a dependency review directory
+from `run_repo_dependency_review.sh`. It is the mechanical bridge between
+finding discovery and refactor orchestration.
+
+The command reads:
+
+- `summary.priority_order`, `summary.repair_slice`,
+  `summary.mechanical_problem_clusters`, and top-level `findings`;
+- `dependency_graph.tsv` and `dependency_edit_scope.txt` from the dependency
+  review directory;
+- optional `python-structure-hash-impact` JSON when before / after comparison
+  is in scope.
+
+The output schema is `python_structure_hash_scope_plan.v1`. It includes:
+
+- `impact_blocks`: dependency-connected repair blocks with root targets,
+  affected files, source groups, blockers, validation hints, and allowed files;
+- `scope_candidates`: candidate granularities such as top block, actionable
+  block wave, module group, file hotspot, and all visible blocks;
+- `selected_scope`: the deterministic candidate with the best objective score;
+- `repair_batches`: dependency-depth ordered waves, with review-required blocks
+  separated from write-capable batches;
+- `subagent_handoff_context`: token-light object-level prompts for
+  write-capable subagents.
+
+The scope objective maximizes priority coverage and penalizes writer waves,
+tool reruns, write conflicts, token cost, validation cost, and semantic risk.
+This treats node size as an optimization target rather than a fixed
+file/function rule. Missing dependency evidence does not fabricate a packet;
+the output status becomes `incomplete_evidence` and records
+`missing_evidence` so the caller can rerun dependency review.
 
 ## Module Groups
 

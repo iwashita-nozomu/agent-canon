@@ -73,6 +73,10 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    truncation は使わず、tool が出した finding を情報を減らさず保存します。
    - Python structural analysis: `python-structure-hash` ->
      `python-structure-hash-report`
+   - Python structural planning: `python-structure-hash-scope-plan` after
+     dependency review exists; this creates the full Change Impact Packet with
+     `impact_blocks`, `scope_candidates`, `selected_scope`, and
+     `repair_batches`
    - Before / after diff: `python-structure-hash-impact`。比較が明示されたときだけ使う
    - Algorithm modules: `python-algorithm-contract-check`
    - Module groups: `python-module-groups-check`

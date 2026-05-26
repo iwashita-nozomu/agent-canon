@@ -931,6 +931,101 @@ class DependencyManifestToolTest(unittest.TestCase):
                 (report_dir / "dependency_edit_scope.txt").read_text(encoding="utf-8"),
             )
 
+    def test_repo_review_report_dir_without_search_hits_records_changed_scope(self) -> None:
+        """Report-dir dependency review persists changed-file edit scope by default."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
+            target = root / "target.md"
+            source = root / "source.md"
+            report_dir = root / "reports" / "dependency-review"
+            target.write_text(
+                "\n".join(
+                    [
+                        "# Target",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines target fixture for changed scope.",
+                        "downstream design source.md source consumes target",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines source fixture for changed scope.",
+                        "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "target.md", "source.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "-c",
+                    "user.name=Test User",
+                    "commit",
+                    "-m",
+                    "seed dependency fixture",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            source.write_text(
+                source.read_text(encoding="utf-8") + "changed\n",
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--report-dir",
+                str(report_dir),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((report_dir / "dependency_edit_scope.txt").is_file())
+            self.assertIn(
+                "DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=source.md",
+                (report_dir / "dependency_edit_scope.txt").read_text(encoding="utf-8"),
+            )
+
     def test_symlink_root_views_are_skipped_without_breaking_scan(self) -> None:
         """Root symlink views are owned by link-root and do not fail header scans."""
         with tempfile.TemporaryDirectory() as tmp_dir:

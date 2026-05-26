@@ -135,6 +135,21 @@ token 予算に収まり、1 つの coherent な validation surface で確認で
 LLM が full artifact を読むのは、現在の repair batch、争点になった edge、review
 で根拠確認が必要な箇所に限定します。
 
+Python structural finding を seed にする場合は、`tool-finding-report` が作った
+full `python-structure-hash-report` JSON と `run_repo_dependency_review.sh` の
+report directory を次の tool に渡します。
+
+```bash
+agent-canon python-structure-hash-scope-plan \
+  --input <python-structure-hash-report.json> \
+  --dependency-report-dir <dependency-review-dir> \
+  --output <change-impact-packet.json>
+```
+
+この JSON は `Change Impact Packet` の機械生成正本です。親 agent はその中の
+`impact_blocks`、`scope_candidates`、`selected_scope`、`repair_batches`、
+`subagent_handoff_context` を使って orchestration plan を作ります。
+
 ## Core References
 
 - `documents/dependency-manifest-design.md`

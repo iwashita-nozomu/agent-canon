@@ -15,6 +15,7 @@ mod python_module_groups;
 mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
+mod python_structure_hash_scope_plan;
 mod rust_migration_plan;
 mod semantic_index;
 
@@ -64,6 +65,10 @@ fn main() {
         std::process::exit(python_structure_hash_impact::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "python-structure-hash-scope-plan" {
+        std::process::exit(python_structure_hash_scope_plan::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "python-algorithm-contract-check" {
         std::process::exit(python_algorithm_contract::run(&args[2..]));
     }
@@ -74,7 +79,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

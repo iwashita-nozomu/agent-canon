@@ -128,6 +128,9 @@ repair-slice loop で 1 slice ずつ進めます。
    header dependency、search scope、structural finding、tests / docs / config /
    log / Info surface、unknown dynamic edge を統合し、tool-generated
    `impact_blocks`、`repair_batches`、`subagent_handoff_context` を固定します。
+   Python structural finding では既定で
+   `agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir <dependency-review-dir> --output <change-impact-packet.json>`
+   を使い、親 agent が手作業で block 化しません。
 1. `repair_slice.root_finding` は今回の修正 batch の根を示します。実装単位は
    root finding 1 件に固定せず、同じ home/downstream group と dependency wave
    にあり、同じ責務で同時に消せる related finding / target object を batch に

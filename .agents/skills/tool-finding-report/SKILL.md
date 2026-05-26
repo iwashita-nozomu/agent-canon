@@ -18,6 +18,12 @@ upstream design ../../../agents/skills/refactor-loop.md consumes finding packets
 1. Fix the target scope, exclude rules, dependency roots, and output directory before running tools. Fix a baseline ref only when before/after impact is explicitly requested.
 1. Preserve raw machine results first with `$result-artifact-writeout`; failed or partial runs are evidence, not noise.
 1. Build structured full-scope artifacts from the raw results before interpreting them. Do not truncate to top-N findings inside this skill. For Python structural findings, use `python-structure-hash` -> `python-structure-hash-report`, and use `python-structure-hash-impact` only when before / after comparison is requested.
+1. When the structured Python findings will feed implementation or refactor
+   planning, preserve the full report and call
+   `python-structure-hash-scope-plan` through `$dependency-analysis` after the
+   dependency review directory exists. The scope-plan JSON, not a chat
+   summary, is the mechanical source for `impact_blocks`, `scope_candidates`,
+   `selected_scope`, and `repair_batches`.
 1. Include the relevant checker family for the task: algorithm contract, module groups, OOP readability, dependency review, static analysis, hook logs, or workflow evals.
 1. Mechanically rank every finding. If the tool does not provide priority, derive a deterministic order from severity, public API or algorithm-contract impact, dependency fan-in/fan-out, duplicate/thin/single-caller signals, production vs test/experiment scope, and tool confidence. Record the ranking policy in the report.
 1. Write a finding packet with scope, commands, raw artifacts, structured artifacts, full counts, full finding table or structured finding artifact reference, mechanical priority order, optional impact, and a handoff boundary. The caller or higher-level workflow chooses the repair slice and decides what to do next.

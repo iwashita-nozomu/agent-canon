@@ -110,6 +110,21 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
    avoids write conflicts, fits the token budget, and can be validated with one
    coherent test/tool surface; shrink the block only when semantic risk,
    ownership, or validation isolation requires it.
+1. For Python structural finding packets, generate the mechanical planning
+   packet with:
+
+```bash
+agent-canon python-structure-hash-scope-plan \
+  --input <python-structure-hash-report.json> \
+  --dependency-report-dir <dependency-review-dir> \
+  --output <change-impact-packet.json>
+```
+
+   The output `python_structure_hash_scope_plan.v1` is the default
+   `Change Impact Packet` input for refactor planning. Do not ask an LLM to
+   hand-partition `impact_blocks`, `scope_candidates`, `selected_scope`, or
+   `repair_batches` when this tool can read the structured report and
+   dependency artifacts.
 
 1. When reverse-edge migration is the task, add strict bidirectional validation:
 
