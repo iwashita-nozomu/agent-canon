@@ -21,6 +21,7 @@ from typing import cast
 
 EVAL_RESULTS_PREFIX = "agents/evals/results/"
 HOOK_RESULTS_PATH = Path("agents/evals/results/hook-runs")
+GIT_STATUS_PATH_OFFSET = 3
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ def relative(root: Path, path: Path) -> str:
 
 def status_path(line: str) -> str:
     """Extract the changed path from one porcelain status line."""
-    path = line[3:]
+    path = line[GIT_STATUS_PATH_OFFSET:]
     if " -> " in path:
         path = path.rsplit(" -> ", maxsplit=1)[-1]
     return path
@@ -154,8 +155,10 @@ def hook_namespace_findings(root: Path) -> tuple[int, int, int, list[Finding]]:
                 continue
             entry = cast(dict[str, object], loaded)
             namespace = entry.get("hook_log_namespace")
-            if namespaced and not isinstance(namespace, str):
+            if not isinstance(namespace, str):
                 legacy_missing_namespace += 1
+                if namespaced:
+                    findings.append(Finding("hook_log_namespace", label, "missing"))
                 continue
             if namespaced and namespace != expected_namespace:
                 findings.append(

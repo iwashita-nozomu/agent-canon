@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 36
+expected_count = 37
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 58
+expected_count = 59
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 36
+expected_count = 37
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -164,6 +164,18 @@ id = "TOOL-FINDING-3"
 critical = true
 description = "Requires prompt feedback classification and prompt repair before the next write-capable subagent."
 required_regex = ["handoff_prompt_gap", "shared_skill_or_workflow_gap", "workflow_monitor\\.py --runtime-feedback", "prompt_repair", "next write-capable subagent"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-4"
+critical = true
+description = "Routes Python structural finding packets through scope planning before implementation."
+required_regex = ["python-structure-hash-scope-plan", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-5"
+critical = true
+description = "Defaults tool finding runs to full repository scope and records any narrowed-scope exception."
+required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
 
 [[evals]]
 id = "report-writing-skill"
@@ -948,6 +960,12 @@ critical = true
 description = "Requires implementation to wait for hypothesis fields and fix-surface validation."
 required_regex = ["code-improvement", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "fix_surface_validated=yes", "Hypothesis Decision"]
 
+[[evals.checklist]]
+id = "DA-CHANGE-IMPACT-1"
+critical = true
+description = "Requires the structural scope-plan command and output fields."
+required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
+
 [[evals]]
 id = "codex-goals-workflow"
 target = "agents/workflows/codex-goals-workflow.md"
@@ -1231,6 +1249,12 @@ id = "REFACTOR-TOOL-FINDING-1"
 critical = true
 description = "Requires refactor-loop to consume tool-finding-report packets and repair prompt gaps before launching more write-capable subagents."
 required_regex = ["tool-finding-report", "finding packet", "impact", "handoff_prompt_gap", "write-capable subagent"]
+
+[[evals.checklist]]
+id = "REFACTOR-SCOPE-PLAN-1"
+critical = true
+description = "Requires refactor-loop to use the mechanical scope-plan output instead of manual block partitioning."
+required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
 
 [[evals]]
 id = "agent-learning-workflow-behavior-eval"

@@ -43,12 +43,15 @@ before / after impact を同じ source packet で結びます。
 ## Finding Packet
 
 tool finding report は次を 1 つの packet として残します。finding はこの skill
-内で勝手に削らず、対象 scope の full artifact として出します。mechanical
+内で勝手に削らず、既定では repository 全体を対象 scope にした full artifact
+として出します。mechanical
 priority order まではこの skill が必ず作ります。repair slice、reader-facing
 excerpt、実際に修正する対象の取捨選択は、この packet を使う上位 workflow や
 実装エージェントが選びます。
 
-- `scope`: 対象 path、baseline ref、exclude、dependency roots
+- `scope`: 既定 `full repository`、対象 path、baseline ref、exclude、dependency roots。
+  user が明示的に targeted / changed-only / slice scope を求めた場合、または tool
+  が repo-wide 実行できない場合だけ狭め、その理由を `scope_exception` として残す
 - `commands`: 実行 command、cwd、exit status、tool version または commit
 - `raw_artifacts`: tool の raw text / JSON / JSONL
 - `structured_artifacts`: 正規化 JSON、full table、summary
@@ -66,13 +69,22 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
 ## Procedure
 
 1. 対象 scope、exclude rules、dependency roots、output directory を固定します。
+   規定の対象 scope は `full repository` です。tool/checker の実行対象は
+   repo-wide に取り、targeted / changed-only / selected-path run は user が明示した
+   場合、tool が full repo を扱えない場合、または repo-wide run を補助する追加
+   診断としてだけ使います。scope を狭めた場合は `scope_exception=<reason>`、
+   `requested_scope=<...>`、`omitted_surfaces=<...>` を finding packet に残します。
    comparison ref / worktree は、差分 impact が明示されたときだけ固定します。
 1. raw result を先に保存します。保存時は `result-artifact-writeout` を使い、
    failed / partial run も evidence として残します。
-1. tool 固有の structured artifact を full scope で作ります。件数上限や top-N
+1. tool 固有の structured artifact を full repository scope で作ります。件数上限や top-N
    truncation は使わず、tool が出した finding を情報を減らさず保存します。
    - Python structural analysis: `python-structure-hash` ->
      `python-structure-hash-report`
+   - Python structural planning: `python-structure-hash-scope-plan` after
+     dependency review exists; this creates the full Change Impact Packet with
+     `impact_blocks`, `scope_candidates`, `selected_scope`, and
+     `repair_batches`
    - Before / after diff: `python-structure-hash-impact`。比較が明示されたときだけ使う
    - Algorithm modules: `python-algorithm-contract-check`
    - Module groups: `python-module-groups-check`
@@ -85,6 +97,14 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    rule は report に残し、同じ入力から同じ順序になるようにします。
 1. report では機械結果と agent interpretation を分けます。reader-facing report に
    する場合は `report-writing` を使います。
+   - user が「レポート」「まとめ」「結果を解釈」「Markdown にして」などを求めた場合、
+     `report-writing` は必須です。validation summary、command log、top-N excerpt、
+     raw JSON path だけで closeout してはいけません。
+   - 非自明な finding packet では、draft 前に `structure-planning` を使い、source
+     packet、reader guide、metric / count contract、priority policy、limitations、
+     next actions を固定します。
+   - report は full structured artifact を参照してよいですが、underlying artifact
+     は削らず、report 側に full table の保存先と取捨選択境界を明記します。
 1. finding を分類します。
    - `implementation_bug`: 実装を直す
    - `missing_test_or_design_evidence`: test / design artifact を直す
