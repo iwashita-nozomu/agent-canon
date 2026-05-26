@@ -161,6 +161,13 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 
 ## Academic Writing, Logic, And Notation
 
+- [Rhetorical Structure Theory: Toward a Functional Theory of Text Organization](https://doi.org/10.1515/text.1.1988.8.3.243)
+  - discourse span relation and text organization background for structure-planning.
+- [Using Linguistic Phenomena to Motivate a Set of Coherence Relations](https://doi.org/10.1080/01638539409544883)
+  - cue phrase / connective evidence for coherence relation design.
+- [Penn Discourse Treebank 3.0 Annotation Manual](https://catalog.ldc.upenn.edu/docs/LDC2019T05/PDTB3-Annotation-Manual.pdf)
+  - explicit connective and relation-sense background for separating surface
+    phrases such as `therefore` / `because` from relation primitives.
 - [Ten simple rules for structuring papers](https://doi.org/10.1371/journal.pcbi.1005619)
   - central contribution、context-content-conclusion、logical flow、results を claim sequence として積む構成、複数 reader からの feedback を得る process の根拠です。
 - [Flow in Scholarly Writing | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/Flow-Handout.pdf)

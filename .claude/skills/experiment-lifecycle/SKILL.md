@@ -19,5 +19,6 @@ upstream design ../../../agents/skills/structure-planning.md defines experiment 
 1. For formal or server-side runs, use a project `Makefile` target that calls `tools/experiments/run_managed_experiment.py` so `run_manifest.json` and `run.log` are captured automatically.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a `config.json` or YAML snapshot, and registered commands must consume `{config_path}`.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, metric contract, invalid interpretations, and validation gate before running or writing.
+1. For experiment plans or reports with nontrivial paragraph order or causal/evidence transitions, ask `$structure-planning` to use `agent-canon semantic-index discourse-relations --profile experiment-report` or `--profile methods-protocol` as advisory edge evidence.
 1. Use `$result-artifact-writeout` for result/report generation so raw run output, Markdown summary, manifest, run name, and overwrite policy are recorded separately.
 1. If code changes must iterate with explicit decision states, also use `experiment-change-loop`.

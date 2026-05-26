@@ -16,8 +16,8 @@ downstream design ../tools/catalog.yaml catalogs the semantic-index tool
 
 `agent-canon semantic-index` builds a repo-local semantic-vector cache for
 text-like files and uses that cache for advisory search, similar-item, merge
-candidate, natural-language relation, thin-document, provider-comparison, and
-fixture Eval reports.
+candidate, natural-language relation, discourse-connective relation,
+thin-document, provider-comparison, and fixture Eval reports.
 
 The tool is candidate generation, not deletion authority. Strict structure
 hashes, dependency graph analysis, AST equality, and safe removal decisions stay
@@ -230,6 +230,43 @@ blocks. This is dependency and responsibility evidence, not authority to merge
 or delete files. Code/document relations are useful as alignment evidence, but
 strict dependency headers, structure hashes, and human review remain the
 authority for refactor decisions.
+
+List discourse relation edges for paragraph/block ordering:
+
+```bash
+agent-canon semantic-index discourse-relations \
+  --profile experiment-report \
+  --top-k 50 \
+  --format jsonl
+```
+
+`discourse-relations` reuses the same SQLite nodes and provider-scoped vectors
+as `search`, `context-pack`, and `natural-relations`. It scans nearby document
+blocks inside each file, checks discourse-connective profiles, and persists
+candidate paragraph edges to the `discourse_relations` table through
+`analysis_runs`. Profiles are:
+
+- `general`
+- `experiment-report`
+- `methods-protocol`
+- `academic-argument`
+- `refactor-design`
+
+The output separates the relation primitive from the surface connective:
+`relation_family`, `relation_schema`, `surface_phrase`, `surface_order`, and
+`logical_direction` are distinct fields. This keeps paired variants such as
+`A therefore B` and `B because A` as the same `reason_to_result` schema while
+recording different surface order and logical direction. Results also include
+`naturalness_score`, `inverse_naturalness_score`, `direction_confidence`,
+`ambiguity`, and `gap_flags`.
+
+Use this command before writing or rendering nontrivial reports, experiment
+plans, papers, long documents, and refactor structure contracts when paragraph
+order or logic gaps matter. It is structure evidence only: it does not replace
+the structure contract, citation/evidence review, report review, dependency
+checks, or human judgment. If an LLM-backed embedding provider has been added
+with `embed-provider`, the same command can run against those latent vectors by
+selecting that provider and model.
 
 Run a fixture Eval:
 

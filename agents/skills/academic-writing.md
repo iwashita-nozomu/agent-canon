@@ -36,6 +36,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 
 - `claim contract` で central contribution、gap、reader、non-goal を先に固定する
 - section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
+- claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
@@ -57,6 +58,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 
 1. `claim contract` を短く書く
 1. 必要なら `structure-planning` で first section / figure / table、source-to-structure map、section order、invalid interpretation を固定する
+1. paragraph order や discourse connective が論点なら discourse-relations JSONL を構造 evidence として添付する
 1. `evidence map` と `notation ledger` を作る
 1. `section contract` と `paragraph claim map` を作る
 1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
