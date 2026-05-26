@@ -2,8 +2,10 @@
 # @dependency-start
 # responsibility Runs configurable local LLM single-file responsibility evals.
 # upstream design ../../agents/evals/README.md eval directory contract
+# upstream design ../../agents/evals/results/README.md eval result archive notice
 # upstream design ../../agents/evals/local_llm_responsibility_eval.toml local LLM eval manifest
-# upstream design ../../agents/evals/results/local-llm-responsibility/README.md local LLM result storage contract
+# upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and mount policy
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # upstream design ../../documents/local-llm-responsibility-analysis.md single-file local LLM scope policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../tools/README.md tool entrypoint index
@@ -46,9 +48,10 @@ from file_responsibility_llm import (  # noqa: E402
     prompt_for_target,
     read_target,
 )
+from runtime_log_paths import eval_results_dir  # noqa: E402
 
 MANIFEST_PATH = "agents/evals/local_llm_responsibility_eval.toml"
-RESULT_DIR = "agents/evals/results/local-llm-responsibility"
+RESULTS_FAMILY = "local-llm-responsibility"
 RUN_ID_PREFIX = "local-llm-eval"
 STATUS_VALUES = ("pass", "fail", "skip")
 RUN_ID_DIGEST_LENGTH = 10
@@ -121,6 +124,7 @@ class LocalLlmEvalRunner:
         run_llm: bool,
         require_llm: bool,
     ) -> None:
+        """Create one eval runner with resolved AgentCanon paths."""
         self.root = agent_canon_root(root.resolve())
         self.manifest_path = manifest_path if manifest_path.is_absolute() else self.root / manifest_path
         self.model = model
@@ -370,7 +374,7 @@ def report_status(results: Sequence[CaseResult]) -> str:
 def make_run_id(seed: str) -> str:
     """Return a unique local LLM eval run id."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    digest = hashlib.sha256(f"{timestamp}\n{seed}".encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
+    digest = hashlib.sha256(f"{timestamp}\n{seed}".encode()).hexdigest()[:RUN_ID_DIGEST_LENGTH]
     return f"{RUN_ID_PREFIX}-{timestamp}-{digest}"
 
 
@@ -425,7 +429,7 @@ def report_markdown(report: EvalReport) -> str:
 
 def write_accumulated_report(root: Path, report: EvalReport) -> EvalReport:
     """Write an append-only report and return a report with path populated."""
-    result_dir = root / RESULT_DIR
+    result_dir = eval_results_dir(root, RESULTS_FAMILY)
     result_dir.mkdir(parents=True, exist_ok=True)
     path = result_dir / f"{report.run_id}-{report.status}.md"
     path.write_text(report_markdown(report), encoding="utf-8")

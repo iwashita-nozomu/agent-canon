@@ -1,44 +1,56 @@
-# Eval Results
+# Legacy Eval Result Notices
 
 <!--
 @dependency-start
-responsibility Documents accumulated AgentCanon eval result storage.
+responsibility Documents the legacy AgentCanon eval result source-tree notice surface.
 upstream design ../README.md eval directory contract
-downstream design skill-workflow-prompt/README.md skill prompt eval result naming convention
+upstream design ../../../documents/runtime-log-archive.md external runtime log archive contract
+upstream design ../../../documents/runtime-log-archive-migration.md legacy in-tree result migration procedure
 downstream design hook-runs/README.md hook result naming convention
-downstream design local-llm-responsibility/README.md local LLM eval result naming convention
-downstream design workflow-selection/README.md workflow selection eval result naming convention
-downstream design report-quality/README.md report quality eval result naming convention
+downstream implementation ../../../tools/agent_tools/runtime_log_paths.py resolves active eval result paths
+downstream implementation ../../../tools/agent_tools/runtime_log_archive_git.py imports legacy eval reports
 downstream implementation ../../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../../../tools/agent_tools/generate_agent_runtime_dashboard.py summarizes accumulated result evidence
 @dependency-end
 -->
 
-This directory stores detailed eval outputs that AgentCanon keeps as durable
-evidence across runs.
+This directory is no longer the normal storage location for accumulated
+AgentCanon eval reports. AgentCanon source keeps this README and the
+`hook-runs/README.md` legacy schema notice only.
 
-Do not overwrite result files. Eval tools assign a unique run id for each
-measurement and write a new file. Periodic cleanup can compact or archive old
-results, but day-to-day agent runs append new evidence instead of replacing the
-last report.
+Normal accumulated eval reports belong in the external log archive documented
+in `documents/runtime-log-archive.md`:
 
-Current result families:
+```text
+.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md
+```
 
-- `skill-workflow-prompt/`: prompt evals produced when a skill or workflow
-  prompt is used, changed, or repaired.
-- `hook-runs/`: Codex hook outcomes accumulated with unique `hook_run_id`
-  values so PR / push guide generation can group repeated failures without
-  overwriting raw events.
-- `local-llm-responsibility/`: single-file local LLM responsibility eval
-  reports produced by `local_llm_eval.py`. Prompt-only runs are the default;
-  model-backed runs are optional and never become repo-wide CI authority.
-- `workflow-selection/`: prompt-to-workflow routing eval reports produced by
-  `evaluate_workflow_selection.py`. These reports prove that common user
-  wording still maps to the expected workflow labels.
-- `report-quality/`: report-writing checklist eval reports produced by
-  `evaluate_report_quality.py`. These reports prove that report authoring
-  prompts still require source packets, evidence traceability, limitations,
-  actionability, artifact separation, and reviewer routing.
+Historical in-tree reports are imported into:
+
+```text
+.agent-canon/log-archive/eval-results/legacy-import/<family>/
+```
+
+Result families currently read by the tools are `skill-workflow-prompt`,
+`local-llm-responsibility`, `workflow-selection`, and `report-quality`.
+Tooling reads the mounted archive first, then the legacy import path, then this
+old source-tree path only as a fallback for temporary tests or unmigrated
+checkouts.
+
+If this directory grows new report files, migrate them instead of committing
+them to AgentCanon source:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py ensure
+python3 tools/agent_tools/runtime_log_archive_git.py import-eval-results --delete-source
+python3 tools/agent_tools/runtime_log_archive_git.py push \
+  --message "Import legacy AgentCanon eval results"
+```
+
+The `log_archive_mount_warning.py` hook warns, without blocking, when
+`.agent-canon/log-archive/` is not mounted as a Git clone. The warning is a
+signal to run `runtime_log_archive_git.py ensure` before accumulating hook or
+eval logs.
 
 Validate the accumulated evidence before using it as workflow feedback:
 
@@ -48,12 +60,12 @@ python3 tools/agent_tools/eval_accumulation_check.py --root .
 
 The checker is structural. It accepts legacy readable reports, but namespaced
 new hook logs must carry the required fields documented under `hook-runs/`.
-Raw hook and eval logs stay append-only after a prompt, skill, workflow, or
-tool repair. Do not move or delete them to make a new report look green. Tools
-that turn accumulated evidence into routing guidance use the latest Git commit
-time of the affected source paths as the analysis cutover: pre-cutover skill
-routing signals are archived out of current gap math while remaining available
-as raw chronology.
+Raw hook and eval logs stay append-only in the archive after a prompt, skill,
+workflow, or tool repair. Do not delete archive history to make a new report
+look green. Tools that turn accumulated evidence into routing guidance use the
+latest Git commit time of the affected source paths as the analysis cutover:
+pre-cutover skill routing signals are archived out of current gap math while
+remaining available as raw chronology.
 For a human-readable view, generate the runtime dashboard. It shows not only
 aggregate counts, but also Mermaid evidence flow, per-skill eval failure rates,
 workflow attribution for hook firing, prompt/tool-selection evidence, token

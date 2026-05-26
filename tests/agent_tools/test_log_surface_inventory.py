@@ -255,6 +255,32 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "")
 
+    def test_discovers_surfaces_without_git_metadata(self) -> None:
+        """Inventory should still work in mounted containers where git is unavailable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            hook = root / ".codex" / "hooks" / "sample.py"
+            hook.parent.mkdir(parents=True)
+            hook.write_text("print('NO_GIT_FIELD=1')\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--format",
+                    "json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        fields = {record["field"] for record in payload["records"]}
+        self.assertIn("NO_GIT_FIELD", fields)
+
 
 if __name__ == "__main__":
     unittest.main()

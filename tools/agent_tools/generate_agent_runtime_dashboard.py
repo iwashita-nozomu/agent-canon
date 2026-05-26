@@ -6,6 +6,7 @@
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, memory, eval, and issue evidence
+# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
 # downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
 # @dependency-end
@@ -34,6 +35,7 @@ from generate_agent_improvement_guide import (  # noqa: E402
     HookEvidenceCounts,
     counter_lines,
 )
+from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 TOKEN_COMPARISON_RE = re.compile(
@@ -314,10 +316,20 @@ class ResultFamilyReader:
         """Store the AgentCanon evidence root."""
         self.root = root
 
-    def read_family(self, family: str, relative_dir: str) -> ResultFamilySummary:
+    def read_family(self, family: str) -> ResultFamilySummary:
         """Read one accumulated Markdown report directory."""
-        directory = self.root / relative_dir
-        reports = tuple(sorted(path for path in directory.glob("*.md") if path.name != "README.md"))
+        directories = eval_result_search_dirs(self.root, family)
+        reports = tuple(
+            sorted(
+                {
+                    path
+                    for directory in directories
+                    if directory.is_dir()
+                    for path in directory.glob("*.md")
+                    if path.name != "README.md"
+                }
+            )
+        )
         status_counts: Counter[str] = Counter()
         failed_reports: list[Path] = []
         for report in reports:
@@ -327,7 +339,7 @@ class ResultFamilyReader:
                 failed_reports.append(report)
         return ResultFamilySummary(
             family=family,
-            directory=directory,
+            directory=directories[0],
             reports=reports,
             failed_reports=tuple(failed_reports),
             status_counts=status_counts,
@@ -576,6 +588,7 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
             "agents/evals/results/**/*.md",
+            ".agent-canon/log-archive/eval-results/**/*.md",
         )
         paths: set[Path] = set()
         for pattern in patterns:
@@ -1041,22 +1054,10 @@ class AgentRuntimeDashboard:
         hook_files = self.guide.hook_result_paths()
         reader = ResultFamilyReader(self.root)
         result_families = (
-            reader.read_family(
-                "skill-workflow-prompt",
-                "agents/evals/results/skill-workflow-prompt",
-            ),
-            reader.read_family(
-                "local-llm-responsibility",
-                "agents/evals/results/local-llm-responsibility",
-            ),
-            reader.read_family(
-                "workflow-selection",
-                "agents/evals/results/workflow-selection",
-            ),
-            reader.read_family(
-                "report-quality",
-                "agents/evals/results/report-quality",
-            ),
+            reader.read_family("skill-workflow-prompt"),
+            reader.read_family("local-llm-responsibility"),
+            reader.read_family("workflow-selection"),
+            reader.read_family("report-quality"),
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         return RuntimeDashboardSummary(
@@ -1775,15 +1776,17 @@ def evidence_location_lines(root: Path) -> list[str]:
     """Return the canonical runtime evidence locations."""
     return [
         f"- evidence_root: `{root.as_posix()}`",
-        "- hook_jsonl: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`",
-        "- skill_prompt_eval_reports: `agents/evals/results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
-        "- local_llm_eval_reports: `agents/evals/results/local-llm-responsibility/<eval-run-id>-<status>.md`",
-        "- workflow_selection_eval_reports: `agents/evals/results/workflow-selection/<eval-run-id>-<status>.md`",
-        "- report_quality_eval_reports: `agents/evals/results/report-quality/<eval-run-id>-<status>.md`",
+        "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
+        "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
+        "- hook_jsonl_legacy: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`",
+        "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
+        "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
+        "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
+        "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
         "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
-        "- reference_capture_hook: `agents/evals/results/hook-runs/<runtime-namespace>/reference_capture_guard.jsonl`",
+        "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
         "- github_actions_dashboard: AgentCanon repository Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
     ]

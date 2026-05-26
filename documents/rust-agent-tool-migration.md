@@ -133,7 +133,8 @@ agent-canon rust-migration-plan --root . --limit 12
 ```
 
 The plan combines this document's fixed first-target list with accumulated
-hook and skill feedback logs under `agents/evals/results/hook-runs/`. It emits
+hook and skill feedback logs from the mounted runtime log archive and legacy
+`agents/evals/results/hook-runs/`. It emits
 `port-now` entries for stable, repo-wide inventory or static-analysis tools,
 `observe-before-port` entries for tools that appear in feedback logs but are
 not yet stable migration targets, and `keep-python` entries for orchestration

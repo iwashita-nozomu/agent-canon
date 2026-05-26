@@ -42,9 +42,9 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
 ```
 
 When a run uses skills, run the same prompt eval with accumulated evidence.
-Detailed reports are stored in
-`agents/evals/results/skill-workflow-prompt/` and are never overwritten during
-normal agent work:
+Detailed reports are stored in the mounted runtime log archive under
+`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` and are never
+overwritten during normal agent work:
 
 ```bash
 python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
@@ -104,14 +104,20 @@ Hook and tool outcomes must also close the protocol feedback loop. Record
 `protocol_feedback_reason=...` so the run shows whether parent workflow rules,
 subagent handoff rules, role TOML, evals, or memory changed because of the
 observed results.
-Hook outcomes accumulate under `agents/evals/results/hook-runs/` with unique
-`hook_run_id` values. Normal hook writers shard JSONL files by runtime namespace
-under `hook-runs/<runtime-namespace>/<hook-name>.jsonl` so multiple containers
-or template-derived repositories do not append to one conflicting filename.
+Hook outcomes and accumulated eval reports use the external runtime log archive
+documented in `documents/runtime-log-archive.md`. Hook entries carry unique
+`hook_run_id` values. Normal hook writers shard JSONL files by source repo key
+and runtime namespace under
+`.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
+so multiple containers or template-derived repositories do not append to one
+conflicting AgentCanon source-tree filename. The historical in-tree
+`agents/evals/results/hook-runs/` directory remains a legacy reader surface and
+README anchor only.
 Run `python3 tools/agent_tools/eval_accumulation_check.py --root .` before
 using accumulated evidence in a PR or guide. The gate validates directory
-presence, JSONL readability, unique run ids, non-ignored evidence paths, and
-legacy report readability without compacting or deleting old results.
+presence, mounted JSONL readability when available, unique run ids, non-ignored
+tracked evidence paths, intentionally ignored archive paths, and legacy report
+readability without compacting or deleting old results.
 Local LLM responsibility prompt evals are configured separately:
 
 ```bash
@@ -120,9 +126,10 @@ agent-canon local-llm eval \
 ```
 
 Use `--accumulate` to write a uniquely named report under
-`agents/evals/results/local-llm-responsibility/`. Use `--run-llm` only when the
-local llama.cpp runtime is intentionally available; CI and static gates keep the
-model-backed step optional and evaluate prompt boundaries only.
+`.agent-canon/log-archive/eval-results/local-llm-responsibility/`. Use
+`--run-llm` only when the local llama.cpp runtime is intentionally available; CI
+and static gates keep the model-backed step optional and evaluate prompt
+boundaries only.
 Workflow selection evals are configured separately:
 
 ```bash
@@ -131,7 +138,8 @@ python3 tools/agent_tools/evaluate_workflow_selection.py \
 ```
 
 Use `--accumulate` when the workflow-routing measurement itself should become
-durable AgentCanon evidence under `agents/evals/results/workflow-selection/`.
+durable AgentCanon evidence under
+`.agent-canon/log-archive/eval-results/workflow-selection/`.
 Reports list case IDs, expected workflow labels, and observed workflow labels;
 they do not store the raw prompt text.
 Report quality evals are configured separately:
@@ -142,7 +150,8 @@ python3 tools/agent_tools/evaluate_report_quality.py \
 ```
 
 Use `--accumulate` when the report-writing checklist measurement itself should
-become durable AgentCanon evidence under `agents/evals/results/report-quality/`.
+become durable AgentCanon evidence under
+`.agent-canon/log-archive/eval-results/report-quality/`.
 Reports list checklist IDs and missing patterns; they do not store raw report
 drafts or prompts.
 Codex subagent role evals are configured separately:

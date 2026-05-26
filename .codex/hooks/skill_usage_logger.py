@@ -713,11 +713,8 @@ def _log_append_log(root: Path, entry: dict[str, object]) -> None:
     if os.environ.get(DISABLE_LOG_ENV, "").strip() == "1":
         return
     try:
-        path = default_log_path(root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as stream:
-            json.dump(entry, stream, sort_keys=True)
-            stream.write("\n")
+        context = HookLogContext(root, "skill_usage", os.environ.get(LOG_PATH_ENV, "").strip())
+        context.append(entry)
     except OSError:
         return
 

@@ -3,6 +3,7 @@
 # responsibility Generates PR and push-time guidance from AgentCanon memory, eval, hook, and issue evidence.
 # upstream design ../../agents/evals/README.md eval evidence contract
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
+# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
 # upstream design ../../issues/README.md durable operational issue storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on PR and push
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
@@ -14,11 +15,20 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from runtime_log_paths import (  # noqa: E402
+    eval_result_search_dirs,
+    hook_result_search_dirs,
+)
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -481,7 +491,7 @@ class AgentImprovementGuide:
 
     def collect(self) -> EvidenceSummary:
         """Collect all evidence families needed by the guide."""
-        skill_eval_reports = self.paths("agents/evals/results/skill-workflow-prompt/*.md")
+        skill_eval_reports = self.skill_eval_report_paths()
         failed_skill_eval_reports = tuple(
             path for path in skill_eval_reports if self.skill_eval_failed(path)
         )
@@ -497,6 +507,17 @@ class AgentImprovementGuide:
     def paths(self, pattern: str) -> tuple[Path, ...]:
         """Return sorted paths for one root-relative glob."""
         return tuple(sorted(self.root.glob(pattern)))
+
+    def skill_eval_report_paths(self) -> tuple[Path, ...]:
+        """Return skill prompt eval reports from mounted archive and legacy paths."""
+        reports = {
+            path
+            for result_dir in eval_result_search_dirs(self.root, "skill-workflow-prompt")
+            if result_dir.is_dir()
+            for path in result_dir.glob("*.md")
+            if path.name != "README.md"
+        }
+        return tuple(sorted(reports))
 
     def memory_entry_counts(self) -> dict[str, int]:
         """Return bullet-entry counts for shared memory notes."""
@@ -531,9 +552,12 @@ class AgentImprovementGuide:
 
     def hook_result_paths(self) -> tuple[Path, ...]:
         """Return direct and runtime-sharded hook result JSONL paths."""
-        direct = self.paths("agents/evals/results/hook-runs/*.jsonl")
-        sharded = self.paths("agents/evals/results/hook-runs/**/*.jsonl")
-        return tuple(sorted(set(direct + sharded)))
+        paths: list[Path] = []
+        for hook_dir in hook_result_search_dirs(self.requested_root, self.root):
+            direct = tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
+            sharded = tuple(sorted(hook_dir.glob("**/*.jsonl"))) if hook_dir.is_dir() else ()
+            paths.extend(direct + sharded)
+        return tuple(sorted(set(paths)))
 
     def render(self, summary: EvidenceSummary) -> str:
         """Render the improvement guide as Markdown."""
