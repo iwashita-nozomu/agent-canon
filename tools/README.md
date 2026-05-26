@@ -423,6 +423,7 @@ agent-canon semantic-index search --query-file reports/search_query.txt --top-k 
 agent-canon semantic-index context-pack --query-file reports/search_query.txt --max-cells 12 --max-total-chars 6000 --format text
 agent-canon semantic-index compare-providers --db reports/semantic-index.sqlite --query-file reports/search_query.txt
 python3 tools/agent_tools/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+agent-canon semantic-index natural-relations --top-k 50 --format jsonl
 agent-canon semantic-index thin-docs --top-k 20 --format text
 agent-canon semantic-index eval --fixture tests/fixtures/semantic-index/basic
 python3 tools/agent_tools/route.py --area search
@@ -461,9 +462,9 @@ embedding vectors, and do not add API keys or model choices to Dockerfile
 defaults.
 
 `agent-canon semantic-index` is the Rust-native SQLite-backed candidate
-generator for semantic search, similar pairs, merge candidates, thin-document
-wrappers, provider comparison, fixture Eval, and output-artifact Eval. Its
-default generated cache is
+generator for semantic search, similar pairs, merge candidates,
+natural-language responsibility relations, thin-document wrappers, provider
+comparison, fixture Eval, and output-artifact Eval. Its default generated cache is
 `~/.cache/agent-canon/semantic-index/<repo-key>/index.sqlite`; explicit `--db`
 paths are still allowed for run-local artifacts. `search` accepts `--query`,
 `--query-file`, or `--query-stdin`; use file/stdin for long user requests and
@@ -478,7 +479,10 @@ keeps full-repo input but only compares nodes inside the same responsibility
 scope, surface kind, document topic, and node kind, so code/document matches,
 runtime mirrors, and eval/report logs are never reported as merge evidence.
 JSONL results include `same_responsibility`, `candidate_bucket`, and per-side
-`responsibility_bucket` for review routing. `thin-docs` reports low-content,
+`responsibility_bucket` for review routing. `natural-relations` scores both
+directions of a pair as "left is a kind of right" and "right is a kind of
+left", persists the result to SQLite, and classifies pairs as `equivalent`,
+`unrelated`, or one-way containment. `thin-docs` reports low-content,
 high-similarity document wrappers
 with advisory actions such as `inline_into_target` or `keep_entrypoint`.
 Preserved source/split guide pairs and tiny heading-only sections are filtered

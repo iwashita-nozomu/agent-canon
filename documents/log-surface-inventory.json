@@ -2180,7 +2180,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_BUILD",
-      "line": 292,
+      "line": 321,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2188,7 +2188,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CLI",
-      "line": 408,
+      "line": 450,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2196,7 +2196,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CLI_ERROR",
-      "line": 409,
+      "line": 451,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2204,7 +2204,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CONTEXT_PACK",
-      "line": 3526,
+      "line": 3932,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2212,7 +2212,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_CONTEXT_PACK_CELLS",
-      "line": 3527,
+      "line": 3933,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2220,7 +2220,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_DB",
-      "line": 293,
+      "line": 322,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2228,7 +2228,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_DB",
-      "line": 318,
+      "line": 347,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2236,7 +2236,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_EMBEDDINGS",
-      "line": 296,
+      "line": 325,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2244,7 +2244,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_EMBEDDINGS",
-      "line": 320,
+      "line": 349,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2252,7 +2252,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_EMBED_PROVIDER",
-      "line": 317,
+      "line": 346,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2260,7 +2260,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_ERROR",
-      "line": 4151,
+      "line": 4630,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2268,7 +2268,15 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_FILES",
-      "line": 294,
+      "line": 323,
+      "path": "rust/agent-canon/src/semantic_index.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "SEMANTIC_INDEX_NATURAL_RELATIONS",
+      "line": 4097,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2276,7 +2284,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_NODES",
-      "line": 295,
+      "line": 324,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2284,7 +2292,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_NODES",
-      "line": 319,
+      "line": 348,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2292,7 +2300,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_SEARCH",
-      "line": 3478,
+      "line": 3884,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
@@ -2300,7 +2308,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "SEMANTIC_INDEX_THIN_DOCS",
-      "line": 3634,
+      "line": 4040,
       "path": "rust/agent-canon/src/semantic_index.rs",
       "surface": "tool"
     },
