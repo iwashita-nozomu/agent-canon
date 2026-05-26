@@ -5,6 +5,7 @@
 # upstream design ../../agents/skills/result-artifact-writeout.md defines raw and summary artifact writeout
 # upstream implementation ./generate_agent_runtime_dashboard.py generates compact runtime summaries
 # downstream report ../../reports/agents/*/subagent_revision_summary.md records run-local summary output
+# downstream implementation ../../tools/README.md documents run-local summary output
 # @dependency-end
 """Summarize subagent revise/rework evidence without reading raw JSONL logs."""
 
@@ -29,7 +30,7 @@ WORK_LOG_RE = re.compile(
     r"(?P<kind>[^|]+)\|\s+(?P<clauses>[^|]+)\|\s+"
     r"(?P<message>.*?)(?:\s+\|\s+Next:\s+(?P<next>.*))?$"
 )
-BACKTICK_ROLE_RE = re.compile(r"`(?P<role>[a-z][a-z0-9_-]*(?:_[a-z0-9_-]+)*)`")
+BACKTICK_ROLE_RE = re.compile(r"`(?P<role>[a-z][a-z0-9_-]{0,79})`")
 
 SUBAGENT_TERMS = (
     "subagent",

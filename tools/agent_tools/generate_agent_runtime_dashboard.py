@@ -6,6 +6,7 @@
 # upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, memory, eval, and issue evidence
+# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
 # downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
 # @dependency-end
@@ -34,6 +35,7 @@ from generate_agent_improvement_guide import (  # noqa: E402
     HookEvidenceCounts,
     counter_lines,
 )
+from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 TOKEN_COMPARISON_RE = re.compile(
@@ -65,8 +67,11 @@ TOKEN_SUMMARY_MARKDOWN_RE = re.compile(
     r"TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=(?P<moving>[0-9.]+)",
     re.DOTALL,
 )
+ISO_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z")
+RUN_ID_TIMESTAMP_RE = re.compile(r"\d{8}T\d{6}(?:\d{6})?Z")
 MAX_REPORT_LINES = 20
 MAX_COMPACT_REPORT_LINES = 8
+ROLLING_TREND_WINDOW = 8
 UNKNOWN_SORT_ORDER = 9
 NO_RESET_EPOCH = 0
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -145,6 +150,22 @@ class HookWorkflowBreakdown:
 
 
 @dataclass(frozen=True)
+class TimedIntMetric:
+    """One integer metric with an optional chronological timestamp."""
+
+    epoch: int
+    value: int
+
+
+@dataclass(frozen=True)
+class TimedFloatMetric:
+    """One float metric with an optional chronological timestamp."""
+
+    epoch: int
+    value: float
+
+
+@dataclass(frozen=True)
 class TokenUsageBreakdown:
     """Token consumption evidence inferred from workflow monitor reports."""
 
@@ -154,12 +175,16 @@ class TokenUsageBreakdown:
     summary_count: int
     baseline_total_tokens: int
     candidate_total_tokens: int
+    baseline_token_counts: tuple[int, ...]
+    candidate_token_counts: tuple[int, ...]
     token_ratios: tuple[float, ...]
     session_count: int
     token_event_count: int
     total_tokens: int
     latest_moving_average_total: float
     average_tokens_per_event: float
+    timed_candidate_token_counts: tuple[TimedIntMetric, ...]
+    timed_token_ratios: tuple[TimedFloatMetric, ...]
 
 
 @dataclass(frozen=True)
@@ -170,6 +195,8 @@ class PromptToolBreakdown:
     prompt_excerpt_entries: int
     prompt_missing_excerpt_entries: int
     prompt_total_chars: int
+    prompt_char_counts: tuple[int, ...]
+    timed_prompt_char_counts: tuple[TimedIntMetric, ...]
     tool_selection_entries: int
     tools: Counter[str]
     command_verbs: Counter[str]
@@ -289,10 +316,20 @@ class ResultFamilyReader:
         """Store the AgentCanon evidence root."""
         self.root = root
 
-    def read_family(self, family: str, relative_dir: str) -> ResultFamilySummary:
+    def read_family(self, family: str) -> ResultFamilySummary:
         """Read one accumulated Markdown report directory."""
-        directory = self.root / relative_dir
-        reports = tuple(sorted(path for path in directory.glob("*.md") if path.name != "README.md"))
+        directories = eval_result_search_dirs(self.root, family)
+        reports = tuple(
+            sorted(
+                {
+                    path
+                    for directory in directories
+                    if directory.is_dir()
+                    for path in directory.glob("*.md")
+                    if path.name != "README.md"
+                }
+            )
+        )
         status_counts: Counter[str] = Counter()
         failed_reports: list[Path] = []
         for report in reports:
@@ -302,7 +339,7 @@ class ResultFamilyReader:
                 failed_reports.append(report)
         return ResultFamilySummary(
             family=family,
-            directory=directory,
+            directory=directories[0],
             reports=reports,
             failed_reports=tuple(failed_reports),
             status_counts=status_counts,
@@ -487,6 +524,10 @@ class TokenUsageBreakdownReader:
         files: set[Path] = set()
         summary_files: set[Path] = set()
         ratios: list[float] = []
+        baseline_counts: list[int] = []
+        candidate_counts: list[int] = []
+        timed_candidate_counts: list[TimedIntMetric] = []
+        timed_ratios: list[TimedFloatMetric] = []
         baseline_total = 0
         candidate_total = 0
         summary_count = 0
@@ -497,10 +538,16 @@ class TokenUsageBreakdownReader:
         average_tokens_per_event = 0.0
         for path in cls.candidate_paths(root):
             text = path.read_text(encoding="utf-8")
+            epoch = cls.evidence_epoch(path, text)
             for baseline, candidate, ratio in cls.comparisons(text):
                 files.add(path)
                 baseline_total += baseline
                 candidate_total += candidate
+                baseline_counts.append(baseline)
+                candidate_counts.append(candidate)
+                if epoch > 0:
+                    timed_candidate_counts.append(TimedIntMetric(epoch, candidate))
+                    timed_ratios.append(TimedFloatMetric(epoch, ratio))
                 ratios.append(ratio)
             for sessions, events, total, moving, average in cls.summaries(text):
                 summary_files.add(path)
@@ -517,12 +564,20 @@ class TokenUsageBreakdownReader:
             summary_count=summary_count,
             baseline_total_tokens=baseline_total,
             candidate_total_tokens=candidate_total,
+            baseline_token_counts=tuple(baseline_counts),
+            candidate_token_counts=tuple(candidate_counts),
             token_ratios=tuple(ratios),
             session_count=session_count,
             token_event_count=token_event_count,
             total_tokens=total_tokens,
             latest_moving_average_total=latest_moving_average_total,
             average_tokens_per_event=average_tokens_per_event,
+            timed_candidate_token_counts=tuple(
+                sorted(timed_candidate_counts, key=lambda observation: observation.epoch)
+            ),
+            timed_token_ratios=tuple(
+                sorted(timed_ratios, key=lambda observation: observation.epoch)
+            ),
         )
 
     @staticmethod
@@ -533,6 +588,7 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
             "agents/evals/results/**/*.md",
+            ".agent-canon/log-archive/eval-results/**/*.md",
         )
         paths: set[Path] = set()
         for pattern in patterns:
@@ -570,6 +626,17 @@ class TokenUsageBreakdownReader:
                     )
                 )
         return tuple(matches)
+
+    @staticmethod
+    def evidence_epoch(path: Path, text: str) -> int:
+        """Return a chronological timestamp for token evidence when available."""
+        text_match = ISO_TIMESTAMP_RE.search(text)
+        if text_match is not None:
+            return parse_hook_timestamp(text_match.group(0))
+        path_match = RUN_ID_TIMESTAMP_RE.search(path.as_posix())
+        if path_match is None:
+            return NO_RESET_EPOCH
+        return parse_compact_utc_timestamp(path_match.group(0))
 
 
 @dataclass
@@ -987,22 +1054,10 @@ class AgentRuntimeDashboard:
         hook_files = self.guide.hook_result_paths()
         reader = ResultFamilyReader(self.root)
         result_families = (
-            reader.read_family(
-                "skill-workflow-prompt",
-                "agents/evals/results/skill-workflow-prompt",
-            ),
-            reader.read_family(
-                "local-llm-responsibility",
-                "agents/evals/results/local-llm-responsibility",
-            ),
-            reader.read_family(
-                "workflow-selection",
-                "agents/evals/results/workflow-selection",
-            ),
-            reader.read_family(
-                "report-quality",
-                "agents/evals/results/report-quality",
-            ),
+            reader.read_family("skill-workflow-prompt"),
+            reader.read_family("local-llm-responsibility"),
+            reader.read_family("workflow-selection"),
+            reader.read_family("report-quality"),
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         return RuntimeDashboardSummary(
@@ -1207,6 +1262,10 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "",
         *compact_markdown_prompt_drilldown_lines(summary),
         "",
+        "### Prompt Token Trend Drilldown",
+        "",
+        *compact_prompt_token_trend_drilldown_lines(summary),
+        "",
         "### Token Consumption Drilldown",
         "",
         *compact_token_consumption_drilldown_lines(summary),
@@ -1355,6 +1414,28 @@ def compact_token_consumption_drilldown_lines(summary: RuntimeDashboardSummary) 
     ]
 
 
+def compact_prompt_token_trend_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return rolling prompt/token trend metrics from generated summaries."""
+    prompt = summary.prompt_tool_breakdown
+    token = summary.token_usage_breakdown
+    return [
+        "| metric | value |",
+        "| --- | --- |",
+        f"| `rolling_window_observations` | `{ROLLING_TREND_WINDOW}` |",
+        f"| `prompt_calls` | `{prompt.prompt_entries}` |",
+        f"| `prompt_chars_per_call_all` | `{mean_int_label(prompt.prompt_char_counts)}` |",
+        f"| `prompt_chars_per_call_recent` | `{rolling_mean_timed_int_label(prompt.timed_prompt_char_counts)}` |",
+        f"| `token_comparisons` | `{token.comparison_count}` |",
+        f"| `token_ratio_all` | `{average_ratio(token.token_ratios)}` |",
+        f"| `token_ratio_recent` | `{rolling_average_timed_ratio(token.timed_token_ratios)}` |",
+        f"| `candidate_tokens_per_comparison_all` | `{mean_int_label(token.candidate_token_counts)}` |",
+        f"| `candidate_tokens_per_comparison_recent` | `{rolling_mean_timed_int_label(token.timed_candidate_token_counts)}` |",
+        f"| `prompt_timed_observations` | `{len(prompt.timed_prompt_char_counts)}` |",
+        f"| `token_timed_observations` | `{len(token.timed_token_ratios)}` |",
+        f"| `joint_trend_status` | `{prompt_token_joint_status(summary)}` |",
+    ]
+
+
 def compact_reference_capture_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return reference-capture details from parsed hook logs."""
     breakdown = summary.reference_capture_breakdown
@@ -1432,6 +1513,8 @@ class PromptToolAccumulator:
     prompt_excerpt_entries: int = 0
     prompt_missing_excerpt_entries: int = 0
     prompt_total_chars: int = 0
+    prompt_char_counts: list[int] = field(default_factory=lambda: list[int]())
+    timed_prompt_char_counts: list[TimedIntMetric] = field(default_factory=lambda: list[TimedIntMetric]())
     tool_selection_entries: int = 0
     tools: Counter[str] = field(default_factory=lambda: Counter[str]())
     command_verbs: Counter[str] = field(default_factory=lambda: Counter[str]())
@@ -1446,8 +1529,13 @@ class PromptToolAccumulator:
         """Add prompt capture evidence from one hook entry."""
         if entry.get("prompt_capture_status") != "present":
             return
+        prompt_chars = integer_field(entry, "prompt_char_count")
         self.prompt_entries += 1
-        self.prompt_total_chars += integer_field(entry, "prompt_char_count")
+        self.prompt_total_chars += prompt_chars
+        self.prompt_char_counts.append(prompt_chars)
+        timestamp = parse_hook_timestamp(entry.get("timestamp"))
+        if timestamp > 0:
+            self.timed_prompt_char_counts.append(TimedIntMetric(timestamp, prompt_chars))
         if str(entry.get("prompt_excerpt_redacted") or ""):
             self.prompt_excerpt_entries += 1
         else:
@@ -1472,6 +1560,10 @@ class PromptToolAccumulator:
             prompt_excerpt_entries=self.prompt_excerpt_entries,
             prompt_missing_excerpt_entries=self.prompt_missing_excerpt_entries,
             prompt_total_chars=self.prompt_total_chars,
+            prompt_char_counts=tuple(self.prompt_char_counts),
+            timed_prompt_char_counts=tuple(
+                sorted(self.timed_prompt_char_counts, key=lambda observation: observation.epoch)
+            ),
             tool_selection_entries=self.tool_selection_entries,
             tools=self.tools,
             command_verbs=self.command_verbs,
@@ -1684,15 +1776,17 @@ def evidence_location_lines(root: Path) -> list[str]:
     """Return the canonical runtime evidence locations."""
     return [
         f"- evidence_root: `{root.as_posix()}`",
-        "- hook_jsonl: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`",
-        "- skill_prompt_eval_reports: `agents/evals/results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
-        "- local_llm_eval_reports: `agents/evals/results/local-llm-responsibility/<eval-run-id>-<status>.md`",
-        "- workflow_selection_eval_reports: `agents/evals/results/workflow-selection/<eval-run-id>-<status>.md`",
-        "- report_quality_eval_reports: `agents/evals/results/report-quality/<eval-run-id>-<status>.md`",
+        "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
+        "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
+        "- hook_jsonl_legacy: `agents/evals/results/hook-runs/<runtime-namespace>/<hook-name>.jsonl`",
+        "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
+        "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
+        "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
+        "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
         "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
-        "- reference_capture_hook: `agents/evals/results/hook-runs/<runtime-namespace>/reference_capture_guard.jsonl`",
+        "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
         "- github_actions_dashboard: AgentCanon repository Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
     ]
@@ -2833,6 +2927,20 @@ def parse_hook_timestamp(value: object) -> int:
     return int(parsed.timestamp())
 
 
+def parse_compact_utc_timestamp(value: str) -> int:
+    """Return epoch seconds parsed from a compact UTC run id timestamp."""
+    trimmed = value.removesuffix("Z")
+    if len(trimmed) == len("YYYYMMDDTHHMMSS"):
+        format_string = "%Y%m%dT%H%M%S"
+    else:
+        format_string = "%Y%m%dT%H%M%S%f"
+    try:
+        parsed = datetime.strptime(trimmed, format_string).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return NO_RESET_EPOCH
+    return int(parsed.timestamp())
+
+
 def entry_inside_reset_window(entry_epoch: int, reset: SelectionReset) -> bool:
     """Return whether an event should count for a component reset window."""
     return (
@@ -2961,6 +3069,38 @@ def average_ratio(values: Sequence[float]) -> str:
     if not values:
         return "unknown"
     return f"{sum(values) / len(values):.3f}"
+
+
+def rolling_average_timed_ratio(values: Sequence[TimedFloatMetric]) -> str:
+    """Return a compact chronological moving-average ratio."""
+    return average_ratio(tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:]))
+
+
+def mean_int_label(values: Sequence[int]) -> str:
+    """Return a compact integer mean label."""
+    if not values:
+        return "unknown"
+    return str(round(sum(values) / len(values)))
+
+
+def rolling_mean_timed_int_label(values: Sequence[TimedIntMetric]) -> str:
+    """Return a compact chronological integer moving-average label."""
+    return mean_int_label(tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:]))
+
+
+def prompt_token_joint_status(summary: RuntimeDashboardSummary) -> str:
+    """Return whether prompt and token trend observations can be compared."""
+    prompt_count = len(summary.prompt_tool_breakdown.timed_prompt_char_counts)
+    token_count = len(summary.token_usage_breakdown.timed_token_ratios)
+    if prompt_count == 0 and token_count == 0:
+        return "missing_prompt_and_token_observations"
+    if prompt_count == 0:
+        return "missing_prompt_observations"
+    if token_count == 0:
+        return "missing_token_observations"
+    if prompt_count < ROLLING_TREND_WINDOW or token_count < ROLLING_TREND_WINDOW:
+        return "limited_joint_window"
+    return "ready"
 
 
 def counter_table_rows(counter: Counter[str]) -> list[str]:

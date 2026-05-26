@@ -9,6 +9,7 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/c
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+downstream implementation ../../tools/agent_tools/agent_canon_log_management_check.py validates hook/eval log management boundaries
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
@@ -45,7 +46,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/issue_sync.py`
   - `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by` を検査し、GitHub Issue mirror の作成 plan と read-only drift check を出します。通常 CI では offline validation、PR の issue mirror workflow では GitHub read-only check を使います。
 - `tools/agent_tools/eval_accumulation_check.py`
-  - `agents/evals/results/` の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
+  - mounted runtime log archive と legacy `agents/evals/results/` notice/fallback の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。
+- `tools/agent_tools/agent_canon_log_management_check.py`
+  - dirty hook/eval JSONL が `agent-logs/*` branch 以外に残っていないこと、hook path namespace と `hook_log_namespace` が一致することを検査します。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm eval`
@@ -60,11 +63,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - LLM search provider 用の `.agent-canon/search-index/` を生成します。生成 index は repo-local ignored state で commit しません。
 - `agent-canon semantic-index`
   - text-like file を安定 node に分け、provider-scoped dense vector を SQLite に保存します。
-  - `build`、`embed-provider`、`search`、`context-pack`、`similar`、`merge-candidates`、`thin-docs`、`compare-providers`、`eval`、`eval-output` を持つ候補生成 tool です。
+  - `build`、`embed-provider`、`search`、`context-pack`、`responsibility-tree`、`similar`、`merge-candidates`、`natural-relations`、`thin-docs`、`compare-providers`、`eval`、`eval-output` を持つ候補生成 tool です。
   - `embed-provider` は既存 node に LLM embedding provider の vector を追加し、`compare-providers` は deterministic baseline と LLM provider の候補 ranking delta を診断します。LLM label や ownership authority は生成しません。
   - `search` は `--query`、`--query-file`、`--query-stdin` を受けます。長い user request は file / stdin で渡し、agent が JSON 全体や長い query echo を読む必要がないように `--top-k` と `--format text` または `--format jsonl` を使います。
   - `context-pack` は agent handoff 用に、上位候補を path、line range、score、responsibility bucket、短い excerpt の bounded evidence cell へ圧縮します。
+  - `responsibility-tree` は SQLite 内の node vector を directory vector に集約し、現在の indexable repo tree と DB file tree の directory 差分を JSON report と exit code で検査します。
   - `similar` は横断 alignment evidence を許可し、`merge-candidates` は full repo 入力のまま同じ responsibility scope / surface kind / document topic / node kind 内だけを候補化します。runtime mirror と eval/report log は統合候補にしません。
+  - `natural-relations` は pair の両方向で "A is a kind of B" の自然さを score 化し、`equivalent`、`unrelated`、片方向包含を SQLite に保存します。
   - `thin-docs` は低内容量、高い単一 target 類似度、参照密度、wrapper 語彙から薄い文書候補を出し、root entrypoint は `keep_entrypoint` として削除候補から分けます。
   - `eval-output` は review JSONL artifact 自体を検査し、result count、responsibility metadata、thin-doc action、long-query echo の欠落を検出します。
   - `tools/agent_tools/semantic_provider_html_report.py` は `compare-providers` JSON を self-contained HTML に描画します。先頭図は `Provider Delta To Shared Candidate Logic` で、provider 差分は診断 evidence、責務 bucket / candidate logic が authority であることを明示します。
@@ -182,7 +187,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
   - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-latest` で tool-first に適用します。
-  - `latest` は safe な AgentCanon `main` 更新、eval / hook log parking、root view check、親 repo update TODO routing / acknowledge まで進めます。dirty submodule が `agents/evals/results/` だけなら `agent-logs/<parent-repo>` branch へ commit / push してから続行します。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。runtime source、local shared-canon branch、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW`、`AGENT_CANON_LATEST_CONFLICT_COMMAND`、`NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
+  - `latest` は safe な AgentCanon `main` 更新、legacy eval / hook log parking、root view check、親 repo update TODO routing / acknowledge まで進めます。dirty submodule が legacy `agents/evals/results/` だけなら互換 path として `agent-logs/<parent-repo>` branch へ commit / push してから続行できますが、新規蓄積は `.agent-canon/log-archive/` を使います。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。runtime source、local shared-canon branch、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW`、`AGENT_CANON_LATEST_CONFLICT_COMMAND`、`NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
   - Local bare / proposal / snapshot refresh route は user-facing command から外しています。submodule 化済み repo の通常 path は GitHub branch と AgentCanon PR です。
   - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、`make agent-canon-merge-main` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
   - AgentCanon PR merge 後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `make agent-canon-latest` と同じ high-level route です。
@@ -301,11 +306,12 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `mcp/repo_mcp_server.py` の `goal.loop_status`
   - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
-  - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`agents/evals/results/skill-workflow-prompt/` に詳細結果を蓄積します。
-  - `generate_agent_improvement_guide.py` は `memory/`、`agents/evals/results/skill-workflow-prompt/`、`agents/evals/results/hook-runs/`、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
-  - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary と generated drilldown を生成し、通常分析では raw JSONL を開かずそれを読みます。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
+  - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。
+  - hook JSONL と eval report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py ensure|status|import-legacy|import-eval-results|push` を使います。
+  - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、legacy `agents/evals/results/hook-runs/`、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
+  - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。
-  - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `agents/evals/results/workflow-selection/` に詳細結果を蓄積します。
+  - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/log-archive/eval-results/workflow-selection/` に詳細結果を蓄積します。
   - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。

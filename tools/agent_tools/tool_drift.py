@@ -178,7 +178,8 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/evals/README.md"),
             LinkCheck("agents/evals/local_llm_responsibility_eval.toml"),
-            LinkCheck("agents/evals/results/local-llm-responsibility/README.md"),
+            LinkCheck("agents/evals/results/README.md"),
+            LinkCheck("documents/runtime-log-archive.md"),
             LinkCheck("documents/local-llm-responsibility-analysis.md"),
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),

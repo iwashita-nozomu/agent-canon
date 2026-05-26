@@ -4,6 +4,7 @@
 # upstream design ../../agents/evals/README.md eval usage contract
 # upstream design ../../agents/evals/report_quality_eval.toml report quality eval manifest
 # upstream design ../../agents/skills/report-writing.md report writing skill contract
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_report_quality.py tests report quality eval behavior
 # @dependency-end
 """Evaluate report-writing quality checklist surfaces."""
@@ -24,8 +25,10 @@ try:
 except ModuleNotFoundError:  # Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from runtime_log_paths import eval_results_dir
+
 DEFAULT_MANIFEST = "agents/evals/report_quality_eval.toml"
-DEFAULT_RESULTS_DIR = "agents/evals/results/report-quality"
+DEFAULT_RESULTS_FAMILY = "report-quality"
 RUN_ID_DIGEST_LENGTH = 10
 
 
@@ -97,7 +100,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST)
     parser.add_argument("--report-out", default="")
     parser.add_argument("--accumulate", action="store_true")
-    parser.add_argument("--results-dir", default=DEFAULT_RESULTS_DIR)
+    parser.add_argument(
+        "--results-dir",
+        default="",
+        help=(
+            "Directory for accumulated reports. Defaults to the mounted "
+            "AgentCanon log archive eval-results/report-quality path, falling "
+            "back to the legacy in-tree path only when no archive is mounted."
+        ),
+    )
     return parser
 
 
@@ -332,9 +343,18 @@ def write_report(path: Path, bundle: ReportQualityBundle) -> Path:
     return path
 
 
-def accumulated_report_path(root: Path, results_dir: str, bundle: ReportQualityBundle) -> Path:
+def resolve_results_dir(root: Path, value: str) -> Path:
+    """Resolve the CLI results directory or the default archive location."""
+    stripped = value.strip()
+    if stripped:
+        path = Path(stripped)
+        return path if path.is_absolute() else root / path
+    return eval_results_dir(root, DEFAULT_RESULTS_FAMILY)
+
+
+def accumulated_report_path(results_dir: Path, bundle: ReportQualityBundle) -> Path:
     """Return the unique accumulated report path."""
-    return root / results_dir / f"{bundle.run_id}-{bundle.status}.md"
+    return results_dir / f"{bundle.run_id}-{bundle.status}.md"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -345,7 +365,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.report_out:
         report_paths.append(write_report(Path(args.report_out), bundle))
     if args.accumulate:
-        report_paths.append(write_report(accumulated_report_path(bundle.root, args.results_dir, bundle), bundle))
+        report_paths.append(
+            write_report(
+                accumulated_report_path(resolve_results_dir(bundle.root, str(args.results_dir)), bundle),
+                bundle,
+            )
+        )
     print(f"REPORT_QUALITY_EVAL_RUN_ID={bundle.run_id}")
     print(f"REPORT_QUALITY_EVAL_TARGETS={len(bundle.evals)}")
     print(f"REPORT_QUALITY_EVAL_CHECKS={len(bundle.results)}")

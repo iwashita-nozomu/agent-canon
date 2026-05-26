@@ -157,6 +157,31 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
+    def test_skips_dependency_review_artifacts(self) -> None:
+        """Generated dependency-review artifacts are not source manifest targets."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            artifact = root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_text("README.md\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "reports/dependency-review/run/search_hits.txt",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -170,6 +170,7 @@ paths = [
   "agents/evals/**",
 ]
 protecting_tools = [
+  "tools/agent_tools/agent_canon_log_management_check.py",
   "tools/agent_tools/eval_accumulation_check.py",
   "tools/agent_tools/evaluate_skill_workflow_prompts.py",
   "tools/agent_tools/evaluate_agent_run.py",

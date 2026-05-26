@@ -218,6 +218,25 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: agent-canon-log-management-check
+    summary: Validates hook/eval log branch ownership and hook namespace consistency.
+    path: tools/agent_tools/agent_canon_log_management_check.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/agent_canon_log_management_check.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/results/README.md
+      - agents/evals/results/hook-runs/README.md
+    tests:
+      - tests/agent_tools/test_agent_canon_log_management_check.py
+
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
     path: tools/agent_tools/evaluate_workflow_selection.py
@@ -234,7 +253,8 @@ entries:
       - documents/tools/README.md
       - agents/evals/README.md
       - agents/evals/workflow_selection_eval.toml
-      - agents/evals/results/workflow-selection/README.md
+      - agents/evals/results/README.md
+      - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
 
@@ -254,7 +274,8 @@ entries:
       - documents/tools/README.md
       - agents/evals/README.md
       - agents/evals/report_quality_eval.toml
-      - agents/evals/results/report-quality/README.md
+      - agents/evals/results/README.md
+      - documents/runtime-log-archive.md
       - agents/skills/report-writing.md
     tests:
       - tests/agent_tools/test_evaluate_report_quality.py
@@ -315,7 +336,8 @@ entries:
       - documents/local-llm-responsibility-analysis.md
       - agents/evals/README.md
       - agents/evals/local_llm_responsibility_eval.toml
-      - agents/evals/results/local-llm-responsibility/README.md
+      - agents/evals/results/README.md
+      - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_local_llm_eval.py
 
@@ -357,12 +379,12 @@ entries:
       - tests/agent_tools/test_search_index.py
 
   - id: semantic-index
-    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, merge, thin-doc, provider-comparison, and Eval results.
+    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, directory responsibility-tree coverage, merge, natural-relation, thin-doc, provider-comparison, and Eval results.
     path: rust/agent-canon/src/semantic_index.rs
     family: root
     role: inventory
     status: canonical
-    command: tools/bin/agent-canon semantic-index build --include documents --include agents
+    command: tools/bin/agent-canon semantic-index responsibility-tree --include documents --include agents --check-directory-coverage
     writes: true
     default_wiring:
       ci: false

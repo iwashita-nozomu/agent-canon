@@ -1,5 +1,5 @@
 // @dependency-start
-// responsibility Provides Rust-native semantic vector indexing, search, similarity, thin-doc, and eval CLI support.
+// responsibility Provides Rust-native semantic vector indexing, search, similarity, natural-relation, thin-doc, and eval CLI support.
 // upstream design ../../../documents/semantic_index.md semantic index responsibility and generated-cache policy
 // upstream design ../../../documents/search-coordination.md coordinated search boundary and advisory search policy
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust CLI migration policy
@@ -34,10 +34,14 @@ const DEFAULT_EMBEDDING_BATCH: usize = 16;
 const DEFAULT_CONTEXT_CELLS: usize = 12;
 const DEFAULT_CONTEXT_CELL_CHARS: usize = 900;
 const DEFAULT_CONTEXT_TOTAL_CHARS: usize = 6000;
+const DEFAULT_TREE_NODE_KIND: &str = "document";
 const VECTOR_EPSILON: f32 = 1.0e-6;
 const MERGE_CANDIDATE_MIN_LINES: i64 = 4;
 const DEFAULT_MIN_THIN_SCORE: f32 = 0.50;
 const DEFAULT_MIN_THIN_NEIGHBOR_SCORE: f32 = 0.86;
+const DEFAULT_MIN_RELATION_SIMILARITY: f32 = 0.72;
+const DEFAULT_MIN_KIND_OF_SCORE: f32 = 0.62;
+const NATURAL_RELATION_FEATURE_FANOUT: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SemanticCommand {
@@ -87,6 +91,25 @@ struct ContextPackArgs {
 }
 
 #[derive(Debug, Clone)]
+struct ResponsibilityTreeArgs {
+    root: PathBuf,
+    includes: Vec<PathBuf>,
+    excludes: Vec<String>,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    max_file_bytes: u64,
+    node_kind: String,
+    max_depth: Option<usize>,
+    top_k: Option<usize>,
+    include_vector: bool,
+    check_directory_coverage: bool,
+    report: Option<PathBuf>,
+    format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
 struct EmbedProviderArgs {
     root: PathBuf,
     db: PathBuf,
@@ -122,6 +145,20 @@ struct ThinDocsArgs {
     min_neighbor_score: f32,
     top_k: usize,
     format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+struct NaturalRelationsArgs {
+    root: PathBuf,
+    db: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    min_similarity: f32,
+    min_kind_of_score: f32,
+    top_k: usize,
+    format: OutputFormat,
+    cross_file_only: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -185,9 +222,11 @@ enum ParsedArgs {
     Build(BuildArgs),
     Search(SearchArgs),
     ContextPack(ContextPackArgs),
+    ResponsibilityTree(ResponsibilityTreeArgs),
     EmbedProvider(EmbedProviderArgs),
     Similar(SimilarArgs),
     ThinDocs(ThinDocsArgs),
+    NaturalRelations(NaturalRelationsArgs),
     Eval(EvalArgs),
     CompareProviders(CompareProvidersArgs),
     EvalOutput(EvalOutputArgs),
@@ -267,6 +306,65 @@ struct ThinDocCandidate {
 }
 
 #[derive(Debug, Clone)]
+struct NaturalRelation {
+    left: IndexedNode,
+    right: IndexedNode,
+    similarity_score: f32,
+    left_is_kind_of_right_score: f32,
+    right_is_kind_of_left_score: f32,
+    relation_kind: String,
+    rank: usize,
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryCoverage {
+    status: String,
+    expected_directories: Vec<String>,
+    db_directories: Vec<String>,
+    missing_directories: Vec<String>,
+    stale_directories: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryResponsibilityNode {
+    path: String,
+    parent: Option<String>,
+    depth: usize,
+    file_count: usize,
+    node_count: usize,
+    vector: Vec<f32>,
+    vector_hash: String,
+    dominant_responsibility: String,
+    dominant_share: f64,
+    responsibility_counts: Vec<(String, usize)>,
+    node_kind_counts: Vec<(String, usize)>,
+    parent_similarity: Option<f32>,
+}
+
+#[derive(Debug, Clone)]
+struct ResponsibilityTreeReport {
+    db: PathBuf,
+    root: PathBuf,
+    provider: String,
+    model: String,
+    dim: usize,
+    node_kind: String,
+    include_vector: bool,
+    directories: Vec<DirectoryResponsibilityNode>,
+    directory_count_total: usize,
+    coverage: DirectoryCoverage,
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryAccumulator {
+    files: HashSet<i64>,
+    node_count: usize,
+    vector_sum: Vec<f32>,
+    responsibility_counts: HashMap<String, usize>,
+    node_kind_counts: HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone)]
 struct BuildStats {
     files: usize,
     nodes: usize,
@@ -312,6 +410,23 @@ pub fn run(args: &[String]) -> i32 {
             }
             Err(error) => fail("CONTEXT_PACK", error),
         },
+        Ok(ParsedArgs::ResponsibilityTree(tree_args)) => match responsibility_tree(&tree_args) {
+            Ok(report) => {
+                let value = responsibility_tree_report_json(&report);
+                if let Some(path) = &tree_args.report {
+                    if let Err(error) = write_pretty_report(path, &value) {
+                        return fail("RESPONSIBILITY_TREE_REPORT", error);
+                    }
+                }
+                print_responsibility_tree_results(&tree_args, &report, &value);
+                if tree_args.check_directory_coverage && report.coverage.status != "pass" {
+                    1
+                } else {
+                    0
+                }
+            }
+            Err(error) => fail("RESPONSIBILITY_TREE", error),
+        },
         Ok(ParsedArgs::EmbedProvider(embed_args)) => match embed_existing_nodes(&embed_args) {
             Ok(stats) => {
                 println!("SEMANTIC_INDEX_EMBED_PROVIDER=ok");
@@ -344,6 +459,19 @@ pub fn run(args: &[String]) -> i32 {
             }
             Err(error) => fail("THIN_DOCS", error),
         },
+        Ok(ParsedArgs::NaturalRelations(relation_args)) => {
+            match natural_relations(&relation_args) {
+                Ok(results) => {
+                    if let Err(error) = persist_natural_relations(&relation_args, &results) {
+                        fail("NATURAL_RELATIONS_PERSIST", error)
+                    } else {
+                        print_natural_relation_results(&relation_args, &results);
+                        0
+                    }
+                }
+                Err(error) => fail("NATURAL_RELATIONS", error),
+            }
+        }
         Ok(ParsedArgs::Eval(eval_args)) => match run_eval(&eval_args) {
             Ok(report) => {
                 if let Some(path) = &eval_args.report {
@@ -426,6 +554,9 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         "context-pack" => Ok(ParsedArgs::ContextPack(parse_context_pack_args(
             &args[1..],
         )?)),
+        "responsibility-tree" | "directory-tree" => Ok(ParsedArgs::ResponsibilityTree(
+            parse_responsibility_tree_args(&args[1..])?,
+        )),
         "embed-provider" => Ok(ParsedArgs::EmbedProvider(parse_embed_provider_args(
             &args[1..],
         )?)),
@@ -438,6 +569,9 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
             SimilarKind::MergeCandidates,
         )?)),
         "thin-docs" => Ok(ParsedArgs::ThinDocs(parse_thin_docs_args(&args[1..])?)),
+        "natural-relations" | "nl-relations" => Ok(ParsedArgs::NaturalRelations(
+            parse_natural_relations_args(&args[1..])?,
+        )),
         "eval" => Ok(ParsedArgs::Eval(parse_eval_args(&args[1..])?)),
         "compare-providers" => Ok(ParsedArgs::CompareProviders(parse_compare_providers_args(
             &args[1..],
@@ -702,6 +836,105 @@ fn parse_context_pack_args(args: &[String]) -> Result<ContextPackArgs, String> {
     Ok(parsed)
 }
 
+fn parse_responsibility_tree_args(args: &[String]) -> Result<ResponsibilityTreeArgs, String> {
+    let mut parsed = ResponsibilityTreeArgs {
+        root: PathBuf::from("."),
+        includes: Vec::new(),
+        excludes: default_excludes(),
+        db: default_db_path(Path::new(".")),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        node_kind: DEFAULT_TREE_NODE_KIND.to_string(),
+        max_depth: None,
+        top_k: None,
+        include_vector: false,
+        check_directory_coverage: false,
+        report: None,
+        format: OutputFormat::Text,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--include" => {
+                parsed.includes.push(value_path(args, index, "--include")?);
+                index += 2;
+            }
+            "--exclude" => {
+                parsed
+                    .excludes
+                    .push(value_string(args, index, "--exclude")?);
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--max-file-bytes" => {
+                parsed.max_file_bytes = value_u64(args, index, "--max-file-bytes")?;
+                index += 2;
+            }
+            "--node-kind" => {
+                parsed.node_kind = value_string(args, index, "--node-kind")?;
+                index += 2;
+            }
+            "--max-depth" => {
+                parsed.max_depth = Some(value_usize(args, index, "--max-depth")?);
+                index += 2;
+            }
+            "--top-k" | "--limit" => {
+                parsed.top_k = Some(value_usize(args, index, "--top-k")?);
+                index += 2;
+            }
+            "--include-vector" | "--include-vectors" => {
+                parsed.include_vector = true;
+                index += 1;
+            }
+            "--check-directory-coverage" | "--check-coverage" => {
+                parsed.check_directory_coverage = true;
+                index += 1;
+            }
+            "--report" => {
+                parsed.report = Some(value_path(args, index, "--report")?);
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            unknown => return Err(format!("unknown responsibility-tree option {unknown}")),
+        }
+    }
+    if parsed.includes.is_empty() {
+        parsed.includes.push(PathBuf::from("."));
+    }
+    if parsed.node_kind.trim().is_empty() {
+        return Err("--node-kind must not be empty".to_string());
+    }
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
+    Ok(parsed)
+}
+
 fn parse_embed_provider_args(args: &[String]) -> Result<EmbedProviderArgs, String> {
     let mut parsed = EmbedProviderArgs {
         root: PathBuf::from("."),
@@ -882,6 +1115,79 @@ fn parse_thin_docs_args(args: &[String]) -> Result<ThinDocsArgs, String> {
     validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
     validate_min_score(parsed.min_thin_score)?;
     validate_min_score(parsed.min_neighbor_score)?;
+    Ok(parsed)
+}
+
+fn parse_natural_relations_args(args: &[String]) -> Result<NaturalRelationsArgs, String> {
+    let mut parsed = NaturalRelationsArgs {
+        root: PathBuf::from("."),
+        db: default_db_path(Path::new(".")),
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: DEFAULT_DIM,
+        min_similarity: DEFAULT_MIN_RELATION_SIMILARITY,
+        min_kind_of_score: DEFAULT_MIN_KIND_OF_SCORE,
+        top_k: DEFAULT_TOP_K,
+        format: OutputFormat::Text,
+        cross_file_only: true,
+    };
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                parsed.root = value_path(args, index, "--root")?;
+                if parsed.db == default_db_path(Path::new(".")) {
+                    parsed.db = default_db_path(&parsed.root);
+                }
+                index += 2;
+            }
+            "--db" => {
+                parsed.db = value_path(args, index, "--db")?;
+                index += 2;
+            }
+            "--provider" => {
+                parsed.provider = value_string(args, index, "--provider")?;
+                index += 2;
+            }
+            "--model" => {
+                parsed.model = value_string(args, index, "--model")?;
+                index += 2;
+            }
+            "--dim" => {
+                parsed.dim = value_usize(args, index, "--dim")?;
+                index += 2;
+            }
+            "--min-similarity" | "--min-score" => {
+                parsed.min_similarity = value_f32(args, index, "--min-similarity")?;
+                index += 2;
+            }
+            "--min-kind-of-score" => {
+                parsed.min_kind_of_score = value_f32(args, index, "--min-kind-of-score")?;
+                index += 2;
+            }
+            "--top-k" => {
+                parsed.top_k = value_usize(args, index, "--top-k")?;
+                index += 2;
+            }
+            "--format" => {
+                parsed.format = parse_format(&value_string(args, index, "--format")?)?;
+                index += 2;
+            }
+            "--cross-file-only" => {
+                parsed.cross_file_only = true;
+                index += 1;
+            }
+            "--allow-same-file" => {
+                parsed.cross_file_only = false;
+                index += 1;
+            }
+            unknown => return Err(format!("unknown natural-relations option {unknown}")),
+        }
+    }
+    validate_provider_dim_or_auto(&parsed.provider, parsed.dim, "--dim")?;
+    validate_min_score(parsed.min_similarity)?;
+    validate_min_score(parsed.min_kind_of_score)?;
+    validate_positive(parsed.top_k, "--top-k")?;
     Ok(parsed)
 }
 
@@ -1291,6 +1597,167 @@ fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, String> {
     Ok(cells)
 }
 
+fn responsibility_tree(args: &ResponsibilityTreeArgs) -> Result<ResponsibilityTreeReport, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
+    let coverage = directory_coverage(&conn, args)?;
+    let mut accumulators: HashMap<String, DirectoryAccumulator> = HashMap::new();
+    for node in nodes
+        .iter()
+        .filter(|node| tree_node_kind_matches(node, &args.node_kind))
+    {
+        for directory in directory_ancestors_for_file(&node.path) {
+            if args
+                .max_depth
+                .is_some_and(|max_depth| directory_depth(&directory) > max_depth)
+            {
+                continue;
+            }
+            accumulators
+                .entry(directory)
+                .or_insert_with(|| DirectoryAccumulator::new(dim))
+                .add(node);
+        }
+    }
+    let mut vectors_by_path: HashMap<String, Vec<f32>> = HashMap::new();
+    for (path, accumulator) in &accumulators {
+        let mut vector = accumulator.vector_sum.clone();
+        normalize_vector(&mut vector);
+        vectors_by_path.insert(path.clone(), vector);
+    }
+    let mut directories = Vec::new();
+    for (path, accumulator) in accumulators {
+        let vector = vectors_by_path
+            .get(&path)
+            .cloned()
+            .unwrap_or_else(|| vec![0.0; dim]);
+        let responsibility_counts = sorted_counts(&accumulator.responsibility_counts);
+        let node_kind_counts = sorted_counts(&accumulator.node_kind_counts);
+        let dominant_count = responsibility_counts
+            .first()
+            .map(|(_, count)| *count)
+            .unwrap_or(0);
+        let dominant_responsibility = responsibility_counts
+            .first()
+            .map(|(name, _)| name.clone())
+            .unwrap_or_else(|| "none".to_string());
+        let parent = directory_parent(&path);
+        let parent_similarity = parent.as_ref().and_then(|parent_path| {
+            vectors_by_path
+                .get(parent_path)
+                .map(|parent_vector| cosine_score(parent_vector, &vector))
+        });
+        directories.push(DirectoryResponsibilityNode {
+            path: path.clone(),
+            parent,
+            depth: directory_depth(&path),
+            file_count: accumulator.files.len(),
+            node_count: accumulator.node_count,
+            vector_hash: bytes_hex_hash(&vector_to_blob(&vector)),
+            vector,
+            dominant_responsibility,
+            dominant_share: if accumulator.node_count == 0 {
+                0.0
+            } else {
+                dominant_count as f64 / accumulator.node_count as f64
+            },
+            responsibility_counts,
+            node_kind_counts,
+            parent_similarity,
+        });
+    }
+    directories.sort_by(|left, right| {
+        left.depth
+            .cmp(&right.depth)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    let directory_count_total = directories.len();
+    if let Some(top_k) = args.top_k {
+        directories.truncate(top_k);
+    }
+    Ok(ResponsibilityTreeReport {
+        db: args.db.clone(),
+        root: args.root.clone(),
+        provider: args.provider.clone(),
+        model: args.model.clone(),
+        dim,
+        node_kind: args.node_kind.clone(),
+        include_vector: args.include_vector,
+        directories,
+        directory_count_total,
+        coverage,
+    })
+}
+
+impl DirectoryAccumulator {
+    fn new(dim: usize) -> Self {
+        Self {
+            files: HashSet::new(),
+            node_count: 0,
+            vector_sum: vec![0.0; dim],
+            responsibility_counts: HashMap::new(),
+            node_kind_counts: HashMap::new(),
+        }
+    }
+
+    fn add(&mut self, node: &IndexedNode) {
+        self.files.insert(node.file_id);
+        self.node_count += 1;
+        for (left, right) in self.vector_sum.iter_mut().zip(node.vector.iter()) {
+            *left += *right;
+        }
+        *self
+            .responsibility_counts
+            .entry(responsibility_scope_bucket(&node.path).to_string())
+            .or_insert(0) += 1;
+        *self.node_kind_counts.entry(node.kind.clone()).or_insert(0) += 1;
+    }
+}
+
+fn tree_node_kind_matches(node: &IndexedNode, node_kind: &str) -> bool {
+    node_kind == "all" || node.kind == node_kind
+}
+
+fn directory_coverage(
+    conn: &Connection,
+    args: &ResponsibilityTreeArgs,
+) -> Result<DirectoryCoverage, String> {
+    let expected_files = discover_files(
+        &args.root,
+        &args.includes,
+        &args.excludes,
+        args.max_file_bytes,
+    )?;
+    let root_for_relative = fs::canonicalize(&args.root).unwrap_or_else(|_| args.root.clone());
+    let mut expected = HashSet::new();
+    for path in expected_files {
+        let relative = relative_path(&root_for_relative, &path);
+        expected.extend(directory_ancestors_for_file(&relative));
+    }
+    let mut db = HashSet::new();
+    for path in load_file_paths(conn)? {
+        db.extend(directory_ancestors_for_file(&path));
+    }
+    let expected_directories = sorted_strings(&expected);
+    let db_directories = sorted_strings(&db);
+    let missing_directories = sorted_difference(&expected, &db);
+    let stale_directories = sorted_difference(&db, &expected);
+    let status = if missing_directories.is_empty() && stale_directories.is_empty() {
+        "pass"
+    } else {
+        "fail"
+    }
+    .to_string();
+    Ok(DirectoryCoverage {
+        status,
+        expected_directories,
+        db_directories,
+        missing_directories,
+        stale_directories,
+    })
+}
+
 fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
@@ -1438,6 +1905,97 @@ fn thin_docs(args: &ThinDocsArgs) -> Result<Vec<ThinDocCandidate>, String> {
         candidate.rank = index + 1;
     }
     Ok(candidates)
+}
+
+fn natural_relations(args: &NaturalRelationsArgs) -> Result<Vec<NaturalRelation>, String> {
+    let conn = open_cache_connection(&args.db)?;
+    let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
+    let nodes: Vec<IndexedNode> = load_nodes(&conn, &args.provider, &args.model, dim)?
+        .into_iter()
+        .filter(is_natural_relation_node)
+        .collect();
+    let pairs = natural_relation_candidate_pairs_from_nodes(&nodes, args);
+    let mut term_cache: HashMap<i64, Vec<String>> = HashMap::new();
+    let mut relations = Vec::new();
+    for pair in pairs {
+        let left_terms = relation_terms_for_node(args, &pair.left, &mut term_cache)?;
+        let right_terms = relation_terms_for_node(args, &pair.right, &mut term_cache)?;
+        let left_is_kind_of_right = directed_kind_of_score(&left_terms, &right_terms, pair.score);
+        let right_is_kind_of_left = directed_kind_of_score(&right_terms, &left_terms, pair.score);
+        let relation_kind = classify_natural_relation(
+            left_is_kind_of_right,
+            right_is_kind_of_left,
+            args.min_kind_of_score,
+        )
+        .to_string();
+        relations.push(NaturalRelation {
+            left: pair.left,
+            right: pair.right,
+            similarity_score: pair.score,
+            left_is_kind_of_right_score: left_is_kind_of_right,
+            right_is_kind_of_left_score: right_is_kind_of_left,
+            relation_kind,
+            rank: 0,
+        });
+    }
+    sort_natural_relations(&mut relations);
+    relations.truncate(args.top_k);
+    for (index, relation) in relations.iter_mut().enumerate() {
+        relation.rank = index + 1;
+    }
+    Ok(relations)
+}
+
+fn natural_relation_candidate_pairs_from_nodes(
+    nodes: &[IndexedNode],
+    args: &NaturalRelationsArgs,
+) -> Vec<SimilarPair> {
+    let mut pairs: Vec<SimilarPair> = Vec::new();
+    let mut inverted: HashMap<(usize, bool), Vec<usize>> = HashMap::new();
+    let prune_limit = args.top_k.saturating_mul(64).max(1024);
+    for right_index in 0..nodes.len() {
+        let right = &nodes[right_index];
+        let mut candidates: HashSet<usize> = HashSet::new();
+        for (index, sign) in prefix_features(&right.vector, args.min_similarity) {
+            if let Some(indices) = inverted.get(&(index, sign)) {
+                candidates.extend(
+                    indices
+                        .iter()
+                        .rev()
+                        .take(NATURAL_RELATION_FEATURE_FANOUT)
+                        .copied(),
+                );
+            }
+        }
+        for left_index in candidates {
+            let left = &nodes[left_index];
+            if args.cross_file_only && left.file_id == right.file_id {
+                continue;
+            }
+            let score = cosine_score(&left.vector, &right.vector);
+            if score + f32::EPSILON >= args.min_similarity {
+                pairs.push(SimilarPair {
+                    left: left.clone(),
+                    right: right.clone(),
+                    score,
+                    rank: 0,
+                });
+                if pairs.len() > prune_limit {
+                    sort_pairs(&mut pairs);
+                    pairs.truncate(args.top_k.saturating_mul(16).max(args.top_k));
+                }
+            }
+        }
+        for (index, sign) in all_signed_features(&right.vector) {
+            inverted.entry((index, sign)).or_default().push(right_index);
+        }
+    }
+    sort_pairs(&mut pairs);
+    pairs.truncate(args.top_k.saturating_mul(16).max(args.top_k));
+    for (index, pair) in pairs.iter_mut().enumerate() {
+        pair.rank = index + 1;
+    }
+    pairs
 }
 
 fn run_eval(args: &EvalArgs) -> Result<Value, String> {
@@ -2128,6 +2686,60 @@ fn persist_thin_docs(args: &ThinDocsArgs, candidates: &[ThinDocCandidate]) -> Re
     Ok(())
 }
 
+fn persist_natural_relations(
+    args: &NaturalRelationsArgs,
+    relations: &[NaturalRelation],
+) -> Result<(), String> {
+    let write_db = prepare_existing_write_db(&args.db)?;
+    let conn = open_cache_connection(&write_db)?;
+    init_schema(&conn)?;
+    let run_id = run_id();
+    conn.execute(
+        "INSERT INTO analysis_runs(run_id, kind, created_at, params_json) VALUES (?1, ?2, ?3, ?4)",
+        params![
+            run_id,
+            "natural-relations",
+            unix_millis().to_string(),
+            json!({
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "top_k": args.top_k,
+                "cross_file_only": args.cross_file_only,
+                "provider": args.provider,
+                "model": args.model,
+                "dim": args.dim
+            })
+            .to_string()
+        ],
+    )
+    .map_err(|error| error.to_string())?;
+    for relation in relations {
+        conn.execute(
+            r#"
+            INSERT INTO natural_language_relations(
+                run_id, left_node_id, right_node_id, similarity_score,
+                left_is_kind_of_right_score, right_is_kind_of_left_score,
+                relation_kind, rank
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                run_id,
+                relation.left.node_id,
+                relation.right.node_id,
+                relation.similarity_score,
+                relation.left_is_kind_of_right_score,
+                relation.right_is_kind_of_left_score,
+                relation.relation_kind,
+                relation.rank as i64,
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    finish_write_db(&write_db, &args.db)?;
+    Ok(())
+}
+
 fn init_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -2184,6 +2796,16 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             target_node_id INTEGER,
             target_score REAL
         );
+        CREATE TABLE IF NOT EXISTS natural_language_relations(
+            run_id TEXT NOT NULL,
+            left_node_id INTEGER NOT NULL,
+            right_node_id INTEGER NOT NULL,
+            similarity_score REAL NOT NULL,
+            left_is_kind_of_right_score REAL NOT NULL,
+            right_is_kind_of_left_score REAL NOT NULL,
+            relation_kind TEXT NOT NULL,
+            rank INTEGER NOT NULL
+        );
         "#,
     )
     .map_err(|error| error.to_string())
@@ -2197,6 +2819,7 @@ fn clear_index(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
         DELETE FROM thin_docs;
+        DELETE FROM natural_language_relations;
         DELETE FROM similar_pairs;
         DELETE FROM analysis_runs;
         DELETE FROM embeddings;
@@ -2297,6 +2920,20 @@ fn load_nodes(
         }
     }
     Ok(nodes)
+}
+
+fn load_file_paths(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut statement = conn
+        .prepare("SELECT path FROM files ORDER BY path")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?;
+    let mut paths = Vec::new();
+    for row in rows {
+        paths.push(row.map_err(|error| error.to_string())?);
+    }
+    Ok(paths)
 }
 
 fn provider_dimensions(
@@ -3214,6 +3851,116 @@ fn thin_doc_action(
     "manual_review".to_string()
 }
 
+fn is_natural_relation_node(node: &IndexedNode) -> bool {
+    if is_alignment_or_log_surface(&node.path) {
+        return false;
+    }
+    if is_document_text_path(&node.path) {
+        return matches!(node.kind.as_str(), "document" | "section");
+    }
+    matches!(node.kind.as_str(), "document" | "block")
+}
+
+fn relation_terms_for_node(
+    args: &NaturalRelationsArgs,
+    node: &IndexedNode,
+    cache: &mut HashMap<i64, Vec<String>>,
+) -> Result<Vec<String>, String> {
+    if let Some(terms) = cache.get(&node.node_id) {
+        return Ok(terms.clone());
+    }
+    let text = context_excerpt(&args.root, node, DEFAULT_REMOTE_EMBEDDING_MAX_CHARS)?;
+    let terms = relation_terms(&format!("{}\n{}", node.path, text));
+    cache.insert(node.node_id, terms.clone());
+    Ok(terms)
+}
+
+fn relation_terms(text: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut terms = Vec::new();
+    for token in text_tokens(&strip_dependency_manifest(text)) {
+        if token.len() < 3 || is_relation_stop_word(&token) {
+            continue;
+        }
+        if seen.insert(token.clone()) {
+            terms.push(token);
+        }
+    }
+    terms
+}
+
+fn is_relation_stop_word(token: &str) -> bool {
+    matches!(
+        token,
+        "the"
+            | "and"
+            | "for"
+            | "with"
+            | "that"
+            | "this"
+            | "from"
+            | "into"
+            | "onto"
+            | "when"
+            | "then"
+            | "than"
+            | "must"
+            | "should"
+            | "will"
+            | "can"
+            | "are"
+            | "was"
+            | "were"
+            | "has"
+            | "have"
+            | "had"
+            | "not"
+            | "but"
+            | "one"
+            | "two"
+            | "via"
+            | "out"
+            | "all"
+            | "any"
+            | "none"
+            | "true"
+            | "false"
+    )
+}
+
+fn directed_kind_of_score(
+    specific_terms: &[String],
+    general_terms: &[String],
+    similarity_score: f32,
+) -> f32 {
+    if specific_terms.is_empty() || general_terms.is_empty() {
+        return 0.0;
+    }
+    let specific: HashSet<&str> = specific_terms.iter().map(String::as_str).collect();
+    let matched_general_terms = general_terms
+        .iter()
+        .filter(|term| specific.contains(term.as_str()))
+        .count();
+    let coverage = matched_general_terms as f32 / general_terms.len() as f32;
+    let length_balance = (specific_terms.len() as f32 / general_terms.len() as f32).min(1.0);
+    (0.85 * coverage * length_balance + 0.15 * similarity_score).clamp(0.0, 1.0)
+}
+
+fn classify_natural_relation(
+    left_is_kind_of_right_score: f32,
+    right_is_kind_of_left_score: f32,
+    min_kind_of_score: f32,
+) -> &'static str {
+    let left_high = left_is_kind_of_right_score + f32::EPSILON >= min_kind_of_score;
+    let right_high = right_is_kind_of_left_score + f32::EPSILON >= min_kind_of_score;
+    match (left_high, right_high) {
+        (true, true) => "equivalent",
+        (true, false) => "left_is_kind_of_right",
+        (false, true) => "right_is_kind_of_left",
+        (false, false) => "unrelated",
+    }
+}
+
 fn document_responsibility_bucket(path: &str) -> &'static str {
     if path == "README.md" || path.ends_with("/README.md") {
         return "readme";
@@ -3391,6 +4138,25 @@ fn sorted_difference(left: &HashSet<String>, right: &HashSet<String>) -> Vec<Str
     output
 }
 
+fn sorted_strings(values: &HashSet<String>) -> Vec<String> {
+    let mut output: Vec<String> = values.iter().cloned().collect();
+    output.sort_by(|left, right| {
+        directory_depth(left)
+            .cmp(&directory_depth(right))
+            .then_with(|| left.cmp(right))
+    });
+    output
+}
+
+fn sorted_counts(counts: &HashMap<String, usize>) -> Vec<(String, usize)> {
+    let mut output: Vec<(String, usize)> = counts
+        .iter()
+        .map(|(key, value)| (key.clone(), *value))
+        .collect();
+    output.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    output
+}
+
 fn pair_key(pair: &SimilarPair) -> String {
     let left = node_key(&pair.left);
     let right = node_key(&pair.right);
@@ -3446,6 +4212,28 @@ fn sort_thin_docs(candidates: &mut [ThinDocCandidate]) {
             .partial_cmp(&left.thin_score)
             .unwrap_or(Ordering::Equal)
             .then_with(|| left.node.path.cmp(&right.node.path))
+    });
+}
+
+fn sort_natural_relations(relations: &mut [NaturalRelation]) {
+    relations.sort_by(|left, right| {
+        right
+            .left_is_kind_of_right_score
+            .max(right.right_is_kind_of_left_score)
+            .partial_cmp(
+                &left
+                    .left_is_kind_of_right_score
+                    .max(left.right_is_kind_of_left_score),
+            )
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| {
+                right
+                    .similarity_score
+                    .partial_cmp(&left.similarity_score)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| left.left.path.cmp(&right.left.path))
+            .then_with(|| left.right.path.cmp(&right.right.path))
     });
 }
 
@@ -3540,6 +4328,87 @@ fn print_context_pack_results(args: &ContextPackArgs, cells: &[ContextCell]) {
         println!("EXCERPT_BEGIN");
         println!("{}", cell.excerpt);
         println!("EXCERPT_END");
+    }
+}
+
+fn print_responsibility_tree_results(
+    args: &ResponsibilityTreeArgs,
+    report: &ResponsibilityTreeReport,
+    value: &Value,
+) {
+    if args.format == OutputFormat::Json {
+        println!("{value}");
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_responsibility_tree": "ok",
+                "provider": report.provider,
+                "model": report.model,
+                "dim": report.dim,
+                "node_kind": report.node_kind,
+                "directory_count_total": report.directory_count_total,
+                "directory_count_returned": report.directories.len(),
+                "coverage_status": report.coverage.status,
+                "missing_directories": report.coverage.missing_directories.len(),
+                "stale_directories": report.coverage.stale_directories.len()
+            })
+        );
+        for directory in &report.directories {
+            println!("{}", directory_node_json(directory, report.include_vector));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_RESPONSIBILITY_TREE=ok");
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_DB={}",
+        report.db.display()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_DIRECTORIES={}",
+        report.directory_count_total
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_RETURNED={}",
+        report.directories.len()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_COVERAGE={}",
+        report.coverage.status
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_MISSING_DIRS={}",
+        report.coverage.missing_directories.len()
+    );
+    println!(
+        "SEMANTIC_INDEX_RESPONSIBILITY_TREE_STALE_DIRS={}",
+        report.coverage.stale_directories.len()
+    );
+    if let Some(path) = &args.report {
+        println!(
+            "SEMANTIC_INDEX_RESPONSIBILITY_TREE_REPORT={}",
+            path.display()
+        );
+    }
+    for directory in &report.directories {
+        let parent_similarity = directory
+            .parent_similarity
+            .map(|value| format!("{value:.4}"))
+            .unwrap_or_else(|| "none".to_string());
+        println!(
+            "DIR path={} parent={} depth={} files={} nodes={} responsibility={} share={:.3} parent_similarity={} vector_hash={}",
+            directory.path,
+            directory.parent.as_deref().unwrap_or("none"),
+            directory.depth,
+            directory.file_count,
+            directory.node_count,
+            directory.dominant_responsibility,
+            directory.dominant_share,
+            parent_similarity,
+            directory.vector_hash
+        );
     }
 }
 
@@ -3660,6 +4529,53 @@ fn print_thin_docs_results(args: &ThinDocsArgs, candidates: &[ThinDocCandidate])
     }
 }
 
+fn print_natural_relation_results(args: &NaturalRelationsArgs, relations: &[NaturalRelation]) {
+    if args.format == OutputFormat::Json {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_natural_relations": "ok",
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "results": relations.iter().map(natural_relation_json).collect::<Vec<_>>()
+            })
+        );
+        return;
+    }
+    if args.format == OutputFormat::Jsonl {
+        println!(
+            "{}",
+            json!({
+                "semantic_index_natural_relations": "ok",
+                "min_similarity": args.min_similarity,
+                "min_kind_of_score": args.min_kind_of_score,
+                "result_count": relations.len()
+            })
+        );
+        for relation in relations {
+            println!("{}", natural_relation_json(relation));
+        }
+        return;
+    }
+    println!("SEMANTIC_INDEX_NATURAL_RELATIONS=ok");
+    for relation in relations {
+        println!(
+            "rank={} relation={} similarity={:.4} left_kind_of_right={:.4} right_kind_of_left={:.4} left={}:{}-{} right={}:{}-{}",
+            relation.rank,
+            relation.relation_kind,
+            relation.similarity_score,
+            relation.left_is_kind_of_right_score,
+            relation.right_is_kind_of_left_score,
+            relation.left.path,
+            relation.left.line_start,
+            relation.left.line_end,
+            relation.right.path,
+            relation.right.line_start,
+            relation.right.line_end
+        );
+    }
+}
+
 fn print_eval_summary(report: &Value) {
     println!(
         "SEMANTIC_INDEX_EVAL={}",
@@ -3775,6 +4691,70 @@ fn scored_node_json(result: &ScoredNode) -> Value {
     })
 }
 
+fn responsibility_tree_report_json(report: &ResponsibilityTreeReport) -> Value {
+    json!({
+        "semantic_index_responsibility_tree": "ok",
+        "root": report.root.display().to_string(),
+        "db": report.db.display().to_string(),
+        "provider": report.provider,
+        "model": report.model,
+        "dim": report.dim,
+        "node_kind": report.node_kind,
+        "directory_count_total": report.directory_count_total,
+        "directory_count_returned": report.directories.len(),
+        "include_vector": report.include_vector,
+        "coverage": coverage_json(&report.coverage),
+        "directories": report
+            .directories
+            .iter()
+            .map(|directory| directory_node_json(directory, report.include_vector))
+            .collect::<Vec<_>>()
+    })
+}
+
+fn coverage_json(coverage: &DirectoryCoverage) -> Value {
+    json!({
+        "status": coverage.status,
+        "expected_directory_count": coverage.expected_directories.len(),
+        "db_directory_count": coverage.db_directories.len(),
+        "missing_directory_count": coverage.missing_directories.len(),
+        "stale_directory_count": coverage.stale_directories.len(),
+        "repo_tree_directories": coverage.expected_directories,
+        "db_tree_directories": coverage.db_directories,
+        "missing_directories": coverage.missing_directories,
+        "stale_directories": coverage.stale_directories
+    })
+}
+
+fn directory_node_json(directory: &DirectoryResponsibilityNode, include_vector: bool) -> Value {
+    let mut value = json!({
+        "path": directory.path,
+        "parent": directory.parent,
+        "depth": directory.depth,
+        "file_count": directory.file_count,
+        "node_count": directory.node_count,
+        "vector_dim": directory.vector.len(),
+        "vector_hash": directory.vector_hash,
+        "dominant_responsibility": directory.dominant_responsibility,
+        "dominant_share": directory.dominant_share,
+        "responsibility_counts": counts_json(&directory.responsibility_counts),
+        "node_kind_counts": counts_json(&directory.node_kind_counts),
+        "parent_similarity": directory.parent_similarity
+    });
+    if include_vector {
+        value["vector"] = json!(directory.vector);
+    }
+    value
+}
+
+fn counts_json(counts: &[(String, usize)]) -> Value {
+    let mut object = serde_json::Map::new();
+    for (key, value) in counts {
+        object.insert(key.clone(), json!(value));
+    }
+    Value::Object(object)
+}
+
 fn context_cell_json(cell: &ContextCell) -> Value {
     json!({
         "rank": cell.rank,
@@ -3844,6 +4824,32 @@ fn thin_doc_json(candidate: &ThinDocCandidate) -> Value {
     })
 }
 
+fn natural_relation_json(relation: &NaturalRelation) -> Value {
+    json!({
+        "rank": relation.rank,
+        "relation_kind": relation.relation_kind,
+        "similarity_score": relation.similarity_score,
+        "left_is_kind_of_right_score": relation.left_is_kind_of_right_score,
+        "right_is_kind_of_left_score": relation.right_is_kind_of_left_score,
+        "left": {
+            "path": relation.left.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.left.path),
+            "surface_kind": merge_candidate_surface_kind(&relation.left.path),
+            "node_kind": relation.left.kind,
+            "line_start": relation.left.line_start,
+            "line_end": relation.left.line_end
+        },
+        "right": {
+            "path": relation.right.path,
+            "responsibility_bucket": responsibility_scope_bucket(&relation.right.path),
+            "surface_kind": merge_candidate_surface_kind(&relation.right.path),
+            "node_kind": relation.right.kind,
+            "line_start": relation.right.line_start,
+            "line_end": relation.right.line_end
+        }
+    })
+}
+
 fn thin_doc_metrics_json(metrics: &ThinDocMetrics) -> Value {
     json!({
         "total_lines": metrics.total_lines,
@@ -3857,6 +4863,12 @@ fn thin_doc_metrics_json(metrics: &ThinDocMetrics) -> Value {
 fn write_report(path: &Path, report: &Value) -> Result<(), String> {
     ensure_parent_dir(path)?;
     fs::write(path, format!("{}\n", report)).map_err(|error| error.to_string())
+}
+
+fn write_pretty_report(path: &Path, report: &Value) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    let text = serde_json::to_string_pretty(report).map_err(|error| error.to_string())?;
+    fs::write(path, format!("{text}\n")).map_err(|error| error.to_string())
 }
 
 fn ensure_parent_dir(path: &Path) -> Result<(), String> {
@@ -3997,8 +5009,10 @@ fn repo_cache_key(root: &Path) -> String {
 fn default_excludes() -> Vec<String> {
     [
         ".git",
+        ".agent-canon/log-archive",
         ".agent-canon/semantic-index",
         ".agent-canon/search-index",
+        "agents/evals/results",
         "target",
         "__pycache__",
         ".pytest_cache",
@@ -4006,6 +5020,8 @@ fn default_excludes() -> Vec<String> {
         ".venv",
         "venv",
         "reports/agents",
+        "reports/hooks",
+        "reports/.cache",
     ]
     .iter()
     .map(|value| value.to_string())
@@ -4126,12 +5142,55 @@ fn relative_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
+fn directory_ancestors_for_file(path: &str) -> Vec<String> {
+    let normalized = path.replace('\\', "/");
+    let parts: Vec<&str> = normalized
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect();
+    let mut directories = vec![".".to_string()];
+    if parts.len() <= 1 {
+        return directories;
+    }
+    let mut current = String::new();
+    for part in parts.iter().take(parts.len() - 1) {
+        if !current.is_empty() {
+            current.push('/');
+        }
+        current.push_str(part);
+        directories.push(current.clone());
+    }
+    directories
+}
+
+fn directory_parent(path: &str) -> Option<String> {
+    if path == "." {
+        return None;
+    }
+    path.rsplit_once('/')
+        .map(|(parent, _)| parent.to_string())
+        .or_else(|| Some(".".to_string()))
+}
+
+fn directory_depth(path: &str) -> usize {
+    if path == "." {
+        0
+    } else {
+        path.split('/').filter(|part| !part.is_empty()).count()
+    }
+}
+
 fn count_lines(text: &str) -> usize {
     text.lines().count()
 }
 
 fn hex_hash(text: &str) -> String {
     let digest = Sha256::digest(text.as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn bytes_hex_hash(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
@@ -4154,17 +5213,19 @@ fn fail(scope: &str, message: String) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|similar|merge-candidates|thin-docs|eval|compare-providers|eval-output> [options]"
+        "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|eval|compare-providers|eval-output> [options]"
     );
     eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("search: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--top-k N] [--format text|json|jsonl]");
     eprintln!("context-pack: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--max-cells N] [--max-cell-chars N] [--max-total-chars N] [--format text|json|jsonl]");
+    eprintln!("responsibility-tree: [--root repo] [--include path] [--db path] [--provider name] [--model name] [--dim N] [--node-kind document|section|block|all] [--check-directory-coverage] [--report path] [--format text|json|jsonl]");
     eprintln!("similar: [--root repo] [--db path] [--min-score S] [--cross-file-only] [--format text|json|jsonl]");
     eprintln!(
         "merge-candidates: [--root repo] [--db path] [--min-score S] [--format text|json|jsonl]"
     );
     eprintln!("thin-docs: [--root repo] [--db path] [--min-thin-score S] [--min-neighbor-score S] [--top-k N] [--format text|json|jsonl]");
+    eprintln!("natural-relations: [--root repo] [--db path] [--min-similarity S] [--min-kind-of-score S] [--top-k N] [--format text|json|jsonl]");
     eprintln!("eval: --fixture <fixture-dir> [--db path] [--report path] [--format text|json]");
     eprintln!("compare-providers: --db path [--query-file path] [--left-provider name] [--right-provider name] [--left-dim N] [--right-dim N] [--report path]");
     eprintln!("eval-output: [--merge-candidates path] [--thin-docs path] [--search path] [--report path] [--format text|json]");
@@ -4457,6 +5518,100 @@ mod tests {
     }
 
     #[test]
+    fn directed_kind_of_score_classifies_equivalent_and_containment() {
+        let specific = relation_terms(
+            "Python reviewer checks Python diffs with ruff pyright pytest evidence.",
+        );
+        let general = relation_terms("Reviewer checks diffs and records evidence.");
+        let left = directed_kind_of_score(&specific, &general, 0.80);
+        let right = directed_kind_of_score(&general, &specific, 0.80);
+        assert_eq!(
+            classify_natural_relation(left, right, DEFAULT_MIN_KIND_OF_SCORE),
+            "left_is_kind_of_right"
+        );
+
+        let equivalent_left = relation_terms("Agent update validates submodule pin workflow.");
+        let equivalent_right = relation_terms("Submodule pin workflow validates agent update.");
+        let left = directed_kind_of_score(&equivalent_left, &equivalent_right, 0.95);
+        let right = directed_kind_of_score(&equivalent_right, &equivalent_left, 0.95);
+        assert_eq!(
+            classify_natural_relation(left, right, DEFAULT_MIN_KIND_OF_SCORE),
+            "equivalent"
+        );
+    }
+
+    #[test]
+    fn natural_relations_persist_directed_kind_of_analysis() {
+        let root = unique_temp_dir("semantic-index-natural-relations");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs").join("python_review.md"),
+            "# Python Review\nPython reviewer checks Python diffs with ruff pyright pytest evidence.",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs").join("review.md"),
+            "# Review\nReviewer checks diffs and records evidence.",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs").join("security.md"),
+            "# Security\nSecret scanner credential exposure audit.",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("docs")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let args = NaturalRelationsArgs {
+            root: root.clone(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            min_similarity: 0.05,
+            min_kind_of_score: DEFAULT_MIN_KIND_OF_SCORE,
+            top_k: 20,
+            format: OutputFormat::Jsonl,
+            cross_file_only: true,
+        };
+        let relations = natural_relations(&args).unwrap();
+        let review_relation = relations
+            .iter()
+            .find(|relation| {
+                relation.left.path == "docs/python_review.md"
+                    && relation.right.path == "docs/review.md"
+                    && relation.relation_kind == "left_is_kind_of_right"
+            })
+            .expect("expected Python review to be a kind of review");
+        assert!(
+            review_relation.left_is_kind_of_right_score
+                > review_relation.right_is_kind_of_left_score
+        );
+
+        persist_natural_relations(&args, &relations).unwrap();
+        let conn = open_cache_connection(&db).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM natural_language_relations WHERE relation_kind = 'left_is_kind_of_right'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(count >= 1);
+    }
+
+    #[test]
     fn sqlite_build_and_search_roundtrip() {
         let root = unique_temp_dir("semantic-index-search");
         fs::create_dir_all(root.join("docs")).unwrap();
@@ -4549,6 +5704,137 @@ mod tests {
         assert!(cells.len() <= 2);
         assert!(cells.iter().all(|cell| cell.excerpt.chars().count() <= 40));
         assert!(cells.iter().any(|cell| cell.path.ends_with("routing.md")));
+    }
+
+    #[test]
+    fn responsibility_tree_reports_vectors_and_coverage() {
+        let root = unique_temp_dir("semantic-index-responsibility-tree");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::create_dir_all(root.join("tools")).unwrap();
+        fs::write(
+            root.join("documents").join("policy.md"),
+            "# Policy\nsemantic index directory coverage responsibility tree",
+        )
+        .unwrap();
+        fs::write(
+            root.join("tools").join("scan.py"),
+            "print('semantic index directory coverage tool')\n",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        let args = ResponsibilityTreeArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db,
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+            node_kind: "document".to_string(),
+            max_depth: None,
+            top_k: None,
+            include_vector: true,
+            check_directory_coverage: true,
+            report: None,
+            format: OutputFormat::Json,
+        };
+        let report = responsibility_tree(&args).unwrap();
+        assert_eq!(report.coverage.status, "pass");
+        assert!(report
+            .directories
+            .iter()
+            .any(|directory| directory.path == "documents" && directory.vector.len() == 64));
+        assert!(report
+            .directories
+            .iter()
+            .any(|directory| directory.path == "tools" && directory.vector.len() == 64));
+        let json = responsibility_tree_report_json(&report);
+        assert_eq!(
+            json["coverage"]["missing_directory_count"].as_u64(),
+            Some(0)
+        );
+        assert!(json["directories"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|directory| directory.get("vector").is_some()));
+        let output = root.join("responsibility_tree.json");
+        write_pretty_report(&output, &json).unwrap();
+        let parsed: Value = serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap();
+        assert_eq!(
+            parsed
+                .get("semantic_index_responsibility_tree")
+                .and_then(Value::as_str),
+            Some("ok")
+        );
+    }
+
+    #[test]
+    fn responsibility_tree_detects_missing_directory_coverage() {
+        let root = unique_temp_dir("semantic-index-responsibility-tree-missing");
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::create_dir_all(root.join("tools")).unwrap();
+        fs::write(
+            root.join("documents").join("policy.md"),
+            "# Policy\nsemantic index coverage baseline",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("documents")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        fs::write(
+            root.join("tools").join("new_tool.py"),
+            "print('not yet indexed')\n",
+        )
+        .unwrap();
+        let report = responsibility_tree(&ResponsibilityTreeArgs {
+            root,
+            includes: vec![PathBuf::from(".")],
+            excludes: default_excludes(),
+            db,
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+            node_kind: "document".to_string(),
+            max_depth: None,
+            top_k: None,
+            include_vector: false,
+            check_directory_coverage: true,
+            report: None,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+        assert_eq!(report.coverage.status, "fail");
+        assert!(report
+            .coverage
+            .missing_directories
+            .contains(&"tools".to_string()));
     }
 
     #[test]

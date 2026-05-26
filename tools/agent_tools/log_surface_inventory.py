@@ -43,6 +43,14 @@ SKILL_PATTERNS = (
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")
 TOOL_PATTERNS = ("tools/*.py", "tools/*.sh", "tools/**/*.py", "tools/**/*.sh", "tools/**/*.bash")
 RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
+FALLBACK_SURFACE_DIRS = (
+    Path(".codex/hooks"),
+    Path(".agents/skills"),
+    Path(".claude/skills"),
+    Path("agents/skills"),
+    Path("tools"),
+    Path("rust/agent-canon/src"),
+)
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20
 OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}
@@ -386,9 +394,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def git_tracked_files(root: Path) -> tuple[str, ...]:
-    """Return tracked files, or an empty tuple outside git."""
+    """Return tracked and untracked candidate files, or an empty tuple outside git."""
     result = subprocess.run(
-        ["git", "-C", str(root), "ls-files"],
+        ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard"],
         check=False,
         capture_output=True,
         text=True,
@@ -433,8 +441,24 @@ def selected_files(root: Path, raw_paths: list[str]) -> tuple[Path, ...]:
 
 def tracked_surface_files(root: Path) -> tuple[Path, ...]:
     """Return tracked files matching known hook/skill/tool surfaces."""
-    tracked = tuple(root / path for path in git_tracked_files(root))
+    tracked_paths = git_tracked_files(root)
+    if not tracked_paths:
+        return filesystem_surface_files(root)
+    tracked = tuple(root / path for path in tracked_paths)
     return tuple(path for path in tracked if surface_kind(path.relative_to(root)) is not None)
+
+
+def filesystem_surface_files(root: Path) -> tuple[Path, ...]:
+    """Return known surface files when git metadata is unavailable."""
+    files: list[Path] = []
+    for relative_dir in FALLBACK_SURFACE_DIRS:
+        directory = root / relative_dir
+        if directory.is_file():
+            files.append(directory)
+            continue
+        if directory.is_dir():
+            files.extend(path for path in directory.rglob("*") if path.is_file())
+    return tuple(path for path in files if surface_kind(path.relative_to(root)) is not None)
 
 
 def should_skip(relative: Path) -> bool:
@@ -679,7 +703,11 @@ def main() -> int:
     """Run the inventory CLI."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
-    inventory = build_inventory(root, list(args.paths))
+    check_root = root
+    baseline_path = resolve_baseline_path(root, Path(args.baseline))
+    if args.check and baseline_path.is_file() and not args.paths:
+        check_root = inventory_root_for_baseline(baseline_path)
+    inventory = build_inventory(check_root if args.check else root, list(args.paths))
 
     if args.output:
         write_inventory((root / args.output).resolve(), inventory)
@@ -687,7 +715,6 @@ def main() -> int:
             print(f"LOG_SURFACE_INVENTORY_OUTPUT={args.output}")
 
     if args.check:
-        baseline_path = (root / args.baseline).resolve()
         if not baseline_path.is_file():
             print("LOG_SURFACE_INVENTORY=fail")
             print(f"LOG_SURFACE_BASELINE_MISSING={baseline_path}")
@@ -705,6 +732,24 @@ def main() -> int:
     elif not args.quiet:
         print(render_text(inventory))
     return 0
+
+
+def resolve_baseline_path(root: Path, raw_baseline: Path) -> Path:
+    """Return the standalone or vendored inventory baseline path."""
+    if raw_baseline.is_absolute():
+        return raw_baseline
+    direct = (root / raw_baseline).resolve()
+    if direct.is_file():
+        return direct
+    vendored = (root / "vendor" / "agent-canon" / raw_baseline).resolve()
+    if vendored.is_file():
+        return vendored
+    return direct
+
+
+def inventory_root_for_baseline(baseline: Path) -> Path:
+    """Return the repository root represented by one documents/ baseline."""
+    return baseline.resolve().parents[1]
 
 
 if __name__ == "__main__":

@@ -16,7 +16,8 @@ downstream design ../tools/catalog.yaml catalogs the semantic-index tool
 
 `agent-canon semantic-index` builds a repo-local semantic-vector cache for
 text-like files and uses that cache for advisory search, similar-item, merge
-candidate, thin-document, provider-comparison, and fixture Eval reports.
+candidate, natural-language relation, thin-document, provider-comparison, and
+fixture Eval reports.
 
 The tool is candidate generation, not deletion authority. Strict structure
 hashes, dependency graph analysis, AST equality, and safe removal decisions stay
@@ -124,6 +125,29 @@ the cells plus the exact follow-up task to the subagent. Do not paste full
 AGENTS/read-packet files when the bounded cells identify the relevant path and
 line ranges; use the source files only for follow-up reads.
 
+Build a directory responsibility tree and verify DB coverage:
+
+```bash
+agent-canon semantic-index responsibility-tree \
+  --root . \
+  --include documents \
+  --include agents \
+  --db reports/semantic-index.sqlite \
+  --check-directory-coverage \
+  --report reports/semantic_index_responsibility_tree.json
+```
+
+`responsibility-tree` reads the current SQLite `files`, `nodes`, and
+`embeddings` tables. It aggregates node vectors into every parent directory,
+stores a vector hash for each directory, and can include full directory vectors
+with `--include-vector`. The JSON report also contains two mechanically
+comparable directory inventories: `repo_tree_directories` from the current
+indexable filesystem tree and `db_tree_directories` from DB file paths.
+`--check-directory-coverage` exits nonzero when either missing or stale
+directories exist. This check uses the same include, exclude, and
+`--max-file-bytes` rules as `build`, so non-indexable binary/cache directories
+are not expected to appear in the DB.
+
 List semantic similarity candidates:
 
 ```bash
@@ -181,6 +205,31 @@ entrypoints such as root README / AGENTS surfaces are reported as
 `keep_entrypoint` rather than deletion candidates. Other actions are advisory:
 `inline_into_target`, `replace_with_catalog_row`, `merge_with_peer`, and
 `manual_review`.
+
+List natural-language responsibility relations:
+
+```bash
+agent-canon semantic-index natural-relations --top-k 50 --format jsonl
+```
+
+`natural-relations` reuses the same repo-wide SQLite nodes and provider-scoped
+vectors, then scores each candidate pair in both directions:
+
+- `left_is_kind_of_right_score` estimates whether "left is a kind of right" is
+  natural.
+- `right_is_kind_of_left_score` estimates the reverse direction.
+- high / high is reported as `equivalent`.
+- low / low is reported as `unrelated`.
+- one high direction is reported as `left_is_kind_of_right` or
+  `right_is_kind_of_left`.
+
+The command persists results to the `natural_language_relations` table through
+the shared `analysis_runs` table. It uses the file-type-aware node units that
+`build` already creates: documents, Markdown sections, and text/code/config
+blocks. This is dependency and responsibility evidence, not authority to merge
+or delete files. Code/document relations are useful as alignment evidence, but
+strict dependency headers, structure hashes, and human review remain the
+authority for refactor decisions.
 
 Run a fixture Eval:
 

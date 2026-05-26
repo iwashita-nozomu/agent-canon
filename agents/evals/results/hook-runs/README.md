@@ -1,25 +1,37 @@
-# Hook Run Results
+# Legacy Hook Run Results
 
 <!--
 @dependency-start
-responsibility Documents accumulated hook run result naming.
+responsibility Documents legacy in-tree hook run result naming.
 upstream design ../README.md eval result accumulation contract
+upstream design ../../../../documents/runtime-log-archive.md external runtime log archive contract
+upstream design ../../../../documents/runtime-log-archive-migration.md legacy in-tree JSONL migration procedure
 downstream implementation ../../../../.codex/hooks/hook_event_log.py assigns hook run ids
 downstream implementation ../../../../tools/agent_tools/generate_agent_improvement_guide.py reads hook results
 downstream implementation ../../../../tools/agent_tools/generate_agent_runtime_dashboard.py displays hook results
 downstream implementation ../../../../tools/agent_tools/eval_accumulation_check.py validates hook result structure
+downstream implementation ../../../../tools/agent_tools/agent_canon_log_management_check.py validates hook log ownership boundaries
 @dependency-end
 -->
 
-This directory stores append-only JSONL hook results owned by AgentCanon.
-It is the canonical hook-result surface for normal Codex hook runs.
+This directory is the legacy in-tree hook-result surface. Normal Codex hook
+runs now write to the mounted external log archive documented in
+`documents/runtime-log-archive.md`:
+
+```text
+.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+```
+
+The historical JSONL files that used to live here were moved into
+`git@github.com:iwashita-nozomu/agent-canon-log.git` in the `InitialCommit`
+under `hook-runs/legacy-import/`.
 
 Runtime-local `reports/hooks/` output is temporary debug output only when a task
 intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
 `AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
-or `AGENT_CANON_SKILL_LOG_PATH`. The default
-hook destination must remain this AgentCanon-owned hook result surface so
-improvement-guide and eval tooling can read one durable chronology.
+or `AGENT_CANON_SKILL_LOG_PATH`. `AGENT_CANON_HOOK_RESULTS_DIR` remains a
+test/debug override for a result directory. The default durable chronology is
+the external archive mount, not this source-tree directory.
 
 OOP hook entries include a `mode` field. The default mode is `full`, which blocks
 all current findings in changed source files. `diff` mode is opt-in for tasks
@@ -68,21 +80,22 @@ PDF or HTML URL has not been materialized as Markdown under `references/`.
 
 ## Artifact Handling
 
-Tracked JSONL in this directory is an evidence artifact, not disposable generated
-scratch. A dirty AgentCanon submodule that only contains new hook-run JSONL
-lines is still carrying AgentCanon-owned product evidence.
-
-Do not stash, drop, or revert these lines merely to fast-forward the submodule.
-Commit them through the AgentCanon branch / PR path, or run an explicit
-retention/compaction task that preserves the chronology according to the eval
-result policy. If a hook is writing unhelpful no-op events, fix the hook filter
-in a follow-up change; do not silently hide already-written evidence.
+Do not add new raw JSONL to this source-tree directory. Runtime hook chronology
+belongs to the external log archive. If old raw JSONL appears here, move it to
+the archive with `runtime_log_archive_git.py import-legacy --delete-source` and
+keep only this README in AgentCanon source.
 
 After a skill / workflow / tool routing repair lands, current analysis should
-cut over at the repaired source path's latest Git commit instead of physically
-moving JSONL. Improvement-guide and dashboard tooling may ignore older skill
-routing signals for gap calculations, but the JSONL lines remain in this tree
-for audit and repeated-failure history.
+cut over at the repaired source path's latest Git commit instead of deleting
+archive JSONL. Improvement-guide and dashboard tooling may ignore older skill
+routing signals for gap calculations, but the external archive keeps the audit
+and repeated-failure history.
+
+Dirty hook/eval JSONL belongs on `agent-logs/*` branches, not on normal
+AgentCanon product branches or detached submodule checkouts. Use
+`bash tools/update_agent_canon.sh latest` from the parent repo to park such
+dirty state before updating the submodule. The structural guard for this is
+`python3 tools/agent_tools/agent_canon_log_management_check.py`.
 
 ## File Naming
 

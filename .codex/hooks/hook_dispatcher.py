@@ -96,6 +96,21 @@ SAFE_TOOL_SCRIPT_PREFIXES = (
     "tool_rejection_preflight",
 )
 SAFE_SED_PRINT_SCRIPT = re.compile(r"^(?:\d+|\$)(?:,(?:\d+|\$))?p$")
+FAST_HOOK_TIMEOUT_SECONDS = 10
+REFERENCE_CAPTURE_TIMEOUT_SECONDS = 15
+CAUSE_INVESTIGATION_TIMEOUT_SECONDS = 30
+STANDARD_GUARD_TIMEOUT_SECONDS = 60
+STYLE_CHECKER_TIMEOUT_SECONDS = 90
+HOOK_CHILD_NOT_FOUND_RETURN_CODE = 127
+HOOK_CHILD_TIMEOUT_RETURN_CODE = 124
+PYTHON_MODULE_MIN_TOKENS = 3
+PYTHON_MODULE_NAME_INDEX = 2
+PYTHON_RUFF_CHECK_MIN_TOKENS = 4
+PYTHON_RUFF_SUBCOMMAND_INDEX = 3
+SCRIPT_MIN_TOKENS = 2
+SCRIPT_PATH_INDEX = 1
+SCRIPT_SUBCOMMAND_MIN_TOKENS = 3
+SCRIPT_SUBCOMMAND_INDEX = 2
 
 
 @dataclass(frozen=True)
@@ -143,37 +158,39 @@ class HookResult:
 
 EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     "UserPromptSubmit": (
-        HookCommandSpec("prompt_secret_guard.py", 10),
-        HookCommandSpec("skill_usage_logger.py", 10),
-        HookCommandSpec("reference_capture_guard.py", 10),
+        HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("prompt_secret_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("reference_capture_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
     ),
     "PreToolUse": (
-        HookCommandSpec("cause_investigation_guard.py", 30),
+        HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS),
     ),
     "PostToolUse": (
-        HookCommandSpec("skill_usage_logger.py", 10),
-        HookCommandSpec("reference_capture_guard.py", 15),
-        HookCommandSpec("oop_readability_guard.py", 60),
-        HookCommandSpec("module_boundary_guard.py", 60),
-        HookCommandSpec("library_implementation_guard.py", 60),
-        HookCommandSpec("helper_inventory_guard.py", 60),
-        HookCommandSpec("helper_first_guard.py", 60),
-        HookCommandSpec("style_checker_guard.py", 90),
-        HookCommandSpec("log_surface_inventory_guard.py", 60),
-        HookCommandSpec("notebook_quality_guard.py", 60),
+        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
+        HookCommandSpec("log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
     ),
     "Stop": (
-        HookCommandSpec("goal_completion_guard.py", 15),
-        HookCommandSpec("oop_readability_guard.py", 60),
-        HookCommandSpec("module_boundary_guard.py", 60),
-        HookCommandSpec("library_implementation_guard.py", 60),
-        HookCommandSpec("helper_inventory_guard.py", 60),
-        HookCommandSpec("helper_first_guard.py", 60),
-        HookCommandSpec("style_checker_guard.py", 90),
-        HookCommandSpec("log_surface_inventory_guard.py", 60),
-        HookCommandSpec("notebook_quality_guard.py", 60),
-        HookCommandSpec("reference_capture_guard.py", 15),
-        HookCommandSpec("skill_usage_logger.py", 10),
+        HookCommandSpec("goal_completion_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
+        HookCommandSpec("log_surface_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
     ),
 }
 
@@ -358,13 +375,16 @@ def sed_in_place_argument(argument: str) -> bool:
 
 def safe_python_validation(tokens: tuple[str, ...]) -> bool:
     """Return whether tokens invoke a Python validation command."""
-    if len(tokens) >= 3 and tokens[1] == "-m":
-        module = tokens[2]
+    if len(tokens) >= PYTHON_MODULE_MIN_TOKENS and tokens[SCRIPT_PATH_INDEX] == "-m":
+        module = tokens[PYTHON_MODULE_NAME_INDEX]
         if module == "ruff":
-            return len(tokens) >= 4 and tokens[3] == "check"
+            return (
+                len(tokens) >= PYTHON_RUFF_CHECK_MIN_TOKENS
+                and tokens[PYTHON_RUFF_SUBCOMMAND_INDEX] == "check"
+            )
         return module in SAFE_PYTHON_MODULE_CHECKS
-    if len(tokens) >= 2:
-        script = Path(tokens[1])
+    if len(tokens) >= SCRIPT_MIN_TOKENS:
+        script = Path(tokens[SCRIPT_PATH_INDEX])
         if script.parts[:2] == ("tools", "agent_tools"):
             return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
         if script.parts[:2] == ("tools", "docs") and script.name.startswith("check_"):
@@ -376,13 +396,19 @@ def safe_python_validation(tokens: tuple[str, ...]) -> bool:
 
 def safe_bash_validation(tokens: tuple[str, ...]) -> bool:
     """Return whether tokens invoke a Bash validation script."""
-    if len(tokens) < 2:
+    if len(tokens) < SCRIPT_MIN_TOKENS:
         return False
-    script = Path(tokens[1])
+    script = Path(tokens[SCRIPT_PATH_INDEX])
     if script.as_posix() == "tools/sync_agent_canon.sh":
-        return len(tokens) >= 3 and tokens[2] in {"check", "plan", "status"}
+        return (
+            len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS
+            and tokens[SCRIPT_SUBCOMMAND_INDEX] in {"check", "plan", "status"}
+        )
     if script.as_posix() == "tools/update_agent_canon.sh":
-        return len(tokens) >= 3 and tokens[2] in {"plan", "status"}
+        return (
+            len(tokens) >= SCRIPT_SUBCOMMAND_MIN_TOKENS
+            and tokens[SCRIPT_SUBCOMMAND_INDEX] in {"plan", "status"}
+        )
     if script.parts[:2] == ("tools", "agent_tools"):
         return script.name.startswith(SAFE_TOOL_SCRIPT_PREFIXES)
     if script.parts[:2] == ("tools", "ci"):
@@ -469,7 +495,7 @@ def run_hook_command(
     except OSError as exc:
         return HookResult(
             spec=spec,
-            returncode=127,
+            returncode=HOOK_CHILD_NOT_FOUND_RETURN_CODE,
             stdout="",
             stderr=f"{type(exc).__name__}: {exc}",
         )
@@ -479,7 +505,7 @@ def run_hook_command(
         timeout_message = f"{spec.script} timed out after {spec.timeout} seconds"
         return HookResult(
             spec=spec,
-            returncode=124,
+            returncode=HOOK_CHILD_TIMEOUT_RETURN_CODE,
             stdout=stdout,
             stderr="\n".join(part for part in (stderr, timeout_message) if part),
             timed_out=True,

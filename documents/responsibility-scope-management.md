@@ -103,7 +103,9 @@ operator action; CI should use offline validation by default.
 ## Eval Evidence
 
 Eval and hook results are AgentCanon-owned evidence. They live under
-`agents/evals/results/` and are validated by:
+the mounted `.agent-canon/log-archive/` archive, while
+`agents/evals/results/` remains only a legacy notice and fallback reader
+surface. They are validated by:
 
 ```bash
 python3 tools/agent_tools/eval_accumulation_check.py --root .

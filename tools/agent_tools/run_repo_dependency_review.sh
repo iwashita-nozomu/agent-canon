@@ -97,6 +97,7 @@ cd "$ROOT_DIR"
 mapfile -t checkable_paths < <(
   git ls-files | awk '
     /^reports\/agents\// { next }
+    /^reports\/dependency-review\// { next }
     /\.(bash|cfg|css|h|hpp|html|c|cc|cpp|json|md|py|rst|sh|toml|txt|yaml|yml|zsh)$/ { print }
   '
 )
