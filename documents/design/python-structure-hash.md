@@ -19,9 +19,11 @@ duplicate analysis.
 `python-structure-hash` finds structurally duplicated Python functions,
 classes, and type aliases using normalized AST shape. It also reports
 single-caller structural helpers when an implementation function or class is
-owned by exactly one enclosing caller block. It intentionally avoids name-only
-matching. Names can appear in the report as evidence, but they are not the
-primary duplicate or single-caller criterion.
+owned by exactly one enclosing caller block, and non-public single-callee
+wrappers when an implementation function or method resolves to exactly one
+repo-local callee. It intentionally avoids name-only matching. Names can appear
+in the report as evidence, but they are not the primary duplicate,
+single-caller, or single-callee criterion.
 
 The tool is intended to support refactoring order, not to automatically delete
 code. Its output is mechanical evidence that an agent or reviewer can inspect.
@@ -126,6 +128,71 @@ dependency graph. `python-structure-hash-report` marks rows with
 `candidate_schema_scope=dependency_enriched` and adds dependency-tree features
 from the structured report.
 
+## Non-Public Single-Callee Wrappers
+
+Single-callee analysis uses the same AST call/reference facts and Rust symbol
+resolution as single-caller analysis, but it reverses the question: instead of
+asking whether a helper has exactly one owner, it asks whether a non-public
+implementation function or method delegates to exactly one repo-local callee.
+
+The caller block is eligible only when it is not part of the public API. Public
+API is determined from AST-visible export context:
+
+- if a module defines a literal `__all__`, top-level blocks listed there are
+  public;
+- otherwise top-level blocks whose names are not private are public;
+- public methods of a public class are public;
+- nested functions, private top-level blocks, private methods, and methods of
+  private classes are non-public.
+
+Only repo-local callees that resolve to implementation functions or classes are
+counted. External library calls are ignored for the single-callee finding
+itself, though dependency metadata remains available elsewhere in the structured
+report. A wrapper that calls the same callee twice still has `callee_count=1`
+and a larger `call_site_count`; a wrapper that calls two different repo-local
+callees is not a single-callee finding.
+
+The structured report emits these findings as
+`single_callee_structural_wrapper` with `callee_analysis` evidence:
+
+- `callee_count`: number of unique repo-local resolved callees;
+- `call_site_count`: number of call/reference sites to that callee;
+- `callee_analysis.callees[*].call_lines`: source lines for the delegated
+  calls;
+- `callee_analysis.integration_candidates`: deterministic feature rows for
+  inline-or-merge review.
+
+Single-callee findings are mechanical wrapper evidence, not automatic deletion
+instructions. They are intended to be reviewed alongside dependency depth,
+production/test scope, and existing public API contracts.
+
+## Mechanical Problem Clusters
+
+The structured report also emits `summary.mechanical_problem_clusters`. These
+clusters sit above individual findings and identify larger repair batches that
+can be planned mechanically before a `refactor-loop` write slice starts.
+
+Cluster families:
+
+- `same_callee_wrapper_batch`: multiple non-public SingleCallee wrappers
+  delegate to the same repo-local target;
+- `same_owner_single_caller_batch`: multiple SingleCaller helpers are owned by
+  the same caller;
+- `same_file_refactor_hotspot`: one production file contains several findings
+  that can be planned as a file-level repair wave;
+- `module_group_refactor_hotspot`: one module group owns a large share of
+  prioritized findings;
+- `large_duplicate_shape_batch`: one duplicate structural hash has many
+  production instances;
+- `review_blocker_cluster`: many findings share the same design or policy
+  blocker.
+
+Each cluster includes `problem_kind`, `cluster_key`, `action_hint`,
+`confidence`, `priority_score`, `finding_count`, `affected_files`, `blockers`,
+and a bounded list of finding references. The full finding rows remain in the
+top-level `findings` array. Clusters do not replace the full finding artifact;
+they provide a deterministic way to choose broader implementation waves.
+
 ## Module Groups
 
 Module-group definitions are parent-repository design state. AgentCanon owns the
@@ -218,11 +285,12 @@ mechanical and uses this order of evidence:
 2. file-level incoming dependency count;
 3. fewer module-group outgoing dependencies;
 4. single-caller ownership signal;
-5. production surface membership;
-6. implementation role before protocol and alias;
-7. cross-module duplicate scope;
-8. impact size from instance count and token count;
-9. structural hash as the stable tie-breaker.
+5. non-public single-callee wrapper signal;
+6. production surface membership;
+7. implementation role before protocol and alias;
+8. cross-module duplicate scope;
+9. impact size from instance count and token count;
+10. structural hash as the stable tie-breaker.
 
 This means low-level repository code is preferred over high-level callers.
 External libraries never increase refactor priority except as advisory context.

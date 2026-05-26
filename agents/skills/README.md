@@ -49,12 +49,13 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
+| `user-guided-debugging` | ユーザー明示時に、1 件ずつ問題点を提示してから修正し、検証後に次の課題を提示する | `agents/skills/user-guided-debugging.md` | `.agents/skills/user-guided-debugging/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
 | `document-canon-cleanup` | 非正本の文書候補を棚卸しし、mirror / generated evidence / closed issue / duplicate heading を正本へ振り分ける | `agents/skills/document-canon-cleanup.md` | `.agents/skills/document-canon-cleanup/SKILL.md` |
-| `dependency-analysis` | 依存 manifest の header / scan / format / graph tool 起動 | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
+| `dependency-analysis` | 依存 manifest / 実コード依存を確認し、変更影響範囲と repair-planning packet を作る | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
 | `worktree-start` | worktree 開始時の scope、action log、kickoff を整える | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
@@ -91,8 +92,9 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
 - 文書整理で正本、mirror、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
-- dependency manifest、reverse edge、cycle、full-repo manifest inventory を確認するときは `dependency-analysis` を使います。
-- 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。
+- dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
+- 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。
+- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は `user-guided-debugging` を使い、修正前の問題提示と修正後の次課題提示を固定します。
 - C / C++ 差分では `cpp-review` を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。

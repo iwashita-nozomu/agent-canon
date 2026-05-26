@@ -1,6 +1,6 @@
 ---
 name: dependency-analysis
-description: Use when checking, validating, or diagnosing repository dependency manifests with the header, scan, format, and graph tools before editing, review, or closeout.
+description: Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout.
 ---
 
 <!--
@@ -26,6 +26,8 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md sepa
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
    - repo-wide text search triage: save `rg -l` hits and run search-to-edit-scope expansion
+   - repair planning or subagent handoff: build a token-light `Change Impact
+     Packet` manifest before selecting implementation targets
 1. For code dependency evidence, run:
 
 ```bash
@@ -57,6 +59,57 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 ```
 
 1. Use `dependency_graph.tsv` and `dependency_edit_scope.txt` to list files that need edits or review. Do not close an issue or PR with only raw search hits when dependency-expanded edit scope is available.
+
+1. When a task changes one requested object/file/finding, or when a parent will
+   hand work to a write-capable subagent, produce a token-light
+   `Change Impact Packet` manifest instead of passing raw hits, raw findings,
+   or pasted dependency dumps. Tool outputs stay on disk as JSON/TSV/Markdown
+   artifacts; the packet stores paths, counts, object ids, and only the minimal
+   excerpts needed for planning. Keep code dependency evidence and header
+   dependency evidence as separate sections, then unify them only in the
+   planning packet. The packet must include:
+   - `requested_target`: `path:start-end:qualname`, file, or finding id
+   - `code_dependency_surface`: imports/includes/source edges and direct
+     callees/callers that are visible to static analysis
+   - `header_dependency_surface`: upstream/downstream design, test,
+     environment, and workflow edges
+   - `search_surface`: `rg -l` hits and `dependency_edit_scope.txt` paths when
+     text search seeded the work
+   - `structural_surface`: tool finding packet, priority order, and repair
+     slice paths when a checker seeded the work
+   - `public_api_exports`: re-export, public import, and generated entrypoint
+     surfaces affected by the target
+   - `tests_docs_config_log_info_edges`: tests, docs, config, log, and Info
+     surfaces that must be edited or reviewed with the code
+   - `unknown_dynamic_edges`: JAX/equinox/runtime dispatch or reflection edges
+     not proven by static analysis
+   - `impact_blocks`: tool-generated blocks grouped by connected dependency
+     component, dependency depth, responsibility group, and validation surface;
+     each block records `block_id`, root targets, downstream targets,
+     evidence artifact paths, `blocked_by`, `parallel_safe`, allowed files,
+     validation, and non-goals
+   - `scope_candidates`: tool-generated candidate granularities for the same
+     impact surface, such as object-level, module-level, responsibility-group
+     level, or representative-consumer-plus-root level
+   - `selected_scope`: the chosen granularity with objective scores for wave
+     count, expected tool reruns, write-conflict risk, token budget, validation
+     cost, and semantic risk
+   - `repair_batches`: sequential root batches and parallel-safe downstream
+     batches derived from `impact_blocks`
+   - `subagent_handoff_context`: object-by-object current problem, intended
+     change, forbidden semantic delta, validation signal, and output format
+1. Do not ask an LLM to re-summarize the full dependency graph by default.
+   Read full artifacts only for the current repair batch or when a reviewer
+   needs to inspect a disputed edge.
+1. Do not ask an LLM to manually partition impact scope by default. Block
+   construction is a tool responsibility. The LLM may accept, split, merge, or
+   mark a block `review_required`, but it must record the reason and preserve
+   the original tool-generated block id.
+1. Do not treat node size as fixed. Scope granularity is an optimization
+   problem. Prefer the largest block that preserves a clear behavior contract,
+   avoids write conflicts, fits the token budget, and can be validated with one
+   coherent test/tool surface; shrink the block only when semantic risk,
+   ownership, or validation isolation requires it.
 
 1. When reverse-edge migration is the task, add strict bidirectional validation:
 

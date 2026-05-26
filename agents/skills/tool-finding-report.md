@@ -85,6 +85,14 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    rule は report に残し、同じ入力から同じ順序になるようにします。
 1. report では機械結果と agent interpretation を分けます。reader-facing report に
    する場合は `report-writing` を使います。
+   - user が「レポート」「まとめ」「結果を解釈」「Markdown にして」などを求めた場合、
+     `report-writing` は必須です。validation summary、command log、top-N excerpt、
+     raw JSON path だけで closeout してはいけません。
+   - 非自明な finding packet では、draft 前に `structure-planning` を使い、source
+     packet、reader guide、metric / count contract、priority policy、limitations、
+     next actions を固定します。
+   - report は full structured artifact を参照してよいですが、underlying artifact
+     は削らず、report 側に full table の保存先と取捨選択境界を明記します。
 1. finding を分類します。
    - `implementation_bug`: 実装を直す
    - `missing_test_or_design_evidence`: test / design artifact を直す
