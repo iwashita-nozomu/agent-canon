@@ -28,7 +28,7 @@ try:
 except ModuleNotFoundError:  # Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from runtime_log_paths import eval_results_dir
+from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
 
 DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
@@ -194,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Directory for accumulated detailed reports. Defaults to the mounted "
             "AgentCanon log archive eval-results/skill-workflow-prompt path, "
-            "falling back to the legacy in-tree path only when no archive is mounted."
+            "falling back to a non-repository state path when no archive is mounted."
         ),
     )
     parser.add_argument(
@@ -659,7 +659,7 @@ def resolve_results_dir(root: Path, value: str) -> Path:
     if stripped:
         path = Path(stripped)
         return path if path.is_absolute() else root / path
-    return eval_results_dir(root, DEFAULT_RESULTS_FAMILY)
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
 
 
 def eval_status(results: tuple[ChecklistResult, ...], audit: ManifestAudit) -> str:

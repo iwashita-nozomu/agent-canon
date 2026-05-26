@@ -3,7 +3,7 @@
 # @dependency-start
 # responsibility Tests AgentCanon hook/eval log management validation.
 # upstream implementation ../../tools/agent_tools/agent_canon_log_management_check.py validates
-# upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
+# upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
 # @dependency-end
 
 from __future__ import annotations
@@ -62,6 +62,35 @@ class AgentCanonLogManagementCheckTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_LOG_MANAGEMENT_DIRTY_EVAL_LOG_PATHS=1", result.stdout)
         self.assertIn("AGENT_CANON_LOG_MANAGEMENT=pass", result.stdout)
 
+    def test_tracked_source_eval_log_fails(self) -> None:
+        """Tracked source-tree eval logs must move to the runtime log archive."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root, branch="main")
+            subprocess.run(["git", "-C", str(root), "add", "agents/evals/results"], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=AgentCanon Test",
+                    "-c",
+                    "user.email=agent-canon-test@example.invalid",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "track logs",
+                ],
+                check=True,
+            )
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("tracked_source_log", result.stdout)
+        self.assertIn("AGENT_CANON_LOG_MANAGEMENT_TRACKED_EVAL_LOG_PATHS=1", result.stdout)
+
     def test_hook_namespace_mismatch_fails(self) -> None:
         """Entry namespace must match the JSONL path namespace."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -112,8 +141,11 @@ class AgentCanonLogManagementCheckTest(unittest.TestCase):
     def write_fixture(self, root: Path, *, branch: str) -> None:
         """Write a minimal AgentCanon-like log fixture."""
         self.init_repo(root, branch=branch)
+        evals_readme = root / "agents" / "evals" / "README.md"
+        evals_readme.parent.mkdir(parents=True)
+        evals_readme.write_text("eval definitions\n", encoding="utf-8")
         hook_path = root / "agents" / "evals" / "results" / "hook-runs" / "test" / "hook.jsonl"
-        hook_path.parent.mkdir(parents=True)
+        hook_path.parent.mkdir(parents=True, exist_ok=True)
         hook_path.write_text(json.dumps(self.hook_entry("test")) + "\n", encoding="utf-8")
 
     def hook_entry(self, namespace: str) -> dict[str, str]:

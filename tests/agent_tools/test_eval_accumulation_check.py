@@ -3,7 +3,7 @@
 # @dependency-start
 # responsibility Tests eval accumulation validation.
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result evidence
-# upstream design ../../agents/evals/results/README.md eval result storage contract
+# upstream design ../../documents/runtime-log-archive.md eval result storage contract
 # @dependency-end
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "eval_accumulation_check.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import repo_log_key  # noqa: E402
+from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 
 class EvalAccumulationCheckTest(unittest.TestCase):
@@ -45,7 +45,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            hook_path = root / "agents" / "evals" / "results" / "hook-runs" / "test" / "hook.jsonl"
+            hook_path = self.hook_path(root)
             entry = self.hook_entry("hook-duplicate")
             hook_path.write_text(
                 json.dumps(entry) + "\n" + json.dumps(entry) + "\n",
@@ -57,12 +57,12 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("duplicate", result.stdout)
 
-    def test_legacy_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
-        """Legacy accumulated hook logs missing namespaces stay readable."""
+    def test_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
+        """Accumulated hook logs missing namespaces remain visible for repair."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            hook_path = root / "agents" / "evals" / "results" / "hook-runs" / "test" / "hook.jsonl"
+            hook_path = self.hook_path(root)
             entry = self.hook_entry("hook-legacy")
             entry.pop("hook_log_namespace")
             hook_path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
@@ -78,17 +78,14 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for path in (root / "agents" / "evals" / "results" / "hook-runs").rglob("*.jsonl"):
-                path.unlink()
+            archive_root = mounted_log_archive_root(root)
             archive_hook_dir = (
-                root
-                / ".agent-canon"
-                / "log-archive"
+                archive_root
                 / "hook-runs"
                 / repo_log_key(root)
                 / "test"
             )
-            archive_hook_dir.mkdir(parents=True)
+            archive_hook_dir.mkdir(parents=True, exist_ok=True)
             (archive_hook_dir / "hook.jsonl").write_text(
                 json.dumps(self.hook_entry("hook-external")) + "\n",
                 encoding="utf-8",
@@ -106,20 +103,6 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for family in (
-                "skill-workflow-prompt",
-                "local-llm-responsibility",
-                "workflow-selection",
-                "report-quality",
-            ):
-                legacy_dir = root / "agents" / "evals" / "results" / family
-                archive_dir = root / ".agent-canon" / "log-archive" / "eval-results" / family
-                archive_dir.mkdir(parents=True)
-                for report in legacy_dir.glob("*.md"):
-                    if report.name == "README.md":
-                        continue
-                    (archive_dir / report.name).write_text(report.read_text(encoding="utf-8"), encoding="utf-8")
-                    report.unlink()
 
             result = self.run_checker(root)
 
@@ -151,9 +134,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for path in (root / "agents" / "evals" / "results" / "skill-workflow-prompt").glob("*.md"):
-                if path.name != "README.md":
-                    path.unlink()
+            for path in self.eval_family_dir(root, "skill-workflow-prompt").glob("*.md"):
+                path.unlink()
 
             result = self.run_checker(root)
 
@@ -165,9 +147,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for path in (root / "agents" / "evals" / "results" / "local-llm-responsibility").glob("*.md"):
-                if path.name != "README.md":
-                    path.unlink()
+            for path in self.eval_family_dir(root, "local-llm-responsibility").glob("*.md"):
+                path.unlink()
 
             result = self.run_checker(root)
 
@@ -179,9 +160,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for path in (root / "agents" / "evals" / "results" / "workflow-selection").glob("*.md"):
-                if path.name != "README.md":
-                    path.unlink()
+            for path in self.eval_family_dir(root, "workflow-selection").glob("*.md"):
+                path.unlink()
 
             result = self.run_checker(root)
 
@@ -193,9 +173,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            for path in (root / "agents" / "evals" / "results" / "report-quality").glob("*.md"):
-                if path.name != "README.md":
-                    path.unlink()
+            for path in self.eval_family_dir(root, "report-quality").glob("*.md"):
+                path.unlink()
 
             result = self.run_checker(root)
 
@@ -204,11 +183,11 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
     def write_fixture(self, root: Path) -> None:
         """Write a minimal eval result fixture."""
-        hook_dir = root / "agents" / "evals" / "results" / "hook-runs" / "test"
-        skill_dir = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
-        local_llm_dir = root / "agents" / "evals" / "results" / "local-llm-responsibility"
-        workflow_selection_dir = root / "agents" / "evals" / "results" / "workflow-selection"
-        report_quality_dir = root / "agents" / "evals" / "results" / "report-quality"
+        hook_dir = self.hook_path(root).parent
+        skill_dir = self.eval_family_dir(root, "skill-workflow-prompt")
+        local_llm_dir = self.eval_family_dir(root, "local-llm-responsibility")
+        workflow_selection_dir = self.eval_family_dir(root, "workflow-selection")
+        report_quality_dir = self.eval_family_dir(root, "report-quality")
         hook_dir.mkdir(parents=True)
         skill_dir.mkdir(parents=True)
         local_llm_dir.mkdir(parents=True)
@@ -237,6 +216,14 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             "REPORT_QUALITY_EVAL_RUN_ID=report-quality-eval-20260517T010203040506Z-1234567890\n",
             encoding="utf-8",
         )
+
+    def hook_path(self, root: Path) -> Path:
+        """Return the archive hook fixture path."""
+        return mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test" / "hook.jsonl"
+
+    def eval_family_dir(self, root: Path, family: str) -> Path:
+        """Return one archive eval family fixture directory."""
+        return mounted_log_archive_root(root) / "eval-results" / family
 
     def hook_entry(self, run_id: str) -> dict[str, str]:
         """Return one valid hook entry."""

@@ -2,8 +2,8 @@
 # @dependency-start
 # responsibility Generates PR and push-time guidance from AgentCanon memory, eval, hook, and issue evidence.
 # upstream design ../../agents/evals/README.md eval evidence contract
-# upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
-# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
+# upstream design ../../documents/runtime-log-archive.md hook result accumulation contract
+# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream design ../../issues/README.md durable operational issue storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on PR and push
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
@@ -509,7 +509,7 @@ class AgentImprovementGuide:
         return tuple(sorted(self.root.glob(pattern)))
 
     def skill_eval_report_paths(self) -> tuple[Path, ...]:
-        """Return skill prompt eval reports from mounted archive and legacy paths."""
+        """Return skill prompt eval reports from the mounted archive."""
         reports = {
             path
             for result_dir in eval_result_search_dirs(self.root, "skill-workflow-prompt")
@@ -683,7 +683,7 @@ def resolve_agentcanon_root(root: Path) -> Path:
 def is_agentcanon_root(root: Path) -> bool:
     """Return whether a path looks like the AgentCanon evidence root."""
     return (
-        (root / "agents" / "evals" / "results").exists()
+        (root / "agents" / "evals" / "README.md").is_file()
         or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
     )
 

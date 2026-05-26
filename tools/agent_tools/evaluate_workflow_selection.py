@@ -26,7 +26,7 @@ try:
 except ModuleNotFoundError:  # Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from runtime_log_paths import eval_results_dir
+from runtime_log_paths import agent_canon_root, eval_results_dir
 
 DEFAULT_MANIFEST = "agents/evals/workflow_selection_eval.toml"
 DEFAULT_RESULTS_FAMILY = "workflow-selection"
@@ -312,7 +312,7 @@ def resolve_results_dir(root: Path, value: str) -> Path:
     if stripped:
         path = Path(stripped)
         return path if path.is_absolute() else root / path
-    return eval_results_dir(root, DEFAULT_RESULTS_FAMILY)
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
 
 
 def accumulated_report_path(results_dir: Path, bundle: WorkflowSelectionBundle) -> Path:

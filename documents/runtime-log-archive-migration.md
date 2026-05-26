@@ -4,8 +4,7 @@ responsibility Documents how to move AgentCanon in-tree hook and eval logs into 
 upstream design runtime-log-archive.md runtime log archive ownership and branch policy
 upstream design coding-conventions-logging.md JSONL logging convention
 upstream implementation ../tools/agent_tools/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
-downstream implementation ../agents/evals/results/hook-runs/README.md points readers away from raw in-tree JSONL
-downstream implementation ../agents/evals/results/README.md points readers away from in-tree eval reports
+downstream design ../agents/evals/README.md points readers away from in-tree result paths
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates mounted archive JSONL and eval reports
 @dependency-end
 -->
@@ -16,8 +15,9 @@ This document is the AgentCanon-side migration procedure for old hook JSONL and
 accumulated eval reports that still exist under `agents/evals/results/`.
 
 Runtime hook JSONL and accumulated eval reports belong in the external archive
-repository mounted at `.agent-canon/log-archive/`. AgentCanon source keeps only
-reader-facing documentation, schemas, tool tests, and legacy notice READMEs.
+repository mounted at `.agent-canon/archive/<env-key>/`. AgentCanon source keeps
+reader-facing documentation, schemas, and tool tests, but no
+`agents/evals/results/` result tree.
 
 ## Required Migration Steps
 
@@ -32,11 +32,8 @@ Run the commands from the AgentCanon repository root.
 1. Inventory old in-tree hook JSONL and eval reports.
 
    ```bash
-   find agents/evals/results/hook-runs -type f -name '*.jsonl' -print | sort
-   find agents/evals/results -type f -name '*.md' \
-     ! -path 'agents/evals/results/README.md' \
-     ! -path 'agents/evals/results/hook-runs/README.md' \
-     -print | sort
+   find agents/evals/results/hook-runs -type f -name '*.jsonl' -print 2>/dev/null | sort
+   find agents/evals/results -type f -name '*.md' -print 2>/dev/null | sort
    ```
 
 1. Copy old JSONL into the archive and remove the source files.
@@ -59,28 +56,24 @@ Run the commands from the AgentCanon repository root.
    ```
 
 1. Verify that AgentCanon source no longer contains raw hook JSONL or eval
-   report artifacts.
+   report artifacts or the old result tree.
 
    ```bash
-   find agents/evals/results/hook-runs -type f -name '*.jsonl' -print | sort
-   find agents/evals/results -type f -name '*.md' \
-     ! -path 'agents/evals/results/README.md' \
-     ! -path 'agents/evals/results/hook-runs/README.md' \
-     -print | sort
+   test ! -e agents/evals/results
    python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
    ```
 
-1. Keep `agents/evals/results/README.md` and
-   `agents/evals/results/hook-runs/README.md` in AgentCanon. They are the
-   migration notice and schema pointers for the old in-tree location.
+1. If `agents/evals/results/` is empty after import, remove the directory from
+   Git. The migration notice and schema pointers now live in
+   `documents/runtime-log-archive.md` and `agents/evals/README.md`.
 
 ## Current Migration Evidence
 
 The 2026-05-25 migration imported the old AgentCanon hook JSONL into:
 
 ```text
-.agent-canon/log-archive/hook-runs/legacy-import/
-.agent-canon/log-archive/eval-results/legacy-import/
+.agent-canon/archive/<env-key>/legacy-import/hook-runs/
+.agent-canon/archive/<env-key>/legacy-import/eval-results/
 ```
 
 The migrated set contains the former repo/runtime directories for
@@ -90,8 +83,8 @@ those old JSONL files for deletion and keeps the migration notice README.
 
 The same migration imported the former accumulated eval result families
 `skill-workflow-prompt`, `local-llm-responsibility`, `workflow-selection`, and
-`report-quality` into `eval-results/legacy-import/`. AgentCanon source keeps only
-the two notice READMEs under `agents/evals/results/`.
+`report-quality` into `legacy-import/eval-results/`. AgentCanon source no
+longer keeps `agents/evals/results/`.
 
 `reports/broken_links.txt` is local docs-check output, not a runtime hook JSONL
 stream. It remains ignored local validation output and must not be copied into

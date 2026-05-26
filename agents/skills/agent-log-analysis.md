@@ -18,7 +18,7 @@ token-light な compact summary に変換してから分析するための skill
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
-- `agents/evals/results/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
+- `.agent-canon/archive/<env-key>/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
 

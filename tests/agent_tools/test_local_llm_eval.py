@@ -18,6 +18,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "local_llm_eval.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class LocalLlmEvalTest(unittest.TestCase):
@@ -28,6 +30,8 @@ class LocalLlmEvalTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
+            archive_root = mounted_log_archive_root(root)
+            archive_root.mkdir(parents=True)
 
             result = subprocess.run(
                 [
@@ -43,7 +47,7 @@ class LocalLlmEvalTest(unittest.TestCase):
             )
 
             reports = list(
-                (root / "agents" / "evals" / "results" / "local-llm-responsibility").glob(
+                (archive_root / "eval-results" / "local-llm-responsibility").glob(
                     "local-llm-eval-*-pass.md"
                 )
             )
