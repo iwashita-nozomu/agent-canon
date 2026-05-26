@@ -171,6 +171,12 @@ critical = true
 description = "Routes Python structural finding packets through scope planning before implementation."
 required_regex = ["python-structure-hash-scope-plan", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
 
+[[evals.checklist]]
+id = "TOOL-FINDING-5"
+critical = true
+description = "Defaults tool finding runs to full repository scope and records any narrowed-scope exception."
+required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
+
 [[evals]]
 id = "report-writing-skill"
 target = ".agents/skills/report-writing/SKILL.md"
