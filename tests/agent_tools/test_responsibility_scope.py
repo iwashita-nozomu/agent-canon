@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -21,10 +22,10 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "responsibility_scope.py"
 class ResponsibilityScopeTest(unittest.TestCase):
     """Exercise the responsibility scope checker."""
 
-    def run_checker(self, root: Path) -> subprocess.CompletedProcess[str]:
+    def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
         return subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(root)],
+            [sys.executable, str(SCRIPT), "--root", str(root), *args],
             check=False,
             capture_output=True,
             text=True,
@@ -88,6 +89,22 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("manifest:", result.stdout)
             self.assertIn("responsibility-scope.toml:missing-file", result.stdout)
+
+    def test_eval_and_hook_evidence_includes_log_archive_control_plane(self) -> None:
+        """The eval/hook evidence scope should cover log archive control-plane files."""
+        result = self.run_checker(PROJECT_ROOT, "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        report = json.loads(result.stdout)
+        scopes = {scope["scope_id"]: scope for scope in report["scopes"]}
+        paths = set(scopes["eval-and-hook-evidence"]["paths"])
+
+        self.assertIn("agents/evals/**", paths)
+        self.assertIn("documents/runtime-log-archive.md", paths)
+        self.assertIn("documents/runtime-log-archive-migration.md", paths)
+        self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
+        self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
+        self.assertIn(".codex/hooks/log_archive_mount_warning.py", paths)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small responsibility-scope fixture repository."""

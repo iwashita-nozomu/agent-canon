@@ -3,17 +3,19 @@
 @dependency-start
 responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../evals/results/README.md accumulated eval and hook result storage
+upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/search-coordination.md coordinated search policy
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates compact runtime summaries
+upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
+upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
 ## Purpose
 
-skill、tool、workflow、hook、eval の蓄積ログを、raw JSONL の広域検索ではなく
-token-light な compact summary に変換してから分析するための skill です。
+skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tree
+ではなく外部 log archive repository 側の API / compact summary に変換してから
+分析するための skill です。
 
 ## Use When
 
@@ -25,17 +27,26 @@ token-light な compact summary に変換してから分析するための skill
 ## Required Flow
 
 1. Raw log を `rg -n` で直接広域検索しません。
-1. 先に compact summary を生成します。
+1. AgentCanon 側では archive の mount / branch 状態だけを確認します。
 
 ```bash
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
-  --root . \
-  --out reports/agent-runtime-dashboard/agent-runtime-dashboard.md \
-  --compact-out reports/agent-runtime-dashboard/agent-runtime-compact.md
+python3 tools/agent_tools/runtime_log_archive_git.py ensure
+python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
 ```
 
-1. 原則として `agent-runtime-compact.md` だけを読み、machine summary、priority problems、next actions、selection misses、evidence drilldown、prompt/token trend の移動平均を分析します。
-1. compact summary で足りない観点がある場合は、raw JSONL を開く前に dashboard tool を拡張するか、より具体的な generated summary を出す option を追加します。
+1. `status --porcelain` の `RUNTIME_LOG_ARCHIVE_ROOT` を `<archive-root>` として、log archive repo 側の API / compact profile を呼びます。
+
+```bash
+python3 <archive-root>/tools/runtime_log_dashboard.py \
+  --root <archive-root> \
+  --profile log-analysis \
+  --output reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
+  --api-output reports/agent-runtime-dashboard/agent-log-analysis-api.json
+```
+
+1. 原則として `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` だけを読みます。log archive repo が集計、移動平均、原稿構造に合わせた evidence cell を所有します。
+1. `<archive-root>/tools/runtime_log_dashboard.py` が無い場合は `log_archive_api_missing` として止めます。AgentCanon 側で raw JSONL 広域検索に戻ってはいけません。
+1. compact summary で足りない観点がある場合は、raw JSONL を開く前に log archive repo の API / report profile を拡張します。
 1. Raw JSONL は tool 実装、schema debugging、破損 audit の例外入力としてだけ読みます。読む場合は理由を明示し、`tail`、小さい parser、または path 限定 `rg -n` を使い、全ログ横断の一致行 dump を避けます。
 1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
 
@@ -43,4 +54,4 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 
 - 実際の prompt / workflow / tool 修正は、分析結果に応じて `$agent-learning`、`$md-style-check`、`$codex-task-workflow`、または対象 skill を追加して行います。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
-- Full dashboard は human review 用です。agent の通常分析入力は compact summary、generated drilldown、rolling trend summary を既定にします。
+- Full dashboard は human review 用です。agent の通常分析入力は log archive API JSON、compact summary、generated evidence cell を既定にします。
