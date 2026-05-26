@@ -1471,3 +1471,39 @@ id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
 critical = true
 description = "Requires unique accumulated prompt eval report naming."
 required_regex = ["--accumulate", ".agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
+
+[[evals]]
+id = "agent-log-analysis-archive-api-skill"
+target = ".agents/skills/agent-log-analysis/SKILL.md"
+kind = "skill"
+description = "The runtime agent-log-analysis skill must call the external log archive API before reading evidence."
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-SHIM-1"
+critical = true
+description = "Requires archive resolution plus the log archive dashboard API command."
+required_regex = ["runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", "--profile log-analysis", "--api-output"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-SHIM-2"
+critical = true
+description = "Forbids raw JSONL fallback when the archive API is missing."
+required_regex = ["log_archive_api_missing", "do not fall back to raw JSONL"]
+
+[[evals]]
+id = "agent-log-analysis-archive-api-doc"
+target = "agents/skills/agent-log-analysis.md"
+kind = "skill-doc"
+description = "The human agent-log-analysis skill must define AgentCanon as a thin client over the log archive repository API."
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-DOC-1"
+critical = true
+description = "Documents archive resolution and log archive API output."
+required_regex = ["external log archive", "runtime_log_archive_git\\.py", "runtime_log_dashboard\\.py", "--profile log-analysis", "--api-output"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-DOC-2"
+critical = true
+description = "Keeps raw JSONL inspection exceptional."
+required_regex = ["log_archive_api_missing", "raw JSONL", "schema debugging", "破損 audit"]
