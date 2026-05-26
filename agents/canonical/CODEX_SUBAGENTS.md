@@ -27,6 +27,8 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent の depth や fan-out は固定値で規定せず、task の複雑さ、review の独立性、write scope 分離で決める
 - 追加の subagent 層を立てるときは、parent が owner、input packet、expected output、write scope を明示する
+- subagent handoff の input packet は role ごとに bounded にし、`/workspace` や repo root 全体を読む scope として渡さない
+- reviewer には raw repo / raw log / full tree ではなく、対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡す
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
 - `文書通読レビュー` は `詳細設計レビュー` と別の subagent で行う
 - 論文 draft では `citation_evidence_reviewer` も別の subagent で行う
@@ -60,6 +62,19 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 - 前 task の subagent に `send_input` して新規 task を継続させることは禁止します。必要な文脈は chat 要約ではなく run bundle と artifact path で渡します
 - `team_manifest.yaml` の `run.subagent_lifecycle_policy` を subagent handoff prompt に含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を実行時の機械契約にします
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` が揃うまで user-facing completion を返しません
+
+## Handoff Context Budget
+
+Subagent の context budget は correctness gate です。parent は handoff prompt ごとに次を固定します。
+
+- `role_scope`: その role が判断する subdomain、stage、risk class。
+- `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` だけの指定は禁止。編集候補、検索 hit、checker finding、changed path を seed にし、dependency header graph を再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
+- `required_artifacts`: checker output、compact dashboard、dependency-expanded scope、design / implementation packet、または review packet。raw logs や full reports を直接読ませず、まず compact artifact を渡します。dependency-expanded scope が必要な場合は `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
+- `canon_refs`: 必要な AgentCanon / project canon の節だけ。文書 tree 全体を辿らせません。
+- `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
+- `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
+
+role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary だけを渡します。Python API / typing review は `python_reviewer` に分け、数学 canon の full context は渡しません。
 
 ## Hook And Tool Feedback To Subagent Protocol
 
