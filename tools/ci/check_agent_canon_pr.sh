@@ -6,6 +6,10 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
+# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
+# upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
+# upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
+# upstream implementation ../docs/mirror_skill_shims.py Claude skill mirror parity check
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
 # @dependency-end
@@ -45,11 +49,33 @@ run_make_or_direct() {
 }
 
 run_direct_agent_checks() {
-  bash tools/sync_agent_canon.sh check
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    bash tools/sync_agent_canon.sh check
+  else
+    echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
+  fi
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/evaluate_codex_agent_roles.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml
+  python3 tools/agent_tools/check_convention_compliance.py
+}
+
+run_shared_surface_status() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    bash tools/sync_agent_canon.sh status
+  else
+    echo "SHARED_SURFACE_STATUS=not_applicable_standalone_source"
+  fi
+}
+
+run_shared_surface_check() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    bash tools/sync_agent_canon.sh check
+  else
+    echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
+  fi
 }
 
 agentcanon_pr_branch_dirty() {
@@ -88,6 +114,10 @@ agentcanon_pr_branch_pending() {
 }
 
 run_pr_agent_checks() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    run_direct_agent_checks
+    return
+  fi
   if agentcanon_pr_branch_dirty; then
     echo "AGENT_CANON_PR_LATEST_GATE=blocked_dirty_agentcanon_branch"
     echo "AGENT_CANON_PR_LATEST_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
@@ -108,6 +138,10 @@ run_pr_agent_checks() {
 }
 
 run_pr_quick_ci() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    run_standalone_static_gate_ci
+    return
+  fi
   if agentcanon_pr_branch_dirty; then
     echo "AGENT_CANON_PR_CI_LATEST_GATE=blocked_dirty_agentcanon_branch"
     echo "AGENT_CANON_PR_CI_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
@@ -120,6 +154,31 @@ run_pr_quick_ci() {
     return
   fi
   run_make_or_direct ci-quick bash tools/ci/run_all_checks.sh --quick
+}
+
+run_standalone_static_gate_ci() {
+  cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
+  cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
+  cargo test --manifest-path rust/agent-canon/Cargo.toml
+  python3 tools/agent_tools/tool_catalog.py
+  python3 tools/agent_tools/tool_drift.py
+  python3 tools/agent_tools/responsibility_scope.py
+  BASE_REF="${GITHUB_BASE_REF:-main}"
+  git fetch origin "${BASE_REF}" --depth=1 || true
+  python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
+  python3 tools/agent_tools/issue_sync.py
+  python3 tools/agent_tools/eval_accumulation_check.py
+  python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
+  python3 tools/agent_tools/check_agent_runtime_alignment.py
+  python3 tools/agent_tools/evaluate_codex_agent_roles.py
+  python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml
+  python3 tools/agent_tools/check_convention_compliance.py
+  tools/bin/agent-canon local-llm eval
+  python3 tools/agent_tools/evaluate_workflow_selection.py
+  python3 tools/agent_tools/evaluate_report_quality.py
+  python3 tools/ci/check_github_workflows.py
+  python3 tools/ci/container_config.py
 }
 
 github_repo_security_status() {
@@ -190,11 +249,11 @@ fi
 echo ""
 
 echo "1️⃣  shared surface status"
-bash tools/sync_agent_canon.sh status
+run_shared_surface_status
 echo ""
 
 echo "2️⃣  shared surface drift check"
-bash tools/sync_agent_canon.sh check
+run_shared_surface_check
 echo ""
 
 echo "2b️⃣  GitHub workflow and PR template checks"

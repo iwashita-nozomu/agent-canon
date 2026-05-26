@@ -44,7 +44,7 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
+- runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - cap は depth 制限ではなく同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません

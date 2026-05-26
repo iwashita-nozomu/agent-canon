@@ -40,40 +40,7 @@ HIGH = "high"
 MEDIUM = "medium"
 LOW = "low"
 
-MODEL_POLICY: dict[str, tuple[str, str, str]] = {
-    "artifact_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "benchmark_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "citation_evidence_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "cpp_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "detailed_design_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "detailed_designer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "diff_triage_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "docs_workflow_steward": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "document_flow_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "execution_planner": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "experiment_runner": ("execution_only", SPARK_MODEL, LOW),
-    "explorer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "fair_data_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "literature_researcher": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "logic_gap_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "long_form_writer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "manager_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "ml_science_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "notation_definition_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "oop_readability_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "plan_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "project_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "python_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "report_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "reproducibility_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "requirements_organizer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "scientific_computing_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "ship_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "spark_worker": ("execution_only", SPARK_MODEL, LOW),
-    "test_designer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "worker": ("frontier_required", FRONTIER_MODEL, HIGH),
-}
+ModelPolicy = dict[str, tuple[str, str, str]]
 
 
 @dataclass(frozen=True)
@@ -147,6 +114,45 @@ def load_agent_configs(root: Path) -> dict[str, dict[str, object]]:
     return configs
 
 
+def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
+    """Load role model policy from the centralized Codex config."""
+    findings: list[Finding] = []
+    config_path = root / ".codex" / "config.toml"
+    if not config_path.is_file():
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
+    payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    agents = payload.get("agents")
+    if not isinstance(agents, dict):
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-agents-table")]
+    model_policy = agents.get("model_policy")
+    if not isinstance(model_policy, dict) or not model_policy:
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
+    role_policy: ModelPolicy = {}
+    for bucket_id, raw_bucket in sorted(cast(dict[str, object], model_policy).items()):
+        if not isinstance(raw_bucket, dict):
+            findings.append(Finding("model-policy", str(bucket_id), "bucket-not-table"))
+            continue
+        bucket = cast(dict[str, object], raw_bucket)
+        model = bucket.get("model")
+        effort = bucket.get("model_reasoning_effort")
+        roles = bucket.get("roles")
+        if not isinstance(model, str) or not model:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-model"))
+            continue
+        if not isinstance(effort, str) or not effort:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-effort"))
+            continue
+        if not isinstance(roles, list) or not all(isinstance(role, str) and role for role in roles):
+            findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
+            continue
+        for role in cast(list[str], roles):
+            if role in role_policy:
+                findings.append(Finding("model-policy", role, "duplicate-policy-role"))
+                continue
+            role_policy[role] = (str(bucket_id), model, effort)
+    return role_policy, findings
+
+
 def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
     """Return roles keyed by id."""
     return {role.id: role for role in roles}
@@ -155,6 +161,7 @@ def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
 def evaluate_static_agent_configs(
     root: Path,
     configs: dict[str, dict[str, object]],
+    model_policy: ModelPolicy,
 ) -> list[Finding]:
     """Evaluate static role TOML schema, behavior, and model policy."""
     findings: list[Finding] = []
@@ -164,10 +171,10 @@ def evaluate_static_agent_configs(
                 findings.append(Finding("schema", agent_id, f"missing-{field}"))
         if config.get("name") != config.get("__stem"):
             findings.append(Finding("schema", agent_id, "name-file-stem-mismatch"))
-        if agent_id not in MODEL_POLICY:
+        if agent_id not in model_policy:
             findings.append(Finding("model-policy", agent_id, "unclassified-agent"))
             continue
-        bucket, expected_model, expected_effort = MODEL_POLICY[agent_id]
+        bucket, expected_model, expected_effort = model_policy[agent_id]
         if config.get("model") != expected_model:
             findings.append(
                 Finding("model-policy", agent_id, f"{bucket}-model-expected-{expected_model}")
@@ -177,7 +184,7 @@ def evaluate_static_agent_configs(
                 Finding("model-policy", agent_id, f"{bucket}-effort-expected-{expected_effort}")
             )
         findings.extend(evaluate_role_behavior(root, agent_id, config))
-    missing_policy = sorted(set(MODEL_POLICY) - set(configs))
+    missing_policy = sorted(set(model_policy) - set(configs))
     for agent_id in missing_policy:
         findings.append(Finding("model-policy", agent_id, "missing-agent-toml"))
     return findings
@@ -363,11 +370,11 @@ def int_metric(entry: dict[str, object], *keys: str) -> tuple[int, str | None]:
     return 0, None
 
 
-def model_matrix(configs: dict[str, dict[str, object]]) -> tuple[str, ...]:
+def model_matrix(configs: dict[str, dict[str, object]], model_policy: ModelPolicy) -> tuple[str, ...]:
     """Render agent model bucket matrix."""
     rows: list[str] = []
     for agent_id in sorted(configs):
-        bucket, _, _ = MODEL_POLICY.get(agent_id, ("unclassified", "", ""))
+        bucket, _, _ = model_policy.get(agent_id, ("unclassified", "", ""))
         rows.append(
             f"{agent_id}:{bucket}:{configs[agent_id].get('model')}:{configs[agent_id].get('model_reasoning_effort')}"
         )
@@ -378,8 +385,10 @@ def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
+    model_policy, policy_findings = load_model_policy(canon_root)
     findings = [
-        *evaluate_static_agent_configs(canon_root, configs),
+        *policy_findings,
+        *evaluate_static_agent_configs(canon_root, configs, model_policy),
         *evaluate_routing(canon_root),
     ]
     metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs)
@@ -387,7 +396,7 @@ def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
     return EvalReport(
         status="pass" if not findings else "fail",
         findings=tuple(findings),
-        model_matrix=model_matrix(configs),
+        model_matrix=model_matrix(configs, model_policy),
         runtime_metrics_status=metrics_status,
         runtime_metrics=metrics,
     )

@@ -41,9 +41,10 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:cheap_first_review", result.stdout)
-        self.assertIn("experiment_runner:execution_only", result.stdout)
-        self.assertIn("ship_reviewer:frontier_required", result.stdout)
+        self.assertIn("diff_triage_reviewer:spark_read", result.stdout)
+        self.assertIn("experiment_runner:spark_coding", result.stdout)
+        self.assertIn("manager_reviewer:mini_review", result.stdout)
+        self.assertIn("ship_reviewer:frontier_judgment", result.stdout)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""

@@ -7,6 +7,12 @@
 # upstream implementation ../../tools/agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../tools/docs/mirror_skill_shims.py validates skill mirror parity
+# upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates Codex runtime role config
+# upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py validates Codex agent role prompts
+# upstream implementation ../../tools/agent_tools/smoke_test_research_perspective_pack.py validates research review pack routing
+# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py validates skill/workflow prompt surfaces
+# upstream implementation ../../tools/agent_tools/check_convention_compliance.py validates convention gate wiring
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs validates local LLM Rust CLI routing
 # upstream implementation ../../tools/agent_tools/local_llm_eval.py validates local LLM eval prompts
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
@@ -74,6 +80,12 @@ jobs:
           python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
           python3 tools/agent_tools/issue_sync.py
           python3 tools/agent_tools/eval_accumulation_check.py
+          python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
+          python3 tools/agent_tools/check_agent_runtime_alignment.py
+          python3 tools/agent_tools/evaluate_codex_agent_roles.py
+          python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+          python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml
+          python3 tools/agent_tools/check_convention_compliance.py
           tools/bin/agent-canon local-llm eval
           python3 tools/agent_tools/evaluate_workflow_selection.py
           python3 tools/agent_tools/evaluate_report_quality.py
