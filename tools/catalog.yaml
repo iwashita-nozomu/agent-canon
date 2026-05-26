@@ -218,6 +218,25 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: agent-canon-log-management-check
+    summary: Validates hook/eval log branch ownership and hook namespace consistency.
+    path: tools/agent_tools/agent_canon_log_management_check.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/agent_canon_log_management_check.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/results/README.md
+      - agents/evals/results/hook-runs/README.md
+    tests:
+      - tests/agent_tools/test_agent_canon_log_management_check.py
+
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
     path: tools/agent_tools/evaluate_workflow_selection.py

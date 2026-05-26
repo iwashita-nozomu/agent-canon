@@ -16,6 +16,7 @@
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../agent_tools/agent_canon_log_management_check.py validates hook/eval log branch ownership
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
@@ -250,6 +251,12 @@ if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
   echo "✅ eval accumulation checks 成功"
 else
   echo "❌ eval accumulation checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/agent_canon_log_management_check.py 2>&1; then
+  echo "✅ AgentCanon log management checks 成功"
+else
+  echo "❌ AgentCanon log management checks 失敗"
   EXIT_CODE=1
 fi
 if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then

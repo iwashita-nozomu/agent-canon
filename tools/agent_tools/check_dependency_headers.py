@@ -34,6 +34,7 @@ SKIP_PREFIXES = (
     ".pytest_cache/",
     ".ruff_cache/",
     "reports/agents/",
+    "reports/dependency-review/",
 )
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096

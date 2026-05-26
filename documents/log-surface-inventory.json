@@ -2305,6 +2305,142 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "canon_root",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "dirty_eval_log_paths",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "findings",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "git_branch",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "hook_entries",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "hook_files",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "hook_legacy_missing_namespace",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 193,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_FINDING",
+      "line": 36,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT",
+      "line": 228,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_CANON_ROOT",
+      "line": 218,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_DIRTY_EVAL_LOG_PATHS",
+      "line": 220,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_FINDINGS",
+      "line": 227,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_GIT_BRANCH",
+      "line": 219,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_HOOK_ENTRIES",
+      "line": 222,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_HOOK_FILES",
+      "line": 221,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_LOG_MANAGEMENT_HOOK_LEGACY_MISSING_NAMESPACE",
+      "line": 223,
+      "path": "tools/agent_tools/agent_canon_log_management_check.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
@@ -6284,7 +6420,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 704,
+      "line": 707,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -6292,7 +6428,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 704,
+      "line": 707,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -6372,7 +6508,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_BASELINE_MISSING",
-      "line": 693,
+      "line": 696,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -6380,7 +6516,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 692,
+      "line": 695,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -6388,7 +6524,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY",
-      "line": 700,
+      "line": 703,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -6396,7 +6532,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "LOG_SURFACE_INVENTORY_OUTPUT",
-      "line": 687,
+      "line": 691,
       "path": "tools/agent_tools/log_surface_inventory.py",
       "surface": "tool"
     },
@@ -9956,7 +10092,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 318,
+      "line": 325,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -9964,7 +10100,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "PYDOCSTYLE",
-      "line": 351,
+      "line": 358,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -9972,7 +10108,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "RUFF",
-      "line": 371,
+      "line": 378,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -12458,6 +12594,7 @@
     "rust/agent-canon/src/rust_migration_plan.rs",
     "rust/agent-canon/src/semantic_index.rs",
     "tools/__init__.py",
+    "tools/agent_tools/agent_canon_log_management_check.py",
     "tools/agent_tools/agent_canon_preflight.py",
     "tools/agent_tools/agent_canon_update_todos.py",
     "tools/agent_tools/agent_team.py",
