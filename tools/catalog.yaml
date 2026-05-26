@@ -384,7 +384,7 @@ entries:
     family: root
     role: inventory
     status: canonical
-    command: tools/bin/agent-canon semantic-index responsibility-tree --include documents --include agents --check-directory-coverage
+    command: tools/bin/agent-canon semantic-index build --include documents --include agents
     writes: true
     default_wiring:
       ci: false

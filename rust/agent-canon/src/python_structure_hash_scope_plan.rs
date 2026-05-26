@@ -480,7 +480,6 @@ fn dependency_related_files(
             related.insert(edge.source.clone());
         }
     }
-    related.extend(dependency.edit_scope_paths.iter().cloned());
     for path in affected {
         related.remove(&path);
     }
@@ -1201,6 +1200,43 @@ mod tests {
         assert!(blocks[0]
             .target_objects
             .contains(&"python/pkg/core.py:30-35:_helper".to_string()));
+    }
+
+    #[test]
+    fn keeps_edit_scope_paths_out_of_block_allowed_files() {
+        let dependency = DependencyEvidence {
+            report_dir: None,
+            graph_path: None,
+            edit_scope_path: Some(PathBuf::from("dependency_edit_scope.txt")),
+            edges: vec![DependencyEdge {
+                direction: "downstream".to_string(),
+                kind: "implementation".to_string(),
+                source: "python/pkg/app.py".to_string(),
+                target: "python/pkg/core.py".to_string(),
+                raw_line: "downstream\timplementation\tpython/pkg/app.py\tpython/pkg/core.py"
+                    .to_string(),
+            }],
+            edit_scope_paths: vec!["python/pkg/unrelated.py".to_string()],
+            missing_evidence: Vec::new(),
+        };
+
+        let blocks = build_impact_blocks(&fixture_report(), &dependency);
+        let allowed = allowed_files_for_block(&blocks[0]);
+        let dependency_evidence = dependency_evidence_json(&dependency);
+
+        assert_eq!(
+            blocks[0].dependency_related_files,
+            vec!["python/pkg/app.py".to_string()]
+        );
+        assert!(allowed.contains(&"python/pkg/core.py".to_string()));
+        assert!(allowed.contains(&"python/pkg/app.py".to_string()));
+        assert!(!allowed.contains(&"python/pkg/unrelated.py".to_string()));
+        assert_eq!(
+            dependency_evidence
+                .pointer("/edit_scope_paths/0")
+                .and_then(Value::as_str),
+            Some("python/pkg/unrelated.py")
+        );
     }
 
     #[test]

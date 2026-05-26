@@ -1398,19 +1398,6 @@ fn single_callee_findings(blocks: &[Block], min_tokens: usize) -> Vec<SingleCall
                     );
                 }
             }
-            for reference in &caller.references {
-                if let Some(target_index) =
-                    resolve_reference_target(blocks, &by_name, &by_qualname, caller, reference)
-                {
-                    record_single_callee_usage(
-                        blocks,
-                        &mut callees,
-                        caller,
-                        target_index,
-                        reference.line,
-                    );
-                }
-            }
             if callees.len() != 1 {
                 return None;
             }
@@ -2697,5 +2684,60 @@ mod tests {
         assert_eq!(findings[0].callee.qualname, "_target");
         assert_eq!(findings[0].call_site_count, 2);
         assert_eq!(findings[0].callee.call_lines, vec![8, 10]);
+    }
+
+    #[test]
+    fn single_callee_ignores_annotation_only_references() {
+        let target = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 1,
+            end_line: 4,
+            kind: "Class".to_string(),
+            role: "implementation".to_string(),
+            name: "Target".to_string(),
+            qualname: "Target".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("target"),
+            context_hash: stable_hash("sample"),
+            token_count: 16,
+            public_api: false,
+            calls: Vec::new(),
+            references: Vec::new(),
+        };
+        let annotation_only_wrapper = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 6,
+            end_line: 12,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "_typed_wrapper".to_string(),
+            qualname: "_typed_wrapper".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("typed_wrapper"),
+            context_hash: stable_hash("sample"),
+            token_count: 24,
+            public_api: false,
+            calls: Vec::new(),
+            references: vec![CallRef {
+                name: "Target".to_string(),
+                line: 8,
+            }],
+        };
+
+        let findings = single_callee_findings(&[target, annotation_only_wrapper], 8);
+
+        assert!(findings.is_empty());
     }
 }
