@@ -74,6 +74,13 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `eval-output` は review JSONL artifact 自体を検査し、result count、responsibility metadata、thin-doc action、long-query echo の欠落を検出します。
   - `tools/agent_tools/semantic_provider_html_report.py` は `compare-providers` JSON を self-contained HTML に描画します。先頭図は `Provider Delta To Shared Candidate Logic` で、provider 差分は診断 evidence、責務 bucket / candidate logic が authority であることを明示します。
   - 生成 DB の既定は `~/.cache/agent-canon/semantic-index/<repo-key>/` です。repo-local cache が必要な場合だけ `--db` で明示し、commit しません。削除・統合の authority にはしません。
+- `agent-canon python-structure-hash-scope-plan`
+  - `python-structure-hash-report` の full JSON と dependency review directory
+    を読み、`python_structure_hash_scope_plan.v1` の Change Impact Packet を
+    生成します。
+  - `impact_blocks`、`scope_candidates`、`selected_scope`、
+    `repair_batches`、`subagent_handoff_context` を機械生成し、refactor-loop
+    の親 agent が修正粒度と wave plan を選ぶ入力にします。
 - `tools/agent_tools/route.py --area search`
   - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
 - `documents/tools/tool-docs.toml`

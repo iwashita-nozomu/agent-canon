@@ -149,6 +149,24 @@ def type_alias_names(tree):
     return names
 
 
+def module_all_names(tree):
+    names = set()
+    found = False
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            targets = [target for target in node.targets if isinstance(target, ast.Name)]
+            if not any(target.id == "__all__" for target in targets):
+                continue
+            found = True
+            values = []
+            if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+                values = node.value.elts
+            for value in values:
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    names.add(value.value)
+    return names if found else None
+
+
 def parameter_count(node):
     args = node.args
     names = []
@@ -301,6 +319,7 @@ class Collector(ast.NodeVisitor):
         self.imports = import_facts(tree)
         self.protocol_names = protocol_names
         self.type_aliases = type_alias_names(tree)
+        self.module_all = module_all_names(tree)
         self.stack = []
         self.blocks = []
 
@@ -339,6 +358,16 @@ class Collector(ast.NodeVisitor):
         )
         inside_protocol = parent["inside_protocol"] if parent else False
         role = "protocol" if class_is_protocol or inside_protocol else "implementation"
+        if parent is None:
+            public_api = (
+                node.name in self.module_all
+                if self.module_all is not None
+                else not node.name.startswith("_")
+            )
+        elif parent["kind"] == "Class" and parent["public_api"]:
+            public_api = not node.name.startswith("_")
+        else:
+            public_api = False
         payload = {
             "path": str(pathlib.Path(self.path).resolve().relative_to(pathlib.Path(self.root).resolve())).replace("\\", "/"),
             "module": self.module,
@@ -350,6 +379,7 @@ class Collector(ast.NodeVisitor):
             "parent_kind": parent["kind"] if parent else None,
             "parent_name": parent["name"] if parent else None,
             "role": role,
+            "public_api": public_api,
             "parameter_count": parameter_count(node) if kind == "Function" else len(node.bases),
             "decorators": decorator_facts(node),
             "bases": base_facts(node),
@@ -364,6 +394,7 @@ class Collector(ast.NodeVisitor):
                 "kind": kind,
                 "name": node.name,
                 "inside_protocol": class_is_protocol or inside_protocol,
+                "public_api": public_api,
             }
         )
         self.generic_visit(node)
@@ -384,6 +415,11 @@ class Collector(ast.NodeVisitor):
                 "parent_kind": parent["kind"] if parent else None,
                 "parent_name": parent["name"] if parent else None,
                 "role": "alias",
+                "public_api": (
+                    name in self.module_all
+                    if self.module_all is not None
+                    else parent is None and not name.startswith("_")
+                ),
                 "parameter_count": 0,
                 "decorators": [],
                 "bases": [],
@@ -475,6 +511,7 @@ struct Block {
     structure_hash: String,
     context_hash: String,
     token_count: usize,
+    public_api: bool,
     calls: Vec<CallRef>,
     references: Vec<CallRef>,
 }
@@ -503,6 +540,7 @@ struct DuplicateGroup {
 struct Analysis {
     groups: Vec<DuplicateGroup>,
     single_callers: Vec<SingleCallerFinding>,
+    single_callees: Vec<SingleCalleeFinding>,
     analyzed_files: Vec<String>,
 }
 
@@ -517,6 +555,24 @@ struct SingleCallerFinding {
 
 #[derive(Debug, PartialEq, Eq)]
 struct CallerEvidence {
+    path: String,
+    module: String,
+    qualname: String,
+    line: usize,
+    end_line: usize,
+    call_lines: Vec<usize>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SingleCalleeFinding {
+    caller: Block,
+    callee: CalleeEvidence,
+    call_site_count: usize,
+    hash: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CalleeEvidence {
     path: String,
     module: String,
     qualname: String,
@@ -720,9 +776,19 @@ fn analyze(args: &Args) -> Result<Analysis, String> {
             .then_with(|| left.hash.cmp(&right.hash))
     });
     single_callers.truncate(args.max_findings);
+    let mut single_callees = single_callee_findings(&all_blocks, args.min_tokens);
+    single_callees.sort_by(|left, right| {
+        right
+            .caller
+            .token_count
+            .cmp(&left.caller.token_count)
+            .then_with(|| left.hash.cmp(&right.hash))
+    });
+    single_callees.truncate(args.max_findings);
     Ok(Analysis {
         groups,
         single_callers,
+        single_callees,
         analyzed_files,
     })
 }
@@ -1117,6 +1183,10 @@ fn block_from_ast_value(value: Value) -> Result<Block, String> {
         structure_hash: stable_hash(&format!("{role}:{kind}:{parameter_count}:{canonical_text}")),
         context_hash: stable_hash(&context_text),
         token_count: ast_token_count(canonical),
+        public_api: value
+            .get("public_api")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         calls,
         references,
     })
@@ -1296,6 +1366,64 @@ fn single_caller_findings(blocks: &[Block], min_tokens: usize) -> Vec<SingleCall
         .collect()
 }
 
+fn single_callee_findings(blocks: &[Block], min_tokens: usize) -> Vec<SingleCalleeFinding> {
+    let mut by_name = BTreeMap::<String, Vec<usize>>::new();
+    let mut by_qualname = BTreeMap::<String, usize>::new();
+    for (index, block) in blocks.iter().enumerate() {
+        by_name.entry(block.name.clone()).or_default().push(index);
+        by_qualname.insert(block.qualname.clone(), index);
+    }
+
+    let block_by_key = blocks
+        .iter()
+        .map(|block| (block_key(block), block))
+        .collect::<BTreeMap<_, _>>();
+    blocks
+        .iter()
+        .filter_map(|caller| {
+            if !single_callee_caller_eligible(caller, min_tokens) {
+                return None;
+            }
+            let mut callees = BTreeMap::<String, CalleeAccumulator>::new();
+            for call in &caller.calls {
+                if let Some(target_index) =
+                    resolve_call_target(blocks, &by_name, &by_qualname, caller, call)
+                {
+                    record_single_callee_usage(
+                        blocks,
+                        &mut callees,
+                        caller,
+                        target_index,
+                        call.line,
+                    );
+                }
+            }
+            if callees.len() != 1 {
+                return None;
+            }
+            let (callee_key, callee) = callees.into_iter().next()?;
+            let target = *block_by_key.get(&callee_key)?;
+            let call_lines = callee.call_lines.into_iter().collect::<Vec<_>>();
+            Some(SingleCalleeFinding {
+                hash: stable_hash(&format!(
+                    "single-callee:{}:{}:{}:{}",
+                    caller.kind, caller.role, caller.structure_hash, target.qualname
+                )),
+                caller: caller.clone(),
+                call_site_count: call_lines.len(),
+                callee: CalleeEvidence {
+                    path: callee.path,
+                    module: callee.module,
+                    qualname: callee.qualname,
+                    line: callee.line,
+                    end_line: callee.end_line,
+                    call_lines,
+                },
+            })
+        })
+        .collect()
+}
+
 fn record_single_caller_usage(
     blocks: &[Block],
     min_tokens: usize,
@@ -1318,6 +1446,29 @@ fn record_single_caller_usage(
         .or_default()
         .entry(caller_key)
         .or_insert_with(|| CallerAccumulator::new(caller))
+        .call_lines
+        .insert(line);
+}
+
+fn record_single_callee_usage(
+    blocks: &[Block],
+    caller_callees: &mut BTreeMap<String, CalleeAccumulator>,
+    caller: &Block,
+    target_index: usize,
+    line: usize,
+) {
+    let target = &blocks[target_index];
+    if !single_callee_target_eligible(target) {
+        return;
+    }
+    let caller_key = block_key(caller);
+    let target_key = block_key(target);
+    if caller_key == target_key {
+        return;
+    }
+    caller_callees
+        .entry(target_key)
+        .or_insert_with(|| CalleeAccumulator::new(target))
         .call_lines
         .insert(line);
 }
@@ -1469,10 +1620,44 @@ impl CallerAccumulator {
     }
 }
 
+#[derive(Debug)]
+struct CalleeAccumulator {
+    path: String,
+    module: String,
+    qualname: String,
+    line: usize,
+    end_line: usize,
+    call_lines: BTreeSet<usize>,
+}
+
+impl CalleeAccumulator {
+    fn new(block: &Block) -> Self {
+        Self {
+            path: block.path.clone(),
+            module: block.module.clone(),
+            qualname: block.qualname.clone(),
+            line: block.line,
+            end_line: block.end_line,
+            call_lines: BTreeSet::new(),
+        }
+    }
+}
+
 fn single_caller_target_eligible(block: &Block, min_tokens: usize) -> bool {
     block.role == "implementation"
         && matches!(block.kind.as_str(), "Function" | "Class")
         && block.token_count >= min_tokens
+}
+
+fn single_callee_caller_eligible(block: &Block, min_tokens: usize) -> bool {
+    block.role == "implementation"
+        && block.kind == "Function"
+        && block.token_count >= min_tokens
+        && !block.public_api
+}
+
+fn single_callee_target_eligible(block: &Block) -> bool {
+    block.role == "implementation" && matches!(block.kind.as_str(), "Function" | "Class")
 }
 
 fn resolve_call_target(
@@ -1559,7 +1744,10 @@ fn render(analysis: Analysis, args: &Args) -> i32 {
         OutputFormat::Json => render_json(&analysis),
         OutputFormat::Text => render_text(&analysis),
     }
-    if analysis.groups.is_empty() && analysis.single_callers.is_empty() {
+    if analysis.groups.is_empty()
+        && analysis.single_callers.is_empty()
+        && analysis.single_callees.is_empty()
+    {
         0
     } else {
         1
@@ -1615,6 +1803,20 @@ fn render_text(analysis: &Analysis) {
             instance_label(target)
         );
     }
+    for finding in &analysis.single_callees {
+        let caller = &finding.caller;
+        println!(
+            "PY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:role={}:{}:params={}:tokens={}:hash={}:count=1:callee_count=1:call_site_count={}:public_api=false:callee={}:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:{}",
+            caller.role,
+            caller.kind,
+            caller.parameter_count,
+            caller.token_count,
+            finding.hash,
+            finding.call_site_count,
+            callee_label(&finding.callee),
+            instance_label(caller)
+        );
+    }
     println!(
         "PY_STRUCTURE_HASH_ANALYZED_FILES={}",
         analysis.analyzed_files.len()
@@ -1631,12 +1833,19 @@ fn render_text(analysis: &Analysis) {
         analysis.single_callers.len()
     );
     println!(
+        "PY_STRUCTURE_HASH_SINGLE_CALLEE_FINDINGS={}",
+        analysis.single_callees.len()
+    );
+    println!(
         "PY_STRUCTURE_HASH_GROUPS={}",
-        analysis.groups.len() + analysis.single_callers.len()
+        analysis.groups.len() + analysis.single_callers.len() + analysis.single_callees.len()
     );
     println!(
         "PY_STRUCTURE_HASH={}",
-        if analysis.groups.is_empty() && analysis.single_callers.is_empty() {
+        if analysis.groups.is_empty()
+            && analysis.single_callers.is_empty()
+            && analysis.single_callees.is_empty()
+        {
             "pass"
         } else {
             "fail"
@@ -1701,6 +1910,23 @@ fn caller_label(caller: &CallerEvidence) -> String {
     )
 }
 
+fn callee_label(callee: &CalleeEvidence) -> String {
+    format!(
+        "{}@{}-{}@{}@{}@sites={}",
+        callee.path,
+        callee.line,
+        callee.end_line,
+        callee.module,
+        callee.qualname,
+        callee
+            .call_lines
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join("|")
+    )
+}
+
 fn parent_label(block: &Block) -> String {
     match (&block.parent_kind, &block.parent_name) {
         (Some(kind), Some(name)) => format!("parent={kind}:{name}"),
@@ -1745,6 +1971,7 @@ fn render_json(analysis: &Analysis) {
                     "decorators_hash": block.decorators_hash,
                     "bases_hash": block.bases_hash,
                     "context_hash": block.context_hash,
+                    "public_api": block.public_api,
                 })
             }).collect::<Vec<_>>(),
         })
@@ -1831,19 +2058,67 @@ fn render_json(analysis: &Analysis) {
                 "decorators_hash": block.decorators_hash,
                 "bases_hash": block.bases_hash,
                 "context_hash": block.context_hash,
+                "public_api": block.public_api,
+            })],
+        })
+    });
+    let single_callee_findings = analysis.single_callees.iter().map(|finding| {
+        let block = &finding.caller;
+        json!({
+            "kind": "single_callee_structural_wrapper",
+            "hash": finding.hash,
+            "block_kind": block.kind,
+            "role": block.role,
+            "parameter_count": block.parameter_count,
+            "token_count": block.token_count,
+            "module_scope": "SameModule",
+            "import_scope": "SameImports",
+            "decorator_scope": "SameDecorators",
+            "base_scope": "SameBases",
+            "callee_count": 1,
+            "call_site_count": finding.call_site_count,
+            "public_api": false,
+            "callee_analysis": {
+                "callee_count": 1,
+                "call_site_count": finding.call_site_count,
+                "callees": [json!({
+                    "path": finding.callee.path,
+                    "line": finding.callee.line,
+                    "end_line": finding.callee.end_line,
+                    "module": finding.callee.module,
+                    "qualname": finding.callee.qualname,
+                    "call_lines": finding.callee.call_lines,
+                })],
+                "candidate_schema_scope": "ast_use_graph_only",
+            },
+            "instances": [json!({
+                "path": block.path,
+                "line": block.line,
+                "end_line": block.end_line,
+                "module": block.module,
+                "name": block.name,
+                "qualname": block.qualname,
+                "parent_kind": block.parent_kind,
+                "parent_name": block.parent_name,
+                "import_hash": block.import_hash,
+                "decorators_hash": block.decorators_hash,
+                "bases_hash": block.bases_hash,
+                "context_hash": block.context_hash,
+                "public_api": block.public_api,
             })],
         })
     });
     let payload = json!({
         "summary": {
-            "groups": analysis.groups.len() + analysis.single_callers.len(),
+            "groups": analysis.groups.len() + analysis.single_callers.len() + analysis.single_callees.len(),
             "duplicate_groups": analysis.groups.len(),
             "single_caller_findings": analysis.single_callers.len(),
-            "status": if analysis.groups.is_empty() && analysis.single_callers.is_empty() { "pass" } else { "fail" },
+            "single_callee_findings": analysis.single_callees.len(),
+            "status": if analysis.groups.is_empty() && analysis.single_callers.is_empty() && analysis.single_callees.is_empty() { "pass" } else { "fail" },
             "analyzed_file_count": analysis.analyzed_files.len(),
             "analyzed_files": analysis.analyzed_files,
         },
-        "findings": duplicate_findings.chain(single_caller_findings).collect::<Vec<_>>(),
+        "findings": duplicate_findings.chain(single_caller_findings).chain(single_callee_findings).collect::<Vec<_>>(),
     });
     println!(
         "{}",
@@ -2042,6 +2317,7 @@ mod tests {
             structure_hash: stable_hash("Function:0:[]"),
             context_hash: stable_hash(module),
             token_count: 8,
+            public_api: false,
             calls: Vec::new(),
             references: Vec::new(),
         }
@@ -2067,6 +2343,7 @@ mod tests {
             structure_hash: stable_hash("helper"),
             context_hash: stable_hash("sample"),
             token_count: 12,
+            public_api: false,
             calls: vec![
                 CallRef {
                     name: "load_config".to_string(),
@@ -2097,6 +2374,7 @@ mod tests {
             structure_hash: stable_hash("caller"),
             context_hash: stable_hash("sample"),
             token_count: 20,
+            public_api: true,
             calls: vec![
                 CallRef {
                     name: "_helper".to_string(),
@@ -2135,6 +2413,7 @@ mod tests {
             structure_hash: stable_hash("peer"),
             context_hash: stable_hash("sample"),
             token_count: 18,
+            public_api: true,
             calls: vec![
                 CallRef {
                     name: "load_config".to_string(),
@@ -2191,6 +2470,7 @@ mod tests {
             structure_hash: stable_hash("helper"),
             context_hash: stable_hash("sample"),
             token_count: 12,
+            public_api: false,
             calls: Vec::new(),
             references: Vec::new(),
         };
@@ -2212,6 +2492,7 @@ mod tests {
             structure_hash: stable_hash("caller"),
             context_hash: stable_hash("sample"),
             token_count: 20,
+            public_api: true,
             calls: vec![
                 CallRef {
                     name: "_helper".to_string(),
@@ -2242,6 +2523,7 @@ mod tests {
             structure_hash: stable_hash("peer"),
             context_hash: stable_hash("sample"),
             token_count: 18,
+            public_api: true,
             calls: vec![CallRef {
                 name: "load".to_string(),
                 line: 10,
@@ -2275,6 +2557,7 @@ mod tests {
             structure_hash: stable_hash("class"),
             context_hash: stable_hash("sample"),
             token_count: 16,
+            public_api: false,
             calls: Vec::new(),
             references: Vec::new(),
         };
@@ -2296,6 +2579,7 @@ mod tests {
             structure_hash: stable_hash("owner"),
             context_hash: stable_hash("sample"),
             token_count: 20,
+            public_api: true,
             calls: Vec::new(),
             references: vec![CallRef {
                 name: "Carry".to_string(),
@@ -2310,5 +2594,150 @@ mod tests {
         assert_eq!(findings[0].target.qualname, "Carry");
         assert_eq!(findings[0].caller.qualname, "solve");
         assert_eq!(findings[0].call_site_count, 1);
+    }
+
+    #[test]
+    fn single_callee_reports_only_non_public_wrappers() {
+        let callee = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 1,
+            end_line: 4,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "_target".to_string(),
+            qualname: "_target".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("target"),
+            context_hash: stable_hash("sample"),
+            token_count: 16,
+            public_api: false,
+            calls: Vec::new(),
+            references: Vec::new(),
+        };
+        let wrapper = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 6,
+            end_line: 12,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "_wrapper".to_string(),
+            qualname: "_wrapper".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("wrapper"),
+            context_hash: stable_hash("sample"),
+            token_count: 24,
+            public_api: false,
+            calls: vec![
+                CallRef {
+                    name: "_target".to_string(),
+                    line: 8,
+                },
+                CallRef {
+                    name: "_target".to_string(),
+                    line: 10,
+                },
+            ],
+            references: Vec::new(),
+        };
+        let public_wrapper = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 14,
+            end_line: 20,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "public_wrapper".to_string(),
+            qualname: "public_wrapper".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("public_wrapper"),
+            context_hash: stable_hash("sample"),
+            token_count: 24,
+            public_api: true,
+            calls: vec![CallRef {
+                name: "_target".to_string(),
+                line: 16,
+            }],
+            references: Vec::new(),
+        };
+
+        let findings = single_callee_findings(&[callee, wrapper, public_wrapper], 8);
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].caller.qualname, "_wrapper");
+        assert_eq!(findings[0].callee.qualname, "_target");
+        assert_eq!(findings[0].call_site_count, 2);
+        assert_eq!(findings[0].callee.call_lines, vec![8, 10]);
+    }
+
+    #[test]
+    fn single_callee_ignores_annotation_only_references() {
+        let target = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 1,
+            end_line: 4,
+            kind: "Class".to_string(),
+            role: "implementation".to_string(),
+            name: "Target".to_string(),
+            qualname: "Target".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("target"),
+            context_hash: stable_hash("sample"),
+            token_count: 16,
+            public_api: false,
+            calls: Vec::new(),
+            references: Vec::new(),
+        };
+        let annotation_only_wrapper = Block {
+            path: "sample.py".to_string(),
+            module: "sample".to_string(),
+            line: 6,
+            end_line: 12,
+            kind: "Function".to_string(),
+            role: "implementation".to_string(),
+            name: "_typed_wrapper".to_string(),
+            qualname: "_typed_wrapper".to_string(),
+            parent_kind: None,
+            parent_name: None,
+            parameter_count: 1,
+            decorators_hash: stable_hash("[]"),
+            bases_hash: stable_hash("[]"),
+            import_hash: stable_hash("[]"),
+            structure_hash: stable_hash("typed_wrapper"),
+            context_hash: stable_hash("sample"),
+            token_count: 24,
+            public_api: false,
+            calls: Vec::new(),
+            references: vec![CallRef {
+                name: "Target".to_string(),
+                line: 8,
+            }],
+        };
+
+        let findings = single_callee_findings(&[target, annotation_only_wrapper], 8);
+
+        assert!(findings.is_empty());
     }
 }

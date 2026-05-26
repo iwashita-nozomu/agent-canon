@@ -98,6 +98,50 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
+    def test_parent_invocation_reads_mounted_legacy_hook_archive(self) -> None:
+        """Parent repo invocation should count vendored AgentCanon legacy-import hook archives."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir)
+            canon_root = parent / "vendor" / "agent-canon"
+            self.write_fixture(canon_root)
+            for path in (canon_root / "agents" / "evals" / "results" / "hook-runs").rglob("*.jsonl"):
+                path.unlink()
+            archive_hook_dir = (
+                canon_root
+                / ".agent-canon"
+                / "log-archive"
+                / "hook-runs"
+                / "legacy-import"
+                / "test"
+            )
+            archive_hook_dir.mkdir(parents=True)
+            (archive_hook_dir / "hook.jsonl").write_text(
+                json.dumps(self.hook_entry("hook-legacy-import")) + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(parent)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_FILES=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
+    def test_result_artifact_skill_uses_eval_filename_contract(self) -> None:
+        """The result-artifact skill should use the accumulated eval filename contract."""
+        text = (PROJECT_ROOT / "agents" / "skills" / "result-artifact-writeout.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            ".agent-canon/log-archive/eval-results/<eval-family>/<eval-run-id>-<status>*.md",
+            text,
+        )
+        self.assertNotIn(
+            ".agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md",
+            text,
+        )
+
     def test_external_eval_archive_entries_are_counted(self) -> None:
         """Mounted eval archive reports should satisfy eval accumulation evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:

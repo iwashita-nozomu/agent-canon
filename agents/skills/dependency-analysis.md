@@ -12,7 +12,7 @@ upstream design ./catalog.yaml registers this public skill
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
-code dependency と header dependency は別 evidence として扱います。
+code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を token-light な `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM context には必要最小限だけを載せます。
 
 ## Use When
 
@@ -22,6 +22,8 @@ code dependency と header dependency は別 evidence として扱います。
 - closeout 前に dependency manifest evidence を揃えたい
 - 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
 - repo-wide text search の hit から、どの file を編集・確認すべきか dependency graph で展開したい
+- requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
+- refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
 
 ## Required Commands
 
@@ -80,6 +82,73 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
+
+## Change Impact Packet
+
+`dependency-analysis` は、依存 evidence を集めるだけでなく、修正計画の入力になる
+token-light な `Change Impact Packet` manifest の正本です。これは LLM が依存
+graph 全体を prose 化する場所ではありません。tool output は JSON / TSV /
+Markdown artifact として保存し、packet には path、count、object id、現在の
+repair batch に必要な最小 excerpt だけを載せます。`refactor-loop`、
+implementation handoff、原因仮説の fix-surface 選定では、raw `rg` hit、raw
+finding、単一 file 名だけを subagent に渡しません。
+
+Packet には最低限次を含めます。
+
+- `requested_target`: `path:start-end:qualname`、file、または finding id
+- `code_dependency_surface`: static に見える import / include / source edge、
+  direct callees、direct callers、re-export / public import surface
+- `header_dependency_surface`: dependency manifest の upstream / downstream
+  design、implementation、environment、test、workflow edge
+- `search_surface`: text search が seed の場合の `rg -l` hit と
+  `dependency_edit_scope.txt`
+- `structural_surface`: `tool-finding-report` や structural checker が seed の
+  場合の full finding packet、priority order、repair slice
+- `tests_docs_config_log_info_edges`: test、doc、config、log、Info など code 以外の
+  同時編集または review surface
+- `unknown_dynamic_edges`: JAX / equinox / runtime dispatch / reflection など、
+  static evidence だけでは未確定の edge
+- `impact_blocks`: tool が連結した依存 component、dependency depth、責務 group、
+  validation surface で機械生成する block。各 block には `block_id`、root
+  targets、downstream targets、evidence artifact path、`blocked_by`、
+  `parallel_safe`、allowed files、validation、non-goals を付けます。
+- `scope_candidates`: 同じ影響範囲に対する候補粒度。object 単位、module 単位、
+  responsibility group 単位、root contract + representative consumer 単位などを
+  tool が列挙します。
+- `selected_scope`: 選んだ粒度と、その評価値。wave 数、想定 tool rerun 数、
+  write conflict risk、token budget、validation cost、semantic risk を記録します。
+- `repair_batches`: `impact_blocks` から導く、依存の根本側から順に直す
+  sequential root batch と、root 修正後に並列化できる downstream batch。
+- `subagent_handoff_context`: 各 target object の current problem、intended
+  structural change、forbidden semantic delta、validation signal、期待する
+  final response format
+
+code dependency と header dependency は packet 内でも section を分けます。
+一本化するのは「実装者へ渡す計画 artifact」であり、edge の意味を混同しません。
+影響範囲の block 化は tool の責務です。LLM は tool-generated block を受け取り、
+必要に応じて accept、split、merge、`review_required` を判断します。その場合も
+元の `block_id`、分割/統合理由、追加確認した artifact path を残します。
+node の大きさも固定値ではなく最適化対象です。最もよい scope は「大きいほどよい」
+でも「小さいほど安全」でもなく、behavior contract が明確で、write conflict がなく、
+token 予算に収まり、1 つの coherent な validation surface で確認できる最大の block
+です。semantic risk、ownership、validation isolation が崩れる場合だけ block を縮めます。
+LLM が full artifact を読むのは、現在の repair batch、争点になった edge、review
+で根拠確認が必要な箇所に限定します。
+
+Python structural finding を seed にする場合は、`tool-finding-report` が作った
+full `python-structure-hash-report` JSON と `run_repo_dependency_review.sh` の
+report directory を次の tool に渡します。
+
+```bash
+agent-canon python-structure-hash-scope-plan \
+  --input <python-structure-hash-report.json> \
+  --dependency-report-dir <dependency-review-dir> \
+  --output <change-impact-packet.json>
+```
+
+この JSON は `Change Impact Packet` の機械生成正本です。親 agent はその中の
+`impact_blocks`、`scope_candidates`、`selected_scope`、`repair_batches`、
+`subagent_handoff_context` を使って orchestration plan を作ります。
 
 ## Core References
 

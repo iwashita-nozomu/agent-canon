@@ -14,6 +14,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_catalog.py"
 
@@ -184,6 +186,18 @@ class CheckToolCatalogTest(unittest.TestCase):
             self.assertIn("## Tool Crosswalk", result.stdout)
             self.assertIn("`tool-catalog`", result.stdout)
             self.assertIn("Validates the fixture tool catalog.", result.stdout)
+
+    def test_semantic_index_catalog_command_builds_index_before_reports(self) -> None:
+        """The semantic-index catalog entry should be safe for fresh checkouts."""
+        catalog = yaml.safe_load((PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8"))
+        entries = {entry["id"]: entry for entry in catalog["entries"]}
+        command = entries["semantic-index"]["command"]
+
+        self.assertEqual(
+            command,
+            "tools/bin/agent-canon semantic-index build --include documents --include agents",
+        )
+        self.assertNotIn("responsibility-tree", command)
 
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
