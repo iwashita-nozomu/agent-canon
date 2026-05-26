@@ -556,14 +556,14 @@ Template-specific hook behavior:
   missing code, or missing visualization. Detailed test coverage belongs in `tests/`.
 - Style checker logs record selected Python / C++ / notebook / Markdown checkers and `unchecked_files` for changed paths with no automatic checker.
 - Hook logs append to the mounted runtime log archive
-  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
+  `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
   Accumulated eval reports append under
-  `.agent-canon/log-archive/eval-results/<family>/`.
+  `.agent-canon/archive/<env-key>/eval-results/<family>/`.
   `log_archive_mount_warning.py` warns, without blocking, when that archive is
   missing and asks the agent to run `runtime_log_archive_git.py ensure` first.
   The archive remote and branch policy are documented in
-  `documents/runtime-log-archive.md`; the old
-  `agents/evals/results/hook-runs/` path is a legacy read surface.
+  `documents/runtime-log-archive.md`; source-tree `agents/evals/results/`
+  paths are not normal read or write locations.
 - Hook log entries include `hook_run_id`, `payload_fingerprint`, `mode`,
   `baseline_ref`, and status fields. Local log paths can be overridden with
   `AGENT_CANON_HOOK_ARCHIVE_DIR`, `AGENT_CANON_HOOK_RESULTS_DIR`,

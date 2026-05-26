@@ -3,7 +3,7 @@
 @dependency-start
 responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../evals/results/README.md accumulated eval and hook result storage
+upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime-log-archive.md defines the external log archive mount and branch policy
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
@@ -20,7 +20,7 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
-- `.agent-canon/archive/<env-key>/**`、`.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
+- `.agent-canon/archive/<env-key>/**`、`reports/**`、`*.jsonl` の生ログを読みそうな調査で、先に要約が必要
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
 

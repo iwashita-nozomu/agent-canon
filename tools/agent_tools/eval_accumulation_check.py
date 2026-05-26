@@ -2,9 +2,9 @@
 # @dependency-start
 # responsibility Validates append-only AgentCanon eval and hook result accumulation.
 # upstream design ../../agents/evals/README.md eval usage contract
-# upstream design ../../agents/evals/results/README.md eval result storage contract
-# upstream design ../../agents/evals/results/hook-runs/README.md hook result accumulation contract
-# upstream implementation ./runtime_log_paths.py resolves mounted archive and legacy eval result paths
+# upstream design ../../documents/runtime-log-archive.md eval and hook result archive contract
+# upstream design ../../documents/runtime-log-archive-migration.md legacy in-tree result migration contract
+# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/ci/run_all_checks.sh runs eval accumulation checks
@@ -91,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
 def agent_canon_root(root: Path) -> Path:
     """Return AgentCanon source root for standalone or parent invocation."""
     vendored = root / "vendor" / "agent-canon"
-    if (vendored / "agents" / "evals" / "results").is_dir():
+    if (vendored / "agents" / "evals" / "README.md").is_file():
         return vendored
     return root
 
@@ -115,18 +115,6 @@ def git_check_ignored(root: Path, path: Path) -> bool:
     return result.returncode == 0
 
 
-def required_directory_findings(root: Path) -> list[Finding]:
-    """Validate required eval result directories."""
-    findings: list[Finding] = []
-    for path in (
-        root / "agents" / "evals" / "results",
-        root / "agents" / "evals" / "results" / "hook-runs",
-    ):
-        if not path.is_dir():
-            findings.append(Finding("directory", relative(root, path), "missing"))
-    return findings
-
-
 def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
     """Return findings for result files ignored by git."""
     return [
@@ -139,7 +127,7 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
 def intentionally_ignored_archive_path(path: Path) -> bool:
     """Return whether the path is inside the mounted external log archive."""
     parts = path.parts
-    return ".agent-canon" in parts and "log-archive" in parts
+    return ".agent-canon" in parts and "archive" in parts
 
 
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
@@ -380,7 +368,7 @@ def validate(root: Path) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
     requested_root = root.resolve()
     canon_root = agent_canon_root(requested_root)
-    findings = required_directory_findings(canon_root)
+    findings: list[Finding] = []
     hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
         canon_root,
         hook_result_search_dirs(requested_root, canon_root),

@@ -20,7 +20,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import repo_log_key  # noqa: E402
+from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 
 class RuntimeLogArchiveGitTest(unittest.TestCase):
@@ -101,7 +101,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_ENSURE=pass", ensure.stdout)
 
-            archive = canon / ".agent-canon" / "log-archive"
+            archive = mounted_log_archive_root(canon)
             self.assertTrue((archive / ".git").exists())
             self.assertEqual(
                 subprocess.run(
@@ -198,11 +198,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertFalse(source_log.exists())
 
             archive_log = (
-                canon
-                / ".agent-canon"
-                / "log-archive"
-                / "hook-runs"
+                mounted_log_archive_root(canon)
                 / "legacy-import"
+                / "hook-runs"
                 / "old-runtime"
                 / "skill_usage.jsonl"
             )
@@ -219,8 +217,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
 
-    def test_import_eval_results_moves_reports_but_keeps_source_notices(self) -> None:
-        """import-eval-results should archive legacy reports and retain source notices."""
+    def test_import_eval_results_moves_reports_and_removes_source_tree(self) -> None:
+        """import-eval-results should archive legacy reports and delete source notices."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -252,13 +250,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=3", imported.stdout)
-            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=2", imported.stdout)
-            self.assertTrue(root_notice.exists())
-            self.assertTrue(hook_notice.exists())
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=4", imported.stdout)
+            self.assertFalse(root_notice.exists())
+            self.assertFalse(hook_notice.exists())
             self.assertFalse(family_notice.exists())
             self.assertFalse(report.exists())
 
-            archive = canon / ".agent-canon" / "log-archive" / "eval-results" / "legacy-import"
+            archive = mounted_log_archive_root(canon) / "legacy-import" / "eval-results"
             self.assertTrue((archive / "README.md").exists())
             self.assertTrue((archive / "skill-workflow-prompt" / family_notice.name).exists())
             self.assertTrue((archive / "skill-workflow-prompt" / report.name).exists())

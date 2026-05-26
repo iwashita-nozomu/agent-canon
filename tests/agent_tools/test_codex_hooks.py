@@ -32,6 +32,9 @@ from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
+
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_SCRIPT = PROJECT_ROOT / ".codex" / "hooks" / "mcp_session_context.sh"
@@ -500,7 +503,7 @@ class CodexHooksTest(unittest.TestCase):
         """Mounted archive clone should produce no visible hook output."""
         with tempfile.TemporaryDirectory() as temp_dir:
             canon_root = Path(temp_dir) / "agent-canon"
-            archive_git = canon_root / ".agent-canon" / "log-archive" / ".git"
+            archive_git = mounted_log_archive_root(canon_root) / ".git"
             archive_git.mkdir(parents=True)
 
             result = subprocess.run(
@@ -2029,13 +2032,13 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_HOOK_ARCHIVE_DIR": str(
-                        temp_root / ".agent-canon" / "log-archive"
+                        temp_root / ".agent-canon" / "archive" / "test-env"
                     ),
                     "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                 },
             )
             durable_logs = sorted(
-                (temp_root / ".agent-canon" / "log-archive" / "hook-runs").glob(
+                (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
                     "*/test-container/oop_readability_guard.jsonl"
                 )
             )
@@ -2549,13 +2552,13 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_HOOK_ARCHIVE_DIR": str(
-                        temp_root / ".agent-canon" / "log-archive"
+                        temp_root / ".agent-canon" / "archive" / "test-env"
                     ),
                     "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
                 },
             )
             log_paths = sorted(
-                (temp_root / ".agent-canon" / "log-archive" / "hook-runs").glob(
+                (temp_root / ".agent-canon" / "archive" / "test-env" / "hook-runs").glob(
                     "*/test-container/skill_usage.jsonl"
                 )
             )

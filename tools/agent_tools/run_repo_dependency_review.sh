@@ -37,7 +37,8 @@ edge declared by, or pointing at, each changed file.
 When --report-dir is set, a stable dependency_graph.tsv artifact is generated
 from dependency headers. With --search-hits-file, text-search hit paths are
 expanded into dependency edit-scope candidates and saved beside the graph when
---report-dir is set.
+--report-dir is set. Without --search-hits-file, the report directory still
+receives changed-file dependency edit-scope evidence.
 EOF
 }
 
@@ -158,6 +159,12 @@ if [[ -n "$SEARCH_HITS_FILE" ]]; then
   else
     bash "${edit_scope_args[@]}" "${checkable_paths[@]}"
   fi
+elif [[ -n "$REPORT_DIR" ]]; then
+  edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --edit-scope-changed)
+  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
+    edit_scope_args+=(--allow-frontmatter)
+  fi
+  bash "${edit_scope_args[@]}" "${checkable_paths[@]}" | tee "$REPORT_DIR/dependency_edit_scope.txt"
 fi
 
 echo "REPO_DEPENDENCY_REVIEW=pass"

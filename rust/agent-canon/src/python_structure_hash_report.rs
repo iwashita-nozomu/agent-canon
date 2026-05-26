@@ -38,9 +38,12 @@ struct Finding {
     decorator_scope: String,
     base_scope: String,
     instances: Vec<Instance>,
+    public_api: Option<bool>,
     caller_count: usize,
     call_site_count: usize,
     callers: Vec<CallerEvidence>,
+    callee_count: usize,
+    callees: Vec<CalleeEvidence>,
     similar_callers: Vec<SimilarCallerEvidence>,
 }
 
@@ -63,6 +66,17 @@ struct Instance {
 #[derive(Debug, PartialEq, Eq)]
 struct CallerEvidence {
     raw_caller: String,
+    path: String,
+    line_start: usize,
+    line_end: usize,
+    module: String,
+    qualname: String,
+    call_lines: Vec<usize>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CalleeEvidence {
+    raw_callee: String,
     path: String,
     line_start: usize,
     line_end: usize,
@@ -179,6 +193,7 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
     let mut group_count = None;
     let mut duplicate_group_count = None;
     let mut single_caller_finding_count = None;
+    let mut single_callee_finding_count = None;
     let mut analyzed_file_count = None;
     let mut analyzed_files = Vec::new();
     let mut ignored_lines = Vec::new();
@@ -197,6 +212,10 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
         }
         if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_SINGLE_CALLER_FINDINGS=") {
             single_caller_finding_count = value.parse::<usize>().ok();
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_SINGLE_CALLEE_FINDINGS=") {
+            single_callee_finding_count = value.parse::<usize>().ok();
             continue;
         }
         if let Some(value) = line.strip_prefix("PY_STRUCTURE_HASH_ANALYZED_FILES=") {
@@ -255,6 +274,8 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
             )
         })
         .collect::<BTreeMap<_, _>>();
+    let mechanical_problem_clusters =
+        mechanical_problem_clusters_json(&findings, &priority_order, &group_graph);
 
     Ok(json!({
         "summary": {
@@ -262,6 +283,7 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
             "reported_group_count": group_count,
             "reported_duplicate_group_count": duplicate_group_count,
             "reported_single_caller_finding_count": single_caller_finding_count,
+            "reported_single_callee_finding_count": single_callee_finding_count,
             "parsed_group_count": findings.len(),
             "reported_analyzed_file_count": analyzed_file_count,
             "parsed_analyzed_file_count": analyzed_files.len(),
@@ -277,9 +299,11 @@ fn structure_text(text: &str, root: &Path) -> Result<Value, String> {
                 "path": crate::python_module_groups::DEFAULT_CONTRACT_PATH,
                 "loaded": module_group_contract.is_some(),
             },
-            "priority_rule": "deep_dependency_first: module-group incoming dependency count, file incoming dependency count, fewer module-group outgoing dependencies, single-caller ownership, production surface, implementation role, cross-module scope, impact tokens, stable hash; external libraries are advisory only",
+            "priority_rule": "deep_dependency_first: module-group incoming dependency count, file incoming dependency count, fewer module-group outgoing dependencies, single-caller ownership, non-public single-callee wrapper, production surface, implementation role, cross-module scope, impact tokens, stable hash; external libraries are advisory only",
             "priority_order": priority_order.iter().map(priority_json).collect::<Vec<_>>(),
             "repair_slice": repair_slice_json(&priority_order, &group_graph),
+            "mechanical_problem_cluster_count": mechanical_problem_clusters.len(),
+            "mechanical_problem_clusters": mechanical_problem_clusters,
         },
         "findings": findings.iter().map(|finding| finding_json(finding, root, &priority_by_hash, &import_target_counts)).collect::<Vec<_>>(),
         "ignored_lines": ignored_lines,
@@ -295,6 +319,11 @@ fn parse_finding(
         line.strip_prefix("PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:")
     {
         return parse_single_caller_finding(line, body, root, import_cache);
+    }
+    if let Some(body) =
+        line.strip_prefix("PY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:")
+    {
+        return parse_single_callee_finding(line, body, root, import_cache);
     }
     let body = line
         .strip_prefix("PY_STRUCTURE_HASH_FINDING=duplicate_structural_hash:")
@@ -328,9 +357,12 @@ fn parse_finding(
         decorator_scope,
         base_scope,
         instances,
+        public_api: None,
         caller_count: 0,
         call_site_count: 0,
         callers: Vec::new(),
+        callee_count: 0,
+        callees: Vec::new(),
         similar_callers: Vec::new(),
     })
 }
@@ -379,10 +411,62 @@ fn parse_single_caller_finding(
         decorator_scope,
         base_scope,
         instances,
+        public_api: None,
         caller_count: parse_usize(&caller_count, "caller_count")?,
         call_site_count: parse_usize(&call_site_count, "call_site_count")?,
         callers: vec![parse_caller(&caller)?],
+        callee_count: 0,
+        callees: Vec::new(),
         similar_callers,
+    })
+}
+
+fn parse_single_callee_finding(
+    line: &str,
+    body: &str,
+    root: &Path,
+    import_cache: &mut BTreeMap<String, Vec<String>>,
+) -> Result<Finding, String> {
+    let (role, rest) = take_field(body, "role")?;
+    let (block_kind, rest) = take_until_colon(rest)?;
+    let (params, rest) = take_field(rest, "params")?;
+    let (tokens, rest) = take_field(rest, "tokens")?;
+    let (hash, rest) = take_field(rest, "hash")?;
+    let (count, rest) = take_field(rest, "count")?;
+    let (callee_count, rest) = take_field(rest, "callee_count")?;
+    let (call_site_count, rest) = take_field(rest, "call_site_count")?;
+    let (public_api, rest) = take_field(rest, "public_api")?;
+    let (callee, rest) = take_field(rest, "callee")?;
+    let (module_scope, rest) = take_field(rest, "module_scope")?;
+    let (import_scope, rest) = take_field(rest, "import_scope")?;
+    let (decorator_scope, rest) = take_field(rest, "decorator_scope")?;
+    let (base_scope, instances_text) = take_field(rest, "base_scope")?;
+    let instances = instances_text
+        .split(',')
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_instance(value, root, import_cache))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Finding {
+        raw_line: line.to_string(),
+        kind: "single_callee_structural_wrapper".to_string(),
+        role,
+        block_kind,
+        parameter_count: parse_usize(&params, "params")?,
+        token_count: parse_usize(&tokens, "tokens")?,
+        hash,
+        instance_count: parse_usize(&count, "count")?,
+        module_scope,
+        import_scope,
+        decorator_scope,
+        base_scope,
+        instances,
+        public_api: Some(parse_bool(&public_api, "public_api")?),
+        caller_count: 0,
+        call_site_count: parse_usize(&call_site_count, "call_site_count")?,
+        callers: Vec::new(),
+        callee_count: parse_usize(&callee_count, "callee_count")?,
+        callees: vec![parse_callee(&callee)?],
+        similar_callers: Vec::new(),
     })
 }
 
@@ -468,6 +552,30 @@ fn parse_caller(text: &str) -> Result<CallerEvidence, String> {
         .collect::<Result<Vec<_>, _>>()?;
     Ok(CallerEvidence {
         raw_caller: text.to_string(),
+        path: parts[0].to_string(),
+        line_start,
+        line_end,
+        module: parts[2].to_string(),
+        qualname: parts[3].to_string(),
+        call_lines,
+    })
+}
+
+fn parse_callee(text: &str) -> Result<CalleeEvidence, String> {
+    let parts = text.split('@').collect::<Vec<_>>();
+    if parts.len() != 5 {
+        return Err(format!("invalid callee evidence {text}"));
+    }
+    let (line_start, line_end) = parse_line_range(parts[1])?;
+    let call_lines = parts[4]
+        .strip_prefix("sites=")
+        .ok_or_else(|| format!("missing callee sites= in {text}"))?
+        .split('|')
+        .filter(|value| !value.is_empty())
+        .map(|value| parse_usize(value, "call_line"))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(CalleeEvidence {
+        raw_callee: text.to_string(),
         path: parts[0].to_string(),
         line_start,
         line_end,
@@ -661,6 +769,16 @@ fn parse_usize(value: &str, label: &str) -> Result<usize, String> {
         .map_err(|error| format!("invalid {label} value {value}: {error}"))
 }
 
+fn parse_bool(value: &str, label: &str) -> Result<bool, String> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(format!(
+            "invalid {label} value {value}: expected true or false"
+        )),
+    }
+}
+
 fn finding_json(
     finding: &Finding,
     root: &Path,
@@ -686,6 +804,7 @@ fn finding_json(
         "import_scope": finding.import_scope,
         "decorator_scope": finding.decorator_scope,
         "base_scope": finding.base_scope,
+        "public_api": finding.public_api,
         "priority": {
             "rank": priority_rank,
             "score": priority_score,
@@ -716,6 +835,12 @@ fn finding_json(
             "similar_responsibility_callers": finding.similar_callers.iter().map(similar_caller_json).collect::<Vec<_>>(),
             "integration_candidates": integration_candidates_json(finding, &import_analysis, import_target_counts, internal_struct_analysis.as_ref()),
         },
+        "callee_analysis": {
+            "callee_count": finding.callee_count,
+            "call_site_count": finding.call_site_count,
+            "callees": finding.callees.iter().map(callee_json).collect::<Vec<_>>(),
+            "integration_candidates": callee_integration_candidates_json(finding, &import_analysis, import_target_counts),
+        },
     })
 }
 
@@ -728,6 +853,18 @@ fn caller_json(caller: &CallerEvidence) -> Value {
         "module": caller.module,
         "qualname": caller.qualname,
         "call_lines": caller.call_lines,
+    })
+}
+
+fn callee_json(callee: &CalleeEvidence) -> Value {
+    json!({
+        "raw_callee": callee.raw_callee,
+        "path": callee.path,
+        "line_start": callee.line_start,
+        "line_end": callee.line_end,
+        "module": callee.module,
+        "qualname": callee.qualname,
+        "call_lines": callee.call_lines,
     })
 }
 
@@ -799,6 +936,73 @@ fn integration_candidates_json(
         )
     }));
     candidates
+}
+
+fn callee_integration_candidates_json(
+    finding: &Finding,
+    import_analysis: &Value,
+    import_target_counts: &BTreeMap<String, usize>,
+) -> Vec<Value> {
+    if finding.kind != "single_callee_structural_wrapper" {
+        return Vec::new();
+    }
+    let Some(wrapper) = finding.instances.first() else {
+        return Vec::new();
+    };
+    let Some(callee) = finding.callees.first() else {
+        return Vec::new();
+    };
+    let mut features = vec![
+        CandidateFeature {
+            code: "non_public_wrapper",
+            weight: 40,
+            detail: format!("public_api={}", finding.public_api.unwrap_or(false)),
+        },
+        CandidateFeature {
+            code: "single_resolved_callee",
+            weight: 40,
+            detail: format!("callee_count={}", finding.callee_count),
+        },
+        CandidateFeature {
+            code: "usage_site_count",
+            weight: finding.call_site_count.min(5) * 4,
+            detail: format!("call_site_count={}", finding.call_site_count),
+        },
+        CandidateFeature {
+            code: "wrapper_structure_size",
+            weight: finding.token_count.min(50),
+            detail: format!(
+                "block_kind={},token_count={}",
+                finding.block_kind, finding.token_count
+            ),
+        },
+    ];
+    features.extend(dependency_tree_features(
+        import_analysis,
+        wrapper,
+        import_target_counts,
+    ));
+    vec![json!({
+        "candidate_kind": "inline_or_merge_non_public_single_callee_wrapper",
+        "candidate_schema_scope": "dependency_enriched",
+        "wrapper": {
+            "path": wrapper.path,
+            "line_start": wrapper.line_start,
+            "line_end": wrapper.line_end,
+            "module": wrapper.module,
+            "qualname": wrapper.qualname,
+        },
+        "callee": {
+            "path": callee.path,
+            "line_start": callee.line_start,
+            "line_end": callee.line_end,
+            "module": callee.module,
+            "qualname": callee.qualname,
+            "call_lines": callee.call_lines,
+        },
+        "features": features.iter().map(candidate_feature_json).collect::<Vec<_>>(),
+        "reason_codes": features.iter().map(|feature| feature.code).collect::<Vec<_>>(),
+    })]
 }
 
 fn base_single_owner_features(
@@ -1657,6 +1861,12 @@ fn priority_item(
     } else {
         0
     };
+    let single_callee_weight = if finding.kind == "single_callee_structural_wrapper" {
+        reason_codes.push("single_callee_structural_wrapper".to_string());
+        700_000
+    } else {
+        0
+    };
     let group_deep_dependency_weight = group_imported_by_count * 10_000_000;
     if group_imported_by_count > 0 {
         reason_codes.push("deep_module_group_dependency".to_string());
@@ -1711,6 +1921,7 @@ fn priority_item(
         + file_deep_dependency_weight
         + fewer_group_dependencies_weight
         + single_caller_weight
+        + single_callee_weight
         + production_weight
         + role_weight
         + module_scope_weight
@@ -1870,6 +2081,433 @@ fn repair_slice_json(priority_order: &[PriorityItem], graph: &ModuleGroupGraph) 
     })
 }
 
+fn mechanical_problem_clusters_json(
+    findings: &[Finding],
+    priority_order: &[PriorityItem],
+    graph: &ModuleGroupGraph,
+) -> Vec<Value> {
+    let priority_by_hash = priority_order
+        .iter()
+        .map(|item| (item.hash.clone(), item))
+        .collect::<BTreeMap<_, _>>();
+    let mut clusters = Vec::<Value>::new();
+    clusters.extend(same_callee_problem_clusters(findings, &priority_by_hash));
+    clusters.extend(same_owner_problem_clusters(findings, &priority_by_hash));
+    clusters.extend(file_hotspot_problem_clusters(findings, &priority_by_hash));
+    clusters.extend(module_group_problem_clusters(priority_order, graph));
+    clusters.extend(duplicate_shape_problem_clusters(
+        findings,
+        &priority_by_hash,
+    ));
+    clusters.extend(review_blocker_problem_clusters(priority_order));
+    clusters.sort_by(|left, right| {
+        right["priority_score"]
+            .as_u64()
+            .cmp(&left["priority_score"].as_u64())
+            .then_with(|| {
+                left["problem_kind"]
+                    .as_str()
+                    .cmp(&right["problem_kind"].as_str())
+            })
+            .then_with(|| {
+                left["cluster_key"]
+                    .as_str()
+                    .cmp(&right["cluster_key"].as_str())
+            })
+    });
+    clusters
+}
+
+fn same_callee_problem_clusters<'a>(
+    findings: &'a [Finding],
+    priority_by_hash: &BTreeMap<String, &'a PriorityItem>,
+) -> Vec<Value> {
+    let mut by_callee = BTreeMap::<String, Vec<&Finding>>::new();
+    for finding in findings
+        .iter()
+        .filter(|finding| finding.kind == "single_callee_structural_wrapper")
+    {
+        let Some(callee) = finding.callees.first() else {
+            continue;
+        };
+        by_callee
+            .entry(callee_key(callee))
+            .or_default()
+            .push(finding);
+    }
+    by_callee
+        .into_iter()
+        .filter(|(_, grouped)| grouped.len() >= 2)
+        .map(|(cluster_key, grouped)| {
+            let callee = grouped
+                .first()
+                .and_then(|finding| finding.callees.first())
+                .expect("callee group has callee");
+            let blockers = same_callee_batch_blockers(&grouped);
+            json!({
+                "problem_kind": "same_callee_wrapper_batch",
+                "cluster_key": cluster_key,
+                "action_hint": if blockers.is_empty() { "merge_or_inline_wrapper_batch" } else { "batch_review_required" },
+                "confidence": if blockers.is_empty() { "high" } else { "medium" },
+                "priority_score": grouped_priority_score(&grouped, priority_by_hash),
+                "finding_count": grouped.len(),
+                "affected_files": affected_files_for_findings(&grouped),
+                "shared_target": {
+                    "path": callee.path,
+                    "line_start": callee.line_start,
+                    "line_end": callee.line_end,
+                    "module": callee.module,
+                    "qualname": callee.qualname,
+                },
+                "blockers": blockers,
+                "findings": finding_refs(&grouped, priority_by_hash),
+            })
+        })
+        .collect()
+}
+
+fn same_owner_problem_clusters<'a>(
+    findings: &'a [Finding],
+    priority_by_hash: &BTreeMap<String, &'a PriorityItem>,
+) -> Vec<Value> {
+    let mut by_owner = BTreeMap::<String, Vec<&Finding>>::new();
+    for finding in findings
+        .iter()
+        .filter(|finding| finding.kind == "single_caller_structural_helper")
+    {
+        let Some(caller) = finding.callers.first() else {
+            continue;
+        };
+        by_owner
+            .entry(caller_key(caller))
+            .or_default()
+            .push(finding);
+    }
+    by_owner
+        .into_iter()
+        .filter(|(_, grouped)| grouped.len() >= 2)
+        .map(|(cluster_key, grouped)| {
+            let caller = grouped
+                .first()
+                .and_then(|finding| finding.callers.first())
+                .expect("owner group has caller");
+            let blockers = same_owner_batch_blockers(&grouped);
+            json!({
+                "problem_kind": "same_owner_single_caller_batch",
+                "cluster_key": cluster_key,
+                "action_hint": if blockers.is_empty() { "inline_or_nest_owned_helpers_together" } else { "batch_review_required" },
+                "confidence": if blockers.is_empty() { "high" } else { "medium" },
+                "priority_score": grouped_priority_score(&grouped, priority_by_hash),
+                "finding_count": grouped.len(),
+                "affected_files": affected_files_for_findings(&grouped),
+                "shared_owner": caller_json(caller),
+                "blockers": blockers,
+                "findings": finding_refs(&grouped, priority_by_hash),
+            })
+        })
+        .collect()
+}
+
+fn file_hotspot_problem_clusters<'a>(
+    findings: &'a [Finding],
+    priority_by_hash: &BTreeMap<String, &'a PriorityItem>,
+) -> Vec<Value> {
+    let mut by_file = BTreeMap::<String, Vec<&Finding>>::new();
+    for finding in findings {
+        for path in finding
+            .instances
+            .iter()
+            .map(|instance| instance.path.clone())
+            .collect::<BTreeSet<_>>()
+        {
+            by_file.entry(path).or_default().push(finding);
+        }
+    }
+    by_file
+        .into_iter()
+        .filter(|(path, grouped)| production_path(path) && grouped.len() >= 5)
+        .map(|(cluster_key, grouped)| {
+            let kind_counts = finding_kind_counts(&grouped);
+            json!({
+                "problem_kind": "same_file_refactor_hotspot",
+                "cluster_key": cluster_key,
+                "action_hint": "plan_file_level_repair_batch",
+                "confidence": "medium",
+                "priority_score": grouped_priority_score(&grouped, priority_by_hash),
+                "finding_count": grouped.len(),
+                "affected_files": affected_files_for_findings(&grouped),
+                "kind_counts": kind_counts,
+                "blockers": file_hotspot_blockers(&grouped),
+                "findings": finding_refs_limited(&grouped, priority_by_hash, 20),
+            })
+        })
+        .collect()
+}
+
+fn module_group_problem_clusters(
+    priority_order: &[PriorityItem],
+    graph: &ModuleGroupGraph,
+) -> Vec<Value> {
+    let mut by_group = BTreeMap::<String, Vec<&PriorityItem>>::new();
+    for item in priority_order {
+        for group in &item.source_groups {
+            by_group.entry(group.clone()).or_default().push(item);
+        }
+    }
+    by_group
+        .into_iter()
+        .filter(|(_, grouped)| grouped.len() >= 10)
+        .map(|(cluster_key, grouped)| {
+            let blockers = if cluster_key == "__unassigned__" {
+                vec!["module_group_contract_missing_or_unassigned".to_string()]
+            } else {
+                Vec::new()
+            };
+            json!({
+                "problem_kind": "module_group_refactor_hotspot",
+                "cluster_key": cluster_key.clone(),
+                "action_hint": if blockers.is_empty() { "plan_module_group_repair_wave" } else { "fix_module_group_contract_before_repair_wave" },
+                "confidence": if blockers.is_empty() { "medium" } else { "low" },
+                "priority_score": grouped.iter().take(20).map(|item| item.score).sum::<usize>(),
+                "finding_count": grouped.len(),
+                "incoming_dependency_count": graph.incoming_counts.get(&cluster_key).copied().unwrap_or(0),
+                "outgoing_dependency_count": graph.outgoing_counts.get(&cluster_key).copied().unwrap_or(0),
+                "affected_files": grouped.iter().flat_map(|item| item.instance_files.iter().cloned()).collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>(),
+                "kind_counts": priority_kind_counts(&grouped),
+                "blockers": blockers,
+                "findings": priority_refs_limited(&grouped, 20),
+            })
+        })
+        .collect()
+}
+
+fn duplicate_shape_problem_clusters<'a>(
+    findings: &'a [Finding],
+    priority_by_hash: &BTreeMap<String, &'a PriorityItem>,
+) -> Vec<Value> {
+    findings
+        .iter()
+        .filter(|finding| {
+            finding.kind == "duplicate_structural_hash"
+                && finding.instance_count >= 5
+                && finding
+                    .instances
+                    .iter()
+                    .filter(|instance| production_path(&instance.path))
+                    .count()
+                    >= 2
+        })
+        .map(|finding| {
+            let grouped = vec![finding];
+            let blockers = duplicate_shape_blockers(finding);
+            json!({
+                "problem_kind": "large_duplicate_shape_batch",
+                "cluster_key": finding.hash,
+                "action_hint": if blockers.is_empty() { "extract_or_contract_review_batch" } else { "design_review_before_unification" },
+                "confidence": if blockers.is_empty() { "medium" } else { "low" },
+                "priority_score": priority_by_hash.get(&finding.hash).map(|item| item.score).unwrap_or_default(),
+                "finding_count": 1,
+                "instance_count": finding.instance_count,
+                "affected_files": affected_files_for_findings(&grouped),
+                "blockers": blockers,
+                "findings": finding_refs(&grouped, priority_by_hash),
+            })
+        })
+        .collect()
+}
+
+fn review_blocker_problem_clusters(priority_order: &[PriorityItem]) -> Vec<Value> {
+    let mut by_blocker = BTreeMap::<String, Vec<&PriorityItem>>::new();
+    for item in priority_order {
+        for blocker in repair_blockers(item) {
+            by_blocker.entry(blocker).or_default().push(item);
+        }
+    }
+    by_blocker
+        .into_iter()
+        .filter(|(_, grouped)| grouped.len() >= 3)
+        .map(|(cluster_key, grouped)| {
+            json!({
+                "problem_kind": "review_blocker_cluster",
+                "cluster_key": cluster_key.clone(),
+                "action_hint": "resolve_policy_or_design_boundary_before_bulk_repair",
+                "confidence": "high",
+                "priority_score": grouped.iter().take(20).map(|item| item.score).sum::<usize>(),
+                "finding_count": grouped.len(),
+                "affected_files": grouped.iter().flat_map(|item| item.instance_files.iter().cloned()).collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>(),
+                "blockers": [cluster_key],
+                "findings": priority_refs_limited(&grouped, 20),
+            })
+        })
+        .collect()
+}
+
+fn callee_key(callee: &CalleeEvidence) -> String {
+    format!(
+        "{}:{}-{}:{}",
+        callee.path, callee.line_start, callee.line_end, callee.qualname
+    )
+}
+
+fn caller_key(caller: &CallerEvidence) -> String {
+    format!(
+        "{}:{}-{}:{}",
+        caller.path, caller.line_start, caller.line_end, caller.qualname
+    )
+}
+
+fn same_callee_batch_blockers(findings: &[&Finding]) -> Vec<String> {
+    let mut blockers = BTreeSet::new();
+    for finding in findings {
+        for instance in &finding.instances {
+            if instance.qualname.contains(".__") {
+                blockers.insert("dunder_or_operator_contract".to_string());
+            }
+            if !production_path(&instance.path) {
+                blockers.insert("contains_non_production_wrapper".to_string());
+            }
+        }
+        if finding.public_api.unwrap_or(false) {
+            blockers.insert("public_api_wrapper".to_string());
+        }
+    }
+    blockers.into_iter().collect()
+}
+
+fn same_owner_batch_blockers(findings: &[&Finding]) -> Vec<String> {
+    let mut blockers = BTreeSet::new();
+    for finding in findings {
+        if finding.role != "implementation" {
+            blockers.insert(format!("non_implementation_role:{}", finding.role));
+        }
+        if finding.block_kind == "Alias" {
+            blockers.insert("alias_requires_design_review".to_string());
+        }
+        for instance in &finding.instances {
+            if !production_path(&instance.path) {
+                blockers.insert("contains_non_production_target".to_string());
+            }
+        }
+    }
+    blockers.into_iter().collect()
+}
+
+fn file_hotspot_blockers(findings: &[&Finding]) -> Vec<String> {
+    let mut blockers = BTreeSet::new();
+    if findings
+        .iter()
+        .any(|finding| finding.role == "protocol" || finding.role == "alias")
+    {
+        blockers.insert("contains_protocol_or_alias_findings".to_string());
+    }
+    if findings.iter().any(|finding| finding.block_kind == "Class") {
+        blockers.insert("contains_class_contract_findings".to_string());
+    }
+    blockers.into_iter().collect()
+}
+
+fn duplicate_shape_blockers(finding: &Finding) -> Vec<String> {
+    let mut blockers = BTreeSet::new();
+    if finding.role != "implementation" {
+        blockers.insert(format!("non_implementation_role:{}", finding.role));
+    }
+    if finding.module_scope == "CrossModule" {
+        blockers.insert("cross_module_contract_review".to_string());
+    }
+    if finding.block_kind == "Class" && finding.token_count <= 100 {
+        blockers.insert("thin_class_contract_review".to_string());
+    }
+    blockers.into_iter().collect()
+}
+
+fn grouped_priority_score(
+    findings: &[&Finding],
+    priority_by_hash: &BTreeMap<String, &PriorityItem>,
+) -> usize {
+    findings
+        .iter()
+        .filter_map(|finding| priority_by_hash.get(&finding.hash).map(|item| item.score))
+        .take(20)
+        .sum()
+}
+
+fn affected_files_for_findings(findings: &[&Finding]) -> Vec<String> {
+    findings
+        .iter()
+        .flat_map(|finding| {
+            finding
+                .instances
+                .iter()
+                .map(|instance| instance.path.clone())
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn finding_kind_counts(findings: &[&Finding]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for finding in findings {
+        *counts.entry(finding.kind.clone()).or_default() += 1;
+    }
+    counts
+}
+
+fn priority_kind_counts(items: &[&PriorityItem]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for item in items {
+        *counts.entry(item.kind.clone()).or_default() += 1;
+    }
+    counts
+}
+
+fn finding_refs(
+    findings: &[&Finding],
+    priority_by_hash: &BTreeMap<String, &PriorityItem>,
+) -> Vec<Value> {
+    finding_refs_limited(findings, priority_by_hash, usize::MAX)
+}
+
+fn finding_refs_limited(
+    findings: &[&Finding],
+    priority_by_hash: &BTreeMap<String, &PriorityItem>,
+    limit: usize,
+) -> Vec<Value> {
+    findings
+        .iter()
+        .take(limit)
+        .map(|finding| {
+            let priority = priority_by_hash.get(&finding.hash);
+            json!({
+                "kind": finding.kind,
+                "hash": finding.hash,
+                "rank": priority.map(|item| item.rank),
+                "score": priority.map(|item| item.score),
+                "representative_instances": finding.instances.iter().take(5).map(|instance| {
+                    format!("{}:{}-{}:{}", instance.path, instance.line_start, instance.line_end, instance.qualname)
+                }).collect::<Vec<_>>(),
+            })
+        })
+        .collect()
+}
+
+fn priority_refs_limited(items: &[&PriorityItem], limit: usize) -> Vec<Value> {
+    items
+        .iter()
+        .take(limit)
+        .map(|item| {
+            json!({
+                "kind": item.kind,
+                "hash": item.hash,
+                "rank": item.rank,
+                "score": item.score,
+                "source_groups": item.source_groups,
+                "representative_instances": item.representative_instances,
+            })
+        })
+        .collect()
+}
+
 fn repair_blockers(item: &PriorityItem) -> Vec<String> {
     let mut blockers = Vec::new();
     if item.role != "implementation" {
@@ -1916,9 +2554,11 @@ fn repair_blockers(item: &PriorityItem) -> Vec<String> {
     {
         blockers.push("unassigned_only_scope".to_string());
     }
-    if item.kind == "single_caller_structural_helper" {
+    if item.kind == "single_caller_structural_helper"
+        || item.kind == "single_callee_structural_wrapper"
+    {
         if item.production_instance_count == 0 {
-            blockers.push("non_production_single_caller".to_string());
+            blockers.push("non_production_single_owner_or_callee".to_string());
         }
     } else if item.production_instance_count < 2 {
         blockers.push("insufficient_production_instances".to_string());
@@ -2444,6 +3084,53 @@ mod tests {
             payload["findings"][0]["caller_analysis"]["integration_candidates"][1]["features"][0]
                 ["code"],
             "unique_owner"
+        );
+    }
+
+    #[test]
+    fn parses_single_callee_wrapper_with_callee_evidence() {
+        let text = "PY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:role=implementation:Function:params=1:tokens=24:hash=h:count=1:callee_count=1:call_site_count=2:public_api=false:callee=pkg/a.py@1-3@pkg.a@_target@sites=11|12:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:10-14:pkg.a:_wrapper:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_SINGLE_CALLEE_FINDINGS=1\nPY_STRUCTURE_HASH_GROUPS=1\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, Path::new(".")).expect("report structures");
+        assert_eq!(
+            payload["summary"]["reported_single_callee_finding_count"],
+            1
+        );
+        assert_eq!(
+            payload["findings"][0]["kind"],
+            "single_callee_structural_wrapper"
+        );
+        assert_eq!(payload["findings"][0]["public_api"], false);
+        assert_eq!(
+            payload["findings"][0]["callee_analysis"]["callees"][0]["qualname"],
+            "_target"
+        );
+        assert_eq!(
+            payload["findings"][0]["callee_analysis"]["callees"][0]["call_lines"][1],
+            12
+        );
+        assert_eq!(
+            payload["findings"][0]["callee_analysis"]["integration_candidates"][0]
+                ["candidate_kind"],
+            "inline_or_merge_non_public_single_callee_wrapper"
+        );
+    }
+
+    #[test]
+    fn structures_mechanical_problem_cluster_for_shared_callee_wrappers() {
+        let text = "PY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:role=implementation:Function:params=1:tokens=24:hash=h1:count=1:callee_count=1:call_site_count=1:public_api=false:callee=pkg/a.py@1-3@pkg.a@_target@sites=11:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:10-14:pkg.a:_wrapper_one:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:role=implementation:Function:params=1:tokens=20:hash=h2:count=1:callee_count=1:call_site_count=1:public_api=false:callee=pkg/a.py@1-3@pkg.a@_target@sites=21:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:pkg/a.py:20-24:pkg.a:_wrapper_two:parent=<module>:imports=i:decorators=d:bases=b:context=c\nPY_STRUCTURE_HASH_SINGLE_CALLEE_FINDINGS=2\nPY_STRUCTURE_HASH_GROUPS=2\nPY_STRUCTURE_HASH=fail\n";
+        let payload = structure_text(text, Path::new(".")).expect("report structures");
+        let clusters = payload["summary"]["mechanical_problem_clusters"]
+            .as_array()
+            .expect("mechanical problem clusters");
+        let shared_callee = clusters
+            .iter()
+            .find(|cluster| cluster["problem_kind"] == "same_callee_wrapper_batch")
+            .expect("shared callee cluster");
+        assert_eq!(shared_callee["finding_count"], 2);
+        assert_eq!(shared_callee["shared_target"]["qualname"], "_target");
+        assert_eq!(
+            shared_callee["findings"][0]["representative_instances"][0],
+            "pkg/a.py:10-14:_wrapper_one"
         );
     }
 

@@ -213,8 +213,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/evals/README.md
-      - agents/evals/results/README.md
-      - agents/evals/results/hook-runs/README.md
+      - documents/runtime-log-archive.md
+      - documents/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
@@ -232,8 +232,9 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/results/README.md
-      - agents/evals/results/hook-runs/README.md
+      - agents/evals/README.md
+      - documents/runtime-log-archive.md
+      - documents/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_agent_canon_log_management_check.py
 
@@ -253,7 +254,6 @@ entries:
       - documents/tools/README.md
       - agents/evals/README.md
       - agents/evals/workflow_selection_eval.toml
-      - agents/evals/results/README.md
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
@@ -274,7 +274,6 @@ entries:
       - documents/tools/README.md
       - agents/evals/README.md
       - agents/evals/report_quality_eval.toml
-      - agents/evals/results/README.md
       - documents/runtime-log-archive.md
       - agents/skills/report-writing.md
     tests:
@@ -336,7 +335,6 @@ entries:
       - documents/local-llm-responsibility-analysis.md
       - agents/evals/README.md
       - agents/evals/local_llm_responsibility_eval.toml
-      - agents/evals/results/README.md
       - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_local_llm_eval.py
@@ -384,7 +382,7 @@ entries:
     family: root
     role: inventory
     status: canonical
-    command: tools/bin/agent-canon semantic-index responsibility-tree --include documents --include agents --check-directory-coverage
+    command: tools/bin/agent-canon semantic-index build --include documents --include agents
     writes: true
     default_wiring:
       ci: false
@@ -397,6 +395,26 @@ entries:
       - .gitignore
     tests:
       - rust/agent-canon/src/semantic_index.rs
+
+  - id: python-structure-hash-scope-plan
+    summary: Builds deterministic Change Impact Packets with impact blocks, scope candidates, selected scope, repair batches, and subagent handoff context from Python structural findings plus dependency-review artifacts.
+    path: rust/agent-canon/src/python_structure_hash_scope_plan.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon python-structure-hash-scope-plan --input reports/python-structure-hash-report.json --dependency-report-dir reports/dependency-review --output reports/change-impact-packet.json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/design/python-structure-hash.md
+      - agents/skills/dependency-analysis.md
+      - agents/skills/refactor-loop.md
+    tests:
+      - rust/agent-canon/src/python_structure_hash_scope_plan.rs
 
   - id: semantic-provider-html-report
     summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
@@ -1241,7 +1259,8 @@ entries:
       pr_check: false
     docs:
       - tools/README.md
-      - agents/evals/results/hook-runs/README.md
+      - agents/evals/README.md
+      - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_log_surface_inventory.py
 
@@ -1382,7 +1401,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/results/README.md
+      - agents/evals/README.md
+      - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_improvement_guide.py
 
@@ -1400,7 +1420,8 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/evals/results/README.md
+      - agents/evals/README.md
+      - documents/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_generate_agent_runtime_dashboard.py
 

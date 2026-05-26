@@ -22,6 +22,8 @@ except ModuleNotFoundError:  # Python 3.10 compatibility.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:
@@ -70,9 +72,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 36)
-        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 36)
-        self.assertEqual(globs["agents/skills/*.md"], 58)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 37)
+        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 37)
+        self.assertEqual(globs["agents/skills/*.md"], 59)
         self.assertEqual(globs["agents/workflows/*.md"], 22)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
         self.assertEqual(globs[".codex/agents/*.toml"], 32)
@@ -304,6 +306,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             tools_dir = canon_root / "tools" / "agent_tools"
             eval_dir.mkdir(parents=True)
             tools_dir.mkdir(parents=True)
+            archive_root = mounted_log_archive_root(canon_root)
+            archive_root.mkdir(parents=True)
             wrapper_root.mkdir()
             (wrapper_root / "agents").symlink_to(canon_root / "agents")
             (wrapper_root / "tools").symlink_to(canon_root / "tools")
@@ -352,7 +356,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             reports = sorted(
-                (canon_root / "agents" / "evals" / "results" / "skill-workflow-prompt").glob(
+                (archive_root / "eval-results" / "skill-workflow-prompt").glob(
                     "skill-eval-*-pass-agent-orchestration.md"
                 )
             )
@@ -360,11 +364,11 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             text = reports[0].read_text(encoding="utf-8")
             header = text.split("-->", 1)[0]
             self.assertIn(
-                "upstream implementation ../../../../tools/agent_tools/"
+                "upstream implementation ../../../../../tools/agent_tools/"
                 "evaluate_skill_workflow_prompts.py",
                 header,
             )
-            self.assertIn("upstream design ../../skill_workflow_prompt_eval.toml", header)
+            self.assertIn("upstream design ../../../../../agents/evals/skill_workflow_prompt_eval.toml", header)
             self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:
