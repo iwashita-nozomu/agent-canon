@@ -1599,8 +1599,23 @@ def main_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str
     if local_symbol and record.role in LOW_SIGNAL_HELPER_ROLES:
         return f"main:low-signal-local-{record.role}"
     if record.visibility == "private" and record.incoming_count > 0:
+        if shared_private_numeric_contract(record):
+            return ""
         return f"main:shared-private-{record.role}"
     return ""
+
+
+def shared_private_numeric_contract(record: FunctionRecord) -> bool:
+    """Return whether a private numeric primitive has enough local ownership."""
+    return (
+        record.kind == "function"
+        and record.incoming_count > LOCAL_CALLER_CLUSTER_LIMIT
+        and (
+            record.role == "numeric_kernel"
+            or "numeric_kernel" in record.secondary_roles
+        )
+        and not record.redundant_helper
+    )
 
 
 def experiment_design_judgment_rule(record: FunctionRecord, local_symbol: bool) -> str:

@@ -250,6 +250,61 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(payload["records"], [])
 
+    def test_shared_private_numeric_contract_is_not_user_judgment_helper(self) -> None:
+        """Multi-caller private numeric diagnostics can be an owned primitive."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "solver.py").write_text(
+                dedent(
+                    """
+                    import jax.numpy as jnp
+
+                    def _residual_score(x, ax, lam):
+                        residual = ax - x * lam
+                        residual_norm = jnp.max(jnp.abs(residual), axis=0)
+                        reference = jnp.where(residual_norm == 0, 1.0, residual_norm)
+                        return jnp.max(residual_norm / reference)
+
+                    def init(x, ax, lam):
+                        return _residual_score(x, ax, lam)
+
+                    def cond(x, ax, lam):
+                        return _residual_score(x, ax, lam)
+
+                    def step(x, ax, lam):
+                        return _residual_score(x, ax, lam)
+
+                    def finish(x, ax, lam):
+                        return _residual_score(x, ax, lam)
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--all-functions",
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            self.assertEqual(records["_residual_score"]["incoming_count"], 4)
+            self.assertEqual(records["_residual_score"]["role"], "numeric_kernel")
+            self.assertFalse(records["_residual_score"]["helper_candidate"])
+            self.assertFalse(records["_residual_score"]["needs_user_judgment"])
+
     def test_main_class_helpers_are_reported_with_domain_specific_rules(self) -> None:
         """Main-code class candidates should use deterministic rule surfaces."""
         with tempfile.TemporaryDirectory() as tmp_dir:

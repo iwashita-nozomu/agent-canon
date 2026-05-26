@@ -92,6 +92,19 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
 
+    def test_vendored_default_manifest_is_used_when_root_override_is_missing(self) -> None:
+        """Derived repos may use the vendored AgentCanon default manifest."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root / "vendor" / "agent-canon")
+            self.write_file(root, "app/main.py", "import app.lib\n\nVALUE = app.lib.VALUE\n")
+            self.write_file(root, "app/lib.py", "VALUE = 1\n")
+
+            result = self.run_checker(root, "app/main.py")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
+
     def write_fixture(self, root: Path) -> None:
         """Write a small responsibility-scope fixture."""
         self.write_file(

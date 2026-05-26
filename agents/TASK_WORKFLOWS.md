@@ -198,11 +198,14 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `cpp_reviewer`
 - `worker`
 
-parent-managed write-scope ルール:
-- parent は `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を明示します
-- 同一 path、同一 directory ownership、同一 public API surface を複数 writer に割り当てません
-- disjoint path または separate worktree が証明できる場合だけ、同一 stage で複数 write-capable subagent を許可します
-- write scope が重なる場合は serialize するか worktree を分けます
+write-scope separation ルール:
+- write-capable subagent の既定は 1 体です
+- parent は `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory / object を明示します
+- root/shared contract、同じ file、同じ canonical surface、同じ module boundary に触る writer は同一 wave では並列化しません
+- parent が dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合だけ、spawn budget 内で複数の write-capable subagent を並列化できます
+- 複数 writer が必要な場合は、各 writer の編集対象を directory / file / object 単位で交差しないように割り、parent が結果を順番に統合します
+- 衝突リスクは作業禁止でも scope 縮小理由でもなく順序制約として扱います。交差する target は先行 wave と後続 wave に分け、先行 wave の validation と tool rerun 後に後続 writer へ渡します
+- 同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います
 - parent は writer ごとの結果を順番に統合し、scope drift を review gate へ渡します
 
 spawn budget ルール:
@@ -214,7 +217,8 @@ spawn budget ルール:
 - `Large Delivery` / `Platform And Environment` は同時 10 体までを既定にします
 - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` は同時 12 体までを既定にします
 - budget 超過は例外扱いにし、`schedule.md` の stage plan と `work_log.md` に理由を書きます
-- write-capable subagent の上限は family ごとの `max_write_subagents` と parent-managed write-scope ledger で縛ります
+- budget を増やしても、write scope 分離、integration order、review gate が明示されない write-capable 並列化は許可しません
+- write-capable subagent の上限は family ごとの `max_write_subagents`、parent-managed write-scope ledger、integration order、review gate で縛ります
 - 新規 user request では前 task の subagent を使い回さず、新しい run bundle と fresh subagent を起こします
 - 前 task の subagent へ `send_input` して新規 task を継続させません。必要な文脈は `team_manifest.yaml`、packet path、review artifact に残して渡します
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます
@@ -402,7 +406,8 @@ concurrent spawn budget:
 - `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
 - tuning 中でも `test_designer` と `report_reviewer` を省略しません。`document_flow_reviewer` は reader-facing report / workflow / design doc を更新する場合に起動します
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
-- 複数 writer が必要な場合は disjoint path / separate worktree を parent-managed write-scope ledger に明記する
+- 複数 writer が必要な場合は、dependency order と wave plan で衝突 target を先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ worktree 分割を使います
+- disjoint path / separate worktree の判断は parent-managed write-scope ledger に明記します
 - `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
 - 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する
 

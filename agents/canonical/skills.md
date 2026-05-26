@@ -31,6 +31,8 @@ upstream design README.md canonical workflow index
   - OOP readability tool の機械実行、表形式 report、分離された agent 分析
 - `result-artifact-writeout`
   - tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す
+- `tool-finding-report`
+  - tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る。impact artifact は比較が明示されたときだけ作る
 - `agent-log-analysis`
   - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
 - `report-writing`

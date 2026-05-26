@@ -100,10 +100,29 @@ The structured report converts these facts into
 `caller_analysis.integration_candidates`. Candidate generation is feature based:
 single-owner usage, AST block shape, target size, dependency-tree evidence, and
 similar-caller shared profile evidence are emitted as weighted feature rows.
-Class targets use `move_or_nest_single_owner_type` instead of a function-style
-inline candidate. The raw `python-structure-hash --format json` output marks
-candidate rows with `candidate_schema_scope=ast_use_graph_only`; it does not
-have the full dependency graph. `python-structure-hash-report` marks rows with
+Class targets that are not private internal structs use
+`move_or_nest_single_owner_type` instead of a function-style inline candidate.
+Private internal struct targets are split deterministically in
+`internal_struct_analysis`:
+
+- `inline_candidate`: one constructor call, field-only dataclass surface, local
+  attribute reads contained in the owning caller or one same-file callee, no
+  loop-carry / pytree / public payload / direct-return usage, and no excessive
+  argument expansion;
+- `preserve_candidate`: JAX pytree registration, `tree_flatten` /
+  `tree_unflatten`, Protocol / Generic contract, loop / scan carry usage,
+  public `Algorithm` / `State` / `Info` / `Answer` / `Problem` /
+  `SolveConfig` payload usage, or excessive field expansion;
+- `review_required`: constructor count other than one, custom class methods,
+  direct return of the private instance, unresolved attribute ownership, or an
+  unrecognized non-dataclass surface.
+
+The corresponding integration candidate kinds are
+`inline_single_owner_internal_struct`,
+`preserve_internal_struct_contract`, and `review_internal_struct`. The raw
+`python-structure-hash --format json` output marks candidate rows with
+`candidate_schema_scope=ast_use_graph_only`; it does not have the full
+dependency graph. `python-structure-hash-report` marks rows with
 `candidate_schema_scope=dependency_enriched` and adds dependency-tree features
 from the structured report.
 
