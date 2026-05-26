@@ -3,11 +3,14 @@
 @dependency-start
 responsibility Documents agent-canon for this repository.
 upstream design AGENTS.md shared canon runtime contract
+upstream design LICENSE AgentCanon license text
+upstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
+downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer operation rulebook.
 @dependency-end
 -->
 
 
-このディレクトリは `agent-canon` 自体の committed snapshot です。
+このディレクトリは `agent-canon` 自体の source tree です。
 template や派生 repo に配布する shared agent canon の正本をここに置きます。
 
 ## このディレクトリの役割
@@ -25,12 +28,33 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `.codex/agents/`
 - `tools/`
 - `documents/SHARED_RUNTIME_SURFACES.md`
+- `CONTAINER_OPERATIONS.md`
+- `documents/github-first-module-and-devcontainer-policy.md`
 - `documents/agent-canon-github-remote.md`
+- `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
+- `documents/runtime-profiles-and-check-matrix.md`
+- `documents/template-agent-canon-audit-resolution.md`
 - `agents/workflows/README.md`
   - workflow catalog と routing guide の入口
 - `agents/workflows/agent-canon-pr-workflow.md`
 - `documents/agent-canon-subtree-migration.md`
+  - legacy vendoring compatibility appendix
+
+## Runtime Profiles
+
+AgentCanon exposes shared runtime surfaces so template and derived repositories
+can opt into them without copying implementation. Exposed does not mean always
+active. The activation and validation policy is
+[Runtime Profiles And Check Matrix](documents/runtime-profiles-and-check-matrix.md).
+
+- Agent runtime surfaces are active when an agent performs or reviews work.
+- Claude, GitHub/Copilot, devcontainer, Docker, experiment, C++, memory, and
+  maintenance surfaces are profile-specific.
+- Full repo validation is still available, but day-to-day checks should be
+  selected by changed path and risk class.
+- The 2026-05-16 500-item audit is resolved in
+  [Template / AgentCanon Audit Resolution](documents/template-agent-canon-audit-resolution.md).
 
 ## 利用時のディレクトリ / リンク構成
 
@@ -38,29 +62,32 @@ AgentCanon 単体 repo では、この tree 自体を source of truth として�
 Template や派生 repo では `vendor/agent-canon/` を source of truth にし、repo
 root の入口は symlink view または明示的な synced copy にします。
 
-標準構成:
+Installed root views:
 
 - `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、MCP、docs の正本。
 - `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex / Copilot 向けの薄い root entrypoint。
-- `CLAUDE.md -> vendor/agent-canon/CLAUDE.md`: Claude Code 向けの薄い root entrypoint。
+- `CLAUDE.md -> vendor/agent-canon/CLAUDE.md`: Claude Code compatibility entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
-- `.claude -> vendor/agent-canon/.claude`: Claude skill / agent mirror の root view。
+- `.claude -> vendor/agent-canon/.claude`: Claude compatibility mirror の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
+- `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
 - `mcp -> vendor/agent-canon/mcp`: repo MCP launcher / server の共有 view。
 - `tools -> vendor/agent-canon/tools`: shared automation の共有 view。
-- `documents/*`: `documents/SHARED_RUNTIME_SURFACES.md` に列挙された canon-owned docs だけを symlink view にします。
-- `memory/*`、`notes/*`、`tests/*`: `documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
-- `.github/copilot-instructions.md`: shared Copilot entrypoint の synced copy。
-- `.github/workflows/agent-coordination.yml`: shared coordination workflow の synced copy。
-- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: shared PR template の synced copy。
+- `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
+- `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
+- `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
+- `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
+- `documents/github-copilot-configuration.md`: standalone AgentCanon の Copilot configuration catalog。template / derived repo root では `vendor/agent-canon/documents/github-copilot-configuration.md` から読み、root `documents/` へ symlink しません。
+- `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
+- `.github/workflows/agent-canon-static-gates.yml`: standalone AgentCanon PR / push で tool catalog、tool drift、dependency review、workflow convention、container config の軽量 gate を走らせる workflow。
+- `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。
+- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template 側で `vendor/agent-canon/` を変える PR 用 checklist。root `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` へ同期されます。
 
 repo-local の正本として残すもの:
 
-- `docker/`: Template / project の開発環境。AgentCanon や Template の remote 名は Dockerfile に焼かず、文書で管理します。
+- `docker/`: Template / project の Docker runtime profile と dependency pack。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth、mount 方針は Dockerfile に焼かず、shared `.devcontainer/` の post-create と host mount convention で管理します。
 - `scripts/`: Template / project 固有の bootstrap と slug 置換。
 - `python/`、`src/`、`include/`、`lib/`: project implementation。
 - `experiments/`、`reports/`、`goal.md`: repo-local state。shared symlink には戻しません。
@@ -78,6 +105,7 @@ remote の正本:
 - AgentCanon canonical remote は `documents/agent-canon-github-remote.md` を見ます。
 - Template canonical remote は `documents/template-github-remote.md` を見ます。
 - local `/mnt/git/*.git` は compatibility mirror であり、source of truth ではありません。
+- reusable module distribution は GitHub PR / main SHA を正本にします。local Git / bare mirror の問題は repo-specific repair として扱い、shared module architecture を曲げません。
 
 ## 検索導線
 
@@ -109,8 +137,22 @@ bash tools/sync_agent_canon.sh check
 template 側で shared canon を直した変更を upstream `agent-canon` repo に戻すときは次を使います。
 
 ```bash
-bash tools/sync_agent_canon.sh push
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
 ```
 
-pull / push / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
+update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
 canonical remote の詳細は `documents/agent-canon-github-remote.md` を見ます。
+
+## License
+
+AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
+[documents/agent-canon-licensing-policy.md](documents/agent-canon-licensing-policy.md).
+
+Parent repositories may use a different root project license, but AgentCanon
+submodule content and root views into AgentCanon retain the AgentCanon license.
+Third-party skills or assets under `vendor/` must keep upstream URL, revision,
+and license metadata before they are enabled. GitHub-sourced third-party
+repositories attach under `vendor/<asset-class>/<github-owner>/<import-id>/`
+with a manifest-backed adapter instead of being copied into canonical runtime
+paths.

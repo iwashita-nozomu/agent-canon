@@ -1,35 +1,74 @@
 {
   "_dependency_manifest": [
     "@dependency-start",
-    "responsibility Configures Codex hook entrypoints for MCP session context.",
+    "responsibility Configures Codex hook entrypoints for repo guardrails.",
     "upstream implementation config.toml enables project-local Codex hooks",
-    "upstream design README.md documents MCP inventory preflight",
-    "downstream implementation hooks/mcp_session_context.sh emits MCP hook context",
+    "upstream design README.md documents hook wiring and optional MCP checks",
+    "downstream implementation hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts",
+    "downstream implementation hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted",
+    "downstream implementation hooks/prompt_secret_guard.py blocks obvious prompt secrets",
+    "downstream implementation hooks/skill_usage_logger.py logs observed skill, workflow, tool, and subagent routing usage",
+    "downstream implementation hooks/reference_capture_guard.py logs and blocks unregistered external source URLs",
+    "downstream implementation hooks/cause_investigation_guard.py blocks code edits before cause investigation evidence",
+    "downstream implementation hooks/goal_completion_guard.py blocks premature goal completion",
+    "downstream implementation hooks/oop_readability_guard.py warns on current changed-source OOP readability failures",
+    "downstream implementation hooks/module_boundary_guard.py blocks forced module-internal rewrites without boundary evidence",
+    "downstream implementation hooks/library_implementation_guard.py blocks direct vendored library implementation rewrites",
+    "downstream implementation hooks/helper_inventory_guard.py blocks repo-policy helper inventory findings",
+    "downstream implementation hooks/helper_first_guard.py blocks helper-function-first implementation drift",
+    "downstream implementation hooks/style_checker_guard.py runs changed-file style checks and logs unchecked edits",
+    "downstream implementation hooks/log_surface_inventory_guard.py blocks hook/tool/skill log-surface inventory drift",
+    "downstream implementation hooks/notebook_quality_guard.py blocks changed notebooks that behave like tests",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
     "@dependency-end"
   ],
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup|resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/mcp_session_context.sh\" SessionStart",
-            "timeout": 30,
-            "statusMessage": "Loading repo MCP context"
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/mcp_session_context.sh\" UserPromptSubmit",
-            "timeout": 30,
-            "statusMessage": "Loading repo MCP preflight guidance"
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" UserPromptSubmit",
+            "timeout": 40,
+            "statusMessage": "Running prompt guard suite"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|python|python3",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PreToolUse",
+            "timeout": 35,
+            "statusMessage": "Running pre-tool guard suite"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" PostToolUse",
+            "timeout": 600,
+            "statusMessage": "Running post-tool guard suite"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/hook_dispatcher.py\" Stop",
+            "timeout": 600,
+            "statusMessage": "Running stop guard suite"
           }
         ]
       }

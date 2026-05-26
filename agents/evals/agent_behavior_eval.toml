@@ -49,6 +49,46 @@ forbidden_any = [
 ]
 
 [[criteria]]
+name = "code_checker_results_recorded"
+max_score = 5
+feedback = "Record code checker results as behavior-eval evidence, or explicitly mark code checkers not required for advisory runs."
+required_any = [
+  "code_checker=pass",
+  "code_checker_not_required",
+  "tool_call=pyright",
+  "tool_call=ruff",
+  "tool_call=oop-readability-check",
+]
+forbidden_any = [
+  "code_checker=fail",
+  "code_checker=pending",
+  "code_checker=missing",
+]
+
+[[criteria]]
+name = "hook_tool_protocol_feedback_recorded"
+max_score = 5
+feedback = "Record how hook and tool results changed or explicitly did not change parent and subagent protocol."
+required_all = [
+  "hook_tool_feedback=",
+  "parent_protocol_update=",
+  "subagent_protocol_update=",
+  "protocol_feedback_reason=",
+]
+required_any = [
+  "hook_tool_feedback=reviewed",
+  "hook_tool_feedback_not_required",
+]
+forbidden_any = [
+  "hook_tool_feedback=pending",
+  "hook_tool_feedback=missing",
+  "parent_protocol_update=pending",
+  "parent_protocol_update=missing",
+  "subagent_protocol_update=pending",
+  "subagent_protocol_update=missing",
+]
+
+[[criteria]]
 name = "execution_path_efficiency_recorded"
 max_score = 5
 feedback = "Compare two run paths when behavior may differ, record the selected route, and prevent known inefficient routes."
@@ -80,12 +120,16 @@ required_all = [
 [[criteria]]
 name = "prompt_eval_behavior_recorded"
 max_score = 5
-feedback = "Record prompt eval baseline/rerun behavior for skill or workflow prompt changes."
+feedback = "Record accumulated prompt eval behavior whenever a skill is used."
 required_any = [
   "tool_call=evaluate_skill_workflow_prompts.py",
   "prompt_eval=pass",
   "EVAL_STATUS=pass",
-  "prompt_eval_not_required",
+]
+required_all = [
+  "EVAL_RUN_ID=",
+  "EVAL_USED_SKILLS=",
+  "EVAL_ACCUMULATED_REPORT=",
 ]
 
 [[criteria]]

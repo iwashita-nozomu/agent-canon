@@ -1,11 +1,12 @@
 <!--
 @dependency-start
-responsibility Documents コメント for this repository.
-upstream design ../../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+responsibility Documents Python コメント for this repository.
+upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../common/03_comments.md common comment policy
 @dependency-end
 -->
 
-# コメント
+# Python コメント
 
 この章は、Python 実装におけるコメント規約を補足します。
 

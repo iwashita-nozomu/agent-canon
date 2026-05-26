@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents Docstring ガイドと `__all__` 統一ルール for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 

@@ -31,6 +31,8 @@ from report_artifact_checks import (
 
 DEFAULT_MIN_SCORE = 85
 MARKDOWN_COMMENT_PATTERN = re.compile(r"<!--.*?-->", flags=re.DOTALL)
+SKILL_INVOCATION_PATTERN = re.compile(r"\bskill_invocation=\$?([A-Za-z0-9_-]+)")
+EVAL_FIELD_PATTERN = re.compile(r"\b(EVAL_RUN_ID|EVAL_ACCUMULATED_REPORT|EVAL_USED_SKILLS)=([^\s]+)")
 REQUIRED_ARTIFACTS = (
     "user_request_contract.md",
     "schedule.md",
@@ -88,6 +90,16 @@ class RunEvidence:
     normalized_bundle: str
     signals_text: str
     behavior_events_text: str
+    behavior_events_raw_text: str
+
+
+@dataclass(frozen=True)
+class PromptEvalEvent:
+    """One accumulated prompt eval event recorded in workflow monitoring."""
+
+    eval_run_id: str
+    report_path: str
+    used_skills: tuple[str, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -142,8 +154,13 @@ def string_tuple(value: object, field: str) -> tuple[str, ...]:
 
 def markdown_section_text(text: str, heading: str) -> str:
     """Return one level-2 Markdown section without comments."""
+    return markdown_section_text_raw(text, heading).lower()
+
+
+def markdown_section_text_raw(text: str, heading: str) -> str:
+    """Return one level-2 Markdown section without lowercasing."""
     lines = markdown_without_comments(text).splitlines()
-    return "\n".join(markdown_section_lines(lines, heading)).lower()
+    return "\n".join(markdown_section_lines(lines, heading))
 
 
 def markdown_section_lines(lines: list[str], heading: str) -> Iterator[str]:
@@ -306,6 +323,10 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
     """Read one run bundle into typed evidence."""
     missing = [name for name in REQUIRED_ARTIFACTS if not (report_dir / name).is_file()]
     monitoring_text = artifact_text(report_dir, "workflow_monitoring.md")
+    behavior_events_raw_text = markdown_section_text_raw(
+        monitoring_text,
+        "## Behavior Events",
+    )
     return RunEvidence(
         missing_artifacts=tuple(missing),
         request_contract=parse_markdown_status(
@@ -329,6 +350,7 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
             monitoring_text,
             "## Behavior Events",
         ),
+        behavior_events_raw_text=behavior_events_raw_text,
     )
 
 
@@ -419,11 +441,15 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
     )
 
 
-def build_base_criteria(evidence: RunEvidence) -> list[CriterionResult]:
+def build_base_criteria(
+    evidence: RunEvidence,
+    report_dir: Path,
+    workspace_root: Path,
+) -> list[CriterionResult]:
     """Build non-manifest run evaluation criteria."""
     return [
         *build_artifact_and_traceability_criteria(evidence),
-        *build_workflow_execution_criteria(evidence),
+        *build_workflow_execution_criteria(evidence, report_dir, workspace_root),
         *build_review_and_closeout_criteria(evidence),
         build_self_improvement_feedback_criterion(evidence),
     ]
@@ -455,6 +481,8 @@ def build_artifact_and_traceability_criteria(
 
 def build_workflow_execution_criteria(
     evidence: RunEvidence,
+    report_dir: Path,
+    workspace_root: Path,
 ) -> list[CriterionResult]:
     """Build planned work, monitoring, and intake criteria."""
     schedule_blockers = check_schedule_artifact(evidence.schedule_text)
@@ -481,7 +509,112 @@ def build_workflow_execution_criteria(
             "or explicit opt-out, repo dependency intake, web research decision, "
             "review status, validation status, and drift risk before implementation.",
         ),
+        build_prompt_eval_artifact_criterion(evidence, report_dir, workspace_root),
     ]
+
+
+def build_prompt_eval_artifact_criterion(
+    evidence: RunEvidence,
+    report_dir: Path,
+    workspace_root: Path,
+) -> CriterionResult:
+    """Require skill-use prompt eval events to cite real matching reports."""
+    invoked_skills = extract_invoked_skills(evidence.behavior_events_raw_text)
+    if not invoked_skills:
+        return criterion(
+            "prompt_eval_artifact_integrity",
+            8,
+            True,
+            "No action required.",
+        )
+    events = extract_prompt_eval_events(evidence.behavior_events_raw_text)
+    problems: list[str] = []
+    covered_skills: set[str] = set()
+    if not events:
+        problems.append("accumulated prompt eval event missing")
+    for event in events:
+        report_path = resolve_eval_report_path(event.report_path, report_dir, workspace_root)
+        if report_path is None:
+            problems.append(f"accumulated prompt eval report missing: {event.report_path}")
+            continue
+        report_text = report_path.read_text(encoding="utf-8")
+        if event.eval_run_id and not report_contains_eval_run_id(report_text, event.eval_run_id):
+            problems.append(
+                f"accumulated prompt eval run-id mismatch: {event.eval_run_id} -> {event.report_path}"
+            )
+        covered_skills.update(event.used_skills)
+        covered_skills.update(extract_report_used_skills(report_text))
+    missing_skills = sorted(invoked_skills - covered_skills)
+    if missing_skills:
+        problems.append("missing accumulated prompt eval skills: " + ",".join(missing_skills))
+    return criterion(
+        "prompt_eval_artifact_integrity",
+        8,
+        not problems,
+        "; ".join(problems) if problems else "No action required.",
+    )
+
+
+def extract_invoked_skills(text: str) -> set[str]:
+    """Return skill ids observed as runtime invocations."""
+    if "skill_invocation_not_required" in text:
+        return set()
+    return {match.group(1).removeprefix("$") for match in SKILL_INVOCATION_PATTERN.finditer(text)}
+
+
+def extract_prompt_eval_events(text: str) -> tuple[PromptEvalEvent, ...]:
+    """Return accumulated prompt eval events recorded in behavior monitoring."""
+    events: list[PromptEvalEvent] = []
+    for line in text.splitlines():
+        if "evaluate_skill_workflow_prompts.py" not in line:
+            continue
+        fields = {match.group(1): match.group(2).strip("`'\"") for match in EVAL_FIELD_PATTERN.finditer(line)}
+        report_path = fields.get("EVAL_ACCUMULATED_REPORT", "")
+        if not report_path:
+            continue
+        used_skills = tuple(
+            skill.strip().removeprefix("$")
+            for skill in fields.get("EVAL_USED_SKILLS", "").split(",")
+            if skill.strip() and skill.strip() != "-"
+        )
+        events.append(
+            PromptEvalEvent(
+                eval_run_id=fields.get("EVAL_RUN_ID", ""),
+                report_path=report_path,
+                used_skills=used_skills,
+            )
+        )
+    return tuple(events)
+
+
+def resolve_eval_report_path(
+    report_text_path: str,
+    report_dir: Path,
+    workspace_root: Path,
+) -> Path | None:
+    """Resolve an accumulated eval report path from report-dir or workspace context."""
+    candidate = Path(report_text_path)
+    candidates = (candidate,) if candidate.is_absolute() else (report_dir / candidate, workspace_root / candidate)
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def report_contains_eval_run_id(report_text: str, eval_run_id: str) -> bool:
+    """Return whether one report contains the expected eval run id."""
+    return f"eval_run_id: `{eval_run_id}`" in report_text or f"EVAL_RUN_ID={eval_run_id}" in report_text
+
+
+def extract_report_used_skills(report_text: str) -> set[str]:
+    """Extract used skill ids from one accumulated prompt eval report."""
+    for line in report_text.splitlines():
+        if "used_skills:" not in line:
+            continue
+        _, _, value = line.partition("used_skills:")
+        value = value.strip().strip("`")
+        return {skill.strip().removeprefix("$") for skill in value.split(",") if skill.strip() and skill.strip() != "-"}
+    return set()
 
 
 def build_review_and_closeout_criteria(
@@ -549,11 +682,12 @@ def build_self_improvement_feedback_criterion(evidence: RunEvidence) -> Criterio
 def evaluate(
     report_dir: Path,
     behavior_criteria: tuple[BehaviorCriterion, ...],
+    workspace_root: Path,
 ) -> tuple[list[CriterionResult], list[str]]:
     """Evaluate one report directory."""
     evidence = read_run_evidence(report_dir)
     criteria = [
-        *build_base_criteria(evidence),
+        *build_base_criteria(evidence, report_dir, workspace_root),
         *evaluate_behavior_criteria(
             {
                 "behavior_events": evidence.behavior_events_text,
@@ -855,7 +989,7 @@ def main() -> int:
     if not behavior_manifest.is_absolute():
         behavior_manifest = workspace_root / behavior_manifest
     behavior_criteria = load_behavior_manifest(behavior_manifest)
-    criteria, blockers = evaluate(report_dir, behavior_criteria)
+    criteria, blockers = evaluate(report_dir, behavior_criteria, workspace_root)
     score = sum(item.score for item in criteria)
     max_score = sum(item.max_score for item in criteria)
     status = "pass" if score >= args.min_score and not blockers else "revise"

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Checks dependency headers agent workflow state.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md dependency manifest requirement
 # upstream design ../../agents/templates/closeout_gate.md closeout requires dependency evidence
 # upstream design ../../documents/dependency-manifest-design.md dependency manifest DSL design
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
@@ -35,8 +34,10 @@ SKIP_PREFIXES = (
     ".pytest_cache/",
     ".ruff_cache/",
     "reports/agents/",
+    "reports/dependency-review/",
 )
-HEADER_SCAN_LINES = 40
+HEADER_SCAN_LINES = 80
+BINARY_SNIFF_BYTES = 4096
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -60,6 +61,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--root",
         default=".",
         help="Repository root. Defaults to the current directory.",
+    )
+    parser.add_argument(
+        "--allow-frontmatter",
+        action="store_true",
+        help=(
+            "Accepted for policy-explicit callers. YAML frontmatter and Markdown H1 "
+            "titles are allowed before the manifest by default."
+        ),
     )
     return parser
 
@@ -94,7 +103,7 @@ def repo_relative(root: Path, path: Path) -> str:
 def is_binary(path: Path) -> bool:
     """Return whether a file appears to be binary."""
     try:
-        return b"\0" in path.read_bytes()[:4096]
+        return b"\0" in path.read_bytes()[:BINARY_SNIFF_BYTES]
     except OSError:
         return True
 

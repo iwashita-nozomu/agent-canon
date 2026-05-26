@@ -70,8 +70,11 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
+review_model = "gpt-5.5"
+
 [features]
-codex_hooks = true
+hooks = true
+goals = true
 
 [agents]
 max_threads = 24
@@ -95,15 +98,19 @@ tool_timeout_sec = 300
 - hooks を有効化し、MCP 起動や context 注入を runtime に組み込む
 - subagent は最大 24 thread、job timeout 3600 秒
 - repo MCP は optional startup にして、失敗時も起動後に検出・報告する
+- AgentCanon は `mcp/repo_mcp_server.sh` / `mcp/repo_mcp_server.py` の実装と repo MCP tool contract を所有する
+- Codex は `.codex/config.toml` registration、project trust、hook context、apps / external connectors / session tool availability を所有する
+- `repo_mcp_server` は repo context / goal loop 専用で、file edit、GitHub、shell、web、Codex app connector の代替を実装しない
 
 ---
 
 # Template に入っていないもの
 
-現在の `.codex/config.toml` に入っている top-level key は 5 つだけです。
+現在の `.codex/config.toml` に入っている top-level key は 6 つだけです。
 
 - `approval_policy`
 - `sandbox_mode`
+- `review_model`
 - `features`
 - `agents`
 - `mcp_servers`
@@ -141,7 +148,7 @@ tool_timeout_sec = 300
 
 # Feature flags
 
-この template で有効なのは `codex_hooks` のみです。
+この template で有効なのは `hooks` と `goals` です。
 
 schema には他にも多くの flag があります。
 例:
@@ -177,7 +184,7 @@ schema には他にも多くの flag があります。
 ```bash
 codex -c model='"gpt-5.5"'
 codex -c model_reasoning_effort='"high"'
-codex --enable codex_hooks
+codex --enable hooks
 codex --disable some_feature
 codex --search
 codex exec --json "run review"
@@ -210,7 +217,7 @@ CLI override は一時操作に使います。repo の正本へ残すのは、�
 - `model_verbosity`
 - `approval_policy`
 - `sandbox_mode`
-- `profiles`
+- `profiles`（user-level config に置く）
 - `mcp_servers`
 - `agents`
 - `skills`
@@ -354,6 +361,9 @@ Hook には「毎回確実に動いてほしい deterministic 処理」を置き
 - MCP inventory の boot / check
 - repo runtime context の注入
 - 禁止 tool の事前 block
+- OOP guard の中間 block と呼び出しログ
+- notebook-as-test misuse の中間 block と呼び出しログ
+- skill usage の `agents/evals/results/hook-runs/skill_usage.jsonl` 追記
 - tool 結果の監査ログ化
 - permission request の追加 review
 
@@ -409,9 +419,10 @@ enabled = true
 
 ---
 
-# Profiles
+# User-Level Profiles
 
 Profiles は operator mode を切り替えるための機構です。
+current Codex では project-local `.codex/config.toml` の `profiles` は warning 対象なので、`~/.codex/config.toml` か `$CODEX_HOME/config.toml` に置きます。
 
 ```toml
 [profiles.review]

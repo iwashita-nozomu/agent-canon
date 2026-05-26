@@ -13,6 +13,8 @@ upstream design README.md canonical workflow index
   - task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint の選択
 - `repo-onboarding`
   - unfamiliar repo の入口確認
+- `task-routing`
+  - 長い tool / skill 候補名を短い route area と command に解決する
 - `start-repository`
   - template clone から新 repository を開始する
 - `codex-task-workflow`
@@ -25,6 +27,16 @@ upstream design README.md canonical workflow index
   - pyright / pytest / ruff を前提にした Python review
 - `cpp-review`
   - build / header / ownership を前提にした C / C++ review
+- `oop-readability-check`
+  - OOP readability tool の機械実行、表形式 report、分離された agent 分析
+- `result-artifact-writeout`
+  - tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す
+- `tool-finding-report`
+  - tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る。impact artifact は比較が明示されたときだけ作る
+- `agent-log-analysis`
+  - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
+- `report-writing`
+  - evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`

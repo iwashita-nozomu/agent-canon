@@ -9,8 +9,11 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 from agent_team import resolve_report_root
 
@@ -21,6 +24,74 @@ DECISION_KEYS = (
     "memory_learning_decision",
 )
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
+STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
+    "skill_invocation=$agent-orchestration status=observed",
+    "subagent_lifecycle=closed subagents_closed=yes fresh_subagents_required=true",
+    (
+        "tool_call=run_repo_dependency_review.sh repo_dependency_review=pass "
+        "scope=repo-wide"
+    ),
+    "tool_call=make ci static_analysis=pass scope=repo-wide",
+    "tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
+    "tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
+    (
+        "tool_call=oop-readability-check code_checker=pass "
+        "checker=oop-readability scope=changed-paths"
+    ),
+    "tool_call=check_convention_compliance.py CONVENTION_COMPLIANCE=pass",
+    "static_analysis_feedback=recorded target=review-backlog-scan",
+    (
+        "hook_tool_feedback=reviewed parent_protocol_update=not_required "
+        "subagent_protocol_update=not_required "
+        "protocol_feedback_reason=standard-closeout-no-new-protocol-change"
+    ),
+    (
+        "pre_edit_rejection_prediction=reviewed "
+        "predicted_tool_rejection_gates=recorded"
+    ),
+    "execution_path_comparison_not_required reason=single-active-route",
+    "token_efficiency_not_required reason=no-comparable-session",
+    "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",
+    "runtime_feedback_not_observed",
+    "review_decision=approve review_findings_integrated=yes",
+    "diff_check_agent_decision=approve diff_check_agent_complete=yes",
+)
+STANDARD_CLOSEOUT_SIGNALS = (
+    "mcp_inventory=pass",
+    "repo_dependency_review=pass scope=repo-wide",
+    "web_research_not_required reason=not-needed-for-closeout-token-recording",
+    "review_status=approve",
+    "validation_status=pass",
+    "drift_risk=checked",
+)
+
+
+def empty_decisions() -> dict[str, str]:
+    """Return an empty decision mapping."""
+    return {}
+
+
+@dataclass(frozen=True)
+class MonitoringEntries:
+    """Structured inputs for one workflow monitoring append."""
+
+    signals: tuple[str, ...] = ()
+    behavior_events: tuple[str, ...] = ()
+    runtime_feedback: tuple[str, ...] = ()
+    interventions: tuple[str, ...] = ()
+    decisions: Mapping[str, str] = field(default_factory=empty_decisions)
+    timestamp: str = ""
+
+
+EMPTY_MONITORING_ENTRIES = MonitoringEntries()
+MONITORING_LEGACY_KEYS = {
+    "signals",
+    "behavior_events",
+    "runtime_feedback",
+    "interventions",
+    "decisions",
+    "timestamp",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -68,6 +139,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "User- or reviewer-observed runtime feedback as key=value tokens, for "
             "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
+        ),
+    )
+    parser.add_argument(
+        "--closeout-token-preset",
+        action="store_true",
+        help=(
+            "Append the standard closeout behavior tokens consumed by "
+            "evaluate_agent_run.py. Use only after the corresponding evidence "
+            "has already been verified in the run bundle."
         ),
     )
     parser.add_argument(
@@ -154,16 +234,25 @@ def normalize_runtime_feedback(entry: str) -> str:
     return f"runtime_feedback=observed {stripped}"
 
 
-def section_bounds(lines: list[str], heading: str) -> tuple[int, int]:
-    """Return insertion bounds for one level-2 section."""
-    start = -1
+def section_start(lines: list[str], heading: str) -> int:
+    """Return the heading index for one level-2 section, or -1 when absent."""
     for index, line in enumerate(lines):
         if line.strip() == heading:
-            start = index
-            break
-    if start == -1:
+            return index
+    return -1
+
+
+def ensure_section(lines: list[str], heading: str) -> None:
+    """Append a level-2 section when the artifact does not contain it yet."""
+    if section_start(lines, heading) == -1:
         lines.extend(["", heading, ""])
-        start = len(lines) - 2
+
+
+def section_bounds(lines: list[str], heading: str) -> tuple[int, int]:
+    """Return insertion bounds for one existing level-2 section."""
+    start = section_start(lines, heading)
+    if start == -1:
+        raise ValueError(f"missing workflow monitoring section: {heading}")
     end = len(lines)
     for index in range(start + 1, len(lines)):
         if lines[index].startswith("## "):
@@ -176,6 +265,7 @@ def insert_entries(lines: list[str], heading: str, entries: list[str]) -> None:
     """Append entries to one markdown section if they are not already present."""
     if not entries:
         return
+    ensure_section(lines, heading)
     _, end = section_bounds(lines, heading)
     insert_at = end
     if insert_at > 0 and lines[insert_at - 1].strip():
@@ -206,6 +296,7 @@ def apply_decisions(lines: list[str], decisions: dict[str, str]) -> None:
     """Set improvement decision values in the monitoring artifact."""
     if not decisions:
         return
+    ensure_section(lines, "## Improvement Decisions")
     start, end = section_bounds(lines, "## Improvement Decisions")
     present: set[str] = set()
     for index in range(start + 1, end):
@@ -224,37 +315,75 @@ def apply_decisions(lines: list[str], decisions: dict[str, str]) -> None:
         insert_at += 1
 
 
+def string_entries(value: object) -> tuple[str, ...]:
+    """Return one legacy entry field as a tuple of strings."""
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, (list, tuple)):
+        items = cast("list[object] | tuple[object, ...]", value)
+        return tuple(str(item) for item in items)
+    raise TypeError(f"expected string entries, got {type(value).__name__}")
+
+
+def decision_entries(value: object) -> Mapping[str, str]:
+    """Return one legacy decision field as a string mapping."""
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        items = cast("Mapping[object, object]", value)
+        return {str(key): str(item) for key, item in items.items()}
+    raise TypeError(f"expected decision mapping, got {type(value).__name__}")
+
+
+def entries_from_legacy(kwargs: dict[str, object]) -> MonitoringEntries:
+    """Build structured monitoring entries from the pre-dataclass keyword API."""
+    unknown = set(kwargs) - MONITORING_LEGACY_KEYS
+    if unknown:
+        raise TypeError(f"unknown monitoring entry keys: {','.join(sorted(unknown))}")
+    return MonitoringEntries(
+        signals=string_entries(kwargs.get("signals")),
+        behavior_events=string_entries(kwargs.get("behavior_events")),
+        runtime_feedback=string_entries(kwargs.get("runtime_feedback")),
+        interventions=string_entries(kwargs.get("interventions")),
+        decisions=decision_entries(kwargs.get("decisions")),
+        timestamp=str(kwargs.get("timestamp", "")),
+    )
+
+
 def append_monitoring(
     report_dir: Path,
-    *,
-    signals: list[str] | None = None,
-    behavior_events: list[str] | None = None,
-    runtime_feedback: list[str] | None = None,
-    interventions: list[str] | None = None,
-    decisions: dict[str, str] | None = None,
-    timestamp: str = "",
+    entries: MonitoringEntries = EMPTY_MONITORING_ENTRIES,
+    **legacy_entries: object,
 ) -> Path:
     """Append monitoring evidence and return the artifact path."""
+    active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
     report_dir.mkdir(parents=True, exist_ok=True)
     path = report_dir / "workflow_monitoring.md"
     if not path.is_file():
         path.write_text(default_monitoring_text(report_dir), encoding="utf-8")
     lines = path.read_text(encoding="utf-8").splitlines()
-    signal_entries = [normalize_entry(item, timestamp) for item in signals or []]
+    signal_entries = [
+        normalize_entry(item, active_entries.timestamp)
+        for item in active_entries.signals
+    ]
     behavior_entries = [
-        normalize_entry(item, timestamp) for item in behavior_events or []
+        normalize_entry(item, active_entries.timestamp)
+        for item in active_entries.behavior_events
     ]
     behavior_entries.extend(
-        normalize_entry(normalize_runtime_feedback(item), timestamp)
-        for item in runtime_feedback or []
+        normalize_entry(normalize_runtime_feedback(item), active_entries.timestamp)
+        for item in active_entries.runtime_feedback
     )
     intervention_entries = [
-        normalize_entry(item, timestamp) for item in interventions or []
+        normalize_entry(item, active_entries.timestamp)
+        for item in active_entries.interventions
     ]
     insert_entries(lines, "## Signals", signal_entries)
     insert_entries(lines, "## Behavior Events", behavior_entries)
     insert_entries(lines, "## Interventions", intervention_entries)
-    apply_decisions(lines, decisions or {})
+    apply_decisions(lines, dict(active_entries.decisions))
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return path
 
@@ -263,14 +392,21 @@ def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     decisions = dict(parse_decision(item) for item in args.decision)
+    signals = list(args.signal)
+    behavior_events = list(args.behavior_event)
+    if args.closeout_token_preset:
+        signals.extend(STANDARD_CLOSEOUT_SIGNALS)
+        behavior_events.extend(STANDARD_CLOSEOUT_BEHAVIOR_EVENTS)
     path = append_monitoring(
         resolve_report_dir(args),
-        signals=list(args.signal),
-        behavior_events=list(args.behavior_event),
-        runtime_feedback=list(args.runtime_feedback),
-        interventions=list(args.intervention),
-        decisions=decisions,
-        timestamp=str(args.timestamp),
+        MonitoringEntries(
+            signals=tuple(signals),
+            behavior_events=tuple(behavior_events),
+            runtime_feedback=tuple(args.runtime_feedback),
+            interventions=tuple(args.intervention),
+            decisions=decisions,
+            timestamp=str(args.timestamp),
+        ),
     )
     print(f"WORKFLOW_MONITORING={path}")
     return 0

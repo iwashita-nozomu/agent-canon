@@ -24,6 +24,12 @@ CHECKBOX_RE = re.compile(
 )
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
 DEFAULT_MAX_PLAN_ITEMS = 12
+PR_MUTATION_AUTHORITY_VALUES = (
+    "inspect_and_prepare_only",
+    "ready_for_review_when_green",
+    "merge_when_green",
+    "github_copilot_merge_when_green",
+)
 DEFAULT_EXIT_CRITERIA = (
     (
         "G1",
@@ -38,8 +44,8 @@ DEFAULT_EXIT_CRITERIA = (
     (
         "G3",
         "OOP/readability analysis is run with "
-        "`python3 tools/agent_tools/analyze_oop_readability.py` and findings are fixed "
-        "or documented.",
+        "`python3 tools/oop/python/readability.py` and, when C++ is in scope, "
+        "`python3 tools/oop/cpp/readability.py`; findings are fixed or documented.",
     ),
     (
         "G4",
@@ -105,7 +111,7 @@ OPTIONAL_GOAL_ITEMS = (
     (
         "O4",
         "release",
-        "Release, branch-integration, push, or downstream template snapshot "
+        "Release, branch-integration, push, or downstream template submodule pin "
         "coordination is required.",
     ),
     (
@@ -154,6 +160,14 @@ class GoalState:
         return int_field(self.fields, "run_safety_cap", 0)
 
     @property
+    def pr_mutation_authority(self) -> str:
+        """Return the PR mutation authority declared by the goal."""
+        return self.fields.get(
+            "pr_mutation_authority",
+            "inspect_and_prepare_only",
+        ).strip()
+
+    @property
     def done_exit_criteria(self) -> int:
         """Return the number of checked exit criteria."""
         return sum(1 for item in self.exit_criteria if item.checked)
@@ -186,6 +200,8 @@ class GoalState:
             return "invalid"
         if self.achieved:
             return "achieved"
+        if self.goal_status in {"blocked", "stopped"}:
+            return self.goal_status
         return "continue"
 
 
@@ -206,6 +222,12 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--goal-file", default="goal.md")
     init_parser.add_argument("--objective", required=True)
     init_parser.add_argument("--max-iterations", type=int, default=0)
+    init_parser.add_argument(
+        "--pr-mutation-authority",
+        choices=PR_MUTATION_AUTHORITY_VALUES,
+        default="inspect_and_prepare_only",
+        help="PR mutation authority mode recorded in goal.md.",
+    )
     init_parser.add_argument("--force", action="store_true")
 
     status_parser = subparsers.add_parser("status", help="Print goal loop status.")
@@ -252,6 +274,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--goal-status",
         choices=("active", "achieved", "blocked", "stopped"),
         help="Optionally update the goal_status field.",
+    )
+    mark_parser.add_argument(
+        "--pr-mutation-authority",
+        choices=PR_MUTATION_AUTHORITY_VALUES,
+        help="Optionally update the goal PR mutation authority field.",
     )
     return parser
 
@@ -309,6 +336,12 @@ def parse_goal(path: Path) -> GoalState:
         parse_errors.append("current_iteration must be >= 0")
     if int_field(fields, "run_safety_cap", 0) < 0:
         parse_errors.append("run_safety_cap must be >= 0")
+    pr_authority = fields.get("pr_mutation_authority", "inspect_and_prepare_only")
+    if pr_authority not in PR_MUTATION_AUTHORITY_VALUES:
+        allowed = ",".join(PR_MUTATION_AUTHORITY_VALUES)
+        parse_errors.append(
+            f"pr_mutation_authority must be one of: {allowed}"
+        )
     return GoalState(
         path=path,
         fields=fields,
@@ -332,6 +365,7 @@ def render_machine_status(state: GoalState) -> str:
         f"GOAL_LOOP_STATUS={state.loop_status}",
         f"GOAL_CURRENT_ITERATION={state.current_iteration}",
         f"GOAL_RUN_SAFETY_CAP={state.run_safety_cap}",
+        f"GOAL_PR_MUTATION_AUTHORITY={state.pr_mutation_authority}",
         f"GOAL_EXIT_CRITERIA_TOTAL={len(state.exit_criteria)}",
         f"GOAL_EXIT_CRITERIA_DONE={state.done_exit_criteria}",
         f"GOAL_BACKLOG_TOTAL={len(state.backlog)}",
@@ -339,6 +373,7 @@ def render_machine_status(state: GoalState) -> str:
         f"GOAL_OPTIONAL_ITEMS_TOTAL={len(state.optional_goal_items)}",
         f"GOAL_OPTIONAL_ITEMS_DONE={state.done_optional_goal_items}",
         f"GOAL_PARSE_ERRORS={len(state.parse_errors)}",
+        f"GOAL_NEXT_OPEN_ITEM={next_open_item(state)}",
         f"NEXT_ACTION={next_action(state)}",
     ]
     for error in state.parse_errors:
@@ -352,7 +387,22 @@ def next_action(state: GoalState) -> str:
         return "close_goal_loop"
     if state.loop_status == "invalid":
         return "repair_goal_md"
+    if state.loop_status == "blocked":
+        return "wait_for_unblock"
+    if state.loop_status == "stopped":
+        return "stop_goal_loop"
     return "run_next_iteration"
+
+
+def next_open_item(state: GoalState) -> str:
+    """Return the first active unchecked item for large backlog iteration."""
+    for item in state.backlog:
+        if not item.checked:
+            return f"backlog:{item.item_id}"
+    for item in state.exit_criteria:
+        if not item.checked:
+            return f"exit_criteria:{item.item_id}"
+    return "none"
 
 
 def dependency_path_for(report_path: Path) -> str:
@@ -379,6 +429,8 @@ def render_markdown_report(state: GoalState, dependency_path: str) -> str:
         f"- goal_loop_status: `{state.loop_status}`",
         f"- current_iteration: `{state.current_iteration}`",
         f"- run_safety_cap: `{state.run_safety_cap}`",
+        f"- pr_mutation_authority: `{state.pr_mutation_authority}`",
+        f"- next_open_item: `{next_open_item(state)}`",
         f"- next_action: `{next_action(state)}`",
         "",
         "## Exit Criteria",
@@ -418,7 +470,7 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
     """Render unchecked goal items as an implementation-ready TODO surface."""
     unchecked_criteria = open_items(state.exit_criteria)
     unchecked_backlog = open_items(state.backlog)
-    selected = [*unchecked_criteria, *unchecked_backlog][: max(0, max_items)]
+    selected = [*unchecked_backlog, *unchecked_criteria][: max(0, max_items)]
     lines = [
         "# Goal Work Breakdown",
         "<!--",
@@ -434,6 +486,7 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
         f"- goal_status_field: `{state.goal_status}`",
         f"- goal_loop_status: `{state.loop_status}`",
         f"- next_action: `{next_action(state)}`",
+        f"- pr_mutation_authority: `{state.pr_mutation_authority}`",
         f"- open_exit_criteria: `{len(unchecked_criteria)}`",
         f"- open_backlog_items: `{len(unchecked_backlog)}`",
         f"- optional_goal_items: `{len(state.optional_goal_items)}`",
@@ -498,7 +551,7 @@ def evidence_hint(item: CheckboxItem) -> str:
     if "code dependency" in text or "scan_code_dependencies" in text:
         return "`scan_code_dependencies.sh` output"
     if "oop" in text or "readability" in text:
-        return "`analyze_oop_readability.py` report"
+        return "`tools/oop/*/readability.py` report"
     if "hardcoded numeric" in text or "check_hardcoded_numbers" in text:
         return "`check_hardcoded_numbers.py` output"
     if "dependency" in text:
@@ -539,6 +592,7 @@ def write_initial_goal(
     path: Path,
     objective: str,
     run_safety_cap: int,
+    pr_mutation_authority: str,
     force: bool,
 ) -> None:
     """Write a starter goal.md contract."""
@@ -562,6 +616,7 @@ def write_initial_goal(
             "- goal_status: active",
             f"- run_safety_cap: {run_safety_cap}",
             "- current_iteration: 0",
+            f"- pr_mutation_authority: {pr_mutation_authority}",
             "- active_run_id:",
             "- stop_reason:",
             "",
@@ -702,6 +757,7 @@ def handle_init(args: argparse.Namespace) -> int:
         goal_file,
         str(args.objective),
         int(args.max_iterations),
+        str(args.pr_mutation_authority),
         bool(args.force),
     )
     print(f"GOAL_FILE={goal_file}")
@@ -751,6 +807,14 @@ def handle_mark(args: argparse.Namespace) -> int:
     set_checkbox(goal_file, str(target), bool(args.done))
     if args.goal_status:
         set_goal_status(goal_file, str(args.goal_status))
+    if args.pr_mutation_authority:
+        lines = goal_file.read_text(encoding="utf-8").splitlines()
+        update_field(
+            lines,
+            "pr_mutation_authority",
+            str(args.pr_mutation_authority),
+        )
+        goal_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"GOAL_FILE={goal_file}")
     print(f"GOAL_MARKED={target}")
     return 0

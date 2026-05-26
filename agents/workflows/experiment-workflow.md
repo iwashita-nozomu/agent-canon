@@ -60,7 +60,9 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - `Registry Plan:`
   - `experiments/registry.toml` の topic entry、canonical entrypoint、formal command、必要なら `active_branch` を先に固定します。
 - `Config Snapshot Plan:`
-  - `result/<run_name>/config.json` に書き出す設定 dictionary を先に固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象は Python closure や notebook state に閉じ込めません。
+  - checked-in 正本は `experiments/<topic>/config.yaml` に置き、`result/<run_name>/config.json` または `config.yaml` snapshot に書き出す設定 dictionary を先に固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象は Python closure や notebook state に閉じ込めません。
+- `Make Target Plan:`
+  - `make experiment-smoke TOPIC=<topic>`、`make experiment-formal TOPIC=<topic>`、または topic 固有 alias を先に固定します。正式 run の exact command を chat や notebook だけに残しません。
 - `Execution Plan:`
   - `main` で進めるか、隔離が必要な場合だけ短期 branch を使うかを先に決めます。既定は `main` です。
 - `Server Run Surface:`
@@ -122,7 +124,7 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 推奨構成は次です。
 
 - `README.md`
-  - 実験目的、コード配置、標準コマンド、出力先、report の入口、命名規則を書く。
+  - 実験目的、コード配置、Make target、YAML config、出力先、report の入口、命名規則を書く。
 - `cases.py`
   - case 定義、difficulty range、resource estimate を置く。
 - `experimentcode.py`
@@ -197,7 +199,8 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - 出力 schema
   - `summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
 - 設定 schema
-  - `--config {config_path}` または同等の入口があり、実験 script が JSON object / dict として設定を読めることを確認する。
+  - `--config experiments/<topic>/config.yaml` または同等の入口があり、実験 script が YAML config を読めることを確認する。
+  - managed runner 経由の `config.json` snapshot から run 条件を復元できることを確認する。
 
 静的チェックの段階では、まだ正式な benchmark conclusion を出しません。
 ここでの目的は「長時間 run を始めても、型・import・引数の破綻で止まらない状態」にすることです。
@@ -251,12 +254,11 @@ server 実行の formal run では、少なくとも `run_manifest.json`、`run.
 main server host で formal run を回す場合は、次を推奨します。
 
 ```bash
-python3 tools/experiments/run_managed_experiment.py \
-  --topic <topic> \
-  --use-registered-command formal
+make experiment-formal TOPIC=<topic>
 ```
 
-この wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
+この Make target は内側で `tools/experiments/run_managed_experiment.py` を呼びます。
+wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run_name>/`、`config.json`、`run_manifest.json`、`run.log`、`experiments/report/<run_name>.md` の初期 stub をそろえます。
 
 #### 4.4 long run のルール
 

@@ -13,8 +13,12 @@ skill_families:
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
     shim: .agents/skills/repo-onboarding/SKILL.md
+  - id: task-routing
+    purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
+    canonical_doc: agents/skills/task-routing.md
+    shim: .agents/skills/task-routing/SKILL.md
   - id: start-repository
-    purpose: Start a new repository from the template clone, including bare remotes and project-local agent-canon seeding.
+    purpose: Start a new GitHub/submodule-first repository from the template clone.
     canonical_doc: agents/skills/start-repository.md
     shim: .agents/skills/start-repository/SKILL.md
   - id: codex-task-workflow
@@ -37,14 +41,46 @@ skill_families:
     purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
     canonical_doc: agents/skills/cpp-review.md
     shim: .agents/skills/cpp-review/SKILL.md
+  - id: oop-readability-check
+    purpose: Run the OOP readability checker, produce mechanical report tables, and optionally add separate agent analysis.
+    canonical_doc: agents/skills/oop-readability-check.md
+    shim: .agents/skills/oop-readability-check/SKILL.md
+  - id: result-artifact-writeout
+    purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
+    canonical_doc: agents/skills/result-artifact-writeout.md
+    shim: .agents/skills/result-artifact-writeout/SKILL.md
+  - id: tool-finding-report
+    purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
+    canonical_doc: agents/skills/tool-finding-report.md
+    shim: .agents/skills/tool-finding-report/SKILL.md
+  - id: agent-log-analysis
+    purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
+    canonical_doc: agents/skills/agent-log-analysis.md
+    shim: .agents/skills/agent-log-analysis/SKILL.md
+  - id: report-writing
+    purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
+    canonical_doc: agents/skills/report-writing.md
+    shim: .agents/skills/report-writing/SKILL.md
+  - id: structure-planning
+    purpose: Build structure contracts for reports, experiments, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
+    canonical_doc: agents/skills/structure-planning.md
+    shim: .agents/skills/structure-planning/SKILL.md
+  - id: html-output
+    purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
+    canonical_doc: agents/skills/html-output.md
+    shim: .agents/skills/html-output/SKILL.md
+  - id: html-experiment-report
+    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the first figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
+    canonical_doc: agents/skills/html-experiment-report.md
+    shim: .agents/skills/html-experiment-report/SKILL.md
   - id: test-design
     purpose: Statically analyze approved code paths and produce adversarial test cases before implementation.
     canonical_doc: agents/skills/test-design.md
     shim: .agents/skills/test-design/SKILL.md
-  - id: behavior-preserving-refactor
-    purpose: Run large refactors as behavior-preserving structural change with explicit safety contracts.
-    canonical_doc: agents/skills/behavior-preserving-refactor.md
-    shim: .agents/skills/behavior-preserving-refactor/SKILL.md
+  - id: refactor-loop
+    purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
+    canonical_doc: agents/skills/refactor-loop.md
+    shim: .agents/skills/refactor-loop/SKILL.md
   - id: long-form-writing
     purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
     canonical_doc: agents/skills/long-form-writing.md
@@ -61,6 +97,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+  - id: document-canon-cleanup
+    purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
+    canonical_doc: agents/skills/document-canon-cleanup.md
+    shim: .agents/skills/document-canon-cleanup/SKILL.md
   - id: dependency-analysis
     purpose: Run dependency manifest header, scan, format, and graph tools for changed-file gates or migration inventory.
     canonical_doc: agents/skills/dependency-analysis.md

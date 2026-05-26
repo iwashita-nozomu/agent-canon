@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents subagent-bootstrap for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
 @dependency-end
 -->
 
@@ -86,6 +87,8 @@ repo inventory、tool drift survey、static validation triage、diff-local Pytho
 実装 slice は 1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を `.codex/config.toml` の Spark bucket の `model` と `model_reasoning_effort` で再起動します。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
+handoff prompt には repo root や `/workspace` 全体ではなく、role ごとの bounded `allowed_paths`、対象 checker / compact artifact、該当 canon 節、`do_not_read` surface、expected output schema を含めます。`allowed_paths` は手書き対象だけで閉じず、編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。full tree search、raw accumulated logs、unrelated module scan が必要になった場合は、parent へ escalation して input packet を拡張してから進めます。
+write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `codex_hook_runtime_alignment`、`skill_mirror_sync`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
@@ -94,7 +97,7 @@ Codex で planning を含む parent session では、plan-mode command を先に
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。
-包括的開発では、同一 worktree の writer を `worker` 1 人に固定します。複数 writer が必要な場合は worktree を分けます。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は serialize するか worktree を分けます。
 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起こします。
 subagent handoff prompt には `team_manifest.yaml` の `run.subagent_lifecycle_policy` を含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` に close evidence を残します。

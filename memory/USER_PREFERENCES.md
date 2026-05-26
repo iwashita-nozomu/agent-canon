@@ -141,6 +141,18 @@ upstream design README.md memory surface index
 - 2026-05-05 | レート制約が強い task では、repo inventory、tool drift survey、static validation planning、diff-local language review、design-traced narrow implementation slice を gpt-5.3-codex-spark low の fresh subagent へ優先委譲し、parent / gpt-5.5 は統合判断と最終責任に集中させる。
   - source: chat
 
+- 2026-05-11 | Codex should actively configure and use available runtime features such as hooks, MCP, and goals when they are stable and useful, instead of leaving them dormant.
+  - source: chat
+
+- 2026-05-11 | Within Docker or devcontainer environments, Codex may use available runtime features and install/configure development dependencies more freely, while keeping host-level changes conservative.
+  - source: chat
+
+- 2026-05-15 | Jupyter notebooks should be readable practical demos that show partial execution and runnable visualization; detailed assertions and fine-grained tests belong in tests/, and hooks should block notebook-as-test misuse.
+  - source: chat
+
+- 2026-05-18 | 当面は skill_usage.jsonl などの通常 session usage log も AgentCanon-owned hook result として毎回 AgentCanon branch / PR に commit/push して蓄積する。
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし

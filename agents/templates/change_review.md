@@ -21,6 +21,10 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
 
+## Semantic Responsibility Candidate Review
+
+<!-- Inspect `semantic_index_merge_candidates_*.jsonl`, `semantic_index_thin_docs_*.jsonl`, and optional `semantic_index_search_*.jsonl` from `review_backlog_scan.sh` when present. Record same-responsibility duplicates, consolidation candidates, thin wrappers, or adjacent search hits that affect this diff. Treat semantic-index output as advisory review evidence only; confirm with dependency review, exact search, structure checks, and source inspection before requiring a merge or deletion. -->
+
 ## Cross-Doc Coverage Review
 
 <!-- Check whether the implementer and parent used the cross-cutting packet rather than relying only on one workflow branch. Return revise if relevant review, guardrail, migration, or lifecycle docs were omitted from the implementation basis. -->
@@ -47,7 +51,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Revision Loop
 
-<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the full required review set on the refreshed diff. -->
+<!-- Record what the implementer must revise before the next checkpoint review. Any fix made from these findings, however small, must return through the active required review set for the risk class and changed surface on the refreshed diff. -->
 
 ## Post-Review Fix Rerun Requirement
 

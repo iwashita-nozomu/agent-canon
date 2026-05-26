@@ -1,0 +1,27 @@
+---
+name: tool-finding-report
+description: Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested.
+---
+<!--
+@dependency-start
+responsibility Documents Tool Finding Report runtime skill for this repository.
+upstream design ../../../agents/skills/tool-finding-report.md documents the human-facing workflow
+upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result artifact policy
+upstream design ../../../agents/skills/report-writing.md defines reader-facing report policy
+upstream design ../../../agents/skills/refactor-loop.md consumes finding packets for repair slices
+@dependency-end
+-->
+
+# Tool Finding Report
+
+1. Read `agents/skills/tool-finding-report.md`.
+1. Fix the target scope, exclude rules, dependency roots, and output directory before running tools. Fix a baseline ref only when before/after impact is explicitly requested.
+1. Preserve raw machine results first with `$result-artifact-writeout`; failed or partial runs are evidence, not noise.
+1. Build structured full-scope artifacts from the raw results before interpreting them. Do not truncate to top-N findings inside this skill. For Python structural findings, use `python-structure-hash` -> `python-structure-hash-report`, and use `python-structure-hash-impact` only when before / after comparison is requested.
+1. Include the relevant checker family for the task: algorithm contract, module groups, OOP readability, dependency review, static analysis, hook logs, or workflow evals.
+1. Mechanically rank every finding. If the tool does not provide priority, derive a deterministic order from severity, public API or algorithm-contract impact, dependency fan-in/fan-out, duplicate/thin/single-caller signals, production vs test/experiment scope, and tool confidence. Record the ranking policy in the report.
+1. Write a finding packet with scope, commands, raw artifacts, structured artifacts, full counts, full finding table or structured finding artifact reference, mechanical priority order, optional impact, and a handoff boundary. The caller or higher-level workflow chooses the repair slice and decides what to do next.
+1. Use `$report-writing` when the user needs a reader-facing narrative report; keep mechanical tool output and agent interpretation separated.
+1. If findings drive behavior-preserving implementation or refactor, pass the full finding packet and mechanical priority order to `$refactor-loop` instead of editing from a chat-only summary.
+1. Classify each tool/reviewer/subagent feedback item as `implementation_bug`, `missing_test_or_design_evidence`, `handoff_prompt_gap`, `shared_skill_or_workflow_gap`, `tool_gap`, or `review_required`.
+1. For `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the next subagent handoff or shared skill/workflow prompt before launching the next write-capable subagent, and record `workflow_monitor.py --runtime-feedback ... action=prompt_repair`.

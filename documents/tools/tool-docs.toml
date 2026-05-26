@@ -1,0 +1,65 @@
+# @dependency-start
+# responsibility Maps canonical tools to same-named explanatory documents.
+# upstream design README.md tool documentation placement policy
+# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+# downstream implementation ../../tools/agent_tools/tool_catalog.py validates one-to-one tool docs
+# @dependency-end
+
+catalog_kind = "agent_canon_tool_docs"
+version = 1
+
+[[tool]]
+id = "route"
+tool = "tools/agent_tools/route.py"
+doc = "documents/tools/route.md"
+language = "python"
+summary = "Short task-routing tool documentation."
+
+[[tool]]
+id = "html-artifact-access"
+tool = "tools/experiments/html_artifact_access.py"
+doc = "documents/tools/html_artifact_access.md"
+language = "python"
+summary = "Remote HTML artifact browser-access command documentation."
+
+[[tool]]
+id = "oop-python-readability"
+tool = "tools/oop/python/readability.py"
+doc = "documents/tools/oop/python/readability.md"
+language = "python"
+summary = "Python OOP readability checker documentation."
+
+[[tool]]
+id = "oop-python-rule-inventory"
+tool = "tools/oop/python/rule_inventory.py"
+doc = "documents/tools/oop/python/rule_inventory.md"
+language = "python"
+summary = "Python OOP rule inventory documentation."
+
+[[tool]]
+id = "oop-cpp-readability"
+tool = "tools/oop/cpp/readability.py"
+doc = "documents/tools/oop/cpp/readability.md"
+language = "cpp"
+summary = "C++ OOP readability checker documentation."
+
+[[tool]]
+id = "oop-cpp-rule-inventory"
+tool = "tools/oop/cpp/rule_inventory.py"
+doc = "documents/tools/oop/cpp/rule_inventory.md"
+language = "cpp"
+summary = "C++ OOP rule inventory documentation."
+
+[[tool]]
+id = "semantic-index"
+tool = "rust/agent-canon/src/semantic_index.rs"
+doc = "documents/semantic_index.md"
+language = "rust"
+summary = "Semantic vector index and Eval harness documentation."
+
+[[tool]]
+id = "semantic-provider-html-report"
+tool = "tools/agent_tools/semantic_provider_html_report.py"
+doc = "documents/tools/semantic_provider_html_report.md"
+language = "python"
+summary = "HTML renderer for semantic-index provider comparison evidence."

@@ -7,19 +7,21 @@
 # @dependency-end
 set -euo pipefail
 
-ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
+ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REQUIRE_HEADER=0
 CHANGED=0
+ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_header_format.sh [--root DIR] [--changed] [--require-header] [paths...]
+  check_dependency_header_format.sh [--root DIR] [--changed] [--require-header] [--allow-frontmatter] [paths...]
 
 Validates @dependency-start / @dependency-end manifest syntax.
 Files without a manifest are skipped unless --require-header is set.
+--allow-frontmatter is accepted for policy-explicit callers; frontmatter is allowed by default.
 EOF
 }
 
@@ -35,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-header)
       REQUIRE_HEADER=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
       shift
       ;;
     -h|--help)
@@ -63,7 +69,7 @@ is_checkable_suffix() {
 
 is_skip_path() {
   case "$1" in
-    .git/*|.pytest_cache/*|.ruff_cache/*|reports/agents/*)
+    .git/*|.pytest_cache/*|.ruff_cache/*|reports/agents/*|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
       return 0
       ;;
     *)
@@ -118,9 +124,30 @@ strip_manifest_line() {
 normalize_path() {
   local source_file="$1"
   local rel_path="$2"
+  local source_context
   local source_dir
-  source_dir="$(dirname "$source_file")"
+  source_context="$(source_context_file "$source_file")"
+  source_dir="$(dirname "$source_context")"
   realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
+}
+
+source_context_file() {
+  local source_file="$1"
+  case "$source_file" in
+    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+      if [[ -f "vendor/agent-canon/$source_file" ]]; then
+        printf 'vendor/agent-canon/%s\n' "$source_file"
+        return
+      fi
+      ;;
+    .github/scripts/checkout_agent_canon_submodule.sh)
+      if [[ -f "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh" ]]; then
+        printf '%s\n' "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh"
+        return
+      fi
+      ;;
+  esac
+  printf '%s\n' "$source_file"
 }
 
 check_file() {

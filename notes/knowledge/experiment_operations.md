@@ -60,4 +60,6 @@ upstream design README.md notes lifecycle index
 ## 関連
 
 - [Benchmark vs Experiment](./benchmark_vs_experiment.md)
-- [../../documents/coding-conventions-experiments.md](../../documents/coding-conventions-experiments.md)
+- `documents/coding-conventions-experiments.md` in standalone AgentCanon;
+  `vendor/agent-canon/documents/coding-conventions-experiments.md` in
+  template roots

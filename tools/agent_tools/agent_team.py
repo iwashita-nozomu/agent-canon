@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Provides agent team agent workflow automation.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared vendor-only document packet policy
 # @dependency-end
 """Shared runtime helpers for the permanent agent team."""
 
@@ -27,6 +28,14 @@ ROOT = Path(__file__).resolve().parents[2]
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 TEMPLATE_ROOT = ROOT / "agents" / "templates"
+TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
+TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
+GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
+GIT_STATUS_SHORT_PATH_START = 3
+DEPENDENCY_MANIFEST_CLOSE_MARKER = "-->"
+RUN_ID_TASK_SLUG_MAX_CHARS = 40
+SHA256_READ_CHUNK_BYTES = 65_536
+NEWLINE = "\n"
 PYTHON_SUFFIXES = {".py", ".pyi"}
 CPP_SUFFIXES = {
     ".c",
@@ -49,6 +58,21 @@ CPP_PATH_MARKERS = (
     "include/",
     "lib/",
 )
+DOC_SUFFIXES = {".md", ".rst", ".txt"}
+CONFIG_SUFFIXES = {".json", ".toml", ".yaml", ".yml"}
+DOC_OR_RUNTIME_PATH_MARKERS = (
+    ".agents/",
+    ".claude/",
+    ".codex/",
+    ".devcontainer/",
+    ".github/",
+    "agents/",
+    "documents/",
+    "memory/",
+    "notes/",
+    "tools/catalog.yaml",
+)
+CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
@@ -137,6 +161,20 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
+def resolve_workspace_document_path(workspace_root: Path, relative_path: str) -> Path:
+    """Resolve a document path through the root view or vendored AgentCanon source."""
+    root_path = (workspace_root / relative_path).resolve()
+    if root_path.exists():
+        return root_path
+    vendor_path = (workspace_root / "vendor" / "agent-canon" / relative_path).resolve()
+    if vendor_path.exists():
+        return vendor_path
+    canon_path = (ROOT / relative_path).resolve()
+    if canon_path.exists():
+        return canon_path
+    return root_path
+
+
 def resolve_report_root(
     report_root: str | None,
     workspace_root: Path | None = None,
@@ -209,18 +247,18 @@ def resolve_cross_cutting_document_packet(workspace_root: Path) -> tuple[Documen
     """Resolve the common cross-cutting document packet for one workspace."""
     required_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
     )
     optional_entries = tuple(
         DocumentPacketEntry(
-            path=(workspace_root / relative_path).resolve(),
+            path=resolve_workspace_document_path(workspace_root, relative_path),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS
-        if (workspace_root / relative_path).resolve().exists()
+        if resolve_workspace_document_path(workspace_root, relative_path).exists()
     )
     return required_entries + optional_entries
 
@@ -250,6 +288,21 @@ class TaskCatalog:
     review_packs: tuple[dict[str, object], ...]
 
 
+@dataclass(frozen=True)
+class RunBundleSpec:
+    """Inputs required to create a run bundle and team manifest."""
+
+    config: TeamConfig
+    report_dir: Path
+    run_id: str
+    task: str
+    owner: str
+    created_at_iso: str
+    roles: tuple[Role, ...]
+    workspace_root: Path
+    workflow_family_id: str = ""
+
+
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -274,9 +327,9 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     )
 
 
-def load_task_catalog(config: TeamConfig) -> TaskCatalog:
+def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
     """Load the task catalog referenced by the team config."""
-    catalog_path = ROOT / str(config.team["task_catalog"])
+    catalog_path = root / str(config.team["task_catalog"])
     raw = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise RuntimeError(f"task catalog must parse as a mapping: {catalog_path}")
@@ -291,6 +344,43 @@ def load_task_catalog(config: TeamConfig) -> TaskCatalog:
 def specialist_role_ids(config: TeamConfig) -> tuple[str, ...]:
     """Return specialist role ids."""
     return tuple(role.id for role in config.specialist_roles)
+
+
+def review_pack_ids(catalog: TaskCatalog) -> tuple[str, ...]:
+    """Return known review pack ids."""
+    return tuple(str(pack["id"]) for pack in catalog.review_packs)
+
+
+def enable_choices(config: TeamConfig, catalog: TaskCatalog) -> tuple[str, ...]:
+    """Return valid --enable values for specialist roles and review packs."""
+    return tuple(sorted((*specialist_role_ids(config), *review_pack_ids(catalog))))
+
+
+def expand_enabled_specialists(
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    enabled_names: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Expand specialist role ids and named review packs into role ids."""
+    specialist_ids = set(specialist_role_ids(config))
+    review_packs = {str(pack["id"]): pack for pack in catalog.review_packs}
+    expanded: list[str] = []
+    for name in enabled_names:
+        if name in specialist_ids:
+            if name not in expanded:
+                expanded.append(name)
+            continue
+        if name in review_packs:
+            for role_id in _as_string_tuple(
+                review_packs[name].get("specialists"),
+                f"review_packs[{name}].specialists",
+            ):
+                resolve_role(config, role_id)
+                if role_id not in expanded:
+                    expanded.append(role_id)
+            continue
+        raise KeyError(f"unknown specialist or review pack: {name}")
+    return tuple(expanded)
 
 
 def resolve_role(config: TeamConfig, role_name: str) -> Role:
@@ -320,9 +410,9 @@ def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
     changed: list[str] = []
     for raw_line in result.stdout.splitlines():
         line = raw_line.rstrip()
-        if len(line) < 4:
+        if len(line) < GIT_STATUS_SHORT_MIN_LINE_LENGTH:
             continue
-        path_part = line[3:]
+        path_part = line[GIT_STATUS_SHORT_PATH_START:]
         if " -> " in path_part:
             _, path_part = path_part.split(" -> ", 1)
         normalized = path_part.strip()
@@ -351,11 +441,17 @@ def auto_language_specialists(
         or any(normalized == marker or normalized.startswith(marker) for marker in CPP_PATH_MARKERS)
         for normalized in normalized_paths
     )
+    has_docs_or_runtime = any(
+        Path(normalized).suffix.lower() in DOC_SUFFIXES | CONFIG_SUFFIXES
+        or any(normalized == marker or normalized.startswith(marker) for marker in DOC_OR_RUNTIME_PATH_MARKERS)
+        for normalized in normalized_paths
+    )
     return tuple(
         role_id
         for role_id, enabled in (
             ("python_reviewer", has_python),
             ("cpp_reviewer", has_cpp),
+            ("docs_workflow_steward", has_docs_or_runtime),
         )
         if enabled
     )
@@ -455,11 +551,20 @@ def select_roles(
     config: TeamConfig,
     enabled_specialists: list[str],
     full_team: bool,
+    catalog: TaskCatalog | None = None,
+    workflow_family_id: str | None = None,
 ) -> tuple[Role, ...]:
     """Return the active roles for one run."""
     if full_team:
         return config.always_on_roles + config.specialist_roles
+    always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
     enabled_roles = tuple(resolve_role(config, name) for name in enabled_specialists)
+    selected_roles = list(always_on_roles)
+    selected_ids = {role.id for role in selected_roles}
+    for role in enabled_roles:
+        if role.id not in selected_ids:
+            selected_roles.append(role)
+            selected_ids.add(role.id)
     enabled_set = {role.id for role in enabled_roles}
     enabled_activations = {
         role.activation for role in enabled_roles if role in config.specialist_roles
@@ -468,8 +573,56 @@ def select_roles(
         role
         for role in config.specialist_roles
         if role.id in enabled_set or role.activation in enabled_activations
+        if role.id not in selected_ids
     )
-    return config.always_on_roles + selected_specialists
+    return tuple(selected_roles) + selected_specialists
+
+
+def workflow_always_on_roles(
+    config: TeamConfig,
+    catalog: TaskCatalog | None,
+    workflow_family_id: str | None,
+) -> tuple[Role, ...]:
+    """Return family-specific always-on roles when a workflow family declares them."""
+    if catalog is None or not workflow_family_id:
+        return config.always_on_roles
+    family = resolve_workflow_family(catalog, workflow_family_id)
+    family_roles = family.get("roles", {})
+    if not isinstance(family_roles, dict):
+        return config.always_on_roles
+    role_ids = _as_string_tuple(
+        family_roles.get("always_on"),
+        f"workflow_families[{workflow_family_id}].roles.always_on",
+    )
+    if not role_ids:
+        return config.always_on_roles
+    return tuple(resolve_role(config, role_id) for role_id in role_ids)
+
+
+def load_codex_agent_configs() -> dict[str, dict[str, object]]:
+    """Load Codex custom agent TOML files by declared agent name."""
+    configs: dict[str, dict[str, object]] = {}
+    for path in sorted(CODEX_AGENT_ROOT.glob("*.toml")):
+        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+        name = parsed.get("name", path.stem)
+        configs[str(name)] = parsed
+    return configs
+
+
+def codex_agent_model_matrix_for_roles(
+    roles: tuple[Role, ...],
+    configs: dict[str, dict[str, object]] | None = None,
+) -> tuple[str, ...]:
+    """Return role:agent:model:effort rows for active Codex agents."""
+    agent_configs = configs if configs is not None else load_codex_agent_configs()
+    rows: list[str] = []
+    for role in roles:
+        for agent_id in role.codex_agents:
+            agent_config = agent_configs.get(agent_id, {})
+            model = str(agent_config.get("model", "inherit"))
+            effort = str(agent_config.get("model_reasoning_effort", "inherit"))
+            rows.append(f"{role.id}:{agent_id}:{model}:{effort}")
+    return tuple(dict.fromkeys(rows))
 
 
 def iter_artifacts(config: TeamConfig, roles: tuple[Role, ...]) -> tuple[str, ...]:
@@ -530,7 +683,7 @@ def resolve_role_document_packet(
     for relative_path in workspace_paths:
         add_entry(
             DocumentPacketEntry(
-                path=(workspace_root / relative_path).resolve(),
+                path=resolve_workspace_document_path(workspace_root, relative_path),
                 rationale=f"workspace doc:{relative_path}",
             )
         )
@@ -544,11 +697,55 @@ def resolve_role_document_packet(
     )
 
 
+def strip_dependency_manifest(text: str) -> str:
+    """Remove a dependency manifest block from text included inside another template."""
+    trimmed = text.lstrip()
+    leading = text[: len(text) - len(trimmed)]
+    if not trimmed.startswith("<!--") or "@dependency-start" not in trimmed:
+        return text
+    end = trimmed.find(DEPENDENCY_MANIFEST_CLOSE_MARKER)
+    if end == -1:
+        return text
+    return leading + trimmed[end + len(DEPENDENCY_MANIFEST_CLOSE_MARKER) :].lstrip(
+        NEWLINE
+    )
+
+
+def render_template_partial(partial_name: str, seen: tuple[str, ...] = ()) -> str:
+    """Load one reusable template partial without leaking its manifest into output."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", partial_name):
+        raise RuntimeError(f"invalid template partial name: {partial_name}")
+    if partial_name in seen:
+        chain = " -> ".join((*seen, partial_name))
+        raise RuntimeError(f"recursive template partial include: {chain}")
+    path = TEMPLATE_PARTIAL_ROOT / f"{partial_name}.md"
+    if not path.is_file():
+        raise RuntimeError(f"template partial not found: {partial_name}")
+    content = strip_dependency_manifest(path.read_text(encoding="utf-8"))
+    return expand_template_partials(content, (*seen, partial_name))
+
+
+def expand_template_partials(content: str, seen: tuple[str, ...] = ()) -> str:
+    """Expand reusable partial markers in one template body."""
+    return TEMPLATE_PARTIAL_RE.sub(
+        lambda match: render_template_partial(match.group(1), seen),
+        content,
+    )
+
+
+def apply_template_replacements(content: str, replacements: dict[str, str]) -> str:
+    """Apply run-specific replacements to one rendered template."""
+    for key, value in replacements.items():
+        content = content.replace(f"{{{{{key}}}}}", value)
+        content = content.replace(f"{{\\{{{key}}}}}", value)
+    return content
+
+
 def render_template(template_name: str, replacements: dict[str, str]) -> str:
     """Load and fill a text template from agents/templates."""
     content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
-    for key, value in replacements.items():
-        content = content.replace(f"{{{{{key}}}}}", value)
+    content = expand_template_partials(content)
+    content = apply_template_replacements(content, replacements)
     return content
 
 
@@ -573,53 +770,33 @@ def required_output_templates_missing(
     )
 
 
-def create_run_bundle(
-    config: TeamConfig,
-    report_dir: Path,
-    run_id: str,
-    task: str,
-    owner: str,
-    created_at_iso: str,
-    roles: tuple[Role, ...],
-    workspace_root: Path,
-    workflow_family_id: str | None = None,
-) -> tuple[str, ...]:
+def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     """Create the standard files for a run."""
     replacements = {
-        "RUN_ID": run_id,
-        "TASK": task,
-        "OWNER": owner,
-        "CREATED_AT": created_at_iso,
+        "RUN_ID": spec.run_id,
+        "TASK": spec.task,
+        "OWNER": spec.owner,
+        "CREATED_AT": spec.created_at_iso,
     }
-    report_dir.mkdir(parents=True, exist_ok=True)
-    created_files = list(iter_artifacts(config, roles))
+    spec.report_dir.mkdir(parents=True, exist_ok=True)
+    created_files = list(iter_artifacts(spec.config, spec.roles))
     for artifact in created_files:
         if has_template(artifact):
-            (report_dir / artifact).write_text(
+            (spec.report_dir / artifact).write_text(
                 render_template(artifact, replacements),
                 encoding="utf-8",
             )
-    (report_dir / config.artifacts["team_manifest"]).write_text(
-        build_manifest(
-            config=config,
-            run_id=run_id,
-            task=task,
-            owner=owner,
-            created_at_iso=created_at_iso,
-            report_dir=report_dir,
-            roles=roles,
-            workspace_root=workspace_root,
-            workflow_family_id=workflow_family_id,
-        ),
+    (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
+        build_manifest(spec),
         encoding="utf-8",
     )
-    (report_dir / config.artifacts["verification"]).write_text(
+    (spec.report_dir / spec.config.artifacts["verification"]).write_text(
         "\n".join(
             [
-                f"run_id={run_id}",
-                f"task={task}",
-                f"owner={owner}",
-                f"created_at_utc={created_at_iso}",
+                f"run_id={spec.run_id}",
+                f"task={spec.task}",
+                f"owner={spec.owner}",
+                f"created_at_utc={spec.created_at_iso}",
                 "status=pending",
                 "user_completion_report=locked",
                 "closeout_gate_status=pending",
@@ -635,32 +812,38 @@ def create_run_bundle(
     return tuple(unique_created_files)
 
 
-def build_manifest(
-    config: TeamConfig,
-    run_id: str,
-    task: str,
-    owner: str,
-    created_at_iso: str,
-    report_dir: Path,
-    roles: tuple[Role, ...],
-    workspace_root: Path,
-    workflow_family_id: str | None = None,
-) -> str:
+def build_manifest(spec: RunBundleSpec) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
-    if workflow_family_id is not None:
-        workflow_family = resolve_workflow_family(load_task_catalog(config), workflow_family_id)
+    if spec.workflow_family_id:
+        workflow_family = resolve_workflow_family(
+            load_task_catalog(spec.config),
+            spec.workflow_family_id,
+        )
+    lines = manifest_run_lines(spec, workflow_family)
+    lines.extend(manifest_role_lines(spec, workflow_family))
+    lines.extend(manifest_context_policy_lines(spec.config))
+    lines.extend(manifest_quality_gate_lines(spec.config))
+    lines.extend(manifest_artifact_lines(spec.config, spec.roles))
+    return "\n".join(lines) + "\n"
+
+
+def manifest_run_lines(
+    spec: RunBundleSpec,
+    workflow_family: dict[str, object] | None,
+) -> list[str]:
+    """Render run-level manifest fields."""
     lines = [
         "run:",
-        f"  id: {run_id}",
-        f"  task: {task!r}",
-        f"  owner: {owner!r}",
-        f"  created_at_utc: {created_at_iso}",
-        f"  report_dir: {str(report_dir)!r}",
-        f"  workspace_root: {str(workspace_root)!r}",
+        f"  id: {spec.run_id}",
+        f"  task: {spec.task!r}",
+        f"  owner: {spec.owner!r}",
+        f"  created_at_utc: {spec.created_at_iso}",
+        f"  report_dir: {str(spec.report_dir)!r}",
+        f"  workspace_root: {str(spec.workspace_root)!r}",
         f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
         f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
-        f"  task_catalog: {str(ROOT / str(config.team['task_catalog']))!r}",
+        f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
         "  subagent_lifecycle_policy:",
         "    fresh_subagents_required: true",
         "    reuse_for_new_task: forbidden",
@@ -671,75 +854,135 @@ def build_manifest(
         "    handoff_rule: 'Do not send_input to agents from another user request; spawn a "
         "fresh run-local agent for each new task or stage wave.'",
     ]
-    communication_protocol = config.team.get("communication_protocol")
+    communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
     if workflow_family is not None:
+        lines.append("  write_scope_policy:")
+        lines.append("    parent_managed: true")
+        lines.append("    disjoint_write_scopes_required: true")
+        lines.append("    overlapping_write_scopes: serialize_or_split_worktree")
+        _, max_write_subagents = workflow_spawn_budget(
+            load_task_catalog(spec.config),
+            spec.workflow_family_id,
+        )
+        lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append("  workflow_family:")
-        lines.append(f"    id: {workflow_family_id}")
+        lines.append(f"    id: {spec.workflow_family_id}")
         lines.append(f"    name: {str(workflow_family['name'])!r}")
         lines.extend(render_subagent_prompt_packet(workflow_family, indent="  "))
     lines.append("  cross_cutting_document_packet:")
-    cross_cutting_packet = resolve_cross_cutting_document_packet(workspace_root)
+    cross_cutting_packet = resolve_cross_cutting_document_packet(spec.workspace_root)
     for entry in cross_cutting_packet:
         lines.append(f"    - path: {str(entry.path)!r}")
         lines.append(f"      rationale: {entry.rationale!r}")
-    lines.append("roles:")
-    for role in roles:
-        lines.append(f"  - id: {role.id}")
-        lines.append(f"    activation: {role.activation}")
-        lines.append("    status: pending")
-        if role.codex_agents:
-            lines.append("    codex_agents:")
-            for codex_agent in role.codex_agents:
-                lines.append(f"      - {codex_agent}")
-        lines.append("    prompt_contract:")
-        lines.append(
-            "      assignment_prompt: "
-            f"{role_prompt_contract(role, workflow_family).replace(chr(10), ' ')!r}"
-        )
-        lines.append("      prompt_must_include:")
-        for item in role_prompt_must_include(role):
-            lines.append(f"        - {item!r}")
-        lines.append("    owns:")
-        for responsibility in role.owns:
-            lines.append(f"      - {responsibility}")
-        lines.append("    required_outputs:")
-        for output in role.required_outputs:
-            lines.append(f"      - {output}")
-        scope = resolve_role_write_scope(
-            config=config,
-            role=role,
-            report_dir=report_dir,
-            workspace_root=workspace_root,
-        )
-        lines.append("    write_policy:")
-        lines.append(f"      mode: {scope.mode}")
-        lines.append(f"      requires_worktree_scope: {str(scope.requires_worktree_scope).lower()}")
-        if scope.notes:
-            lines.append(f"      notes: {scope.notes!r}")
-        if scope.worktree_scope_file is not None:
-            lines.append(f"      worktree_scope_file: {str(scope.worktree_scope_file)!r}")
-        if scope.unresolved_reason is not None:
-            lines.append(f"      unresolved_reason: {scope.unresolved_reason!r}")
-        lines.append("      allowed_files:")
-        for path in scope.allowed_files:
-            lines.append(f"        - {str(path)!r}")
-        lines.append("      allowed_directories:")
-        for path in scope.allowed_directories:
-            lines.append(f"        - {str(path)!r}")
-        document_packet = resolve_role_document_packet(config, role, report_dir, workspace_root)
-        lines.append("    document_packet:")
-        lines.append(
-            f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
-        )
-        if document_packet.notes:
-            lines.append(f"      notes: {document_packet.notes!r}")
-        lines.append("      read_before_work:")
-        for entry in document_packet.read_before_work:
-            lines.append(f"        - path: {str(entry.path)!r}")
-            lines.append(f"          rationale: {entry.rationale!r}")
-    lines.append("context_policies:")
+    return lines
+
+
+def manifest_role_lines(
+    spec: RunBundleSpec,
+    workflow_family: dict[str, object] | None,
+) -> list[str]:
+    """Render role entries for the team manifest."""
+    lines = ["roles:"]
+    for role in spec.roles:
+        lines.extend(manifest_one_role_lines(spec, workflow_family, role))
+    return lines
+
+
+def manifest_one_role_lines(
+    spec: RunBundleSpec,
+    workflow_family: dict[str, object] | None,
+    role: Role,
+) -> list[str]:
+    """Render one role entry for the team manifest."""
+    lines = [
+        f"  - id: {role.id}",
+        f"    activation: {role.activation}",
+        "    status: pending",
+    ]
+    if role.codex_agents:
+        lines.append("    codex_agents:")
+        for codex_agent in role.codex_agents:
+            lines.append(f"      - {codex_agent}")
+    lines.extend(manifest_prompt_contract_lines(role, workflow_family))
+    lines.append("    owns:")
+    for responsibility in role.owns:
+        lines.append(f"      - {responsibility}")
+    lines.append("    required_outputs:")
+    for output in role.required_outputs:
+        lines.append(f"      - {output}")
+    lines.extend(manifest_write_policy_lines(spec, role))
+    lines.extend(manifest_document_packet_lines(spec, role))
+    return lines
+
+
+def manifest_prompt_contract_lines(
+    role: Role,
+    workflow_family: dict[str, object] | None,
+) -> list[str]:
+    """Render prompt contract lines for one role."""
+    lines = ["    prompt_contract:"]
+    lines.append(
+        "      assignment_prompt: "
+        f"{role_prompt_contract(role, workflow_family).replace(NEWLINE, ' ')!r}"
+    )
+    lines.append("      prompt_must_include:")
+    for item in role_prompt_must_include(role):
+        lines.append(f"        - {item!r}")
+    return lines
+
+
+def manifest_write_policy_lines(spec: RunBundleSpec, role: Role) -> list[str]:
+    """Render resolved write policy lines for one role."""
+    scope = resolve_role_write_scope(
+        config=spec.config,
+        role=role,
+        report_dir=spec.report_dir,
+        workspace_root=spec.workspace_root,
+    )
+    lines = ["    write_policy:"]
+    lines.append(f"      mode: {scope.mode}")
+    lines.append(f"      requires_worktree_scope: {str(scope.requires_worktree_scope).lower()}")
+    if scope.notes:
+        lines.append(f"      notes: {scope.notes!r}")
+    if scope.worktree_scope_file is not None:
+        lines.append(f"      worktree_scope_file: {str(scope.worktree_scope_file)!r}")
+    if scope.unresolved_reason is not None:
+        lines.append(f"      unresolved_reason: {scope.unresolved_reason!r}")
+    lines.append("      allowed_files:")
+    for path in scope.allowed_files:
+        lines.append(f"        - {str(path)!r}")
+    lines.append("      allowed_directories:")
+    for path in scope.allowed_directories:
+        lines.append(f"        - {str(path)!r}")
+    return lines
+
+
+def manifest_document_packet_lines(spec: RunBundleSpec, role: Role) -> list[str]:
+    """Render explicit document packet lines for one role."""
+    document_packet = resolve_role_document_packet(
+        spec.config,
+        role,
+        spec.report_dir,
+        spec.workspace_root,
+    )
+    lines = ["    document_packet:"]
+    lines.append(
+        f"      must_cite_before_edit: {str(document_packet.must_cite_before_edit).lower()}"
+    )
+    if document_packet.notes:
+        lines.append(f"      notes: {document_packet.notes!r}")
+    lines.append("      read_before_work:")
+    for entry in document_packet.read_before_work:
+        lines.append(f"        - path: {str(entry.path)!r}")
+        lines.append(f"          rationale: {entry.rationale!r}")
+    return lines
+
+
+def manifest_context_policy_lines(config: TeamConfig) -> list[str]:
+    """Render context-sharing policy lines."""
+    lines = ["context_policies:"]
     for policy in config.context_policies:
         lines.append("  - roles:")
         for role_name in tuple(policy["roles"]):
@@ -751,13 +994,23 @@ def build_manifest(
         lines.append("    do_not_share:")
         for artifact in tuple(policy["do_not_share"]):
             lines.append(f"      - {artifact}")
-    lines.append("quality_gates:")
+    return lines
+
+
+def manifest_quality_gate_lines(config: TeamConfig) -> list[str]:
+    """Render quality gate lines."""
+    lines = ["quality_gates:"]
     for gate in config.quality_gates:
         lines.append(f"  - {gate}")
-    lines.append("artifacts:")
+    return lines
+
+
+def manifest_artifact_lines(config: TeamConfig, roles: tuple[Role, ...]) -> list[str]:
+    """Render artifact lines."""
+    lines = ["artifacts:"]
     for artifact in iter_artifacts(config, roles):
         lines.append(f"  - {artifact}")
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def render_subagent_prompt_packet(
@@ -790,7 +1043,7 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "the selected workflow"
     )
     write_scope = (
-        "write only in the manifest write_policy scope"
+        "write only in the manifest write_policy scope and avoid paths assigned to other writers"
         if role.write_policy.mode != "read_only"
         else "do not edit repository files"
     )
@@ -839,52 +1092,10 @@ def resolve_role_write_scope(
     workspace_root: Path,
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
-    allowed_files = tuple(
-        sorted(
-            {
-                (report_dir / config.artifacts[artifact_key]).resolve()
-                for artifact_key in role.write_policy.allowed_artifacts
-            },
-            key=str,
-        )
-    )
-    allowed_directories: tuple[Path, ...] = ()
+    allowed_files = role_allowed_artifact_files(config, role, report_dir)
     scope_file = find_worktree_scope_file(workspace_root)
-    unresolved_reason: str | None = None
-    if role.write_policy.mode == "worktree_scope_plus_artifacts":
-        editable_directories = tuple(
-            _resolve_scope_directories(
-                scope_file,
-                workspace_root,
-                "## Editable Directories",
-            )
-        )
-        allowed_directories = tuple(sorted(editable_directories, key=str))
-        if role.write_policy.requires_worktree_scope and scope_file is None:
-            unresolved_reason = (
-                "WORKTREE_SCOPE.md is required but was not found in the workspace root."
-            )
-        elif role.write_policy.requires_worktree_scope and not allowed_directories:
-            unresolved_reason = (
-                "WORKTREE_SCOPE.md was found, but no editable directories could be parsed."
-            )
-    elif role.write_policy.mode == "runtime_outputs_plus_artifacts":
-        runtime_output_directories = tuple(
-            _resolve_scope_directories(
-                scope_file,
-                workspace_root,
-                "## Runtime Output Directories",
-            )
-        )
-        allowed_directories = tuple(sorted(runtime_output_directories, key=str))
-        if role.write_policy.requires_worktree_scope and scope_file is None:
-            unresolved_reason = (
-                "WORKTREE_SCOPE.md is required but was not found in the workspace root."
-            )
-        elif role.write_policy.requires_worktree_scope and not allowed_directories:
-            unresolved_reason = (
-                "WORKTREE_SCOPE.md was found, but no runtime output directories could be parsed."
-            )
+    allowed_directories = role_allowed_directories(role, workspace_root, scope_file)
+    unresolved_reason = role_write_scope_unresolved_reason(role, scope_file, allowed_directories)
     return RoleWriteScope(
         role_id=role.id,
         mode=role.write_policy.mode,
@@ -895,6 +1106,62 @@ def resolve_role_write_scope(
         unresolved_reason=unresolved_reason,
         notes=role.write_policy.notes,
     )
+
+
+def role_allowed_artifact_files(
+    config: TeamConfig,
+    role: Role,
+    report_dir: Path,
+) -> tuple[Path, ...]:
+    """Resolve generated artifact files one role may write."""
+    return tuple(
+        sorted(
+            {
+                (report_dir / config.artifacts[artifact_key]).resolve()
+                for artifact_key in role.write_policy.allowed_artifacts
+            },
+            key=str,
+        )
+    )
+
+
+def role_allowed_directories(
+    role: Role,
+    workspace_root: Path,
+    scope_file: Path | None,
+) -> tuple[Path, ...]:
+    """Resolve worktree-scope directories one role may write."""
+    section_heading = role_write_scope_section(role.write_policy.mode)
+    if section_heading == "":
+        return ()
+    directories = _resolve_scope_directories(scope_file, workspace_root, section_heading)
+    return tuple(sorted(directories, key=str))
+
+
+def role_write_scope_section(mode: str) -> str:
+    """Return the WORKTREE_SCOPE.md section used by one write-policy mode."""
+    sections = {
+        "worktree_scope_plus_artifacts": "## Editable Directories",
+        "runtime_outputs_plus_artifacts": "## Runtime Output Directories",
+    }
+    return sections.get(mode, "")
+
+
+def role_write_scope_unresolved_reason(
+    role: Role,
+    scope_file: Path | None,
+    allowed_directories: tuple[Path, ...],
+) -> str | None:
+    """Return why a write policy requiring worktree scope is unresolved."""
+    if not role.write_policy.requires_worktree_scope:
+        return None
+    if scope_file is None:
+        return "WORKTREE_SCOPE.md is required but was not found in the workspace root."
+    if allowed_directories:
+        return None
+    if role.write_policy.mode == "runtime_outputs_plus_artifacts":
+        return "WORKTREE_SCOPE.md was found, but no runtime output directories could be parsed."
+    return "WORKTREE_SCOPE.md was found, but no editable directories could be parsed."
 
 
 def collect_changed_files(
@@ -985,7 +1252,7 @@ def slugify(value: str) -> str:
 def make_run_id(task: str, created_at: datetime) -> str:
     """Build a stable default run id."""
     timestamp = created_at.strftime("%Y%m%d-%H%M%S")
-    return f"{timestamp}-{slugify(task)[:40]}"
+    return f"{timestamp}-{slugify(task)[:RUN_ID_TASK_SLUG_MAX_CHARS]}"
 
 
 def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
@@ -1192,7 +1459,7 @@ def _file_sha256(path: Path) -> str:
     """Return the sha256 digest for one file."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
+        for chunk in iter(lambda: handle.read(SHA256_READ_CHUNK_BYTES), b""):
             digest.update(chunk)
     return digest.hexdigest()
 

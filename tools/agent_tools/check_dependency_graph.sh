@@ -7,17 +7,26 @@
 # @dependency-end
 set -euo pipefail
 
-ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"
+ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 PRINT_EDGES=0
 CHANGED=0
 CHECK_BIDIRECTIONAL=0
+ALLOW_FRONTMATTER=0
+LIST_RELATED=0
+FOCUS_CHANGED=0
+EDIT_SCOPE=0
+EDIT_SCOPE_CHANGED=0
+GRAPH_TSV_OUTPUT=""
+EDIT_SCOPE_HITS_FILE=""
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 declare -a INPUT_PATHS=()
+declare -a FOCUS_PATHS=()
+declare -a EDIT_SCOPE_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--check-bidirectional] [paths...]
+  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--allow-frontmatter] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
   - isolated manifest files with no graph edge
@@ -27,6 +36,19 @@ Builds separate upstream/downstream dependency graphs and validates:
 With --check-bidirectional it also validates:
   - bidirectional consistency
   - reverse-edge kind matches
+
+With --list-related it prints every manifest edge declared by, or pointing at,
+the focused path set. Use --focus PATH for explicit paths or --focus-changed
+to list the dependency surfaces for current changed files.
+
+With --graph-tsv it writes a stable machine-readable graph artifact with columns:
+direction, kind, source, target.
+
+With --edit-scope, --edit-scope-changed, or --search-hits-file it expands files
+found by a repo-wide text search into edit-scope candidates using the manifest
+graph. Search hit files themselves, declared dependencies, incoming dependents,
+and directory-contained dependency surfaces are emitted as
+DEPENDENCY_EDIT_SCOPE_PATH lines.
 EOF
 }
 
@@ -44,8 +66,42 @@ while [[ $# -gt 0 ]]; do
       PRINT_EDGES=1
       shift
       ;;
+    --graph-tsv)
+      GRAPH_TSV_OUTPUT="$2"
+      shift 2
+      ;;
+    --list-related)
+      LIST_RELATED=1
+      shift
+      ;;
+    --focus)
+      FOCUS_PATHS+=("$2")
+      shift 2
+      ;;
+    --focus-changed)
+      FOCUS_CHANGED=1
+      shift
+      ;;
+    --edit-scope)
+      EDIT_SCOPE=1
+      EDIT_SCOPE_PATHS+=("$2")
+      shift 2
+      ;;
+    --edit-scope-changed)
+      EDIT_SCOPE_CHANGED=1
+      shift
+      ;;
+    --search-hits-file)
+      EDIT_SCOPE=1
+      EDIT_SCOPE_HITS_FILE="$2"
+      shift 2
+      ;;
     --check-bidirectional)
       CHECK_BIDIRECTIONAL=1
+      shift
+      ;;
+    --allow-frontmatter)
+      ALLOW_FRONTMATTER=1
       shift
       ;;
     -h|--help)
@@ -59,6 +115,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+ROOT_DIR="$(realpath -m "$ROOT_DIR")"
 cd "$ROOT_DIR"
 
 collect_paths() {
@@ -67,13 +124,67 @@ collect_paths() {
     return
   fi
   if [[ "$CHANGED" -eq 1 ]]; then
-    {
-      git diff --name-only --diff-filter=ACMRT HEAD -- 2>/dev/null || true
-      git ls-files --others --exclude-standard 2>/dev/null || true
-    } | awk 'NF'
+    collect_changed_paths
     return
   fi
   git ls-files
+}
+
+collect_changed_paths() {
+  {
+    git diff --name-only --diff-filter=ACMRT HEAD -- 2>/dev/null || true
+    git ls-files --others --exclude-standard 2>/dev/null || true
+  } | awk 'NF'
+}
+
+collect_focus_paths() {
+  if [[ ${#FOCUS_PATHS[@]} -gt 0 ]]; then
+    printf '%s\n' "${FOCUS_PATHS[@]}"
+    return
+  fi
+  if [[ "$FOCUS_CHANGED" -eq 1 ]]; then
+    collect_changed_paths
+  fi
+}
+
+path_from_search_hit_line() {
+  local raw_line="$1"
+  local candidate
+  raw_line="${raw_line#./}"
+  if [[ -e "$ROOT_DIR/$raw_line" || -L "$ROOT_DIR/$raw_line" ]]; then
+    printf '%s\n' "$raw_line"
+    return
+  fi
+  candidate="${raw_line%%:*}"
+  if [[ "$candidate" != "$raw_line" && ( -e "$ROOT_DIR/$candidate" || -L "$ROOT_DIR/$candidate" ) ]]; then
+    printf '%s\n' "$candidate"
+    return
+  fi
+  printf '%s\n' "$raw_line"
+}
+
+collect_edit_scope_paths() {
+  if [[ ${#EDIT_SCOPE_PATHS[@]} -gt 0 ]]; then
+    printf '%s\n' "${EDIT_SCOPE_PATHS[@]}"
+  fi
+  if [[ "$EDIT_SCOPE_CHANGED" -eq 1 ]]; then
+    collect_changed_paths
+  fi
+  if [[ -n "$EDIT_SCOPE_HITS_FILE" ]]; then
+    while IFS= read -r raw_hit; do
+      [[ -n "$raw_hit" ]] || continue
+      path_from_search_hit_line "$raw_hit"
+    done < "$EDIT_SCOPE_HITS_FILE"
+  fi
+}
+
+normalize_input_path() {
+  local raw_path="$1"
+  if [[ "$raw_path" = /* ]]; then
+    realpath -m --relative-to="$ROOT_DIR" "$raw_path"
+  else
+    realpath -m --relative-to="$ROOT_DIR" "$ROOT_DIR/$raw_path"
+  fi
 }
 
 strip_manifest_line() {
@@ -107,9 +218,30 @@ strip_manifest_line() {
 normalize_path() {
   local source_file="$1"
   local rel_path="$2"
+  local source_context
   local source_dir
-  source_dir="$(dirname "$source_file")"
+  source_context="$(source_context_file "$source_file")"
+  source_dir="$(dirname "$source_context")"
   realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
+}
+
+source_context_file() {
+  local source_file="$1"
+  case "$source_file" in
+    .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
+      if [[ -f "vendor/agent-canon/$source_file" ]]; then
+        printf 'vendor/agent-canon/%s\n' "$source_file"
+        return
+      fi
+      ;;
+    .github/scripts/checkout_agent_canon_submodule.sh)
+      if [[ -f "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh" ]]; then
+        printf '%s\n' "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh"
+        return
+      fi
+      ;;
+  esac
+  printf '%s\n' "$source_file"
 }
 
 extract_edges() {
@@ -149,11 +281,12 @@ extract_edges() {
 
 edges_file="$(mktemp)"
 manifest_files="$(mktemp)"
-trap 'rm -f "$edges_file" "$edges_file.sorted" "$manifest_files" "$manifest_files.sorted"' EXIT
+edit_scope_file="$(mktemp)"
+trap 'rm -f "$edges_file" "$edges_file.sorted" "$manifest_files" "$manifest_files.sorted" "$edit_scope_file"' EXIT
 
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
-  path="${raw_path#./}"
+  path="$(normalize_input_path "$raw_path")"
   extract_edges "$path" >> "$edges_file"
 done < <(collect_paths)
 
@@ -164,6 +297,73 @@ mv "$manifest_files.sorted" "$manifest_files"
 
 if [[ "$PRINT_EDGES" -eq 1 ]]; then
   cat "$edges_file"
+fi
+
+if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
+  mkdir -p "$(dirname "$GRAPH_TSV_OUTPUT")"
+  {
+    printf 'direction\tkind\tsource\ttarget\n'
+    cat "$edges_file"
+  } > "$GRAPH_TSV_OUTPUT"
+  echo "DEPENDENCY_GRAPH_TSV=$GRAPH_TSV_OUTPUT"
+fi
+
+if [[ "$LIST_RELATED" -eq 1 ]]; then
+  related_count=0
+  while IFS= read -r raw_focus; do
+    [[ -n "$raw_focus" ]] || continue
+    focus="$(normalize_input_path "$raw_focus")"
+    related_count=$((related_count + 1))
+    echo "DEPENDENCY_RELATED_SURFACE=$focus"
+    awk -F '\t' -v file="$focus" '
+      $3 == file {
+        printf "DEPENDENCY_RELATED_EDGE role=declared_%s kind=%s source=%s target=%s\n", $1, $2, $3, $4
+        found = 1
+      }
+      $4 == file {
+        printf "DEPENDENCY_RELATED_EDGE role=incoming_%s kind=%s source=%s target=%s\n", $1, $2, $3, $4
+        found = 1
+      }
+      END {
+        if (!found) {
+          printf "DEPENDENCY_RELATED_EDGE role=none path=%s\n", file
+        }
+      }
+    ' "$edges_file"
+  done < <(collect_focus_paths | sort -u)
+  echo "DEPENDENCY_RELATED_SURFACES=$related_count"
+fi
+
+emit_edit_scope_for_focus() {
+  local focus="$1"
+  local focus_dir=""
+  if [[ -d "$ROOT_DIR/$focus" ]]; then
+    focus_dir="$focus"
+  else
+    focus_dir="$(dirname "$focus")"
+  fi
+  printf 'DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=%s\n' "$focus"
+  awk -F '\t' -v file="$focus" -v dir="$focus_dir" '
+    $3 == file {
+      printf "DEPENDENCY_EDIT_SCOPE_PATH role=declared_%s kind=%s path=%s source=%s target=%s\n", $1, $2, $4, $3, $4
+    }
+    $4 == file {
+      printf "DEPENDENCY_EDIT_SCOPE_PATH role=incoming_%s kind=%s path=%s source=%s target=%s\n", $1, $2, $3, $3, $4
+    }
+    dir != "." && ($3 == dir || index($3, dir "/") == 1 || $4 == dir || index($4, dir "/") == 1) {
+      printf "DEPENDENCY_EDIT_SCOPE_PATH role=directory_related_%s kind=%s path=%s source=%s target=%s\n", $1, $2, ($3 == file ? $4 : $3), $3, $4
+    }
+  ' "$edges_file"
+}
+
+if [[ "$EDIT_SCOPE" -eq 1 || "$EDIT_SCOPE_CHANGED" -eq 1 ]]; then
+  while IFS= read -r raw_scope_path; do
+    [[ -n "$raw_scope_path" ]] || continue
+    scope_path="$(normalize_input_path "$raw_scope_path")"
+    emit_edit_scope_for_focus "$scope_path"
+  done < <(collect_edit_scope_paths | sort -u) | sort -u > "$edit_scope_file"
+  cat "$edit_scope_file"
+  echo "DEPENDENCY_EDIT_SCOPE_PATHS=$(wc -l < "$edit_scope_file" | tr -d ' ')"
 fi
 
 failures=0

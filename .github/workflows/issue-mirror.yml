@@ -1,0 +1,97 @@
+# @dependency-start
+# responsibility Checks and optionally synchronizes AgentCanon local issues with GitHub Issues.
+# upstream design ../../issues/README.md durable local issue and GitHub mirror policy
+# upstream implementation ../../tools/agent_tools/issue_sync.py validates and syncs issue mirrors
+# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow wiring
+# @dependency-end
+
+# Standalone-only workflow. Template and derived repositories should not copy
+# this workflow because their canonical issue mirror lives in the AgentCanon repo.
+name: Issue Mirror
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: issue-mirror-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  issue-mirror-sync:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Sync linked GitHub issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/agent_tools/issue_sync.py \
+            --root . \
+            --repo "${GITHUB_REPOSITORY}" \
+            --github-check \
+            --sync-github \
+            --summary-file "${GITHUB_STEP_SUMMARY}"
+
+  issue-mirror-check:
+    needs: issue-mirror-sync
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Setup Python
+        if: steps.checkout.outcome == 'success'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Check issue mirror
+        if: steps.checkout.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/agent_tools/issue_sync.py \
+            --root . \
+            --repo "${GITHUB_REPOSITORY}" \
+            --github-check \
+            --allow-github-auth-unavailable \
+            --summary-file "${GITHUB_STEP_SUMMARY}"
+
+      - name: Record issue mirror unavailable
+        if: steps.checkout.outcome != 'success'
+        run: |
+          {
+            echo "## Issue Mirror Check"
+            echo ""
+            echo "- status: \`unavailable\`"
+            echo "- reason: \`checkout-failed\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          echo "ISSUE_SYNC_GITHUB_UNAVAILABLE=1"
+          echo "ISSUE_SYNC=pass"

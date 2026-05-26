@@ -1,9 +1,9 @@
-"""Tests for the AgentCanon vector search helper."""
+"""Tests for dependency-free vector search."""
 
 # @dependency-start
-# responsibility Tests dependency-free vector search behavior.
-# upstream implementation ../../tools/agent_tools/vector_search.py vector search CLI
-# upstream design ../../documents/tools/README.md tool search policy
+# responsibility Tests vector search indexing exclusions and context expansion.
+# upstream implementation ../../tools/agent_tools/vector_search.py searches text surfaces
+# upstream design ../../tools/README.md documents vector search usage
 # @dependency-end
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "vector_search.py"
+VECTOR_SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "vector_search.py"
 
 
 def run_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """Run vector_search.py inside a temporary repository root."""
+    """Run vector search against a temporary root."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--root", str(root), *args],
+        [sys.executable, str(VECTOR_SEARCH), "--root", str(root), *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -31,86 +31,174 @@ def run_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 class VectorSearchTest(unittest.TestCase):
-    """Exercise the vector-search CLI through realistic temporary surfaces."""
+    """Verify vector search index hygiene."""
 
-    def test_finds_tool_surface_by_query_terms(self) -> None:
-        """A query should rank the matching tool file."""
+    def test_git_directory_is_not_indexed(self) -> None:
+        """Root .git files must not be indexed even when the surface is broad."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            target = root / "tools" / "agent_tools" / "check_mcp_inventory.py"
-            target.parent.mkdir(parents=True)
-            target.write_text(
-                "MCP inventory checker validates configured repo_mcp_server command.\n",
+            (root / "tools").mkdir()
+            (root / "tools" / "guide.md").write_text(
+                "ordinary searchable guide\n",
                 encoding="utf-8",
             )
-            other = root / "documents" / "notes.md"
-            other.parent.mkdir(parents=True)
-            other.write_text("Notebook environment setup and unrelated prose.\n", encoding="utf-8")
+            leak = root / ".git" / "objects" / "aa" / "secret.md"
+            leak.parent.mkdir(parents=True)
+            leak.write_text("needleonlytoken\n", encoding="utf-8")
 
-            result = run_search(root, "--query", "configured mcp inventory command")
+            result = run_search(
+                root,
+                "--surface",
+                ".",
+                "--query",
+                "needleonlytoken",
+                "--format",
+                "json",
+            )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("VECTOR_SEARCH=pass", result.stdout)
-            self.assertIn("tools/agent_tools/check_mcp_inventory.py", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["hits"], [])
 
-    def test_surface_option_limits_index(self) -> None:
-        """The surface option should keep searches scoped to requested roots."""
+    def test_submodule_object_database_is_not_indexed(self) -> None:
+        """Nested .git object databases must be excluded from custom surfaces."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            tool = root / "tools" / "docker_dependency_validator.sh"
-            tool.parent.mkdir(parents=True)
-            tool.write_text("GitHub CLI gh validation for container tooling.\n", encoding="utf-8")
-            doc = root / "documents" / "github.md"
-            doc.parent.mkdir(parents=True)
-            doc.write_text("GitHub remote policy for prose documentation.\n", encoding="utf-8")
-
-            result = run_search(root, "--surface", "tools", "--query", "github remote policy")
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("tools/docker_dependency_validator.sh", result.stdout)
-            self.assertNotIn("documents/github.md", result.stdout)
-
-    def test_symlinked_surface_is_indexed(self) -> None:
-        """Template root symlink views should be indexed through the root path."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            target = root / "vendor" / "agent-canon" / "tools" / "agent_tools"
-            target.mkdir(parents=True)
-            (target / "vector_search.py").write_text(
-                "AgentCanon directory link vector search helper.\n",
+            module = root / "module"
+            (module / "docs").mkdir(parents=True)
+            (module / "docs" / "guide.md").write_text(
+                "module visible guide\n",
                 encoding="utf-8",
             )
-            (root / "tools").symlink_to(root / "vendor" / "agent-canon" / "tools")
+            leak = module / ".git" / "objects" / "aa" / "secret.md"
+            leak.parent.mkdir(parents=True)
+            leak.write_text("submoduleonlytoken\n", encoding="utf-8")
 
-            result = run_search(root, "--surface", "tools", "--query", "directory link vector")
+            result = run_search(
+                root,
+                "--surface",
+                "module",
+                "--query",
+                "submoduleonlytoken",
+                "--format",
+                "json",
+            )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("tools/agent_tools/vector_search.py", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["hits"], [])
+            self.assertEqual(payload["indexed_files"], 1)
 
-    def test_json_output_is_machine_readable(self) -> None:
-        """JSON output should expose indexed file count and hits."""
+    def test_context_expands_dependency_headers(self) -> None:
+        """Context mode should expand search hits through dependency manifests."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            doc = root / "documents" / "dependency.md"
-            doc.parent.mkdir(parents=True)
-            doc.write_text(
-                "Dependency graph header validation and scan workflow.\n",
+            (root / "tools").mkdir()
+            (root / "documents").mkdir()
+            (root / "tests").mkdir()
+            (root / "tools" / "search_tool.py").write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Implements alpha search entrypoint.",
+                        "# upstream design ../documents/search.md alpha search design",
+                        "# downstream implementation ../tests/test_search_tool.py validates search",
+                        "# @dependency-end",
+                        "def alpha_entry():",
+                        "    return alpha_helper()",
+                        "",
+                        "def alpha_helper():",
+                        "    return 1",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "documents" / "search.md").write_text(
+                "# Search Design\n",
+                encoding="utf-8",
+            )
+            (root / "tests" / "test_search_tool.py").write_text(
+                "from tools.search_tool import alpha_entry\n",
                 encoding="utf-8",
             )
 
             result = run_search(
                 root,
+                "--surface",
+                ".",
                 "--query",
-                "dependency graph validation",
+                "alpha_entry",
+                "--context",
                 "--format",
                 "json",
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["status"], "pass")
-            self.assertEqual(payload["indexed_files"], 1)
-            self.assertEqual(payload["hits"][0]["path"], "documents/dependency.md")
+            context_paths = {
+                (item["role"], item["path"]) for item in payload["context"]["paths"]
+            }
+            self.assertIn(("search_hit", "tools/search_tool.py"), context_paths)
+            self.assertIn(("declared_upstream", "documents/search.md"), context_paths)
+            self.assertIn(("declared_downstream", "tests/test_search_tool.py"), context_paths)
+
+    def test_context_expands_python_call_graph(self) -> None:
+        """Context mode should include direct callees and callers for focus symbols."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_dir = root / "python"
+            source_dir.mkdir()
+            (source_dir / "workflow.py").write_text(
+                "\n".join(
+                    [
+                        "def caller():",
+                        "    return alpha_entry()",
+                        "",
+                        "def alpha_entry():",
+                        "    return alpha_helper()",
+                        "",
+                        "def alpha_helper():",
+                        "    return 1",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_search(
+                root,
+                "--surface",
+                "python",
+                "--query",
+                "alpha_entry",
+                "--context",
+                "--symbol",
+                "alpha_entry",
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            edge_pairs = {
+                (item["direction"], item["caller"], item["callee"])
+                for item in payload["context"]["python_edges"]
+            }
+            self.assertIn(
+                (
+                    "calls",
+                    "python/workflow.py:alpha_entry",
+                    "python/workflow.py:alpha_helper",
+                ),
+                edge_pairs,
+            )
+            self.assertIn(
+                (
+                    "called_by",
+                    "python/workflow.py:caller",
+                    "python/workflow.py:alpha_entry",
+                ),
+                edge_pairs,
+            )
 
 
 if __name__ == "__main__":

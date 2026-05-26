@@ -19,6 +19,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Note unsupported claims, weak evidence, or missing comparisons. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

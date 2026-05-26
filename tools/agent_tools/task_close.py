@@ -214,6 +214,9 @@ def main() -> int:
         == "yes",
         "repo_wide_static_analysis_complete": closeout.get("repo_wide_static_analysis_complete")
         == "yes",
+        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
+        "make_ci_status": closeout.get("make_ci_status")
+        in {"pass", "environment_blocked_with_full_static_fallback"},
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
         == "yes",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
@@ -339,6 +342,11 @@ def main() -> int:
         "REPO_WIDE_STATIC_ANALYSIS_COMPLETE="
         f"{closeout.get('repo_wide_static_analysis_complete', '')}"
     )
+    print(
+        "AGENT_CANON_LATEST_COMPLETE="
+        f"{closeout.get('agent_canon_latest_complete', '')}"
+    )
+    print(f"MAKE_CI_STATUS={closeout.get('make_ci_status', '')}")
     print(
         "SPEC_PRODUCT_COVERAGE_COMPLETE="
         f"{closeout.get('spec_product_coverage_complete', '')}"

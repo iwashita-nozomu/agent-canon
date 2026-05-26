@@ -3,6 +3,7 @@
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
 # upstream design ../../agents/evals/README.md prompt eval directory contract
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml default prompt eval manifest
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end
 """Evaluate skill and workflow prompt surfaces against frozen checklist evals."""
@@ -11,16 +12,30 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
+import os
 import re
+import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
 try:
-    import tomllib
+    import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python 3.10 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
+
+from runtime_log_paths import eval_results_dir
+from workflow_monitor import MonitoringEntries, append_monitoring
+
+DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
+REPORT_STATUS_LINE_LIMIT = 13
+RUN_ID_DIGEST_LENGTH = 10
+UNIQUE_REPORT_CANDIDATE_LIMIT = 1000
+GIT_COMMAND_TIMEOUT_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -81,6 +96,71 @@ class ManifestAudit:
         return self.growth_candidates == 0
 
 
+@dataclass(frozen=True)
+class EvalRunMetadata:
+    """Metadata recorded with one prompt eval run."""
+
+    created_at: str
+    eval_run_id: str
+    used_skills: tuple[str, ...]
+    run_id: str
+    argv: tuple[str, ...]
+    cwd: str
+    root: str
+    manifest: str
+    git_branch: str
+    git_commit: str
+    git_dirty: str
+
+
+@dataclass(frozen=True)
+class ReportDependencyPaths:
+    """Dependency paths rendered relative to one Markdown report."""
+
+    tool: str
+    manifest: str
+
+
+@dataclass(frozen=True)
+class EvalOutputs:
+    """Optional output paths rendered in machine status lines."""
+
+    accumulated_report: str = ""
+    report_out: str = ""
+
+
+EMPTY_EVAL_OUTPUTS = EvalOutputs()
+
+
+@dataclass(frozen=True)
+class EvalRunBundle:
+    """All evaluated prompt data used to render reports and status."""
+
+    manifest: Path
+    evals: tuple[PromptEval, ...]
+    results: tuple[ChecklistResult, ...]
+    audit: ManifestAudit
+    metadata: EvalRunMetadata
+
+
+@dataclass(frozen=True)
+class ReportWriteRequest:
+    """Inputs for writing one Markdown eval report."""
+
+    path: str
+    root: Path
+    bundle: EvalRunBundle
+
+
+@dataclass(frozen=True)
+class AccumulatedReportRequest:
+    """Inputs for writing one accumulated eval report."""
+
+    root: Path
+    results_dir: Path
+    bundle: EvalRunBundle
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -99,6 +179,41 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-out",
         help="Optional Markdown report path.",
+    )
+    parser.add_argument(
+        "--accumulate",
+        action="store_true",
+        help=(
+            "Write a unique durable Markdown report under --results-dir. "
+            "Use this whenever a skill is selected or invoked."
+        ),
+    )
+    parser.add_argument(
+        "--results-dir",
+        default="",
+        help=(
+            "Directory for accumulated detailed reports. Defaults to the mounted "
+            "AgentCanon log archive eval-results/skill-workflow-prompt path, "
+            "falling back to the legacy in-tree path only when no archive is mounted."
+        ),
+    )
+    parser.add_argument(
+        "--skill-used",
+        action="append",
+        default=[],
+        help="Skill id used in the run. Repeat for every selected or invoked skill.",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run bundle id recorded in accumulated reports.",
+    )
+    parser.add_argument(
+        "--report-dir",
+        help=(
+            "Optional run bundle directory. When set with --accumulate, append "
+            "the prompt eval behavior event to workflow_monitoring.md."
+        ),
     )
     return parser
 
@@ -313,10 +428,13 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
 
 
 def render_machine_status(
-    results: tuple[ChecklistResult, ...],
-    audit: ManifestAudit,
+    bundle: EvalRunBundle,
+    outputs: EvalOutputs = EMPTY_EVAL_OUTPUTS,
 ) -> str:
     """Render machine-readable status."""
+    results = bundle.results
+    audit = bundle.audit
+    metadata = bundle.metadata
     total = len(results)
     passed = sum(1 for result in results if result.passed)
     critical_total = sum(1 for result in results if result.critical)
@@ -333,7 +451,16 @@ def render_machine_status(
         f"EVAL_DUPLICATE_TARGETS={len(audit.duplicate_targets)}",
         f"EVAL_DUPLICATE_CHECKLIST_IDS={len(audit.duplicate_checklist_ids)}",
         f"EVAL_GROWTH_CANDIDATES={audit.growth_candidates}",
+        f"EVAL_RUN_ID={metadata.eval_run_id}",
+        f"EVAL_USED_SKILLS={','.join(metadata.used_skills) or '-'}",
+        f"EVAL_GIT_BRANCH={metadata.git_branch}",
+        f"EVAL_GIT_COMMIT={metadata.git_commit}",
+        f"EVAL_GIT_DIRTY={metadata.git_dirty}",
     ]
+    if outputs.accumulated_report:
+        lines.append(f"EVAL_ACCUMULATED_REPORT={outputs.accumulated_report}")
+    if outputs.report_out:
+        lines.append(f"EVAL_REPORT_OUT={outputs.report_out}")
     for result in results:
         verdict = "pass" if result.passed else "fail"
         lines.append(
@@ -354,30 +481,51 @@ def render_machine_status(
 
 
 def render_markdown_report(
-    manifest: Path,
-    evals: tuple[PromptEval, ...],
-    results: tuple[ChecklistResult, ...],
-    audit: ManifestAudit,
+    bundle: EvalRunBundle,
+    dependency_paths: ReportDependencyPaths,
 ) -> str:
     """Render a Markdown eval report."""
+    evals = bundle.evals
+    results = bundle.results
+    metadata = bundle.metadata
     by_eval = {eval_def.eval_id: eval_def for eval_def in evals}
     lines = [
         "# Skill Workflow Prompt Eval",
         "<!--",
         "@dependency-start",
         "responsibility Records skill/workflow prompt eval results.",
-        "upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py "
+        f"upstream implementation {dependency_paths.tool} "
         "generates this report",
-        f"upstream design ../../{manifest.as_posix()} defines frozen evals",
+        f"upstream design {dependency_paths.manifest} defines frozen evals",
         "@dependency-end",
         "-->",
         "",
         "## Summary",
         "",
+        f"- created_at: `{metadata.created_at}`",
+        f"- eval_run_id: `{metadata.eval_run_id}`",
+        f"- run_id: `{metadata.run_id or '-'}`",
+        f"- used_skills: `{', '.join(metadata.used_skills) or '-'}`",
     ]
-    status_lines = render_machine_status(results, audit).strip().splitlines()
-    lines.extend(f"- {line}" for line in status_lines[:10])
-    lines.extend(["", "## Results", ""])
+    status_lines = render_machine_status(bundle).strip().splitlines()
+    lines.extend(f"- {line}" for line in status_lines[:REPORT_STATUS_LINE_LIMIT])
+    lines.extend(
+        [
+            "",
+            "## Run Manifest",
+            "",
+            f"- argv: `{' '.join(metadata.argv)}`",
+            f"- cwd: `{metadata.cwd}`",
+            f"- root: `{metadata.root}`",
+            f"- manifest: `{metadata.manifest}`",
+            f"- git_branch: `{metadata.git_branch}`",
+            f"- git_commit: `{metadata.git_commit}`",
+            f"- git_dirty: `{metadata.git_dirty}`",
+            "",
+            "## Results",
+            "",
+        ]
+    )
     for result in results:
         eval_def = by_eval[result.eval_id]
         verdict = "pass" if result.passed else "fail"
@@ -393,33 +541,230 @@ def render_markdown_report(
     return "\n".join(lines)
 
 
-def write_report(
-    path: str,
-    manifest: Path,
-    evals: tuple[PromptEval, ...],
-    results: tuple[ChecklistResult, ...],
-    audit: ManifestAudit,
-) -> None:
+def write_report(request: ReportWriteRequest) -> Path:
     """Write a Markdown eval report."""
-    report_path = Path(path)
+    report_path = unique_report_path(Path(request.path), request.bundle.metadata)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
-        render_markdown_report(manifest, evals, results, audit),
+        render_markdown_report(
+            request.bundle,
+            dependency_paths=report_dependency_paths(
+                report_path,
+                request.root,
+                request.bundle.manifest,
+            ),
+        ),
         encoding="utf-8",
+    )
+    return report_path
+
+
+def relative_posix_path(from_dir: Path, to_path: Path) -> str:
+    """Return a POSIX relative path from one directory to a target."""
+    return os.path.relpath(to_path.resolve(), from_dir.resolve()).replace(os.sep, "/")
+
+
+def report_dependency_paths(report_path: Path, root: Path, manifest: Path) -> ReportDependencyPaths:
+    """Return dependency paths that are valid from the generated report."""
+    report_dir = report_path.parent
+    manifest_path = manifest if manifest.is_absolute() else root / manifest
+    tool_path = root / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+    return ReportDependencyPaths(
+        tool=relative_posix_path(report_dir, tool_path),
+        manifest=relative_posix_path(report_dir, manifest_path),
+    )
+
+
+def report_slug(manifest: Path, metadata: EvalRunMetadata, status: str) -> str:
+    """Return a stable filename slug for one accumulated report."""
+    skill_slug = "-".join(skill.replace("_", "-") for skill in metadata.used_skills) or "no-skill"
+    return f"{metadata.eval_run_id}-{status}-{skill_slug}.md"
+
+
+def unique_report_path(path: Path, metadata: EvalRunMetadata) -> Path:
+    """Return a non-existing report path by adding the run id when needed."""
+    if not path.exists():
+        return path
+    candidate = path.with_name(f"{path.stem}-{metadata.eval_run_id}{path.suffix}")
+    if not candidate.exists():
+        return candidate
+    for index in range(2, UNIQUE_REPORT_CANDIDATE_LIMIT):
+        indexed = path.with_name(f"{path.stem}-{metadata.eval_run_id}-{index:03d}{path.suffix}")
+        if not indexed.exists():
+            return indexed
+    raise RuntimeError(f"unable to allocate unique eval report path for {path}")
+
+
+def build_eval_run_metadata(
+    manifest: Path,
+    used_skills: Sequence[str],
+    run_id: str,
+    root: Path,
+) -> EvalRunMetadata:
+    """Build metadata with a unique, filename-safe eval run id."""
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat()
+    timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
+    clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())
+    digest_source = "|".join((manifest.as_posix(), run_id.strip(), ",".join(clean_skills), created_at))
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
+    return EvalRunMetadata(
+        created_at=created_at,
+        eval_run_id=f"skill-eval-{timestamp}-{digest}",
+        used_skills=clean_skills,
+        run_id=run_id.strip(),
+        argv=tuple(sys.argv),
+        cwd=Path.cwd().as_posix(),
+        root=root.as_posix(),
+        manifest=manifest.as_posix(),
+        git_branch=git_output(root, "rev-parse", "--abbrev-ref", "HEAD"),
+        git_commit=git_output(root, "rev-parse", "HEAD"),
+        git_dirty="yes" if git_output(root, "status", "--short", "--untracked-files=all") else "no",
+    )
+
+
+def git_output(root: Path, *args: str) -> str:
+    """Return one git command output, or '-' outside a usable git checkout."""
+    try:
+        result = subprocess.run(
+            ("git", "-C", root.as_posix(), *args),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "-"
+    if result.returncode != 0:
+        return "-"
+    return result.stdout.strip() or "-"
+
+
+def write_accumulated_report(request: AccumulatedReportRequest) -> Path:
+    """Write one non-overwriting accumulated eval report."""
+    status = eval_status(request.bundle.results, request.bundle.audit)
+    output_dir = request.results_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / report_slug(
+        request.bundle.manifest,
+        request.bundle.metadata,
+        status,
+    )
+    return write_report(ReportWriteRequest(path=str(report_path), root=request.root, bundle=request.bundle))
+
+
+def resolve_results_dir(root: Path, value: str) -> Path:
+    """Resolve the CLI results directory or the default archive location."""
+    stripped = value.strip()
+    if stripped:
+        path = Path(stripped)
+        return path if path.is_absolute() else root / path
+    return eval_results_dir(root, DEFAULT_RESULTS_FAMILY)
+
+
+def eval_status(results: tuple[ChecklistResult, ...], audit: ManifestAudit) -> str:
+    """Return the aggregate prompt eval status."""
+    prompt_checks_passed = all(result.passed or not result.critical for result in results)
+    return "pass" if audit.passed and prompt_checks_passed else "fail"
+
+
+def append_prompt_eval_monitoring(
+    report_dir: Path,
+    bundle: EvalRunBundle,
+    accumulated_report: Path,
+) -> Path:
+    """Record accumulated prompt eval evidence in workflow monitoring."""
+    metadata = bundle.metadata
+    results = bundle.results
+    audit = bundle.audit
+    total = len(results)
+    passed = sum(1 for result in results if result.passed)
+    critical_failed = sum(1 for result in results if result.critical and not result.passed)
+    event = (
+        "tool_call=evaluate_skill_workflow_prompts.py "
+        f"prompt_eval={eval_status(results, audit)} "
+        f"EVAL_STATUS={eval_status(results, audit)} "
+        f"EVAL_RUN_ID={metadata.eval_run_id} "
+        f"EVAL_USED_SKILLS={','.join(metadata.used_skills) or '-'} "
+        f"EVAL_ACCUMULATED_REPORT={accumulated_report.as_posix()} "
+        f"EVAL_CHECKS_TOTAL={total} "
+        f"EVAL_CHECKS_PASSED={passed} "
+        f"EVAL_CRITICAL_FAILED={critical_failed} "
+        f"EVAL_AUDIT_STATUS={'pass' if audit.passed else 'fail'} "
+        f"EVAL_GROWTH_CANDIDATES={audit.growth_candidates} "
+        f"EVAL_GIT_BRANCH={metadata.git_branch} "
+        f"EVAL_GIT_COMMIT={metadata.git_commit} "
+        f"EVAL_GIT_DIRTY={metadata.git_dirty}"
+    )
+    return append_monitoring(
+        report_dir,
+        MonitoringEntries(behavior_events=(event,)),
     )
 
 
 def run(args: argparse.Namespace) -> int:
     """Run prompt evals."""
     root = Path(str(args.root)).resolve()
-    manifest = (root / str(args.manifest)).resolve()
+    manifest_arg = Path(str(args.manifest))
+    manifest = manifest_arg if manifest_arg.is_absolute() else root / manifest_arg
+    manifest_for_report = manifest_arg if not manifest_arg.is_absolute() else manifest
     evals, audit = load_manifest(manifest, root)
     results = tuple(result for eval_def in evals for result in evaluate_prompt(eval_def))
+    metadata = build_eval_run_metadata(
+        manifest_for_report,
+        tuple(str(skill) for skill in args.skill_used),
+        str(args.run_id),
+        root,
+    )
+    bundle = EvalRunBundle(
+        manifest=manifest_for_report,
+        evals=evals,
+        results=results,
+        audit=audit,
+        metadata=metadata,
+    )
+    accumulated_report: Path | None = None
+    report_out: Path | None = None
     if args.report_out:
-        write_report(str(args.report_out), manifest.relative_to(root), evals, results, audit)
-    print(render_machine_status(results, audit), end="")
-    prompt_checks_passed = all(result.passed or not result.critical for result in results)
-    return 0 if audit.passed and prompt_checks_passed else 1
+        report_out = write_report(
+            ReportWriteRequest(path=str(args.report_out), root=root, bundle=bundle)
+        )
+    if args.accumulate:
+        accumulated_report = write_accumulated_report(
+            AccumulatedReportRequest(
+                root=root,
+                results_dir=resolve_results_dir(root, str(args.results_dir)),
+                bundle=bundle,
+            )
+        )
+    if args.report_dir and accumulated_report is not None:
+        append_prompt_eval_monitoring(
+            Path(str(args.report_dir)),
+            bundle,
+            (
+                relative_to_root(accumulated_report, root)
+            ),
+        )
+    print(
+        render_machine_status(
+            bundle,
+            EvalOutputs(
+                accumulated_report=(
+                    relative_to_root(accumulated_report, root).as_posix()
+                    if accumulated_report is not None
+                    else ""
+                ),
+                report_out=report_out.as_posix() if report_out is not None else "",
+            ),
+        ),
+        end="",
+    )
+    return 0 if eval_status(results, audit) == "pass" else 1
+
+
+def relative_to_root(path: Path, root: Path) -> Path:
+    """Return a root-relative path when possible."""
+    return path.relative_to(root) if path.is_relative_to(root) else path
 
 
 def main() -> int:

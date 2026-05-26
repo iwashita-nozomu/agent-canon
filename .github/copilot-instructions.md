@@ -4,6 +4,7 @@
 responsibility Documents GitHub Copilot Repository Instructions for this repository.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime workflow
+upstream design ../documents/github-copilot-configuration.md Copilot configuration catalog
 @dependency-end
 -->
 
@@ -13,12 +14,18 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - `AGENTS.md`
 - `agents/README.md`
 - `documents/README.md`
+- `vendor/agent-canon/documents/github-copilot-configuration.md` in template or
+  derived repos; `documents/github-copilot-configuration.md` in standalone
+  AgentCanon.
 - `agents/workflows/github-copilot-workflow.md`
+- `.github/instructions/pr-processing.instructions.md`
 
 ## Defaults
 
 - 日本語で対応してください。
-- repo 全体の正本は `documents/` と `agents/` にあります。
+- repo-local active contracts are in `documents/`; shared AgentCanon policy is
+  under `vendor/agent-canon/documents/` when this file is exposed in a template
+  root.
 - 長期に残す agent ルールは `agents/` 側を更新し、このファイルは薄く保ってください。
 
 ## Skills
@@ -27,6 +34,23 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - If a task matches a project skill, use the skill before inventing a new local workflow.
 - CLI/runtime differences are summarized in `agents/canonical/CLI_ENTRYPOINTS.md`.
 - For issue, PR, and IDE tasks, follow `agents/workflows/github-copilot-workflow.md` before adding Copilot-only instructions.
+- For Copilot settings, custom agents, MCP, setup workflows, or PR-template
+  routing, read `vendor/agent-canon/documents/github-copilot-configuration.md`
+  in template roots, or `documents/github-copilot-configuration.md` in the
+  standalone AgentCanon repository.
+- For PR triage, use `.github/instructions/pr-processing.instructions.md`; if
+  custom agents are available, select `.github/agents/pr-maintainer.md`.
+
+## Plan Mode
+
+- Use Plan mode before non-trivial repo-changing work, especially Copilot
+  settings, GitHub Actions, PR templates, AgentCanon sync, or multi-file runtime
+  surface changes.
+- Codex uses `/plan` when available. If GitHub Copilot does not expose an
+  explicit Plan mode in the current surface, write the plan in the issue, PR
+  body, or PR comment before editing.
+- Keep the plan separate from validation evidence; PR closeout still needs
+  command output, AgentCanon SHA/pin evidence, and sync checks.
 
 ## Pull Requests
 
@@ -34,6 +58,29 @@ upstream design ../agents/workflows/github-copilot-workflow.md Copilot runtime w
 - Use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` when a template PR changes `vendor/agent-canon/`.
 - In the standalone AgentCanon repository, use its `.github/PULL_REQUEST_TEMPLATE.md`.
 - Keep validation evidence explicit; do not mark commands complete if Copilot could not run them.
+- When acting on a PR, write a visible PR comment, review body, or PR body
+  update before any readiness or merge decision. The visible output must include
+  `COPILOT_PR_AUTHORITY`, `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, and
+  `COPILOT_VISIBLE_EVIDENCE` lines so Codex and reviewers can inspect the same
+  result with `gh pr view` or `gh pr checks`.
+- If `goal.md` or the PR body declares
+  `pr_mutation_authority: github_copilot_merge_when_green`, GitHub-hosted
+  Copilot / PR automation may merge only after required checks and reviews are
+  green and after publishing the visible evidence block. Local Codex must not
+  treat that mode as permission to merge from the terminal.
+- If PR checks fail before tests with `repository ... agent-canon.git not found`,
+  treat it as private submodule authentication. The repository needs
+  `AGENT_CANON_REPO_TOKEN` with read-only Contents access to AgentCanon, or
+  `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or AgentCanon must be
+  made public by a human security decision.
+- If PR checks fail with `AGENT_CANON_SUBMODULE_AUTH=missing`, do not change
+  code to hide the failure. Record that repository secret
+  `AGENT_CANON_REPO_TOKEN` or `AGENT_CANON_REPO_SSH_KEY` is missing or
+  unavailable in that run context.
+- If `AGENT_CANON_SUBMODULE_AUTH=token_persisted` or
+  `AGENT_CANON_SUBMODULE_AUTH=ssh_persisted` appears and a later same-job step
+  still fails with `could not read Username`, treat the helper persistence path
+  as broken instead of changing individual validation commands.
 
 ## Validation
 

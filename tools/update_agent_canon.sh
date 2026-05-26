@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # @dependency-start
-# responsibility Provides update agent canon repository automation.
-# upstream design ../agents/canonical/CODEX_WORKFLOW.md defines shared canon update gates
-# upstream implementation ./sync_agent_canon.sh performs snapshot synchronization
-# downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior
+# responsibility Provides GitHub-first AgentCanon submodule update automation.
+# upstream design ../documents/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
+# upstream design ../documents/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
+# upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
+# downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
+# downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
 # @dependency-end
 
 set -euo pipefail
@@ -17,41 +20,42 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
-REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
-DEFAULT_PROPOSAL_PREFIX="${AGENT_CANON_PROPOSAL_PREFIX:-canon-proposal}"
-DEFAULT_SHARED_SOURCE_REPO="${AGENT_CANON_SOURCE_REPO:-/mnt/l/workspace/agent-canon}"
 
 usage() {
   cat <<EOF
 Usage:
   bash tools/update_agent_canon.sh plan [branch]
+  bash tools/update_agent_canon.sh latest [branch]
   bash tools/update_agent_canon.sh apply [branch]
-  bash tools/update_agent_canon.sh refresh-remote [branch]
-  bash tools/update_agent_canon.sh register-remote <remote-url>
-  bash tools/update_agent_canon.sh proposal-branch [--proposal-branch <name>]
-  bash tools/update_agent_canon.sh push-proposal [proposal-branch]
-  bash tools/update_agent_canon.sh register-local-bare --bare-repo <path>.git [--branch <branch>] [--proposal-branch <name>] [--source-repo <path>]
+  bash tools/update_agent_canon.sh rebuild-tools
+  bash tools/update_agent_canon.sh merge-main-into-current [branch]
+  bash tools/update_agent_canon.sh status
 
 Commands:
   plan
-      Print the derived-repo update route for agent-canon only.
+      Print the AgentCanon update route for the current parent repo.
+  latest
+      Tool-first update workflow. It applies a safe AgentCanon main update,
+      repairs root views, writes/acknowledges parent update TODO state when
+      possible, and emits a machine-readable Agent workflow route when local
+      shared-canon work or merge conflicts require human/agent resolution.
   apply
-      Refresh the remote snapshot from the source repo when configured, then update
-      vendor/agent-canon via sync_agent_canon.sh ensure-latest.
-  refresh-remote
-      Push the configured source repo branch to the agent-canon remote before a local import.
-  register-remote
-      Configure or replace the '${REMOTE_NAME}' remote.
-  proposal-branch
-      Print the configured or derived branch that should receive shared-canon
-      proposals from this derived repository.
-  push-proposal
-      Push the current vendor/agent-canon snapshot to the proposal branch.
-  register-local-bare
-      Initialize or reuse a project-local bare repo, seed it from the current
-      vendor/agent-canon snapshot when needed, prepare the proposal branch, and
-      point '${REMOTE_NAME}' at it.
+      Update the parent repo to AgentCanon main when the update surface is safe.
+  rebuild-tools
+      Rebuild compiled AgentCanon tools from the currently checked-out source.
+  merge-main-into-current
+      Inside vendor/agent-canon, fetch AgentCanon main and merge it into the
+      currently checked-out AgentCanon branch. This is the canonical repair path
+      for local AgentCanon branches that need to be brought near GitHub main
+      before pushing an AgentCanon PR branch.
+  status
+      Print low-level AgentCanon submodule/root-view status.
+
+Removed user-facing commands:
+  Compatibility commands for local remotes, local source refresh, and direct
+  main alignment were removed from this wrapper. GitHub-backed repos should
+  push a normal AgentCanon branch and PR instead.
 EOF
 }
 
@@ -60,415 +64,542 @@ die() {
   exit 1
 }
 
-sanitize_branch_slug() {
+ensure_agent_canon_submodule() {
+  [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
+  [ "$(git -C "$ROOT_DIR" ls-tree HEAD "$PREFIX" 2>/dev/null | awk '{print $1}')" = "160000" ] \
+    || die "prefix '$PREFIX' is not a Git submodule"
+  if ! git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" submodule update --init --recursive "$PREFIX" >/dev/null
+  fi
+}
+
+submodule_remote_url() {
+  git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
+}
+
+sanitize_ref_component() {
   local raw="${1:-}"
   raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-  raw="$(printf '%s' "$raw" | sed -E 's/[^a-z0-9._-]+/-/g; s#^[./-]+##; s#[./-]+$##; s/-+/-/g')"
+  raw="$(printf '%s' "$raw" | sed -E 's#[^a-z0-9._/-]+#-#g; s#^[./-]+##; s#[./-]+$##; s#/{2,}#/#g; s#-+#-#g')"
   if [[ -z "$raw" ]]; then
-    raw="derived-repo"
+    raw="detached"
   fi
   printf '%s\n' "$raw"
 }
 
-default_proposal_branch_name() {
-  local bare_repo_path="${1:-}"
-  local bare_name=""
-  local slug=""
+parent_repo_log_slug() {
+  local raw="${AGENT_CANON_LOG_REPO_SLUG:-}"
+  if [ -z "$raw" ]; then
+    raw="$(basename "$ROOT_DIR")"
+  fi
+  sanitize_ref_component "$raw"
+}
 
-  if [[ -n "${AGENT_CANON_PROPOSAL_BRANCH:-}" ]]; then
-    printf '%s\n' "${AGENT_CANON_PROPOSAL_BRANCH}"
+status_porcelain_path() {
+  local line="$1"
+  local path="${line:3}"
+  case "$path" in
+    *" -> "*)
+      path="${path##* -> }"
+      ;;
+  esac
+  printf '%s\n' "$path"
+}
+
+is_accumulated_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_jsonl_eval_result_path() {
+  case "$1" in
+    agents/evals/results/*.jsonl|agents/evals/results/*/*.jsonl|agents/evals/results/*/*/*.jsonl|agents/evals/results/*/*/*/*.jsonl)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+restore_original_submodule_ref() {
+  local original_branch="$1"
+  local original_head="$2"
+  if [ -n "$original_branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" switch "$original_branch" >/dev/null
     return
   fi
+  git -C "$ROOT_DIR/$PREFIX" checkout --detach "$original_head" >/dev/null
+}
 
-  if git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.proposalBranch" >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.proposalBranch"
-    return
+stash_ref_for_sha() {
+  local stash_sha="$1"
+  git -C "$ROOT_DIR/$PREFIX" stash list --format='%gd %H' \
+    | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
+}
+
+drop_stash_sha_if_present() {
+  local stash_sha="$1"
+  local stash_ref=""
+  stash_ref="$(stash_ref_for_sha "$stash_sha")"
+  [ -n "$stash_ref" ] || return 0
+  git -C "$ROOT_DIR/$PREFIX" stash drop "$stash_ref" >/dev/null
+}
+
+remove_eval_log_worktree() {
+  local worktree_path="$1"
+  local branch="$2"
+  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
+    git -C "$ROOT_DIR/$PREFIX" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$branch" ]; then
+    git -C "$ROOT_DIR/$PREFIX" branch -D "$branch" >/dev/null 2>&1 || true
+  fi
+}
+
+resolve_eval_jsonl_conflicts() {
+  local worktree_root="$1"
+  local conflict_path=""
+  local tmp_dir=""
+  local unresolved=""
+
+  while IFS= read -r conflict_path; do
+    [ -n "$conflict_path" ] || continue
+    if ! is_jsonl_eval_result_path "$conflict_path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK_CONFLICT_UNSAFE=$conflict_path"
+      return 1
+    fi
+    tmp_dir="$(mktemp -d)"
+    git -C "$worktree_root" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
+    git -C "$worktree_root" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
+    mkdir -p "$(dirname "$worktree_root/$conflict_path")"
+    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$worktree_root/$conflict_path"
+    rm -rf "$tmp_dir"
+    git -C "$worktree_root" add "$conflict_path"
+  done < <(git -C "$worktree_root" diff --name-only --diff-filter=U)
+
+  unresolved="$(git -C "$worktree_root" diff --name-only --diff-filter=U)"
+  [ -z "$unresolved" ]
+}
+
+park_eval_log_dirty_state_if_safe() {
+  local status_output=""
+  local line=""
+  local path=""
+  local current_branch=""
+  local current_head=""
+  local log_branch=""
+  local log_start_ref=""
+  local stash_sha=""
+  local apply_log=""
+  local apply_rc=0
+  local commit_sha=""
+  local tmp_worktree=""
+  local tmp_branch=""
+  local -a paths=()
+
+  ensure_agent_canon_submodule
+  status_output="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
+  if [ -z "$status_output" ]; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=clean"
+    return 0
   fi
 
-  if [[ -n "$bare_repo_path" ]]; then
-    bare_name="$(basename "$bare_repo_path")"
-    bare_name="${bare_name%.git}"
-    bare_name="${bare_name%-agent-canon}"
-    slug="$(sanitize_branch_slug "$bare_name")"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    path="$(status_porcelain_path "$line")"
+    if ! is_accumulated_eval_result_path "$path"; then
+      echo "AGENT_CANON_EVAL_LOG_PARK=skipped_non_log_dirty"
+      echo "AGENT_CANON_EVAL_LOG_PARK_BLOCKING_PATH=$path"
+      return 1
+    fi
+    paths+=("$path")
+  done <<< "$status_output"
+
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  current_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
+  tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+
+  echo "AGENT_CANON_EVAL_LOG_PARK=started"
+  echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
+  git -C "$ROOT_DIR/$PREFIX" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
+  stash_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --verify refs/stash)"
+
+  git -C "$ROOT_DIR/$PREFIX" fetch origin "$log_branch" >/dev/null 2>&1 || true
+  if git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
+    log_start_ref="origin/$log_branch"
+  elif git -C "$ROOT_DIR/$PREFIX" show-ref --verify --quiet "refs/heads/$log_branch"; then
+    log_start_ref="$log_branch"
   else
-    slug="$(sanitize_branch_slug "$(basename "$ROOT_DIR")")"
+    log_start_ref="$current_head"
   fi
+  tmp_worktree="$(mktemp -d)"
+  git -C "$ROOT_DIR/$PREFIX" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
 
-  printf '%s/%s\n' "$DEFAULT_PROPOSAL_PREFIX" "$slug"
+  apply_log="$(mktemp)"
+  git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
+  if [ "$apply_rc" -ne 0 ]; then
+    if ! resolve_eval_jsonl_conflicts "$tmp_worktree"; then
+      cat "$apply_log" >&2
+      rm -f "$apply_log"
+      remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+      return "$apply_rc"
+    fi
+  fi
+  rm -f "$apply_log"
+
+  git -C "$tmp_worktree" add -- "${paths[@]}"
+  if git -C "$tmp_worktree" diff --cached --quiet; then
+    echo "AGENT_CANON_EVAL_LOG_PARK=noop"
+    drop_stash_sha_if_present "$stash_sha"
+    remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+    return 0
+  fi
+  git -C "$tmp_worktree" commit -m "Append $(parent_repo_log_slug) AgentCanon eval logs" >/dev/null
+  commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
+  git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
+  drop_stash_sha_if_present "$stash_sha"
+  remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
+  echo "AGENT_CANON_EVAL_LOG_PARK=committed"
+  echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
 }
 
-configured_source_repo() {
-  if [[ -n "${AGENT_CANON_SOURCE_REPO:-}" ]]; then
-    printf '%s\n' "${AGENT_CANON_SOURCE_REPO}"
-    return
-  fi
-  if git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.sourceRepo" >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.sourceRepo"
-    return
-  fi
+parent_pin() {
+  git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
 
-default_remote_url() {
-  if [[ -n "${AGENT_CANON_REMOTE_URL:-}" ]]; then
-    printf '%s\n' "${AGENT_CANON_REMOTE_URL}"
-    return
-  fi
-  printf '%s\n' "${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
-}
-
-configured_remote_url() {
-  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME"
-    return
-  fi
-  default_remote_url || true
-}
-
-cmd_refresh_remote() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  local remote_url=""
-  local source_repo=""
-  local source_sha=""
-  local remote_sha=""
-
-  remote_url="$(configured_remote_url)"
-  [ -n "$remote_url" ] || die "remote '$REMOTE_NAME' is not configured"
-
-  source_repo="$(configured_source_repo || true)"
-  [ -n "$source_repo" ] || die "source repo for '$REMOTE_NAME' is not configured"
-  [ -d "$source_repo/.git" ] || die "source repo does not exist: $source_repo"
-
-  if [[ -n "$(git -C "$source_repo" status --short)" ]]; then
-    die "source repo is dirty: $source_repo"
-  fi
-
-  source_sha="$(git -C "$source_repo" rev-parse "refs/heads/${branch}")"
-  remote_sha="$(git ls-remote "$remote_url" "refs/heads/${branch}" | awk '{print $1}')"
-
-  echo "agent_canon_refresh_source_repo=$source_repo"
-  echo "agent_canon_refresh_remote_url=$remote_url"
-  echo "agent_canon_refresh_branch=$branch"
-  echo "agent_canon_refresh_source_sha=$source_sha"
-  if [[ -n "$remote_sha" ]]; then
-    echo "agent_canon_refresh_remote_sha=$remote_sha"
+parent_pin_pending() {
+  local post_head="$1"
+  if [ "$(parent_pin)" = "$post_head" ]; then
+    echo "no"
   else
-    echo "agent_canon_refresh_remote_sha=<unset>"
+    echo "yes"
   fi
+}
 
-  if [[ "$remote_sha" = "$source_sha" ]]; then
-    echo "agent_canon_refresh_status=already_current"
+emit_remote_main_ancestor_evidence() {
+  local remote_sha="$1"
+  local post_head="$2"
+
+  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$post_head"; then
+    echo "agent_canon_merge_remote_main_in_post_head=yes"
+    echo "agent_canon_merge_remote_main_verified=yes"
     return
   fi
+  echo "agent_canon_merge_remote_main_in_post_head=no"
+  echo "agent_canon_merge_remote_main_verified=no"
+  die "current AgentCanon branch does not contain fetched remote main after merge-main-into-current"
+}
 
-  git -C "$source_repo" push "$remote_url" "refs/heads/${branch}:refs/heads/${branch}" >/dev/null
-  echo "agent_canon_refresh_status=updated_remote_snapshot"
+plan_value() {
+  local key="$1"
+  local text="$2"
+  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1); exit}' <<< "$text"
+}
+
+emit_agentcanon_conflict_workflow_route() {
+  local reason="$1"
+  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
+  echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
+  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+  echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current"
+  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=make agent-canon-ensure-latest"
+  echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
+}
+
+route_requires_agent_workflow() {
+  local route="$1"
+  local prefix_mode="$2"
+  local dirty_update_surface="$3"
+  local submodule_worktree_status="$4"
+
+  case "$route" in
+    local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
+      return 0
+      ;;
+    deferred_branch_pr)
+      return 1
+      ;;
+  esac
+  if [ "$prefix_mode" = "submodule" ] && [ "$submodule_worktree_status" = "dirty" ]; then
+    return 0
+  fi
+  if [ "$dirty_update_surface" = "yes" ]; then
+    case "$route" in
+      submodule_update)
+        return 1
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  fi
+  return 1
+}
+
+acknowledge_update_todos_if_available() {
+  local todo_tool="$ROOT_DIR/tools/agent_tools/agent_canon_update_todos.py"
+  local state_path="$ROOT_DIR/.agent-canon/update-state.toml"
+  local todo_log=""
+  local pending_count=""
+
+  if [ ! -f "$todo_tool" ]; then
+    echo "AGENT_CANON_LATEST_TODOS=skipped_missing_tool"
+    return 0
+  fi
+
+  todo_log="$(mktemp)"
+  if ! python3 "$todo_tool" plan --write >"$todo_log" 2>&1; then
+    cat "$todo_log"
+    rm -f "$todo_log"
+    echo "AGENT_CANON_LATEST_TODOS=failed"
+    echo "NEXT_ACTION=repair_agent_canon_update_todo_state_then_rerun_latest"
+    return 1
+  fi
+  cat "$todo_log"
+  pending_count="$(awk -F= '/^AGENT_CANON_UPDATE_TODO_PENDING_COUNT=/{print $2}' "$todo_log")"
+  rm -f "$todo_log"
+
+  if [ "${pending_count:-0}" != "0" ]; then
+    echo "AGENT_CANON_LATEST_TODOS=pending"
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos"
+    echo "NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest"
+    return 2
+  fi
+
+  python3 "$todo_tool" acknowledge
+  if [ -f "$state_path" ]; then
+    git -C "$ROOT_DIR" add "$state_path"
+    if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
+      git -C "$ROOT_DIR" commit -m "chore: acknowledge agent-canon update tasks"
+      echo "AGENT_CANON_LATEST_TODOS=acknowledged_committed"
+      return 0
+    fi
+  fi
+  echo "AGENT_CANON_LATEST_TODOS=acknowledged_noop"
+}
+
+rebuild_agent_tools_if_available() {
+  local rebuild_tool="$ROOT_DIR/tools/rebuild_agent_tools.sh"
+  if [ ! -f "$rebuild_tool" ]; then
+    echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
+    return
+  fi
+  bash "$rebuild_tool"
 }
 
 cmd_plan() {
   local branch="${1:-$DEFAULT_BRANCH}"
-  local source_repo=""
-  local remote_url=""
-  local source_sha=""
-  local remote_sha=""
-  source_repo="$(configured_source_repo || true)"
-  if [[ -n "$source_repo" ]]; then
-    echo "agent_canon_plan_source_repo=$source_repo"
-    echo "agent_canon_plan_apply_order=refresh_remote_snapshot_then_local_sync"
-    [ -d "$source_repo/.git" ] || die "configured source repo does not exist: $source_repo"
-    if [[ -n "$(git -C "$source_repo" status --short)" ]]; then
-      die "source repo is dirty: $source_repo"
-    fi
-    remote_url="$(configured_remote_url)"
-    [ -n "$remote_url" ] || die "remote '$REMOTE_NAME' is not configured"
-    source_sha="$(git -C "$source_repo" rev-parse "refs/heads/${branch}")"
-    remote_sha="$(git ls-remote "$remote_url" "refs/heads/${branch}" | awk '{print $1}')"
-    echo "agent_canon_plan_refresh_remote_url=$remote_url"
-    echo "agent_canon_plan_effective_remote_url=$source_repo"
-    echo "agent_canon_plan_source_sha=$source_sha"
-    if [[ -n "$remote_sha" ]]; then
-      echo "agent_canon_plan_refresh_remote_sha=$remote_sha"
-    else
-      echo "agent_canon_plan_refresh_remote_sha=<unset>"
-    fi
-    if [[ "$remote_sha" = "$source_sha" ]]; then
-      echo "agent_canon_plan_refresh_status=already_current"
-    else
-      echo "agent_canon_plan_refresh_status=will_update_remote_snapshot"
-    fi
-    AGENT_CANON_PLAN_REMOTE_URL="$source_repo" \
-      bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
-    return
-  else
-    echo "agent_canon_plan_source_repo=<unset>"
-    echo "agent_canon_plan_apply_order=local_sync_only"
-  fi
   bash "$ROOT_DIR/tools/sync_agent_canon.sh" plan "$branch"
+}
+
+cmd_latest() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local plan_output=""
+  local route=""
+  local prefix_mode=""
+  local dirty_update_surface=""
+  local submodule_worktree_status=""
+  local latest_log=""
+  local latest_rc=0
+  local park_rc=0
+  local todo_rc=0
+
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
+  fi
+
+  plan_output="$(cmd_plan "$branch")"
+  printf '%s\n' "$plan_output"
+  route="$(plan_value agent_canon_plan_route "$plan_output")"
+  prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
+  dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
+  submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
+
+  if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
+    emit_agentcanon_conflict_workflow_route "route=${route:-unknown};dirty_update_surface=${dirty_update_surface:-unknown};submodule_worktree_status=${submodule_worktree_status:-unknown}"
+    return 2
+  fi
+
+  latest_log="$(mktemp)"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  if [ "$latest_rc" -ne 0 ]; then
+    cat "$latest_log"
+    rm -f "$latest_log"
+    emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    return "$latest_rc"
+  fi
+  cat "$latest_log"
+  if [ "$prefix_mode" = "submodule" ] && ! grep -q '^agent_canon_latest_submodule_local_state_checked=yes$' "$latest_log"; then
+    rm -f "$latest_log"
+    emit_agentcanon_conflict_workflow_route "ensure_latest_missing_submodule_local_state_evidence=yes;route=${route:-unknown}"
+    return 2
+  fi
+  if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
+    rm -f "$latest_log"
+    bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
+    echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
+    return 0
+  fi
+  rm -f "$latest_log"
+
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" check
+  rebuild_agent_tools_if_available
+  acknowledge_update_todos_if_available || todo_rc=$?
+  if [ "$todo_rc" -eq 2 ]; then
+    return 0
+  fi
+  if [ "$todo_rc" -ne 0 ]; then
+    return "$todo_rc"
+  fi
+  echo "AGENT_CANON_LATEST_TOOL_RESULT=updated"
+  echo "NEXT_ACTION=run_validation_then_push_parent_repo"
 }
 
 cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
-  if [[ -n "$(configured_source_repo || true)" ]]; then
-    cmd_refresh_remote "$branch"
-  fi
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch"
-}
+  local latest_log=""
+  local latest_rc=0
+  local park_rc=0
 
-cmd_register_remote() {
-  local remote_url="${1:-}"
-  [ -n "$remote_url" ] || die "register-remote requires <remote-url>"
-  if git -C "$ROOT_DIR" remote get-url "$REMOTE_NAME" >/dev/null 2>&1; then
-    git -C "$ROOT_DIR" remote set-url "$REMOTE_NAME" "$remote_url"
-    echo "agent_canon_remote_updated=$remote_url"
-  else
-    git -C "$ROOT_DIR" remote add "$REMOTE_NAME" "$remote_url"
-    echo "agent_canon_remote_added=$remote_url"
-  fi
-}
-
-cmd_proposal_branch() {
-  local explicit_branch=""
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --proposal-branch)
-        explicit_branch="${2:-}"
-        shift 2
-        ;;
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      *)
-        die "unknown proposal-branch option '$1'"
-        ;;
-    esac
-  done
-
-  if [[ -n "$explicit_branch" ]]; then
-    echo "agent_canon_proposal_branch=$explicit_branch"
-    echo "agent_canon_proposal_branch_source=explicit"
-    return
+  park_eval_log_dirty_state_if_safe || park_rc=$?
+  if [ "$park_rc" -gt 1 ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
+    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
+    return "$park_rc"
   fi
 
-  if [[ -n "${AGENT_CANON_PROPOSAL_BRANCH:-}" ]]; then
-    echo "agent_canon_proposal_branch=${AGENT_CANON_PROPOSAL_BRANCH}"
-    echo "agent_canon_proposal_branch_source=environment"
-    return
+  latest_log="$(mktemp)"
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  cat "$latest_log"
+  if [ "$latest_rc" -ne 0 ]; then
+    rm -f "$latest_log"
+    return "$latest_rc"
   fi
-
-  if git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.proposalBranch" >/dev/null 2>&1; then
-    echo "agent_canon_proposal_branch=$(git -C "$ROOT_DIR" config --get "${REMOTE_NAME}.proposalBranch")"
-    echo "agent_canon_proposal_branch_source=git_config"
-    return
-  fi
-
-  echo "agent_canon_proposal_branch=$(default_proposal_branch_name)"
-  echo "agent_canon_proposal_branch_source=derived"
-}
-
-split_prefix_snapshot() {
-  local split_sha=""
-
-  if ! git subtree --help >/dev/null 2>&1; then
-    return 1
-  fi
-
-  split_sha="$(git -C "$ROOT_DIR" subtree split --prefix="$PREFIX" HEAD 2>/dev/null || true)"
-  if [[ -n "$split_sha" ]]; then
-    printf '%s\n' "$split_sha"
+  if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
+    rm -f "$latest_log"
+    echo "AGENT_CANON_TOOL_REBUILD=skipped_deferred_branch_pr"
     return 0
   fi
-
-  split_sha="$(git -C "$ROOT_DIR" subtree split --ignore-joins --prefix="$PREFIX" HEAD 2>/dev/null || true)"
-  if [[ -n "$split_sha" ]]; then
-    printf '%s\n' "$split_sha"
-    return 0
-  fi
-
-  return 1
+  rm -f "$latest_log"
+  rebuild_agent_tools_if_available
 }
 
-commit_prefix_worktree_snapshot() {
-  local tmp_index=""
-  local path=""
-  local rel_path=""
-  local mode=""
-  local blob_sha=""
-  local tree_sha=""
+cmd_rebuild_tools() {
+  rebuild_agent_tools_if_available
+}
 
-  tmp_index="$(mktemp)"
-  rm -f "$tmp_index"
+cmd_status() {
+  bash "$ROOT_DIR/tools/sync_agent_canon.sh" status
+}
 
-  GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" read-tree --empty
-  while IFS= read -r -d '' path; do
-    rel_path="${path#"$ROOT_DIR/$PREFIX/"}"
-    if [[ -L "$path" ]]; then
-      mode="120000"
-      blob_sha="$(readlink "$path" | git -C "$ROOT_DIR" hash-object -w --stdin)"
-    elif [[ -f "$path" ]]; then
-      if [[ -x "$path" ]]; then
-        mode="100755"
-      else
-        mode="100644"
-      fi
-      blob_sha="$(git -C "$ROOT_DIR" hash-object -w --path="$rel_path" "$path")"
+cmd_merge_main_into_current() {
+  local branch="${1:-$DEFAULT_BRANCH}"
+  local remote_url=""
+  local remote_sha=""
+  local pre_head=""
+  local post_head=""
+  local current_branch=""
+  local submodule_status=""
+  local backup_branch=""
+  local backup_ref=""
+  local timestamp=""
+  local merge_log=""
+  local result=""
+  local conflict_files=""
+
+  ensure_agent_canon_submodule
+  remote_url="$(submodule_remote_url)"
+  [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
+
+  git -C "$ROOT_DIR/$PREFIX" fetch "$remote_url" "$branch" >/dev/null
+  remote_sha="$(git -C "$ROOT_DIR/$PREFIX" rev-parse FETCH_HEAD)"
+  pre_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all)"
+
+  echo "agent_canon_merge_prefix=$PREFIX"
+  echo "agent_canon_merge_source=${remote_url}#${branch}"
+  echo "agent_canon_merge_source_sha=$remote_sha"
+  echo "agent_canon_merge_target_branch=${current_branch:-<detached>}"
+  echo "agent_canon_merge_pre_head=$pre_head"
+
+  if [ -n "$submodule_status" ]; then
+    echo "agent_canon_merge_worktree_status=dirty"
+    echo "agent_canon_merge_result=blocked_dirty"
+    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
+    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_merge-main-into-current"
+    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or explicitly stash non-artifact local changes before merging main"
+  fi
+  echo "agent_canon_merge_worktree_status=clean"
+
+  if [ -z "$current_branch" ]; then
+    echo "agent_canon_merge_result=blocked_detached_head"
+    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
+    echo "NEXT_ACTION=create_agentcanon_branch_then_rerun_merge-main-into-current"
+    die "submodule '$PREFIX' is detached; create or switch to a branch before merging main"
+  fi
+
+  if [ "$pre_head" = "$remote_sha" ]; then
+    echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
+    echo "agent_canon_merge_result=already_current"
+    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
+    echo "NEXT_ACTION=continue_parent_workflow"
+    return
+  fi
+
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  backup_branch="agent-canon-merge-backup/$(sanitize_ref_component "$current_branch")/$timestamp"
+  backup_ref="refs/heads/$backup_branch"
+  git -C "$ROOT_DIR/$PREFIX" branch "$backup_branch" "$pre_head" >/dev/null
+  echo "agent_canon_merge_backup_ref=$backup_ref"
+
+  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
+    echo "agent_canon_merge_post_head=$pre_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
+    echo "agent_canon_merge_result=already_contains_main"
+    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
+    echo "NEXT_ACTION=push_current_agentcanon_branch_and_open_or_update_PR"
+    return
+  fi
+
+  merge_log="$(mktemp)"
+  if git -C "$ROOT_DIR/$PREFIX" merge --no-edit FETCH_HEAD >"$merge_log" 2>&1; then
+    post_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+    if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
+      result="fast_forwarded"
     else
-      continue
+      result="merged"
     fi
-    GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" update-index --add --cacheinfo "$mode,$blob_sha,$rel_path"
-  done < <(
-    find "$ROOT_DIR/$PREFIX" \
-      -name .git -prune -o \
-      \( -type f -o -type l \) -print0
-  )
-
-  tree_sha="$(GIT_INDEX_FILE="$tmp_index" git -C "$ROOT_DIR" write-tree)"
-  rm -f "$tmp_index"
-  git -C "$ROOT_DIR" commit-tree "$tree_sha" -m "chore: seed agent-canon snapshot"
-}
-
-push_submodule_head_snapshot() {
-  local bare_repo_path="$1"
-  local branch="$2"
-  local submodule_top=""
-
-  submodule_top="$(git -C "$ROOT_DIR/$PREFIX" rev-parse --show-toplevel 2>/dev/null || true)"
-  [[ "$submodule_top" == "$ROOT_DIR/$PREFIX" ]] || return 1
-  git -C "$ROOT_DIR/$PREFIX" rev-parse --verify HEAD^{commit} >/dev/null 2>&1 || return 1
-  git -C "$ROOT_DIR/$PREFIX" push "$bare_repo_path" "HEAD:refs/heads/${branch}" >/dev/null
-  git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
-  echo "seeded agent_canon_bare_repo=${bare_repo_path}"
-}
-
-push_root_seed_snapshot() {
-  local bare_repo_path="$1"
-  local branch="$2"
-  local seed_sha="$3"
-
-  git -C "$ROOT_DIR" push "$bare_repo_path" "${seed_sha}:refs/heads/${branch}" >/dev/null
-  git --git-dir="$bare_repo_path" symbolic-ref HEAD "refs/heads/${branch}"
-  echo "seeded agent_canon_bare_repo=${bare_repo_path}"
-}
-
-seed_snapshot_into_bare() {
-  local bare_repo_path="$1"
-  local branch="$2"
-  local seed_sha=""
-
-  if git --git-dir="$bare_repo_path" rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
-    echo "agent_canon_bare_repo=already_has_${branch}:${bare_repo_path}"
+    rm -f "$merge_log"
+    echo "agent_canon_merge_post_head=$post_head"
+    emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
+    echo "agent_canon_merge_result=$result"
+    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$post_head")"
+    echo "NEXT_ACTION=run_validation_then_push_current_agentcanon_branch_and_open_or_update_PR"
     return
   fi
 
-  if seed_sha="$(split_prefix_snapshot)"; then
-    echo "agent_canon_seed_method=subtree_split"
-    push_root_seed_snapshot "$bare_repo_path" "$branch" "$seed_sha"
-    return
-  fi
-
-  if push_submodule_head_snapshot "$bare_repo_path" "$branch"; then
-    echo "agent_canon_seed_method=submodule_head"
-    return
-  fi
-
-  if seed_sha="$(commit_prefix_worktree_snapshot)"; then
-    echo "agent_canon_seed_method=commit_tree_snapshot"
-  else
-    die "failed to seed agent-canon snapshot from '$PREFIX'"
-  fi
-
-  push_root_seed_snapshot "$bare_repo_path" "$branch" "$seed_sha"
-}
-
-ensure_bare_branch_exists() {
-  local bare_repo_path="$1"
-  local base_branch="$2"
-  local proposal_branch="$3"
-  local base_ref="refs/heads/$base_branch"
-  local proposal_ref="refs/heads/$proposal_branch"
-
-  git --git-dir="$bare_repo_path" rev-parse --verify "$base_ref" >/dev/null 2>&1 || \
-    die "base branch '$base_branch' does not exist in bare repo '$bare_repo_path'"
-
-  if git --git-dir="$bare_repo_path" rev-parse --verify "$proposal_ref" >/dev/null 2>&1; then
-    echo "agent_canon_proposal_branch=already_has_${proposal_branch}:${bare_repo_path}"
-    return
-  fi
-
-  git --git-dir="$bare_repo_path" update-ref "$proposal_ref" "$base_ref"
-  echo "created agent_canon_proposal_branch=${proposal_branch}"
-}
-
-cmd_register_local_bare() {
-  local bare_repo_path=""
-  local branch="$DEFAULT_BRANCH"
-  local proposal_branch=""
-  local source_repo=""
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --bare-repo)
-        bare_repo_path="${2:-}"
-        shift 2
-        ;;
-      --branch)
-        branch="${2:-}"
-        shift 2
-        ;;
-      --proposal-branch)
-        proposal_branch="${2:-}"
-        shift 2
-        ;;
-      --source-repo)
-        source_repo="${2:-}"
-        shift 2
-        ;;
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      *)
-        die "unknown register-local-bare option '$1'"
-        ;;
-    esac
-  done
-
-  [ -n "$bare_repo_path" ] || die "register-local-bare requires --bare-repo <path>.git"
-  [ -d "$ROOT_DIR/$PREFIX" ] || die "prefix '$PREFIX' does not exist"
-
-  mkdir -p "$(dirname "$bare_repo_path")"
-  if [[ ! -d "$bare_repo_path" ]]; then
-    git init --bare "$bare_repo_path" >/dev/null
-    echo "created agent_canon_bare_repo=$bare_repo_path"
-  fi
-
-  seed_snapshot_into_bare "$bare_repo_path" "$branch"
-  if [[ -z "$proposal_branch" ]]; then
-    proposal_branch="$(default_proposal_branch_name "$bare_repo_path")"
-  fi
-  ensure_bare_branch_exists "$bare_repo_path" "$branch" "$proposal_branch"
-  cmd_register_remote "$bare_repo_path"
-  if [[ -n "$source_repo" ]]; then
-    git -C "$ROOT_DIR" config "${REMOTE_NAME}.sourceRepo" "$source_repo"
-    echo "agent_canon_source_repo=$source_repo"
-  else
-    git -C "$ROOT_DIR" config --unset-all "${REMOTE_NAME}.sourceRepo" >/dev/null 2>&1 || true
-    echo "agent_canon_source_repo=<unset>"
-  fi
-  git -C "$ROOT_DIR" config "${REMOTE_NAME}.proposalBranch" "$proposal_branch"
-  echo "agent_canon_proposal_branch=$proposal_branch"
-  echo "agent_canon_register_next=bash tools/update_agent_canon.sh plan $branch"
-  echo "agent_canon_proposal_next=bash tools/update_agent_canon.sh push-proposal"
-}
-
-cmd_push_proposal() {
-  local proposal_branch="${1:-}"
-  if [[ -z "$proposal_branch" ]]; then
-    proposal_branch="$(default_proposal_branch_name)"
-  fi
-
-  echo "agent_canon_push_target=$proposal_branch"
-  bash "$ROOT_DIR/tools/sync_agent_canon.sh" push "$proposal_branch"
+  cat "$merge_log" >&2
+  rm -f "$merge_log"
+  conflict_files="$(git -C "$ROOT_DIR/$PREFIX" diff --name-only --diff-filter=U | paste -sd, -)"
+  echo "agent_canon_merge_result=conflict"
+  echo "agent_canon_merge_conflict_files=${conflict_files:-<unset>}"
+  echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
+  echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_commit_and_push_current_branch"
+  exit 1
 }
 
 main() {
@@ -478,29 +609,25 @@ main() {
       shift
       cmd_plan "${1:-$DEFAULT_BRANCH}"
       ;;
+    latest)
+      shift
+      cmd_latest "${1:-$DEFAULT_BRANCH}"
+      ;;
     apply)
       shift
       cmd_apply "${1:-$DEFAULT_BRANCH}"
       ;;
-    refresh-remote)
+    rebuild-tools)
       shift
-      cmd_refresh_remote "${1:-$DEFAULT_BRANCH}"
+      cmd_rebuild_tools
       ;;
-    register-remote)
+    merge-main-into-current)
       shift
-      cmd_register_remote "${1:-}"
+      cmd_merge_main_into_current "${1:-$DEFAULT_BRANCH}"
       ;;
-    proposal-branch)
+    status)
       shift
-      cmd_proposal_branch "$@"
-      ;;
-    push-proposal)
-      shift
-      cmd_push_proposal "${1:-}"
-      ;;
-    register-local-bare)
-      shift
-      cmd_register_local_bare "$@"
+      cmd_status
       ;;
     -h|--help|help|"")
       usage

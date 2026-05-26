@@ -23,7 +23,6 @@ DEFAULT_EXCLUDES = (
     "build",
     "dist",
     "reports",
-    "tools/legacy",
     "vendor",
 )
 
@@ -52,6 +51,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("paths", nargs="*", help="Files or directories to scan.")
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--root-only",
+        action="store_true",
+        help="Scan the parent repo surface and exclude submodule internals.",
+    )
+    scope.add_argument(
+        "--agentcanon-only",
+        action="store_true",
+        help="Scan AgentCanon source. In a derived repo this uses vendor/agent-canon.",
+    )
+    scope.add_argument(
+        "--submodule-aware",
+        action="store_true",
+        help="Scan the parent repo surface and AgentCanon source as separate scopes.",
+    )
     parser.add_argument(
         "--exclude",
         action="append",
@@ -170,10 +185,19 @@ def main() -> int:
     """Run the checker."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
-    files = iter_python_files(root, list(args.paths), list(args.exclude))
+    scan_roots = resolve_scan_roots(
+        root,
+        root_only=bool(args.root_only),
+        agentcanon_only=bool(args.agentcanon_only),
+        submodule_aware=bool(args.submodule_aware),
+    )
     findings: list[Finding] = []
-    for path in files:
-        findings.extend(scan_file(root, path))
+    files: list[Path] = []
+    for scan_root in scan_roots:
+        scope_files = iter_python_files(scan_root, list(args.paths), list(args.exclude))
+        files.extend(scope_files)
+        for path in scope_files:
+            findings.extend(scan_file(scan_root, path))
     findings.sort(key=lambda item: (item.path, item.line, item.kind, item.detail))
     print(f"STATIC_ANY_FILES={len(files)}")
     print(f"STATIC_ANY_FINDINGS={len(findings)}")
@@ -181,6 +205,30 @@ def main() -> int:
         print(finding.render())
     print(f"STATIC_ANY={'pass' if not findings else 'fail'}")
     return 0 if not findings else 1
+
+
+def agentcanon_root(root: Path) -> Path:
+    """Return the AgentCanon source root for a parent or source checkout."""
+    candidate = root / "vendor" / "agent-canon"
+    if candidate.exists():
+        return candidate.resolve()
+    return root
+
+
+def resolve_scan_roots(
+    root: Path,
+    *,
+    root_only: bool,
+    agentcanon_only: bool,
+    submodule_aware: bool,
+) -> tuple[Path, ...]:
+    """Return scan roots for the requested parent/submodule scope."""
+    canon_root = agentcanon_root(root)
+    if agentcanon_only:
+        return (canon_root,)
+    if submodule_aware and canon_root != root:
+        return (root, canon_root)
+    return (root,)
 
 
 if __name__ == "__main__":

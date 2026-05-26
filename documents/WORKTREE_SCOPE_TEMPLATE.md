@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 responsibility Documents WORKTREE_SCOPE Template for this repository.
+upstream design worktree-lifecycle.md worktree lifecycle policy
 @dependency-end
 -->
 

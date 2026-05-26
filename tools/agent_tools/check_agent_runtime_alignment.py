@@ -2,13 +2,16 @@
 # @dependency-start
 # responsibility Checks agent runtime alignment agent workflow state.
 # upstream design ../README.md shared automation index
+# upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
 
 from __future__ import annotations
 
+import json
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +24,10 @@ except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
 
 from agent_team import (
     ROOT,
+    Role,
+    RunBundleSpec,
+    TaskCatalog,
+    TeamConfig,
     codex_runtime_max_threads,
     create_run_bundle,
     default_specialists_for_task,
@@ -31,12 +38,28 @@ from agent_team import (
     resolve_role,
     resolve_role_document_packet,
     task_ids,
+    workflow_always_on_roles,
     workflow_spawn_budget,
 )
+from vendor_skill_adapters import VendorSkillValidator
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
+HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+FRONTMATTER_OPEN_MARKER = "---\n"
+MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
+EXPECTED_MAX_THREADS = 24
+EXPECTED_MAX_DEPTH = 1
+EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+
+
+@dataclass(frozen=True)
+class AlignmentWorkspace:
+    """Temporary workspace used for runtime bundle smoke checks."""
+
+    workspace_root: Path
+    report_root: Path
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -60,7 +83,11 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
     """Load every Codex agent config."""
     parsed: dict[str, dict[str, object]] = {}
     for path in sorted(CODEX_AGENT_ROOT.glob("*.toml")):
-        parsed[path.stem] = tomllib.loads(path.read_text(encoding="utf-8"))
+        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        name = str(payload.get("name", path.stem))
+        payload["__file_name"] = path.name
+        payload["__file_stem"] = path.stem
+        parsed[name] = payload
     return parsed
 
 
@@ -116,30 +143,87 @@ def validate_agent_model(
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
-    profiles = config.get("profiles", {})
-    ensure(isinstance(profiles, dict), "profiles must be a mapping")
-    review_profile = profiles.get("review", {})
-    ensure(isinstance(review_profile, dict), "review profile must be a mapping")
-    review_model = review_profile.get("model")
-    ensure(config.get("review_model") == review_model, "review_model must match profiles.review.model")
+    ensure(isinstance(config.get("review_model"), str), "review_model must be a string")
+    features = config.get("features", {})
+    ensure(isinstance(features, dict), "features must be a mapping")
+    ensure(features.get("hooks") is True, "features.hooks must be true")
+    ensure(features.get("goals") is True, "features.goals must be true")
+    ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
+    ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    agents = config.get("agents", {})
+    ensure(isinstance(agents, dict), "agents must be a mapping")
     ensure(
-        isinstance(review_model, str) and review_model,
-        "review profile model must be a non-empty string",
+        agents.get("max_threads") == EXPECTED_MAX_THREADS,
+        f"agents.max_threads must remain {EXPECTED_MAX_THREADS}",
     )
     ensure(
-        isinstance(review_profile.get("model_reasoning_effort"), str)
-        and review_profile.get("model_reasoning_effort"),
-        "review profile model_reasoning_effort must be a non-empty string",
+        agents.get("max_depth") == EXPECTED_MAX_DEPTH,
+        f"agents.max_depth must remain {EXPECTED_MAX_DEPTH}",
     )
     ensure(
-        review_profile.get("sandbox_mode") == "read-only",
-        "review profile sandbox_mode must be read-only",
+        agents.get("job_max_runtime_seconds") == EXPECTED_JOB_MAX_RUNTIME_SECONDS,
+        f"agents.job_max_runtime_seconds must remain {EXPECTED_JOB_MAX_RUNTIME_SECONDS}",
+    )
+    codex_agents = parse_codex_agents()
+    registry = {
+        key: value
+        for key, value in agents.items()
+        if isinstance(value, dict) and key != "model_policy"
+    }
+    missing_registry = sorted(set(codex_agents) - set(registry))
+    extra_registry = sorted(set(registry) - set(codex_agents))
+    ensure(
+        not missing_registry,
+        f"missing .codex/config.toml agent registry: {', '.join(missing_registry)}",
     )
     ensure(
-        review_profile.get("approval_policy") == "never",
-        "review profile approval_policy must be never",
+        not extra_registry,
+        f"stale .codex/config.toml agent registry: {', '.join(extra_registry)}",
     )
+    for role_id, agent_config in codex_agents.items():
+        registered = registry[role_id]
+        ensure(
+            registered.get("config_file") == f"agents/{agent_config['__file_name']}",
+            f"{role_id} config_file must point at agents/{agent_config['__file_name']}",
+        )
+        ensure(
+            registered.get("description") == agent_config.get("description"),
+            f"{role_id} registry description must match agent TOML",
+        )
     _ = iter_model_policy_buckets(config)
+
+
+def validate_project_hooks() -> None:
+    """Check that project hooks cover active safety and completion guardrails."""
+    hooks_payload = json.loads(HOOKS_JSON_PATH.read_text(encoding="utf-8"))
+    hooks = hooks_payload.get("hooks", {})
+    ensure(isinstance(hooks, dict), "hooks.json hooks must be a mapping")
+
+    for event in ("UserPromptSubmit", "PostToolUse", "Stop"):
+        entries = hooks.get(event, [])
+        ensure(isinstance(entries, list) and entries, f"{event} hook must be configured")
+
+    hooks_text = HOOKS_JSON_PATH.read_text(encoding="utf-8")
+    ensure(
+        "mcp_session_context.sh" not in hooks_text,
+        "mcp_session_context.sh must not be wired as a startup hook",
+    )
+    ensure(
+        (ROOT / ".codex" / "hooks" / "mcp_session_context.sh").is_file(),
+        "mcp_session_context.sh must exist as an optional context helper",
+    )
+    for hook_script in (
+        "log_archive_mount_warning.py",
+        "prompt_secret_guard.py",
+        "goal_completion_guard.py",
+        "oop_readability_guard.py",
+        "log_surface_inventory_guard.py",
+        "notebook_quality_guard.py",
+        "style_checker_guard.py",
+        "skill_usage_logger.py",
+    ):
+        ensure(hook_script in hooks_text, f"{hook_script} must be wired in hooks.json")
+        ensure((ROOT / ".codex" / "hooks" / hook_script).is_file(), f"{hook_script} must exist")
 
 
 def validate_codex_agent_settings() -> None:
@@ -160,12 +244,8 @@ def validate_codex_agent_settings() -> None:
             required_role_ids.add(str(role_id))
     missing = sorted(required_role_ids - set(configs))
     ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
-
-    unassigned_agents = sorted(set(configs) - required_role_ids)
-    ensure(
-        not unassigned_agents,
-        "Codex agents missing from agents.model_policy: " + ", ".join(unassigned_agents),
-    )
+    unclassified = sorted(set(configs) - required_role_ids)
+    ensure(not unclassified, f"unclassified Codex agent model policy: {', '.join(unclassified)}")
 
     for bucket_id, bucket in model_policy:
         for role_id in sorted(str(role) for role in bucket["roles"]):
@@ -296,8 +376,12 @@ def validate_task_catalog_references() -> None:
             f"family {family['id']} active_subagents exceeds runtime max_threads",
         )
         ensure(
-            max_write_budget == 1,
-            f"family {family['id']} max_write_subagents must remain 1",
+            max_write_budget >= 1,
+            f"family {family['id']} max_write_subagents must be >= 1",
+        )
+        ensure(
+            max_write_budget <= active_budget,
+            f"family {family['id']} max_write_subagents exceeds active_subagents",
         )
 
     for task_id in task_ids(catalog):
@@ -351,107 +435,170 @@ def validate_public_skill_shims() -> None:
             f"{skill_id} shim is outside the Codex skill root: {shim}",
         )
         text = shim.read_text(encoding="utf-8")
-        ensure(text.startswith("---\n"), f"{skill_id} shim must start with YAML frontmatter")
-        ensure("\n---\n" in text[4:], f"{skill_id} shim YAML frontmatter must close")
+        ensure(text.startswith(FRONTMATTER_OPEN_MARKER), f"{skill_id} shim must start with YAML frontmatter")
+        ensure(
+            "\n---\n" in text[len(FRONTMATTER_OPEN_MARKER) :],
+            f"{skill_id} shim YAML frontmatter must close",
+        )
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
 
 
-def validate_bundle_outputs() -> None:
-    """Create temporary bundles for every catalog task and full-team run."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
-    created_at_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+def validate_vendor_skill_adapters() -> None:
+    """Check that third-party skill vendor adapters are manifest-backed."""
+    findings = VendorSkillValidator(ROOT).validate(require_adapters=True)
+    ensure(
+        not findings,
+        "vendor skill adapter findings: "
+        + "; ".join(
+            finding.render()
+            for finding in findings[:MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE]
+        ),
+    )
+
+
+def alignment_workspace(tmp_root: Path) -> AlignmentWorkspace:
+    """Return the temporary workspace layout for bundle smoke checks."""
+    return AlignmentWorkspace(
+        workspace_root=tmp_root / "workspace",
+        report_root=tmp_root / "reports",
+    )
+
+
+def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
+    """Create the directories and scope file required by bundle smoke checks."""
+    workspace.workspace_root.mkdir(parents=True, exist_ok=True)
+    workspace.report_root.mkdir(parents=True, exist_ok=True)
+    (workspace.workspace_root / "python").mkdir()
+    (workspace.workspace_root / "documents").mkdir()
+    (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
+    (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
+        "\n".join(
+            [
+                "# Worktree Scope",
+                "",
+                "## Editable Directories",
+                "- `python`",
+                "- `documents`",
+                "",
+                "## Runtime Output Directories",
+                "- `reports/runtime`",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def current_utc_iso() -> str:
+    """Return a second-granularity UTC timestamp."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
         "+00:00",
         "Z",
     )
 
-    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as tmp_dir:
-        tmp_root = Path(tmp_dir)
-        workspace_root = tmp_root / "workspace"
-        report_root = tmp_root / "reports"
-        workspace_root.mkdir(parents=True, exist_ok=True)
-        report_root.mkdir(parents=True, exist_ok=True)
-        (workspace_root / "python").mkdir()
-        (workspace_root / "documents").mkdir()
-        (workspace_root / "reports" / "runtime").mkdir(parents=True)
-        (workspace_root / "WORKTREE_SCOPE.md").write_text(
-            "\n".join(
-                [
-                    "# Worktree Scope",
-                    "",
-                    "## Editable Directories",
-                    "- `python`",
-                    "- `documents`",
-                    "",
-                    "## Runtime Output Directories",
-                    "- `reports/runtime`",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
+
+def task_by_id(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
+    """Return one task-catalog row by id."""
+    return next(task for task in catalog.tasks if task["id"] == task_id)
+
+
+def roles_for_task(config: TeamConfig, catalog: TaskCatalog, task_id: str) -> tuple[Role, ...]:
+    """Return always-on plus default specialist roles for one task."""
+    enabled = default_specialists_for_task(
+        config=config,
+        catalog=catalog,
+        task_id=task_id,
+        include_default_review_packs=True,
+    )
+    task = task_by_id(catalog, task_id)
+    always_on = workflow_always_on_roles(config, catalog, str(task["family"]))
+    return tuple(always_on) + tuple(
+        resolve_role(config, role_id) for role_id in enabled
+    )
+
+
+def missing_required_outputs(report_dir: Path, roles: tuple[Role, ...]) -> list[str]:
+    """Return required role outputs not created in one report directory."""
+    return [
+        output
+        for role in roles
+        for output in role.required_outputs
+        if not (report_dir / output).is_file()
+    ]
+
+
+def ensure_required_outputs(report_dir: Path, roles: tuple[Role, ...], label: str) -> None:
+    """Ensure all role-required outputs exist in one report directory."""
+    missing_outputs = missing_required_outputs(report_dir, roles)
+    ensure(
+        not missing_outputs,
+        f"{label} bundle did not generate required outputs: "
+        + ", ".join(sorted(set(missing_outputs))),
+    )
+
+
+def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> None:
+    """Ensure one generated task manifest preserves subagent handoff contracts."""
+    manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
+        encoding="utf-8",
+    )
+    ensure(
+        "subagent_prompt_packet:" in manifest_text,
+        f"task {task_id} manifest missing subagent_prompt_packet",
+    )
+    ensure(
+        "subagent_lifecycle_policy:" in manifest_text,
+        f"task {task_id} manifest missing subagent_lifecycle_policy",
+    )
+    ensure(
+        "fresh_subagents_required: true" in manifest_text
+        and "reuse_for_new_task: forbidden" in manifest_text,
+        f"task {task_id} manifest missing fresh subagent lifecycle policy",
+    )
+    ensure(
+        "prompt_contract:" in manifest_text,
+        f"task {task_id} manifest missing role prompt_contract",
+    )
+
+
+def validate_task_bundle_output(
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    workspace: AlignmentWorkspace,
+    task_id: str,
+    created_at_iso: str,
+) -> None:
+    """Create and validate one catalog task bundle."""
+    task = task_by_id(catalog, task_id)
+    roles = roles_for_task(config, catalog, task_id)
+    report_dir = workspace.report_root / task_id
+    create_run_bundle(
+        RunBundleSpec(
+            config=config,
+            report_dir=report_dir,
+            run_id=task_id,
+            task=f"alignment smoke for {task_id}",
+            owner="codex",
+            created_at_iso=created_at_iso,
+            roles=roles,
+            workspace_root=workspace.workspace_root,
+            workflow_family_id=str(task["family"]),
         )
+    )
+    ensure_required_outputs(report_dir, roles, f"task {task_id}")
+    ensure_task_manifest(config, report_dir, task_id)
 
-        for task_id in task_ids(catalog):
-            task = next(task for task in catalog.tasks if task["id"] == task_id)
-            enabled = list(
-                default_specialists_for_task(
-                    config=config,
-                    catalog=catalog,
-                    task_id=task_id,
-                    include_default_review_packs=True,
-                )
-            )
-            roles = tuple(config.always_on_roles) + tuple(
-                resolve_role(config, role_id) for role_id in enabled
-            )
-            report_dir = report_root / task_id
-            create_run_bundle(
-                config=config,
-                report_dir=report_dir,
-                run_id=task_id,
-                task=f"alignment smoke for {task_id}",
-                owner="codex",
-                created_at_iso=created_at_iso,
-                roles=roles,
-                workspace_root=workspace_root,
-                workflow_family_id=str(task["family"]),
-            )
-            missing_outputs = [
-                output
-                for role in roles
-                for output in role.required_outputs
-                if not (report_dir / output).is_file()
-            ]
-            ensure(
-                not missing_outputs,
-                "task "
-                f"{task_id} did not generate required outputs: "
-                f"{', '.join(sorted(set(missing_outputs)))}",
-            )
-            manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
-                encoding="utf-8",
-            )
-            ensure(
-                "subagent_prompt_packet:" in manifest_text,
-                f"task {task_id} manifest missing subagent_prompt_packet",
-            )
-            ensure(
-                "subagent_lifecycle_policy:" in manifest_text,
-                f"task {task_id} manifest missing subagent_lifecycle_policy",
-            )
-            ensure(
-                "fresh_subagents_required: true" in manifest_text
-                and "reuse_for_new_task: forbidden" in manifest_text,
-                f"task {task_id} manifest missing fresh subagent lifecycle policy",
-            )
-            ensure(
-                "prompt_contract:" in manifest_text,
-                f"task {task_id} manifest missing role prompt_contract",
-            )
 
-        full_team_roles = config.always_on_roles + config.specialist_roles
-        full_team_dir = report_root / "full-team"
-        create_run_bundle(
+def validate_full_team_bundle_output(
+    config: TeamConfig,
+    workspace: AlignmentWorkspace,
+    created_at_iso: str,
+) -> None:
+    """Create and validate a full specialist-team bundle."""
+    full_team_roles = config.always_on_roles + config.specialist_roles
+    full_team_dir = workspace.report_root / "full-team"
+    create_run_bundle(
+        RunBundleSpec(
             config=config,
             report_dir=full_team_dir,
             run_id="full-team",
@@ -459,29 +606,48 @@ def validate_bundle_outputs() -> None:
             owner="codex",
             created_at_iso=created_at_iso,
             roles=full_team_roles,
-            workspace_root=workspace_root,
+            workspace_root=workspace.workspace_root,
             workflow_family_id="comprehensive_development",
         )
-        missing_outputs = [
-            output
-            for role in full_team_roles
-            for output in role.required_outputs
-            if not (full_team_dir / output).is_file()
-        ]
-        ensure(
-            not missing_outputs,
-            "full-team bundle did not generate required outputs: "
-            + ", ".join(sorted(set(missing_outputs))),
+    )
+    ensure_required_outputs(full_team_dir, full_team_roles, "full-team")
+
+
+def validate_bundle_outputs() -> None:
+    """Create temporary bundles for every catalog task and full-team run."""
+    config = load_team_config()
+    catalog = load_task_catalog(config)
+    created_at_iso = current_utc_iso()
+
+    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as tmp_dir:
+        workspace = alignment_workspace(Path(tmp_dir))
+        initialize_alignment_workspace(workspace)
+
+        for task_id in task_ids(catalog):
+            validate_task_bundle_output(
+                config=config,
+                catalog=catalog,
+                workspace=workspace,
+                task_id=task_id,
+                created_at_iso=created_at_iso,
+            )
+
+        validate_full_team_bundle_output(
+            config=config,
+            workspace=workspace,
+            created_at_iso=created_at_iso,
         )
 
 
 def main() -> int:
     """Run all runtime-alignment checks."""
     validate_project_config()
+    validate_project_hooks()
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()
     validate_public_skill_shims()
+    validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0

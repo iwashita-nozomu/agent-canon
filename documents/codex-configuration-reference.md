@@ -49,7 +49,7 @@ Codex combines settings from persistent config, project config, profiles, custom
 
 - Put durable repo policy in `.codex/config.toml`.
 - Put human-readable task and coding rules in `AGENTS.md`, not in model/provider settings.
-- Use `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
+- Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or OSS/local model usage.
 - Use CLI `-c` for temporary one-off changes; do not commit temporary operator overrides.
 - Treat `experimental_*` and realtime websocket overrides as unstable unless a task explicitly targets those features.
 
@@ -57,7 +57,7 @@ Example temporary overrides:
 
 ```bash
 codex -c model='"gpt-5.5"' -c model_reasoning_effort='"high"'
-codex --enable codex_hooks --search
+codex --enable hooks --search
 codex exec --json -c sandbox_mode='"read-only"' "review this repo"
 ```
 
@@ -72,32 +72,8 @@ sandbox_mode = "danger-full-access"
 review_model = "gpt-5.5"
 
 [features]
-codex_hooks = true
+hooks = true
 goals = true
-
-[profiles.token-lite]
-model_reasoning_effort = "minimal"
-plan_mode_reasoning_effort = "minimal"
-model_verbosity = "low"
-tool_output_token_limit = 2000
-
-[profiles.token-standard]
-model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
-model_verbosity = "medium"
-tool_output_token_limit = 3000
-
-[profiles.token-deep]
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-model_verbosity = "medium"
-tool_output_token_limit = 6000
-
-[profiles.review]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
 
 [agents]
 max_threads = 24
@@ -115,9 +91,9 @@ tool_timeout_sec = 300
 Operational interpretation:
 
 - `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
-- `features.codex_hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
+- `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
 - `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `repo_mcp_server.goal_loop_status`.
-- `token-lite`, `token-standard`, and `token-deep` are reusable runtime profiles. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
+- Reusable runtime profiles such as `token-lite`, `token-standard`, and `token-deep` belong in user-level Codex config. They adjust reasoning effort, verbosity, and per-tool output history budget without weakening review, dependency, or CI gates.
 - `[agents]` raises subagent capacity and runtime budget without forcing all agents to spawn.
 - `repo_mcp_server` is optional (`required=false`) so Codex can still boot if the local MCP process fails, but hooks and verification should surface that failure.
 
@@ -133,8 +109,7 @@ They are an explicit inventory of settings that Codex can accept but this templa
 | --- | ------------------------- |
 | `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
 | `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
-| `features` | `features.codex_hooks=true` and `features.goals=true` are configured. |
-| `profiles` | `token-lite`, `token-standard`, and `token-deep` are configured for operator-selected token budgets. |
+| `features` | `features.hooks=true` and `features.goals=true` are configured. |
 | `agents` | `max_threads=24` and `job_max_runtime_seconds=3600` are configured. |
 | `mcp_servers` | Only `mcp_servers.repo_mcp_server` is configured. |
 
@@ -164,7 +139,7 @@ Interpretation for this template:
 ### Feature Flags Not Currently Enabled Here
 
 The schema currently exposes many feature flags under `[features]`.
-This template enables `codex_hooks` and `goals`.
+This template enables `hooks` and `goals`.
 All other schema-listed flags are currently absent from the shared repo config:
 
 ```text
@@ -527,6 +502,9 @@ Template guidance for local repo MCP:
 - Keep `required=false` for optional local-process MCP so the agent can still boot and report a startup problem.
 - Put deterministic repo-local startup in `mcp/repo_mcp_server.sh`.
 - Use hooks and validation scripts to detect missing MCP inventory; do not hide startup failures.
+- Treat `mcp/repo_mcp_server.sh`, `mcp/repo_mcp_server.py`, and `mcp/README.md` as the AgentCanon-owned repo MCP implementation and tool contract.
+- Treat `.codex/config.toml`, hook registration, project trust, user profiles, apps, and external connectors as the Codex-owned registration and runtime plane.
+- Keep `repo_mcp_server` limited to repo context and goal-loop checks. Do not reimplement file edit, GitHub, shell, web, or Codex app connector behavior inside AgentCanon MCP.
 
 ## Hooks
 
@@ -543,11 +521,54 @@ Use hooks for deterministic runtime checks, not for replacing workflow policy:
 
 - Start or verify repo-local MCP surfaces early.
 - Inject stable environment/context hints.
-- Block known-bad tool use before it runs.
-- Record tool-use summaries for later audit.
+- Record hook invocations, OOP guard results, and skill usage signals for later audit.
 - Avoid long-running logic in hooks unless timeouts are explicit.
+- Keep pre-tool hooks out of the shared default unless they can deterministically
+  repair state or prevent high-confidence secret/destructive actions without
+  interrupting normal repository work.
 
 Hook output may include hook-specific structured results. Treat hook failures as runtime evidence to fix, not as optional noise.
+
+Template-specific hook behavior:
+
+- `hooks.json` wires one `hook_dispatcher.py` command per active lifecycle
+  event. The dispatcher replays the original stdin payload to the child guard
+  scripts in the configured order and returns the first blocking JSON payload,
+  or the first non-blocking visible output when no guard blocks.
+- The dispatcher bypasses child guards for `GitStatus`, read-only file / Git
+  inspection, and known validation commands including AgentCanon
+  plan/status/latest-check inspection. Do not rename, move, or temporarily
+  disable `hooks.json` to inspect hook state or run validation.
+- `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
+  reference capture checks.
+- `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
+  module boundary, library implementation, helper inventory, helper-first,
+  style, log-surface inventory, and notebook quality checks.
+- `Stop` runs goal completion, the post-edit guard suite, reference capture,
+  and final skill usage logging.
+- The OOP hook emits warning/approve output for readability findings and keeps
+  explicit OOP validation available as a closeout gate. Use
+  `AGENT_CANON_OOP_HOOK_MODE=diff` only when the user explicitly requests
+  baseline-only checking; `AGENT_CANON_OOP_HOOK_BASELINE_REF` overrides the
+  diff baseline when needed.
+- Notebook quality checks block notebook-as-test misuse: fine-grained assertions,
+  pytest/unittest imports, `test_` helpers, stored error output, missing narrative,
+  missing code, or missing visualization. Detailed test coverage belongs in `tests/`.
+- Style checker logs record selected Python / C++ / notebook / Markdown checkers and `unchecked_files` for changed paths with no automatic checker.
+- Hook logs append to the mounted runtime log archive
+  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
+  Accumulated eval reports append under
+  `.agent-canon/log-archive/eval-results/<family>/`.
+  `log_archive_mount_warning.py` warns, without blocking, when that archive is
+  missing and asks the agent to run `runtime_log_archive_git.py ensure` first.
+  The archive remote and branch policy are documented in
+  `documents/runtime-log-archive.md`; the old
+  `agents/evals/results/hook-runs/` path is a legacy read surface.
+- Hook log entries include `hook_run_id`, `payload_fingerprint`, `mode`,
+  `baseline_ref`, and status fields. Local log paths can be overridden with
+  `AGENT_CANON_HOOK_ARCHIVE_DIR`, `AGENT_CANON_HOOK_RESULTS_DIR`,
+  `AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
+  `AGENT_CANON_NOTEBOOK_QUALITY_HOOK_LOG_PATH`, and `AGENT_CANON_SKILL_LOG_PATH`.
 
 ## Skills
 
@@ -596,9 +617,11 @@ Policy boundary:
 - hooks should enforce deterministic startup/tool behavior.
 - run bundles should preserve task-specific evidence.
 
-## Profiles
+## User-Level Profiles
 
-`[profiles.<name>]` can override many of the same keys as the root config:
+`[profiles.<name>]` can override many of the same keys as the root config, but
+current Codex warns when project-local `.codex/config.toml` defines profiles.
+Keep reusable profiles in `~/.codex/config.toml` or `$CODEX_HOME/config.toml`:
 
 - `model`, `model_provider`, `model_reasoning_effort`, `plan_mode_reasoning_effort`, `model_verbosity`
 - `approval_policy`, `approvals_reviewer`, `sandbox_mode`
@@ -610,7 +633,7 @@ Policy boundary:
 - `zsh_path`
 - selected prompt/context toggles
 
-Use profiles for operator modes:
+Use user-level profiles for operator modes:
 
 ```toml
 [profiles.token-lite]
@@ -734,7 +757,8 @@ Before changing Codex config in this repo:
 
 ## Field Stability Notes
 
-- Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `profiles`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
+- Normal operator keys: `model`, `approval_policy`, `sandbox_mode`, `model_providers`, `mcp_servers`, `tools`, `web_search`, `agents`, `skills`, `hooks`.
+- User-level operator keys: `profiles`, UI preferences, local model/provider experiments, and other machine-specific defaults.
 - Repo-policy keys: project doc discovery, hooks, MCP, subagent limits, skill instructions, shared defaults.
 - Machine-local keys: audio, TUI, credentials stores, notifications, logs, SQLite home, notices, Windows onboarding state.
 - Experimental keys: names beginning with `experimental_`, realtime websocket overrides, app-server/thread endpoints, and other fields documented as experimental.

@@ -1,6 +1,7 @@
 # Project-scoped Codex settings.
-# Keep review fan-out explicit, keep one writer per worktree, do not fix agent depth in repo config,
+# Keep review fan-out explicit, keep project subagent registration centralized here,
 # and use spawned agents in bounded waves instead of starting every available role at once.
+# Role-specific behavior lives in .codex/agents/*.toml; this file owns the registry.
 # @dependency-start
 # responsibility Documents Project-scoped Codex settings. for this repository.
 # upstream design ../agents/task_catalog.yaml workflow family runtime budgets
@@ -17,35 +18,12 @@ sandbox_mode = "danger-full-access"
 review_model = "gpt-5.5"
 
 [features]
-codex_hooks = true
+hooks = true
 goals = true
-
-[profiles.token-lite]
-model_reasoning_effort = "minimal"
-plan_mode_reasoning_effort = "minimal"
-model_verbosity = "low"
-tool_output_token_limit = 2000
-
-[profiles.token-standard]
-model_reasoning_effort = "medium"
-plan_mode_reasoning_effort = "medium"
-model_verbosity = "medium"
-tool_output_token_limit = 3000
-
-[profiles.token-deep]
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-model_verbosity = "medium"
-tool_output_token_limit = 6000
-
-[profiles.review]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-sandbox_mode = "read-only"
-approval_policy = "never"
 
 [agents]
 max_threads = 24
+max_depth = 1
 job_max_runtime_seconds = 3600
 
 [agents.model_policy.frontier_judgment]
@@ -63,6 +41,7 @@ roles = [
   "reviewer",
   "project_reviewer",
   "literature_researcher",
+  "ship_reviewer",
 ]
 
 [agents.model_policy.mini_review]
@@ -91,6 +70,7 @@ roles = [
   "test_designer",
   "python_reviewer",
   "cpp_reviewer",
+  "diff_triage_reviewer",
 ]
 
 [agents.model_policy.frontier_implementation]
@@ -104,8 +84,137 @@ roles = [
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "low"
 roles = [
+  "experiment_runner",
   "spark_worker",
 ]
+
+[agents.artifact_reviewer]
+description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."
+config_file = "agents/artifact_reviewer.toml"
+
+[agents.benchmark_reviewer]
+description = "Read-only reviewer for fairness, confounders, and benchmark anti-patterns."
+config_file = "agents/benchmark_reviewer.toml"
+
+[agents.citation_evidence_reviewer]
+description = "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability."
+config_file = "agents/citation_evidence_reviewer.toml"
+
+[agents.cpp_reviewer]
+description = "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions."
+config_file = "agents/cpp_reviewer.toml"
+
+[agents.detailed_design_reviewer]
+description = "Read-only reviewer for detailed design docs, implementation readiness, reuse-first discipline, and style continuity."
+config_file = "agents/detailed_design_reviewer.toml"
+
+[agents.detailed_designer]
+description = "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first and style-continuity guidance."
+config_file = "agents/detailed_designer.toml"
+
+[agents.diff_triage_reviewer]
+description = "Low-cost read-only reviewer for narrow diffs before escalation to broad review."
+config_file = "agents/diff_triage_reviewer.toml"
+
+[agents.docs_workflow_steward]
+description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."
+config_file = "agents/docs_workflow_steward.toml"
+
+[agents.document_flow_reviewer]
+description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."
+config_file = "agents/document_flow_reviewer.toml"
+
+[agents.execution_planner]
+description = "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans."
+config_file = "agents/execution_planner.toml"
+
+[agents.experiment_runner]
+description = "Low-cost execution-only agent for running bounded experiments and summarizing logs."
+config_file = "agents/experiment_runner.toml"
+
+[agents.explorer]
+description = "Read-only agent for tracing code paths, docs, and workflow state."
+config_file = "agents/explorer.toml"
+
+[agents.fair_data_reviewer]
+description = "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization."
+config_file = "agents/fair_data_reviewer.toml"
+
+[agents.literature_researcher]
+description = "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting."
+config_file = "agents/literature_researcher.toml"
+
+[agents.logic_gap_reviewer]
+description = "Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps."
+config_file = "agents/logic_gap_reviewer.toml"
+
+[agents.long_form_writer]
+description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."
+config_file = "agents/long_form_writer.toml"
+
+[agents.manager_reviewer]
+description = "Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline."
+config_file = "agents/manager_reviewer.toml"
+
+[agents.ml_science_reviewer]
+description = "Read-only reviewer for assumptions, limitations, uncertainty, and reader-facing scientific reporting."
+config_file = "agents/ml_science_reviewer.toml"
+
+[agents.notation_definition_reviewer]
+description = "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents."
+config_file = "agents/notation_definition_reviewer.toml"
+
+[agents.oop_readability_reviewer]
+description = "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts."
+config_file = "agents/oop_readability_reviewer.toml"
+
+[agents.plan_reviewer]
+description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."
+config_file = "agents/plan_reviewer.toml"
+
+[agents.project_reviewer]
+description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."
+config_file = "agents/project_reviewer.toml"
+
+[agents.python_reviewer]
+description = "Read-only reviewer for Python diffs, pyright, pytest, ruff, and type-boundary changes."
+config_file = "agents/python_reviewer.toml"
+
+[agents.report_reviewer]
+description = "Read-only reviewer for experiment reports and evidence traceability."
+config_file = "agents/report_reviewer.toml"
+
+[agents.reproducibility_reviewer]
+description = "Read-only reviewer for provenance, seeds, commands, environments, and rerunability."
+config_file = "agents/reproducibility_reviewer.toml"
+
+[agents.requirements_organizer]
+description = "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets."
+config_file = "agents/requirements_organizer.toml"
+
+[agents.reviewer]
+description = "Read-only review agent for diffs, regressions, and documentation alignment."
+config_file = "agents/reviewer.toml"
+
+[agents.scientific_computing_reviewer]
+description = "Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code."
+config_file = "agents/scientific_computing_reviewer.toml"
+
+[agents.ship_reviewer]
+description = "High-assurance read-only reviewer for final clause coverage and release readiness."
+config_file = "agents/ship_reviewer.toml"
+
+[agents.spark_worker]
+description = "Low-latency implementation agent for narrow, design-traced code, docs, tests, or mechanical cleanup slices."
+config_file = "agents/spark_worker.toml"
+
+[agents.test_designer]
+description = "Read-only agent for static analysis and adversarial test-case design before implementation."
+config_file = "agents/test_designer.toml"
+
+[agents.worker]
+description = "Implementation agent for bounded code, docs, or test changes."
+config_file = "agents/worker.toml"
 
 [mcp_servers.repo_mcp_server]
 command = "bash"

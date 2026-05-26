@@ -11,10 +11,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Findings
-
-| Area | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+{{>findings_area_table}}
 
 ## Top-Down Readthrough
 
@@ -36,6 +33,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Record what the designer must rewrite so the top-down reader path becomes approval-ready. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

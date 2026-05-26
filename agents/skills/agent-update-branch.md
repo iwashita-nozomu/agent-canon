@@ -12,7 +12,7 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 ## Lanes
 
 - `memory-eval`: updates durable agent memory, eval manifests, eval result artifacts, and skill prompt feedback.
-- `canon-pin`: updates the `vendor/agent-canon` submodule pin, `.gitmodules`, and root AgentCanon link/copy views.
+- `canon-pin`: updates the `vendor/agent-canon` submodule pin, `.agent-canon/update-state.toml`, `.gitmodules`, and root AgentCanon link/copy views.
 - `integration`: merges one or more `agent-updates/*` branches into an integration branch before `main`.
 
 ## Required Gates

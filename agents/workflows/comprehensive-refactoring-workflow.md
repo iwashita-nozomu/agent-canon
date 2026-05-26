@@ -4,11 +4,12 @@ responsibility Documents 包括的リファクタリングワークフロー for
 upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
-upstream design ../skills/behavior-preserving-refactor.md behavior-preserving refactor contract
+upstream design ../skills/refactor-loop.md refactor loop contract
 upstream design ../../documents/object-oriented-design.md OOP boundary policy
 upstream design ../../documents/algorithm-implementation-boundary.md algorithm boundary policy
-upstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
-upstream implementation ../../tools/agent_tools/analyze_oop_readability.py OOP readability analyzer
+downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
+downstream implementation ../../tools/oop/python/readability.py Python OOP readability analyzer
+downstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability analyzer
 @dependency-end
 -->
 
@@ -98,17 +99,28 @@ python3 tools/agent_tools/analyze_refactor_surface.py python tests --min-score 8
 
 この tool は AST と file length から、長すぎる function / class / file、公開 method 過多の class を検出し、score を出します。
 
-Python / C++ の OOP readability baseline では次を使います。
+Python の OOP readability baseline では次を使います。
 
 ```bash
-python3 tools/agent_tools/analyze_oop_readability.py \
+python3 tools/oop/python/readability.py \
   --exclude vendor \
   --exclude reports \
-  python include src tests \
-  --min-score 85
+  python tools tests \
+  --min-score 95
 ```
 
-この tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method / field 過多、instance state 過多、static method namespace、引数過多、`None` / `nullptr` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。
+Python tool は `object-oriented-design.md` に合わせ、責務不明 class / helper 名、巨大 class / function、public method 過多、instance state 過多、static method namespace、引数過多、`None` runtime routing、純粋変換と副作用の混在、control-flow の読みづらさを検出します。
+C / C++ surface がある場合は別 entrypoint を使います。
+
+```bash
+python3 tools/oop/cpp/readability.py \
+  --exclude vendor \
+  --exclude reports \
+  include src tests/cpp \
+  --min-score 95
+```
+
+C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。
 score は設計判断の補助であり、behavior correctness の代替ではありません。
 tool が足りない場合は、refactor 対象に合わせて小さい解析 tool を同じ pass で追加し、合格点、限界、false positive の扱いを design artifact に書きます。
 
@@ -158,7 +170,7 @@ chunk の例:
 closeout 前に次を確認します。
 
 - `refactor_safety_case.md` または design artifact に Behavior Contract、Allowed Structural Delta、Forbidden Semantic Delta、Path Mapping、Deletion Plan がある。
-- `analyze_refactor_surface.py`、`analyze_oop_readability.py`、または task 固有解析 tool を使った場合、baseline、target、actual score がある。
+- `analyze_refactor_surface.py`、`tools/oop/*/readability.py`、または task 固有解析 tool を使った場合、baseline、target、actual score がある。
 - `project_reviewer` が stale path、delete 漏れ、cross-module drift を確認している。
 - language reviewer が OOP boundary、function/class length、public API、test placement を確認している。
 - dependency review が full repo で pass している。

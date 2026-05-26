@@ -2,6 +2,9 @@
 # responsibility Defines deterministic evals for skill and workflow prompt drift.
 # upstream design README.md prompt eval directory contract
 # upstream design ../skills/adaptive-improvement-loop.md adaptive improvement skill contract
+# upstream design ../skills/academic-writing.md Academic Writing TeX routing contract
+# upstream design ../skills/structure-planning.md reusable structure planning skill contract
+# upstream design ../skills/html-output.md explicit HTML output and browser publication skill contract
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
 
@@ -10,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 26
+expected_count = 36
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -35,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 48
+expected_count = 58
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -54,7 +57,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-workflow-docs"
 target_glob = "agents/workflows/*.md"
-expected_count = 21
+expected_count = 22
 kind = "workflow"
 description = "Every workflow document must be dependency-linked and reader-addressable."
 
@@ -86,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 26
+expected_count = 36
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -107,6 +110,456 @@ id = "CLAUDE-SKILL-GENERIC-3"
 critical = true
 description = "Provides an executable numbered instruction list."
 required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "result-artifact-writeout-skill"
+target = ".agents/skills/result-artifact-writeout/SKILL.md"
+kind = "skill"
+description = "Result writeout must preserve raw evidence, summary artifacts, manifests, unique paths, and no-overwrite policy."
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-1"
+critical = true
+description = "Requires raw source result and summary artifact separation."
+required_regex = ["raw", "summary", "source result"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-2"
+critical = true
+description = "Requires manifest, unique artifact path, and overwrite policy."
+required_regex = ["manifest", "unique", "overwrite"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-3"
+critical = true
+description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
+required_regex = ["failed", "partial", "status", "exit code"]
+
+[[evals.checklist]]
+id = "RESULT-WRITEOUT-4"
+critical = true
+description = "Routes reader-facing tool or JSON result reports to report-writing instead of treating writeout as the narrative report skill."
+required_regex = ["reader-facing report", "\\$report-writing", "source packet", "limitations", "quality checklist"]
+
+[[evals]]
+id = "tool-finding-report-skill"
+target = ".agents/skills/tool-finding-report/SKILL.md"
+kind = "skill"
+description = "Tool finding reports must preserve raw and structured artifacts, route narrative reports separately, and feed prompt repair decisions into implementation loops."
+
+[[evals.checklist]]
+id = "TOOL-FINDING-1"
+critical = true
+description = "Requires raw result preservation, structured artifacts, and before/after impact when available."
+required_regex = ["raw", "structured", "impact", "python-structure-hash-report", "python-structure-hash-impact"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-2"
+critical = true
+description = "Separates writeout, reader report, and refactor implementation responsibilities."
+required_regex = ["\\$result-artifact-writeout", "\\$report-writing", "\\$refactor-loop"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-3"
+critical = true
+description = "Requires prompt feedback classification and prompt repair before the next write-capable subagent."
+required_regex = ["handoff_prompt_gap", "shared_skill_or_workflow_gap", "workflow_monitor\\.py --runtime-feedback", "prompt_repair", "next write-capable subagent"]
+
+[[evals]]
+id = "report-writing-skill"
+target = ".agents/skills/report-writing/SKILL.md"
+kind = "skill"
+description = "Report writing must require source packets, evidence traceability, limitations, actionability, reviewer routing, and result-artifact separation."
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-1"
+critical = true
+description = "Requires reader-facing report classification and source packet setup."
+required_regex = ["reader-facing", "Classify the report", "source packet"]
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-2"
+critical = true
+description = "Requires quality checklist dimensions, limitations, and actionability."
+required_regex = ["Report Quality Checklist", "limitations", "actionability", "evidence traceability"]
+
+[[evals.checklist]]
+id = "REPORT-WRITING-SKILL-3"
+critical = true
+description = "Separates raw result writeout from report narrative and requires reviewer routing."
+required_regex = ["\\$result-artifact-writeout", "raw", "reader report", "report_reviewer"]
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-SHIM-1"
+critical = true
+description = "Requires existing reference-note inspection and durable source packets."
+required_regex = ["external references", "existing repo reference notes", "durable source packets"]
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-SHIM-2"
+critical = true
+description = "Rejects transient browser, temporary download, and chat-only summaries as provenance."
+required_regex = ["browser tab", "downloaded temp file", "chat-only source summary"]
+
+[[evals.checklist]]
+id = "REPORT-STRUCTURE-SHIM-1"
+critical = true
+description = "Routes nontrivial report structure through structure-planning before drafting."
+required_regex = ["\\$structure-planning", "structure contract", "report skeleton", "mapped evidence"]
+
+[[evals.checklist]]
+id = "REPORT-OUTPUT-FORMAT-SKILL-1"
+critical = true
+description = "Defaults reports to Markdown and routes explicit HTML/browser output to html-output."
+required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$html-output", "browser view", "external browser publication"]
+
+[[evals]]
+id = "html-output-shim"
+target = ".agents/skills/html-output/SKILL.md"
+kind = "skill"
+description = "HTML output runtime skill must handle explicit HTML routing, layout, ImageGen, and browser server publication."
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-SHIM-1"
+critical = true
+description = "Only routes explicit HTML/browser requests and defaults unspecified reports to Markdown."
+required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$report-writing", "browser view", "external browser publication"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-SHIM-2"
+critical = true
+description = "Documents server reuse, start, validation, bind, and host-IP commands."
+required_regex = ["ss -ltnp", "curl -fsS", "HTML_SERVER=reuse", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "hostname -I"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-SHIM-3"
+critical = true
+description = "Wires ImageGen and layout quality constraints."
+required_regex = ["\\$imagegen", "stable dimensions", "responsive", "no overlapping text", "first-viewport"]
+
+[[evals]]
+id = "html-output-doc"
+target = "agents/skills/html-output.md"
+kind = "skill"
+description = "Human HTML output skill must define Markdown default, server publication, ImageGen, and layout quality gates."
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-DOC-1"
+critical = true
+description = "Defines Markdown default and explicit HTML trigger boundary."
+required_regex = ["default report output is Markdown", "explicitly asks for HTML", "browser page", "external browser publication"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-DOC-2"
+critical = true
+description = "Documents server reuse, start, validation, bind, and external URL commands."
+required_regex = ["ss -ltnp", "curl -fsS", "HTML_SERVER=reuse", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "hostname -I", "external_url"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-DOC-3"
+critical = true
+description = "Wires ImageGen and layout quality gates."
+required_regex = ["\\$imagegen", "Layout Quality Gate", "stable dimensions", "Text fits", "html_layout_check"]
+
+[[evals]]
+id = "structure-planning-shim"
+target = ".agents/skills/structure-planning/SKILL.md"
+kind = "skill"
+description = "Structure planning runtime skill must cover reports, experiments, documents, HTML views, and refactors."
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-1"
+critical = true
+description = "Defines a structure contract with first artifact, source map, metric or delta contract, invalid interpretations, and validation gate."
+required_regex = ["structure contract", "first artifact", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-2"
+critical = true
+description = "Routes the completed contract to report, HTML experiment, experiment lifecycle, document, paper, and refactor skills."
+required_regex = ["\\$report-writing", "\\$html-output", "\\$html-experiment-report", "\\$experiment-lifecycle", "\\$long-form-writing", "\\$academic-writing", "\\$paper-writing", "\\$refactor-loop"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-3"
+critical = true
+description = "Keeps structure planning separate from storage, execution, prose, implementation, and domain authority."
+required_regex = ["owns structure", "not raw storage", "experiment execution", "report prose", "implementation", "domain authority"]
+
+[[evals]]
+id = "structure-planning-doc"
+target = "agents/skills/structure-planning.md"
+kind = "skill"
+description = "Human structure-planning skill must define reusable contracts for report, experiment, document, and refactor structure."
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-1"
+critical = true
+description = "Covers report, experiment, document, paper, HTML, and refactor use cases."
+required_regex = ["report", "experiment", "document", "paper", "HTML", "refactor"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-2"
+critical = true
+description = "Defines the structure contract fields and closeout tokens."
+required_regex = ["structure_kind", "first_artifact", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-3"
+critical = true
+description = "Separates structure authority from raw storage, experiment execution, report prose, document drafting, implementation, and domain authority."
+required_regex = ["does not own raw result storage", "experiment execution", "report prose", "document\\s+drafting", "implementation", "domain authority"]
+
+[[evals]]
+id = "literature-survey-source-record-shim"
+target = ".agents/skills/literature-survey/SKILL.md"
+kind = "skill"
+description = "Literature survey runtime skill must inspect existing references before external lookup and leave durable source records."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-1"
+critical = true
+description = "Requires an existing-reference sweep before web search, PDF download, or citation lookup."
+required_regex = ["Before web search", "existing `references/`", "same source or claim"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-2"
+critical = true
+description = "Requires durable source notes or source packets with provenance fields."
+required_regex = ["durable tracked reference note", "URL/DOI", "access date", "artifact location"]
+
+[[evals]]
+id = "literature-survey-source-record-doc"
+target = "agents/skills/literature-survey.md"
+kind = "skill"
+description = "Human literature survey skill must define existing-reference sweep and durable source packet deliverables."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-1"
+critical = true
+description = "Requires checking existing references, notes, documents, and topic reports before external lookup."
+required_regex = ["web search", "既存の `references/`", "topic report"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-2"
+critical = true
+description = "Requires tracked artifacts and durable source record fields."
+required_regex = ["tracked artifact", "durable source record", "URL / DOI", "download artifact"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-3"
+critical = true
+description = "Defines reader-facing source sweep and adoption/exclusion sections."
+required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "academic-writing-tex-routing-shim"
+target = ".agents/skills/academic-writing/SKILL.md"
+kind = "skill"
+description = "Academic Writing runtime skill must be the default TeX route for academic documents and figures."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-SHIM-1"
+critical = true
+description = "Requires a TeX output plan and devcontainer TeX commands."
+required_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-SHIM-2"
+critical = true
+description = "Prevents TeX from becoming the default route for ordinary docs."
+required_regex = ["Do not route general README", "default-wired only for Academic Writing"]
+
+[[evals.checklist]]
+id = "ACADEMIC-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before drafting when section, figure/table, or claim/evidence layout is nontrivial."
+required_regex = ["\\$structure-planning", "section order", "figure/table placement", "claim/evidence layout", "invalid interpretations"]
+
+[[evals]]
+id = "academic-writing-tex-routing-doc"
+target = "agents/skills/academic-writing.md"
+kind = "skill"
+description = "Human Academic Writing skill must define the TeX output boundary."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-DOC-1"
+critical = true
+description = "Defines the TeX output boundary and validation commands."
+required_regex = ["TeX Output Boundary", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-DOC-2"
+critical = true
+description = "Limits default TeX routing to Academic Writing rather than general writing skills."
+required_regex = ["TeX を使う既定配線はこの skill に限る", "一般の `\\$long-form-writing`"]
+
+[[evals]]
+id = "academic-writing-workflow-tex-output"
+target = "agents/workflows/academic-writing-workflow.md"
+kind = "workflow"
+description = "Academic writing workflow must include TeX validation only when TeX output is active."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-WORKFLOW-1"
+critical = true
+description = "Routes active TeX output plans through document and figure validation commands."
+required_regex = ["TeX output plan", "latexmk -pdf", "dvisvgm", "pdfcrop"]
+
+[[evals]]
+id = "long-form-writing-avoids-tex-default"
+target = "agents/skills/long-form-writing.md"
+kind = "skill"
+description = "Long-form writing must not gain Academic Writing's default TeX route."
+
+[[evals.checklist]]
+id = "NON-ACADEMIC-TEX-1"
+critical = true
+description = "Forbid Academic Writing's default TeX route from leaking into long-form writing."
+forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals]]
+id = "paper-writing-avoids-tex-default"
+target = "agents/skills/paper-writing.md"
+kind = "skill"
+description = "Paper Writing remains a section-discipline overlay and must not own the default TeX route."
+
+[[evals.checklist]]
+id = "NON-ACADEMIC-TEX-2"
+critical = true
+description = "Forbid Academic Writing's default TeX route from leaking into paper writing."
+forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals]]
+id = "research-workflow-source-record"
+target = "agents/workflows/research-workflow.md"
+kind = "workflow"
+description = "Research workflow must check existing source notes and persist external-source provenance."
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-1"
+critical = true
+description = "Requires checking existing source notes before external research."
+required_regex = ["既存 source note", "外部調査", "durable source packet"]
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-2"
+critical = true
+description = "Requires durable provenance for external sources and rejects transient browser/download context."
+required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
+
+[[evals]]
+id = "report-writing-source-provenance-doc"
+target = "agents/skills/report-writing.md"
+kind = "skill"
+description = "Human report-writing skill must require durable source provenance for external references."
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-DOC-1"
+critical = true
+description = "Requires durable source notes or source packets before publishing reports with external references."
+required_regex = ["External Source Provenance", "existing durable source notes", "source packets"]
+
+[[evals.checklist]]
+id = "REPORT-SOURCE-DOC-2"
+critical = true
+description = "Requires source fields and rejects transient provenance."
+required_regex = ["URL/DOI", "adoption/exclusion decision", "chat-only summaries"]
+
+[[evals.checklist]]
+id = "REPORT-OUTPUT-FORMAT-DOC-1"
+critical = true
+description = "Defines Markdown default and explicit HTML route."
+required_regex = ["default report output is Markdown", "explicitly asks for HTML", "html-output", "output format"]
+
+[[evals.checklist]]
+id = "NON-ACADEMIC-TEX-3"
+critical = true
+description = "Forbid Academic Writing's default TeX route from leaking into report writing."
+forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals]]
+id = "html-experiment-report-structure-planning"
+target = ".agents/skills/html-experiment-report/SKILL.md"
+kind = "skill"
+description = "HTML experiment report skill must delegate reusable structure creation to structure-planning."
+
+[[evals.checklist]]
+id = "HTML-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before renderer or experiment implementation."
+required_regex = ["\\$structure-planning", "before renderer or experiment implementation", "first figure", "source-to-structure map", "metric contract", "invalid interpretations"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-EXPERIMENT-1"
+critical = true
+description = "Routes experiment HTML delivery through html-output for layout, ImageGen, server publication, and URL validation."
+required_regex = ["\\$html-output", "\\$imagegen", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "curl -fsS", "local/external browser URLs"]
+
+[[evals]]
+id = "experiment-lifecycle-structure-planning"
+target = ".agents/skills/experiment-lifecycle/SKILL.md"
+kind = "skill"
+description = "Experiment lifecycle skill must use structure-planning for experiment plans, rerun plans, reports, and HTML views."
+
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before nontrivial experiment planning or report generation."
+required_regex = ["\\$structure-planning", "experiment planning", "rerun planning", "result report generation", "HTML view generation", "validation gate"]
+
+[[evals]]
+id = "document-writing-structure-planning"
+target = ".agents/skills/long-form-writing/SKILL.md"
+kind = "skill"
+description = "Long-form writing skill must use structure-planning for nontrivial document structure."
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning when reader path, source mapping, first section, or invalid interpretations are nontrivial."
+required_regex = ["\\$structure-planning", "section order", "reader path", "source mapping", "first section", "invalid interpretations"]
+
+[[evals]]
+id = "paper-writing-structure-planning"
+target = ".agents/skills/paper-writing/SKILL.md"
+kind = "skill"
+description = "Paper writing skill must use structure-planning for nontrivial paper section and evidence layout."
+
+[[evals.checklist]]
+id = "PAPER-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before drafting when paper section, figure/table, or evidence layout is nontrivial."
+required_regex = ["\\$structure-planning", "section order", "first figure/table", "claim/evidence layout", "source-to-structure map"]
+
+[[evals]]
+id = "refactor-loop-structure-planning"
+target = ".agents/skills/refactor-loop/SKILL.md"
+kind = "skill"
+description = "Refactor loop skill must use structure-planning for nontrivial refactor structure."
+
+[[evals.checklist]]
+id = "REFACTOR-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before refactor edits when module, path, responsibility, or delta structure is nontrivial."
+required_regex = ["\\$structure-planning", "file moves", "module boundaries", "repair slices", "path mapping", "responsibility maps", "forbidden semantic delta"]
+
+[[evals]]
+id = "references-readme-existing-source-policy"
+target = "references/README.md"
+kind = "reference"
+description = "References index must require checking existing source notes and writing durable source records."
+
+[[evals.checklist]]
+id = "REFERENCES-README-1"
+critical = true
+description = "Requires searching existing durable reference surfaces before adding a source note."
+required_regex = ["Before adding a new source note", "existing `references/`", "same title, DOI, URL, or claim"]
+
+[[evals.checklist]]
+id = "REFERENCES-README-2"
+critical = true
+description = "Requires durable source records with provenance and artifact-retention fields."
+required_regex = ["leave a durable source record", "URL or DOI", "access date", "downloaded artifact"]
 
 [[evals]]
 id = "all-canonical-routing-docs"
@@ -130,7 +583,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-codex-subagent-prompts"
 target_glob = ".codex/agents/*.toml"
-expected_count = 29
+expected_count = 32
 kind = "subagent"
 description = "Every Codex subagent prompt must be dependency-linked and declare a model."
 
@@ -212,6 +665,60 @@ critical = true
 description = "Requires agent-orchestration first, repo execution skills, task-shape skill routing, and convention verifier gate."
 required_regex = ["\\$agent-orchestration", "\\$codex-task-workflow", "\\$subagent-bootstrap", "task-shape skill", "check_convention_compliance\\.py"]
 forbidden_regex = ["(?i)do not run .*check_convention_compliance\\.py"]
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-SKILL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and pairs raw machine result storage with result-artifact-writeout."
+required_regex = ["PR body", "reader-facing report", "\\$report-writing", "JSON/JSONL", "\\$result-artifact-writeout", "evidence-backed"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-ROUTING-SKILL-1"
+critical = true
+description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
+required_regex = ["\\$html-output", "\\$html-experiment-report", "defaults to Markdown", "explicitly asks for HTML", "external browser publication"]
+
+[[evals.checklist]]
+id = "STRUCTURE-ROUTING-SKILL-1"
+critical = true
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
+required_regex = ["\\$structure-planning", "experiment plan/report", "document", "paper", "refactor", "source map"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-SKILL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool/checker/hook/static-analysis", "\\$tool-finding-report", "before/after impact"]
+
+[[evals]]
+id = "agent-orchestration-canonical-report-routing"
+target = "agents/skills/agent-orchestration.md"
+kind = "skill"
+description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
+required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
+required_regex = ["html-output", "html-experiment-report", "Markdown", "HTML", "external browser publication"]
+
+[[evals.checklist]]
+id = "STRUCTURE-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning."
+required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
 
 [[evals]]
 id = "codex-task-workflow-convention-gate"
@@ -554,13 +1061,14 @@ required_regex = ["layout drift", "layout review", "reference visibility", "clos
 id = "codex-config-shared-features"
 target = ".codex/config.toml"
 kind = "config"
-description = "Shared Codex config must expose token-saving profiles and goals."
+description = "Shared Codex config must expose supported hook and goal feature flags without project-local profiles."
 
 [[evals.checklist]]
 id = "CODEX-CONFIG-TOKEN-1"
 critical = true
-description = "Defines token-lite, token-standard, and token-deep profiles."
-required_regex = ["\\[profiles\\.token-lite\\]", "\\[profiles\\.token-standard\\]", "\\[profiles\\.token-deep\\]", "tool_output_token_limit"]
+description = "Keeps reusable token profiles out of project-local config."
+required_regex = ["\\[features\\]", "hooks\\s*=\\s*true", "goals\\s*=\\s*true"]
+forbidden_regex = ["\\[profiles\\.", "codex_hooks\\s*="]
 
 [[evals.checklist]]
 id = "CODEX-CONFIG-GOALS-1"
@@ -577,8 +1085,8 @@ description = "The Codex workflow must route token-saving and goal-driven reques
 [[evals.checklist]]
 id = "CODEX-WF-TOKEN-1"
 critical = true
-description = "Mentions token profiles, agent modes, and non-waivable gates."
-required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "Full dependency review"]
+description = "Mentions token profiles, agent modes, and profile/risk-selected gates."
+required_regex = ["Token And Agent Mode Preflight", "token-lite", "spark-slice", "risk class", "targeted checks"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"
@@ -641,6 +1149,60 @@ description = "Separates survey execution from closeout score-gate execution."
 required_regex = ["--min-score 0", "target score", "pass / fail"]
 
 [[evals]]
+id = "oop-readability-skill-artifact"
+target = ".agents/skills/oop-readability-check/SKILL.md"
+kind = "skill"
+description = "The OOP readability runtime skill must create Markdown report artifacts by default."
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-1"
+critical = true
+description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
+required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-2"
+critical = true
+description = "Requires the final response to include the artifact path."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
+
+[[evals]]
+id = "oop-readability-claude-skill-artifact"
+target = ".claude/skills/oop-readability-check/SKILL.md"
+kind = "skill"
+description = "The Claude OOP readability runtime skill mirror must create Markdown report artifacts by default."
+
+[[evals.checklist]]
+id = "OOP-CLAUDE-SKILL-1"
+critical = true
+description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
+required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
+
+[[evals.checklist]]
+id = "OOP-CLAUDE-SKILL-2"
+critical = true
+description = "Requires the final response to include the artifact path."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
+
+[[evals]]
+id = "oop-readability-canonical-artifact"
+target = "agents/skills/oop-readability-check.md"
+kind = "skill"
+description = "The canonical OOP readability skill must define durable Markdown report artifacts."
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-1"
+critical = true
+description = "Requires Markdown artifacts by default and a single tool result as the source of truth."
+required_regex = ["Markdown report artifact by default", "Chat-only tables are insufficient", "Use one tool result as the source of truth"]
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-2"
+critical = true
+description = "Requires the durable report path and user-facing artifact path evidence."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "user-facing response must include the artifact path"]
+
+[[evals]]
 id = "oop-readability-tool-docs"
 target = "documents/object-oriented-design.md"
 kind = "docs"
@@ -654,15 +1216,21 @@ required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bu
 
 [[evals]]
 id = "oop-refactor-skill-route"
-target = "agents/skills/behavior-preserving-refactor.md"
+target = "agents/skills/refactor-loop.md"
 kind = "skill"
-description = "The behavior-preserving refactor skill must preserve OOP analyzer scope evidence."
+description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
 
 [[evals.checklist]]
 id = "OOP-SKILL-1"
 critical = true
 description = "Requires external OOP surveys to record commit, paths, excludes, and reports."
 required_regex = ["外部 repo", "commit SHA", "--exclude vendor --exclude reports", "Markdown / JSON report"]
+
+[[evals.checklist]]
+id = "REFACTOR-TOOL-FINDING-1"
+critical = true
+description = "Requires refactor-loop to consume tool-finding-report packets and repair prompt gaps before launching more write-capable subagents."
+required_regex = ["tool-finding-report", "finding packet", "impact", "handoff_prompt_gap", "write-capable subagent"]
 
 [[evals]]
 id = "agent-learning-workflow-behavior-eval"
@@ -814,6 +1382,36 @@ critical = true
 description = "Documents prompt eval manifest duplicate and growth-candidate audit gates."
 required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
 
+[[evals.checklist]]
+id = "EVALS-README-ACCUMULATE-1"
+critical = true
+description = "Documents accumulated prompt eval results for skill use."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/"]
+
+[[evals.checklist]]
+id = "EVALS-README-HOOK-GUIDE-1"
+critical = true
+description = "Documents hook result accumulation and PR/push improvement guide generation."
+required_regex = [".agent-canon/log-archive", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+
+[[evals.checklist]]
+id = "EVALS-README-PROMPT-FEEDBACK-1"
+critical = true
+description = "Documents prompt-derived candidate routing and human feedback evidence."
+required_regex = ["candidate skill / workflow / tool", "human feedback", "skill usage entries"]
+
+[[evals]]
+id = "hook-runs-prompt-feedback-routing"
+target = "agents/evals/results/hook-runs/README.md"
+kind = "hook-result-doc"
+description = "Hook result policy must describe prompt-intake routing evidence without raw prompt retention."
+
+[[evals.checklist]]
+id = "HOOK-RUNS-PROMPT-FEEDBACK-1"
+critical = true
+description = "Requires skill_usage prompt candidate routing and human feedback fields."
+required_regex = ["candidate skill", "workflow / tool", "human feedback labels", "raw prompt text"]
+
 [[evals]]
 id = "tools-readme-prompt-eval-audit"
 target = "tools/README.md"
@@ -826,6 +1424,18 @@ critical = true
 description = "Requires prompt eval audit status and growth-candidate zero closeout condition."
 required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate explicit targets"]
 
+[[evals.checklist]]
+id = "TOOLS-README-EVAL-ACCUMULATE-1"
+critical = true
+description = "Requires unique accumulated prompt eval report naming."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "<eval_run_id>-<status>-<skill-slug>\\.md"]
+
+[[evals.checklist]]
+id = "TOOLS-README-IMPROVEMENT-GUIDE-1"
+critical = true
+description = "Documents the PR and branch-push improvement guide tool."
+required_regex = ["generate_agent_improvement_guide\\.py", "mounted runtime hook archive", "issues/open\\|closed/", "read-only evidence"]
+
 [[evals]]
 id = "documents-tools-readme-prompt-eval-audit"
 target = "documents/tools/README.md"
@@ -837,3 +1447,9 @@ id = "DOCS-TOOLS-EVAL-AUDIT-1"
 critical = true
 description = "Requires prompt eval audit status and duplicate-growth candidate wording."
 required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs"]
+
+[[evals.checklist]]
+id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
+critical = true
+description = "Requires unique accumulated prompt eval report naming."
+required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]

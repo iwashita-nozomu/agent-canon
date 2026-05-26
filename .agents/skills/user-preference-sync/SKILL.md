@@ -1,6 +1,6 @@
 ---
 name: user-preference-sync
-description: Use when notes/themes/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions.
+description: Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions.
 ---
 <!--
 @dependency-start
@@ -13,7 +13,7 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 # User Preference Sync
 
 1. Read `agents/skills/user-preference-sync.md`.
-1. Read `AGENTS.md` and `notes/themes/USER_PREFERENCES.md`.
+1. Read `AGENTS.md` and `memory/USER_PREFERENCES.md`.
 1. Separate durable repo-wide preferences from task-local instructions.
 1. Promote only repeated and stable items into `AGENTS.md`.
-1. Keep rationale, examples, and volatile observations in `notes/themes/USER_PREFERENCES.md`.
+1. Keep rationale, examples, and volatile observations in `memory/USER_PREFERENCES.md` unless they are project-specific notes that belong under repo-local `notes/themes/`.

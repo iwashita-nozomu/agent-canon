@@ -29,10 +29,20 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Mandatory Checklist
 
+- web search、PDF download、citation lookup の前に、同じ topic / source / claim が
+  既存の `references/`、`notes/`、`documents/`、topic report にあるかを確認します。
+- 既存 source note がある場合は、それを更新または引用し、同じ source の並行 truth
+  surface を作りません。
 - primary source、survey、benchmark comparison を優先します
 - peer-reviewed、preprint、vendor doc、blog を区別して記録します
 - 支持資料だけでなく、限定条件や反証候補も集めます
 - query、探索日、採用理由、除外理由を残します
+- answer / report / design で使った source は、`references/`、`notes/`、
+  `reports/agents/<run-id>/source_packet.md` などの tracked artifact に残します。
+- durable source record には URL / DOI、access date、使った claim、limitation、
+  download artifact の有無と保存場所を入れます。
+- browser context、download cache、一時 PDF、chat 上の要約だけを source record として
+  扱いません。
 - task に近い problem setting、data regime、hardware regime を区別します
 - source から直接言えることと、自分の解釈を分けます
 - 最終的に使う主張ごとに source を辿れるようにします
@@ -42,20 +52,26 @@ upstream design ../canonical/skills.md skill canon registry
 1. 問いを 1 文で固定する
 1. inclusion / exclusion を決める
 1. query pack を作る
+1. 既存 `references/`、`notes/`、`documents/`、topic report を topic keyword、
+   source title、DOI / URL で確認する
 1. survey、代表論文、比較論文、公式資料を優先して集める
 1. 支持資料と反証候補を分ける
 1. 各 source について、setting、claim、limitations、使える点を短く抜く
 1. baseline、metric、failure mode、artifact policy に効く source を抜き出す
 1. `Known`、`Contested`、`Open` に整理する
-1. `references/` か `notes/` に残す
+1. 使った source と採用/除外理由を `references/`、`notes/`、または run-local
+   `source_packet.md` に残す
 
 ## Deliverable Shape
 
 - `Question`
 - `Scope`
 - `Search Log`
+- `Existing Reference Sweep`
 - `Primary Sources`
 - `Contrary Or Narrowing Sources`
+- `Adopted Source Claims`
+- `Excluded Sources`
 - `Known`
 - `Contested`
 - `Open`

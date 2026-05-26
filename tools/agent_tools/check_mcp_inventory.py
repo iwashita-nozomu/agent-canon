@@ -273,6 +273,14 @@ def main() -> int:
             print("PROJECT_CODEX_CONFIG_DECLARES_MISSING_MCP=yes")
             print(f"PROJECT_CONFIG_MCP_SERVERS={','.join(sorted(project_config_names))}")
             print("LIKELY_CAUSE=project_config_not_loaded_or_project_not_trusted")
+            if "repo_mcp_server" in ignored_required:
+                print(
+                    "EXPECTED_REPO_MCP_LAUNCHER=.codex/config.toml -> "
+                    "bash mcp/repo_mcp_server.sh"
+                )
+                print(
+                    "REPAIR_REPO_MCP=trust_project_or_restore_.codex_and_mcp_link_root"
+                )
             print("NEXT_ACTION=trust_project_or_fix_codex_config_loading_before_work")
             record_monitoring(
                 args,

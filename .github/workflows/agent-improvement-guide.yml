@@ -1,0 +1,74 @@
+# @dependency-start
+# responsibility Generates AgentCanon improvement guidance on PRs, branch pushes, and manual dispatch.
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py builds the guide
+# upstream implementation ../../tools/ci/checkout_agent_canon_submodule.sh checks out AgentCanon when this workflow is copied into template repos
+# @dependency-end
+
+# Synced to /.github/workflows/agent-improvement-guide.yml by tools/sync_agent_canon.sh link-root.
+# Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml, not the root copy.
+name: Agent Improvement Guide
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+
+concurrency:
+  group: agent-improvement-guide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guide:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Checkout AgentCanon submodule
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+        run: |
+          if [ -f .github/scripts/checkout_agent_canon_submodule.sh ]; then
+            bash .github/scripts/checkout_agent_canon_submodule.sh
+          else
+            bash tools/ci/checkout_agent_canon_submodule.sh
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Generate improvement guide
+        id: guide
+        run: |
+          canon_root="${GITHUB_WORKSPACE}"
+          if [ -d "${GITHUB_WORKSPACE}/vendor/agent-canon" ]; then
+            canon_root="${GITHUB_WORKSPACE}/vendor/agent-canon"
+          fi
+          report_dir="${GITHUB_WORKSPACE}/reports/agent-improvement-guide"
+          mkdir -p "${report_dir}"
+          guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          python3 "${canon_root}/tools/agent_tools/generate_agent_improvement_guide.py" \
+            --root "${canon_root}" \
+            --out "${guide_path}"
+          cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload improvement guide
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-improvement-guide-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.guide.outputs.guide_path }}

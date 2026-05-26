@@ -1,13 +1,14 @@
-# agent-canon Snapshot Instructions
+# AgentCanon Repository Instructions
 <!--
 @dependency-start
-responsibility Documents agent-canon Snapshot Instructions for this repository.
+responsibility Documents AgentCanon Repository Instructions for this repository.
 downstream design README.md shared canon overview must reflect runtime contract
 @dependency-end
 -->
 
 
-この subtree は shared agent canon の snapshot です。
+この tree は standalone AgentCanon repo の source of truth です。
+template / derived repo では `vendor/agent-canon/` submodule pin として参照されます。
 ここを単体で見ているときは、shared canon の整合を優先し、特定の派生 repo に閉じた Docker、implementation、experiment 前提を持ち込みません。
 
 ## Read First
@@ -31,7 +32,7 @@ downstream design README.md shared canon overview must reflect runtime contract
 - Codex / Claude subagent inventory
 - agent review / coordination documents
 - shared runtime surface ownership document
-- subtree migration and sync operation canon
+- submodule update and legacy migration operation canon
 - skill and worktree operation canon
 - carry-over note template
 - worktree note templates
@@ -48,5 +49,7 @@ downstream design README.md shared canon overview must reflect runtime contract
 
 ## Working Rule
 
-- subtree 内の変更は shared canon として成立するかを先に確認する
-- root entrypoint wrapper の変更は、この subtree ではなく template / 派生 repo 側の wrapper task として扱う
+- AgentCanon tree changes は shared canon として成立するかを先に確認する
+- 広い概念、長い user request、文書統合、薄い文書洗い出しでは、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text|jsonl` または `agent-canon semantic-index thin-docs --top-k <N> --format text` を試す
+- skill、tool、workflow、HTML report、実験 script を追加または変更するときは、先に既存資産の調査、次に責務境界の解析、その後に実装へ入る。この順序と再利用しなかった候補は run bundle または work log に残す
+- root entrypoint wrapper の変更は、この tree ではなく template / 派生 repo 側の wrapper task として扱う

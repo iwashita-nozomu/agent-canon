@@ -1,38 +1,97 @@
 <!--
 @dependency-start
 responsibility Documents documents/ for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md documents ownership policy
+upstream design ./shared-runtime-surfaces.toml machine-readable ownership manifest
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 downstream design ./codex-configuration-reference.md Codex configuration reference
-downstream design ./codex-configuration-slides.md Codex configuration slide deck
 downstream design ./object-oriented-design.md general OOP coding policy
-downstream design ./result-log-retention-and-visualization.md result artifact policy
-downstream design ./repo-local-tool-imports.md repo-local tool import ledger
-downstream design ./agent-canon-github-remote.md GitHub canonical remote policy
-downstream design ./template-github-remote.md template GitHub canonical remote policy
+downstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+downstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
+downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
+downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
+downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
+downstream design ./rust-agent-tool-migration.md Rust tool migration policy
 @dependency-end
 -->
 
 # documents/
 
-`documents/` は repo 固有の文書置き場です。
-template の初期状態では、ここを shared workflow のリンク集にしません。
+`documents/` is a mixed documentation directory. The root `documents/README.md`
+is repo-local and should stay a regular file after template clone. AgentCanon may
+seed this file, but derived repositories own their local index.
 
-派生 repo では、その repo に固有の規約、設計、contract、運用メモだけをここに置きます。
+## Ownership Matrix
+
+| Class | Examples | Edit source |
+| --- | --- | --- |
+| AgentCanon-owned shared policy symlink | coding conventions, review process, workflow-supporting policies, shared templates, tool docs | `vendor/agent-canon/documents/` |
+| Template-owned active contract | bootstrap, host requirements, server contract, remote execution contract, template remote policy | root `documents/` regular files |
+| Project-owned docs | architecture notes, project-specific design specs, implementation contracts | root `documents/` regular files |
+| Generated or run artifacts | agent reports, experiment outputs, logs | `reports/` or `experiments/`, not `documents/` |
+
+If a file is an AgentCanon-owned symlink, edit the source under
+`vendor/agent-canon/` and repair the root view with
+`bash tools/sync_agent_canon.sh link-root`. If a file is a template-owned active
+contract, edit the root regular file.
 
 ## Canon Runtime References
 
-- [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI / config schema / hooks / MCP / skills / subagents の設定一覧。
-- [Codex Configuration Slides](./codex-configuration-slides.md): 上記 reference から作成した Markdown slide deck。
+- [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md): owner classes,
+  symlink/copy/regular behavior, and root-view repair rules.
+- [Shared Runtime Surface Manifest](./shared-runtime-surfaces.toml):
+  machine-readable surface ownership list.
+- [AgentCanon Parent Repository Latest-State Checklist](./agent-canon-parent-repo-latest-checklist.md):
+  task-start checklist for repos that vendor AgentCanon.
+- [Runtime Profiles And Check Matrix](./runtime-profiles-and-check-matrix.md):
+  active profile selection, risk classes, and validation routing.
+- [Runtime Profile Inventory](./runtime-profiles-and-check-matrix.json):
+  machine-readable source of truth for the runtime profile/check matrix doc.
+- [Template / AgentCanon Audit Resolution](./template-agent-canon-audit-resolution.md):
+  2026-05-16 500-item audit coverage and resolution ledger.
+- [Tool And Skill Routing Refactor](./tool-skill-routing-refactor.md): short
+  public tool/skill names, compatibility aliases, and routing policy.
+- [Rust Agent Tool Migration](./rust-agent-tool-migration.md): Rust CLI,
+  devcontainer toolchain, and Python-to-Rust migration boundaries.
+- [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
+  reusable module distribution, local Git compatibility, Dockerfile ownership,
+  and shared devcontainer ownership.
+- [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI
+  / config schema / hooks / MCP / skills / subagents reference.
+- [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical
+  remote and local bare mirror compatibility.
+- [GitHub Copilot Configuration](./github-copilot-configuration.md): Copilot
+  repository instructions, path-specific instructions, custom agents, MCP, setup
+  workflow, and PR template routing.
 
 ## Coding Policy References
 
-- [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md): 数理・仕様境界と implementation boundary の対応表、変更種別、review gate。
-- [Object-Oriented Design Policy](./object-oriented-design.md): class、dataclass、Protocol、composition、継承の判断基準。
+- [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md):
+  math/specification boundary, implementation boundary, change classes, and
+  review gates.
+- [Object-Oriented Design Policy](./object-oriented-design.md): class,
+  dataclass, Protocol, composition, and inheritance policy.
+- [Python Coding Conventions](./coding-conventions-python.md): Python-specific
+  implementation rules.
+- [Project Coding Conventions](./coding-conventions-project.md): project-wide
+  environment, dependency, and runtime rules.
+
+## Template-Owned Active Contracts
+
+These files should be regular files in the template or derived repo root:
+
+- [Template Bootstrap](./template-bootstrap.md)
+- [Template GitHub Remote](./template-github-remote.md)
+- [Linux / WSL Host Requirements](./linux-wsl-host-requirements.md)
+- [Server Host Contract](./server-host-contract.md)
+- [Remote Execution Repo Contract](./remote-execution-repo-contract.md)
+
+AgentCanon provides reusable contract templates under [templates/](./templates/),
+but the active contract for a derived repo belongs to that repo.
 
 ## Tooling And Artifact References
 
-- [Result Log Retention And Visualization](./result-log-retention-and-visualization.md): run result、summary、visualization artifact、retention decision の正本ルール。
-- [Repo-Local Tool Imports](./repo-local-tool-imports.md): 派生 repo で育った tool を AgentCanon に取り込むときの disposition 台帳。
-- [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical remote と local bare mirror 互換運用。
-- [Template GitHub Remote](./template-github-remote.md): Template canonical remote と local bare mirror 互換運用。
+- [Result Log Retention And Visualization](./result-log-retention-and-visualization.md):
+  run result, summary, visualization artifact, and retention rules.
+- [Repo-Local Tool Imports](./repo-local-tool-imports.md): disposition ledger for
+  tools that grow in derived repos before AgentCanon promotion.

@@ -1,173 +1,235 @@
-# Shared Runtime Surfaces
-
 <!--
 @dependency-start
 responsibility Documents Shared Runtime Surfaces for this repository.
-upstream design ../tools/sync_agent_canon.sh shared surface link specification
-upstream design ./agent-canon-subtree-migration.md vendoring ownership model
-downstream implementation ../tools/sync_agent_canon.sh enforces this surface list
-downstream design ./algorithm-implementation-boundary.md listed shared algorithm boundary policy surface
-downstream design ./object-oriented-design.md listed shared coding policy surface
+upstream design ./github-copilot-configuration.md GitHub Copilot configuration surface
+downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
+downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
+downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
+downstream implementation ../tools/sync_agent_canon.sh enforces root-view synchronization
+downstream implementation ../tools/agent_tools/check_convention_compliance.py verifies manifest/doc wiring
+downstream design ./agent-canon-parent-repo-latest-checklist.md task-start parent repo checklist
 @dependency-end
 -->
 
-この文書は、`vendor/agent-canon/` を source of truth とする runtime surface をまとめます。
-template root と派生 repo root では同じ path を使い続けますが、shared canon の正本は vendor 側にあります。
-`vendor/agent-canon/` は新規 repo では submodule pin、legacy repo では subtree snapshot のどちらでもよく、root view の意味は同じです。
-`goal.md` は repo 固有の実行状態なので shared runtime surface ではありません。
-root `goal.md` を `vendor/agent-canon/goal.md` へ symlink してはいけません。
-`tools/sync_agent_canon.sh link-root` は既存の shared `goal.md` symlink を repo-local placeholder に変換します。
+# Shared Runtime Surfaces
 
-## Surface Types
+This document defines how `vendor/agent-canon/` is exposed into a template or
+derived repository root. The machine-readable source of truth is
+`documents/shared-runtime-surfaces.toml`; this document explains the ownership
+rules for readers and reviewers.
 
-### symlink view
+The template and its derived repositories may be tightly coupled to AgentCanon
+because they are cloned from the template. That coupling is intentional. The
+boundary that must stay clear is ownership: each root path must say who owns it,
+whether a derived repository may override it, and where edits must be made.
 
-root では次を symlink view として扱います。
+## Owner Classes
 
-- `AGENTS.md`
-- `agents/`
-- `.agents/`
-- `.claude/`
-- `CLAUDE.md`
-- `.github/AGENTS.md`
-- `.github/copilot-instructions.md`
-- `.codex/config.toml`
-- `.codex/README.md`
-- `.codex/agents`
-- `mcp/`
-- `documents/BRANCH_SCOPE.md`
-- `documents/AGENTS_COORDINATION.md`
-- `documents/DOCSTRING_GUIDE.md`
-- `documents/FILE_CHECKLIST_OPERATIONS.md`
+| Owner class | Root behavior | Edit source | Local override |
+| --- | --- | --- | --- |
+| AgentCanon-owned runtime surface | symlink view into `vendor/agent-canon/` | AgentCanon source | no |
+| AgentCanon-owned shared policy | standalone under `vendor/agent-canon/documents/` | AgentCanon source | no |
+| Template-owned active contract | regular root file when the template or derived repo creates one | template or derived repo root | yes |
+| Project-owned durable state / content | regular project-local file or directory | project root | yes |
+| GitHub path constraint copy surface | regular root copy from AgentCanon source | AgentCanon source, then `link-root` copy | no |
+| AgentCanon standalone-only surface | absent from template root; `link-root` removes stale root views | standalone AgentCanon repo | no |
+
+## Manifest Contract
+
+`documents/shared-runtime-surfaces.toml` lists every synchronized surface with
+these fields:
+
+- `path`: root-relative path in the template or derived repo.
+- `mode`: `symlink`, `copy`, `regular`, `repo_state`, `standalone_only`, or
+  `removed_legacy`.
+- `owner`: the owner class in machine-readable form.
+- `class`: the behavior class, such as `runtime_surface`, `shared_policy`,
+  `active_contract`, `durable_state`, `test_mirror`, or `github_copy`.
+- `source`: optional AgentCanon-relative source when it differs from `path`.
+- `local_override_allowed`: whether a derived repo may make the root path its
+  own truth surface after clone.
+
+`tools/sync_agent_canon.sh` reads the manifest through
+`tools/agent_tools/surface_manifest.py`. The shell script must not carry a
+separate long hard-coded list of root paths. If the manifest and this document
+disagree, update the manifest first and then adjust this reader-facing policy.
+
+## AgentCanon-Owned Symlink Views
+
+AgentCanon-owned runtime and policy paths are symlink views in the template root.
+Edit the `vendor/agent-canon/` source, then repair the root view with:
+
+```bash
+bash tools/sync_agent_canon.sh link-root
+```
+
+Core runtime surfaces include `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`,
+`.claude/`, `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `mcp/`, and `tools/`.
+These paths are installed capability. The active profile and required checks
+are selected by `documents/runtime-profiles-and-check-matrix.md`.
+
+### Tools Directory Boundary
+
+Root `tools/` is a symlink view, not a project-local implementation directory.
+Its source is `vendor/agent-canon/tools/`, which owns shared agent tooling,
+workflow automation, CI helpers, container runners, document maintenance tools,
+and static-analysis utilities.
+
+Parent repositories call shared tooling through the stable root command path,
+such as `python3 tools/agent_tools/check_convention_compliance.py`, while edits
+to those tools are made in `vendor/agent-canon/tools/...` and routed through
+AgentCanon. Project-local automation must stay in project-owned paths, such as
+`scripts/`, package-local modules, project-specific CI files, or another
+repo-owned path. A derived repository must not turn root `tools/` into a mixed
+directory or add project-specific files under that symlink view.
+
+Inventory and review tooling should distinguish these roles: `tools/` at the
+root is the AgentCanon tool view, and `vendor/agent-canon/tools/` is the
+AgentCanon tool source.
+
+GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`,
+`.github/copilot-instructions.md`, `.github/instructions/`, and
+`.github/agents/`.
+
+Shared policy documents are not exposed as root `documents/` symlink views in
+template or derived repositories. They remain available under
+`vendor/agent-canon/documents/`, including review, workflow, coding conventions,
+OOP guidance, experiment policy, dependency manifest policy, worktree lifecycle,
+conventions subtrees, tool docs, reusable templates, `documents/README.md`,
+`documents/template-bootstrap.md`, and
+`documents/github-first-module-and-devcontainer-policy.md`. Parent repositories
+decide which repo-specific documents appear in root `documents/`.
+
+`.devcontainer/` is a shared AgentCanon runtime ergonomics surface. It may
+generate `.devcontainer/docker-compose.generated.yml` locally, but the source
+scripts, `devcontainer.json`, post-create setup, and attach status reporting are
+edited in AgentCanon. The devcontainer consumes repo-local `docker/Dockerfile`,
+`docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it
+does not make `docker/` AgentCanon-owned.
+
+## Template-Owned Active Contracts
+
+These root files may describe the current template or derived repository. They
+are regular files, not symlink views, only when the parent repository creates
+and owns them:
+
+- `README.md`
+- `QUICK_START.md`
 - `documents/README.md`
-- `documents/algorithm-implementation-boundary.md`
-- `documents/object-oriented-design.md`
-- `documents/dependency-manifest-design.md`
-- `documents/notes-lifecycle.md`
-- `documents/REVIEW_PROCESS.md`
-- `documents/SHARED_RUNTIME_SURFACES.md`
-- `documents/SKILL_IMPLEMENTATION_GUIDE.md`
-- `documents/TROUBLESHOOTING.md`
-- `documents/WORKTREE_SCOPE_TEMPLATE.md`
-- `documents/agent-canon-github-remote.md`
-- `documents/agent-canon-subtree-migration.md`
-- `documents/template-github-remote.md`
-- `documents/coding-conventions-cpp.md`
-- `documents/coding-conventions-experiments.md`
-- `documents/coding-conventions-house-style.md`
-- `documents/coding-conventions-logging.md`
-- `documents/coding-conventions-project.md`
-- `documents/coding-conventions-python.md`
-- `documents/coding-conventions-reviews.md`
-- `documents/coding-conventions-testing.md`
-- `documents/experiment-critical-review.md`
-- `documents/experiment-registry.md`
-- `documents/experiment-report-style.md`
-- `documents/experiment_runner.md`
-- `documents/cpp-build-layout.md`
-- `documents/linux-wsl-host-requirements.md`
-- `documents/remote-execution-repo-contract.md`
-- `documents/server-host-contract.md`
 - `documents/template-bootstrap.md`
-- `documents/worktree-lifecycle.md`
-- `documents/conventions/README.md`
-- `documents/conventions/common/01_principles.md`
-- `documents/conventions/common/02_naming.md`
-- `documents/conventions/common/03_comments.md`
-- `documents/conventions/common/04_operators.md`
-- `documents/conventions/common/05_docs.md`
-- `documents/conventions/python/01_scope.md`
-- `documents/conventions/python/04_type_annotations.md`
-- `documents/conventions/python/06_comments.md`
-- `documents/conventions/python/07_type_checker.md`
-- `documents/conventions/python/09_file_roles.md`
-- `documents/conventions/python/11_naming.md`
-- `documents/conventions/python/15_jax_rules.md`
-- `documents/conventions/python/20_benchmark_policy.md`
-- `documents/conventions/python/30_experiment_directory_structure.md`
-- `documents/design/README.md`
-- `documents/design/protocols.md`
-- `documents/templates/README.md`
-- `documents/templates/remote_execution_repo.template.toml`
-- `documents/templates/remote_execution_target.template.toml`
-- `documents/templates/server_host_inventory.template.md`
-- `documents/templates/server_runtime_layout.template.toml`
-- `documents/tools/README.md`
-- `memory/README.md`
-- `memory/USER_PREFERENCES.md`
-- `memory/AGENT_PHILOSOPHY.md`
-- `notes/experiments/README.md`
-- `notes/experiments/REPORT_TEMPLATE.md`
-- `notes/experiments/results/README.md`
-- `notes/branches/README.md`
-- `notes/branches/BRANCH_NOTE_TEMPLATE.md`
-- `notes/failures/README.md`
-- `notes/failures/FAILURE_NOTE_TEMPLATE.md`
-- `notes/github-mirror-procedure.md`
-- `notes/guardrails/README.md`
-- `notes/guardrails/engineering_avoidances.md`
-- `notes/knowledge/README.md`
-- `notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
-- `notes/knowledge/benchmark_levels_analysis.md`
-- `notes/knowledge/benchmark_vs_experiment.md`
-- `notes/knowledge/environment_setup.md`
-- `notes/knowledge/experiment_directory_planning.md`
-- `notes/knowledge/experiment_operations.md`
-- `notes/knowledge/git_mirroring.md`
-- `notes/knowledge/literature_intake.md`
-- `notes/knowledge/path_resolution.md`
-- `notes/knowledge/pyright_operations.md`
-- `notes/themes/README.md`
-- `notes/themes/THEME_NOTE_TEMPLATE.md`
-- `notes/themes/from_another_agent.md`
-- `notes/worktrees/README.md`
-- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- `tests/agent_tools/__init__.py`
-- `tests/agent_tools/test_check_agent_runtime_alignment.py`
-- `tests/agent_tools/test_analyze_refactor_surface.py`
-- `tests/agent_tools/test_check_mcp_inventory.py`
-- `tests/agent_tools/test_work_log.py`
-- `tests/agent_tools/test_smoke_test_research_perspective_pack.py`
-- `tests/tools/test_check_merge_structure.py`
-- `tests/tools/test_check_markdown_math.py`
-- `tests/tools/test_mirror_skill_shims.py`
-- `tests/tools/test_run_managed_experiment.py`
-- `tools/`
+- `documents/template-github-remote.md`
+- `documents/linux-wsl-host-requirements.md`
+- `documents/server-host-contract.md`
+- `documents/remote-execution-repo-contract.md`
+- `docker/README.md`
+- `scripts/README.md`
+- `notes/README.md`
+- `.gitmodules`
 
-### synced root copy
+`link-root` no longer materializes AgentCanon documents into root `documents/`.
+A derived repo may create its own server contract, bootstrap contract, host
+requirements, template remote policy, or root `documents/README.md`; those files
+are reviewed and committed as template or derived-repo content.
 
-次は root 側に regular file を残しますが、正本は vendor 側です。
+`standalone_only` manifest entries are intentionally absent from template and
+derived repo roots. If a legacy symlink or copy remains at such a path,
+`bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
+
+AgentCanon may provide generic templates under `documents/templates/`, such as
+`server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
+`remote_execution_repo.template.toml`, and
+`remote_execution_target.template.toml`. Those are shared policy/template
+inputs; they are not the derived repo's active contract.
+
+## Project-Owned Durable State And Content
+
+Project state remains regular root content. AgentCanon must not restore these as
+shared symlinks or shared copies:
+
+- `goal.md`
+- `.agent-canon/update-state.toml`
+- `experiments/README.md`
+- `experiments/registry.toml`
+- `experiments/<topic>/`
+- `reports/`
+- project-specific design documents
+- project-specific implementation notes
+
+`goal.md` is always repo-local state. If a legacy root has `goal.md` symlinked
+to AgentCanon, `link-root` converts it to a repo-local placeholder.
+
+## GitHub Path Constraint Copies
+
+GitHub requires some files to exist at root paths where symlinks are not the
+right operational surface. These paths remain regular root files but are copied
+from AgentCanon:
 
 - `.github/workflows/agent-coordination.yml`
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
+- `.github/scripts/checkout_agent_canon_submodule.sh`
 
-### AgentCanon standalone-only surface
+Do not edit these root copies as independent truth surfaces. Edit the
+AgentCanon source, then run `bash tools/sync_agent_canon.sh link-root`.
 
-次は standalone `agent-canon` GitHub repository 用の正本であり、template root へ同期しません。
+## Documents Directory Ownership
 
-- `vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md`
+Root `documents/` is parent-repo owned. It should contain repo-specific
+architecture, design, contracts, and implementation-specific specs. Shared
+AgentCanon documents stay under `vendor/agent-canon/documents/`; root docs may
+link there when readers need shared conventions or workflow policy. Generated or
+experiment artifacts stay under `reports/` or `experiments/` unless they become
+a durable repo-local design or policy surface.
+
+## Memory And Notes Boundary
+
+`memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md` are AgentCanon
+shared runtime memory. They are global user-agent and agent-operating notes, not
+project-specific design logs.
+
+`notes/README.md` is repo-local. Under `notes/`, shared templates and global
+guardrails may be AgentCanon symlinks, while project-specific knowledge,
+themes, failures, branch notes, worktree logs, and experiment notes belong to
+the template or derived repo. If a preference should apply across repositories,
+promote it through the AgentCanon memory workflow instead of burying it in a
+project-local note.
+
+## Tests Directory Ownership
+
+`tests/` is also mixed:
+
+- `tests/agent_tools/`: AgentCanon-owned symlink mirror for shared runtime
+  tooling tests.
+- `tests/tools/`: AgentCanon-owned symlink mirror for shared tool and workflow
+  tests.
+- `tests/project/` or package-specific test directories: project-local
+  implementation tests owned by the derived repo.
+
+Failures in root `tests/agent_tools/` or `tests/tools/` usually indicate
+AgentCanon tooling or root-view drift; their canonical source files live under
+`vendor/agent-canon/tests/agent_tools/` and `vendor/agent-canon/tests/tools/`.
+Failures in project-local test namespaces usually belong to the derived repo
+implementation.
 
 ## Editing Rule
 
-- shared runtime surface を直すときは `vendor/agent-canon/` 側を編集します
-- root 側の symlink view や copy surface を直接編集しません
-- root copy が drift したら `bash tools/sync_agent_canon.sh link-root` で復元します
-- drift を確認したいときは `bash tools/sync_agent_canon.sh check` を使います
-- root 側で shared surface の file / directory 欠落を見つけたときは、再作成前に template root、`vendor/agent-canon/`、standalone `agent-canon`、この surface list、`tools/sync_agent_canon.sh` の順で確認します
-- 欠落が broken symlink、root copy drift、surface list 漏れ、canon 側 rename、意図的削除のどれかを分類してから、`link-root`、vendor update、surface list update、または削除 follow-up に進みます
-- template と canon の両方で欠落している path だけを repo-local 新規 file 候補にします
+- Edit AgentCanon-owned symlink views in `vendor/agent-canon/`.
+- Edit template-owned active contracts at the root after they are regular
+  files.
+- Edit project-owned durable state at the root.
+- Repair root symlinks and GitHub copy surfaces with
+  `bash tools/sync_agent_canon.sh link-root`.
+- Audit root-view drift with `bash tools/sync_agent_canon.sh check`.
+- Before recreating a missing shared path, check the template root,
+  `vendor/agent-canon/`, standalone AgentCanon, the manifest, and
+  `tools/sync_agent_canon.sh`.
 
 ## Validation
 
 ```bash
+python3 tools/agent_tools/surface_manifest.py check-doc
 bash tools/sync_agent_canon.sh check
+python3 tools/agent_tools/check_convention_compliance.py
 make agent-checks
 make agent-canon-pr-check
 ```
-
-## Root-Side Interpretation
-
-- `scripts/README.md` と `documents/tools/README.md` は root 側の実行入口です
-- workflow canon は `agents/workflows/` にあり、root では `agents/` symlink view 経由で参照します
-- `experiments/README.md`、`experiments/_template/`、`experiments/report/README.md`、`experiments/registry.toml`、topic 固有の `experiments/<topic>/`、`reports/`、repo-local note は root 側の正本に残します
-- shared surface の ownership や upstream sync は、この文書と `documents/agent-canon-subtree-migration.md` を正本にします

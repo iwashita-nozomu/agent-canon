@@ -39,6 +39,7 @@ outer loop は agile、inner change pass は waterfall です。
 - 最初に top-level `goal.md` を更新し、今回の Objective、Exit Criteria、Backlog、Loop Log を固定します。これを tool 追加、prompt repair、workflow 編集より後回しにしてはいけません。
 - repo MCP が利用可能な場合は、`goal.loop_status` を iteration gate にします。`NEXT_ACTION=run_next_iteration` なら次 backlog item を選び、`NEXT_ACTION=close_goal_loop` になるまで completion report を出しません。
 - Codex `goals` feature が有効な場合でも、durable state は `goal.md` に置きます。Codex goals は `goal.md` と同じ Objective / Exit Criteria を表示する session view として扱い、食い違う場合は `goal.md` を正本にして修正します。
+- template repo では active `goal.md` は repo-local runtime state です。派生 repo の seed に混ぜないため tracked product state からは外し、必要なら `.gitignore` で ignored local state として保持します。
 - goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
 - ただし 1 iteration は単発 micro-fix ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
@@ -53,10 +54,12 @@ outer loop は agile、inner change pass は waterfall です。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
 - `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
 - `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
+- skill を使う run では、`evaluate_skill_workflow_prompts.py --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細 report を蓄積します。report file は `<eval_run_id>-<status>-<skill-slug>.md` で採番し、既存 report を上書きしません。
 - skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`agents/evals/skill_workflow_prompt_eval.toml` を正本にします。
-- prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` になるまで loop を閉じません。
+- prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0`、`EVAL_RUN_ID`、`EVAL_ACCUMULATED_REPORT` が揃うまで loop を閉じません。
 - eval manifest の growth candidate は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs です。既存 prompt surface の coverage を増やす場合は、同じ target / same target の eval entry に checklist を統合し、重複 target の並行 eval を残しません。
-- agent 行動改善では、run 中に `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を蓄積し、`agents/evals/agent_behavior_eval.toml` を正本にして `evaluate_agent_run.py` で採点します。
+- agent 行動改善では、run 中に `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を蓄積し、`agents/evals/agent_behavior_eval.toml` を正本にして `evaluate_agent_run.py` で採点します。
+- closeout evidence を確認したあと、標準 behavior token の記録だけを省力化する場合は `workflow_monitor.py --closeout-token-preset` を使います。この preset は `evaluate_agent_run.py` の required tokens を埋める記録 shortcut であり、validation、dependency review、diff-check、review finding resolution の代替ではありません。
 - 利用中の user / reviewer feedback は、`workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> evidence=<...>"` で `runtime_feedback=observed` event として蓄積します。target が skill / workflow prompt なら、対応 eval を確認してから prompt repair し、同じ eval を rerun します。target が memory なら `agent-learning` の note へ還元し、target が no-op なら理由を evidence に残します。
 - static analysis の結果が agent の設計・実装経路の弱さを示す場合は、結果を `static_analysis_feedback=applied|recorded` として workflow monitoring に残し、還元先の skill / workflow / eval を明記します。`static_analysis_feedback=pending` または `missing` は behavior eval で revise にします。
 - 同じ objective で 2 回の実行経路が異なり得る場合は、`tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path` と `route_efficiency` を比較します。経路が異なり、candidate が `route_efficiency=inefficient` または `selected_inefficient_route=yes` なら、非効率経路を選んだとき発火する eval を追加または更新し、skill / workflow prompt を修正してから rerun します。
@@ -69,7 +72,7 @@ outer loop は agile、inner change pass は waterfall です。
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
 1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
 1. Codex `goals` feature が有効な場合は `codex features list | grep '^goals'` の結果を記録し、Codex goals view を `goal.md` と同じ Objective / Exit Criteria に揃える
-1. repo MCP が利用可能な場合は MCP `goal.loop_status` でも同じ `GOAL_LOOP_STATUS` と `NEXT_ACTION` を確認し、run bundle に evidence を残す
+1. repo MCP が利用可能な場合は MCP `goal.loop_status` でも同じ `GOAL_LOOP_STATUS` と `NEXT_ACTION` を確認し、run bundle に evidence を残す。MCP `goal.plan` が使える場合は次 open work units も同じ MCP surface から取得する
 1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定する
 1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を baseline として実行する
 1. agent 行動改善の場合は、`agents/evals/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する

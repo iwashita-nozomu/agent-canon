@@ -3,7 +3,14 @@
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../documents/conventions/README.md convention index
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout prohibition policy
+# upstream design ../../agents/templates/closeout_gate.md closeout gate policy
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
+# upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream implementation ./surface_manifest.py validates shared surface manifest wiring
+# downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
 """Verify that convention, workflow, and skill-routing gates are wired."""
@@ -82,8 +89,23 @@ TOOL_GATES = {
             "documents/conventions/common/02_naming.md",
         ),
     ),
+    "notebook_quality": (
+        "tools/validation/notebook_quality.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
     "oop_readability": (
-        "tools/agent_tools/analyze_oop_readability.py",
+        "tools/oop/python/readability.py",
+        (
+            "documents/object-oriented-design.md",
+            "agents/workflows/comprehensive-refactoring-workflow.md",
+        ),
+    ),
+    "oop_cpp_readability": (
+        "tools/oop/cpp/readability.py",
         (
             "documents/object-oriented-design.md",
             "agents/workflows/comprehensive-refactoring-workflow.md",
@@ -104,7 +126,68 @@ TOOL_GATES = {
         "tools/agent_tools/check_convention_compliance.py",
         ("tools/ci/run_all_checks.sh", "agents/evals/skill_workflow_prompt_eval.toml"),
     ),
+    "tool_catalog": (
+        "tools/agent_tools/tool_catalog.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
+    "tool_convention_drift": (
+        "tools/agent_tools/tool_drift.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "tools/README.md",
+            "documents/tools/README.md",
+        ),
+    ),
+    "import_responsibility": (
+        "tools/agent_tools/import_responsibility.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "documents/responsibility-scope-management.md",
+            "documents/coding-conventions-python.md",
+        ),
+    ),
+    "github_workflow_pr_flow": (
+        "tools/ci/check_github_workflows.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "agents/workflows/agent-canon-pr-workflow.md",
+        ),
+    ),
+    "container_config": (
+        "tools/ci/container_config.py",
+        (
+            "tools/ci/run_all_checks.sh",
+            "agents/skills/environment-maintenance.md",
+            "documents/coding-conventions-project.md",
+        ),
+    ),
+    "surface_manifest": (
+        "tools/agent_tools/surface_manifest.py",
+        (
+            "tools/sync_agent_canon.sh",
+            "documents/SHARED_RUNTIME_SURFACES.md",
+        ),
+    ),
+    "runtime_profile_inventory": (
+        "tools/agent_tools/check_runtime_profile_inventory.py",
+        ("tools/ci/run_docs_checks.sh",),
+    ),
 }
+
+AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
+AGENT_CANON_PUSH_REMOTE_MARKERS = (
+    "remote_verified=yes",
+    "git status --short --branch",
+    "git remote -v",
+    r"git config --get-regexp '^remote\\..*\\.url$'",
+    ".git/config",
+    "literal URL push",
+    "hardcoded repository name",
+)
 
 SKILL_ROUTING_PROMPTS = (
     ".agents/skills/agent-orchestration/SKILL.md",
@@ -140,6 +223,44 @@ PROMPT_EVAL_MARKERS = (
     "check_convention_compliance",
     "CONVENTION-WORKFLOW",
     "CONVENTION-SKILL",
+)
+SURFACE_MANIFEST_FILES = (
+    "documents/SHARED_RUNTIME_SURFACES.md",
+    "documents/shared-runtime-surfaces.toml",
+    "documents/agent-canon-parent-repo-latest-checklist.md",
+    "tools/sync_agent_canon.sh",
+    "tools/agent_tools/surface_manifest.py",
+)
+SURFACE_POLICY_MARKERS = (
+    "documents/shared-runtime-surfaces.toml",
+    "owner class",
+    ".codex/hooks.json",
+    ".codex/hooks",
+    ".devcontainer/",
+    "documents/README.md",
+    "documents/template-bootstrap.md",
+    "documents/github-first-module-and-devcontainer-policy.md",
+    "memory/USER_PREFERENCES.md",
+    "tests/agent_tools/",
+    "Root `tools/` is a symlink view",
+    "vendor/agent-canon/tools/",
+    "Project-local automation must stay in project-owned paths",
+)
+SURFACE_MANIFEST_MARKERS = (
+    'mode = "standalone_only"',
+    'owner = "agent-canon-standalone"',
+    'path = "goal.md"',
+    '"documents/README.md"',
+    '"documents/template-bootstrap.md"',
+    '".devcontainer"',
+    '"documents/github-first-module-and-devcontainer-policy.md"',
+    '".codex/hooks.json"',
+    '"tests/agent_tools/test_check_convention_compliance.py"',
+)
+SURFACE_SYNC_MARKERS = (
+    "surface_manifest.py",
+    "build_regular_specs",
+    "regular_path",
 )
 NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
@@ -182,16 +303,28 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def readable_path(root: Path, relative_path: str) -> Path | None:
+    """Return the readable root path, falling back to vendored AgentCanon docs."""
+    candidates = (root / relative_path, root / "vendor" / "agent-canon" / relative_path)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def read_text(root: Path, relative_path: str) -> str:
     """Read a UTF-8 text file relative to root."""
-    return (root / relative_path).read_text(encoding="utf-8")
+    resolved = readable_path(root, relative_path)
+    if resolved is None:
+        return (root / relative_path).read_text(encoding="utf-8")
+    return resolved.read_text(encoding="utf-8")
 
 
 def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[Finding]:
     """Return findings for missing required files."""
     findings: list[Finding] = []
     for path in paths:
-        if not (root / path).is_file():
+        if readable_path(root, path) is None:
             findings.append(Finding(check, path, "missing-required-file"))
     return findings
 
@@ -206,8 +339,8 @@ def check_tool_gates(root: Path) -> list[Finding]:
             )
             continue
         for reference in references:
-            reference_path = root / reference
-            if not reference_path.is_file():
+            reference_path = readable_path(root, reference)
+            if reference_path is None:
                 findings.append(
                     Finding("tool_gate", reference, f"{gate_name}:missing-reference")
                 )
@@ -294,6 +427,25 @@ def check_closeout_prohibitions(root: Path) -> list[Finding]:
     return findings
 
 
+def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
+    """Verify AgentCanon PR workflow documents remote verification before push."""
+    path = AGENT_CANON_PR_WORKFLOW_PATH
+    findings = check_required_files(root, (path,), "agentcanon_push_remote_guard")
+    if findings:
+        return findings
+    text = read_text(root, path)
+    for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
+        if marker not in text:
+            findings.append(
+                Finding(
+                    "agentcanon_push_remote_guard",
+                    path,
+                    f"missing-marker:{marker}",
+                )
+            )
+    return findings
+
+
 def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     """Verify prompt evals cover convention verifier and skill-call routing."""
     path = "agents/evals/skill_workflow_prompt_eval.toml"
@@ -307,12 +459,49 @@ def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     return findings
 
 
+def check_surface_manifest_wiring(root: Path) -> list[Finding]:
+    """Verify shared surface ownership has one manifest-backed route."""
+    findings = check_required_files(root, SURFACE_MANIFEST_FILES, "surface_manifest")
+    readable_files = {
+        path: resolved.read_text(encoding="utf-8")
+        for path in SURFACE_MANIFEST_FILES
+        if (resolved := readable_path(root, path)) is not None
+    }
+    policy_text = readable_files.get("documents/SHARED_RUNTIME_SURFACES.md", "")
+    for marker in SURFACE_POLICY_MARKERS:
+        if marker not in policy_text:
+            findings.append(
+                Finding(
+                    "surface_manifest",
+                    "documents/SHARED_RUNTIME_SURFACES.md",
+                    f"missing-marker:{marker}",
+                )
+            )
+    manifest_text = readable_files.get("documents/shared-runtime-surfaces.toml", "")
+    for marker in SURFACE_MANIFEST_MARKERS:
+        if marker not in manifest_text:
+            findings.append(
+                Finding(
+                    "surface_manifest",
+                    "documents/shared-runtime-surfaces.toml",
+                    f"missing-marker:{marker}",
+                )
+            )
+    sync_text = readable_files.get("tools/sync_agent_canon.sh", "")
+    for marker in SURFACE_SYNC_MARKERS:
+        if marker not in sync_text:
+            findings.append(
+                Finding("surface_manifest", "tools/sync_agent_canon.sh", f"missing-marker:{marker}")
+            )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
     for path in CONVENTION_SOURCES:
-        full_path = root / path
-        if not full_path.is_file():
+        full_path = readable_path(root, path)
+        if full_path is None:
             continue
         text = full_path.read_text(encoding="utf-8")
         normative_lines = NORMATIVE_RE.findall(text)
@@ -345,7 +534,9 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_workflow_hooks(root))
     findings.extend(check_skill_routing(root))
     findings.extend(check_closeout_prohibitions(root))
+    findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
+    findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_convention_assertions(root))
     return sorted(
         findings,

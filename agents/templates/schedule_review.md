@@ -35,6 +35,4 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Record which stage the planner must revisit, what must change, and what blocks approval. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

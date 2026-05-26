@@ -49,12 +49,43 @@ class RepoMcpServerTest(unittest.TestCase):
         self.assertIn("GOAL_LOOP_STATUS=", text)
         self.assertIn("NEXT_ACTION=", text)
 
+    def test_goal_plan_tool_reports_work_units(self) -> None:
+        """The MCP server should expose goal.md work planning output."""
+        server = load_server()
+        old_root = os.environ.get("CODEX_WORKSPACE_ROOT")
+        os.environ["CODEX_WORKSPACE_ROOT"] = str(PROJECT_ROOT)
+        try:
+            result = server.call_tool(
+                "goal.plan",
+                {"goal_file": "goal.md", "max_items": 2},
+            )
+        finally:
+            if old_root is None:
+                os.environ.pop("CODEX_WORKSPACE_ROOT", None)
+            else:
+                os.environ["CODEX_WORKSPACE_ROOT"] = old_root
+
+        text = result["content"][0]["text"]
+        self.assertIn("MCP_GOAL_LOOP_TOOL=goal.plan", text)
+        self.assertIn("GOAL_WORK_UNITS=", text)
+        self.assertIn("NEXT_ACTION=", text)
+
     def test_goal_loop_status_rejects_paths_outside_repo(self) -> None:
         """The MCP goal tool must not inspect files outside the repository root."""
         server = load_server()
 
         with self.assertRaises(ValueError):
             server.call_tool("goal.loop_status", {"goal_file": "../goal.md"})
+
+        with self.assertRaises(ValueError):
+            server.call_tool("goal.plan", {"goal_file": "../goal.md"})
+
+    def test_goal_plan_rejects_non_integer_max_items(self) -> None:
+        """The MCP goal plan tool should validate max_items type."""
+        server = load_server()
+
+        with self.assertRaises(ValueError):
+            server.call_tool("goal.plan", {"goal_file": "goal.md", "max_items": "2"})
 
     def test_repo_root_prefers_server_file_location_over_process_cwd(self) -> None:
         """The MCP server root should not drift when Codex restarts from elsewhere."""

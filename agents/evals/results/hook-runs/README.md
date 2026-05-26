@@ -1,0 +1,157 @@
+# Legacy Hook Run Results
+
+<!--
+@dependency-start
+responsibility Documents legacy in-tree hook run result naming.
+upstream design ../README.md eval result accumulation contract
+upstream design ../../../../documents/runtime-log-archive.md external runtime log archive contract
+upstream design ../../../../documents/runtime-log-archive-migration.md legacy in-tree JSONL migration procedure
+downstream implementation ../../../../.codex/hooks/hook_event_log.py assigns hook run ids
+downstream implementation ../../../../tools/agent_tools/generate_agent_improvement_guide.py reads hook results
+downstream implementation ../../../../tools/agent_tools/generate_agent_runtime_dashboard.py displays hook results
+downstream implementation ../../../../tools/agent_tools/eval_accumulation_check.py validates hook result structure
+downstream implementation ../../../../tools/agent_tools/agent_canon_log_management_check.py validates hook log ownership boundaries
+@dependency-end
+-->
+
+This directory is the legacy in-tree hook-result surface. Normal Codex hook
+runs now write to the mounted external log archive documented in
+`documents/runtime-log-archive.md`:
+
+```text
+.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+```
+
+The historical JSONL files that used to live here were moved into
+`git@github.com:iwashita-nozomu/agent-canon-log.git` in the `InitialCommit`
+under `hook-runs/legacy-import/`.
+
+Runtime-local `reports/hooks/` output is temporary debug output only when a task
+intentionally overrides the destination with `AGENT_CANON_HOOK_RESULTS_DIR`,
+`AGENT_CANON_OOP_HOOK_LOG_PATH`, `AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH`,
+or `AGENT_CANON_SKILL_LOG_PATH`. `AGENT_CANON_HOOK_RESULTS_DIR` remains a
+test/debug override for a result directory. The default durable chronology is
+the external archive mount, not this source-tree directory.
+
+OOP hook entries include a `mode` field. The default mode is `full`, which blocks
+all current findings in changed source files. `diff` mode is opt-in for tasks
+where the user explicitly asked to ignore baseline findings; those entries also
+record the `baseline_ref` used for comparison.
+
+Style checker hook entries include `selected_checkers`, `checked_files`, and
+`unchecked_files`. `unchecked_files` is the durable signal that a changed file
+had no automatic Python / C++ / notebook / Markdown style checker selected.
+
+Module boundary hook entries include `changed_modules`, `finding_count`,
+`findings`, and `import_checks`. They are the durable signal that a Python
+module rewrite changed public surface or exceeded rewrite thresholds without
+test / docs / issue / responsibility-scope evidence, or that
+`import_responsibility.py` rejected unused imports, wildcard imports, or
+responsibility-scope import crossings.
+
+Library implementation hook entries include `changed_library_files`,
+`finding_count`, and `findings`. They are the durable signal that an agent tried
+to patch vendored or installed library internals instead of using an adapter,
+fork / upstream patch, or manifest-backed vendor import.
+
+Cause investigation hook entries include `code_paths`,
+`cause_evidence_status`, `cause_evidence_source`, and
+`cause_evidence_files`. They are the durable signal that an agent attempted a
+code edit before or after recording root-cause / hypothesis evidence. Prompt and
+skill evals should use blocked records to improve pre-edit investigation
+wording and accepted records to learn what evidence was sufficient.
+
+Helper-first hook entries include `helper_candidate_records`,
+`helper_candidate_record_count`, `helper_first_records`,
+`helper_first_candidate_count`, `boundary_evidence_changed`, and
+`inventory_output_snippet`. They are the durable signal that an agent touched
+helper-like functions; `helper_first_records` is the blocking subset where no
+ownership, module boundary, issue, docs, or test evidence was changed. Prompt
+and skill evals should consume both the accepted and blocked records when
+improving implementation handoff wording.
+`helper_candidate_records` may include `redundant_helper` records with
+`redundancy_rule` and `redundant_with`; those entries show when an agent tried
+to add identity wrappers, pass-through wrappers, or duplicate helper bodies.
+
+Reference capture hook entries include `urls`, `registered_urls`,
+`missing_urls`, `reference_files`, and `decision`. UserPromptSubmit entries are
+measurement-only, while PostToolUse and Stop entries may block when a consulted
+PDF or HTML URL has not been materialized as Markdown under `references/`.
+
+## Artifact Handling
+
+Do not add new raw JSONL to this source-tree directory. Runtime hook chronology
+belongs to the external log archive. If old raw JSONL appears here, move it to
+the archive with `runtime_log_archive_git.py import-legacy --delete-source` and
+keep only this README in AgentCanon source.
+
+After a skill / workflow / tool routing repair lands, current analysis should
+cut over at the repaired source path's latest Git commit instead of deleting
+archive JSONL. Improvement-guide and dashboard tooling may ignore older skill
+routing signals for gap calculations, but the external archive keeps the audit
+and repeated-failure history.
+
+Dirty hook/eval JSONL belongs on `agent-logs/*` branches, not on normal
+AgentCanon product branches or detached submodule checkouts. Use
+`bash tools/update_agent_canon.sh latest` from the parent repo to park such
+dirty state before updating the submodule. The structural guard for this is
+`python3 tools/agent_tools/agent_canon_log_management_check.py`.
+
+## File Naming
+
+Each hook writes one JSONL file named after the hook inside a runtime namespace:
+
+```text
+<runtime-namespace>/<hook-name>.jsonl
+```
+
+The namespace is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
+`DEVCONTAINER_PROJECT_NAME`, `COMPOSE_PROJECT_NAME`, generated devcontainer
+Compose `name:`, or a host/repo hash fallback. This prevents shared
+AgentCanon-owned hook result files such as `oop_readability_guard.jsonl` from
+becoming one conflicting append target across multiple containers or clones.
+Legacy direct files at `hook-runs/<hook-name>.jsonl` may remain readable, but
+new default hook writes must use a namespace directory.
+
+Each line must include:
+
+```text
+hook_run_id: hook-<YYYYMMDDTHHMMSSffffffZ>-<10-char-payload-hash>-<10-char-nonce>
+hook_log_namespace: runtime namespace used for the JSONL path
+timestamp: ISO-8601 UTC
+event: hook event name or UnknownHookEvent
+payload_fingerprint: stable payload hash
+status: pass|fail|skipped
+```
+
+Hook runs are never overwritten. Repeated failures are intentionally kept as
+separate observations. The final nonce makes the run id unique even when two
+hook calls share the same timestamp and payload hash, and `failure_fingerprint`
+is used by guide-generation tools to group repeated failures without losing the
+raw chronology.
+
+Guide-generation tools also mine these JSONL lines for routing evidence:
+`skill_usage.jsonl` contributes explicit skill counts, candidate skill /
+workflow / tool counts inferred from prompt text, human feedback labels and
+targets, prompt fingerprints, bounded redacted prompt excerpts, and skill/event
+coverage. `PostToolUse` entries in that same file contribute chosen tool names,
+tool input fingerprints, input key names, and command verbs. Hook entries with
+`tool_name` contribute tool usage counts, and checker command arrays contribute
+target file counts. Do not strip command target paths from hook results; they
+are how the next repair branch can see which skill, workflow, tool, or source
+file needs attention.
+
+Prompt-intake logs must not store unbounded raw prompt text. Store only
+`prompt_excerpt_redacted`, `prompt_fingerprint`, `prompt_char_count`, and
+`prompt_excerpt_truncated`. If a prompt contains secret-like values, redact them
+before writing the excerpt. If later analysis cannot answer which prompt shape,
+tool selection, or workflow attribution caused a failure, that is evidence that
+the hook log schema is still too weak and should be extended deliberately.
+
+Before editing `.codex/hooks.json` or `.codex/hooks/*`, run
+`python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`.
+The predicted `codex_hook_runtime_alignment` and `log_surface_inventory_guard`
+gates are part of the hook change contract: update hook wiring, quiet-pass
+tests, durable JSONL fields, and `documents/log-surface-inventory.json` together
+instead of letting the PostToolUse/Stop hook discover the mismatch after the
+edit.

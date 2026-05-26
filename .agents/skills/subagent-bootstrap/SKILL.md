@@ -6,6 +6,7 @@ description: Use when a task needs specialist delegation, run-bundle bootstrap, 
 @dependency-start
 responsibility Documents Subagent Bootstrap for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
+upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
 @dependency-end
 -->
 
@@ -26,9 +27,12 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, prefer the Spark bucket from `.codex/config.toml` when explicit spawn authorization exists.
 1. For bounded review, report traceability, and checklist-style review gates, prefer the mini review bucket from `.codex/config.toml` before escalating to frontier roles.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+1. Keep every handoff packet bounded: include role-specific `allowed_paths`, checker or compact artifact paths, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema. Do not use `/workspace` or the repo root as the only scope.
+1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
 1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent using the Spark bucket's `model` and `model_reasoning_effort` from `.codex/config.toml` before escalating to the parent or frontier bucket.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
 1. Use one writer per worktree. If multiple writers are necessary, split worktrees before implementation.
 1. For each new user request, start fresh run-local subagents; do not `send_input` a new task into subagents from a previous request.
 1. Include `team_manifest.yaml` `run.subagent_lifecycle_policy` in every subagent handoff prompt, especially `fresh_subagents_required: true` and `reuse_for_new_task: forbidden`.
+1. Before assigning write-capable work, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and include `TOOL_REJECTION_PREDICTED_GATE` lines, `rejection_preflight_command`, and the gate-specific repair plan in the handoff. Treat hook runtime, skill mirror sync, tool catalog, agent protocol convention, and log-surface inventory gates as implementation blockers until the repair command is run or explicitly scheduled in the same handoff.
 1. Before closeout, close run-local subagents and record `subagents_closed=yes` plus `Subagent Lifecycle Evidence` in `closeout_gate.md`.

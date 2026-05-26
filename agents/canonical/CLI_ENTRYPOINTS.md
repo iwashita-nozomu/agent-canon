@@ -56,6 +56,8 @@ upstream design README.md canonical workflow index
 
 入口:
 - `.github/copilot-instructions.md`
+- `.github/instructions/*.instructions.md`
+- `.github/agents/*.md`
 - `AGENTS.md`
 - `.agents/skills/`
 - `agents/workflows/github-copilot-workflow.md`
@@ -67,6 +69,8 @@ upstream design README.md canonical workflow index
 
 補足:
 - repo instructions は `.github/copilot-instructions.md` に置く
+- PR 処理の path-wide instruction は `.github/instructions/pr-processing.instructions.md` に置く
+- PR maintenance 用 custom agent profile は `.github/agents/pr-maintainer.md` に置く
 - issue / PR / IDE 起点の作業は `agents/workflows/github-copilot-workflow.md` を overlay として扱う
 - old `gh-copilot` extension 前提の説明は正本にしない
 - GitHub-hosted agent は issue / PR 起点で使うことがあるため、repo 正本は特定ローカル wrapper に寄せすぎない
@@ -105,6 +109,6 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-包括的開発では、同一 worktree の writer を 1 人に固定します。複数 writer が必要な場合は worktree を分けます。
+包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。write scope が重なる場合は serialize するか worktree を分けます。
 
 GitHub Actions から回すときは `.github/workflows/agent-coordination.yml` を使います。

@@ -39,10 +39,11 @@ upstream design ../canonical/skills.md skill canon registry
 - 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
 - iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、明示的な `goal_status: achieved` なしに完了扱いしません。
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
+- skill を使う run では `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`EVAL_RUN_ID` と `EVAL_ACCUMULATED_REPORT` を evidence にします。
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `agents/evals/skill_workflow_prompt_eval.toml` に固定します。
-- prompt 修正前後で `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml` を実行し、`EVAL_STATUS=pass` を evidence にします。
+- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
 - eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
-- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
+- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
 - 利用中に得られた user / reviewer feedback は、raw prose のまま放置せず `workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、同じ iteration 内で対象 skill prompt、workflow prompt、eval、memory のいずれかへ還元します。
 - `action=prompt_repair` または `action=eval_update` の feedback は、対応する `agents/evals/skill_workflow_prompt_eval.toml` の entry を先に更新または確認し、prompt repair 後に同じ eval を rerun します。
 - static analysis が workflow / skill / prompt の弱さを示した場合は、結果を `static_analysis_feedback=applied|recorded` として監視し、還元先の skill / workflow / eval を明示します。未処理の `static_analysis_feedback=pending` を残して loop を閉じません。

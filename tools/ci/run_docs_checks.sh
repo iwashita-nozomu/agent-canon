@@ -34,16 +34,29 @@ MARKDOWN_TARGETS=(
   .agents/skills
   .codex/README.md
 )
+EXISTING_MARKDOWN_TARGETS=()
+for target in "${MARKDOWN_TARGETS[@]}"; do
+  if [ -e "$target" ]; then
+    EXISTING_MARKDOWN_TARGETS+=("$target")
+  fi
+done
 
 echo "════════════════════════════════════════════════════════════════"
 echo "📝 Documentation checks"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
-"$PYTHON_BIN" tools/docs/check_markdown_lint.py "${MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" tools/docs/check_markdown_math.py "${MARKDOWN_TARGETS[@]}"
-"$PYTHON_BIN" tools/docs/audit_and_fix_links.py --check "${MARKDOWN_TARGETS[@]}"
+if [ "${#EXISTING_MARKDOWN_TARGETS[@]}" -eq 0 ]; then
+  echo "DOCS_CHECKS=skip"
+  echo "No documentation targets exist in this checkout."
+  exit 0
+fi
+
+"$PYTHON_BIN" tools/docs/check_markdown_lint.py "${EXISTING_MARKDOWN_TARGETS[@]}"
+"$PYTHON_BIN" tools/docs/check_markdown_math.py "${EXISTING_MARKDOWN_TARGETS[@]}"
+"$PYTHON_BIN" tools/docs/audit_and_fix_links.py --check "${EXISTING_MARKDOWN_TARGETS[@]}"
 "$PYTHON_BIN" tools/docs/check_bootstrap_docs.py
+"$PYTHON_BIN" tools/agent_tools/check_runtime_profile_inventory.py
 
 echo ""
 echo "Documentation checks completed successfully"

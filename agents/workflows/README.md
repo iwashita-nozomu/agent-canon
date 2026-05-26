@@ -20,7 +20,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、MCP `goal.loop_status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
 - token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context budget、escalation trigger を先に決めます。
-- GitHub Copilot から issue / PR / IDE 起点で作業する場合は `github-copilot-workflow.md` を overlay とし、Copilot instructions、PR checklist、GitHub Actions evidence を揃えます。
+- GitHub Copilot から issue / PR / IDE 起点で作業する場合は `github-copilot-workflow.md` を overlay とし、`documents/github-copilot-configuration.md`、Copilot instructions、path-specific PR instructions、custom PR maintainer agent、PR checklist、GitHub Actions evidence を揃えます。
 
 ## Quick Routing
 
@@ -60,6 +60,8 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
   - `agents/workflows/main-integration-workflow.md`
 - shared canon 自体を更新して PR / upstream sync する
   - `agents/workflows/agent-canon-pr-workflow.md`
+- open AgentCanon source PR と dependent template pin PR を順番に片付ける
+  - `agents/workflows/pr-queue-cleanup-workflow.md`
 - 派生 repo の `vendor/agent-canon/` 差分を proposal / shared canon main / 派生 repo snapshot の順で閉じる
   - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - task から agent philosophy や durable observation を昇格する
@@ -91,7 +93,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `token-efficient-codex-workflow.md`
   - Codex parent profile、agent mode、context budget、token-saving escalation trigger
 - `github-copilot-workflow.md`
-  - GitHub Copilot の repository instructions、PR checklist、Actions validation の運用
+  - GitHub Copilot の repository instructions、path-specific PR instructions、custom PR maintainer agent、MCP / setup workflow placement、PR checklist、Actions validation の運用
 
 ### Research And Experiment
 
@@ -117,8 +119,10 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 
 - `agent-canon-pr-workflow.md`
   - shared canon change の branch、PR、upstream sync
+- `pr-queue-cleanup-workflow.md`
+  - AgentCanon source PR と template / derived pin PR が同時に開いているとき、source merge、template pin realignment、dependent PR validation、ready / merge 判断を順番に閉じる手順
 - `derived-agent-canon-diff-workflow.md`
-  - 派生 repo の agent-canon 差分を proposal branch、shared canon main、派生 repo snapshot へ順に反映する手順
+  - 派生 repo の agent-canon 差分を AgentCanon branch / PR、shared canon main、派生 repo submodule pin へ順に反映する手順
 - `agent-learning-workflow.md`
   - `memory/` と guardrail への learning promotion
 - `workflow-references.md`
@@ -134,6 +138,7 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 - `documents/SHARED_RUNTIME_SURFACES.md`
 - `documents/agent-canon-subtree-migration.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
+- `agents/workflows/pr-queue-cleanup-workflow.md`
 - `agents/workflows/derived-agent-canon-diff-workflow.md`
 
 基本手順:
@@ -142,24 +147,23 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 1. `vendor/agent-canon/` を source of truth として編集する
 1. root surface を再同期する
 1. shared canon 用 check を流す
-1. template 側 PR を閉じる
-1. merge 後に upstream `agent-canon` へ push する
+1. AgentCanon source PR を merge する
+1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行して pin を持ち帰る
+1. template 側 pin PR を閉じる
 
 ```bash
 make agent-canon-ensure-latest
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
-bash tools/sync_agent_canon.sh push
 ```
 
 derived repo から shared canon だけ更新するときは、必要に応じて次を使います。
 
 ```bash
 bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
-bash tools/update_agent_canon.sh proposal-branch
-bash tools/update_agent_canon.sh push-proposal
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
 ```
 
 ## Convention Compliance Gate

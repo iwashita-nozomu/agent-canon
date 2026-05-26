@@ -64,7 +64,7 @@ if [[ -z "$TARGET_BRANCH" ]]; then
 fi
 
 if [[ "$ALLOW_DIRTY" -eq 0 ]] && [[ -n "$(git status --short --untracked-files=all)" ]]; then
-  echo "Worktree is not clean. Commit, stash, or pass --allow-dirty before pushing." >&2
+  echo "Worktree is not clean. Commit artifacts, explicitly stash non-artifact local changes, or pass --allow-dirty before pushing." >&2
   exit 1
 fi
 

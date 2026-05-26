@@ -1,6 +1,7 @@
 # @dependency-start
 # responsibility Tests test task start and close behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test
 # @dependency-end
 
 """Tests for machine-driven task start and close commands."""
@@ -244,6 +245,8 @@ def write_ready_closeout_bundle(
                 "- dependency_headers_complete: yes",
                 "- repo_wide_dependency_tools_complete: yes",
                 "- repo_wide_static_analysis_complete: yes",
+                "- agent_canon_latest_complete: yes",
+                "- make_ci_status: pass",
                 "- spec_product_coverage_complete: yes",
                 "- review_findings_integrated: yes",
                 "- post_fix_full_review_complete: yes",
@@ -271,6 +274,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = PROJECT_ROOT / "vendor" / "agent-canon"
+            if not source_root.exists():
+                source_root = PROJECT_ROOT
             result = subprocess.run(
                 [
                     sys.executable,
@@ -282,7 +288,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "--run-id",
                     "source-canon-preflight",
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(source_root),
                     "--report-root",
                     str(Path(tmp_dir) / "reports"),
                 ],
@@ -294,6 +300,169 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon-parent-repo-latest-checklist.md",
+                result.stdout,
+            )
+            self.assertIn("AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout)
+
+    def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
+        """Dirty shared-canon surfaces should not point only to commit-or-stash."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            (workspace_root / "vendor" / "agent-canon").mkdir(parents=True)
+            (workspace_root / "vendor" / "agent-canon" / "README.md").write_text(
+                "shared canon candidate\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "shared canon preflight route",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "shared-canon-preflight",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
+                result.stdout,
+            )
+            self.assertIn("open_agent-canon_PR", result.stdout)
+            self.assertNotIn(
+                "AGENT_CANON_PREFLIGHT_NEXT=commit_or_stash_then_run_make_agent-canon-ensure-latest",
+                result.stdout,
+            )
+
+    def test_task_start_reports_parent_repo_latest_checklist(self) -> None:
+        """Parent repos should expose the AgentCanon latest-state checklist at task start."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            checklist = (
+                workspace_root
+                / "vendor"
+                / "agent-canon"
+                / "documents"
+                / "agent-canon-parent-repo-latest-checklist.md"
+            )
+            checklist.parent.mkdir(parents=True)
+            checklist.write_text("# Checklist\n", encoding="utf-8")
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "parent checklist smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "parent-checklist",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_CHECKLIST=vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md",
+                result.stdout,
+            )
+            self.assertIn("AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout)
+
+    def test_task_start_allows_unrelated_parent_dirty_state_for_submodule_update(
+        self,
+    ) -> None:
+        """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            checklist = (
+                workspace_root
+                / "vendor"
+                / "agent-canon"
+                / "documents"
+                / "agent-canon-parent-repo-latest-checklist.md"
+            )
+            checklist.parent.mkdir(parents=True)
+            checklist.write_text("# Checklist\n", encoding="utf-8")
+            (workspace_root / "Makefile").write_text(
+                "agent-canon-ensure-latest:\n\t@echo latest-ok\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+            subprocess.run(
+                ["git", "add", "Makefile", "vendor/agent-canon/documents/agent-canon-parent-repo-latest-checklist.md"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Start Test",
+                    "-c",
+                    "user.email=task-start@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: seed workspace",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "local-note.md").write_text("unrelated\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_START_SCRIPT),
+                    "--task",
+                    "parent dirty unrelated smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "parent-dirty-unrelated",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes", result.stdout)
+            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", result.stdout)
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow", result.stdout)
 
     def test_task_start_emits_workflow_skills_and_auto_specialists(self) -> None:
         """task_start should emit machine-friendly workflow and reviewer data."""
@@ -340,13 +509,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=12", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=4", result.stdout)
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
                 result.stdout,
             )
             self.assertIn("AUTO_SPECIALISTS=cpp_reviewer", result.stdout)
             self.assertIn("IMPLEMENTATION_CODEX_AGENTS=spark_worker,worker", result.stdout)
+            self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
@@ -399,9 +569,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=3", result.stdout)
             self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$behavior-preserving-refactor",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
                 result.stdout,
             )
 
@@ -494,10 +664,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=1", result.stdout)
+            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
             manifest_text = (
                 report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
+            self.assertIn("write_scope_policy:", manifest_text)
+            self.assertIn("parent_managed: true", manifest_text)
             self.assertIn("workflow_family:", manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("subagent_lifecycle_policy:", manifest_text)
@@ -673,6 +845,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -797,6 +971,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -1188,6 +1364,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -1281,6 +1459,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: no",
                         "- review_findings_integrated: no",
                         "- post_fix_full_review_complete: no",
@@ -1394,6 +1574,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: no",
@@ -1486,6 +1668,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",
@@ -1598,6 +1782,8 @@ class TaskStartAndCloseTest(unittest.TestCase):
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
+                        "- agent_canon_latest_complete: yes",
+                        "- make_ci_status: pass",
                         "- spec_product_coverage_complete: yes",
                         "- review_findings_integrated: yes",
                         "- post_fix_full_review_complete: yes",

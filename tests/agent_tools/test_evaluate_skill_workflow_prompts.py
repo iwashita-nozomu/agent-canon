@@ -57,6 +57,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self.assertIn("EVAL_CRITICAL_FAILED=0", result.stdout)
         self.assertIn("EVAL_AUDIT_STATUS=pass", result.stdout)
         self.assertIn("EVAL_GROWTH_CANDIDATES=0", result.stdout)
+        self.assertIn("EVAL_RUN_ID=skill-eval-", result.stdout)
 
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
@@ -69,12 +70,12 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 26)
-        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 26)
-        self.assertEqual(globs["agents/skills/*.md"], 48)
-        self.assertEqual(globs["agents/workflows/*.md"], 21)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 36)
+        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 36)
+        self.assertEqual(globs["agents/skills/*.md"], 58)
+        self.assertEqual(globs["agents/workflows/*.md"], 22)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
-        self.assertEqual(globs[".codex/agents/*.toml"], 29)
+        self.assertEqual(globs[".codex/agents/*.toml"], 32)
 
     def test_default_manifest_includes_convention_compliance_eval_coverage(
         self,
@@ -203,7 +204,168 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             text = report.read_text(encoding="utf-8")
             self.assertIn("# Skill Workflow Prompt Eval", text)
+            self.assertIn("eval_run_id:", text)
             self.assertIn("EVAL_STATUS=pass", text)
+            self.assertIn("## Run Manifest", text)
+            self.assertIn("git_commit:", text)
+
+    def test_existing_report_out_gets_unique_sibling(self) -> None:
+        """An existing report path should not be overwritten."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = Path(tmp_dir) / "report.md"
+            report.write_text("keep me\n", encoding="utf-8")
+
+            result = run_eval(
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--report-out",
+                str(report),
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(report.read_text(encoding="utf-8"), "keep me\n")
+            sibling_reports = sorted(report.parent.glob("report-skill-eval-*.md"))
+            self.assertEqual(len(sibling_reports), 1)
+            self.assertIn("EVAL_REPORT_OUT=", result.stdout)
+            self.assertIn("agent-orchestration", sibling_reports[0].read_text(encoding="utf-8"))
+
+    def test_accumulate_writes_unique_agentcanon_report(self) -> None:
+        """Accumulated prompt evals should create durable unique result files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            result = run_eval(
+                "--root",
+                str(PROJECT_ROOT),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--results-dir",
+                str(root / "results"),
+                "--run-id",
+                "run-123",
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATED_REPORT=", result.stdout)
+            reports = sorted((root / "results").glob("skill-eval-*-pass-agent-orchestration.md"))
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            self.assertIn("run_id: `run-123`", text)
+            self.assertIn("used_skills: `agent-orchestration`", text)
+            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", text)
+            self.assertIn("skill_workflow_prompt_eval.toml", text)
+            self.assertIn("## Run Manifest", text)
+
+    def test_accumulate_records_workflow_monitoring_event(self) -> None:
+        """Accumulated prompt evals should append behavior-eval evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            report_dir = root / "reports" / "agents" / "run-123"
+
+            result = run_eval(
+                "--root",
+                str(PROJECT_ROOT),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--results-dir",
+                str(root / "results"),
+                "--run-id",
+                "run-123",
+                "--skill-used",
+                "agent-orchestration",
+                "--report-dir",
+                str(report_dir),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            monitor = report_dir / "workflow_monitoring.md"
+            self.assertTrue(monitor.is_file())
+            text = monitor.read_text(encoding="utf-8")
+            self.assertIn("tool_call=evaluate_skill_workflow_prompts.py", text)
+            self.assertIn("EVAL_RUN_ID=skill-eval-", text)
+            self.assertIn("EVAL_USED_SKILLS=agent-orchestration", text)
+            self.assertIn("EVAL_ACCUMULATED_REPORT=", text)
+            self.assertIn("EVAL_GIT_COMMIT=", text)
+
+    def test_accumulated_report_dependencies_resolve_through_root_symlinks(
+        self,
+    ) -> None:
+        """Reports written through a wrapper root should reference canon paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            canon_root = tmp_root / "canon"
+            wrapper_root = tmp_root / "wrapper"
+            eval_dir = canon_root / "agents" / "evals"
+            tools_dir = canon_root / "tools" / "agent_tools"
+            eval_dir.mkdir(parents=True)
+            tools_dir.mkdir(parents=True)
+            wrapper_root.mkdir()
+            (wrapper_root / "agents").symlink_to(canon_root / "agents")
+            (wrapper_root / "tools").symlink_to(canon_root / "tools")
+            (tools_dir / "evaluate_skill_workflow_prompts.py").write_text(
+                "# placeholder for dependency header validation\n",
+                encoding="utf-8",
+            )
+            (eval_dir / "prompt.md").write_text("required-marker\n", encoding="utf-8")
+            (eval_dir / "skill_workflow_prompt_eval.toml").write_text(
+                textwrap.dedent(
+                    """
+                    # @dependency-start
+                    # responsibility Defines prompt evals for symlink wrapper tests.
+                    # upstream design prompt.md test prompt
+                    # @dependency-end
+                    version = 1
+
+                    [[evals]]
+                    id = "sample"
+                    target = "agents/evals/prompt.md"
+                    kind = "workflow"
+                    description = "sample"
+
+                    [[evals.checklist]]
+                    id = "S1"
+                    critical = true
+                    description = "requires marker"
+                    required_regex = ["required-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval(
+                "--root",
+                str(wrapper_root),
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--accumulate",
+                "--run-id",
+                "run-symlink",
+                "--skill-used",
+                "agent-orchestration",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            reports = sorted(
+                (canon_root / "agents" / "evals" / "results" / "skill-workflow-prompt").glob(
+                    "skill-eval-*-pass-agent-orchestration.md"
+                )
+            )
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            header = text.split("-->", 1)[0]
+            self.assertIn(
+                "upstream implementation ../../../../tools/agent_tools/"
+                "evaluate_skill_workflow_prompts.py",
+                header,
+            )
+            self.assertIn("upstream design ../../skill_workflow_prompt_eval.toml", header)
+            self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:
         """A target_glob eval applies the same checklist to every matching prompt."""

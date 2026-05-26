@@ -14,9 +14,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-
-from agent_team import create_run_bundle, load_team_config, resolve_role, resolve_role_write_scope
-
+from agent_team import (
+    RunBundleSpec,
+    create_run_bundle,
+    load_team_config,
+    resolve_role,
+    resolve_role_write_scope,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
@@ -34,6 +38,10 @@ PERSPECTIVE_ROLE_IDS = (
     "artifact_reviewer",
     "fair_data_reviewer",
     "ml_science_reviewer",
+)
+TRIAGE_ROLE_IDS = (
+    "reproducibility_reviewer",
+    "artifact_reviewer",
 )
 ROLE_TO_ARTIFACT_KEY = {
     "reproducibility_reviewer": "reproducibility_review",
@@ -138,16 +146,26 @@ def validate_task_catalog() -> None:
     review_pack = find_by_id(data.get("review_packs"), "research_perspective_review")
     pack_specialists = review_pack.get("specialists", [])
     ensure(isinstance(pack_specialists, list), "review pack specialists must be a list")
-    default_for_tasks = review_pack.get("default_for_tasks", [])
-    ensure(isinstance(default_for_tasks, list), "review pack default_for_tasks must be a list")
-    ensure("T4" in default_for_tasks, "review pack must default to T4")
-    ensure("T5" in default_for_tasks, "review pack must default to T5")
-    ensure("T9" in default_for_tasks, "review pack must default to T9")
+    optional_for_tasks = review_pack.get("optional_for_tasks", [])
+    ensure(isinstance(optional_for_tasks, list), "review pack optional_for_tasks must be a list")
+    ensure("T4" in optional_for_tasks, "full review pack must be optional for T4")
+    ensure("T5" in optional_for_tasks, "full review pack must be optional for T5")
+    ensure("T9" in optional_for_tasks, "full review pack must be optional for T9")
+
+    triage_pack = find_by_id(data.get("review_packs"), "research_perspective_triage")
+    triage_specialists = triage_pack.get("specialists", [])
+    ensure(isinstance(triage_specialists, list), "triage pack specialists must be a list")
+    triage_default_for_tasks = triage_pack.get("default_for_tasks", [])
+    ensure(isinstance(triage_default_for_tasks, list), "triage default_for_tasks must be a list")
+    for task_id in ("T4", "T5", "T9", "T13"):
+        ensure(task_id in triage_default_for_tasks, f"triage pack must default to {task_id}")
 
     for role_id in PERSPECTIVE_ROLE_IDS:
         ensure(role_id in family_specialists, f"research family missing specialist {role_id}")
-        ensure(role_id in t9_specialists, f"T9 missing specialist {role_id}")
         ensure(role_id in pack_specialists, f"review pack missing specialist {role_id}")
+    for role_id in TRIAGE_ROLE_IDS:
+        ensure(role_id in t9_specialists, f"T9 missing triage specialist {role_id}")
+        ensure(role_id in triage_specialists, f"triage pack missing specialist {role_id}")
 
 
 def validate_runtime_surfaces(report_dir: Path, workspace_root: Path) -> None:
@@ -228,14 +246,16 @@ def main() -> int:
         report_dir = (report_root / args.run_id).resolve()
 
         create_run_bundle(
-            config=config,
-            report_dir=report_dir,
-            run_id=args.run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root.resolve(),
+            RunBundleSpec(
+                config=config,
+                report_dir=report_dir,
+                run_id=args.run_id,
+                task=args.task,
+                owner=args.owner,
+                created_at_iso=created_at_iso,
+                roles=roles,
+                workspace_root=workspace_root.resolve(),
+            )
         )
 
         validate_runtime_surfaces(report_dir, workspace_root.resolve())

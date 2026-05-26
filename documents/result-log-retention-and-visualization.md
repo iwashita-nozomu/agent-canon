@@ -2,7 +2,7 @@
 @dependency-start
 responsibility Defines retention and visualization rules for result logs and reports.
 upstream design coding-conventions-logging.md defines JSONL logging conventions
-upstream design experiment-report-style.md defines human-readable experiment reports
+downstream design experiment-report-style.md defines human-readable experiment reports
 upstream implementation ../tools/data/jsonl_to_md.py converts JSONL to Markdown
 upstream implementation ../tools/hlo/summarize_hlo_jsonl.py summarizes HLO JSONL
 downstream implementation ../tools/docker_dependency_validator.sh validates runtime support
@@ -60,8 +60,15 @@ Canonical helper commands:
 ```bash
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+python3 tools/experiments/html_artifact_access.py <report.html>
 dot -V
 ```
+
+When an HTML report is produced on an SSH-reached HPC host or inside a container
+on that host, use `tools/experiments/html_artifact_access.py` to record the
+`python3 -m http.server` command, SSH tunnel command, and local browser URL. The
+default bind address is `127.0.0.1`; use `--use-container-ip` when serving
+directly from inside a container and tunneling to the container IP.
 
 ## Retention Rules
 

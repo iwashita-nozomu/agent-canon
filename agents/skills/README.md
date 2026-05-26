@@ -32,18 +32,28 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | ------ | ------- | ------------- | -------------- |
 | `agent-orchestration` | task 開始時の mandatory routing。workflow family、skill、review、runtime entrypoint を先に選ぶ | `agents/skills/agent-orchestration.md` | `.agents/skills/agent-orchestration/SKILL.md` |
 | `repo-onboarding` | unfamiliar repo の最短入口確認 | `agents/skills/repo-onboarding.md` | `.agents/skills/repo-onboarding/SKILL.md` |
+| `task-routing` | 長い tool / skill 候補名を短い route area と command に解決する | `agents/skills/task-routing.md` | `.agents/skills/task-routing/SKILL.md` |
 | `start-repository` | template clone から新 repo を開始し bare remote と agent-canon seed を整える | `agents/skills/start-repository.md` | `.agents/skills/start-repository/SKILL.md` |
 | `codex-task-workflow` | Codex の context-independent task 実行 | `agents/skills/codex-task-workflow.md` | `.agents/skills/codex-task-workflow/SKILL.md` |
 | `subagent-bootstrap` | specialist run bundle と stage subagent の明示 | `agents/skills/subagent-bootstrap.md` | `.agents/skills/subagent-bootstrap/SKILL.md` |
 | `change-review` | findings-first の差分 review | `agents/skills/change-review.md` | `.agents/skills/change-review/SKILL.md` |
 | `python-review` | pyright / pytest / ruff を前提にした Python review | `agents/skills/python-review.md` | `.agents/skills/python-review/SKILL.md` |
 | `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
+| `oop-readability-check` | OOP readability tool を走らせ、必要なら機械結果と分離して agent 分析も出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
+| `result-artifact-writeout` | tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す | `agents/skills/result-artifact-writeout.md` | `.agents/skills/result-artifact-writeout/SKILL.md` |
+| `tool-finding-report` | tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る | `agents/skills/tool-finding-report.md` | `.agents/skills/tool-finding-report/SKILL.md` |
+| `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
+| `report-writing` | evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
+| `structure-planning` | report / experiment / Eval / document / refactor の構造 contract、first artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
+| `html-output` | HTML が明示された出力だけを browser-readable artifact にし、layout、ImageGen、既存 server reuse / external URL 公開を固定する | `agents/skills/html-output.md` | `.agents/skills/html-output/SKILL.md` |
+| `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
-| `behavior-preserving-refactor` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/behavior-preserving-refactor.md` | `.agents/skills/behavior-preserving-refactor/SKILL.md` |
+| `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
 | `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
+| `document-canon-cleanup` | 非正本の文書候補を棚卸しし、mirror / generated evidence / closed issue / duplicate heading を正本へ振り分ける | `agents/skills/document-canon-cleanup.md` | `.agents/skills/document-canon-cleanup/SKILL.md` |
 | `dependency-analysis` | 依存 manifest の header / scan / format / graph tool 起動 | `agents/skills/dependency-analysis.md` | `.agents/skills/dependency-analysis/SKILL.md` |
 | `worktree-start` | worktree 開始時の scope、action log、kickoff を整える | `agents/skills/worktree-start.md` | `.agents/skills/worktree-start/SKILL.md` |
 | `worktree-health` | worktree の scope drift と cleanup risk を確認 | `agents/skills/worktree-health.md` | `.agents/skills/worktree-health/SKILL.md` |
@@ -70,6 +80,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - task ごとの skill 選択は、このディレクトリか `catalog.yaml` を見て決めます。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
+- 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
 - repo-changing task では `$agent-orchestration`、`$codex-task-workflow`、`$subagent-bootstrap` の順で使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
@@ -79,9 +90,18 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - code 変更では `test-design` を使い、実装前に nasty case と regression case を先に固定します。
+- 文書整理で正本、mirror、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory を確認するときは `dependency-analysis` を使います。
-- 大規模 refactor では `behavior-preserving-refactor` を追加し、semantic delta を別管理にします。
+- 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。
 - C / C++ 差分では `cpp-review` を既定候補にします。
+- OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
+- tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
+- tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
+- skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に compact summary を生成して読みます。
+- reader-facing な report、status report、eval summary、audit summary、decision brief を書くときは `report-writing` を使い、source packet と Report Quality Checklist を固定します。
+- report、experiment plan / report、Eval output、decision brief、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、first artifact、source map、metric / delta contract、invalid interpretation を固定します。
+- report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
+- HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。

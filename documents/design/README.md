@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents 設計ドキュメント for this repository.
-upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ../SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 
@@ -17,6 +17,8 @@ upstream design ../SHARED_RUNTIME_SURFACES.md root documents mirror is canon-own
   - 型パラメータ化の方針
 - [experiment_runner.md](../experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
+- [python-structure-hash.md](python-structure-hash.md)
+  - Python structural duplicate analysis and module-group dependency priority
 - [../remote-execution-repo-contract.md](../remote-execution-repo-contract.md)
   - remote execution を受ける repo の最小契約
 

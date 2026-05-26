@@ -7,8 +7,21 @@
 # upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
+# upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
+# upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../agent_tools/check_algorithm_module_nested_contract.py validates nested algorithm ownership
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
+# upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
+# upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
+# upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
+# upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
+# upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../agent_tools/agent_canon_log_management_check.py validates hook/eval log branch ownership
+# upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
+# upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
+# upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
+# upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
+# upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
 # upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
@@ -47,6 +60,13 @@ set -euo pipefail
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$WORKSPACE_ROOT"
 
+AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
+if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
+  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+fi
+AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
+
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
   if command -v python3 >/dev/null 2>&1; then
@@ -83,6 +103,22 @@ export PYTHONPATH="${WORKSPACE_ROOT}/python:${PYTHONPATH:-}"
 export JAX_PLATFORMS="${JAX_PLATFORMS:-cpu}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
 export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}"
+export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-AgentCanon CI}"
+export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-agent-canon-ci@example.invalid}"
+export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-AgentCanon CI}"
+export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-agent-canon-ci@example.invalid}"
+
+if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
+  # shellcheck disable=SC1091
+  . "${HOME}/.cargo/env"
+fi
+
+PYTHON_SOURCE_PATHS=()
+for candidate_path in python tests; do
+  if [ -e "${candidate_path}" ]; then
+    PYTHON_SOURCE_PATHS+=("${candidate_path}")
+  fi
+done
 
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 統合 CI セッション開始"
@@ -117,6 +153,12 @@ if "$PYTHON_BIN" tools/agent_tools/smoke_test_research_perspective_pack.py 2>&1;
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/evaluate_codex_agent_roles.py 2>&1; then
+  echo "✅ Codex agent role eval 成功"
+else
+  echo "❌ Codex agent role eval 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/agent_tools/check_dependency_headers.py --changed 2>&1; then
@@ -155,6 +197,18 @@ else
   echo "❌ log helper naming checks 失敗"
   EXIT_CODE=1
 fi
+if "$PYTHON_BIN" tools/agent_tools/import_responsibility.py --changed 2>&1; then
+  echo "✅ import responsibility checks 成功"
+else
+  echo "❌ import responsibility checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/validation/notebook_quality.py --all 2>&1; then
+  echo "✅ notebook quality checks 成功"
+else
+  echo "❌ notebook quality checks 失敗"
+  EXIT_CODE=1
+fi
 if [ -d python ]; then
   if "$PYTHON_BIN" tools/agent_tools/check_algorithm_module_nested_contract.py python 2>&1; then
     echo "✅ algorithm module nested contract checks 成功"
@@ -167,6 +221,90 @@ if "$PYTHON_BIN" tools/agent_tools/check_convention_compliance.py 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/tool_catalog.py 2>&1; then
+  echo "✅ tool catalog checks 成功"
+else
+  echo "❌ tool catalog checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/tool_drift.py 2>&1; then
+  echo "✅ tool/convention drift checks 成功"
+else
+  echo "❌ tool/convention drift checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/responsibility_scope.py 2>&1; then
+  echo "✅ responsibility scope checks 成功"
+else
+  echo "❌ responsibility scope checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/issue_sync.py 2>&1; then
+  echo "✅ local issue sync checks 成功"
+else
+  echo "❌ local issue sync checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
+  echo "✅ eval accumulation checks 成功"
+else
+  echo "❌ eval accumulation checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/agent_canon_log_management_check.py 2>&1; then
+  echo "✅ AgentCanon log management checks 成功"
+else
+  echo "❌ AgentCanon log management checks 失敗"
+  EXIT_CODE=1
+fi
+if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
+  echo "✅ Rust format checks 成功"
+else
+  echo "❌ Rust format checks 失敗"
+  EXIT_CODE=1
+fi
+if cargo clippy --manifest-path "$AGENT_CANON_CARGO_MANIFEST" --all-targets -- -D warnings 2>&1; then
+  echo "✅ Rust clippy checks 成功"
+else
+  echo "❌ Rust clippy checks 失敗"
+  EXIT_CODE=1
+fi
+if cargo test --manifest-path "$AGENT_CANON_CARGO_MANIFEST" 2>&1; then
+  echo "✅ Rust tests 成功"
+else
+  echo "❌ Rust tests 失敗"
+  EXIT_CODE=1
+fi
+if tools/bin/agent-canon local-llm eval 2>&1; then
+  echo "✅ local LLM responsibility eval checks 成功"
+else
+  echo "❌ local LLM responsibility eval checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/evaluate_workflow_selection.py 2>&1; then
+  echo "✅ workflow selection eval checks 成功"
+else
+  echo "❌ workflow selection eval checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/evaluate_report_quality.py 2>&1; then
+  echo "✅ report quality eval checks 成功"
+else
+  echo "❌ report quality eval checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
+  echo "✅ GitHub workflow / PR template checks 成功"
+else
+  echo "❌ GitHub workflow / PR template checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/ci/container_config.py 2>&1; then
+  echo "✅ container configuration checks 成功"
+else
+  echo "❌ container configuration checks 失敗"
   EXIT_CODE=1
 fi
 echo ""
@@ -183,7 +321,10 @@ echo ""
 
 # 2. experiment registry checks
 echo "2️⃣  experiment registry checks を実行中..."
-if "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
+if [ ! -e experiments/registry.toml ]; then
+  echo "EXPERIMENT_REGISTRY=skip"
+  echo "experiment registry absent in this checkout; skipping registry validation"
+elif "$PYTHON_BIN" tools/ci/check_experiment_registry.py 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"
@@ -213,7 +354,10 @@ echo ""
 
 # 5. pydocstyle 実行（Docstring 検証）
 echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
-if "$PYTHON_BIN" -m pydocstyle python tests 2>&1; then
+if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
+  echo "PYDOCSTYLE=skip"
+  echo "python/tests source roots are absent in this checkout; skipping pydocstyle"
+elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pydocstyle 成功"
 else
   echo "❌ pydocstyle 失敗（詳細: documents/DOCSTRING_GUIDE.md を参照）"
@@ -230,7 +374,10 @@ if [ $QUICK_MODE -eq 0 ]; then
   echo "   - UP: Python 最新構文チェック"
   echo ""
   
-  if "$PYTHON_BIN" -m ruff check python tests --select D,E,F,I,UP --ignore E501 2>&1; then
+  if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
+    echo "RUFF=skip"
+    echo "python/tests source roots are absent in this checkout; skipping ruff"
+  elif "$PYTHON_BIN" -m ruff check "${PYTHON_SOURCE_PATHS[@]}" --select D,E,F,I,UP --ignore E501 2>&1; then
     echo "✅ ruff 成功"
   else
     echo "❌ ruff 失敗"

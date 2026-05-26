@@ -23,19 +23,29 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`
-   - for `repo-changing execution`, add `$codex-task-workflow` and `$subagent-bootstrap`
+   - for `repo-changing execution`, add `$codex-task-workflow`
+   - add `$subagent-bootstrap` only when the task is Shared canon, Large delivery, high-risk, multi-step, or explicitly uses subagents
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
      - README, workflow, guide, migration, or other long reader-facing docs -> `$long-form-writing`
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
-     - large refactor -> `$behavior-preserving-refactor`
+     - PR body, PR evidence comment, status update, decision brief, or reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence -> `$report-writing`; report output defaults to Markdown unless the user explicitly asks for HTML, browser view, dashboard, web page, or external browser publication; if raw machine results are written or copied, also add `$result-artifact-writeout`
+     - explicit HTML output, HTML report, browser-readable page, dashboard, local preview server, or external browser publication -> `$html-output`
+     - explicit HTML experiment or Eval report -> `$html-experiment-report` plus `$html-output`
+     - nontrivial report, experiment plan/report, Eval output, decision brief, HTML view, document, paper, or refactor structure; first figure/table/section/slice choice; source map; or invalid interpretation boundary -> `$structure-planning`
+     - tool/checker/hook/static-analysis runs to discover problems, create finding packets, compare before/after impact, or feed implementation/refactor planning -> `$tool-finding-report`; if raw results are written, also add `$result-artifact-writeout`; if the output is reader-facing narrative, also add `$report-writing`
+     - README, workflow, guide, migration, or specification docs keep their domain writing skill; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
+     - large refactor -> `$refactor-loop`
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, or multi-candidate comparison -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay
+     - Markdown file edits, docs lint/link/heading repair, docs-check failures, or Markdown style drift -> `$md-style-check`
+     - accumulated skill/tool/workflow/hook/eval log analysis, routing misses, selection gaps, or weak-skill diagnosis -> `$agent-log-analysis`
+     - user/reviewer feedback about agent behavior, repeated routing misses, recurrence prevention, task retrospectives, or agent-side memory updates -> `$agent-learning`
    - do not add unrelated family skills just because they are nearby in the catalog
-1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, or repo-changing-only skills.
+1. Keep the advisory branch narrow. If the request is `routing-only/advisory`, do not silently escalate into full repo-changing kickoff, run-bundle bootstrap, repo MCP tools, `check_mcp_inventory.py`, shell / GitHub checks, or repo-changing-only skills. Ordinary consultation, brainstorming, and explanation-only turns stay conversational until the user asks to inspect repo state, edit files, run validation, process PRs/issues, check CI, or execute implementation work.
 1. Choose the starter command with explicit precedence:
    - if the request is `repo-changing execution`, or the user asks for the startup command / run bundle, prefer `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"`
    - use `python3 tools/agent_tools/task_start.py --task "<task>" --task-id <T*> --owner codex --workspace-root "$PWD"` only for routing-only starter guidance when no run bundle is being created yet
@@ -45,6 +55,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - `review=<...>` plus the minimal specialist / reviewer stack that matches that family
    - the starter command when the scenario asks for kickoff guidance
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`
+1. For PR-producing repository tasks, carry that first routing declaration into the PR body, run bundle, or linked comment with `skills=$agent-orchestration` first and the result of `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` when prompt-derived routing is relevant.
 1. Mention Codex implementation routing only when implementation is in scope. Read `agents/canonical/CODEX_SUBAGENTS.md` before assigning agents.
-1. For implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
+1. For Routine docs or Focused code, parent-direct implementation is allowed after the risk class and check matrix are fixed. For subagent implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
 1. Do not route detailed design, review, or final judgment to `spark_worker`.

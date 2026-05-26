@@ -37,9 +37,13 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Confirm that change review, language-specific review, docs review, final review, and required specialist findings were reflected in implementation or explicitly escalated. Return revise if fix-now findings were ignored or only recorded in review artifacts. -->
 
+## Semantic Search And Responsibility Evidence
+
+<!-- Confirm whether review-time semantic-index artifacts were required for this task. If present, record how responsibility-scoped merge candidates, thin-doc candidates, and long-query search hits were accepted, fixed, or rejected. Return revise if relevant semantic candidates were ignored, or if semantic output alone was used as merge/delete authority without dependency and structure evidence. -->
+
 ## Post-Fix Full Review Rerun Review
 
-<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the full required review set was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last full review pass. Return revise if any tiny fix skipped the rerun. -->
+<!-- Confirm that if any review-driven fix landed after an earlier review artifact, the active required review set for the risk class and changed surface was rerun against the latest diff. Record the refreshed review artifacts, or explicitly state that no post-review fixes occurred after the last applicable review pass. Return revise if any tiny fix skipped the rerun. -->
 
 ## Repo-Wide Dependency Review
 
@@ -53,6 +57,4 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 <!-- Record remaining risk, approval notes, or escalation points. -->
 
-## Decision
-
-<!-- Record approve, revise, or escalate. -->
+{{>decision_approve_revise_escalate}}

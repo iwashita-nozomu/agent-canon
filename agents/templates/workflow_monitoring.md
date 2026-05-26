@@ -5,6 +5,7 @@ responsibility Documents Workflow Monitoring for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
 upstream design ../workflows/agent-learning-workflow.md defines feedback and self-improvement capture
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates monitoring evidence
+downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts pre-edit rejection gates
 @dependency-end
 -->
 
@@ -20,7 +21,7 @@ downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluate
 
 ## Behavior Events
 
-<!-- Record observable agent behavior as structured events, not retrospective prose. Prefer `workflow_monitor.py --behavior-event "..."`. Required event families include skill invocation, stage/subagent routing, tool calls that gate implementation, prompt eval baseline/rerun status, dependency/static-analysis runs, token-efficiency protocol activation or explicit opt-out, token footprint comparison, runtime_feedback=observed or runtime_feedback_not_observed, static_analysis_feedback=applied|recorded|not_applicable, execution_path=..., route_efficiency=..., selected_inefficient_route=..., review decisions, feedback actions, subagent lifecycle closeout, and diff-check approval. Use `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` when feedback from actual use should update skill prompts, workflow prompts, evals, or memory. -->
+<!-- Record observable agent behavior as structured events, not retrospective prose. Prefer `workflow_monitor.py --behavior-event "..."`. Required event families include skill invocation, stage/subagent routing, tool calls that gate implementation, accumulated prompt eval run status with EVAL_RUN_ID, EVAL_USED_SKILLS, and EVAL_ACCUMULATED_REPORT whenever a skill is used, dependency/static-analysis runs, code checker results such as `tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`, `tool_call=oop-readability-check code_checker=pass`, or explicit `code_checker_not_required`, pre-edit tool rejection prediction with `pre_edit_rejection_prediction=reviewed` and `predicted_tool_rejection_gates=<recorded|none>`, hook/tool feedback routing with `hook_tool_feedback=reviewed`, `parent_protocol_update=<applied|recorded|not_required>`, `subagent_protocol_update=<applied|recorded|not_required>`, and `protocol_feedback_reason=...`, token-efficiency protocol activation or explicit opt-out, token footprint comparison, runtime_feedback=observed or runtime_feedback_not_observed, static_analysis_feedback=applied|recorded|not_applicable, execution_path=..., route_efficiency=..., selected_inefficient_route=..., review decisions, feedback actions, subagent lifecycle closeout, and diff-check approval. Use `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` when feedback from actual use should update skill prompts, workflow prompts, evals, or memory. -->
 
 ## Interventions
 

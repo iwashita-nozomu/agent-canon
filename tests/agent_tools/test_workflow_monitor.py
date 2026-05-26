@@ -98,6 +98,53 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("target=", result.stderr)
 
+    def test_closeout_token_preset_records_behavior_eval_tokens(self) -> None:
+        """The closeout preset should append the standard behavior tokens."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--closeout-token-preset",
+                    "--decision",
+                    "skill_improvement_decision=recorded",
+                    "--decision",
+                    "config_improvement_decision=not_applicable",
+                    "--decision",
+                    "workflow_improvement_decision=recorded",
+                    "--decision",
+                    "memory_learning_decision=not_applicable",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("skill_invocation=$agent-orchestration", text)
+            self.assertIn("repo_dependency_review=pass", text)
+            self.assertIn("tool_call=pyright code_checker=pass", text)
+            self.assertIn("tool_call=ruff code_checker=pass", text)
+            self.assertIn("tool_call=oop-readability-check code_checker=pass", text)
+            self.assertIn("static_analysis_feedback=recorded", text)
+            self.assertIn("hook_tool_feedback=reviewed", text)
+            self.assertIn("parent_protocol_update=not_required", text)
+            self.assertIn("subagent_protocol_update=not_required", text)
+            self.assertIn("protocol_feedback_reason=", text)
+            self.assertIn("execution_path_comparison_not_required", text)
+            self.assertIn("token_efficiency_not_required", text)
+            self.assertIn("prompt_eval_required", text)
+            self.assertNotIn("EVAL_RUN_ID=recorded", text)
+            self.assertNotIn("EVAL_ACCUMULATED_REPORT=recorded", text)
+            self.assertIn("runtime_feedback_not_observed", text)
+            self.assertIn("diff_check_agent_decision=approve", text)
+
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents C++ コーディング規約 for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 downstream design ./algorithm-implementation-boundary.md algorithm math-to-code boundary policy for C++ implementations
 @dependency-end
 -->
@@ -40,7 +40,7 @@ layout と build tree の正本は [cpp-build-layout.md](cpp-build-layout.md) �
 
 ## 3.5 Header-Only Rule
 
-- template の C++ 実装は `include/project_template/*.hpp` を既定にします。
+- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `include/<project>/*.hpp` を既定にします。
 - 小さい helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
 - `src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
 - `src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
@@ -69,10 +69,10 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 - 小さく決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
-- `jax.export` と C++ をつなぐ変更では、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build build/cpp/<profile> --target project_template_cpp_smoke` を通します。
+- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build build/cpp/<profile> --target <project-cpp-smoke-target>` を通します。
 
 ## 6. 再利用
 
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。
-- 再利用する local `jax.export` artifact は `.state/jax-export/<profile>/` に置きます。
-- `docker/Dockerfile`、`docker/requirements.txt`、`CMakeLists.txt`、`cmake/`、`jax/jaxlib` version、calling convention が変わったら rebuild します。
+- optional な local `jax.export` artifact は project-local `.state/<project>/jax-export/<profile>/` のように用途名を含む path に置きます。
+- `docker/Dockerfile`、`docker/requirements.txt`、`CMakeLists.txt`、`cmake/`、optional `jax/jaxlib` version、calling convention が変わったら rebuild します。

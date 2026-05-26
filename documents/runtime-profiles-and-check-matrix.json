@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "title": "Runtime Profiles And Check Matrix",
+  "summary": [
+    "AgentCanon ships broad shared surfaces, but not every surface is mandatory for",
+    "every repository task. Treat root views and tools as installed capability, then",
+    "activate only the profile required by the current change."
+  ],
+  "profile_classes": [
+    {
+      "profile": "Base project",
+      "activates": [
+        "`README.md`",
+        "`QUICK_START.md`",
+        "`documents/README.md`",
+        "project code and tests"
+      ],
+      "required_when": "Every template or derived repo"
+    },
+    {
+      "profile": "Agent runtime",
+      "activates": [
+        "`AGENTS.md`",
+        "`agents/`",
+        "`.agents/`",
+        "`.codex/`",
+        "`mcp/`",
+        "shared `tools/`"
+      ],
+      "required_when": "An agent performs or reviews repo work"
+    },
+    {
+      "profile": "Claude compatibility",
+      "activates": [
+        "`CLAUDE.md`",
+        "`.claude/`"
+      ],
+      "required_when": "Claude Code compatibility is explicitly used"
+    },
+    {
+      "profile": "Devcontainer",
+      "activates": [
+        "`.devcontainer/`",
+        "shared post-create helpers"
+      ],
+      "required_when": "VS Code devcontainer or agent ergonomics are used"
+    },
+    {
+      "profile": "Docker runtime",
+      "activates": [
+        "root `docker/`",
+        "runtime packs"
+      ],
+      "required_when": "Dockerfile, image, pack, Jupyter, or container setup changes"
+    },
+    {
+      "profile": "GitHub automation",
+      "activates": [
+        "`.github/`",
+        "Copilot docs",
+        "PR templates",
+        "Actions helpers"
+      ],
+      "required_when": "GitHub Actions, Copilot, PR automation, or GitHub path-constrained copies change"
+    },
+    {
+      "profile": "Experiment",
+      "activates": [
+        "`experiments/`",
+        "experiment registry",
+        "managed runner tools"
+      ],
+      "required_when": "Experiment topics, formal runs, result summaries, or research workflows change"
+    },
+    {
+      "profile": "C++",
+      "activates": [
+        "`CMakeLists.txt`",
+        "`cmake/`",
+        "`src/`",
+        "`include/`",
+        "`lib/`",
+        "C++ OOP checks"
+      ],
+      "required_when": "C or C++ code, build layout, or native artifacts change"
+    },
+    {
+      "profile": "Memory and learning",
+      "activates": [
+        "`memory/`",
+        "notes promotion",
+        "learning workflows"
+      ],
+      "required_when": "User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope"
+    },
+    {
+      "profile": "Maintenance",
+      "activates": [
+        "inventories",
+        "review backlog scan",
+        "improvement guide",
+        "catalog drift tools"
+      ],
+      "required_when": "AgentCanon maintenance, repo-wide audit, or scheduled cleanup work"
+    }
+  ],
+  "compatibility_note": [
+    "Compatibility surfaces such as local bare mirrors, legacy subtree routes, and",
+    "multi-runtime mirrors may remain documented, but only under the matching",
+    "compatibility profile. They are not the default path for GitHub/submodule-first",
+    "repositories."
+  ],
+  "risk_classes": [
+    {
+      "risk": "Routine docs",
+      "examples": "Link/text edits in project-local docs with no source contract change",
+      "minimum_validation": "docs check for touched docs and changed-file dependency header checks"
+    },
+    {
+      "risk": "Focused code",
+      "examples": "Narrow Python or shell edit with local tests",
+      "minimum_validation": "changed-file dependency checks, targeted tests, ruff/pyright when Python changes"
+    },
+    {
+      "risk": "Profile change",
+      "examples": "Docker, GitHub, experiment, C++, devcontainer, MCP, or memory surface change",
+      "minimum_validation": "profile-specific checker plus targeted tests"
+    },
+    {
+      "risk": "Shared canon",
+      "examples": "`vendor/agent-canon/`, root shared views, skills, workflows, hooks, tools",
+      "minimum_validation": "`make agent-canon-pr-check` or equivalent AgentCanon PR gate"
+    },
+    {
+      "risk": "Large delivery",
+      "examples": "repo-wide rewrite, workflow redesign, broad policy change, or user-requested comprehensive run",
+      "minimum_validation": "run bundle, dependency review, focused and full validation gates, independent review"
+    }
+  ],
+  "risk_note": [
+    "`make ci` remains the full local confidence gate, but it is not the only",
+    "acceptable evidence for every small change. The selected validation must match",
+    "the changed paths and risk class, and the PR or run bundle must state why that",
+    "set is sufficient."
+  ],
+  "check_matrix": [
+    {
+      "changed_surface": "Markdown docs only",
+      "required_check": [
+        "`make docs-check`",
+        "changed-file dependency header checks"
+      ]
+    },
+    {
+      "changed_surface": "Python code/tests",
+      "required_check": [
+        "targeted `pytest`",
+        "`python3 -m pyright`",
+        "`python3 -m ruff check ...`"
+      ]
+    },
+    {
+      "changed_surface": "AgentCanon docs/workflows/skills/tools/hooks",
+      "required_check": [
+        "`make agent-canon-pr-check`",
+        "prompt/eval checks when prompt surfaces change"
+      ]
+    },
+    {
+      "changed_surface": "Root shared views or submodule pin",
+      "required_check": [
+        "`bash tools/sync_agent_canon.sh check`",
+        "`git submodule status vendor/agent-canon` evidence"
+      ]
+    },
+    {
+      "changed_surface": "Docker/devcontainer/runtime pack",
+      "required_check": [
+        "`bash tools/docker_dependency_validator.sh`",
+        "`make docker-build-check` when build behavior changes"
+      ]
+    },
+    {
+      "changed_surface": "GitHub workflow/PR/Copilot",
+      "required_check": [
+        "`python3 tools/ci/check_github_workflows.py`",
+        "relevant GitHub Actions evidence when available"
+      ]
+    },
+    {
+      "changed_surface": "Experiments",
+      "required_check": [
+        "`make experiment-check`",
+        "managed run evidence for formal experiment changes"
+      ]
+    },
+    {
+      "changed_surface": "C/C++",
+      "required_check": [
+        "project-native configure/build/test and C++ reviewer/checker where applicable"
+      ]
+    },
+    {
+      "changed_surface": "Memory/eval/hook logging",
+      "required_check": [
+        "append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change"
+      ]
+    }
+  ],
+  "closeout_rule": [
+    "Do not turn optional profiles into hidden mandatory work. If a profile is not",
+    "activated by the changed paths, user request, or risk class, record it as",
+    "`not_applicable` instead of running or explaining its checks."
+  ]
+}

@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents レビュー文書の運用規約 for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 
@@ -75,6 +75,14 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 - `main` に未統合の worktree 内容を、現在の実装の事実として書きません。
 - worktree 由来の指摘は、`main` の不具合と混ぜず、`Conflict Risk`、`Merge Risk`、`Divergence Risk` などとして区別して書きます。
 - 通常レビューでは、`main` だけを見て終わりにしません。active な worktree があるなら、それらもレビュー対象に含めます。
+
+## 6.5 Full-Repo Review と Diff-Check 独立性
+
+- repo-changing task の closeout review は差分だけでなく full repo surface を対象にします。
+- full repo review では少なくとも dependency manifest、code dependency graph、static analysis、workflow / README / PR template の stale reference を確認します。
+- diff-check は parent 自己レビューだけで完了扱いにしません。runtime が subagent spawn を許す場合は read-only diff-check agent を使い、許さない場合も run bundle に独立 review 不実施理由と代替 mechanical gate を残します。
+- diff-check artifact は current tracked diff ref、reviewed paths、decision、findings disposition、rerun evidence を持たなければなりません。
+- review finding を修正したあとは、tiny fix でも該当 full-repo review gate を再実行します。
 
 ## 7. 粒度
 

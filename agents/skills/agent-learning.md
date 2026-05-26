@@ -13,7 +13,9 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 
 ## Use When
 
+- user request が plain `agent-learning` または `$agent-learning` を挙げている
 - user が agent の人格形成、作業哲学、対話からの継続学習を求めている
+- user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、または agent-side memory update を要求している
 - task closeout で、次回以降の agent 行動を変える観測がある
 - run bundle を評価し、agent feedback action を closeout 前に潰したい
 - `USER_PREFERENCES.md` には入らない agent-side の学習を残したい
@@ -40,6 +42,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - source、evidence、scope、confidence を書く
 - task-local な一時指示を stable philosophy にしない
 - `evaluate_agent_run.py --write` で `agent_evaluation.md` を作り、feedback action を closeout 前に解決する
+- eval / hook / skill feedback の結果を書き出すときは `result-artifact-writeout` を使い、raw evidence、summary、manifest、unique artifact path を分ける
 - `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
 - 利用中に得られた user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、skill prompt、workflow prompt、eval、memory のどれへ還元したかを残す
 - behavior eval は `agents/evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる

@@ -1,7 +1,8 @@
 <!--
 @dependency-start
 responsibility Documents トラブルシューティング for this repository.
-upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owned
+upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ./github-first-module-and-devcontainer-policy.md environment ownership boundary
 @dependency-end
 -->
 
@@ -19,7 +20,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 
 - `make docker-build-check` を実行して、build と container 起動のどちらで落ちるかを切り分けます。
 - `docker` / `podman` がない環境では、GitHub Actions の `Docker Build` workflow を使います。
-- `docker/Dockerfile` と `docker/requirements.txt` の更新漏れがないか確認します。
+- repo-local `docker/Dockerfile`、`docker/requirements.txt`、AgentCanon-owned `.devcontainer/` の責務境界に更新漏れがないか確認します。
 - Linux / WSL host の前提が怪しい場合は `documents/linux-wsl-host-requirements.md` を見ます。
 
 ## WSL / host 前提が怪しい
@@ -31,7 +32,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md root documents mirror is canon-owne
 
 ## import や依存が壊れる
 
-- Python を使う場合は `docker/Dockerfile` と `docker/requirements.txt` を正本にします。
+- Python package dependency は `docker/requirements.txt` と devcontainer post-create installer を正本にします。`docker/Dockerfile` は OS package、runtime library、build tool、image-level helper の正本です。
 - `python/` 前提のスクリプトでは import path の前提を確認します。
 
 ## 実験が不安定
