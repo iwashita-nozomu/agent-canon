@@ -1,0 +1,124 @@
+# tool-finding-report
+
+<!--
+@dependency-start
+responsibility Documents tool-finding-report for this repository.
+upstream design ../canonical/skills.md skill canon registry
+upstream design result-artifact-writeout.md raw result and summary artifact policy
+upstream design report-writing.md reader-facing evidence report policy
+downstream design refactor-loop.md consumes finding packets for repair slices
+downstream implementation ../../.agents/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
+@dependency-end
+-->
+
+## Purpose
+
+tool、checker、hook、static analysis、構造解析を使って問題を探し、raw result、
+structured artifact、mechanical priority order、full finding report、必要なら
+before / after impact を同じ source packet で結びます。
+
+この skill は実装修正を担当しません。実装は `refactor-loop`、通常 task execution、
+または該当 workflow が担当し、この skill の finding packet を入力にします。
+
+## Use When
+
+- user が tool で問題を探して報告するよう求めたとき
+- refactor / implementation の前に full baseline finding と mechanical priority order
+  を固定するとき
+- 実装後に finding が増えたか、priority が悪化したかを見たいとき
+- tool / hook / reviewer / subagent feedback を、次の handoff prompt や shared
+  skill / workflow prompt に戻す必要があるとき
+
+## Boundary
+
+- raw result、summary artifact、manifest、overwrite policy は
+  `result-artifact-writeout` の責務です。
+- reader-facing な narrative report、limitations、claim strength は
+  `report-writing` の責務です。
+- behavior-preserving な実装修正、repair slice、review gate、実際にどれを直すかの
+  取捨選択は `refactor-loop` または呼び出し元 workflow の責務です。
+- この skill は finding を自動で「削除対象」とは扱いません。tool は候補と根拠を
+  出し、実装側が責務境界、数理契約、API 契約を見て採否を決めます。
+
+## Finding Packet
+
+tool finding report は次を 1 つの packet として残します。finding はこの skill
+内で勝手に削らず、対象 scope の full artifact として出します。mechanical
+priority order まではこの skill が必ず作ります。repair slice、reader-facing
+excerpt、実際に修正する対象の取捨選択は、この packet を使う上位 workflow や
+実装エージェントが選びます。
+
+- `scope`: 対象 path、baseline ref、exclude、dependency roots
+- `commands`: 実行 command、cwd、exit status、tool version または commit
+- `raw_artifacts`: tool の raw text / JSON / JSONL
+- `structured_artifacts`: 正規化 JSON、full table、summary
+- `impact_artifacts`: before / after comparison、added / removed finding。比較が明示
+  されたときだけ作る補助 artifact
+- `mechanical_summary`: count、full finding table、mechanical priority order、
+  actionability signals
+- `priority_policy`: deterministic ranking inputs and weights used for this run
+- `interpretation`: agent の解釈。観測事実と推論を分ける
+- `prompt_feedback_decision`: `not_required`、`handoff_prompt_gap`、
+  `shared_skill_or_workflow_gap`、`tool_gap`、`test_or_design_gap`
+- `handoff_boundary`: this skill reports and ranks findings; the consumer skill decides
+  repair slices, implementation, deferral, or prompt/tool repair
+
+## Procedure
+
+1. 対象 scope、exclude rules、dependency roots、output directory を固定します。
+   comparison ref / worktree は、差分 impact が明示されたときだけ固定します。
+1. raw result を先に保存します。保存時は `result-artifact-writeout` を使い、
+   failed / partial run も evidence として残します。
+1. tool 固有の structured artifact を full scope で作ります。件数上限や top-N
+   truncation は使わず、tool が出した finding を情報を減らさず保存します。
+   - Python structural analysis: `python-structure-hash` ->
+     `python-structure-hash-report`
+   - Before / after diff: `python-structure-hash-impact`。比較が明示されたときだけ使う
+   - Algorithm modules: `python-algorithm-contract-check`
+   - Module groups: `python-module-groups-check`
+   - OOP readability: `tools/oop/<language>/readability.py --format json`
+   - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
+1. 全 finding に deterministic priority を付けます。tool が priority を持たない
+   場合も、少なくとも severity、public API / algorithm contract 影響、dependency
+   fan-in / fan-out、single-caller / duplicate / thin-structure signal、test /
+   experiment / production scope、tool confidence を使って機械的に並べます。ranking
+   rule は report に残し、同じ入力から同じ順序になるようにします。
+1. report では機械結果と agent interpretation を分けます。reader-facing report に
+   する場合は `report-writing` を使います。
+1. finding を分類します。
+   - `implementation_bug`: 実装を直す
+   - `missing_test_or_design_evidence`: test / design artifact を直す
+   - `handoff_prompt_gap`: 次の subagent handoff prompt を直す
+   - `shared_skill_or_workflow_gap`: skill / workflow / task catalog prompt を直す
+   - `tool_gap`: tool rule、false positive、structured output を直す
+   - `review_required`: 機械判定だけでは採否を決めない
+1. `handoff_prompt_gap` または `shared_skill_or_workflow_gap` は、次の
+   write-capable subagent を起動する前に prompt を修正します。closeout へ先送り
+   しません。
+1. prompt feedback は run bundle に構造化して残します。
+
+```bash
+python3 tools/agent_tools/workflow_monitor.py \
+  --report-dir reports/agents/<run-id> \
+  --runtime-feedback "source=<tool|hook|reviewer|subagent|user> target=<skill-or-workflow-or-handoff> action=prompt_repair reason=<short-reason>"
+```
+
+1. shared skill / workflow prompt を直した場合は、該当 prompt eval を確認し、
+   実行可能なら次を rerun します。
+
+```bash
+python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
+  --manifest agents/evals/skill_workflow_prompt_eval.toml
+```
+
+## Refactor Integration
+
+`refactor-loop` は、この skill が作った finding packet を入力として使います。
+実装前に baseline packet を作り、1 slice 後に同じ tool set を再実行し、
+必要なら impact packet を作ってから次の slice を選びます。slice selection では
+full finding packet と mechanical priority order から上位 agent が修正対象を選び、
+`tool-finding-report` 自体は finding を隠さず、修正対象の採否判断もしません。
+
+write-capable subagent への handoff には、finding packet path、current
+`repair_slice`、`Forbidden Semantic Delta`、新規 finding を増やさない制約、
+prompt feedback decision を含めます。

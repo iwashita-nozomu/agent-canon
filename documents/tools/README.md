@@ -333,6 +333,8 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - `algorithm_module_protocol` を使う algorithm module の公開面を検査します。標準公開名は `InitializeConfig`、`SolveConfig`、`Problem`、`State`、`Answer`、`Info`、`Algorithm`、`initialize` だけで、余計な `__all__` entry や top-level public 定義を fail にします。
 - `tools/agent_tools/check_algorithm_module_nested_contract.py`
   - `algorithm_module_protocol` を使う algorithm module の nested ownership を検査します。module `B` が algorithm module `A` を import して `A.initialize` や `A.Algorithm` を使う場合、`B.InitializeConfig` / `B.SolveConfig` / `B.Info` / `B.Algorithm` がそれぞれ `A.InitializeConfig` / `A.SolveConfig` / `A.Info` / `A.Algorithm` を field として持つことを確認します。
+- `tools/bin/agent-canon python-algorithm-contract-check`
+  - Python AST を JSON として抽出し、Rust 側で `algorithm_module_protocol` module の standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema を検査します。親 algorithm 側の nested field は特定 module 名に固定せず、import された amp module alias と `*.Algorithm` / `*.SolveConfig` / `*.Info` / `*.initialize` の AST usage から自動推定します。
 - `tools/experiments/update_latest_result.py`
   - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
 - `tools/push_origin.sh`

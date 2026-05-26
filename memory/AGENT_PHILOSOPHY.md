@@ -141,6 +141,18 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User reported hook logs, memory, and skill results were not accumulating and asked for PR/push-time guide generation
 
+- 2026-05-23 | interaction-observation | When launching write-capable subagents in refactor-loop tasks, the parent should verbalize the exact object-level repair intent: target qualname, current problem, intended structural change, non-goals, semantic invariants, and validation signal.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback after reports/agents/20260523-051658-pcg-refactor-loop-stopping-dependency-cl retrospective; updated refactor-loop skill handoff contract.
+
+- 2026-05-23 | interaction-observation | For refactor-loop delegation, the parent should build a dependency-DAG orchestration plan before spawning writers: repair low-level/root slices sequentially with few agents, validate and rerun tools, then parallelize only independent downstream slices with disjoint write scopes.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback on refactor-loop subagent orchestration; updated Refactor Orchestration Plan in refactor-loop skill.
+
 ## Task Retrospectives
 
 

@@ -27,6 +27,11 @@ PAYLOAD_STATUS_INVALID_JSON = "invalid_json"
 LOG_PATH_ENV = "AGENT_CANON_CAUSE_INVESTIGATION_HOOK_LOG_PATH"
 CONFIRMED_ENV = "AGENT_CANON_CAUSE_INVESTIGATION_CONFIRMED"
 DISABLE_LOG_ENV = "AGENT_CANON_DISABLE_HOOK_LOG"
+ACTIVE_REPORT_DIR_ENVS = (
+    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
+    "AGENT_RUN_REPORT_DIR",
+    "AGENT_REPORT_DIR",
+)
 GIT_TIMEOUT_SECONDS = 10
 MAX_TEXT_BYTES = 160_000
 MAX_RECORDED_PATHS = 20
@@ -75,8 +80,11 @@ CAUSE_EVIDENCE_PREFIXES = (
 CAUSE_EVIDENCE_GLOBS = (
     "reports/agents/**/cause_investigation.md",
     "reports/agents/**/*hypothesis*.md",
-    "reports/agents/**/workflow_monitoring.md",
-    "reports/agents/**/work_log.md",
+)
+RUN_LOCAL_EVIDENCE_NAMES = (
+    "cause_investigation.md",
+    "workflow_monitoring.md",
+    "work_log.md",
 )
 REQUIRED_TOKEN_GROUPS = (
     ("Observation:",),
@@ -257,11 +265,55 @@ def evidence_path(path: str) -> bool:
 def evidence_candidate_paths(root: Path) -> tuple[str, ...]:
     """Return changed or task-local cause evidence candidate paths."""
     paths = {path for path in changed_files(root) if evidence_path(path)}
+    for report_dir in active_report_dirs(root):
+        for name in RUN_LOCAL_EVIDENCE_NAMES:
+            candidate = report_dir / name
+            if candidate.is_file():
+                paths.add(candidate.relative_to(root).as_posix())
     for pattern in CAUSE_EVIDENCE_GLOBS:
         for candidate in root.glob(pattern):
             if candidate.is_file():
                 paths.add(candidate.relative_to(root).as_posix())
-    return tuple(sorted(paths)[:MAX_EVIDENCE_FILES])
+    return tuple(sorted(paths, key=lambda path: evidence_candidate_priority(root, path))[:MAX_EVIDENCE_FILES])
+
+
+def active_report_dirs(root: Path) -> tuple[Path, ...]:
+    """Return explicit current run directories under the repository root."""
+    dirs: list[Path] = []
+    root_resolved = root.resolve()
+    for env_name in ACTIVE_REPORT_DIR_ENVS:
+        raw_path = os.environ.get(env_name, "").strip()
+        if not raw_path:
+            continue
+        report_dir = Path(raw_path)
+        if not report_dir.is_absolute():
+            report_dir = root / report_dir
+        try:
+            resolved = report_dir.resolve()
+            resolved.relative_to(root_resolved)
+        except (OSError, ValueError):
+            continue
+        if resolved.is_dir() and resolved not in dirs:
+            dirs.append(resolved)
+    return tuple(dirs)
+
+
+def evidence_candidate_priority(root: Path, path: str) -> tuple[int, int, str]:
+    """Return priority for bounded evidence scanning."""
+    name = Path(path).name
+    if name == "cause_investigation.md":
+        rank = 0
+    elif "hypothesis" in name:
+        rank = 1
+    elif name == "workflow_monitoring.md":
+        rank = 2
+    else:
+        rank = 3
+    try:
+        mtime = (root / path).stat().st_mtime_ns
+    except OSError:
+        mtime = 0
+    return (rank, -mtime, path)
 
 
 def read_evidence_text(path: Path) -> str:

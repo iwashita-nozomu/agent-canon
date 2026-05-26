@@ -51,6 +51,10 @@ CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
 NOTEBOOK_SUFFIXES = {".ipynb"}
 MARKDOWN_SUFFIXES = {".md"}
 EXCLUDED_PARTS = {".git", "__pycache__", "reports", ".pytest_cache", ".ruff_cache"}
+EXCLUDED_SUFFIXES = {".jsonl"}
+EXCLUDED_PREFIXES = (
+    ("agents", "evals", "results"),
+)
 
 
 @dataclass(frozen=True)
@@ -242,7 +246,12 @@ def is_visible_changed_file(root: Path, relative_path: str) -> bool:
     path = root / relative_path
     if not path.is_file():
         return False
-    return not any(part in EXCLUDED_PARTS for part in Path(relative_path).parts)
+    relative_parts = Path(relative_path).parts
+    if any(part in EXCLUDED_PARTS for part in relative_parts):
+        return False
+    if Path(relative_path).suffix in EXCLUDED_SUFFIXES:
+        return False
+    return not any(relative_parts[: len(prefix)] == prefix for prefix in EXCLUDED_PREFIXES)
 
 
 def files_with_suffixes(paths: tuple[str, ...], suffixes: set[str]) -> tuple[str, ...]:
