@@ -199,6 +199,62 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             self.assertEqual(line_only_move.returncode, 0)
             self.assertEqual(line_only_move.stdout, "")
 
+    def test_check_uses_vendored_baseline_when_root_baseline_is_absent(self) -> None:
+        """Derived repos should check the AgentCanon baseline under vendor/."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            canon = root / "vendor" / "agent-canon"
+            hook = canon / ".codex" / "hooks" / "sample.py"
+            hook.parent.mkdir(parents=True)
+            hook.write_text("print('VENDORED_FIELD=1')\n", encoding="utf-8")
+
+            subprocess.run(
+                ["git", "init"],
+                cwd=canon,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "add", ".codex/hooks/sample.py"],
+                cwd=canon,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(canon),
+                    "--output",
+                    "documents/log-surface-inventory.json",
+                    "--quiet",
+                    ".codex",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--root",
+                    str(root),
+                    "--check",
+                    "--quiet",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
 
 if __name__ == "__main__":
     unittest.main()

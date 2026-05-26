@@ -232,6 +232,24 @@ def load_scope_index(path: Path) -> tuple[ScopeIndex, dict[str, ImportRule]]:
     return ScopeIndex(scopes), rules
 
 
+def resolve_manifest_path(root: Path, manifest: str) -> Path:
+    """Return the active responsibility manifest path.
+
+    Parent repositories may omit a root-local override and rely on the vendored
+    AgentCanon default manifest. A root-local manifest wins when present.
+    """
+    requested = Path(manifest)
+    if requested.is_absolute():
+        return requested
+    root_manifest = root / requested
+    if root_manifest.is_file():
+        return root_manifest
+    vendored_manifest = root / "vendor" / "agent-canon" / requested
+    if vendored_manifest.is_file():
+        return vendored_manifest
+    return root_manifest
+
+
 def pattern_covers(pattern: str, path: str) -> bool:
     """Return whether one scope pattern covers a repository path."""
     if pattern == path:
@@ -484,7 +502,7 @@ def check_imports(
     baseline_ref: str,
 ) -> Report:
     """Check import usage and responsibility boundaries."""
-    scope_index, rules = load_scope_index(root / manifest)
+    scope_index, rules = load_scope_index(resolve_manifest_path(root, manifest))
     findings: list[Finding] = []
     import_count = 0
     checked_paths = checked_python_paths(

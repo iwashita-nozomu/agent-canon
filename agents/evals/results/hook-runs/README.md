@@ -8,6 +8,7 @@ downstream implementation ../../../../.codex/hooks/hook_event_log.py assigns hoo
 downstream implementation ../../../../tools/agent_tools/generate_agent_improvement_guide.py reads hook results
 downstream implementation ../../../../tools/agent_tools/generate_agent_runtime_dashboard.py displays hook results
 downstream implementation ../../../../tools/agent_tools/eval_accumulation_check.py validates hook result structure
+downstream implementation ../../../../tools/agent_tools/agent_canon_log_management_check.py validates hook log ownership boundaries
 @dependency-end
 -->
 
@@ -83,6 +84,12 @@ cut over at the repaired source path's latest Git commit instead of physically
 moving JSONL. Improvement-guide and dashboard tooling may ignore older skill
 routing signals for gap calculations, but the JSONL lines remain in this tree
 for audit and repeated-failure history.
+
+Dirty hook/eval JSONL belongs on `agent-logs/*` branches, not on normal
+AgentCanon product branches or detached submodule checkouts. Use
+`bash tools/update_agent_canon.sh latest` from the parent repo to park such
+dirty state before updating the submodule. The structural guard for this is
+`python3 tools/agent_tools/agent_canon_log_management_check.py`.
 
 ## File Naming
 

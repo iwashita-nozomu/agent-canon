@@ -266,6 +266,8 @@ def main() -> int:
                 workflow_family_id=workflow_family_id or "",
             )
         )
+        active_pointer = report_root / ".active_run"
+        active_pointer.write_text(str(report_dir.resolve()) + "\n", encoding="utf-8")
 
     review_roles = tuple(
         role.id
@@ -355,6 +357,7 @@ def main() -> int:
         )
         print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
         print(f"CREATED_FILES={','.join(created_files)}")
+        print(f"AGENT_CANON_ACTIVE_RUN_POINTER={active_pointer}")
     return 0
 
 

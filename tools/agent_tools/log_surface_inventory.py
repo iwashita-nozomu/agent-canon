@@ -679,7 +679,11 @@ def main() -> int:
     """Run the inventory CLI."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
-    inventory = build_inventory(root, list(args.paths))
+    check_root = root
+    baseline_path = resolve_baseline_path(root, Path(args.baseline))
+    if args.check and baseline_path.is_file() and not args.paths:
+        check_root = inventory_root_for_baseline(baseline_path)
+    inventory = build_inventory(check_root if args.check else root, list(args.paths))
 
     if args.output:
         write_inventory((root / args.output).resolve(), inventory)
@@ -687,7 +691,6 @@ def main() -> int:
             print(f"LOG_SURFACE_INVENTORY_OUTPUT={args.output}")
 
     if args.check:
-        baseline_path = (root / args.baseline).resolve()
         if not baseline_path.is_file():
             print("LOG_SURFACE_INVENTORY=fail")
             print(f"LOG_SURFACE_BASELINE_MISSING={baseline_path}")
@@ -705,6 +708,24 @@ def main() -> int:
     elif not args.quiet:
         print(render_text(inventory))
     return 0
+
+
+def resolve_baseline_path(root: Path, raw_baseline: Path) -> Path:
+    """Return the standalone or vendored inventory baseline path."""
+    if raw_baseline.is_absolute():
+        return raw_baseline
+    direct = (root / raw_baseline).resolve()
+    if direct.is_file():
+        return direct
+    vendored = (root / "vendor" / "agent-canon" / raw_baseline).resolve()
+    if vendored.is_file():
+        return vendored
+    return direct
+
+
+def inventory_root_for_baseline(baseline: Path) -> Path:
+    """Return the repository root represented by one documents/ baseline."""
+    return baseline.resolve().parents[1]
 
 
 if __name__ == "__main__":

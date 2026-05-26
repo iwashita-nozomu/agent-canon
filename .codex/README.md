@@ -104,7 +104,7 @@ or high-risk review. Profiles do not waive workflow gates.
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
-- write-capable subagent は parent-managed write scope で制御します。`team_manifest.yaml` の write policy が disjoint path / separate worktree を割り当てた場合だけ複数 writer を許可し、重なる場合は serialize します。
+- write-capable subagent は既定 1 体です。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、spawn budget 内で複数 writer を並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
 - closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` を揃えます

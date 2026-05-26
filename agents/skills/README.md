@@ -41,6 +41,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `cpp-review` | build / header / ownership を前提にした C / C++ review | `agents/skills/cpp-review.md` | `.agents/skills/cpp-review/SKILL.md` |
 | `oop-readability-check` | OOP readability tool を走らせ、必要なら機械結果と分離して agent 分析も出す | `agents/skills/oop-readability-check.md` | `.agents/skills/oop-readability-check/SKILL.md` |
 | `result-artifact-writeout` | tool / hook / eval / experiment result を raw artifact、summary、manifest として上書きせず書き出す | `agents/skills/result-artifact-writeout.md` | `.agents/skills/result-artifact-writeout/SKILL.md` |
+| `tool-finding-report` | tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る | `agents/skills/tool-finding-report.md` | `.agents/skills/tool-finding-report/SKILL.md` |
 | `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
 | `report-writing` | evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
 | `structure-planning` | report / experiment / Eval / document / refactor の構造 contract、first artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
@@ -95,6 +96,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - C / C++ 差分では `cpp-review` を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
+- tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
 - skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に compact summary を生成して読みます。
 - reader-facing な report、status report、eval summary、audit summary、decision brief を書くときは `report-writing` を使い、source packet と Report Quality Checklist を固定します。
 - report、experiment plan / report、Eval output、decision brief、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、first artifact、source map、metric / delta contract、invalid interpretation を固定します。
