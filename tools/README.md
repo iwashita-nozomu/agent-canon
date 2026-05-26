@@ -367,8 +367,10 @@ publish their own runtime dashboard copies. Pass `--compact-out` to also write
 a token-light summary for agent log analysis. Agents should use that compact
 summary and its generated evidence drilldowns as the normal analysis input; if
 the summary lacks a needed detail, extend or rerun the dashboard tool for a more
-specific generated summary. Raw JSONL is reserved for tool implementation,
-schema debugging, or corruption audits with an explicit rationale.
+specific generated summary. Token-use questions should use recent moving
+averages and coverage status from the prompt/token trend drilldown instead of
+lifetime totals. Raw JSONL is reserved for tool implementation, schema
+debugging, or corruption audits with an explicit rationale.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
 reports are readable, uniquely identified, and not hidden by ignore rules

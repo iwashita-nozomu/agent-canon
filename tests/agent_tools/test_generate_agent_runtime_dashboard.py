@@ -73,10 +73,16 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "### Hook Failure Drilldown",
             "### Skill Eval Failure Drilldown",
             "### Selection Evidence Drilldown",
+            "### Prompt Token Trend Drilldown",
             "### Token Consumption Drilldown",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
+            "| `rolling_window_observations` | `8` |",
+            "| `prompt_chars_per_call_recent` | `27` |",
+            "| `token_ratio_recent` | `0.500` |",
+            "| `candidate_tokens_per_comparison_recent` | `100` |",
+            "| `joint_trend_status` | `limited_joint_window` |",
             "| `comparison_count` | `1` |",
-            "| `missing_namespaces` | `test-container=3` |",
+            "| `missing_namespaces` | `test-container=5` |",
             "| `missing_urls` | `https://example.com/paper.pdf=1` |",
             "| `registered_urls` | `https://example.com/reference.html=1` |",
             "Do not read raw JSONL during normal agent log analysis.",
@@ -96,7 +102,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Problem Components",
             "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=6",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
-            "`3 hook entries lack workflow attribution` | "
+            "`5 hook entries lack workflow attribution` | "
             "`compact report Workflow Attribution Drilldown` | "
             "`repair workflow attribution logging` |",
             "| `hook` | `reference_capture_guard` | `attention` | "
@@ -145,8 +151,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",
             "| `environment-maintenance@UserPromptSubmit` | `1` |",
-            "hook_entries_missing_workflow_attribution: `3`",
-            "hook_entries_context_attributed: `2`",
+            "hook_entries_missing_workflow_attribution: `5`",
+            "hook_entries_context_attributed: `0`",
             "## Token Consumption Evidence",
             "token_comparison_status: `present`",
             "average_token_ratio: `0.500`",
@@ -246,6 +252,37 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={canon_root.resolve().as_posix()}", dashboard)
         self.assertIn("hook_jsonl_files: `3`", dashboard)
+
+    def test_prompt_token_trend_uses_chronological_recent_window(self) -> None:
+        """Recent prompt/token trend rows should use timestamps, not file order."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_out_of_order_trend_fixture(root)
+            compact_output = root / "reports" / "compact-dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(root / "reports" / "dashboard.md"),
+                    "--compact-out",
+                    str(compact_output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            compact_dashboard = compact_output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("| `prompt_chars_per_call_recent` | `10` |", compact_dashboard)
+        self.assertIn("| `token_ratio_recent` | `0.100` |", compact_dashboard)
+        self.assertIn("| `candidate_tokens_per_comparison_recent` | `100` |", compact_dashboard)
+        self.assertIn("| `joint_trend_status` | `ready` |", compact_dashboard)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -361,6 +398,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "prompt_capture_status": "present",
                     "prompt_excerpt_redacted": "Use environment maintenance",
                     "prompt_char_count": 27,
+                    "timestamp": "2026-05-17T01:02:02Z",
                     "tool_name": "",
                     "tool_command_verb": "",
                     "skill_source_fields": ["prompt"],
@@ -451,8 +489,66 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
         workflow_report.parent.mkdir(parents=True)
         workflow_report.write_text(
+            "timestamp=2026-05-17T01:02:03Z "
             "token_efficiency_protocol=active token_footprint_comparison=pass "
             "baseline_total=200 candidate_total=100 token_ratio=0.500 target_ratio=0.500\n",
+            encoding="utf-8",
+        )
+
+    def write_out_of_order_trend_fixture(self, root: Path) -> None:
+        """Write trend evidence where lexical and chronological order disagree."""
+        hook_dir = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
+        (root / "reports" / "agents" / "test" / "workflow_monitoring.md").unlink()
+        new_entries = [
+            self.prompt_entry(f"2026-05-{day:02d}T00:00:00Z", 10)
+            for day in range(2, 10)
+        ]
+        old_entry = self.prompt_entry("2026-05-01T00:00:00Z", 900)
+        (hook_dir / "skill_usage.jsonl").write_text(
+            "\n".join(json.dumps(entry) for entry in (*new_entries, old_entry)) + "\n",
+            encoding="utf-8",
+        )
+        self.write_token_report(root, "z-old", "2026-05-01T00:00:00Z", 1000, 900, 0.900)
+        for day in range(2, 10):
+            self.write_token_report(
+                root,
+                f"a-new-{day}",
+                f"2026-05-{day:02d}T00:00:00Z",
+                1000,
+                100,
+                0.100,
+            )
+
+    @staticmethod
+    def prompt_entry(timestamp: str, prompt_chars: int) -> dict[str, object]:
+        """Return one prompt-capture hook entry."""
+        return {
+            "hook_run_id": f"hook-{timestamp}",
+            "hook_log_namespace": "test-container",
+            "event": "UserPromptSubmit",
+            "status": "pass",
+            "payload_fingerprint": timestamp,
+            "prompt_capture_status": "present",
+            "prompt_excerpt_redacted": "trend",
+            "prompt_char_count": prompt_chars,
+            "timestamp": timestamp,
+        }
+
+    @staticmethod
+    def write_token_report(
+        root: Path,
+        name: str,
+        timestamp: str,
+        baseline: int,
+        candidate: int,
+        ratio: float,
+    ) -> None:
+        """Write one token comparison report."""
+        report = root / "reports" / "agents" / name / "workflow_monitoring.md"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(
+            f"timestamp={timestamp} baseline_total={baseline} "
+            f"candidate_total={candidate} token_ratio={ratio:.3f}\n",
             encoding="utf-8",
         )
 
