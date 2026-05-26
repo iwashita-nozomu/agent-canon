@@ -22,9 +22,11 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Keep requirements review, plan review, detailed design review, and document flow review as separate agents.
 1. Check the command output for `IMPLEMENTATION_CODEX_AGENTS`.
 1. If `IMPLEMENTATION_CODEX_AGENTS` starts with `spark_worker,worker`, send approved, design-traced, low-risk implementation slices to `spark_worker` first.
-1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, prefer a read-only `gpt-5.3-codex-spark` `low` wave when explicit spawn authorization exists.
+1. Read `.codex/config.toml` `agents.model_policy` before choosing model / reasoning for a spawned role.
+1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, prefer the Spark bucket from `.codex/config.toml` when explicit spawn authorization exists.
+1. For bounded review, report traceability, and checklist-style review gates, prefer the mini review bucket from `.codex/config.toml` before escalating to frontier roles.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
-1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent with `model="gpt-5.3-codex-spark"` and `reasoning_effort="low"` before escalating to the parent or `gpt-5.5`.
+1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent using the Spark bucket's `model` and `model_reasoning_effort` from `.codex/config.toml` before escalating to the parent or frontier bucket.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
 1. Use one writer per worktree. If multiple writers are necessary, split worktrees before implementation.
 1. For each new user request, start fresh run-local subagents; do not `send_input` a new task into subagents from a previous request.

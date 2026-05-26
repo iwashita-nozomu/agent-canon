@@ -37,46 +37,6 @@ from agent_team import (
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
-FRONTIER_MODEL = "gpt-5.5"
-SPARK_CODING_MODEL = "gpt-5.3-codex-spark"
-SPARK_REASONING_EFFORT = "low"
-WRITING_AND_REVIEW_ROLE_IDS = {
-    "requirements_organizer",
-    "manager_reviewer",
-    "execution_planner",
-    "detailed_designer",
-    "long_form_writer",
-    "plan_reviewer",
-    "detailed_design_reviewer",
-    "document_flow_reviewer",
-    "citation_evidence_reviewer",
-    "notation_definition_reviewer",
-    "logic_gap_reviewer",
-    "oop_readability_reviewer",
-    "reviewer",
-    "project_reviewer",
-    "report_reviewer",
-    "docs_workflow_steward",
-    "reproducibility_reviewer",
-    "scientific_computing_reviewer",
-    "benchmark_reviewer",
-    "artifact_reviewer",
-    "fair_data_reviewer",
-    "ml_science_reviewer",
-    "literature_researcher",
-}
-SPARK_READ_ROLE_IDS = {
-    "explorer",
-    "test_designer",
-    "python_reviewer",
-    "cpp_reviewer",
-}
-FRONTIER_IMPLEMENTATION_ROLE_IDS = {
-    "worker",
-}
-SPARK_CODING_ROLE_IDS = {
-    "spark_worker",
-}
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -104,21 +64,72 @@ def parse_codex_agents() -> dict[str, dict[str, object]]:
     return parsed
 
 
+def load_project_config_toml() -> dict[str, object]:
+    """Load the shared Codex project config."""
+    return tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def iter_model_policy_buckets(config: dict[str, object]) -> list[tuple[str, dict[str, object]]]:
+    """Return model policy buckets from `.codex/config.toml`."""
+    agents = config.get("agents", {})
+    ensure(isinstance(agents, dict), "agents config must be a mapping")
+    model_policy = agents.get("model_policy", {})
+    ensure(isinstance(model_policy, dict), "agents.model_policy must be a mapping")
+    ensure(model_policy, "agents.model_policy must not be empty")
+    buckets: list[tuple[str, dict[str, object]]] = []
+    for bucket_id, raw_bucket in sorted(model_policy.items()):
+        ensure(isinstance(raw_bucket, dict), f"model policy {bucket_id} must be a mapping")
+        model = raw_bucket.get("model")
+        reasoning_effort = raw_bucket.get("model_reasoning_effort")
+        roles = raw_bucket.get("roles")
+        ensure(isinstance(model, str) and model, f"model policy {bucket_id} missing model")
+        ensure(
+            isinstance(reasoning_effort, str) and reasoning_effort,
+            f"model policy {bucket_id} missing model_reasoning_effort",
+        )
+        ensure(
+            isinstance(roles, list) and all(isinstance(role, str) and role for role in roles),
+            f"model policy {bucket_id} roles must be a non-empty string list",
+        )
+        ensure(len(set(roles)) == len(roles), f"model policy {bucket_id} has duplicate roles")
+        buckets.append((str(bucket_id), raw_bucket))
+    return buckets
+
+
+def validate_agent_model(
+    configs: dict[str, dict[str, object]],
+    role_id: str,
+    *,
+    model: str,
+    reasoning_effort: str,
+) -> None:
+    """Check one Codex agent model bucket."""
+    config = configs[role_id]
+    ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
+    ensure(
+        config.get("model_reasoning_effort") == reasoning_effort,
+        f"{role_id} model_reasoning_effort must be {reasoning_effort}",
+    )
+    ensure(config.get("model") == model, f"{role_id} model must be {model}")
+
+
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
-    config = tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
-    ensure(config.get("review_model") == FRONTIER_MODEL, f"review_model must be {FRONTIER_MODEL}")
+    config = load_project_config_toml()
     profiles = config.get("profiles", {})
     ensure(isinstance(profiles, dict), "profiles must be a mapping")
     review_profile = profiles.get("review", {})
     ensure(isinstance(review_profile, dict), "review profile must be a mapping")
+    review_model = review_profile.get("model")
+    ensure(config.get("review_model") == review_model, "review_model must match profiles.review.model")
     ensure(
-        review_profile.get("model") == FRONTIER_MODEL,
-        f"review profile model must be {FRONTIER_MODEL}",
+        isinstance(review_model, str) and review_model,
+        "review profile model must be a non-empty string",
     )
     ensure(
-        review_profile.get("model_reasoning_effort") == "high",
-        "review profile model_reasoning_effort must be high",
+        isinstance(review_profile.get("model_reasoning_effort"), str)
+        and review_profile.get("model_reasoning_effort"),
+        "review profile model_reasoning_effort must be a non-empty string",
     )
     ensure(
         review_profile.get("sandbox_mode") == "read-only",
@@ -128,61 +139,45 @@ def validate_project_config() -> None:
         review_profile.get("approval_policy") == "never",
         "review profile approval_policy must be never",
     )
+    _ = iter_model_policy_buckets(config)
 
 
 def validate_codex_agent_settings() -> None:
     """Check that Codex agent settings use the expected model split."""
+    project_config = load_project_config_toml()
+    model_policy = iter_model_policy_buckets(project_config)
     configs = parse_codex_agents()
-    required_role_ids = (
-        WRITING_AND_REVIEW_ROLE_IDS
-        | SPARK_READ_ROLE_IDS
-        | FRONTIER_IMPLEMENTATION_ROLE_IDS
-        | SPARK_CODING_ROLE_IDS
-    )
+    required_role_ids: set[str] = set()
+    owner_by_role: dict[str, str] = {}
+    for bucket_id, bucket in model_policy:
+        for role_id in bucket["roles"]:
+            if str(role_id) in owner_by_role:
+                raise RuntimeError(
+                    f"role {role_id} appears in multiple model policy buckets: "
+                    f"{owner_by_role[str(role_id)]}, {bucket_id}"
+                )
+            owner_by_role[str(role_id)] = bucket_id
+            required_role_ids.add(str(role_id))
     missing = sorted(required_role_ids - set(configs))
     ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
 
-    for role_id in sorted(WRITING_AND_REVIEW_ROLE_IDS):
-        config = configs[role_id]
-        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        ensure(
-            config.get("model_reasoning_effort") == "high",
-            f"{role_id} model_reasoning_effort must be high",
-        )
-        ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
+    unassigned_agents = sorted(set(configs) - required_role_ids)
+    ensure(
+        not unassigned_agents,
+        "Codex agents missing from agents.model_policy: " + ", ".join(unassigned_agents),
+    )
 
-    for role_id in sorted(SPARK_READ_ROLE_IDS):
-        config = configs[role_id]
-        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        ensure(
-            config.get("model_reasoning_effort") == SPARK_REASONING_EFFORT,
-            f"{role_id} model_reasoning_effort must be {SPARK_REASONING_EFFORT}",
-        )
-        ensure(
-            config.get("model") == SPARK_CODING_MODEL,
-            f"{role_id} model must be {SPARK_CODING_MODEL}",
-        )
-
-    for role_id in sorted(FRONTIER_IMPLEMENTATION_ROLE_IDS):
-        config = configs[role_id]
-        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        ensure(
-            config.get("model_reasoning_effort") == "high",
-            f"{role_id} model_reasoning_effort must be high",
-        )
-        ensure(config.get("model") == FRONTIER_MODEL, f"{role_id} model must be {FRONTIER_MODEL}")
-
-    for role_id in sorted(SPARK_CODING_ROLE_IDS):
-        config = configs[role_id]
-        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-        ensure(
-            config.get("model_reasoning_effort") == SPARK_REASONING_EFFORT,
-            f"{role_id} model_reasoning_effort must be {SPARK_REASONING_EFFORT}",
-        )
-        ensure(
-            config.get("model") == SPARK_CODING_MODEL,
-            f"{role_id} model must be {SPARK_CODING_MODEL}",
-        )
+    for bucket_id, bucket in model_policy:
+        for role_id in sorted(str(role) for role in bucket["roles"]):
+            try:
+                validate_agent_model(
+                    configs,
+                    role_id,
+                    model=str(bucket["model"]),
+                    reasoning_effort=str(bucket["model_reasoning_effort"]),
+                )
+            except RuntimeError as exc:
+                raise RuntimeError(f"model policy {bucket_id}: {exc}") from exc
 
 
 def validate_team_config_references() -> None:
