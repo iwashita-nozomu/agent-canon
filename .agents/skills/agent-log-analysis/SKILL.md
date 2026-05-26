@@ -24,10 +24,11 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   --compact-out reports/agent-runtime-dashboard/agent-runtime-compact.md
 ```
 
-1. Read `reports/agent-runtime-dashboard/agent-runtime-compact.md` as the default analysis input.
+1. Read `reports/agent-runtime-dashboard/agent-runtime-compact.md` as the default analysis input, including generated drilldowns and prompt/token rolling trend metrics.
 1. Use the generated `Evidence Drilldown` section before consulting any raw evidence.
 1. If the compact report lacks enough context for a specific claim, extend or rerun the dashboard tool with a more specific generated summary instead of opening raw JSONL.
 1. Treat raw JSONL as tool-development or corruption-audit input only; record an explicit rationale before reading it.
+1. Do not answer token-use questions from lifetime totals alone; prefer the compact report's recent moving averages and coverage status.
 1. Report observations separately from interpretation, repair target, and unknowns.
 1. If the analysis drives a prompt, skill, workflow, or tool change, add the responsible skill such as `$agent-learning`, `$md-style-check`, or the target skill before editing.
 1. If the user asks for a durable report, pair this skill with `$result-artifact-writeout`.

@@ -29,6 +29,7 @@ contract listed in `documents/README.md`.
 - repo-changing task では、task の risk class を先に決めます。trivial / Routine docs / Focused code は parent-direct を許可し、Shared canon / Large delivery / high-risk では requirements / planning / detailed design / review / implementation を stage ごとに分けます。
 - subagent は task の複雑さ、review 独立性、write scope 分離で使います。使わない場合は user update または run bundle に parent-direct rationale を短く残します。
 - parent agent は subagent を chat 要約だけで動かさず、run bundle と `team_manifest.yaml` に書かれた文書パスを明示して渡します。
+- subagent handoff は workspace 全体を scope として渡しません。role ごとに bounded path list、対象 checker / compact artifact、読むべき canon 節、読まない surface、expected output を明示します。bounded path list は編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。`/workspace` や repo root は作業場所であり、入力 packet の代替ではありません。
 - detailed design には `DESIGN_DOCUMENT_PACKET`、implementation には `IMPLEMENTATION_DOCUMENT_PACKET` を明示参照させ、必要文書を読ませてから作業させます。
 - subagent の depth や fan-out は固定値で規定しません。task の複雑さ、review の独立性、write scope 分離で決め、追加する各層に owner、入力 packet、write scope、review gate を明示します。
 - `.codex/config.toml` の `max_threads` を超えて同時 spawn しません。role が多い task は wave に分け、同時に動かすのはその stage で今必要な subagent だけに絞ります。
@@ -96,7 +97,7 @@ contract listed in `documents/README.md`.
 - 当面は検索 Eval 収集のため、semantic-index の bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
 - 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。
 - 通常の code / docs / routing 調査では、`agents/evals/results/**`、`reports/**`、`*.jsonl`、generated dashboard / inventory / eval artifact を検索対象から除外します。skill、tool、workflow ログの分析は生ログの広域 `rg` ではなく、蓄積分析 tool、dashboard、専用 eval report で要約してから必要箇所だけ読みます。
-- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary と generated drilldown を生成して分析します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
+- skill、tool、workflow、hook、eval の蓄積ログ分析では `$agent-log-analysis` を使い、raw JSONL を読む代わりに compact summary、generated drilldown、prompt/token rolling trend を生成して分析します。token 利用は lifetime total だけで判断せず、recent moving average と coverage status を優先します。compact summary で足りない場合は生ログ検索ではなく分析 tool を拡張します。
 - 検索で見つけた既存 skill、tool、workflow を使わない場合は、run bundle、PR body、または作業 update に理由を残します。
 
 ## Runtime Profiles And Risk

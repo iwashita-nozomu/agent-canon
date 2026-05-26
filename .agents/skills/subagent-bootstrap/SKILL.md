@@ -25,6 +25,8 @@ upstream design ../../../agents/COMMUNICATION_PROTOCOL.md defines pre-edit tool 
 1. If `IMPLEMENTATION_CODEX_AGENTS` starts with `spark_worker,worker`, send approved, design-traced, low-risk implementation slices to `spark_worker` first.
 1. For repo inventory, tool drift survey, static validation triage, diff-local Python / C++ review, and machine-report summarization, prefer a read-only `gpt-5.3-codex-spark` `low` wave when explicit spawn authorization exists.
 1. Treat a narrow implementation slice as `spark_worker` eligible only when it is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+1. Keep every handoff packet bounded: include role-specific `allowed_paths`, checker or compact artifact paths, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema. Do not use `/workspace` or the repo root as the only scope.
+1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
 1. If a project-defined Spark role fails because runtime tools conflict with its effort profile, retry as a fresh default subagent with `model="gpt-5.3-codex-spark"` and `reasoning_effort="low"` before escalating to the parent or `gpt-5.5`.
 1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
 1. Use one writer per worktree. If multiple writers are necessary, split worktrees before implementation.

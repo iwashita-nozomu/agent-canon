@@ -272,7 +272,7 @@ dependency surface は task に応じて次を見ます。
 1. manifest が無い checkable file を編集する場合は、同じ差分の最初に `@dependency-start` block を追加する
 1. downstream edge を持つ file を編集した場合は、差分後に downstream target を確認する
 1. 新しい dependency edge を足す場合は、同じ変更で reverse edge も足すか、migration 中で足せない理由を review artifact に記録する
-1. subagent handoff には `dependency_manifest_plan` を含め、編集対象ごとの upstream / downstream edge と読む順序を固定する
+1. subagent handoff には `dependency_manifest_plan` と dependency header graph の再帰展開結果を含め、編集対象ごとの upstream / downstream edge、`dependency_edit_scope.txt` / `dependency_graph.tsv`、読む順序を固定する
 
 closeout 前に、少なくとも次を実行します。
 
