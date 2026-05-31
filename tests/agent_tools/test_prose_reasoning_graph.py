@@ -1,6 +1,7 @@
 # @dependency-start
 # responsibility Tests prose reasoning graph CLI behavior.
 # upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py graph CLI
+# upstream design ../../documents/prose-reasoning-graph/dsl-spec.md graph DSL contract
 # upstream design ../../documents/tools/prose_reasoning_graph.md tool contract
 # @dependency-end
 """Tests for prose reasoning graph CLI."""

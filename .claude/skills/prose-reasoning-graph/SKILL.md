@@ -6,6 +6,7 @@ description: Use when existing prose should be converted into a SQLite-backed st
 @dependency-start
 responsibility Documents Prose Reasoning Graph runtime skill for this repository.
 upstream design ../../../agents/skills/prose-reasoning-graph.md documents the human-facing skill
+upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 upstream implementation ../../../tools/agent_tools/prose_reasoning_graph.py builds graph projections and handoff packets
 upstream design ../../../documents/tools/prose_reasoning_graph.md documents CLI usage
 @dependency-end
@@ -14,6 +15,9 @@ upstream design ../../../documents/tools/prose_reasoning_graph.md documents CLI 
 # Prose Reasoning Graph
 
 1. Read `agents/skills/prose-reasoning-graph.md`.
+1. Read `documents/prose-reasoning-graph/dsl-spec.md` before interpreting,
+   changing, or extending graph layers, ids, relation kinds, diagnostics,
+   projections, or adapter vocabulary.
 1. Use this when prose structure, paragraph connection, claim support, evidence traceability, experiment-plan completeness, or split/merge/bridge/reorder rewrite planning should be derived from a graph rather than inferred repeatedly from raw prose.
 1. Store the SQLite DB and generated outputs under the active run bundle or task-local artifact directory; the graph DB is an intermediate artifact, not a durable source of truth.
 1. Run `python3 tools/agent_tools/prose_reasoning_graph.py ingest <source.md> --db <graph.sqlite> --stats-out <ingest.stats.json>`.

@@ -4,6 +4,7 @@
 responsibility Documents prose-reasoning-graph analysis and skill handoff workflow.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
+upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../.claude/skills/prose-reasoning-graph/SKILL.md mirrors this workflow for Claude-compatible runtimes
@@ -18,6 +19,11 @@ graph before asking an LLM or writing skill to rewrite it. It converts existing
 Markdown/plain text into a SQLite-backed intermediate graph, runs layer
 diagnostics, explains graph findings in natural language, and emits handoff
 packets for existing writing, research, review, experiment, and artifact skills.
+
+The normative DSL contract is
+[documents/prose-reasoning-graph/dsl-spec.md](../../documents/prose-reasoning-graph/dsl-spec.md).
+This skill owns when and how to use the graph; the DSL spec owns layer,
+relation, identifier, projection, validation, and adapter vocabulary.
 
 It does not replace `$long-form-writing`, `$report-writing`,
 `$academic-writing`, `$paper-writing`, `$literature-survey`,
