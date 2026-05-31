@@ -57,10 +57,18 @@ skill_families:
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
     shim: .agents/skills/agent-log-analysis/SKILL.md
+  - id: agent-update-branch
+    purpose: Isolate memory, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
+    canonical_doc: agents/skills/agent-update-branch.md
+    shim: .agents/skills/agent-update-branch/SKILL.md
   - id: report-writing
     purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
+  - id: prose-reasoning-graph
+    purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
+    canonical_doc: agents/skills/prose-reasoning-graph.md
+    shim: .agents/skills/prose-reasoning-graph/SKILL.md
   - id: structure-planning
     purpose: Build structure contracts for reports, experiments, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md

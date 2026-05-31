@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -216,7 +217,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_REFERENCE_BLOCKED_ENTRIES=0",
             "| `UserPromptSubmit` | `1` |",
             "| `last_assistant_message` | `1` |",
-            ".agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl",
+            ".agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl",
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
             "skill-workflow-prompt",
@@ -287,6 +288,41 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("| `token_ratio_recent` | `0.100` |", compact_dashboard)
         self.assertIn("| `candidate_tokens_per_comparison_recent` | `100` |", compact_dashboard)
         self.assertIn("| `joint_trend_status` | `ready` |", compact_dashboard)
+
+    def test_recent_days_filters_hook_and_token_evidence(self) -> None:
+        """Recent dashboard mode should not mix old JSONL rows into reports."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_recent_filter_fixture(root)
+            compact_output = root / "reports" / "compact-dashboard.md"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(root / "reports" / "dashboard.md"),
+                    "--compact-out",
+                    str(compact_output),
+                    "--recent-days",
+                    "5",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            compact_dashboard = compact_output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_RECENT_DAYS=5", compact_dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=1", compact_dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES=1", compact_dashboard)
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS=1", compact_dashboard)
+        self.assertIn("| `prompt_chars_per_call_recent` | `10` |", compact_dashboard)
+        self.assertIn("| `token_ratio_recent` | `0.100` |", compact_dashboard)
+        self.assertNotIn("legacy-skill", compact_dashboard)
 
     def write_fixture(self, root: Path, *, source_root: Path | None = None) -> None:
         """Write a small AgentCanon-like evidence tree."""
@@ -503,6 +539,55 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "baseline_total=200 candidate_total=100 token_ratio=0.500 target_ratio=0.500\n",
             encoding="utf-8",
         )
+
+    def write_recent_filter_fixture(self, root: Path) -> None:
+        """Write mixed old and recent evidence for recent-mode assertions."""
+        hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
+        hook_dir.mkdir(parents=True)
+        recent_timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        (hook_dir / "skill_usage.jsonl").write_text(
+            json.dumps(
+                {
+                    "hook_run_id": "old-hook",
+                    "hook_log_namespace": "test-container",
+                    "event": "UserPromptSubmit",
+                    "status": "pass",
+                    "payload_fingerprint": "old",
+                    "skills": ["legacy-skill"],
+                    "prompt_capture_status": "present",
+                    "prompt_excerpt_redacted": "old prompt",
+                    "timestamp": "2000-01-01T00:00:00Z",
+                    "prompt_char_count": 900,
+                    "skill_source_fields": ["prompt"],
+                    "observed_text_field_count": 1,
+                    "workflow_monitor_event_count": 1,
+                    "workflow_monitor_report_dir": "reports/agents/old",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "hook_run_id": "recent-hook",
+                    "hook_log_namespace": "test-container",
+                    "event": "UserPromptSubmit",
+                    "status": "pass",
+                    "payload_fingerprint": "recent",
+                    "skills": ["md-style-check"],
+                    "prompt_capture_status": "present",
+                    "prompt_excerpt_redacted": "recent",
+                    "timestamp": recent_timestamp,
+                    "prompt_char_count": 10,
+                    "skill_source_fields": ["prompt"],
+                    "observed_text_field_count": 1,
+                    "workflow_monitor_event_count": 1,
+                    "workflow_monitor_report_dir": "reports/agents/recent",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        self.write_token_report(root, "old", "2000-01-01T00:00:00Z", 1000, 900, 0.900)
+        self.write_token_report(root, "recent", recent_timestamp, 1000, 100, 0.100)
 
     def write_out_of_order_trend_fixture(self, root: Path) -> None:
         """Write trend evidence where lexical and chronological order disagree."""

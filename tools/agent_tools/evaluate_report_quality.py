@@ -16,13 +16,13 @@ import hashlib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from runtime_log_paths import agent_canon_root, eval_results_dir
@@ -276,7 +276,7 @@ def evaluate(root: Path, manifest: Path) -> ReportQualityBundle:
 
 def run_id_for(manifest: Path, results: tuple[QualityChecklistResult, ...]) -> str:
     """Return a unique report quality eval run id."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     digest_source = "\n".join(
         [
             manifest.as_posix(),

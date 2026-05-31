@@ -65,7 +65,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Bootstrap agent run
         id: bootstrap
         run: |
@@ -116,7 +116,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download bootstrap bundle
         uses: actions/download-artifact@v4
         with:
@@ -168,7 +168,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download manager bundle
         uses: actions/download-artifact@v4
         with:
@@ -220,7 +220,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download manager review bundle
         uses: actions/download-artifact@v4
         with:
@@ -272,7 +272,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download manager response bundle
         uses: actions/download-artifact@v4
         with:
@@ -331,7 +331,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download research bundle
         uses: actions/download-artifact@v4
         with:
@@ -390,7 +390,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download research review bundle
         uses: actions/download-artifact@v4
         with:
@@ -449,7 +449,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download research response bundle
         uses: actions/download-artifact@v4
         with:
@@ -508,7 +508,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download schedule bundle
         uses: actions/download-artifact@v4
         with:
@@ -567,7 +567,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download schedule review bundle
         uses: actions/download-artifact@v4
         with:
@@ -626,7 +626,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download schedule response bundle
         uses: actions/download-artifact@v4
         with:
@@ -685,7 +685,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download infra bundle
         uses: actions/download-artifact@v4
         with:
@@ -744,7 +744,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download infra review bundle
         uses: actions/download-artifact@v4
         with:
@@ -803,7 +803,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download infra response bundle
         uses: actions/download-artifact@v4
         with:
@@ -862,7 +862,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download manager specialist response bundle
         uses: actions/download-artifact@v4
         with:
@@ -914,7 +914,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download design bundle
         uses: actions/download-artifact@v4
         with:
@@ -966,7 +966,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download design review bundle
         uses: actions/download-artifact@v4
         with:
@@ -1018,7 +1018,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download design response bundle
         uses: actions/download-artifact@v4
         with:
@@ -1070,7 +1070,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download implementer bundle
         uses: actions/download-artifact@v4
         with:
@@ -1122,7 +1122,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download change review bundle
         uses: actions/download-artifact@v4
         with:
@@ -1174,7 +1174,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download implementer change response bundle
         uses: actions/download-artifact@v4
         with:
@@ -1226,7 +1226,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download final review bundle
         uses: actions/download-artifact@v4
         with:
@@ -1278,7 +1278,7 @@ jobs:
       - name: Install Python and deps
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -1322,7 +1322,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Download verification bundle
         uses: actions/download-artifact@v4
         with:

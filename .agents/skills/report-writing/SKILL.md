@@ -8,6 +8,7 @@ responsibility Documents Report Writing runtime skill for this repository.
 upstream design ../../../agents/skills/report-writing.md documents the human-facing report-writing workflow
 upstream design ../../../agents/skills/structure-planning.md defines report structure contracts
 upstream design ../../../agents/skills/result-artifact-writeout.md defines raw result and summary artifact placement
+upstream design ../../../agents/skills/prose-reasoning-graph.md defines graph diagnostics and skill handoff packets
 downstream design ../../../agents/skills/html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../../../agents/evals/report_quality_eval.toml defines report quality checklist eval coverage
 downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py evaluates report-writing prompt surfaces
@@ -22,6 +23,7 @@ downstream implementation ../../../tools/agent_tools/evaluate_report_quality.py 
 1. Build a source packet with audience, decision context, source artifacts, observed facts, inferred claims, limitations, provenance, and requested next action.
 1. Use `$structure-planning` before drafting when the report has a nontrivial reader structure, first figure/table, comparison, metric interpretation, source-to-section map, or invalid interpretation boundary.
 1. When `$structure-planning` is active, use its structure contract as the report skeleton and do not add sections or claims that lack mapped evidence, an explicit inference label, or a stated limitation; if it records `discourse_relations=<path>`, use those edge scores to check paragraph order and transition claims.
+1. If a prose graph handoff is present, read its projection, diagnostics, explanation, and integration plan as advisory evidence for reader flow, unsupported claims, paragraph bridges, and split/merge/reorder operations; keep the report source packet authoritative for factual claims.
 1. If the report uses external references, first inspect existing repo reference notes and cite/update those durable source packets; a browser tab, downloaded temp file, or chat-only source summary is not enough provenance.
 1. Use `$result-artifact-writeout` when the task also writes raw machine results, append-only eval evidence, hook logs, or experiment artifacts; do not treat the reader report as the raw evidence store.
 1. Apply the Report Quality Checklist: audience and decision fit, purpose and non-goals, evidence traceability, observation/interpretation separation, claim strength, limitations and uncertainty, provenance, actionability, artifact integrity, and rule-drift control.

@@ -20,7 +20,7 @@ import tempfile
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
@@ -209,7 +209,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def utc_now() -> str:
     """Return one UTC timestamp."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def normalize_whitespace(value: str) -> str:

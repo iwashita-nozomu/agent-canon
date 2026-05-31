@@ -28,13 +28,13 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
@@ -365,7 +365,7 @@ def report_status(results: Sequence[CaseResult]) -> str:
 
 def make_run_id(seed: str) -> str:
     """Return a unique local LLM eval run id."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     digest = hashlib.sha256(f"{timestamp}\n{seed}".encode()).hexdigest()[:RUN_ID_DIGEST_LENGTH]
     return f"{RUN_ID_PREFIX}-{timestamp}-{digest}"
 

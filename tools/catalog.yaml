@@ -159,6 +159,25 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: repo-structure-contract
+    summary: Compares an observed repository tree with the AgentCanon structure contract.
+    path: tools/agent_tools/repo_structure_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/repo_structure_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repo_structure_contract.md
+      - documents/repo-structure-contract.toml
+    tests:
+      - tests/agent_tools/test_repo_structure_contract.py
+
   - id: import-responsibility
     summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
     path: tools/agent_tools/import_responsibility.py
@@ -217,26 +236,6 @@ entries:
       - documents/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
-
-  - id: agent-canon-log-management-check
-    summary: Validates hook/eval log branch ownership and hook namespace consistency.
-    path: tools/agent_tools/agent_canon_log_management_check.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent_tools/agent_canon_log_management_check.py
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/evals/README.md
-      - documents/runtime-log-archive.md
-      - documents/runtime-log-archive-migration.md
-    tests:
-      - tests/agent_tools/test_agent_canon_log_management_check.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
@@ -396,26 +395,6 @@ entries:
     tests:
       - rust/agent-canon/src/semantic_index.rs
 
-  - id: python-structure-hash-scope-plan
-    summary: Builds deterministic Change Impact Packets with impact blocks, scope candidates, selected scope, repair batches, and subagent handoff context from Python structural findings plus dependency-review artifacts.
-    path: rust/agent-canon/src/python_structure_hash_scope_plan.rs
-    family: root
-    role: inventory
-    status: canonical
-    command: tools/bin/agent-canon python-structure-hash-scope-plan --input reports/python-structure-hash-report.json --dependency-report-dir reports/dependency-review --output reports/change-impact-packet.json
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/design/python-structure-hash.md
-      - agents/skills/dependency-analysis.md
-      - agents/skills/refactor-loop.md
-    tests:
-      - rust/agent-canon/src/python_structure_hash_scope_plan.rs
-
   - id: semantic-provider-html-report
     summary: Renders semantic-index compare-providers JSON into a self-contained HTML report with the provider-delta-to-shared-candidate-logic figure.
     path: tools/agent_tools/semantic_provider_html_report.py
@@ -435,6 +414,26 @@ entries:
       - documents/semantic_index.md
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
+
+  - id: prose-reasoning-graph
+    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, and writing-skill handoff packets.
+    path: tools/agent_tools/prose_reasoning_graph.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/prose_reasoning_graph.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/prose_reasoning_graph.md
+      - agents/skills/prose-reasoning-graph.md
+      - agents/skills/structure-planning.md
+    tests:
+      - tests/agent_tools/test_prose_reasoning_graph.py
 
   - id: route
     summary: Maps long proposed tool/skill names and broad prompts to short task-routing areas and public skill sets.

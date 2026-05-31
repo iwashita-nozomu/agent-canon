@@ -13,19 +13,20 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import json
 import os
 import re
 import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from runtime_log_paths import agent_canon_root, eval_results_dir
@@ -36,6 +37,9 @@ REPORT_STATUS_LINE_LIMIT = 13
 RUN_ID_DIGEST_LENGTH = 10
 UNIQUE_REPORT_CANDIDATE_LIMIT = 1000
 GIT_COMMAND_TIMEOUT_SECONDS = 5
+COMPACT_MISSING_REQUIRED_SAMPLE_LIMIT = 5
+COMPACT_MATCHED_FORBIDDEN_SAMPLE_LIMIT = 5
+COMPACT_FAILED_CHECK_SAMPLE_LIMIT = 25
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,7 @@ class EvalOutputs:
 
     accumulated_report: str = ""
     report_out: str = ""
+    compact_out: str = ""
 
 
 EMPTY_EVAL_OUTPUTS = EvalOutputs()
@@ -179,6 +184,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-out",
         help="Optional Markdown report path.",
+    )
+    parser.add_argument(
+        "--compact-out",
+        help=(
+            "Optional JSON summary path. When set, stdout is limited to status "
+            "and artifact paths; detailed check rows are written to artifacts."
+        ),
     )
     parser.add_argument(
         "--accumulate",
@@ -430,6 +442,8 @@ def evaluate_prompt(eval_def: PromptEval) -> tuple[ChecklistResult, ...]:
 def render_machine_status(
     bundle: EvalRunBundle,
     outputs: EvalOutputs = EMPTY_EVAL_OUTPUTS,
+    *,
+    include_details: bool = True,
 ) -> str:
     """Render machine-readable status."""
     results = bundle.results
@@ -461,6 +475,10 @@ def render_machine_status(
         lines.append(f"EVAL_ACCUMULATED_REPORT={outputs.accumulated_report}")
     if outputs.report_out:
         lines.append(f"EVAL_REPORT_OUT={outputs.report_out}")
+    if outputs.compact_out:
+        lines.append(f"EVAL_COMPACT_OUT={outputs.compact_out}")
+    if not include_details:
+        return "\n".join(lines) + "\n"
     for result in results:
         verdict = "pass" if result.passed else "fail"
         lines.append(
@@ -478,6 +496,63 @@ def render_machine_status(
                 f"pattern={pattern}"
             )
     return "\n".join(lines) + "\n"
+
+
+def compact_summary(bundle: EvalRunBundle, outputs: EvalOutputs) -> dict[str, object]:
+    """Return a bounded JSON-friendly eval summary."""
+    results = bundle.results
+    audit = bundle.audit
+    failed = [result for result in results if not result.passed]
+    critical_failed = [result for result in failed if result.critical]
+    return {
+        "status": eval_status(results, audit),
+        "eval_run_id": bundle.metadata.eval_run_id,
+        "run_id": bundle.metadata.run_id,
+        "used_skills": list(bundle.metadata.used_skills),
+        "git_branch": bundle.metadata.git_branch,
+        "git_commit": bundle.metadata.git_commit,
+        "git_dirty": bundle.metadata.git_dirty,
+        "checks_total": len(results),
+        "checks_passed": sum(1 for result in results if result.passed),
+        "critical_total": sum(1 for result in results if result.critical),
+        "critical_failed": len(critical_failed),
+        "audit_status": "pass" if audit.passed else "fail",
+        "audit": {
+            "duplicate_eval_ids": len(audit.duplicate_eval_ids),
+            "duplicate_targets": len(audit.duplicate_targets),
+            "duplicate_checklist_ids": len(audit.duplicate_checklist_ids),
+            "growth_candidates": audit.growth_candidates,
+        },
+        "outputs": {
+            "accumulated_report": outputs.accumulated_report,
+            "report_out": outputs.report_out,
+            "compact_out": outputs.compact_out,
+        },
+        "failed_check_samples": [
+            {
+                "eval_id": result.eval_id,
+                "item_id": result.item_id,
+                "critical": result.critical,
+                "missing_required": list(
+                    result.missing_required[:COMPACT_MISSING_REQUIRED_SAMPLE_LIMIT]
+                ),
+                "matched_forbidden": list(
+                    result.matched_forbidden[:COMPACT_MATCHED_FORBIDDEN_SAMPLE_LIMIT]
+                ),
+            }
+            for result in failed[:COMPACT_FAILED_CHECK_SAMPLE_LIMIT]
+        ],
+    }
+
+
+def write_compact_summary(path: Path, bundle: EvalRunBundle, outputs: EvalOutputs) -> Path:
+    """Write a bounded JSON summary for agent consumption."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(compact_summary(bundle, outputs), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def render_markdown_report(
@@ -602,7 +677,7 @@ def build_eval_run_metadata(
     root: Path,
 ) -> EvalRunMetadata:
     """Build metadata with a unique, filename-safe eval run id."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created_at = now.isoformat()
     timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())
@@ -725,6 +800,7 @@ def run(args: argparse.Namespace) -> int:
     )
     accumulated_report: Path | None = None
     report_out: Path | None = None
+    compact_out: Path | None = None
     if args.report_out:
         report_out = write_report(
             ReportWriteRequest(path=str(args.report_out), root=root, bundle=bundle)
@@ -745,17 +821,27 @@ def run(args: argparse.Namespace) -> int:
                 relative_to_root(accumulated_report, root)
             ),
         )
+    outputs = EvalOutputs(
+        accumulated_report=(
+            relative_to_root(accumulated_report, root).as_posix()
+            if accumulated_report is not None
+            else ""
+        ),
+        report_out=report_out.as_posix() if report_out is not None else "",
+        compact_out=str(args.compact_out or ""),
+    )
+    if args.compact_out:
+        compact_out = write_compact_summary(Path(str(args.compact_out)), bundle, outputs)
+        outputs = EvalOutputs(
+            accumulated_report=outputs.accumulated_report,
+            report_out=outputs.report_out,
+            compact_out=compact_out.as_posix(),
+        )
     print(
         render_machine_status(
             bundle,
-            EvalOutputs(
-                accumulated_report=(
-                    relative_to_root(accumulated_report, root).as_posix()
-                    if accumulated_report is not None
-                    else ""
-                ),
-                report_out=report_out.as_posix() if report_out is not None else "",
-            ),
+            outputs,
+            include_details=compact_out is None,
         ),
         end="",
     )

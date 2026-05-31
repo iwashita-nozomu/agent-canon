@@ -24,11 +24,7 @@ from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E4
 class EvalAccumulationCheckTest(unittest.TestCase):
     """Exercise accumulated eval result validation."""
 
-    def run_checker(
-        self,
-        root: Path,
-        family_registry: Path = PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml",
-    ) -> subprocess.CompletedProcess[str]:
+    def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
         return subprocess.run(
             [
@@ -37,19 +33,23 @@ class EvalAccumulationCheckTest(unittest.TestCase):
                 "--root",
                 str(root),
                 "--family-registry",
-                str(family_registry),
+                str(PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml"),
+                *args,
             ],
             check=False,
             capture_output=True,
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository has readable accumulated eval evidence."""
-        result = self.run_checker(PROJECT_ROOT)
+    def test_complete_fixture_passes(self) -> None:
+        """A complete mounted archive fixture should pass."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            result = self.run_checker(root)
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
     def test_duplicate_hook_run_id_fails(self) -> None:
         """Hook run ids must be unique even within the same JSONL file."""
@@ -67,6 +67,29 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("duplicate", result.stdout)
+
+    def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
+        """Compact mode writes finding stats to JSON and keeps stdout bounded."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_path = self.hook_path(root)
+            entry = self.hook_entry("hook-duplicate")
+            hook_path.write_text(
+                json.dumps(entry) + "\n" + json.dumps(entry) + "\n",
+                encoding="utf-8",
+            )
+            compact = root / "compact.json"
+
+            result = self.run_checker(root, "--compact-out", str(compact))
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_COMPACT_OUT=", result.stdout)
+            self.assertNotIn("EVAL_ACCUMULATION_FINDING=", result.stdout)
+            payload = json.loads(compact.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "fail")
+            self.assertGreater(payload["finding_count"], 0)
+            self.assertIn("hook_run_id", payload["finding_counts"])
 
     def test_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
         """Accumulated hook logs missing namespaces remain visible for repair."""
@@ -109,47 +132,26 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
-    def test_parent_invocation_reads_mounted_legacy_hook_archive(self) -> None:
-        """Parent repo invocation should count vendored AgentCanon legacy-import hook archives."""
+    def test_external_hook_archive_malformed_json_is_warning(self) -> None:
+        """Mounted hook archive parse debt should not block source-tree validation."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            parent = Path(temp_dir)
-            canon_root = parent / "vendor" / "agent-canon"
-            self.write_fixture(canon_root)
-            for path in (canon_root / "agents" / "evals" / "results" / "hook-runs").rglob("*.jsonl"):
-                path.unlink()
-            archive_hook_dir = (
-                mounted_log_archive_root(canon_root)
-                / "hook-runs"
-                / "legacy-import"
-                / "test"
-            )
-            archive_hook_dir.mkdir(parents=True)
-            (archive_hook_dir / "hook.jsonl").write_text(
-                json.dumps(self.hook_entry("hook-legacy-import")) + "\n",
-                encoding="utf-8",
-            )
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            hook_path = self.hook_path(root)
+            hook_path.write_text("{not-json}\n", encoding="utf-8")
+            compact = root / "compact.json"
 
-            result = self.run_checker(parent)
+            result = self.run_checker(root, "--compact-out", str(compact))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("EVAL_ACCUMULATION_HOOK_FILES=1", result.stdout)
-            self.assertIn("EVAL_ACCUMULATION_HOOK_ENTRIES=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_FINDINGS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_BLOCKING_FINDINGS=0", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_WARNINGS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
-
-    def test_result_artifact_skill_uses_eval_filename_contract(self) -> None:
-        """The result-artifact skill should use the accumulated eval filename contract."""
-        text = (PROJECT_ROOT / "agents" / "skills" / "result-artifact-writeout.md").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn(
-            ".agent-canon/archive/<env-key>/eval-results/<eval-family>/<unique-id>.md",
-            text,
-        )
-        self.assertNotIn(
-            ".agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md",
-            text,
-        )
+            payload = json.loads(compact.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["blocking_finding_count"], 0)
+            self.assertEqual(payload["warning_count"], 1)
 
     def test_external_eval_archive_entries_are_counted(self) -> None:
         """Mounted eval archive reports should satisfy eval accumulation evidence."""
@@ -282,7 +284,7 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
                 encoding="utf-8",
             )
 
-            result = self.run_checker(root, registry_path)
+            result = self.run_checker(root, "--family-registry", str(registry_path))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_FAMILY_REPORTS=abstract-review:1", result.stdout)

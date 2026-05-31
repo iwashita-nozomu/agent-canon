@@ -4,6 +4,7 @@
 responsibility Documents long-form-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
+upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 @dependency-end
 -->
 
@@ -29,7 +30,7 @@ upstream design structure-planning.md reusable document structure contract
 - `summary statement` で argument、purpose、reader を先に固定する
 - section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph flow や transition choice が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile general` または `--profile academic-argument` を使う
-- 文書 task が prompt / routing / subagent-config canon も触るなら、prose を広く書き換える前に `prompt_config_reviewer` で prompt/config audit を切る
+- prose graph handoff がある場合は、diagnostics / explanation / integration plan を section order、paragraph bridge、split / merge の evidence として使う
 - 見出し列を roadmap として先に作る
 - section ごとに `focus`、`purpose`、`support` を固定する
 - draft 後に reverse outline を取る
