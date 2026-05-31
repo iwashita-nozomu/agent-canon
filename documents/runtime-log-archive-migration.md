@@ -21,7 +21,7 @@ This document is the AgentCanon-side migration procedure for old hook JSONL and
 accumulated eval reports that still exist under `agents/evals/results/`.
 
 Runtime hook JSONL and accumulated eval reports belong in the external archive
-repository mounted at `.agent-canon/archive/<env-key>/`. AgentCanon source keeps
+repository mounted at `.agent-canon/log-archive/`. AgentCanon source keeps
 reader-facing documentation, schemas, and tool tests, but no
 `agents/evals/results/` result tree.
 
@@ -78,8 +78,8 @@ Run the commands from the AgentCanon repository root.
 The 2026-05-25 migration imported the old AgentCanon hook JSONL into:
 
 ```text
-.agent-canon/archive/<env-key>/legacy-import/hook-runs/
-.agent-canon/archive/<env-key>/legacy-import/eval-results/
+.agent-canon/log-archive/legacy-import/hook-runs/
+.agent-canon/log-archive/legacy-import/eval-results/
 ```
 
 The migrated set contains the former repo/runtime directories for

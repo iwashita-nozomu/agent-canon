@@ -35,6 +35,8 @@ upstream design README.md canonical workflow index
   - tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る。impact artifact は比較が明示されたときだけ作る
 - `agent-log-analysis`
   - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
+- `agent-update-branch`
+  - memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する
 - `report-writing`
   - evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する
 - `test-design`

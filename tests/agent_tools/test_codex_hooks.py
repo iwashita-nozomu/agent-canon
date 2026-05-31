@@ -15,6 +15,7 @@
 # upstream implementation ../../.codex/hooks/log_surface_inventory_guard.py blocks log surface drift
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
+# upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
 # upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
@@ -51,6 +52,7 @@ LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_i
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
+CODEX_RUNTIME_SUMMARY_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
 LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
@@ -377,6 +379,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(HOOKS_JSON.exists())
         self.assertTrue(HOOK_SCRIPT.exists())
         self.assertTrue(HOOK_DISPATCHER.exists())
+        self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
 
     def _dispatcher_scripts(self, event: str) -> list[str]:
         """Return the child hook scripts configured for one dispatcher event."""
@@ -469,6 +472,7 @@ class CodexHooksTest(unittest.TestCase):
                 "notebook_quality_guard.py",
                 "reference_capture_guard.py",
                 "skill_usage_logger.py",
+                "codex_runtime_summary_logger.py",
             ],
         )
 

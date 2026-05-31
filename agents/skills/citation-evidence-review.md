@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents citation-evidence-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design prose-reasoning-graph.md prose graph citation/evidence diagnostic overlay
 @dependency-end
 -->
 
@@ -32,6 +33,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `shows`, `proves`, `suggests`, `is consistent with` の強さが source と合っているかを見る
 - no-citation claim と under-cited synthesis を拾う
 - source mismatch と support mismatch を notation/style issue と混ぜない
+- prose graph diagnostics がある場合は unsupported claim と evidence edge を citation/evidence matrix の seed として扱う
 
 ## Boundary
 

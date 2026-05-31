@@ -18,7 +18,7 @@ from typing import cast
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 
@@ -39,6 +39,7 @@ WORKSPACE_ROOT = detect_workspace_root()
 HOST_CODEX_HOME = Path.home() / ".codex"
 HOST_GH_CONFIG = Path.home() / ".config" / "gh"
 HOST_SSH_DIR = Path.home() / ".ssh"
+BUILDER_INFO_TIMEOUT_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -189,7 +190,7 @@ def builder_readiness_error(builder: str) -> str | None:
             check=False,
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=BUILDER_INFO_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
         return f"{builder} info timed out"

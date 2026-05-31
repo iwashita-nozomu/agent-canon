@@ -19,15 +19,19 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})
+FILE_READ_CHUNK_BYTES = 1024 * 1024
+STREAM_TERMINATION_TIMEOUT_SECONDS = 10
+INTERRUPTED_EXIT_CODE = 130
+DURATION_ROUND_DIGITS = 3
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 
@@ -38,12 +42,12 @@ def repo_root_from_script() -> Path:
 
 def utc_now() -> str:
     """Return the current UTC timestamp in ISO-8601 form."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def compact_timestamp() -> str:
     """Return the compact timestamp used for run names."""
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def parse_args() -> argparse.Namespace:
@@ -475,7 +479,7 @@ def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         while True:
-            chunk = handle.read(1024 * 1024)
+            chunk = handle.read(FILE_READ_CHUNK_BYTES)
             if not chunk:
                 break
             digest.update(chunk)
@@ -505,7 +509,7 @@ def line_count(path: Path) -> int:
     last_byte = b""
     with path.open("rb") as handle:
         while True:
-            chunk = handle.read(1024 * 1024)
+            chunk = handle.read(FILE_READ_CHUNK_BYTES)
             if not chunk:
                 break
             saw_bytes = True
@@ -643,11 +647,11 @@ def stream_command(command: list[str], *, cwd: Path, env: dict[str, str], log_pa
         except KeyboardInterrupt:
             process.terminate()
             try:
-                return process.wait(timeout=10)
+                return process.wait(timeout=STREAM_TERMINATION_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
-                return 130
+                return INTERRUPTED_EXIT_CODE
 
 
 def main() -> int:
@@ -850,7 +854,7 @@ def main() -> int:
     )
     write_json(eval_manifest_path, eval_collection)
     manifest["finished_at_utc"] = finished_at
-    manifest["duration_seconds"] = round(time.monotonic() - start_monotonic, 3)
+    manifest["duration_seconds"] = round(time.monotonic() - start_monotonic, DURATION_ROUND_DIGITS)
     manifest["exit_code"] = exit_code
     manifest["status"] = "completed" if exit_code == 0 else "failed"
     manifest["eval_artifacts"] = {

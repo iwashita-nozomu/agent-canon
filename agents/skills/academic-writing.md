@@ -4,6 +4,7 @@
 responsibility Documents academic-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
+upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design ../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
 downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex skill shim
 downstream implementation ../../.claude/skills/academic-writing/SKILL.md generated Claude skill mirror
@@ -37,6 +38,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 - `claim contract` で central contribution、gap、reader、non-goal を先に固定する
 - section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
+- prose graph handoff がある場合は、unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する

@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--canon-root",
         type=Path,
         default=Path(__file__).resolve().parents[2],
-        help="AgentCanon root that owns .agent-canon/archive/<env-key>.",
+        help="AgentCanon root that owns .agent-canon/log-archive.",
     )
     parser.add_argument(
         "--remote",
@@ -70,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--archive-root",
         type=Path,
-        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/archive/<env-key>.",
+        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/log-archive.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

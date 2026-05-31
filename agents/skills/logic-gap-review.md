@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents logic-gap-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design prose-reasoning-graph.md prose graph logic diagnostic overlay
 @dependency-end
 -->
 
@@ -31,6 +32,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 暗黙の仮定、前提、boundary condition が露出している
 - 文献 citation が claim の重さに見合っている
 - limitation や alternative explanation を隠していない
+- prose graph diagnostics がある場合は unsupported claim、topic jump、weak bridge を初期 finding 候補として扱う
 
 ## Default Sequence
 

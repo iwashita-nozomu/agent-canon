@@ -45,7 +45,20 @@ HOOK_REQUIRED_FIELDS = (
     "status",
     "payload_fingerprint",
 )
+SKILL_REPORT_RE = re.compile(
+    r"^skill-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)-[a-z0-9-]+(?:-[a-z0-9-]+)*\.md$"
+)
+LOCAL_LLM_REPORT_RE = re.compile(
+    r"^local-llm-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail|skip)\.md$"
+)
+WORKFLOW_SELECTION_REPORT_RE = re.compile(
+    r"^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
+)
+REPORT_QUALITY_REPORT_RE = re.compile(
+    r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
+)
 DEFAULT_FAMILY_REGISTRY = Path("agents") / "evals" / "eval_result_families.toml"
+COMPACT_FINDING_SAMPLE_LIMIT = 25
 
 
 @dataclass(frozen=True)
@@ -88,6 +101,33 @@ class EvalAccumulationReport:
     findings: tuple[Finding, ...]
 
 
+def is_mounted_archive_path(path_label: str) -> bool:
+    """Return whether a finding path points at the mounted external archive."""
+    return path_label.startswith(".agent-canon/archive/") or path_label.startswith(
+        ".agent-canon/log-archive/"
+    )
+
+
+def is_warning_finding(finding: Finding) -> bool:
+    """Return whether a finding is nonblocking archive evidence debt."""
+    return finding.check == "hook_jsonl" and is_mounted_archive_path(finding.path)
+
+
+def blocking_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
+    """Return findings that should fail the checker."""
+    return tuple(finding for finding in report.findings if not is_warning_finding(finding))
+
+
+def warning_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
+    """Return findings that should be reported without blocking the checker."""
+    return tuple(finding for finding in report.findings if is_warning_finding(finding))
+
+
+def report_status(report: EvalAccumulationReport) -> str:
+    """Return pass/fail status from blocking findings only."""
+    return "pass" if not blocking_findings(report) else "fail"
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -98,6 +138,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="TOML registry that declares accumulated eval result families.",
     )
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "--compact-out",
+        type=Path,
+        help="Optional JSON summary path. When set, stdout omits full finding detail.",
+    )
     return parser
 
 
@@ -140,7 +185,7 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
 def intentionally_ignored_archive_path(path: Path) -> bool:
     """Return whether the path is inside the mounted external log archive."""
     parts = path.parts
-    return ".agent-canon" in parts and "archive" in parts
+    return ".agent-canon" in parts and ("archive" in parts or "log-archive" in parts)
 
 
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
@@ -370,9 +415,11 @@ def validate(root: Path, family_registry: str = DEFAULT_FAMILY_REGISTRY.as_posix
 
 def render_json(report: EvalAccumulationReport) -> str:
     """Render JSON output."""
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
     return json.dumps(
         {
-            "status": "pass" if not report.findings else "fail",
+            "status": report_status(report),
             "hook_files": report.hook_files,
             "hook_entries": report.hook_entries,
             "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
@@ -382,6 +429,8 @@ def render_json(report: EvalAccumulationReport) -> str:
             "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
             "report_quality_reports": eval_report_count(report, "report-quality"),
             "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
+            "blocking_finding_count": len(blocking),
+            "warning_count": len(warnings),
             "findings": [asdict(item) for item in report.findings],
         },
         indent=2,
@@ -402,31 +451,104 @@ def eval_family_count_lines(report: EvalAccumulationReport) -> list[str]:
     ]
 
 
+def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
+    """Return a bounded JSON-friendly accumulation summary."""
+    finding_counts: dict[str, int] = {}
+    for finding in report.findings:
+        finding_counts[finding.check] = finding_counts.get(finding.check, 0) + 1
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
+    return {
+        "status": report_status(report),
+        "finding_count": len(report.findings),
+        "blocking_finding_count": len(blocking),
+        "warning_count": len(warnings),
+        "finding_counts": dict(sorted(finding_counts.items())),
+        "hook_files": report.hook_files,
+        "hook_entries": report.hook_entries,
+        "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
+        "eval_report_counts": report.eval_report_counts,
+        "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
+        "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
+        "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
+        "report_quality_reports": eval_report_count(report, "report-quality"),
+        "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
+        "blocking_finding_samples": [
+            asdict(finding) for finding in blocking[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+        "warning_samples": [
+            asdict(finding) for finding in warnings[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+        "finding_samples": [
+            asdict(finding) for finding in report.findings[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+    }
+
+
+def write_compact_summary(path: Path, report: EvalAccumulationReport) -> None:
+    """Write a bounded JSON summary for agent consumption."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def render_text(
+    report: EvalAccumulationReport,
+    *,
+    include_details: bool = True,
+    compact_out: Path | None = None,
+) -> str:
+    """Render machine-readable text output."""
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
+    lines: list[str] = []
+    if include_details:
+        lines.extend(finding.render() for finding in report.findings)
+    lines.extend(
+        [
+            f"EVAL_ACCUMULATION_HOOK_FILES={report.hook_files}",
+            f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}",
+            "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
+            f"{report.hook_legacy_missing_namespace}",
+            f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
+            "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS="
+            f"{eval_report_count(report, 'local-llm-responsibility')}",
+            "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS="
+            f"{eval_report_count(report, 'workflow-selection')}",
+            f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}",
+            f"EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS={eval_report_count(report, 'codex-agent-role')}",
+            *eval_family_count_lines(report),
+            f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}",
+            f"EVAL_ACCUMULATION_BLOCKING_FINDINGS={len(blocking)}",
+            f"EVAL_ACCUMULATION_WARNINGS={len(warnings)}",
+            f"EVAL_ACCUMULATION={report_status(report)}",
+        ]
+    )
+    if compact_out is not None:
+        lines.append(f"EVAL_ACCUMULATION_COMPACT_OUT={compact_out.as_posix()}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the eval accumulation checker."""
     args = build_parser().parse_args(argv)
     report = validate(args.root, str(args.family_registry))
+    if args.compact_out is not None:
+        write_compact_summary(args.compact_out, report)
     if args.format == "json":
         print(render_json(report))
     else:
-        for finding in report.findings:
-            print(finding.render())
-        print(f"EVAL_ACCUMULATION_HOOK_FILES={report.hook_files}")
-        print(f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}")
         print(
-            "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
-            f"{report.hook_legacy_missing_namespace}"
+            render_text(
+                report,
+                include_details=args.compact_out is None,
+                compact_out=args.compact_out,
+            ),
+            end="",
         )
-        print(f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}")
-        print(f"EVAL_ACCUMULATION_LOCAL_LLM_REPORTS={eval_report_count(report, 'local-llm-responsibility')}")
-        print(f"EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS={eval_report_count(report, 'workflow-selection')}")
-        print(f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}")
-        print(f"EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS={eval_report_count(report, 'codex-agent-role')}")
-        for line in eval_family_count_lines(report):
-            print(line)
-        print(f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}")
-        print(f"EVAL_ACCUMULATION={'pass' if not report.findings else 'fail'}")
-    return 1 if report.findings else 0
+    return 1 if blocking_findings(report) else 0
 
 
 if __name__ == "__main__":

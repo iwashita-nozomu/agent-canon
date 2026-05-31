@@ -3,6 +3,7 @@
 @dependency-start
 responsibility Documents literature-survey for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design prose-reasoning-graph.md prose graph claim and evidence handoff overlay
 @dependency-end
 -->
 
@@ -46,6 +47,7 @@ upstream design ../canonical/skills.md skill canon registry
 - task に近い problem setting、data regime、hardware regime を区別します
 - source から直接言えることと、自分の解釈を分けます
 - 最終的に使う主張ごとに source を辿れるようにします
+- prose graph handoff がある場合は、unsupported claim や citation/evidence gap を query pack と source adoption/exclusion decision の入力にします
 
 ## Canonical Flow
 

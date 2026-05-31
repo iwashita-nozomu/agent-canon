@@ -16,10 +16,13 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SCHEMA = "subagent_revision_summary.v1"
+DEFAULT_MAX_EVIDENCE_ROWS = 30
+SECONDS_PER_HOUR = 3600
+SECONDS_PER_MINUTE = 60
 
 TIMESTAMP_RE = re.compile(
     r"\b(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?Z)\b"
@@ -133,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-evidence",
         type=int,
-        default=30,
+        default=DEFAULT_MAX_EVIDENCE_ROWS,
         help="Maximum evidence rows per Markdown section.",
     )
     return parser
@@ -353,7 +356,7 @@ def artifact_time_span(paths: Iterable[Path]) -> dict[str, str | int | None]:
     for path in paths:
         if not path.exists():
             continue
-        timestamps.append(datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc))
+        timestamps.append(datetime.fromtimestamp(path.stat().st_mtime, tz=UTC))
     if not timestamps:
         return {"first": None, "last": None, "elapsed_seconds": None}
     first = min(timestamps)
@@ -431,8 +434,8 @@ def format_elapsed(seconds: object) -> str:
     """Format elapsed seconds for Markdown."""
     if not isinstance(seconds, int):
         return "unknown"
-    hours, remainder = divmod(seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
+    hours, remainder = divmod(seconds, SECONDS_PER_HOUR)
+    minutes, secs = divmod(remainder, SECONDS_PER_MINUTE)
     return f"{hours}h {minutes}m {secs}s"
 
 

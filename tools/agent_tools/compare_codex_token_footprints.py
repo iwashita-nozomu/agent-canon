@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,9 @@ from workflow_monitor import append_monitoring
 
 TARGET_RATIO = 0.5
 DEFAULT_MOVING_AVERAGE_WINDOW = 5
+HOURS_PER_DAY = 24
+MINUTES_PER_HOUR = 60
+SECONDS_PER_MINUTE = 60
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_MOVING_AVERAGE_WINDOW,
         help="Session window size for token summary moving averages.",
+    )
+    parser.add_argument(
+        "--recent-days",
+        type=int,
+        help=(
+            "Only include session files modified within this many days in "
+            "summary mode. Uses file mtime so long-running sessions stay visible."
+        ),
     )
     parser.add_argument(
         "--report-out",
@@ -196,18 +208,36 @@ def row(label: str, footprint: TokenFootprint) -> str:
     )
 
 
-def session_glob_paths(patterns: Sequence[str]) -> tuple[Path, ...]:
+def session_glob_paths(
+    patterns: Sequence[str],
+    *,
+    recent_days: int | None = None,
+) -> tuple[Path, ...]:
     """Return deterministic session paths from one or more glob patterns."""
     paths: set[Path] = set()
     for pattern in patterns:
-        paths.update(Path(path).resolve() for path in glob.glob(pattern) if Path(path).is_file())
+        paths.update(
+            Path(path).resolve()
+            for path in glob.glob(pattern, recursive=True)
+            if Path(path).is_file()
+        )
+    if recent_days is not None:
+        cutoff = (
+            time.time()
+            - max(0, recent_days) * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE
+        )
+        paths = {path for path in paths if path.stat().st_mtime >= cutoff}
     return tuple(sorted(paths, key=lambda path: path.as_posix()))
 
 
-def read_session_globs(patterns: Sequence[str]) -> tuple[TokenFootprint, ...]:
+def read_session_globs(
+    patterns: Sequence[str],
+    *,
+    recent_days: int | None = None,
+) -> tuple[TokenFootprint, ...]:
     """Return token footprints for all parseable sessions in the requested globs."""
     footprints: list[TokenFootprint] = []
-    for path in session_glob_paths(patterns):
+    for path in session_glob_paths(patterns, recent_days=recent_days):
         try:
             footprints.append(parse_token_usage(path))
         except ValueError:
@@ -252,7 +282,12 @@ def latest_moving_average(footprints: Sequence[TokenFootprint], window: int) -> 
     return moving_average(values, window)[-1]
 
 
-def render_summary_report(footprints: Sequence[TokenFootprint], window: int) -> str:
+def render_summary_report(
+    footprints: Sequence[TokenFootprint],
+    window: int,
+    *,
+    recent_days: int | None = None,
+) -> str:
     """Render a Markdown token usage summary with moving averages."""
     averages = moving_average([footprint.total_tokens for footprint in footprints], window)
     lines = [
@@ -270,6 +305,7 @@ def render_summary_report(footprints: Sequence[TokenFootprint], window: int) -> 
         f"- token_session_count: {len(footprints)}",
         f"- token_event_count: {token_event_total(footprints)}",
         f"- total_tokens: {token_total(footprints)}",
+        f"- recent_days: {recent_days if recent_days is not None else 'all'}",
         f"- average_tokens_per_event: {tokens_per_event(footprints):.3f}",
         f"- moving_average_window: {max(1, window)}",
         f"- latest_moving_average_total_tokens: {latest_moving_average(footprints, window):.3f}",
@@ -295,6 +331,7 @@ def render_summary_report(footprints: Sequence[TokenFootprint], window: int) -> 
             f"- TOKEN_USAGE_SESSION_COUNT={len(footprints)}",
             f"- TOKEN_USAGE_TOKEN_EVENT_COUNT={token_event_total(footprints)}",
             f"- TOKEN_USAGE_TOTAL_TOKENS={token_total(footprints)}",
+            f"- TOKEN_USAGE_RECENT_DAYS={recent_days if recent_days is not None else 'all'}",
             f"- TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT={tokens_per_event(footprints):.3f}",
             f"- TOKEN_USAGE_MOVING_AVERAGE_WINDOW={max(1, window)}",
             f"- TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL={latest_moving_average(footprints, window):.3f}",
@@ -353,6 +390,8 @@ def append_summary_report_dir(
     report_dir: Path,
     footprints: Sequence[TokenFootprint],
     window: int,
+    *,
+    recent_days: int | None = None,
 ) -> None:
     """Append token moving-average evidence to one run bundle."""
     append_monitoring(
@@ -363,6 +402,7 @@ def append_summary_report_dir(
                 f"session_count={len(footprints)} "
                 f"token_event_count={token_event_total(footprints)} "
                 f"total_tokens={token_total(footprints)} "
+                f"recent_days={recent_days if recent_days is not None else 'all'} "
                 f"moving_average_window={max(1, window)} "
                 f"latest_moving_average_total={latest_moving_average(footprints, window):.3f} "
                 f"average_tokens_per_event={tokens_per_event(footprints):.3f}"
@@ -374,12 +414,18 @@ def append_summary_report_dir(
     )
 
 
-def print_summary_status(footprints: Sequence[TokenFootprint], window: int) -> None:
+def print_summary_status(
+    footprints: Sequence[TokenFootprint],
+    window: int,
+    *,
+    recent_days: int | None = None,
+) -> None:
     """Print grep-friendly token summary status lines."""
     print("TOKEN_USAGE_SUMMARY=pass")
     print(f"TOKEN_USAGE_SESSION_COUNT={len(footprints)}")
     print(f"TOKEN_USAGE_TOKEN_EVENT_COUNT={token_event_total(footprints)}")
     print(f"TOKEN_USAGE_TOTAL_TOKENS={token_total(footprints)}")
+    print(f"TOKEN_USAGE_RECENT_DAYS={recent_days if recent_days is not None else 'all'}")
     print(f"TOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT={tokens_per_event(footprints):.3f}")
     print(f"TOKEN_USAGE_MOVING_AVERAGE_WINDOW={max(1, window)}")
     print(f"TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL={latest_moving_average(footprints, window):.3f}")
@@ -390,12 +436,19 @@ def main() -> int:
     """Run the token comparison CLI."""
     args = build_parser().parse_args()
     if args.session_glob:
-        footprints = read_session_globs(tuple(str(pattern) for pattern in args.session_glob))
+        footprints = read_session_globs(
+            tuple(str(pattern) for pattern in args.session_glob),
+            recent_days=args.recent_days,
+        )
         if args.report_out:
             report_path = Path(str(args.report_out))
             report_path.parent.mkdir(parents=True, exist_ok=True)
             report_path.write_text(
-                render_summary_report(footprints, args.moving_average_window),
+                render_summary_report(
+                    footprints,
+                    args.moving_average_window,
+                    recent_days=args.recent_days,
+                ),
                 encoding="utf-8",
             )
         if args.report_dir:
@@ -403,8 +456,13 @@ def main() -> int:
                 Path(str(args.report_dir)).resolve(),
                 footprints,
                 args.moving_average_window,
+                recent_days=args.recent_days,
             )
-        print_summary_status(footprints, args.moving_average_window)
+        print_summary_status(
+            footprints,
+            args.moving_average_window,
+            recent_days=args.recent_days,
+        )
         return 0
     if not args.baseline_session or not args.candidate_session:
         raise SystemExit("--baseline-session and --candidate-session are required unless --session-glob is set")

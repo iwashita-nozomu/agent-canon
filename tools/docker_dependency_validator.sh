@@ -319,8 +319,8 @@ check_repo_local_venv_policy() {
     report_issue "canonical env-policy tool missing: $canonical_tool"
   fi
 
-  if [ -f docker/Dockerfile ] && ! grep -q 'python3-venv' docker/Dockerfile; then
-    report_issue "docker/Dockerfile must install python3-venv so the canonical container can create .venv"
+  if [ -f docker/Dockerfile ] && ! grep -q 'python3.11-venv' docker/Dockerfile; then
+    report_issue "docker/Dockerfile must install python3.11-venv so the canonical container can create .venv"
   fi
 
   for root in scripts tools Makefile .github; do

@@ -25,7 +25,7 @@ from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
@@ -39,16 +39,10 @@ from agent_team import (  # noqa: E402
 )
 from runtime_log_paths import eval_results_dir  # noqa: E402
 
+COMPACT_FINDING_SAMPLE_LIMIT = 25
 DEFAULT_RESULTS_FAMILY = "codex-agent-role"
-FRONTIER_MODEL = "gpt-5.5"
-MINI_MODEL = "gpt-5.4-mini"
-SPARK_MODEL = "gpt-5.3-codex-spark"
-HIGH = "high"
-MEDIUM = "medium"
-LOW = "low"
 RUN_ID_DIGEST_LENGTH = 10
 GIT_COMMAND_TIMEOUT_SECONDS = 5
-
 ModelPolicy = dict[str, tuple[str, str, str]]
 
 
@@ -116,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSONL file with role runtime metrics.",
     )
     parser.add_argument("--report-out", type=Path)
+    parser.add_argument(
+        "--compact-out",
+        type=Path,
+        help="Optional JSON summary path. When set, stdout omits full finding and model-matrix detail.",
+    )
     parser.add_argument("--accumulate", action="store_true")
     parser.add_argument(
         "--results-dir",
@@ -470,9 +469,9 @@ def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalRepor
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
-    model_policy, policy_findings = load_model_policy(canon_root)
+    model_policy, model_policy_findings = load_model_policy(canon_root)
     findings = [
-        *policy_findings,
+        *model_policy_findings,
         *evaluate_static_agent_configs(canon_root, configs, model_policy),
         *evaluate_routing(canon_root),
     ]
@@ -488,15 +487,19 @@ def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalRepor
     )
 
 
-def render_text(report: EvalReport) -> str:
+def render_text(report: EvalReport, *, include_details: bool = True, compact_out: Path | None = None) -> str:
     """Render text output."""
     lines = [
         f"CODEX_AGENT_ROLE_EVAL_RUN_ID={report.metadata.eval_run_id}",
         f"CODEX_AGENT_ROLE_EVAL={report.status}",
         f"CODEX_AGENT_ROLE_FINDINGS={len(report.findings)}",
         f"ROLE_RUNTIME_METRICS_STATUS={report.runtime_metrics_status}",
-        f"ROLE_MODEL_MATRIX={';'.join(report.model_matrix)}",
     ]
+    if compact_out is not None:
+        lines.append(f"CODEX_AGENT_ROLE_COMPACT_OUT={compact_out.as_posix()}")
+    if not include_details:
+        return "\n".join(lines) + "\n"
+    lines.append(f"ROLE_MODEL_MATRIX={';'.join(report.model_matrix)}")
     for agent_id, summary in report.runtime_metrics.items():
         lines.append(
             "ROLE_RUNTIME_METRIC="
@@ -507,6 +510,43 @@ def render_text(report: EvalReport) -> str:
         )
     lines.extend(finding.render() for finding in report.findings)
     return "\n".join(lines) + "\n"
+
+
+def compact_summary(report: EvalReport) -> dict[str, object]:
+    """Return a bounded JSON-friendly role eval summary."""
+    findings_by_check = Counter(finding.check for finding in report.findings)
+    model_buckets = Counter(row.split(":", 2)[1] for row in report.model_matrix)
+    runtime_totals = {
+        "calls": sum(summary.calls for summary in report.runtime_metrics.values()),
+        "tokens": sum(summary.tokens for summary in report.runtime_metrics.values()),
+        "latency_ms": sum(summary.latency_ms for summary in report.runtime_metrics.values()),
+        "retries": sum(summary.retries for summary in report.runtime_metrics.values()),
+        "parent_interventions": sum(
+            summary.parent_interventions for summary in report.runtime_metrics.values()
+        ),
+        "format_violations": sum(summary.format_violations for summary in report.runtime_metrics.values()),
+        "output_used": sum(summary.output_used for summary in report.runtime_metrics.values()),
+    }
+    return {
+        "status": report.status,
+        "finding_count": len(report.findings),
+        "findings_by_check": dict(sorted(findings_by_check.items())),
+        "model_buckets": dict(sorted(model_buckets.items())),
+        "runtime_metrics_status": report.runtime_metrics_status,
+        "runtime_totals": runtime_totals,
+        "finding_samples": [
+            asdict(finding) for finding in report.findings[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+    }
+
+
+def write_compact_summary(path: Path, report: EvalReport) -> None:
+    """Write a bounded JSON summary for agent consumption."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def write_markdown_report(path: Path, report: EvalReport) -> Path:
@@ -573,6 +613,8 @@ def main() -> int:
     report_paths: list[Path] = []
     if args.report_out is not None:
         report_paths.append(write_markdown_report(args.report_out, report))
+    if args.compact_out is not None:
+        write_compact_summary(args.compact_out, report)
     if args.accumulate:
         report_paths.append(
             write_markdown_report(
@@ -583,7 +625,14 @@ def main() -> int:
     if args.format == "json":
         print(json.dumps(asdict(report), indent=2, sort_keys=True))
     else:
-        print(render_text(report), end="")
+        print(
+            render_text(
+                report,
+                include_details=args.compact_out is None,
+                compact_out=args.compact_out,
+            ),
+            end="",
+        )
         for path in report_paths:
             print(f"CODEX_AGENT_ROLE_EVAL_REPORT={path}")
         if args.accumulate and report_paths:

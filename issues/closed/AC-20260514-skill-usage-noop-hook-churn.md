@@ -13,7 +13,7 @@ issue_id: AC-20260514-skill-usage-noop-hook-churn
 status: resolved
 source: user-observation
 severity: S1
-evidence: repeated `skill_count=0` entries in archived `hook-runs/skill_usage.jsonl` during read-only GitHub workflow diagnosis.
+evidence: repeated `skill_count=0` entries in legacy hook JSONL during read-only GitHub workflow diagnosis.
 affected_surfaces: .codex/hooks/skill_usage_logger.py, documents/runtime-log-archive.md, tests/agent_tools/test_codex_hooks.py
 edit_scope: .codex/hooks/skill_usage_logger.py, tests/agent_tools/test_codex_hooks.py, issues/closed/AC-20260514-skill-usage-noop-hook-churn.md
 required_action: Keep real skill-use evidence append-only, but do not write durable hook JSONL for payloads where no skill was observed.

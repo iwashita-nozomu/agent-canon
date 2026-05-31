@@ -73,7 +73,7 @@ def write_valid_docker_runtime(root: Path) -> None:
                 "# @dependency-end",
                 "FROM ubuntu:22.04",
                 "RUN apt-get update && apt-get install -y \\",
-                "    rsync openssh-client graphviz python3-venv",
+                "    rsync openssh-client graphviz python3.11 python3.11-dev python3.11-venv",
                 "COPY docker/register_safe_directories.sh /usr/local/bin/register_safe_directories",
                 "",
             ]
