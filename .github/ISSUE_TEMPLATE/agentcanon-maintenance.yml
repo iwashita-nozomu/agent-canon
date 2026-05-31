@@ -1,0 +1,87 @@
+# @dependency-start
+# responsibility Defines AgentCanon maintenance issue capture form.
+# upstream design ../../documents/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../../issues/README.md durable operational issue storage policy.
+# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# @dependency-end
+
+name: AgentCanon maintenance issue
+description: Track an AgentCanon runtime, tool, workflow, docs, or propagation defect.
+title: "[agent-canon] "
+labels: ["agent-canon", "maintenance"]
+body:
+  - type: dropdown
+    id: runtime_profile
+    attributes:
+      label: Affected runtime profile
+      options:
+        - Agent runtime
+        - Docs
+        - Python/tooling
+        - Docker/devcontainer
+        - GitHub automation
+        - MCP
+        - Submodule/update
+        - Eval/logging
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: affected_surface
+    attributes:
+      label: Affected surface/path
+      placeholder: "agents/workflows/..., tools/..., .codex/..."
+    validations:
+      required: true
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current behavior
+      description: Include observed command, hook, CI, or workflow evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: downstream_impact
+    attributes:
+      label: Downstream impact
+      description: Note template/derived repo impact or say not applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: required_validation
+    attributes:
+      label: Required validation
+      value: |
+        - [ ] targeted local check:
+        - [ ] docs/link check:
+        - [ ] AgentCanon PR gate:
+    validations:
+      required: true
+  - type: textarea
+    id: eval_required
+    attributes:
+      label: Eval required or not required
+      description: Link an eval case, or explain why this cannot be evaled.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback consideration
+      description: Include rollback command or explain why rollback is not applicable.
+  - type: textarea
+    id: closeout_evidence
+    attributes:
+      label: Closeout evidence
+      value: |
+        - fixed by:
+        - validation:
+        - issue/eval links:
+    validations:
+      required: true

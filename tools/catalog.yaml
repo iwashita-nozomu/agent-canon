@@ -159,6 +159,44 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: render-dependency-manifest-graph
+    summary: Renders dependency manifest graph TSV artifacts into Markdown and DOT reports.
+    path: tools/agent_tools/render_dependency_manifest_graph.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/render_dependency_manifest_graph.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/render_dependency_manifest_graph.md
+      - documents/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_render_dependency_manifest_graph.py
+
+  - id: classify-path-risk
+    summary: Classifies changed paths into runtime profiles and targeted validation checks.
+    path: tools/agent_tools/classify_path_risk.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/classify_path_risk.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/classify_path_risk.md
+      - documents/runtime-profiles-and-check-matrix.md
+    tests:
+      - tests/agent_tools/test_classify_path_risk.py
+
   - id: repo-structure-contract
     summary: Compares an observed repository tree with the AgentCanon structure contract.
     path: tools/agent_tools/repo_structure_contract.py

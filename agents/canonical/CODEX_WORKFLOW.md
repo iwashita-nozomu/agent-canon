@@ -348,6 +348,13 @@ user が skill を明示したい場合は `$skill-name` を使います。例: 
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `$codex-task-workflow` に加えます。
 
+Before a negative capability claim about an existing API, dependency, config,
+or extension point, the implementation plan must include the
+`documents/api-surface-traversal-policy.md` evidence trail. Do not add helper
+wrappers, patch first-party reusable APIs, or propose vendor/library edits
+until the public import/export/signature/nested-config/example path has been
+checked and cited.
+
 - workflow / runtime routing:
   - `agent-orchestration`
 - repo 入口確認:

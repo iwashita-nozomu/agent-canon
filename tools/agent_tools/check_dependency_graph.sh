@@ -11,6 +11,7 @@ ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 PRINT_EDGES=0
 CHANGED=0
 CHECK_BIDIRECTIONAL=0
+CYCLE_REPORT_ONLY=0
 ALLOW_FRONTMATTER=0
 LIST_RELATED=0
 FOCUS_CHANGED=0
@@ -26,7 +27,7 @@ declare -a EDIT_SCOPE_PATHS=()
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--allow-frontmatter] [paths...]
+  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--cycle-report-only] [--allow-frontmatter] [paths...]
 
 Builds separate upstream/downstream dependency graphs and validates:
   - isolated manifest files with no graph edge
@@ -36,6 +37,9 @@ Builds separate upstream/downstream dependency graphs and validates:
 With --check-bidirectional it also validates:
   - bidirectional consistency
   - reverse-edge kind matches
+
+With --cycle-report-only it reports upstream/downstream cycles without failing.
+Use this for repo-wide migration or PR gates that also publish a graph report.
 
 With --list-related it prints every manifest edge declared by, or pointing at,
 the focused path set. Use --focus PATH for explicit paths or --focus-changed
@@ -98,6 +102,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --check-bidirectional)
       CHECK_BIDIRECTIONAL=1
+      shift
+      ;;
+    --cycle-report-only)
+      CYCLE_REPORT_ONLY=1
       shift
       ;;
     --allow-frontmatter)
@@ -447,10 +455,18 @@ check_cycles() {
 }
 
 if ! check_cycles upstream; then
-  failures=$((failures + 1))
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    echo "DEPENDENCY_GRAPH_UPSTREAM_CYCLES=report_only"
+  else
+    failures=$((failures + 1))
+  fi
 fi
 if ! check_cycles downstream; then
-  failures=$((failures + 1))
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    echo "DEPENDENCY_GRAPH_DOWNSTREAM_CYCLES=report_only"
+  else
+    failures=$((failures + 1))
+  fi
 fi
 
 if [[ "$failures" -gt 0 ]]; then
