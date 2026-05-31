@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -60,7 +61,11 @@ def write_tool(root: Path) -> None:
     )
 
 
-def run_index(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run_index(
+    root: Path,
+    *args: str,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run search_index.py against a temporary root."""
     return subprocess.run(
         [sys.executable, str(SEARCH_INDEX), *args, "--root", str(root)],
@@ -68,6 +73,7 @@ def run_index(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, **(env or {})},
     )
 
 
@@ -111,6 +117,11 @@ class SearchIndexTest(unittest.TestCase):
                 "--require-llm",
                 "--llama-cli",
                 str(root / "missing-llama-cli"),
+                env={
+                    "AGENT_CANON_TOOLS_HOME": str(root / ".tools"),
+                    "HOME": str(root),
+                    "PATH": "",
+                },
             )
 
             self.assertEqual(result.returncode, 2)

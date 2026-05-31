@@ -1,7 +1,7 @@
 version: 1
 # @dependency-start
 # responsibility Catalogs canonical agent skills and their descriptions.
-# upstream design ../canonical/CODEX_WORKFLOW.md defines skill selection workflow
+# downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # @dependency-end
 
 skill_families:
@@ -85,6 +85,10 @@ skill_families:
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
     shim: .agents/skills/refactor-loop/SKILL.md
+  - id: user-guided-debugging
+    purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
+    canonical_doc: agents/skills/user-guided-debugging.md
+    shim: .agents/skills/user-guided-debugging/SKILL.md
   - id: long-form-writing
     purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
     canonical_doc: agents/skills/long-form-writing.md
@@ -106,7 +110,7 @@ skill_families:
     canonical_doc: agents/skills/document-canon-cleanup.md
     shim: .agents/skills/document-canon-cleanup/SKILL.md
   - id: dependency-analysis
-    purpose: Run dependency manifest header, scan, format, and graph tools for changed-file gates or migration inventory.
+    purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .agents/skills/dependency-analysis/SKILL.md
   - id: worktree-start

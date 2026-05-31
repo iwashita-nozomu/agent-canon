@@ -4,6 +4,7 @@
 responsibility Documents refactor-loop for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable refactor structure contract
+upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 @dependency-end
 -->
@@ -35,6 +36,14 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
    関連 test / docs を展開し、その dependency-expanded scope 全体を候補集合に
    します。実装対象は、その展開済み scope 内で関数、method、class 単位に
    絞り込んでから決めます。
+1. target 選定、`Refactor Orchestration Plan:`、write-capable subagent handoff
+   の前に、`dependency-analysis` で token-light な `Change Impact Packet:`
+   manifest を作ります。この packet は code dependency、header dependency、
+   search surface、structural finding、tests / docs / config / log / Info
+   surface、unknown dynamic edge をまとめた修正計画の入力ですが、full graph を
+   LLM prose 化する場所ではありません。raw artifact は path と count で参照し、
+   current repair batch に必要な excerpt だけを載せます。raw finding、raw
+   `rg` hit、単一 file 名だけから実装計画を作ってはいけません。
 1. refactor pass では `Behavior Contract:` を先に固定します。
 1. file moves、module boundary、repair slice、path mapping、responsibility map が非自明な場合は `structure-planning` で構造 contract を先に固定します。
 1. `Allowed Structural Delta:` と `Forbidden Semantic Delta:` を分けて書きます。
@@ -52,12 +61,17 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 1. delete、rename、move、module split は `Files To Remove Or Move:` として先に列挙します。
 1. old path と new path の対応を `Path Mapping:` として残します。
 1. 大規模 repo では `Current Responsibility Map:` と `Target Responsibility Map:` を先に作り、OOP 的に責務、状態、契約、adapter を最小境界へ分けます。
-1. full tool finding、mechanical priority order、baseline packet、任意の impact、repair packet は `tool-finding-report` を使って固定します。
+1. full tool finding、mechanical priority order、baseline packet、任意の impact、repair packet は `tool-finding-report` を使って固定し、その後 `dependency-analysis` の `Change Impact Packet` に統合します。
 1. implementation subagent を起動する前に、親 agent が dependency graph から
    `Refactor Orchestration Plan:` を作ります。依存の根本に近い sequential root
    slice と、root 修正後に並列化できる independent downstream slice を分け、
    各 target object に owner wave、`blocked_by`、allowed files、validation
    signal、single-agent / parallel-safe の判定を付けます。
+1. repair scope の粒度は、file / function / class に固定しません。
+   `Change Impact Packet` の `scope_candidates` から、wave 数、tool rerun 数、
+   write conflict risk、token budget、validation cost、semantic risk を見て
+   `selected_scope` を選びます。behavior contract が保てて、1 つの coherent な
+   validation surface で確認できるなら、大きい block を選んで構いません。
 1. implementation の既定単位は finding 1 件ではなく、dependency-expanded repair
    batch です。同じ責務 group、同じ dependency wave、同じ validation surface に
    属し、機械的に安全に直せる target object は 1 つの handoff にまとめます。
@@ -109,6 +123,14 @@ repair-slice loop で 1 slice ずつ進めます。
    `priority_order`、`repair_slice` を生成します。
    Python structural duplicate では次を既定入口にします。
    `python-structure-hash` -> `python-structure-hash-report`
+1. `tool-finding-report` の結果はそのまま実装者へ配らず、`dependency-analysis`
+   に渡して token-light な `Change Impact Packet` manifest を作ります。ここで code dependency、
+   header dependency、search scope、structural finding、tests / docs / config /
+   log / Info surface、unknown dynamic edge を統合し、tool-generated
+   `impact_blocks`、`repair_batches`、`subagent_handoff_context` を固定します。
+   Python structural finding では既定で
+   `agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir <dependency-review-dir> --output <change-impact-packet.json>`
+   を使い、親 agent が手作業で block 化しません。
 1. `repair_slice.root_finding` は今回の修正 batch の根を示します。実装単位は
    root finding 1 件に固定せず、同じ home/downstream group と dependency wave
    にあり、同じ責務で同時に消せる related finding / target object を batch に
@@ -152,9 +174,10 @@ refactor-loop は tool 実行と finding report の詳細手順を自分で複�
 mechanical priority order、baseline、必要に応じた impact、prompt feedback
 decision を作ります。
 
-1. write-capable subagent への handoff には、`tool-finding-report` が作った
-   finding packet path、current `repair_slice`、repair batch に含める全 target
-   object、`Forbidden Semantic Delta`、新規 finding を増やさない制約を含めます。
+1. write-capable subagent への handoff には、`dependency-analysis` が作った
+   `Change Impact Packet` path、`tool-finding-report` が作った finding packet
+   path、current `repair_slice`、repair batch に含める全 target object、
+   `Forbidden Semantic Delta`、新規 finding を増やさない制約を含めます。
 1. write-capable subagent への handoff は token-bounded にします。必ず exact
    target objects、allowed files、object-by-object repair intent、
    forbidden semantic delta、test commands、final response format を指定します。
@@ -196,8 +219,15 @@ decision を作ります。
 親 agent は tool の finding をそのまま subagent に配るのではなく、依存 DAG から
 実装順と並列化可否を決める統括 plan を先に作ります。
 
-1. `dependency-expanded scope` から対象 object、依存先、依存元、test / docs を
-   object 単位で並べます。
+1. `Change Impact Packet` の `impact_blocks` と `repair_batches` を起点に、
+   対象 object、依存先、依存元、test / docs / config / log / Info surface、
+   unknown dynamic edge を object 単位で並べます。block 化は tool の出力を
+   正本にし、親 agent が手作業で依存範囲を切り直す場合は split / merge 理由と
+   元の `block_id` を残します。
+1. `scope_candidates` を比較し、node 粒度を選びます。最適化目的は最小 wave 数と
+   最小 tool rerun 数だけではなく、writer 衝突、review 可能性、token 消費、
+   validation surface の一貫性、semantic risk を含みます。選ばなかった候補は
+   rejected reason を残します。
 1. dependency depth、call direction、shared policy / base abstraction の有無から
    `sequential_root_slices` と `parallel_candidate_slices` に分けます。
 1. 各 wave では、同じ責務 group と validation surface に属する mechanically safe

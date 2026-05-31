@@ -8,6 +8,7 @@
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
 # downstream implementation ./hooks.json injects MCP startup and prompt context
 # downstream implementation ../tools/agent_tools/check_mcp_inventory.py verifies MCP inventory
+# downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates agent model policy
 # downstream design ../agents/workflows/token-efficient-codex-workflow.md token-aware runtime modes
 # @dependency-end
 
@@ -156,6 +157,10 @@ path = "../.agents/skills/tool-finding-report/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/user-guided-debugging/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/user-preference-sync/SKILL.md"
 enabled = true
 
@@ -171,6 +176,68 @@ enabled = true
 max_threads = 24
 max_depth = 1
 job_max_runtime_seconds = 3600
+
+[agents.model_policy.frontier_judgment]
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+roles = [
+  "requirements_organizer",
+  "execution_planner",
+  "detailed_designer",
+  "long_form_writer",
+  "detailed_design_reviewer",
+  "citation_evidence_reviewer",
+  "notation_definition_reviewer",
+  "logic_gap_reviewer",
+  "reviewer",
+  "project_reviewer",
+  "literature_researcher",
+  "ship_reviewer",
+]
+
+[agents.model_policy.mini_review]
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+roles = [
+  "manager_reviewer",
+  "plan_reviewer",
+  "document_flow_reviewer",
+  "oop_readability_reviewer",
+  "report_reviewer",
+  "docs_workflow_steward",
+  "reproducibility_reviewer",
+  "scientific_computing_reviewer",
+  "benchmark_reviewer",
+  "artifact_reviewer",
+  "fair_data_reviewer",
+  "ml_science_reviewer",
+]
+
+[agents.model_policy.spark_read]
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "low"
+roles = [
+  "explorer",
+  "test_designer",
+  "python_reviewer",
+  "cpp_reviewer",
+  "diff_triage_reviewer",
+]
+
+[agents.model_policy.frontier_implementation]
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+roles = [
+  "worker",
+]
+
+[agents.model_policy.spark_coding]
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "low"
+roles = [
+  "experiment_runner",
+  "spark_worker",
+]
 
 [agents.artifact_reviewer]
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."

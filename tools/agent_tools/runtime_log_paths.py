@@ -159,6 +159,7 @@ def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Pat
     candidates: list[Path] = [
         archive_root / "hook-runs" / repo_log_key(requested_root),
         archive_root / "hook-runs" / "legacy-import",
+        canon_root / "agents" / "evals" / "results" / "hook-runs",
         archive_root / "hook-runs",
     ]
     return tuple(dict.fromkeys(candidates))

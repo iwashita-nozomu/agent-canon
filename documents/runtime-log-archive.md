@@ -21,7 +21,7 @@ AgentCanon runtime hook JSONL and accumulated eval reports are stored in the sep
 `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
 
 ```text
-.agent-canon/log-archive/
+.agent-canon/archive/<env-key>/
 ```
 
 The mount is intentionally ignored by AgentCanon Git. It is not a submodule and
@@ -33,13 +33,13 @@ repo AgentCanon pins.
 Normal hook writers use:
 
 ```text
-.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
 ```
 
 Normal eval writers use:
 
 ```text
-.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md
+.agent-canon/archive/<env-key>/eval-results/<family>/<eval-run-id>-<status>*.md
 ```
 
 Codex runtime summary exporters use:
