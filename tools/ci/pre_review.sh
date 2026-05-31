@@ -16,7 +16,7 @@
 #   3. Docstring validation (pydocstyle)
 #   4. Code quality checks (Ruff)
 #
-# 環境要件: Python 3.10+, pyright, pytest, pydocstyle, ruff がインストール済み
+# 環境要件: Python 3.11.x, pyright, pytest, pydocstyle, ruff がインストール済み
 
 set -euo pipefail
 

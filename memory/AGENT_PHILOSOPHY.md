@@ -153,6 +153,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User feedback on refactor-loop subagent orchestration; updated Refactor Orchestration Plan in refactor-loop skill.
 
+- 2026-05-31 | interaction-observation | Do not create production or test-only wrapper/subclass surfaces merely to exercise a utility; unit tests may use existing minimal protocol fixtures, and integration tests must use real repository surfaces such as existing Info/Config classes.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User objected to adding _Nested* test-only amp.Info/Config classes and pointed out that unit and integration tests should be separated instead.
+
 ## Task Retrospectives
 
 

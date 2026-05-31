@@ -18,10 +18,11 @@ import json
 import re
 import subprocess
 import sys
+import time
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -31,8 +32,10 @@ if __package__ in (None, ""):
 from generate_agent_improvement_guide import (  # noqa: E402
     AgentImprovementGuide,
     EvidenceSummary,
+    HookEvidenceCounter,
     HookEvidenceCounts,
     counter_lines,
+    known_skill_ids,
 )
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
@@ -75,6 +78,9 @@ UNKNOWN_SORT_ORDER = 9
 NO_RESET_EPOCH = 0
 GIT_LOG_TIMEOUT_SECONDS = 5
 COMMIT_ABBREV_CHARS = 12
+HOURS_PER_DAY = 24
+MINUTES_PER_HOUR = 60
+SECONDS_PER_MINUTE = 60
 PERCENT_SCALE = 100.0
 UNKNOWN_RESET_BASIS = "untracked-or-unknown"
 MARKDOWN_SKILL_IDS = ("md-style-check",)
@@ -295,6 +301,8 @@ class RuntimeDashboardSummary:
     """All evidence used by one runtime dashboard."""
 
     root: Path
+    recent_days: int | None
+    recent_cutoff_epoch: int | None
     evidence: EvidenceSummary
     hook_files: tuple[Path, ...]
     hook_entries: int
@@ -311,9 +319,10 @@ class RuntimeDashboardSummary:
 class ResultFamilyReader:
     """Reads accumulated Markdown result families."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, recent_cutoff_epoch: int | None = None) -> None:
         """Store the AgentCanon evidence root."""
         self.root = root
+        self.recent_cutoff_epoch = recent_cutoff_epoch
 
     def read_family(self, family: str) -> ResultFamilySummary:
         """Read one accumulated Markdown report directory."""
@@ -326,6 +335,7 @@ class ResultFamilyReader:
                     if directory.is_dir()
                     for path in directory.glob("*.md")
                     if path.name != "README.md"
+                    if path_inside_recent_window(path, self.recent_cutoff_epoch)
                 }
             )
         )
@@ -417,7 +427,12 @@ class HookWorkflowBreakdownReader:
     WORKFLOW_FIELDS = ("candidate_workflows", *SELECTED_WORKFLOW_FIELDS)
 
     @classmethod
-    def read(cls, hook_files: Sequence[Path], root: Path) -> HookWorkflowBreakdown:
+    def read(
+        cls,
+        hook_files: Sequence[Path],
+        root: Path,
+        recent_cutoff_epoch: int | None = None,
+    ) -> HookWorkflowBreakdown:
         """Return workflow attribution for hook entries."""
         workflows: Counter[str] = Counter()
         workflow_events: Counter[str] = Counter()
@@ -430,7 +445,10 @@ class HookWorkflowBreakdownReader:
         entries_without_workflow = 0
         context_attributed_entries = 0
         latest_by_namespace: dict[str, tuple[str, ...]] = {}
-        for _entry_epoch, _sequence, hook_file, entry in cls.sorted_entries(hook_files):
+        for _entry_epoch, _sequence, hook_file, entry in cls.sorted_entries(
+            hook_files,
+            recent_cutoff_epoch,
+        ):
             namespace = str(entry.get("hook_log_namespace") or "missing_namespace")
             names = cls.workflow_names(entry)
             if names:
@@ -473,12 +491,13 @@ class HookWorkflowBreakdownReader:
     def sorted_entries(
         cls,
         hook_files: Sequence[Path],
+        recent_cutoff_epoch: int | None = None,
     ) -> tuple[tuple[int, int, Path, dict[str, object]], ...]:
         """Return hook entries in a stable approximate runtime order."""
         rows: list[tuple[int, int, Path, dict[str, object]]] = []
         sequence = 0
         for hook_file in hook_files:
-            for entry in cls.iter_entries(hook_file):
+            for entry in cls.iter_entries(hook_file, recent_cutoff_epoch):
                 rows.append(
                     (
                         parse_hook_timestamp(entry.get("timestamp")),
@@ -491,7 +510,10 @@ class HookWorkflowBreakdownReader:
         return tuple(sorted(rows, key=lambda row: (row[0] or row[1], row[1])))
 
     @staticmethod
-    def iter_entries(hook_file: Path) -> tuple[dict[str, object], ...]:
+    def iter_entries(
+        hook_file: Path,
+        recent_cutoff_epoch: int | None = None,
+    ) -> tuple[dict[str, object], ...]:
         """Return parsed hook entries from one JSONL file."""
         entries: list[dict[str, object]] = []
         for line in hook_file.read_text(encoding="utf-8").splitlines():
@@ -502,7 +524,9 @@ class HookWorkflowBreakdownReader:
             except json.JSONDecodeError:
                 continue
             if isinstance(value, dict):
-                entries.append(cast(dict[str, object], value))
+                entry = cast(dict[str, object], value)
+                if hook_entry_inside_recent_window(entry, hook_file, recent_cutoff_epoch):
+                    entries.append(entry)
         return tuple(entries)
 
     @classmethod
@@ -518,7 +542,11 @@ class TokenUsageBreakdownReader:
     """Reads token consumption evidence from accumulated run reports."""
 
     @classmethod
-    def read(cls, root: Path) -> TokenUsageBreakdown:
+    def read(
+        cls,
+        root: Path,
+        recent_cutoff_epoch: int | None = None,
+    ) -> TokenUsageBreakdown:
         """Return accumulated token comparison stats."""
         files: set[Path] = set()
         summary_files: set[Path] = set()
@@ -538,6 +566,8 @@ class TokenUsageBreakdownReader:
         for path in cls.candidate_paths(root):
             text = path.read_text(encoding="utf-8")
             epoch = cls.evidence_epoch(path, text)
+            if not evidence_inside_recent_window(path, epoch, recent_cutoff_epoch):
+                continue
             for baseline, candidate, ratio in cls.comparisons(text):
                 files.add(path)
                 baseline_total += baseline
@@ -586,6 +616,7 @@ class TokenUsageBreakdownReader:
             "reports/agents/**/workflow_monitoring.md",
             "reports/agents/**/*token*.md",
             "reports/**/*token*.md",
+            ".agent-canon/log-archive/eval-results/**/*.md",
             ".agent-canon/archive/*/eval-results/**/*.md",
         )
         paths: set[Path] = set()
@@ -741,7 +772,11 @@ class SelectionMetricsReader:
         """Store the AgentCanon root used to resolve reset windows."""
         self.root = root
 
-    def read(self, hook_files: Sequence[Path]) -> SelectionMetricsBreakdown:
+    def read(
+        self,
+        hook_files: Sequence[Path],
+        recent_cutoff_epoch: int | None = None,
+    ) -> SelectionMetricsBreakdown:
         """Return responsibility-scoped selection metrics."""
         store = SelectionMetricStore(self.root)
         entries_seen = 0
@@ -759,7 +794,10 @@ class SelectionMetricsReader:
         ] = []
         sequence = 0
         for hook_file in hook_files:
-            for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+            for entry in HookWorkflowBreakdownReader.iter_entries(
+                hook_file,
+                recent_cutoff_epoch,
+            ):
                 selected = selected_by_responsibility(entry, hook_file)
                 candidates = candidates_by_responsibility(entry)
                 events.append(
@@ -861,6 +899,7 @@ class RuntimeDashboardVisuals:
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
             f"  LocalLLM[\"Local LLM evals<br/>reports: {family_count(summary, 'local-llm-responsibility')}\"]",
+            f"  RoleEval[\"Codex role evals<br/>reports: {family_count(summary, 'codex-agent-role')}\"]",
             f"  Issues[\"Durable issues<br/>open: {len(summary.evidence.open_issues)}<br/>closed: {len(summary.evidence.closed_issues)}\"]",
             "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
             "  Guide[\"Improvement guide<br/>next repair targets\"]",
@@ -885,6 +924,7 @@ class RuntimeDashboardVisuals:
             "  WorkflowEval --> Dashboard",
             "  ReportEval --> Dashboard",
             "  LocalLLM --> Dashboard",
+            "  RoleEval --> Dashboard",
             "  Issues --> Dashboard",
             "  Dashboard --> Reviewer",
             "  Dashboard --> Guide",
@@ -918,6 +958,11 @@ class RuntimeDashboardVisuals:
                 "local LLM eval",
                 "local-llm-responsibility",
                 "repair single-file responsibility prompt or local model harness",
+            ),
+            self.family_row(
+                "Codex role eval",
+                "codex-agent-role",
+                "repair subagent role TOML, model buckets, routing, or runtime metric capture",
             ),
             self.issue_row(),
         )
@@ -1041,39 +1086,78 @@ class RuntimeDashboardVisuals:
 class AgentRuntimeDashboard:
     """Builds a reader-facing dashboard from AgentCanon runtime evidence."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, recent_days: int | None = None) -> None:
         """Resolve the requested root to the AgentCanon evidence root."""
         self.guide = AgentImprovementGuide(root)
         self.root = self.guide.root
+        self.recent_days = recent_days
+        self.recent_cutoff_epoch = recent_cutoff_epoch(recent_days)
 
     def collect(self) -> RuntimeDashboardSummary:
         """Collect dashboard evidence without mutating repository state."""
         evidence = self.guide.collect()
-        hook_files = self.guide.hook_result_paths()
-        reader = ResultFamilyReader(self.root)
+        hook_files = filter_hook_paths(
+            self.guide.hook_result_paths(),
+            self.recent_cutoff_epoch,
+        )
+        reader = ResultFamilyReader(self.root, self.recent_cutoff_epoch)
         result_families = (
             reader.read_family("skill-workflow-prompt"),
             reader.read_family("local-llm-responsibility"),
             reader.read_family("workflow-selection"),
             reader.read_family("report-quality"),
+            reader.read_family("codex-agent-role"),
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
+        if self.recent_cutoff_epoch is not None:
+            evidence = EvidenceSummary(
+                open_issues=evidence.open_issues,
+                closed_issues=evidence.closed_issues,
+                memory_entries=evidence.memory_entries,
+                skill_eval_reports=result_families[0].reports,
+                failed_skill_eval_reports=result_families[0].failed_reports,
+                hook_counts=read_hook_evidence_counts(
+                    self.root,
+                    hook_files,
+                    self.recent_cutoff_epoch,
+                ),
+            )
         return RuntimeDashboardSummary(
             root=self.root,
+            recent_days=self.recent_days,
+            recent_cutoff_epoch=self.recent_cutoff_epoch,
             evidence=evidence,
             hook_files=hook_files,
-            hook_entries=sum(non_empty_line_count(path) for path in hook_files),
+            hook_entries=sum(
+                hook_entry_count(path, self.recent_cutoff_epoch) for path in hook_files
+            ),
             result_families=result_families,
             skill_eval_breakdown=skill_eval_breakdown,
-            hook_workflow_breakdown=HookWorkflowBreakdownReader.read(hook_files, self.root),
-            token_usage_breakdown=TokenUsageBreakdownReader.read(self.root),
-            prompt_tool_breakdown=read_prompt_tool_breakdown(hook_files),
+            hook_workflow_breakdown=HookWorkflowBreakdownReader.read(
+                hook_files,
+                self.root,
+                self.recent_cutoff_epoch,
+            ),
+            token_usage_breakdown=TokenUsageBreakdownReader.read(
+                self.root,
+                self.recent_cutoff_epoch,
+            ),
+            prompt_tool_breakdown=read_prompt_tool_breakdown(
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
             markdown_docs_breakdown=read_markdown_docs_breakdown(
                 evidence.hook_counts,
                 skill_eval_breakdown,
             ),
-            reference_capture_breakdown=read_reference_capture_breakdown(hook_files),
-            selection_metrics_breakdown=SelectionMetricsReader(self.root).read(hook_files),
+            reference_capture_breakdown=read_reference_capture_breakdown(
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
+            selection_metrics_breakdown=SelectionMetricsReader(self.root).read(
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
         )
 
 
@@ -1287,7 +1371,10 @@ def compact_hook_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> li
     events: Counter[str] = Counter()
     tools: Counter[str] = Counter()
     for hook_file in summary.hook_files:
-        for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file,
+            summary.recent_cutoff_epoch,
+        ):
             if (
                 str(entry.get("status") or "") == "fail"
                 and str(entry.get("failure_fingerprint") or "") == fingerprint
@@ -1462,11 +1549,17 @@ def compact_counter_summary(counter: Counter[str]) -> str:
     )
 
 
-def read_prompt_tool_breakdown(hook_files: Sequence[Path]) -> PromptToolBreakdown:
+def read_prompt_tool_breakdown(
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> PromptToolBreakdown:
     """Return prompt capture and tool-selection summary."""
     prompt = PromptToolAccumulator()
     for hook_file in hook_files:
-        for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file,
+            recent_cutoff_epoch,
+        ):
             prompt.add_entry(entry)
     return prompt.to_breakdown()
 
@@ -1494,11 +1587,17 @@ def read_markdown_docs_breakdown(
     )
 
 
-def read_reference_capture_breakdown(hook_files: Sequence[Path]) -> ReferenceCaptureBreakdown:
+def read_reference_capture_breakdown(
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> ReferenceCaptureBreakdown:
     """Return reference-capture hook signal counts."""
     accumulator = ReferenceCaptureAccumulator()
     for hook_file in hook_files:
-        for entry in HookWorkflowBreakdownReader.iter_entries(hook_file):
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file,
+            recent_cutoff_epoch,
+        ):
             accumulator.add_entry(entry)
     return accumulator.to_breakdown()
 
@@ -1770,20 +1869,52 @@ def non_empty_line_count(path: Path) -> int:
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
 
 
+def hook_entry_count(path: Path, recent_cutoff_epoch: int | None = None) -> int:
+    """Count hook JSONL entries inside an optional recent window."""
+    return len(HookWorkflowBreakdownReader.iter_entries(path, recent_cutoff_epoch))
+
+
+def filter_hook_paths(
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> tuple[Path, ...]:
+    """Return hook files that contain at least one entry inside the recent window."""
+    if recent_cutoff_epoch is None:
+        return tuple(hook_files)
+    return tuple(
+        path
+        for path in hook_files
+        if HookWorkflowBreakdownReader.iter_entries(path, recent_cutoff_epoch)
+    )
+
+
+def read_hook_evidence_counts(
+    root: Path,
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> HookEvidenceCounts:
+    """Return hook counters from already-selected hook entries."""
+    counter = HookEvidenceCounter(known_skill_ids(root), root=root)
+    for path in hook_files:
+        for entry in HookWorkflowBreakdownReader.iter_entries(path, recent_cutoff_epoch):
+            counter.add_entry(path, entry)
+    return counter.counts()
+
+
 def evidence_location_lines(root: Path) -> list[str]:
     """Return the canonical runtime evidence locations."""
     return [
         f"- evidence_root: `{root.as_posix()}`",
-        "- hook_jsonl_archive_mount: `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
+        "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
-        "- skill_prompt_eval_reports: `.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
-        "- local_llm_eval_reports: `.agent-canon/archive/<env-key>/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
-        "- workflow_selection_eval_reports: `.agent-canon/archive/<env-key>/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
-        "- report_quality_eval_reports: `.agent-canon/archive/<env-key>/eval-results/report-quality/<eval-run-id>-<status>.md`",
+        "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
+        "- local_llm_eval_reports: `.agent-canon/log-archive/eval-results/local-llm-responsibility/<eval-run-id>-<status>.md`",
+        "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
+        "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
         "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
-        "- reference_capture_hook: `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
+        "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
         "- github_actions_dashboard: AgentCanon repository Step Summary plus uploaded artifact under `reports/agent-runtime-dashboard/` during the run",
     ]
@@ -2628,12 +2759,14 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return [
         "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
         f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}",
+        f"AGENT_RUNTIME_DASHBOARD_RECENT_DAYS={summary.recent_days if summary.recent_days is not None else 'all'}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
         f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={family_count(summary, 'skill-workflow-prompt')}",
         f"AGENT_RUNTIME_DASHBOARD_LOCAL_LLM_REPORTS={family_count(summary, 'local-llm-responsibility')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
         f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
+        f"AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS={family_count(summary, 'codex-agent-role')}",
         f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS={len(summary.skill_eval_breakdown.active_failed)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED={summary.hook_workflow_breakdown.entries_with_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING={summary.hook_workflow_breakdown.entries_without_workflow}",
@@ -2920,7 +3053,7 @@ def parse_hook_timestamp(value: object) -> int:
     except ValueError:
         return NO_RESET_EPOCH
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return int(parsed.timestamp())
 
 
@@ -2932,10 +3065,57 @@ def parse_compact_utc_timestamp(value: str) -> int:
     else:
         format_string = "%Y%m%dT%H%M%S%f"
     try:
-        parsed = datetime.strptime(trimmed, format_string).replace(tzinfo=timezone.utc)
+        parsed = datetime.strptime(trimmed, format_string).replace(tzinfo=UTC)
     except ValueError:
         return NO_RESET_EPOCH
     return int(parsed.timestamp())
+
+
+def recent_cutoff_epoch(recent_days: int | None) -> int | None:
+    """Return the lower epoch bound for a recent-day filter."""
+    if recent_days is None:
+        return None
+    return int(time.time()) - recent_days * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE
+
+
+def path_mtime_epoch(path: Path) -> int:
+    """Return file mtime as an epoch second, or zero when unavailable."""
+    try:
+        return int(path.stat().st_mtime)
+    except OSError:
+        return NO_RESET_EPOCH
+
+
+def path_inside_recent_window(path: Path, recent_cutoff_epoch: int | None) -> bool:
+    """Return whether a path is inside an optional mtime-based recent window."""
+    return recent_cutoff_epoch is None or path_mtime_epoch(path) >= recent_cutoff_epoch
+
+
+def evidence_inside_recent_window(
+    path: Path,
+    evidence_epoch: int,
+    recent_cutoff_epoch: int | None,
+) -> bool:
+    """Return whether timestamped evidence is inside an optional recent window."""
+    if recent_cutoff_epoch is None:
+        return True
+    if evidence_epoch > 0:
+        return evidence_epoch >= recent_cutoff_epoch
+    return path_inside_recent_window(path, recent_cutoff_epoch)
+
+
+def hook_entry_inside_recent_window(
+    entry: dict[str, object],
+    hook_file: Path,
+    recent_cutoff_epoch: int | None,
+) -> bool:
+    """Return whether one hook entry is inside an optional recent window."""
+    if recent_cutoff_epoch is None:
+        return True
+    entry_epoch = parse_hook_timestamp(entry.get("timestamp"))
+    if entry_epoch > 0:
+        return entry_epoch >= recent_cutoff_epoch
+    return path_inside_recent_window(hook_file, recent_cutoff_epoch)
 
 
 def entry_inside_reset_window(entry_epoch: int, reset: SelectionReset) -> bool:
@@ -2951,7 +3131,7 @@ def reset_epoch_label(epoch: int) -> str:
     """Return a compact UTC reset timestamp label."""
     if epoch == NO_RESET_EPOCH:
         return UNKNOWN_RESET_BASIS
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(epoch, tz=UTC).strftime("%Y-%m-%d")
 
 
 def read_selection_reset(root: Path, responsibility: str, name: str) -> SelectionReset:
@@ -3125,13 +3305,22 @@ def build_parser() -> argparse.ArgumentParser:
             "next actions, and selection misses without raw JSONL excerpts."
         ),
     )
+    parser.add_argument(
+        "--recent-days",
+        type=int,
+        help=(
+            "Limit hook, eval, and token evidence to entries or reports from the "
+            "last N days. Hook entries use their timestamp when present and fall "
+            "back to JSONL mtime."
+        ),
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Generate an AgentCanon runtime dashboard."""
     args = build_parser().parse_args(argv)
-    dashboard = AgentRuntimeDashboard(args.root)
+    dashboard = AgentRuntimeDashboard(args.root, recent_days=args.recent_days)
     summary = dashboard.collect()
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -3142,6 +3331,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")
+    print(f"AGENT_RUNTIME_DASHBOARD_RECENT_DAYS={summary.recent_days if summary.recent_days is not None else 'all'}")
     print(f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}")
     print(f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}")
     return 0

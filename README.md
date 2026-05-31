@@ -13,6 +13,20 @@ downstream design CONTAINER_OPERATIONS.md top-level container and devcontainer o
 このディレクトリは `agent-canon` 自体の source tree です。
 template や派生 repo に配布する shared agent canon の正本をここに置きます。
 
+## First Read Path
+
+人がこの repo を読む入口は次の順で固定します。
+
+1. `README.md`
+1. `documents/README.md`
+1. `agents/README.md`
+1. `agents/workflows/README.md`
+
+`documents/README.md` は root `documents/` の索引、`agents/README.md` は
+workflow / skill / runtime hub、`agents/workflows/README.md` は workflow
+selector です。`agents/canonical/README.md` は layout appendix として扱い、
+最初の hub にはしません。
+
 ## このディレクトリの役割
 
 - workflow canon の正本
@@ -22,6 +36,12 @@ template や派生 repo に配布する shared agent canon の正本をここに
 
 ## 主な入口
 
+- `documents/README.md`
+  - root `documents/` の索引
+- `agents/README.md`
+  - workflow / skill / runtime hub
+- `agents/workflows/README.md`
+  - workflow catalog と routing guide の入口
 - `ROOT_AGENTS.md`
 - `agents/`
 - `.agents/skills/`
@@ -35,8 +55,6 @@ template や派生 repo に配布する shared agent canon の正本をここに
 - `documents/template-github-remote.md`
 - `documents/runtime-profiles-and-check-matrix.md`
 - `documents/template-agent-canon-audit-resolution.md`
-- `agents/workflows/README.md`
-  - workflow catalog と routing guide の入口
 - `agents/workflows/agent-canon-pr-workflow.md`
 - `documents/agent-canon-subtree-migration.md`
   - legacy vendoring compatibility appendix
@@ -109,17 +127,19 @@ remote の正本:
 
 ## 検索導線
 
-正確な symbol、path、error message はまず `rg` で探します。広い概念、近い tool、
-既存 helper の再利用候補を探すときは AgentCanon の軽量 vector search を併用します。
+正確な symbol、path、error message はまず `rg` で探します。広い概念、長い
+query、近い tool、既存 helper の再利用候補を探すときは semantic-index を先に
+使います。
 
 ```bash
-python3 tools/agent_tools/vector_search.py --query "github remote safe directory"
-python3 tools/agent_tools/vector_search.py --surface tools --query "dependency header graph"
+tools/bin/agent-canon semantic-index search --root . \
+  --query-file /tmp/query.txt --top-k 10 --format text
+tools/bin/agent-canon semantic-index thin-docs --root . --top-k 10 --format text
 ```
 
-この search は標準ライブラリだけの TF-IDF vector model です。embedding index や外部 API
-key は Dockerfile に入れず、必要になった repo だけ optional layer として artifact
-directory に生成します。
+JSON が必要な場合でも full dump をそのまま読まず、`--top-k` を小さくし、
+`--format jsonl` で必要 field だけ扱います。旧 `vector_search.py` は軽量な
+互換 helper として残っていますが、新しい検索導線の正本ではありません。
 
 ## 保守ルール
 

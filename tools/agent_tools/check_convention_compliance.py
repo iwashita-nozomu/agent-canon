@@ -7,6 +7,8 @@
 # upstream design ../../agents/evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/shared-runtime-surfaces.toml shared surface manifest
+# upstream design ../../documents/codex-configuration-reference.md Codex hook severity policy
+# upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./surface_manifest.py validates shared surface manifest wiring
@@ -262,6 +264,33 @@ SURFACE_SYNC_MARKERS = (
     "build_regular_specs",
     "regular_path",
 )
+HOOK_GUARDRAIL_POLICY_MARKERS = {
+    ".codex/hooks/hook_dispatcher.py": (
+        "CRITICAL_BLOCKING_CHILD_HOOKS",
+        "STRICT_BLOCKS_ENV",
+        "STRICT_FAILURES_ENV",
+        "downgraded_block_payload",
+        "failure_warning_payload",
+    ),
+    ".codex/README.md": (
+        "dispatcher は fail-open",
+        "AGENT_CANON_HOOK_STRICT_BLOCKS",
+        "systemMessage",
+        "hookSpecificOutput.additionalContext",
+    ),
+    "documents/codex-configuration-reference.md": (
+        "Hook Severity Policy",
+        "fail-open",
+        "CRITICAL_BLOCKING_CHILD_HOOKS",
+        "warning/evidence",
+    ),
+    "ROOT_AGENTS.md": (
+        "Mechanical Guardrail Policy",
+        "原則 block しません",
+        "hook 設定の退避や無効化ではなく",
+        "strict block mode",
+    ),
+}
 NORMATIVE_RE = re.compile(
     r"(?m)^\s*[-*]\s+.*(?:禁止|必須|しなければなりません|してはいけません|"
     r"must|must not|required|forbidden)",
@@ -496,6 +525,29 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
     return findings
 
 
+def check_hook_guardrail_policy(root: Path) -> list[Finding]:
+    """Verify hook severity stays centralized and fail-open by default."""
+    findings: list[Finding] = []
+    for path, markers in HOOK_GUARDRAIL_POLICY_MARKERS.items():
+        resolved = readable_path(root, path)
+        if resolved is None:
+            findings.append(
+                Finding("hook_guardrail_policy", path, "missing-required-file")
+            )
+            continue
+        text = resolved.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "hook_guardrail_policy",
+                        path,
+                        f"missing-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def check_convention_assertions(root: Path) -> list[Finding]:
     """Verify convention documents expose checkable normative assertions."""
     findings: list[Finding] = []
@@ -537,6 +589,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_surface_manifest_wiring(root))
+    findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_convention_assertions(root))
     return sorted(
         findings,

@@ -22,7 +22,7 @@ if __package__ in (None, ""):
 
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
-    log_environment_key,
+    _log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
 )
@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--canon-root",
         type=Path,
         default=Path(__file__).resolve().parents[2],
-        help="AgentCanon root that owns .agent-canon/archive/<env-key>.",
+        help="AgentCanon root that owns .agent-canon/log-archive.",
     )
     parser.add_argument(
         "--remote",
@@ -70,7 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--archive-root",
         type=Path,
-        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/archive/<env-key>.",
+        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/log-archive.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -199,7 +199,7 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         else mounted_log_archive_root(canon_root).resolve()
     )
     key = repo_log_key(source_root)
-    env_key = log_environment_key(canon_root)
+    env_key = _log_environment_key(canon_root)
     return ArchiveContext(
         source_root=source_root,
         canon_root=canon_root,

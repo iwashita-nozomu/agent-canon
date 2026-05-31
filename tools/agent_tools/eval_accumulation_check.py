@@ -2,6 +2,7 @@
 # @dependency-start
 # responsibility Validates append-only AgentCanon eval and hook result accumulation.
 # upstream design ../../agents/evals/README.md eval usage contract
+# upstream design ../../agents/evals/eval_result_families.toml eval family artifact registry
 # upstream design ../../documents/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime-log-archive-migration.md legacy in-tree result migration contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
@@ -23,6 +24,11 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python 3.10 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -51,6 +57,8 @@ WORKFLOW_SELECTION_REPORT_RE = re.compile(
 REPORT_QUALITY_REPORT_RE = re.compile(
     r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
+DEFAULT_FAMILY_REGISTRY = Path("agents") / "evals" / "eval_result_families.toml"
+COMPACT_FINDING_SAMPLE_LIMIT = 25
 
 
 @dataclass(frozen=True)
@@ -67,24 +75,74 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class EvalFamilyContract:
+    """One accumulated eval family artifact contract."""
+
+    family_id: str
+    check_id: str
+    count_label: str
+    summary: str
+    producer: str
+    filename_regex: str
+    run_id_regex: str
+    missing_reports_detail: str
+    missing_run_id_detail: str
+    duplicate_run_id_detail: str
+
+
+@dataclass(frozen=True)
 class EvalAccumulationReport:
     """Eval accumulation report."""
 
     hook_files: int
     hook_entries: int
     hook_legacy_missing_namespace: int
-    skill_reports: int
-    local_llm_reports: int
-    workflow_selection_reports: int
-    report_quality_reports: int
+    eval_report_counts: dict[str, int]
     findings: tuple[Finding, ...]
+
+
+def is_mounted_archive_path(path_label: str) -> bool:
+    """Return whether a finding path points at the mounted external archive."""
+    return path_label.startswith(".agent-canon/archive/") or path_label.startswith(
+        ".agent-canon/log-archive/"
+    )
+
+
+def is_warning_finding(finding: Finding) -> bool:
+    """Return whether a finding is nonblocking archive evidence debt."""
+    return finding.check == "hook_jsonl" and is_mounted_archive_path(finding.path)
+
+
+def blocking_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
+    """Return findings that should fail the checker."""
+    return tuple(finding for finding in report.findings if not is_warning_finding(finding))
+
+
+def warning_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
+    """Return findings that should be reported without blocking the checker."""
+    return tuple(finding for finding in report.findings if is_warning_finding(finding))
+
+
+def report_status(report: EvalAccumulationReport) -> str:
+    """Return pass/fail status from blocking findings only."""
+    return "pass" if not blocking_findings(report) else "fail"
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--family-registry",
+        default=DEFAULT_FAMILY_REGISTRY.as_posix(),
+        help="TOML registry that declares accumulated eval result families.",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument(
+        "--compact-out",
+        type=Path,
+        help="Optional JSON summary path. When set, stdout omits full finding detail.",
+    )
     return parser
 
 
@@ -127,7 +185,7 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
 def intentionally_ignored_archive_path(path: Path) -> bool:
     """Return whether the path is inside the mounted external log archive."""
     parts = path.parts
-    return ".agent-canon" in parts and "archive" in parts
+    return ".agent-canon" in parts and ("archive" in parts or "log-archive" in parts)
 
 
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
@@ -196,15 +254,6 @@ def hook_result_findings(root: Path, hook_dirs: Sequence[Path]) -> tuple[int, in
     return len(files), entries, legacy_missing_namespace, findings
 
 
-def eval_run_id_from_text(text: str) -> str:
-    """Extract an eval run id from current or legacy report text."""
-    current = re.search(r"\bEVAL_RUN_ID=([A-Za-z0-9_.:-]+)", text)
-    if current:
-        return current.group(1)
-    legacy = re.search(r"eval_run_id:\s*`?([A-Za-z0-9_.:-]+)`?", text)
-    return legacy.group(1) if legacy else ""
-
-
 def markdown_reports(results_dirs: Sequence[Path]) -> tuple[Path, ...]:
     """Return unique Markdown reports from multiple result directories."""
     return tuple(
@@ -230,206 +279,158 @@ def reports_required(results_dirs: Sequence[Path], *, archive_mounted: bool) -> 
     return archive_mounted or any(results_dir.is_dir() for results_dir in results_dirs)
 
 
-def skill_eval_findings(
+def resolve_family_registry(canon_root: Path, registry_value: str) -> Path:
+    """Resolve the eval family registry path."""
+    registry = Path(registry_value)
+    return registry if registry.is_absolute() else canon_root / registry
+
+
+def load_family_contracts(registry_path: Path) -> tuple[EvalFamilyContract, ...]:
+    """Load accumulated eval family contracts from TOML."""
+    data = tomllib.loads(registry_path.read_text(encoding="utf-8"))
+    families = data.get("families")
+    if not isinstance(families, list) or not families:
+        raise ValueError("eval family registry must define at least one [[families]] entry")
+    contracts: list[EvalFamilyContract] = []
+    seen_ids: set[str] = set()
+    seen_labels: set[str] = set()
+    for raw_family in cast(list[object], families):
+        if not isinstance(raw_family, dict):
+            raise ValueError("eval family registry entries must be TOML tables")
+        family = cast(dict[str, object], raw_family)
+        values: dict[str, str] = {}
+        for field in (
+            "id",
+            "check_id",
+            "count_label",
+            "summary",
+            "producer",
+            "filename_regex",
+            "run_id_regex",
+            "missing_reports_detail",
+            "missing_run_id_detail",
+            "duplicate_run_id_detail",
+        ):
+            value = family.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"eval family registry entry missing string field: {field}")
+            values[field] = value.strip()
+        if values["id"] in seen_ids:
+            raise ValueError(f"duplicate eval family id: {values['id']}")
+        if values["count_label"] in seen_labels:
+            raise ValueError(f"duplicate eval family count label: {values['count_label']}")
+        re.compile(values["filename_regex"])
+        re.compile(values["run_id_regex"])
+        seen_ids.add(values["id"])
+        seen_labels.add(values["count_label"])
+        contracts.append(
+            EvalFamilyContract(
+                family_id=values["id"],
+                check_id=values["check_id"],
+                count_label=values["count_label"],
+                summary=values["summary"],
+                producer=values["producer"],
+                filename_regex=values["filename_regex"],
+                run_id_regex=values["run_id_regex"],
+                missing_reports_detail=values["missing_reports_detail"],
+                missing_run_id_detail=values["missing_run_id_detail"],
+                duplicate_run_id_detail=values["duplicate_run_id_detail"],
+            )
+        )
+    return tuple(contracts)
+
+
+def eval_family_findings(
     root: Path,
+    contract: EvalFamilyContract,
     results_dirs: Sequence[Path],
     *,
     require_reports: bool,
 ) -> tuple[int, list[Finding]]:
-    """Validate accumulated skill/workflow prompt eval reports."""
+    """Validate one accumulated eval report family declared by the registry."""
     findings: list[Finding] = []
     reports = markdown_reports(results_dirs)
     seen_run_ids: dict[str, str] = {}
+    filename_pattern = re.compile(contract.filename_regex)
+    run_id_pattern = re.compile(contract.run_id_regex)
     if not reports and require_reports:
-        findings.append(Finding("skill_eval", missing_reports_label(root, results_dirs), "no-skill-eval-reports"))
+        findings.append(
+            Finding(
+                contract.check_id,
+                missing_reports_label(root, results_dirs),
+                contract.missing_reports_detail,
+            )
+        )
     for path in reports:
         rel_path = relative(root, path)
-        if not SKILL_REPORT_RE.fullmatch(path.name):
-            findings.append(Finding("skill_eval", rel_path, "invalid-report-name"))
+        if not filename_pattern.fullmatch(path.name):
+            findings.append(Finding(contract.check_id, rel_path, "invalid-report-name"))
         text = path.read_text(encoding="utf-8")
-        run_id = eval_run_id_from_text(text)
-        if not run_id:
-            findings.append(Finding("skill_eval", rel_path, "missing-eval-run-id"))
+        run_id_match = run_id_pattern.search(text)
+        if run_id_match is None:
+            findings.append(Finding(contract.check_id, rel_path, contract.missing_run_id_detail))
             continue
+        run_id = run_id_match.group(1)
         previous = seen_run_ids.get(run_id)
         if previous is not None:
-            findings.append(Finding("skill_eval", rel_path, f"duplicate-eval-run-id:{previous}"))
+            findings.append(
+                Finding(contract.check_id, rel_path, f"{contract.duplicate_run_id_detail}:{previous}")
+            )
         seen_run_ids[run_id] = rel_path
     findings.extend(ignored_path_findings(root, reports))
     return len(reports), findings
 
 
-def local_llm_eval_findings(
-    root: Path,
-    results_dirs: Sequence[Path],
-    *,
-    require_reports: bool,
-) -> tuple[int, list[Finding]]:
-    """Validate accumulated local LLM responsibility eval reports."""
-    findings: list[Finding] = []
-    reports = markdown_reports(results_dirs)
-    seen_run_ids: dict[str, str] = {}
-    if not reports and require_reports:
-        findings.append(Finding("local_llm_eval", missing_reports_label(root, results_dirs), "no-local-llm-eval-reports"))
-    for path in reports:
-        rel_path = relative(root, path)
-        if not LOCAL_LLM_REPORT_RE.fullmatch(path.name):
-            findings.append(Finding("local_llm_eval", rel_path, "invalid-report-name"))
-        text = path.read_text(encoding="utf-8")
-        run_id = re.search(r"\bLOCAL_LLM_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)", text)
-        if run_id is None:
-            findings.append(Finding("local_llm_eval", rel_path, "missing-local-llm-eval-run-id"))
-            continue
-        previous = seen_run_ids.get(run_id.group(1))
-        if previous is not None:
-            findings.append(Finding("local_llm_eval", rel_path, f"duplicate-local-llm-eval-run-id:{previous}"))
-        seen_run_ids[run_id.group(1)] = rel_path
-    findings.extend(ignored_path_findings(root, reports))
-    return len(reports), findings
-
-
-def workflow_selection_eval_findings(
-    root: Path,
-    results_dirs: Sequence[Path],
-    *,
-    require_reports: bool,
-) -> tuple[int, list[Finding]]:
-    """Validate accumulated workflow selection eval reports."""
-    findings: list[Finding] = []
-    reports = markdown_reports(results_dirs)
-    seen_run_ids: dict[str, str] = {}
-    if not reports and require_reports:
-        findings.append(
-            Finding(
-                "workflow_selection_eval",
-                missing_reports_label(root, results_dirs),
-                "no-workflow-selection-eval-reports",
-            )
-        )
-    for path in reports:
-        rel_path = relative(root, path)
-        if not WORKFLOW_SELECTION_REPORT_RE.fullmatch(path.name):
-            findings.append(Finding("workflow_selection_eval", rel_path, "invalid-report-name"))
-        text = path.read_text(encoding="utf-8")
-        run_id = re.search(r"\bWORKFLOW_SELECTION_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)", text)
-        if run_id is None:
-            findings.append(Finding("workflow_selection_eval", rel_path, "missing-workflow-selection-eval-run-id"))
-            continue
-        previous = seen_run_ids.get(run_id.group(1))
-        if previous is not None:
-            findings.append(
-                Finding(
-                    "workflow_selection_eval",
-                    rel_path,
-                    f"duplicate-workflow-selection-eval-run-id:{previous}",
-                )
-            )
-        seen_run_ids[run_id.group(1)] = rel_path
-    findings.extend(ignored_path_findings(root, reports))
-    return len(reports), findings
-
-
-def report_quality_eval_findings(
-    root: Path,
-    results_dirs: Sequence[Path],
-    *,
-    require_reports: bool,
-) -> tuple[int, list[Finding]]:
-    """Validate accumulated report quality eval reports."""
-    findings: list[Finding] = []
-    reports = markdown_reports(results_dirs)
-    seen_run_ids: dict[str, str] = {}
-    if not reports and require_reports:
-        findings.append(Finding("report_quality_eval", missing_reports_label(root, results_dirs), "no-report-quality-eval-reports"))
-    for path in reports:
-        rel_path = relative(root, path)
-        if not REPORT_QUALITY_REPORT_RE.fullmatch(path.name):
-            findings.append(Finding("report_quality_eval", rel_path, "invalid-report-name"))
-        text = path.read_text(encoding="utf-8")
-        run_id = re.search(r"\bREPORT_QUALITY_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)", text)
-        if run_id is None:
-            findings.append(Finding("report_quality_eval", rel_path, "missing-report-quality-eval-run-id"))
-            continue
-        previous = seen_run_ids.get(run_id.group(1))
-        if previous is not None:
-            findings.append(
-                Finding(
-                    "report_quality_eval",
-                    rel_path,
-                    f"duplicate-report-quality-eval-run-id:{previous}",
-                )
-            )
-        seen_run_ids[run_id.group(1)] = rel_path
-    findings.extend(ignored_path_findings(root, reports))
-    return len(reports), findings
-
-
-def validate(root: Path) -> EvalAccumulationReport:
+def validate(root: Path, family_registry: str = DEFAULT_FAMILY_REGISTRY.as_posix()) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
     requested_root = root.resolve()
     canon_root = agent_canon_root(requested_root)
+    contracts = load_family_contracts(resolve_family_registry(canon_root, family_registry))
     findings: list[Finding] = []
     hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
         canon_root,
         hook_result_search_dirs(requested_root, canon_root),
     )
     archive_mounted = mounted_log_archive_root(canon_root).is_dir()
-    skill_results_dirs = eval_result_search_dirs(canon_root, "skill-workflow-prompt")
-    skill_reports, skill_findings = skill_eval_findings(
-        canon_root,
-        skill_results_dirs,
-        require_reports=reports_required(skill_results_dirs, archive_mounted=archive_mounted),
-    )
-    local_llm_results_dirs = eval_result_search_dirs(canon_root, "local-llm-responsibility")
-    local_llm_reports, local_llm_findings = local_llm_eval_findings(
-        canon_root,
-        local_llm_results_dirs,
-        require_reports=reports_required(local_llm_results_dirs, archive_mounted=archive_mounted),
-    )
-    workflow_selection_results_dirs = eval_result_search_dirs(canon_root, "workflow-selection")
-    workflow_selection_reports, workflow_selection_findings = workflow_selection_eval_findings(
-        canon_root,
-        workflow_selection_results_dirs,
-        require_reports=reports_required(
-            workflow_selection_results_dirs,
-            archive_mounted=archive_mounted,
-        ),
-    )
-    report_quality_results_dirs = eval_result_search_dirs(canon_root, "report-quality")
-    report_quality_reports, report_quality_findings = report_quality_eval_findings(
-        canon_root,
-        report_quality_results_dirs,
-        require_reports=reports_required(report_quality_results_dirs, archive_mounted=archive_mounted),
-    )
+    eval_report_counts: dict[str, int] = {}
     findings.extend(hook_findings)
-    findings.extend(skill_findings)
-    findings.extend(local_llm_findings)
-    findings.extend(workflow_selection_findings)
-    findings.extend(report_quality_findings)
+    for contract in contracts:
+        results_dirs = eval_result_search_dirs(canon_root, contract.family_id)
+        report_count, family_findings = eval_family_findings(
+            canon_root,
+            contract,
+            results_dirs,
+            require_reports=reports_required(results_dirs, archive_mounted=archive_mounted),
+        )
+        eval_report_counts[contract.family_id] = report_count
+        findings.extend(family_findings)
     return EvalAccumulationReport(
         hook_files=hook_files,
         hook_entries=hook_entries,
         hook_legacy_missing_namespace=hook_legacy_missing_namespace,
-        skill_reports=skill_reports,
-        local_llm_reports=local_llm_reports,
-        workflow_selection_reports=workflow_selection_reports,
-        report_quality_reports=report_quality_reports,
+        eval_report_counts=eval_report_counts,
         findings=tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
     )
 
 
 def render_json(report: EvalAccumulationReport) -> str:
     """Render JSON output."""
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
     return json.dumps(
         {
-            "status": "pass" if not report.findings else "fail",
+            "status": report_status(report),
             "hook_files": report.hook_files,
             "hook_entries": report.hook_entries,
             "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
-            "skill_reports": report.skill_reports,
-            "local_llm_reports": report.local_llm_reports,
-            "workflow_selection_reports": report.workflow_selection_reports,
-            "report_quality_reports": report.report_quality_reports,
+            "eval_report_counts": report.eval_report_counts,
+            "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
+            "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
+            "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
+            "report_quality_reports": eval_report_count(report, "report-quality"),
+            "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
+            "blocking_finding_count": len(blocking),
+            "warning_count": len(warnings),
             "findings": [asdict(item) for item in report.findings],
         },
         indent=2,
@@ -437,28 +438,117 @@ def render_json(report: EvalAccumulationReport) -> str:
     )
 
 
+def eval_report_count(report: EvalAccumulationReport, family_id: str) -> int:
+    """Return a report count for one family id."""
+    return report.eval_report_counts.get(family_id, 0)
+
+
+def eval_family_count_lines(report: EvalAccumulationReport) -> list[str]:
+    """Return generic per-family count lines without dynamic field names."""
+    return [
+        f"EVAL_ACCUMULATION_FAMILY_REPORTS={family_id}:{count}"
+        for family_id, count in sorted(report.eval_report_counts.items())
+    ]
+
+
+def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
+    """Return a bounded JSON-friendly accumulation summary."""
+    finding_counts: dict[str, int] = {}
+    for finding in report.findings:
+        finding_counts[finding.check] = finding_counts.get(finding.check, 0) + 1
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
+    return {
+        "status": report_status(report),
+        "finding_count": len(report.findings),
+        "blocking_finding_count": len(blocking),
+        "warning_count": len(warnings),
+        "finding_counts": dict(sorted(finding_counts.items())),
+        "hook_files": report.hook_files,
+        "hook_entries": report.hook_entries,
+        "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
+        "eval_report_counts": report.eval_report_counts,
+        "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
+        "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
+        "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
+        "report_quality_reports": eval_report_count(report, "report-quality"),
+        "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
+        "blocking_finding_samples": [
+            asdict(finding) for finding in blocking[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+        "warning_samples": [
+            asdict(finding) for finding in warnings[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+        "finding_samples": [
+            asdict(finding) for finding in report.findings[:COMPACT_FINDING_SAMPLE_LIMIT]
+        ],
+    }
+
+
+def write_compact_summary(path: Path, report: EvalAccumulationReport) -> None:
+    """Write a bounded JSON summary for agent consumption."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def render_text(
+    report: EvalAccumulationReport,
+    *,
+    include_details: bool = True,
+    compact_out: Path | None = None,
+) -> str:
+    """Render machine-readable text output."""
+    blocking = blocking_findings(report)
+    warnings = warning_findings(report)
+    lines: list[str] = []
+    if include_details:
+        lines.extend(finding.render() for finding in report.findings)
+    lines.extend(
+        [
+            f"EVAL_ACCUMULATION_HOOK_FILES={report.hook_files}",
+            f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}",
+            "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
+            f"{report.hook_legacy_missing_namespace}",
+            f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
+            "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS="
+            f"{eval_report_count(report, 'local-llm-responsibility')}",
+            "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS="
+            f"{eval_report_count(report, 'workflow-selection')}",
+            f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}",
+            f"EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS={eval_report_count(report, 'codex-agent-role')}",
+            *eval_family_count_lines(report),
+            f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}",
+            f"EVAL_ACCUMULATION_BLOCKING_FINDINGS={len(blocking)}",
+            f"EVAL_ACCUMULATION_WARNINGS={len(warnings)}",
+            f"EVAL_ACCUMULATION={report_status(report)}",
+        ]
+    )
+    if compact_out is not None:
+        lines.append(f"EVAL_ACCUMULATION_COMPACT_OUT={compact_out.as_posix()}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the eval accumulation checker."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root)
+    report = validate(args.root, str(args.family_registry))
+    if args.compact_out is not None:
+        write_compact_summary(args.compact_out, report)
     if args.format == "json":
         print(render_json(report))
     else:
-        for finding in report.findings:
-            print(finding.render())
-        print(f"EVAL_ACCUMULATION_HOOK_FILES={report.hook_files}")
-        print(f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}")
         print(
-            "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
-            f"{report.hook_legacy_missing_namespace}"
+            render_text(
+                report,
+                include_details=args.compact_out is None,
+                compact_out=args.compact_out,
+            ),
+            end="",
         )
-        print(f"EVAL_ACCUMULATION_SKILL_REPORTS={report.skill_reports}")
-        print(f"EVAL_ACCUMULATION_LOCAL_LLM_REPORTS={report.local_llm_reports}")
-        print(f"EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS={report.workflow_selection_reports}")
-        print(f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={report.report_quality_reports}")
-        print(f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}")
-        print(f"EVAL_ACCUMULATION={'pass' if not report.findings else 'fail'}")
-    return 1 if report.findings else 0
+    return 1 if blocking_findings(report) else 0
 
 
 if __name__ == "__main__":

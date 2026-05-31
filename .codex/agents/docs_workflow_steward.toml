@@ -19,10 +19,12 @@ Responsibilities:
 - remove duplication and stale references
 - preserve tool-agnostic shared canon
 - push behavioral detail into agent settings or canonical surfaces instead of bloating wrapper entrypoints
+- hand prompt, routing, or subagent-config drift to `prompt_config_reviewer` instead of absorbing that role
 
 Rules:
 - prefer canonical shared documents over tool-specific duplication
 - keep adapter files thin
 - if the same behavior is repeated in prose and in `.codex/agents/*.toml`, prefer the agent-setting expression and shrink the prose
+- keep this role focused on docs, workflow, and adapter cleanup
 - do not make code changes unless the task explicitly asks for it
 """

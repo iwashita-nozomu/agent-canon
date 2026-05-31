@@ -14,19 +14,23 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 role ごとの具体的な禁止事項、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
+prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
+この file を workflow prose や skill prose の重複格納先にしません。
 
 ## Principles
 
 - role behavior は docs より `.codex/agents/*.toml` を優先します
+- prompt / config drift を見つけたら、親がその場で policy prose を増やす前に `prompt_config_reviewer` の監査結果を要求します
 - parent agent が最終編集責任を持つ
 - routing と required review を決める前に subagent を乱立させない
 - repo-changing task では、stage ごとに適切な subagent を explicit に立てる
 - 調査、レビュー、文書整備は分ける
 - 再帰的 fan-out は避ける
+- subagents do not spawn subagents; parent が stage wave、handoff packet、closeout を管理する
 - 探索、レビュー、仕様確認の並列化は使うが、parallel write-heavy implementation は避ける
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
-- subagent の depth や fan-out は固定値で規定せず、task の複雑さ、review の独立性、write scope 分離で決める
-- 追加の subagent 層を立てるときは、parent が owner、input packet、expected output、write scope を明示する
+- subagent depth は `.codex/config.toml` の `agents.max_depth = 1` を正本にし、parent-launched waves と active spawn budget で fan-out を管理する
+- 追加の subagent wave を立てるときは、parent が owner、input packet、expected output、write scope を明示する
 - subagent handoff の input packet は role ごとに bounded にし、`/workspace` や repo root 全体を読む scope として渡さない
 - reviewer には raw repo / raw log / full tree ではなく、対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡す
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
@@ -35,8 +39,8 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の model / reasoning policy は `.codex/config.toml` の `agents.model_policy` を正本にする
-- approved packet で完全に切れる低リスク slice は `agents.model_policy` の Spark coding bucket を first implementation candidate とする
+- Codex の model / reasoning policy は `.codex/config.toml` の `agent_model_policy` を正本にする
+- approved packet で完全に切れる低リスク slice は `agent_model_policy` の Spark coding bucket を first implementation candidate とする
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier bucket は統合判断、設計判断、最終責任に集中する
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に `.codex/config.toml` の Spark bucket で fresh default subagent を再試行する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier bucket に残す
@@ -44,11 +48,12 @@ project-level subagent registration と runtime budget は `.codex/config.toml` 
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
-- cap は depth 制限ではなく同時実行数の上限として扱います
+- runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
+- `.codex/config.toml` の `[agents].max_depth` は `1` を正本にし、subagents do not spawn subagents
+- cap は同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
-- depth は固定しませんが、active な subagent 数は spawn budget で縛ります
+- active な subagent 数は spawn budget で縛ります
 - 既定 budget は `Scoped Change Lite` で同時 4 体までです
 - 既定 budget は `Scoped Change` で同時 8 体までです
 - 既定 budget は `Large Delivery` / `Platform And Environment` で同時 10 体までです
@@ -76,6 +81,16 @@ Subagent の context budget は correctness gate です。parent は handoff pro
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
 
 role 分割が妥当でも input packet が広すぎる場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、各 agent には solver / optimizer / functional などの担当 path list と contract-check summary だけを渡します。Python API / typing review は `python_reviewer` に分け、数学 canon の full context は渡しません。
+
+## Initial Three-Agent Intake
+
+Initial Three-Agent Intake は repo-changing task の初期責務を3つに分けます。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、subagents do not spawn subagents の制約の下で次の stage wave を起動します。
+
+Tool-result route markers:
+- raw checker/stat artifacts -> artifact_reviewer
+- reader-facing narrative interpretation -> report_reviewer
+- OOP mechanical reports -> oop_readability_reviewer
+- repo-wide drift and integration risk -> project_reviewer
 
 ## Hook And Tool Feedback To Subagent Protocol
 
@@ -162,6 +177,7 @@ Constraints:
 | `critical_guardian` | `project_reviewer` |
 | `researcher` | `literature_researcher` or `explorer` |
 | `infra_steward` | parent + `docs_workflow_steward` or infrastructure-focused `worker` planning |
+| `prompt_config_reviewer` | `prompt_config_reviewer` |
 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`
@@ -208,6 +224,8 @@ Constraints:
   - approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する
 - `docs_workflow_steward`
   - agent 文書、workflow、adapter file の整理を行う
+- `prompt_config_reviewer`
+  - `.codex/agents/*.toml`、`.codex/config.toml`、workflow prompt、routing skill の prompt/config drift を読み取り専用で監査する
 - `project_reviewer`
   - repo-wide な inventory と workflow health を確認する
 - `literature_researcher`
@@ -255,7 +273,7 @@ Constraints:
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS` を確認し、design trace、naming、validation が固定済みの slice は `spark_worker`、broad / ambiguous slice は `worker` |
 | 低リスク実装slice | design trace、naming、validation が固定済みの slice だけを `spark_worker` first |
 | 実装後レビュー | `reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` |
-| 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
+| 包括的開発の統合レビュー | `project_reviewer`、`docs_workflow_steward`、prompt/config surface がある場合は `prompt_config_reviewer`、`python_reviewer`、必要に応じて `cpp_reviewer` を intake / wrap-up の固定 stack として使う |
 
 運用ルール:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
@@ -281,7 +299,7 @@ Constraints:
 ## Codex Model Policy
 
 Model policy の正本は `.codex/config.toml` の
-`[agents.model_policy.*]` です。各 bucket が `model`、
+`[agent_model_policy.*]` です。各 bucket が `model`、
 `model_reasoning_effort`、`roles` を持ちます。
 
 `.codex/agents/*.toml` は Codex runtime が読む materialized role 定義です。
@@ -290,7 +308,7 @@ role の `model` / `model_reasoning_effort` は設定正本ではなく、
 `tools/agent_tools/check_agent_runtime_alignment.py` で検証する対象です。
 
 policy を変更するときは、先に `.codex/config.toml` の
-`agents.model_policy` を更新し、その後に該当 `.codex/agents/*.toml` を
+`agent_model_policy` を更新し、その後に該当 `.codex/agents/*.toml` を
 同期します。Python checker、workflow docs、task catalog に role list や
 model list を重複管理しません。
 
@@ -342,7 +360,7 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 - `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
 - `agents/agents_config.json` の required output が実テンプレートに結び付いている
 - `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
-- `.codex/agents/*.toml` の model split が `.codex/config.toml` の `agents.model_policy` に揃っている
+- `.codex/agents/*.toml` の model split が `.codex/config.toml` の `agent_model_policy` に揃っている
 - temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある

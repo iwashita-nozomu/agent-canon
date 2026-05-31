@@ -19,6 +19,7 @@
     "downstream implementation hooks/style_checker_guard.py runs changed-file style checks and logs unchecked edits",
     "downstream implementation hooks/log_surface_inventory_guard.py blocks hook/tool/skill log-surface inventory drift",
     "downstream implementation hooks/notebook_quality_guard.py blocks changed notebooks that behave like tests",
+    "downstream implementation hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries",
     "downstream implementation ../tests/agent_tools/test_codex_hooks.py validates hook wiring",
     "@dependency-end"
   ],

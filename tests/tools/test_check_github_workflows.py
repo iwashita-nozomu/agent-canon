@@ -198,6 +198,38 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Operational Findings / Issues", result.stdout)
 
+    def test_static_gates_require_prompt_eval_parity(self) -> None:
+        """Static gates must keep parity with local prompt eval checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            workflow = root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+            shutil.copy2(
+                REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml",
+                workflow,
+            )
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "missing_text:evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml",
+                result.stdout,
+            )
+
     def test_missing_agentcanon_issues_readme_fails(self) -> None:
         """Durable AgentCanon issue conventions must remain present."""
         with tempfile.TemporaryDirectory() as tmp_dir:

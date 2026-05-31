@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -49,9 +49,26 @@ CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
 FRONTMATTER_OPEN_MARKER = "---\n"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
+EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
+EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 24
 EXPECTED_MAX_DEPTH = 1
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
+INITIAL_INTAKE_MARKERS = {
+    "requirements_organizer": "Initial three-agent intake role: own user-request clauses",
+    "explorer": "Initial three-agent intake role: own evidence, reuse, and stale-surface inventory",
+    "execution_planner": "Initial three-agent intake role: own stage order and artifact routing",
+}
+SUBAGENT_PROTOCOL_DOCS = (
+    ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
+    ROOT / "agents" / "TASK_WORKFLOWS.md",
+)
+TOOL_RESULT_ROUTE_MARKERS = (
+    "raw checker/stat artifacts -> artifact_reviewer",
+    "reader-facing narrative interpretation -> report_reviewer",
+    "OOP mechanical reports -> oop_readability_reviewer",
+    "repo-wide drift and integration risk -> project_reviewer",
+)
 
 
 @dataclass(frozen=True)
@@ -98,11 +115,9 @@ def load_project_config_toml() -> dict[str, object]:
 
 def iter_model_policy_buckets(config: dict[str, object]) -> list[tuple[str, dict[str, object]]]:
     """Return model policy buckets from `.codex/config.toml`."""
-    agents = config.get("agents", {})
-    ensure(isinstance(agents, dict), "agents config must be a mapping")
-    model_policy = agents.get("model_policy", {})
-    ensure(isinstance(model_policy, dict), "agents.model_policy must be a mapping")
-    ensure(model_policy, "agents.model_policy must not be empty")
+    model_policy = config.get("agent_model_policy", {})
+    ensure(isinstance(model_policy, dict), "agent_model_policy must be a mapping")
+    ensure(model_policy, "agent_model_policy must not be empty")
     buckets: list[tuple[str, dict[str, object]]] = []
     for bucket_id, raw_bucket in sorted(model_policy.items()):
         ensure(isinstance(raw_bucket, dict), f"model policy {bucket_id} must be a mapping")
@@ -144,12 +159,22 @@ def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
     ensure(isinstance(config.get("review_model"), str), "review_model must be a string")
+    ensure(
+        config.get("model_context_window") == EXPECTED_MODEL_CONTEXT_WINDOW,
+        f"model_context_window must remain {EXPECTED_MODEL_CONTEXT_WINDOW}",
+    )
+    ensure(
+        config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
+        f"tool_output_token_limit must remain {EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT}",
+    )
     features = config.get("features", {})
     ensure(isinstance(features, dict), "features must be a mapping")
     ensure(features.get("hooks") is True, "features.hooks must be true")
     ensure(features.get("goals") is True, "features.goals must be true")
+    ensure(features.get("multi_agent") is True, "features.multi_agent must be true")
     ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
     ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    validate_skill_config(config)
     agents = config.get("agents", {})
     ensure(isinstance(agents, dict), "agents must be a mapping")
     ensure(
@@ -168,7 +193,7 @@ def validate_project_config() -> None:
     registry = {
         key: value
         for key, value in agents.items()
-        if isinstance(value, dict) and key != "model_policy"
+        if isinstance(value, dict)
     }
     missing_registry = sorted(set(codex_agents) - set(registry))
     extra_registry = sorted(set(registry) - set(codex_agents))
@@ -191,6 +216,43 @@ def validate_project_config() -> None:
             f"{role_id} registry description must match agent TOML",
         )
     _ = iter_model_policy_buckets(config)
+
+
+def expected_skill_config_paths() -> tuple[str, ...]:
+    """Return the project-local skill paths that must be enabled in Codex config."""
+    return tuple(
+        sorted(
+            f"../{path.relative_to(ROOT).as_posix()}"
+            for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
+        )
+    )
+
+
+def validate_skill_config(config: dict[str, object]) -> None:
+    """Check that every local public skill is wired through official skills.config."""
+    skills = config.get("skills", {})
+    ensure(isinstance(skills, dict), "skills must be a mapping")
+    entries = skills.get("config", [])
+    ensure(isinstance(entries, list), "skills.config must be a list")
+    observed: list[str] = []
+    for entry in entries:
+        ensure(isinstance(entry, dict), "skills.config entries must be mappings")
+        path_value = str(entry.get("path", "")).strip()
+        ensure(path_value, "skills.config entry path must be non-empty")
+        ensure(entry.get("enabled") is True, f"skills.config {path_value} must be enabled")
+        resolved = (PROJECT_CONFIG_PATH.parent / path_value).resolve()
+        ensure(resolved.is_file(), f"skills.config path missing: {path_value}")
+        ensure(resolved.name == "SKILL.md", f"skills.config path must point at SKILL.md: {path_value}")
+        ensure(
+            resolved.is_relative_to(SKILL_SHIM_ROOT.resolve()),
+            f"skills.config path is outside .agents/skills: {path_value}",
+        )
+        observed.append(path_value)
+    expected = expected_skill_config_paths()
+    ensure(
+        sorted(observed) == list(expected),
+        "skills.config must enable every .agents/skills/*/SKILL.md path",
+    )
 
 
 def validate_project_hooks() -> None:
@@ -258,6 +320,10 @@ def validate_codex_agent_settings() -> None:
                 )
             except RuntimeError as exc:
                 raise RuntimeError(f"model policy {bucket_id}: {exc}") from exc
+
+    for role_id, marker in INITIAL_INTAKE_MARKERS.items():
+        instructions = str(configs[role_id].get("developer_instructions", ""))
+        ensure(marker in instructions, f"{role_id} missing initial intake marker")
 
 
 def validate_team_config_references() -> None:
@@ -443,6 +509,25 @@ def validate_public_skill_shims() -> None:
         ensure(f"name: {skill_id}" in text, f"{skill_id} shim frontmatter name mismatch")
 
 
+def validate_subagent_protocol_docs() -> None:
+    """Check subagent routing docs keep machine-enforceable boundaries."""
+    for path in SUBAGENT_PROTOCOL_DOCS:
+        text = path.read_text(encoding="utf-8")
+        ensure("Initial Three-Agent Intake" in text, f"{path} missing initial intake contract")
+        for role_id in INITIAL_INTAKE_MARKERS:
+            ensure(role_id in text, f"{path} missing initial intake role {role_id}")
+        ensure(
+            "subagents do not spawn subagents" in text,
+            f"{path} must state parent-launched waves and no recursive spawn",
+        )
+        ensure("depth は固定しません" not in text, f"{path} must not allow unfixed depth wording")
+    subagents_text = (ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
+        encoding="utf-8"
+    )
+    for marker in TOOL_RESULT_ROUTE_MARKERS:
+        ensure(marker in subagents_text, f"CODEX_SUBAGENTS.md missing tool route marker: {marker}")
+
+
 def validate_vendor_skill_adapters() -> None:
     """Check that third-party skill vendor adapters are manifest-backed."""
     findings = VendorSkillValidator(ROOT).validate(require_adapters=True)
@@ -491,7 +576,7 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
 
 def current_utc_iso() -> str:
     """Return a second-granularity UTC timestamp."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace(
         "+00:00",
         "Z",
     )
@@ -647,6 +732,7 @@ def main() -> int:
     validate_team_config_references()
     validate_task_catalog_references()
     validate_public_skill_shims()
+    validate_subagent_protocol_docs()
     validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")

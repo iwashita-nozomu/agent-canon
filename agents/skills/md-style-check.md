@@ -45,6 +45,7 @@ Markdown の体裁、見出し、リンク、可読性を崩さずに保ちま�
 
 1. changed Markdown files を固定します。
 1. `make docs-check` を実行し、lint と link の両方を見ます。
+1. markdown math drift がある場合は `python3 tools/docs/check_markdown_math.py <paths>` で確認し、delimiter だけの機械修正は `python3 tools/docs/fix_markdown_math.py <paths>` を使います。
 1. 体裁違反、broken link、見出し drift を修正します。
 1. 文書間の矛盾や内容不足が見えたら、それぞれ docs consistency review、docs completeness review へ分岐します。
 

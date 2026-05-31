@@ -63,3 +63,24 @@ tool = "tools/agent_tools/semantic_provider_html_report.py"
 doc = "documents/tools/semantic_provider_html_report.md"
 language = "python"
 summary = "HTML renderer for semantic-index provider comparison evidence."
+
+[[tool]]
+id = "prose-reasoning-graph"
+tool = "tools/agent_tools/prose_reasoning_graph.py"
+doc = "documents/tools/prose_reasoning_graph.md"
+language = "python"
+summary = "SQLite-backed prose structure graph, diagnostics, explanation, and skill handoff documentation."
+
+[[tool]]
+id = "repo-structure-contract"
+tool = "tools/agent_tools/repo_structure_contract.py"
+doc = "documents/tools/repo_structure_contract.md"
+language = "python"
+summary = "Repository tree versus AgentCanon structure contract checker documentation."
+
+[[tool]]
+id = "fix-markdown-math"
+tool = "tools/docs/fix_markdown_math.py"
+doc = "documents/tools/fix_markdown_math.md"
+language = "python"
+summary = "Markdown math notation fixer documentation."

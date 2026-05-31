@@ -18,7 +18,7 @@ import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -512,11 +512,19 @@ class AgentImprovementGuide:
         """Return skill prompt eval reports from the mounted archive."""
         reports = {
             path
-            for result_dir in eval_result_search_dirs(self.root, "skill-workflow-prompt")
+            for result_dir in (
+                *eval_result_search_dirs(self.root, "skill-workflow-prompt"),
+                self.root / "agents" / "evals" / "results" / "skill-workflow-prompt",
+            )
             if result_dir.is_dir()
             for path in result_dir.glob("*.md")
             if path.name != "README.md"
         }
+        legacy_dir = self.root / "agents" / "evals" / "results" / "skill-workflow-prompt"
+        if legacy_dir.is_dir():
+            reports.update(
+                path for path in legacy_dir.glob("*.md") if path.name != "README.md"
+            )
         return tuple(sorted(reports))
 
     def memory_entry_counts(self) -> dict[str, int]:
@@ -553,7 +561,11 @@ class AgentImprovementGuide:
     def hook_result_paths(self) -> tuple[Path, ...]:
         """Return direct and runtime-sharded hook result JSONL paths."""
         paths: list[Path] = []
-        for hook_dir in hook_result_search_dirs(self.requested_root, self.root):
+        hook_dirs = [
+            *hook_result_search_dirs(self.requested_root, self.root),
+            self.root / "agents" / "evals" / "results" / "hook-runs",
+        ]
+        for hook_dir in hook_dirs:
             direct = tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
             sharded = tuple(sorted(hook_dir.glob("**/*.jsonl"))) if hook_dir.is_dir() else ()
             paths.extend(direct + sharded)
@@ -684,7 +696,10 @@ def is_agentcanon_root(root: Path) -> bool:
     """Return whether a path looks like the AgentCanon evidence root."""
     return (
         (root / "agents" / "evals" / "README.md").is_file()
+        or (root / ".agents" / "skills").is_dir()
         or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
+        or (root / "agents" / "evals" / "results").is_dir()
+        or (root / ".agents" / "skills").is_dir()
     )
 
 
@@ -710,7 +725,7 @@ def hook_entry_epoch(entry: dict[str, object]) -> int:
     except ValueError:
         return NO_RESET_EPOCH
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return int(parsed.timestamp())
 
 

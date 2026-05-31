@@ -8,6 +8,7 @@ responsibility Documents Academic Writing for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/academic-writing.md Academic Writing skill contract
 upstream design ../../../agents/skills/structure-planning.md defines reusable document structure contracts
+upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose graph diagnostics and rewrite handoffs
 upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
 @dependency-end
 -->
@@ -18,6 +19,7 @@ upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling b
 1. Read `agents/skills/academic-writing.md`.
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
 1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
+1. If a prose graph handoff is present, use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
 1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
 1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
 1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.

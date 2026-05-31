@@ -21,8 +21,10 @@ from pathlib import Path
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
+
+PROC_MOUNTS_MIN_FIELDS = 3
 
 
 @dataclass(frozen=True)
@@ -56,9 +58,9 @@ def parse_mounts() -> dict[str, tuple[str, str]]:
     with Path("/proc/mounts").open("r", encoding="utf-8") as handle:
         for raw_line in handle:
             parts = raw_line.split()
-            if len(parts) < 3:
+            if len(parts) < PROC_MOUNTS_MIN_FIELDS:
                 continue
-            source, mountpoint, fstype = parts[:3]
+            source, mountpoint, fstype = parts[:PROC_MOUNTS_MIN_FIELDS]
             mounts[mountpoint] = (source, fstype)
     return mounts
 

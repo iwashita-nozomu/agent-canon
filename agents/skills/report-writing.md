@@ -6,6 +6,7 @@ upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design structure-planning.md reusable structure contract skill
 upstream design result-artifact-writeout.md raw result artifact placement skill
+upstream design prose-reasoning-graph.md prose graph diagnostics and handoff overlay
 downstream design html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
@@ -40,6 +41,9 @@ use this skill to turn that evidence into a report a human can evaluate.
 - A report needs a first figure/table, source-to-section map, metric contract,
   or invalid interpretation boundary; in that case use `structure-planning`
   before drafting.
+- A report has a prose graph handoff; in that case use the graph diagnostics,
+  explanation, and integration plan as evidence for reader flow and claim
+  support while keeping the report source packet authoritative.
 - A report needs HTML output only when the user explicitly asks for HTML or a
   browser-readable page; in that case use `html-output` after report planning.
 

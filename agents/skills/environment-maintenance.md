@@ -61,7 +61,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - repo-wide に必要な Python tool は `CONTAINER_OPERATIONS.md` の Python dependency rule に従い、repo-local installer contract に載せます。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は `CONTAINER_OPERATIONS.md` の devcontainer boundary に従います。
 - environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
-- repo の canonical image では `python3-venv` を同梱し、container runtime 内の canonical `.venv` だけを `tools/ci/python_env_policy.py --runtime container --create` で許可します。host runtime では repo-local `.venv` を作らず、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を既定手順にしません。
+- repo の canonical image では `python3.11-venv` を同梱し、container runtime 内の canonical `.venv` だけを `tools/ci/python_env_policy.py --runtime container --create` で許可します。host runtime では repo-local `.venv` を作らず、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を既定手順にしません。
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
 - Docker 変更では `docker/Dockerfile` だけで閉じず、`docker/requirements.txt`、runtime pack、AgentCanon-owned devcontainer、関連 README の要否を同じ pass で判定します。

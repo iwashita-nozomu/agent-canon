@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -197,6 +199,39 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             )
             self.assertIn("token_usage_summary=present", monitor_text)
             self.assertIn("latest_moving_average_total=150.000", monitor_text)
+
+    def test_session_glob_summary_can_filter_recent_files(self) -> None:
+        """Recent summary mode should use file mtime for long-running sessions."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            sessions = root / "sessions"
+            sessions.mkdir()
+            old_session = sessions / "old.jsonl"
+            recent_session = sessions / "recent.jsonl"
+            write_session(old_session, total_tokens=100)
+            write_session(recent_session, total_tokens=300)
+            old_timestamp = time.time() - 10 * 24 * 60 * 60
+            os.utime(old_session, (old_timestamp, old_timestamp))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--session-glob",
+                    str(sessions / "*.jsonl"),
+                    "--recent-days",
+                    "5",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("TOKEN_USAGE_SESSION_COUNT=1", result.stdout)
+            self.assertIn("TOKEN_USAGE_TOTAL_TOKENS=300", result.stdout)
+            self.assertIn("TOKEN_USAGE_RECENT_DAYS=5", result.stdout)
 
 
 if __name__ == "__main__":

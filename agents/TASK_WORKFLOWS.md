@@ -15,7 +15,7 @@ downstream design workflows/implementation-waterfall-workflow.md stage gate impl
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[agents/workflows/implementation-waterfall-workflow.md](../../../agents/workflows/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
@@ -61,6 +61,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
+- Initial Three-Agent Intake は `requirements_organizer`、`explorer`、`execution_planner` の3責務で固定します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing を持ちます。subagents do not spawn subagents; parent が stage wave と handoff packet を管理します
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
@@ -194,6 +195,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
+- `prompt_config_reviewer`
 - `python_reviewer`
 - `cpp_reviewer`
 - `worker`
@@ -209,7 +211,7 @@ write-scope separation ルール:
 - parent は writer ごとの結果を順番に統合し、scope drift を review gate へ渡します
 
 spawn budget ルール:
-- depth は固定しませんが、active な subagent 数は family ごとの budget で縛ります
+- subagent depth は `.codex/config.toml` の `agents.max_depth = 1` を正本にし、subagents do not spawn subagents; active な subagent 数は family ごとの budget で縛ります
 - 機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - `Scoped Change Lite` は同時 4 体までを既定にします
@@ -230,7 +232,7 @@ concurrent spawn budget:
 - `Research-Driven Change`: parent を除いて同時 9-12 agent を目安にします。perspective reviewer は batch で回します
 - `Platform And Environment` と `Large Delivery`: parent を除いて同時 8-10 agent を目安にします。planning / design / review を wave に分けます
 - `Comprehensive Development` と `Adaptive Improvement Loop`: parent を除いて同時 9-12 agent を目安にします。review pack はまとめて起こさず、intake・implementation・wrap-up の波に分けます
-- depth は固定しませんが、cap を超える fan-out は許可しません。必要な role が多いときは stage を細かく切って順次起動します
+- subagent depth は `.codex/config.toml` の `agents.max_depth = 1` を正本にし、cap を超える fan-out や recursive spawn は許可しません。必要な role が多いときは parent-launched stage を細かく切って順次起動します
 
 ## Workflow Families
 

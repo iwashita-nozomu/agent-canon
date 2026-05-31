@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 37
+expected_count = 38
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 59
+expected_count = 60
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 37
+expected_count = 38
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -625,7 +625,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-codex-subagent-prompts"
 target_glob = ".codex/agents/*.toml"
-expected_count = 32
+expected_count = 33
 kind = "subagent"
 description = "Every Codex subagent prompt must be dependency-linked and declare a model."
 
@@ -1440,13 +1440,13 @@ required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate
 id = "EVALS-README-ACCUMULATE-1"
 critical = true
 description = "Documents accumulated prompt eval results for skill use."
-required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/"]
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/"]
 
 [[evals.checklist]]
 id = "EVALS-README-HOOK-GUIDE-1"
 critical = true
 description = "Documents hook result accumulation and PR/push improvement guide generation."
-required_regex = [".agent-canon/archive/<env-key>", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+required_regex = [".agent-canon/log-archive", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
 
 [[evals.checklist]]
 id = "EVALS-README-PROMPT-FEEDBACK-1"
@@ -1500,7 +1500,7 @@ required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplica
 id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
 critical = true
 description = "Requires unique accumulated prompt eval report naming."
-required_regex = ["--accumulate", ".agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
+required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
 
 [[evals]]
 id = "agent-log-analysis-archive-api-skill"

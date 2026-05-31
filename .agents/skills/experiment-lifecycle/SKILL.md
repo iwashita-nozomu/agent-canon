@@ -7,6 +7,7 @@ description: Use this skill when preparing, running, or validating experiments.
 responsibility Documents Experiment Lifecycle for this repository.
 upstream design ../../../agents/canonical/skills.md skill canon registry
 upstream design ../../../agents/skills/structure-planning.md defines experiment and report structure contracts
+upstream design ../../../agents/skills/prose-reasoning-graph.md defines experiment-plan graph diagnostics
 @dependency-end
 -->
 
@@ -20,5 +21,6 @@ upstream design ../../../agents/skills/structure-planning.md defines experiment 
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a `config.json` or YAML snapshot, and registered commands must consume `{config_path}`.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, metric contract, invalid interpretations, and validation gate before running or writing.
 1. For experiment plans or reports with nontrivial paragraph order or causal/evidence transitions, ask `$structure-planning` to use `agent-canon semantic-index discourse-relations --profile experiment-report` or `--profile methods-protocol` as advisory edge evidence.
+1. If a prose graph handoff is present, use hypothesis, metric, baseline, and expected-result diagnostics as advisory input to the experiment plan or rerun plan.
 1. Use `$result-artifact-writeout` for result/report generation so raw run output, Markdown summary, manifest, run name, and overwrite policy are recorded separately.
 1. If code changes must iterate with explicit decision states, also use `experiment-change-loop`.

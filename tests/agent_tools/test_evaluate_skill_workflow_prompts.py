@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -17,11 +18,17 @@ from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+EXPECTED_SKILL_SHIM_COUNT = 37
+EXPECTED_CLAUDE_SKILL_COUNT = 37
+EXPECTED_HUMAN_SKILL_DOC_COUNT = 59
+EXPECTED_WORKFLOW_DOC_COUNT = 22
+EXPECTED_CANONICAL_DOC_COUNT = 6
+EXPECTED_CODEX_AGENT_PROMPT_COUNT = 33
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
@@ -72,12 +79,12 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             for entry in evals
         }
 
-        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 37)
-        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 37)
-        self.assertEqual(globs["agents/skills/*.md"], 59)
+        self.assertEqual(globs[".agents/skills/*/SKILL.md"], 38)
+        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 38)
+        self.assertEqual(globs["agents/skills/*.md"], 60)
         self.assertEqual(globs["agents/workflows/*.md"], 22)
         self.assertEqual(globs["agents/canonical/*.md"], 6)
-        self.assertEqual(globs[".codex/agents/*.toml"], 32)
+        self.assertEqual(globs[".codex/agents/*.toml"], EXPECTED_CODEX_AGENT_PROMPT_COUNT)
 
     def test_default_manifest_includes_convention_compliance_eval_coverage(
         self,
@@ -210,6 +217,27 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("EVAL_STATUS=pass", text)
             self.assertIn("## Run Manifest", text)
             self.assertIn("git_commit:", text)
+
+    def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
+        """Compact mode writes stats to JSON and keeps stdout bounded."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            compact = Path(tmp_dir) / "compact.json"
+
+            result = run_eval(
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--compact-out",
+                str(compact),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_STATUS=pass", result.stdout)
+            self.assertIn("EVAL_COMPACT_OUT=", result.stdout)
+            self.assertNotIn("EVAL_CHECK eval=", result.stdout)
+            payload = json.loads(compact.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["critical_failed"], 0)
+            self.assertGreater(payload["checks_total"], 0)
 
     def test_existing_report_out_gets_unique_sibling(self) -> None:
         """An existing report path should not be overwritten."""
@@ -363,12 +391,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(len(reports), 1)
             text = reports[0].read_text(encoding="utf-8")
             header = text.split("-->", 1)[0]
-            self.assertIn(
-                "upstream implementation ../../../../../tools/agent_tools/"
-                "evaluate_skill_workflow_prompts.py",
-                header,
-            )
-            self.assertIn("upstream design ../../../../../agents/evals/skill_workflow_prompt_eval.toml", header)
+            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", header)
+            self.assertIn("agents/evals/skill_workflow_prompt_eval.toml", header)
             self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:

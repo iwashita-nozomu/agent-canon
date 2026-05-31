@@ -15,12 +15,19 @@ This document is the shared policy for result logs, run artifacts, summaries,
 and visual outputs. It applies to agent runs, CI checks, experiments, benchmark
 runs, and analysis tools.
 
+This file owns storage classes and retention decisions. External runtime hook
+JSONL and accumulated eval archive branch policy belong to
+`documents/runtime-log-archive.md`.
+
 ## Storage Classes
 
 - `reports/agents/<run-id>/` stores agent workflow evidence, reviews, validation,
   monitoring, and closeout material.
 - `reports/` stores repo-wide automation reports, dependency reviews, lint
   reports, merge audits, and other project-level checks.
+- external runtime hook JSONL and accumulated eval reports live under
+  `.agent-canon/log-archive/...` as defined by
+  `documents/runtime-log-archive.md`.
 - `experiments/<topic>/result/<run-id>/` stores raw experiment outputs, JSONL,
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
 - `experiments/report/<run-id>.md` stores the human-readable experiment report.

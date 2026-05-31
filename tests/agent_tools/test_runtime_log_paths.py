@@ -15,7 +15,11 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import hook_result_search_dirs, mounted_log_archive_root, repo_log_key  # noqa: E402
+from runtime_log_paths import (  # noqa: E402
+    hook_result_search_dirs,
+    mounted_log_archive_root,
+    repo_log_key,
+)
 
 
 class RuntimeLogPathsTest(unittest.TestCase):
