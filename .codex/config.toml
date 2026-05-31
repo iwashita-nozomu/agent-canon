@@ -181,7 +181,7 @@ max_threads = 24
 max_depth = 1
 job_max_runtime_seconds = 3600
 
-[agents.model_policy.frontier_judgment]
+[agent_model_policy.frontier_judgment]
 model = "gpt-5.5"
 model_reasoning_effort = "high"
 roles = [
@@ -199,7 +199,7 @@ roles = [
   "ship_reviewer",
 ]
 
-[agents.model_policy.mini_review]
+[agent_model_policy.mini_review]
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
 roles = [
@@ -209,6 +209,7 @@ roles = [
   "oop_readability_reviewer",
   "report_reviewer",
   "docs_workflow_steward",
+  "prompt_config_reviewer",
   "reproducibility_reviewer",
   "scientific_computing_reviewer",
   "benchmark_reviewer",
@@ -217,7 +218,7 @@ roles = [
   "ml_science_reviewer",
 ]
 
-[agents.model_policy.spark_read]
+[agent_model_policy.spark_read]
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "low"
 roles = [
@@ -228,14 +229,14 @@ roles = [
   "diff_triage_reviewer",
 ]
 
-[agents.model_policy.frontier_implementation]
+[agent_model_policy.frontier_implementation]
 model = "gpt-5.5"
 model_reasoning_effort = "high"
 roles = [
   "worker",
 ]
 
-[agents.model_policy.spark_coding]
+[agent_model_policy.spark_coding]
 model = "gpt-5.3-codex-spark"
 model_reasoning_effort = "low"
 roles = [
@@ -274,6 +275,10 @@ config_file = "agents/diff_triage_reviewer.toml"
 [agents.docs_workflow_steward]
 description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."
 config_file = "agents/docs_workflow_steward.toml"
+
+[agents.prompt_config_reviewer]
+description = "Read-only reviewer for prompt, routing, and subagent-config drift."
+config_file = "agents/prompt_config_reviewer.toml"
 
 [agents.document_flow_reviewer]
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."

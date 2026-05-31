@@ -397,9 +397,9 @@ averages and coverage status from the prompt/token trend drilldown instead of
 lifetime totals. Raw JSONL is reserved for tool implementation, schema
 debugging, or corruption audits with an explicit rationale.
 `eval_accumulation_check.py` is the structural gate for that accumulation
-surface. It confirms hook JSONL, prompt eval reports, and local LLM eval
-reports are readable, uniquely identified, and not hidden by ignore rules
-before the improvement guide tries to mine them.
+surface. It confirms hook JSONL and every eval family registered in
+`agents/evals/eval_result_families.toml` are readable, uniquely identified, and
+not hidden by ignore rules before the improvement guide tries to mine them.
 `evaluate_workflow_selection.py` checks the prompt-intake classifier against
 frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
 Use `--accumulate` only when the measurement should become durable evidence
@@ -735,7 +735,7 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `tool_drift.py` validates dependency-manifest trace links between tools, PR flow docs/templates, workflow checks, and convention gates.
 - `responsibility_scope.py` validates top-level `responsibility-scope.toml`, required top-level coverage, protecting tool catalog entries, and linked issue files.
 - `issue_sync.py` validates durable local issues and plans GitHub Issue mirrors without requiring network access in CI.
-- `eval_accumulation_check.py` validates append-only hook, skill eval, and local LLM eval results before guide generation consumes them.
+- `eval_accumulation_check.py` validates append-only hook results and registered eval-family reports before guide generation consumes them.
 
 Do not use Dockerfile or environment files as universal dependency anchors.
 Use `environment` edges only for real Docker / CI / requirements / runtime coupling.
@@ -748,7 +748,7 @@ Use code dependency evidence to understand import/include/source reachability, a
 
 - `check_convention_compliance.py` aggregates convention compliance evidence. It verifies that every convention source exists, every normative convention document exposes a verification route, prohibition-bearing documents carry a prohibition section, every manifestable convention gate has a tool or prompt-eval check, every workflow calls the convention gate, workflow prohibitions remain wired, and skill-routing prompts delegate tool-covered rules to the checker.
 - `tool_catalog.py` keeps the AgentCanon tool catalog machine-readable and blocks stale paths, uncataloged default-wired tools, missing docs/tests, retired legacy entries, and broken tool-doc mappings.
-- `tool_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, and the tool catalog.
+- `tool_drift.py` checks dependency-header trace contracts for GitHub PR flow, AgentCanon PR validation, convention compliance, repo dependency review, skill/workflow prompt eval wiring, runtime alignment wiring, skill mirror parity, and the tool catalog.
 - `responsibility_scope.py` keeps checker/tool ownership tied to a scope so new gates do not become orphaned entrypoints.
 - `import_responsibility.py` ties Python imports back to `responsibility-scope.toml`, catches unused aliases before later style checks, and rejects local imports whose source scope is not allowed to depend on the target scope.
 - `issue_sync.py` keeps folder issues structurally valid and gives GitHub Issue sync a repeatable command plan.

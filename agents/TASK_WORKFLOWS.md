@@ -15,7 +15,7 @@ downstream design workflows/implementation-waterfall-workflow.md stage gate impl
 task を細かく増やしすぎず、少数の family に寄せて運用します。
 
 すべての family で、repo に持ち帰る実装パスは
-[agents/workflows/implementation-waterfall-workflow.md](../../../agents/workflows/implementation-waterfall-workflow.md)
+[agents/workflows/implementation-waterfall-workflow.md](workflows/implementation-waterfall-workflow.md)
 の段階ゲートに従います。
 また、repo を編集する task では、stage ごとに適切な subagent / specialist を explicit に立てることを既定にします。
 stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.toml` に寄せます。
@@ -195,6 +195,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
+- `prompt_config_reviewer`
 - `python_reviewer`
 - `cpp_reviewer`
 - `worker`

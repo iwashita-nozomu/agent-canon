@@ -9,6 +9,9 @@ upstream design ../README.md agent canon overview
 
 このディレクトリは、cross-agent で共有する人間向け正本の説明置き場です。
 実行時に読まれる entrypoint は別にあっても、保守対象はここを基準にします。
+ただし、この file 自体は first-reader hub ではなく layout appendix です。
+通常の読順は `README.md` -> `documents/README.md` -> `agents/README.md` ->
+`agents/workflows/README.md` を優先します。
 
 ## なぜ正本を分けるか
 

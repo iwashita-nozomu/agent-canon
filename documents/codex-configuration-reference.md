@@ -10,7 +10,7 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 
 # Codex Configuration Reference
 
-この文書は Codex CLI / Codex runtime の設定面を、2026-05-02 時点の公式 OpenAI Codex docs、公式 `config-schema.json`、ローカル `codex --help` / `codex exec --help` / `codex review --help` / `codex mcp --help` / `codex features list`、およびこの template の `.codex/config.toml` から整理したものです。
+この文書は Codex CLI / Codex runtime の設定面を、2026-05-31 時点の公式 OpenAI Codex docs、公式 `config-schema.json`、ローカル `codex --help` / `codex exec --help` / `codex review --help` / `codex mcp --help` / `codex features list`、およびこの template の `.codex/config.toml` から整理したものです。
 
 目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
 
@@ -529,12 +529,37 @@ Use hooks for deterministic runtime checks, not for replacing workflow policy:
 
 Hook output may include hook-specific structured results. Treat hook failures as runtime evidence to fix, not as optional noise.
 
+### Hook Severity Policy
+
+Runtime hooks must not become the reason normal read-only inspection, validation,
+repair, or PR evidence work cannot proceed. AgentCanon therefore uses these
+severity rules:
+
+- `block` is reserved for high-confidence public-accident prevention such as
+  obvious API keys or private keys in a prompt. Add new runtime blockers only
+  when the finding is deterministic, mechanically fixable, and safer to stop
+  immediately than to continue.
+- Process, search, reuse, planning, review completeness, style, OOP,
+  module-boundary, helper-first, log-surface, notebook, and closeout discipline
+  findings are warning/evidence by default. They should be fixed before
+  closeout, but they must not require moving hook config aside or disabling
+  hooks to keep working.
+- Child hook failures are fail-open by default. They surface as warning context
+  with repair commands. Use `AGENT_CANON_HOOK_STRICT_FAILURES=1` only while
+  explicitly developing or validating the hook itself.
+- Child `decision=block` output is downgraded to official warning context unless
+  the child script is listed in `CRITICAL_BLOCKING_CHILD_HOOKS` or
+  `AGENT_CANON_HOOK_STRICT_BLOCKS=1` is set for explicit enforcement tests.
+- AGENTS / ROOT_AGENTS policy prose should first ask whether a rule belongs in
+  a checker, warning hook, closeout gate, role TOML, workflow eval, or PR gate
+  before adding more prompt-only prohibitions.
+
 Template-specific hook behavior:
 
 - `hooks.json` wires one `hook_dispatcher.py` command per active lifecycle
   event. The dispatcher replays the original stdin payload to the child guard
-  scripts in the configured order and returns the first blocking JSON payload,
-  or the first non-blocking visible output when no guard blocks.
+  scripts in the configured order, preserves log opportunities, and normalizes
+  non-critical child findings into official warning context.
 - The dispatcher bypasses child guards for `GitStatus`, read-only file / Git
   inspection, and known validation commands including AgentCanon
   plan/status/latest-check inspection. Do not rename, move, or temporarily
@@ -543,9 +568,10 @@ Template-specific hook behavior:
   reference capture checks.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
   module boundary, library implementation, helper inventory, helper-first,
-  style, log-surface inventory, and notebook quality checks.
+  style, log-surface inventory, and notebook quality checks as warning/evidence
+  guardrails by default.
 - `Stop` runs goal completion, the post-edit guard suite, reference capture,
-  and final skill usage logging.
+  and final skill usage logging as closeout repair context by default.
 - The OOP hook emits warning/approve output for readability findings and keeps
   explicit OOP validation available as a closeout gate. Use
   `AGENT_CANON_OOP_HOOK_MODE=diff` only when the user explicitly requests

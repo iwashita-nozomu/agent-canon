@@ -17,9 +17,14 @@ downstream design ./rust-agent-tool-migration.md Rust tool migration policy
 
 # documents/
 
-`documents/` is a mixed documentation directory. The root `documents/README.md`
-is repo-local and should stay a regular file after template clone. AgentCanon may
-seed this file, but derived repositories own their local index.
+`documents/README.md` is the root `documents/` index. Read it after the top-level
+`README.md` when you need the root-owned document map. Use `agents/README.md`
+for workflow / skill / runtime routing rather than treating this file as a
+second agent hub.
+
+`documents/` is still a mixed documentation directory. The root
+`documents/README.md` stays repo-local after template clone. AgentCanon may seed
+this file, but derived repositories own their local index.
 
 ## Ownership Matrix
 
@@ -35,7 +40,10 @@ If a file is an AgentCanon-owned symlink, edit the source under
 `bash tools/sync_agent_canon.sh link-root`. If a file is a template-owned active
 contract, edit the root regular file.
 
-## Canon Runtime References
+## Shared Policy References
+
+These are shared policy documents that often support workflow or runtime tasks.
+For the broader agent routing path, return to `agents/README.md`.
 
 - [Shared Runtime Surfaces](./SHARED_RUNTIME_SURFACES.md): owner classes,
   symlink/copy/regular behavior, and root-view repair rules.

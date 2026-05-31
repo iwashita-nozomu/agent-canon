@@ -18,6 +18,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 - repository task を開始する
 - どの workflow family を使うか決めたい
 - skill、subagent、review、model / team policy、run bundle、runtime entrypoint を選ぶ
+- prompt、routing、subagent-config の refactor task で、まずどの policy surface を直すか決めたい
 - run bundle や review artifact の要否を決めたい
 - Codex / Claude / Copilot 間で共通ルールを保ちたい
 
@@ -35,6 +36,7 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 1. 他の task-shape skill を選ぶ前に、この skill で request が `repo-changing execution` か `routing-only/advisory` かを先に分ける
 1. `agents/TASK_WORKFLOWS.md` から primary workflow family を 1 つ選ぶ
 1. `agents/skills/README.md` から必要最小限の public skill を足す
+1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
@@ -123,6 +125,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 - implementation が scope に入るときだけ routing を出します
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS` を確認してから route します
+- prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - Routine docs / Focused code では parent-direct を許可します。subagent 実装では、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。

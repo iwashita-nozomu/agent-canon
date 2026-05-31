@@ -334,7 +334,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/agent_tools/tool_catalog.py`
   - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
 - `tools/agent_tools/tool_drift.py`
-  - GitHub PR flow、AgentCanon PR check、dependency review、convention compliance、tool catalog の dependency-header trace を検査します。
+  - GitHub PR flow、AgentCanon PR check、dependency review、skill/workflow prompt eval、runtime alignment、skill mirror parity、convention compliance、tool catalog の dependency-header trace を検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/check_static_any.py`

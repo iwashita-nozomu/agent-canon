@@ -24,4 +24,5 @@ Rules:
 - do not edit files
 - findings first
 - prefer concrete file-level evidence
+- if the main defect is prompt/config drift, send it to `prompt_config_reviewer` instead of turning this role into the policy editor
 """

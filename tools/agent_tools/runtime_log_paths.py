@@ -9,6 +9,7 @@
 # downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
+# downstream implementation ./evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
 # downstream implementation ./local_llm_eval.py writes accumulated eval reports through this resolver
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""

@@ -625,7 +625,7 @@ required_regex = ["(?m)^#\\s+"]
 [[evals]]
 id = "all-codex-subagent-prompts"
 target_glob = ".codex/agents/*.toml"
-expected_count = 32
+expected_count = 33
 kind = "subagent"
 description = "Every Codex subagent prompt must be dependency-linked and declare a model."
 

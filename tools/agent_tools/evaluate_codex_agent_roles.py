@@ -4,6 +4,7 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../agents/evals/README.md eval directory contract
 # upstream implementation ./agent_team.py loads team and task routing metadata
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
 """Evaluate Codex custom agent role definitions and routing cost policy."""
@@ -11,10 +12,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -32,6 +36,7 @@ from agent_team import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
+from runtime_log_paths import eval_results_dir  # noqa: E402
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25
 ModelPolicy = dict[str, tuple[str, str, str]]
@@ -64,9 +69,25 @@ class RuntimeSummary:
 
 
 @dataclass(frozen=True)
+class EvalRunMetadata:
+    """Metadata recorded with one role eval run."""
+
+    created_at: str
+    eval_run_id: str
+    run_id: str
+    argv: tuple[str, ...]
+    cwd: str
+    root: str
+    git_branch: str
+    git_commit: str
+    git_dirty: str
+
+
+@dataclass(frozen=True)
 class EvalReport:
     """Complete role eval report."""
 
+    metadata: EvalRunMetadata
     status: str
     findings: tuple[Finding, ...]
     model_matrix: tuple[str, ...]
@@ -374,7 +395,44 @@ def model_matrix(configs: dict[str, dict[str, object]], model_policy: ModelPolic
     return tuple(rows)
 
 
-def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
+def git_output(root: Path, *args: str) -> str:
+    """Return one git command output, or '-' outside a usable git checkout."""
+    try:
+        result = subprocess.run(
+            ("git", "-C", root.as_posix(), *args),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "-"
+    if result.returncode != 0:
+        return "-"
+    return result.stdout.strip() or "-"
+
+
+def build_eval_run_metadata(root: Path, run_id: str) -> EvalRunMetadata:
+    """Build metadata with a unique, filename-safe eval run id."""
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat()
+    timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
+    digest_source = "|".join(("codex-agent-role", run_id.strip(), created_at, root.as_posix()))
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
+    return EvalRunMetadata(
+        created_at=created_at,
+        eval_run_id=f"codex-agent-role-eval-{timestamp}-{digest}",
+        run_id=run_id.strip(),
+        argv=tuple(sys.argv),
+        cwd=Path.cwd().as_posix(),
+        root=root.as_posix(),
+        git_branch=git_output(root, "rev-parse", "--abbrev-ref", "HEAD"),
+        git_commit=git_output(root, "rev-parse", "HEAD"),
+        git_dirty="yes" if git_output(root, "status", "--short", "--untracked-files=all") else "no",
+    )
+
+
+def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalReport:
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
@@ -387,6 +445,7 @@ def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
     metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs)
     findings.extend(metric_findings)
     return EvalReport(
+        metadata=build_eval_run_metadata(canon_root, run_id),
         status="pass" if not findings else "fail",
         findings=tuple(findings),
         model_matrix=model_matrix(configs, model_policy),
@@ -398,6 +457,7 @@ def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
 def render_text(report: EvalReport, *, include_details: bool = True, compact_out: Path | None = None) -> str:
     """Render text output."""
     lines = [
+        f"CODEX_AGENT_ROLE_EVAL_RUN_ID={report.metadata.eval_run_id}",
         f"CODEX_AGENT_ROLE_EVAL={report.status}",
         f"CODEX_AGENT_ROLE_FINDINGS={len(report.findings)}",
         f"ROLE_RUNTIME_METRICS_STATUS={report.runtime_metrics_status}",
@@ -461,9 +521,21 @@ def write_markdown_report(path: Path, report: EvalReport) -> None:
     lines = [
         "# Codex Agent Role Eval",
         "",
+        "<!--",
+        "@dependency-start",
+        "responsibility Records one Codex subagent role eval run.",
+        "upstream implementation ../../../../tools/agent_tools/evaluate_codex_agent_roles.py generates this report",
+        "@dependency-end",
+        "-->",
+        "",
+        f"CODEX_AGENT_ROLE_EVAL_RUN_ID={report.metadata.eval_run_id}",
         f"CODEX_AGENT_ROLE_EVAL={report.status}",
         f"CODEX_AGENT_ROLE_FINDINGS={len(report.findings)}",
         f"ROLE_RUNTIME_METRICS_STATUS={report.runtime_metrics_status}",
+        f"run_id: `{report.metadata.run_id or '-'}`",
+        f"git_branch: `{report.metadata.git_branch}`",
+        f"git_commit: `{report.metadata.git_commit}`",
+        f"git_dirty: `{report.metadata.git_dirty}`",
         "",
         "## Model Matrix",
         "",
@@ -481,13 +553,31 @@ def write_markdown_report(path: Path, report: EvalReport) -> None:
     else:
         lines.append("- none")
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path = path.with_name(f"{path.stem}-{report.metadata.eval_run_id}{path.suffix}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def resolve_results_dir(root: Path, value: str) -> Path:
+    """Resolve the CLI results directory or the default archive location."""
+    stripped = value.strip()
+    if stripped:
+        path = Path(stripped)
+        return path if path.is_absolute() else root / path
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
+
+
+def accumulated_report_path(results_dir: Path, report: EvalReport) -> Path:
+    """Return the unique accumulated report path."""
+    return results_dir / f"{report.metadata.eval_run_id}-{report.status}.md"
 
 
 def main() -> int:
     """Run the role eval."""
     args = build_parser().parse_args()
-    report = evaluate(args.root, cast(list[str], args.runtime_log))
+    report = evaluate(args.root, cast(list[str], args.runtime_log), str(args.run_id))
+    report_paths: list[Path] = []
     if args.report_out is not None:
         write_markdown_report(args.report_out, report)
     if args.compact_out is not None:

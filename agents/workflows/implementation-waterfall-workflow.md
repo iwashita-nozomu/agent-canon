@@ -740,12 +740,12 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## 関連正本
 
-- [agents/TASK_WORKFLOWS.md](../../../../agents/TASK_WORKFLOWS.md)
-- [agents/canonical/CODEX_WORKFLOW.md](../../../../agents/canonical/CODEX_WORKFLOW.md)
-- [agents/workflows/README.md](../../../../agents/workflows/README.md)
-- [agents/workflows/research-workflow.md](../../../../agents/workflows/research-workflow.md)
-- [agents/workflows/experiment-workflow.md](../../../../agents/workflows/experiment-workflow.md)
-- [agents/workflows/workflow-references.md](../../../../agents/workflows/workflow-references.md)
+- [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md)
+- [agents/workflows/README.md](README.md)
+- [agents/workflows/research-workflow.md](research-workflow.md)
+- [agents/workflows/experiment-workflow.md](experiment-workflow.md)
+- [agents/workflows/workflow-references.md](workflow-references.md)
 
 ## Convention Compliance Gate
 

@@ -71,6 +71,10 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         '"tests/agent_tools/test_check_convention_compliance.py"\n'
     ),
     "documents/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
+    "documents/codex-configuration-reference.md": (
+        "## Hook Severity Policy\n"
+        "fail-open CRITICAL_BLOCKING_CHILD_HOOKS warning/evidence\n"
+    ),
     "documents/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
     "documents/tools/README.md": "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py\n",
     "tools/README.md": (
@@ -136,6 +140,18 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/ci/run_docs_checks.sh": "check_runtime_profile_inventory.py\n",
     "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
     "agents/skills/environment-maintenance.md": "container_config.py\n",
+    ".codex/README.md": (
+        "dispatcher は fail-open AGENT_CANON_HOOK_STRICT_BLOCKS "
+        "systemMessage hookSpecificOutput.additionalContext\n"
+    ),
+    ".codex/hooks/hook_dispatcher.py": (
+        "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
+        "downgraded_block_payload failure_warning_payload\n"
+    ),
+    "ROOT_AGENTS.md": (
+        "## Mechanical Guardrail Policy\n"
+        "原則 block しません hook 設定の退避や無効化ではなく strict block mode\n"
+    ),
 }
 
 MINIMAL_AGENT_TOOLS = (
@@ -294,6 +310,22 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("surface_manifest:documents/SHARED_RUNTIME_SURFACES.md", result.stdout)
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
+
+    def test_hook_guardrail_policy_marker_fails(self) -> None:
+        """Hook severity policy must stay wired to docs and dispatcher behavior."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / ".codex" / "hooks" / "hook_dispatcher.py").write_text(
+                "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("hook_guardrail_policy:.codex/hooks/hook_dispatcher.py", result.stdout)
+            self.assertIn("missing-marker:STRICT_FAILURES_ENV", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""

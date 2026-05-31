@@ -7,7 +7,9 @@ upstream design ../TASK_WORKFLOWS.md workflow routing contract
 -->
 
 この文書は、`agents/workflows/` 配下の workflow catalog と routing guide の入口です。
-repo 利用者も `agent-canon` maintainer も、まずここで「今回どの workflow を primary にし、どの overlay を重ねるか」を決めます。
+repo 利用者も `agent-canon` maintainer も、まずここで「今回どの workflow を
+primary にし、どの overlay を重ねるか」を決めます。workflow 読順の入口も
+この file に一本化し、後からこの file へ戻ってくる前提の read order にはしません。
 
 ## 使い方
 
@@ -69,9 +71,9 @@ repo 利用者も `agent-canon` maintainer も、まずここで「今回どの 
 
 ## Recommended Read Order
 
+1. `agents/workflows/README.md`
 1. `agents/TASK_WORKFLOWS.md`
 1. `agents/canonical/CODEX_WORKFLOW.md`
-1. `agents/workflows/README.md`
 1. 選んだ primary workflow
 1. 必要な overlay workflow
 1. task に当たる maintenance workflow

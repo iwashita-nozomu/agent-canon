@@ -1,0 +1,67 @@
+# @dependency-start
+# responsibility Declares accumulated eval result families and artifact contracts.
+# upstream design README.md eval directory and accumulation contract
+# upstream design ../../documents/runtime-log-archive.md runtime archive contract
+# downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates these families
+# downstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py summarizes these families
+# @dependency-end
+
+[[families]]
+id = "skill-workflow-prompt"
+check_id = "skill_eval"
+count_label = "SKILL_REPORTS"
+summary = "Skill and workflow prompt checklist eval reports."
+producer = "tools/agent_tools/evaluate_skill_workflow_prompts.py --accumulate"
+filename_regex = '^skill-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)-[a-z0-9-]+(?:-[a-z0-9-]+)*\.md$'
+run_id_regex = '\bEVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-skill-eval-reports"
+missing_run_id_detail = "missing-eval-run-id"
+duplicate_run_id_detail = "duplicate-eval-run-id"
+
+[[families]]
+id = "local-llm-responsibility"
+check_id = "local_llm_eval"
+count_label = "LOCAL_LLM_REPORTS"
+summary = "Local LLM responsibility prompt and optional model-backed eval reports."
+producer = "tools/agent_tools/local_llm_eval.py --accumulate"
+filename_regex = '^local-llm-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail|skip)\.md$'
+run_id_regex = '\bLOCAL_LLM_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-local-llm-eval-reports"
+missing_run_id_detail = "missing-local-llm-eval-run-id"
+duplicate_run_id_detail = "duplicate-local-llm-eval-run-id"
+
+[[families]]
+id = "workflow-selection"
+check_id = "workflow_selection_eval"
+count_label = "WORKFLOW_SELECTION_REPORTS"
+summary = "Prompt-intake workflow selection routing eval reports."
+producer = "tools/agent_tools/evaluate_workflow_selection.py --accumulate"
+filename_regex = '^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$'
+run_id_regex = '\bWORKFLOW_SELECTION_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-workflow-selection-eval-reports"
+missing_run_id_detail = "missing-workflow-selection-eval-run-id"
+duplicate_run_id_detail = "duplicate-workflow-selection-eval-run-id"
+
+[[families]]
+id = "report-quality"
+check_id = "report_quality_eval"
+count_label = "REPORT_QUALITY_REPORTS"
+summary = "Reader-facing report-writing quality checklist eval reports."
+producer = "tools/agent_tools/evaluate_report_quality.py --accumulate"
+filename_regex = '^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$'
+run_id_regex = '\bREPORT_QUALITY_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-report-quality-eval-reports"
+missing_run_id_detail = "missing-report-quality-eval-run-id"
+duplicate_run_id_detail = "duplicate-report-quality-eval-run-id"
+
+[[families]]
+id = "codex-agent-role"
+check_id = "codex_agent_role_eval"
+count_label = "CODEX_AGENT_ROLE_REPORTS"
+summary = "Codex subagent role behavior, model bucket, routing, and runtime metric eval reports."
+producer = "tools/agent_tools/evaluate_codex_agent_roles.py --accumulate"
+filename_regex = '^codex-agent-role-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$'
+run_id_regex = '\bCODEX_AGENT_ROLE_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-codex-agent-role-eval-reports"
+missing_run_id_detail = "missing-codex-agent-role-eval-run-id"
+duplicate_run_id_detail = "duplicate-codex-agent-role-eval-run-id"

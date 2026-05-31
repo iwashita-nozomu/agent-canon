@@ -158,6 +158,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_LOCAL_LLM_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
     def test_unmounted_archive_without_legacy_eval_dirs_is_nonblocking(self) -> None:
@@ -174,6 +175,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_SKILL_REPORTS=0", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=0", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
     def test_missing_skill_eval_report_fails(self) -> None:
@@ -228,18 +230,74 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("no-report-quality-eval-reports", result.stdout)
 
+    def test_missing_codex_agent_role_eval_report_fails(self) -> None:
+        """At least one accumulated Codex role eval report is required."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            for path in self.eval_family_dir(root, "codex-agent-role").glob("*.md"):
+                path.unlink()
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("no-codex-agent-role-eval-reports", result.stdout)
+
+    def test_registry_declared_family_is_counted_without_code_change(self) -> None:
+        """New eval families should be added by registry contract, not checker code."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            registry_path = root / "agents" / "evals" / "eval_result_families.toml"
+            registry_path.write_text(
+                (PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml").read_text(
+                    encoding="utf-8"
+                )
+                + """
+
+[[families]]
+id = "abstract-review"
+check_id = "abstract_review_eval"
+count_label = "ABSTRACT_REVIEW_REPORTS"
+summary = "Fixture for an abstract, non-code eval family."
+producer = "tools/agent_tools/example.py --accumulate"
+filename_regex = '^abstract-review-eval-\\d{8}T\\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\\.md$'
+run_id_regex = '\\bABSTRACT_REVIEW_EVAL_RUN_ID=([A-Za-z0-9_.:-]+)'
+missing_reports_detail = "no-abstract-review-eval-reports"
+missing_run_id_detail = "missing-abstract-review-eval-run-id"
+duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
+""",
+                encoding="utf-8",
+            )
+            abstract_dir = self.eval_family_dir(root, "abstract-review")
+            abstract_dir.mkdir(parents=True)
+            (abstract_dir / "abstract-review-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
+                "ABSTRACT_REVIEW_EVAL_RUN_ID=abstract-review-eval-20260517T010203040506Z-1234567890\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, registry_path)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_FAMILY_REPORTS=abstract-review:1", result.stdout)
+
     def write_fixture(self, root: Path) -> None:
         """Write a minimal eval result fixture."""
+        evals_root = root / "agents" / "evals"
+        evals_root.mkdir(parents=True, exist_ok=True)
+        (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         hook_dir = self.hook_path(root).parent
         skill_dir = self.eval_family_dir(root, "skill-workflow-prompt")
         local_llm_dir = self.eval_family_dir(root, "local-llm-responsibility")
         workflow_selection_dir = self.eval_family_dir(root, "workflow-selection")
         report_quality_dir = self.eval_family_dir(root, "report-quality")
+        codex_agent_role_dir = self.eval_family_dir(root, "codex-agent-role")
         hook_dir.mkdir(parents=True)
         skill_dir.mkdir(parents=True)
         local_llm_dir.mkdir(parents=True)
         workflow_selection_dir.mkdir(parents=True)
         report_quality_dir.mkdir(parents=True)
+        codex_agent_role_dir.mkdir(parents=True)
         (hook_dir / "hook.jsonl").write_text(
             json.dumps(self.hook_entry("hook-1")) + "\n",
             encoding="utf-8",
@@ -261,6 +319,13 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         )
         (report_quality_dir / "report-quality-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
             "REPORT_QUALITY_EVAL_RUN_ID=report-quality-eval-20260517T010203040506Z-1234567890\n",
+            encoding="utf-8",
+        )
+        (
+            codex_agent_role_dir
+            / "codex-agent-role-eval-20260517T010203040506Z-1234567890-pass.md"
+        ).write_text(
+            "CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-20260517T010203040506Z-1234567890\n",
             encoding="utf-8",
         )
 
