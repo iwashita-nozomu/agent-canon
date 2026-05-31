@@ -17,6 +17,7 @@ downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local L
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
+downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 @dependency-end
 -->
 
@@ -59,6 +60,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `agents/evals/report_quality_eval.toml` を読み、report-writing skill と report reviewer route が Report Quality Checklist を落としていないかを eval します。必要なときだけ `--accumulate` で append-only report を保存します。
 - `tools/agent_tools/evaluate_codex_agent_roles.py`
   - `.codex/agents/*.toml` の期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を role 単位で eval します。
+- `tools/agent_tools/prose_reasoning_graph.py`
+  - Markdown/plain text を SQLite-backed prose graph に取り込み、projection、
+    diagnostics、natural-language explanation、split/merge/bridge/reorder
+    operation、既存 writing/review skill への handoff packet を出します。
 - `agent-canon local-llm search`
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
 - `agent-canon local-llm build-index`

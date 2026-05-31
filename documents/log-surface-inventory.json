@@ -1459,23 +1459,71 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "prose_graph_db",
+      "line": 57,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_diagnostics",
+      "line": 59,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_explanation",
+      "line": 60,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_handoff",
+      "line": 62,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_integration_plan",
+      "line": 61,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_projection",
+      "line": 58,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_rewrite_packet",
+      "line": 63,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_stats",
+      "line": 64,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "report_output_format",
-      "line": 143,
-      "path": "agents/skills/report-writing.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "report_quality_checklist",
-      "line": 144,
-      "path": "agents/skills/report-writing.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "report_reviewer",
       "line": 147,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
@@ -1483,7 +1531,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "report_rule_drift",
+      "field": "report_quality_checklist",
       "line": 148,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
@@ -1491,8 +1539,24 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "report_reviewer",
+      "line": 151,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "report_rule_drift",
+      "line": 152,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "report_source_packet",
-      "line": 145,
+      "line": 149,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -1500,14 +1564,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_writing",
-      "line": 142,
-      "path": "agents/skills/report-writing.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "structure_contract",
       "line": 146,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
@@ -1515,8 +1571,16 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 150,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "result_manifest",
-      "line": 109,
+      "line": 111,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1524,7 +1588,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_overwrite_policy",
-      "line": 110,
+      "line": 112,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1532,7 +1596,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_raw_artifact",
-      "line": 107,
+      "line": 109,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1540,14 +1604,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "result_source",
-      "line": 106,
-      "path": "agents/skills/result-artifact-writeout.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "result_summary_artifact",
       "line": 108,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
@@ -1555,8 +1611,16 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "result_summary_artifact",
+      "line": 110,
+      "path": "agents/skills/result-artifact-writeout.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "result_writeout",
-      "line": 105,
+      "line": 107,
       "path": "agents/skills/result-artifact-writeout.md",
       "surface": "skill"
     },
@@ -1564,14 +1628,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "audience",
-      "line": 48,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "decision_context",
       "line": 49,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -1579,15 +1635,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "discourse_relations",
-      "line": 115,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact",
+      "field": "decision_context",
       "line": 50,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -1595,7 +1643,15 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "first_artifact_question",
+      "field": "discourse_relations",
+      "line": 120,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "first_artifact",
       "line": 51,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -1603,31 +1659,7 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "invalid_interpretations",
-      "line": 55,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "metric_or_delta_contract",
-      "line": 53,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordered_structure",
-      "line": 54,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_to_structure_map",
+      "field": "first_artifact_question",
       "line": 52,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -1635,8 +1667,40 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "invalid_interpretations",
+      "line": 56,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "metric_or_delta_contract",
+      "line": 54,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "ordered_structure",
+      "line": 55,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "source_to_structure_map",
+      "line": 53,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "structure_contract",
-      "line": 112,
+      "line": 117,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1644,7 +1708,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_first_artifact",
-      "line": 113,
+      "line": 118,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1652,7 +1716,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_invalid_interpretations_recorded",
-      "line": 116,
+      "line": 121,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1660,7 +1724,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_kind",
-      "line": 47,
+      "line": 48,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1668,7 +1732,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_planning",
-      "line": 111,
+      "line": 116,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1676,7 +1740,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_source_map",
-      "line": 114,
+      "line": 119,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -1684,7 +1748,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "validation_gate",
-      "line": 56,
+      "line": 57,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -4644,7 +4708,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 458,
+      "line": 454,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4652,7 +4716,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 500,
+      "line": 496,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4660,7 +4724,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 500,
+      "line": 496,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4668,38 +4732,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_COMPACT_OUT",
-      "line": 410,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 405,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 468,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_FINDING",
-      "line": 90,
-      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "CODEX_AGENT_ROLE_FINDINGS",
       "line": 406,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
@@ -4707,8 +4739,40 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_EVAL",
+      "line": 401,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_EVAL",
+      "line": 464,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_FINDING",
+      "line": 50,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 469,
+      "line": 402,
+      "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "CODEX_AGENT_ROLE_FINDINGS",
+      "line": 465,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4716,7 +4780,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_MODEL_MATRIX",
-      "line": 413,
+      "line": 409,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4724,7 +4788,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRIC",
-      "line": 416,
+      "line": 412,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4732,7 +4796,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 407,
+      "line": 403,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4740,7 +4804,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 470,
+      "line": 466,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -7089,6 +7153,110 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 381,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "command",
+      "line": 266,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "command",
+      "line": 1320,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "fields",
+      "line": 266,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "fields",
+      "line": 1320,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema",
+      "line": 266,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema",
+      "line": 1320,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 266,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "status",
+      "line": 1320,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 267,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 270,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_stdout",
+      "field": "<dynamic>",
+      "line": 272,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "PROSE_REASONING_GRAPH_STATS",
+      "line": 268,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_sha256",
@@ -7340,7 +7508,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 580,
+      "line": 596,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -7348,7 +7516,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 598,
+      "line": 614,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -7356,7 +7524,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 618,
+      "line": 634,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -7364,7 +7532,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 646,
+      "line": 662,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -7372,7 +7540,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 364,
+      "line": 380,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -7380,7 +7548,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 712,
+      "line": 728,
       "path": "tools/agent_tools/route.py",
       "surface": "tool"
     },
@@ -13159,6 +13327,7 @@
     ".agents/skills/md-style-check/SKILL.md",
     ".agents/skills/oop-readability-check/SKILL.md",
     ".agents/skills/paper-writing/SKILL.md",
+    ".agents/skills/prose-reasoning-graph/SKILL.md",
     ".agents/skills/python-review/SKILL.md",
     ".agents/skills/refactor-loop/SKILL.md",
     ".agents/skills/repo-onboarding/SKILL.md",
@@ -13196,6 +13365,7 @@
     ".claude/skills/md-style-check/SKILL.md",
     ".claude/skills/oop-readability-check/SKILL.md",
     ".claude/skills/paper-writing/SKILL.md",
+    ".claude/skills/prose-reasoning-graph/SKILL.md",
     ".claude/skills/python-review/SKILL.md",
     ".claude/skills/refactor-loop/SKILL.md",
     ".claude/skills/repo-onboarding/SKILL.md",
@@ -13271,6 +13441,7 @@
     "agents/skills/paper-writing.md",
     "agents/skills/project-health.md",
     "agents/skills/project-review.md",
+    "agents/skills/prose-reasoning-graph.md",
     "agents/skills/python-review.md",
     "agents/skills/refactor-loop.md",
     "agents/skills/repo-onboarding.md",
@@ -13350,6 +13521,7 @@
     "tools/agent_tools/noncanonical_document_inventory.py",
     "tools/agent_tools/parent_repo_readiness.py",
     "tools/agent_tools/persist_agent_memory.py",
+    "tools/agent_tools/prose_reasoning_graph.py",
     "tools/agent_tools/reference_materializer.py",
     "tools/agent_tools/repo_structure_contract.py",
     "tools/agent_tools/report_artifact_checks.py",

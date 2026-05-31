@@ -109,6 +109,10 @@ path = "../.agents/skills/paper-writing/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/prose-reasoning-graph/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/python-review/SKILL.md"
 enabled = true
 

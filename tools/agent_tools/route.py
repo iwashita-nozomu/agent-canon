@@ -3,6 +3,7 @@
 # responsibility Provides short task routing helper for tool and skill selection.
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # downstream design ../../documents/tools/route.md reader-facing route tool documentation
 # downstream implementation ../../tests/agent_tools/test_route.py tests route output and aliases
 # @dependency-end
@@ -330,6 +331,21 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
             ("run bundle", "evidence"),
             ("蓄積分析", "レポート"),
             ("ログ", "レポート", "残"),
+        ),
+    ),
+    (
+        "prose-reasoning-graph",
+        "prose structure graphing, diagnostics, or rewrite handoff is in scope",
+        (
+            ("文章構造", "graph"),
+            ("文章構造", "グラフ"),
+            ("段落", "接続"),
+            ("段落", "統合"),
+            ("dsl", "文章"),
+            ("prose", "graph"),
+            ("prose", "reasoning"),
+            ("rewrite", "packet"),
+            ("claim", "evidence", "graph"),
         ),
     ),
 )

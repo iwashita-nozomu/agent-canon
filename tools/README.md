@@ -17,6 +17,7 @@ downstream implementation agent_tools/file_responsibility_llm.py keeps the Pytho
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
+downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 @dependency-end
 -->
 
@@ -69,6 +70,7 @@ python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
 python3 tools/agent_tools/evaluate_codex_agent_roles.py
+python3 tools/agent_tools/prose_reasoning_graph.py --help
 ```
 
 For agent-facing diagnostics, prefer compact artifact options over detailed
@@ -116,6 +118,10 @@ model-backed reports under `.agent-canon/archive/<env-key>/eval-results/local-ll
 `evaluate_report_quality.py` validates the report-writing skill and report
 reviewer route against the Report Quality Checklist and can accumulate reports
 under `.agent-canon/archive/<env-key>/eval-results/report-quality/`.
+`prose_reasoning_graph.py` ingests Markdown/plain text into a SQLite-backed
+prose structure graph, exports diagnostics and natural-language explanations,
+and writes handoff packets for writing, review, literature, experiment, and
+artifact skills.
 
 ## 含めるもの
 - `bin/`

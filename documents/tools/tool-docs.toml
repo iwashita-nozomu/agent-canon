@@ -65,6 +65,13 @@ language = "python"
 summary = "HTML renderer for semantic-index provider comparison evidence."
 
 [[tool]]
+id = "prose-reasoning-graph"
+tool = "tools/agent_tools/prose_reasoning_graph.py"
+doc = "documents/tools/prose_reasoning_graph.md"
+language = "python"
+summary = "SQLite-backed prose structure graph, diagnostics, explanation, and skill handoff documentation."
+
+[[tool]]
 id = "repo-structure-contract"
 tool = "tools/agent_tools/repo_structure_contract.py"
 doc = "documents/tools/repo_structure_contract.md"

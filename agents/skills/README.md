@@ -45,6 +45,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `agent-log-analysis` | skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する | `agents/skills/agent-log-analysis.md` | `.agents/skills/agent-log-analysis/SKILL.md` |
 | `agent-update-branch` | memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する | `agents/skills/agent-update-branch.md` | `.agents/skills/agent-update-branch/SKILL.md` |
 | `report-writing` | evidence から reader-facing report を構成し、source packet、limitations、actionability、quality checklist を固定する | `agents/skills/report-writing.md` | `.agents/skills/report-writing/SKILL.md` |
+| `prose-reasoning-graph` | 既存 prose を SQLite-backed graph に変換し、構造診断、自然言語説明、rewrite packet、既存 skill handoff を出す | `agents/skills/prose-reasoning-graph.md` | `.agents/skills/prose-reasoning-graph/SKILL.md` |
 | `structure-planning` | report / experiment / Eval / document / refactor の構造 contract、first artifact、source map、invalid interpretation を先に固定する | `agents/skills/structure-planning.md` | `.agents/skills/structure-planning/SKILL.md` |
 | `html-output` | HTML が明示された出力だけを browser-readable artifact にし、layout、ImageGen、既存 server reuse / external URL 公開を固定する | `agents/skills/html-output.md` | `.agents/skills/html-output/SKILL.md` |
 | `html-experiment-report` | experiment / Eval artifact を HTML report にし、最初の図、実験計画、責務境界、表示 artifact を固定する | `agents/skills/html-experiment-report.md` | `.agents/skills/html-experiment-report/SKILL.md` |
@@ -105,6 +106,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に compact summary を生成して読みます。
 - agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは `agent-update-branch` を使います。
 - reader-facing な report、status report、eval summary、audit summary、decision brief を書くときは `report-writing` を使い、source packet と Report Quality Checklist を固定します。
+- 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは `prose-reasoning-graph` を使います。
 - report、experiment plan / report、Eval output、decision brief、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、first artifact、source map、metric / delta contract、invalid interpretation を固定します。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。

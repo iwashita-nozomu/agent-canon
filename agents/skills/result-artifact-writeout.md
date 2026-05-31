@@ -5,6 +5,7 @@ responsibility Documents result-artifact-writeout for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement
 upstream design ../../documents/experiment-report-style.md experiment report artifact policy
+upstream design prose-reasoning-graph.md prose graph output artifact contract
 downstream implementation ../../.agents/skills/result-artifact-writeout/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -22,6 +23,7 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 - user が結果の保存、書き出し、export、report、表、JSON / JSONL / Markdown 化を求める
 - tool / checker / hook / skill eval の結果を次の改善 branch が読む必要がある
 - experiment result と reader-facing report を同じ run から作る
+- prose graph projection、diagnostics、explanation、integration plan、rewrite packet を同じ source DB から書き出す
 - 既存 result を上書きせず、unique ID 付きで蓄積したい
 
 ## Output Contract

@@ -4,6 +4,7 @@
 responsibility Documents reusable structure planning for reports, experiments, documents, and refactors.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
+upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../.claude/skills/structure-planning/SKILL.md mirrors this workflow for Claude-compatible runtimes
 downstream design html-output.md consumes structure contracts for explicit HTML output
@@ -74,6 +75,10 @@ experiment scripts, or refactor edits.
    structure. The tool separates relation primitives from surface phrases, so
    `therefore` / `because` variants can support the same logical relation while
    recording opposite surface order.
+1. When a prose graph projection is available, use
+   `prose_reasoning_graph.py explain` and `integrate` as advisory evidence for
+   section order, paragraph bridges, split/merge candidates, and invalid
+   interpretations before drafting or rewriting.
 1. Define metric denominator, directionality, baseline, and caveat for reports
    or experiments; define allowed structural delta and forbidden semantic delta
    for refactors.

@@ -415,6 +415,26 @@ entries:
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
+  - id: prose-reasoning-graph
+    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, and writing-skill handoff packets.
+    path: tools/agent_tools/prose_reasoning_graph.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/prose_reasoning_graph.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/prose_reasoning_graph.md
+      - agents/skills/prose-reasoning-graph.md
+      - agents/skills/structure-planning.md
+    tests:
+      - tests/agent_tools/test_prose_reasoning_graph.py
+
   - id: route
     summary: Maps long proposed tool/skill names and broad prompts to short task-routing areas and public skill sets.
     path: tools/agent_tools/route.py

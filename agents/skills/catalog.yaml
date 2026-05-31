@@ -65,6 +65,10 @@ skill_families:
     purpose: Draft reader-facing reports from evidence with explicit source packets, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .agents/skills/report-writing/SKILL.md
+  - id: prose-reasoning-graph
+    purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
+    canonical_doc: agents/skills/prose-reasoning-graph.md
+    shim: .agents/skills/prose-reasoning-graph/SKILL.md
   - id: structure-planning
     purpose: Build structure contracts for reports, experiments, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md

@@ -134,6 +134,34 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
 
+    def test_prompt_routes_prose_reasoning_graph(self) -> None:
+        """Prose graph requests should route to the public graph skill."""
+        result = self.run_route(
+            "--prompt",
+            "既存文章を文章構造グラフにして段落接続と統合 rewrite packet を作りたい",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("prose-reasoning-graph", decision["skills"])
+        self.assertIn("prose-reasoning-graph", decision["matched_skills"])
+
+    def test_prompt_routes_explicit_prose_reasoning_graph(self) -> None:
+        """Explicit public graph skill mention should route directly."""
+        result = self.run_route(
+            "--prompt",
+            "$prose-reasoning-graph で既存文章を解析して",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("prose-reasoning-graph", decision["skills"])
+        self.assertIn("prose-reasoning-graph", decision["matched_skills"])
+
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""
         result = self.run_route("--name", "unknown_super_router.py")
