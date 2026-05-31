@@ -17,6 +17,7 @@ import json
 import subprocess
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -143,8 +144,9 @@ def agent_canon_root(root: Path) -> Path:
 def load_agent_configs(root: Path) -> dict[str, dict[str, object]]:
     """Load all project-scoped Codex custom agent TOML files."""
     configs: dict[str, dict[str, object]] = {}
+    load_toml = cast(Callable[[str], dict[str, object]], getattr(tomllib, "loads"))
     for path in sorted((root / ".codex" / "agents").glob("*.toml")):
-        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        payload = load_toml(path.read_text(encoding="utf-8"))
         payload["__path"] = path.relative_to(root).as_posix()
         payload["__stem"] = path.stem
         configs[str(payload.get("name", path.stem))] = payload
@@ -157,34 +159,45 @@ def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
     config_path = root / ".codex" / "config.toml"
     if not config_path.is_file():
         return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
-    config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    buckets = config.get("agent_model_policy")
-    if not isinstance(buckets, dict) or not buckets:
+    load_toml = cast(Callable[[str], dict[str, object]], getattr(tomllib, "loads"))
+    payload = load_toml(config_path.read_text(encoding="utf-8"))
+    raw_model_policy = payload.get("agent_model_policy")
+    if not isinstance(raw_model_policy, dict) or not raw_model_policy:
         return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
-    policy: ModelPolicy = {}
-    for bucket_id, raw_bucket in sorted(cast(dict[str, object], buckets).items()):
+    role_policy: ModelPolicy = {}
+    model_policy = cast(dict[str, object], raw_model_policy)
+    for bucket_id, raw_bucket in sorted(model_policy.items()):
         if not isinstance(raw_bucket, dict):
             findings.append(Finding("model-policy", str(bucket_id), "bucket-not-table"))
             continue
         bucket = cast(dict[str, object], raw_bucket)
         model = bucket.get("model")
         effort = bucket.get("model_reasoning_effort")
-        roles = bucket.get("roles")
+        raw_roles = bucket.get("roles")
         if not isinstance(model, str) or not model:
             findings.append(Finding("model-policy", str(bucket_id), "missing-model"))
             continue
         if not isinstance(effort, str) or not effort:
             findings.append(Finding("model-policy", str(bucket_id), "missing-effort"))
             continue
-        if not isinstance(roles, list) or not all(isinstance(role, str) and role for role in roles):
+        if not isinstance(raw_roles, list):
             findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
             continue
-        for role in cast(list[str], roles):
-            if role in policy:
+        raw_role_items = cast(list[object], raw_roles)
+        roles: list[str] = []
+        for raw_role in raw_role_items:
+            if not isinstance(raw_role, str) or not raw_role:
+                findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
+                break
+            roles.append(raw_role)
+        if len(roles) != len(raw_role_items):
+            continue
+        for role in roles:
+            if role in role_policy:
                 findings.append(Finding("model-policy", role, "duplicate-policy-role"))
                 continue
-            policy[role] = (str(bucket_id), model, effort)
-    return policy, findings
+            role_policy[role] = (str(bucket_id), model, effort)
+    return role_policy, findings
 
 
 def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:

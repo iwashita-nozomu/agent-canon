@@ -4732,7 +4732,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 534,
+      "line": 547,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4740,7 +4740,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 613,
+      "line": 626,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4748,7 +4748,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 613,
+      "line": 626,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4756,7 +4756,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_COMPACT_OUT",
-      "line": 486,
+      "line": 499,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4764,7 +4764,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 481,
+      "line": 494,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4772,7 +4772,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 552,
+      "line": 565,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4780,7 +4780,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 480,
+      "line": 493,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4788,7 +4788,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 551,
+      "line": 564,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4796,7 +4796,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDING",
-      "line": 58,
+      "line": 59,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4804,7 +4804,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 482,
+      "line": 495,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4812,7 +4812,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 553,
+      "line": 566,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4820,7 +4820,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_MODEL_MATRIX",
-      "line": 489,
+      "line": 502,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4828,7 +4828,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRIC",
-      "line": 492,
+      "line": 505,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4836,7 +4836,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 483,
+      "line": 496,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4844,7 +4844,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 554,
+      "line": 567,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4852,7 +4852,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT",
-      "line": 626,
+      "line": 639,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4860,7 +4860,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_REPORT",
-      "line": 624,
+      "line": 637,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -5612,7 +5612,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_IMPROVEMENT_GUIDE",
-      "line": 896,
+      "line": 903,
       "path": "tools/agent_tools/generate_agent_improvement_guide.py",
       "surface": "tool"
     },
@@ -11684,7 +11684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11692,7 +11692,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11700,7 +11700,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11708,7 +11708,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11716,7 +11716,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2528,
+      "line": 1585,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 2856,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11738,9 +11746,17 @@
     },
     {
       "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "construct",
+      "line": 490,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 3855,
+      "line": 4238,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11748,7 +11764,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 3850,
+      "line": 4233,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11756,7 +11772,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 3851,
+      "line": 4234,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11764,7 +11780,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 3853,
+      "line": 4236,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11772,7 +11788,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 3852,
+      "line": 4235,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11780,7 +11796,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 3854,
+      "line": 4237,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },

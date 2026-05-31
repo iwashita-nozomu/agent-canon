@@ -48,7 +48,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 ## Activation Budget
 
-- runtime hard ceiling は [.codex/config.toml](../../../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
+- runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
 - `.codex/config.toml` の `[agents].max_depth` は `1` を正本にし、subagents do not spawn subagents
 - cap は同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません

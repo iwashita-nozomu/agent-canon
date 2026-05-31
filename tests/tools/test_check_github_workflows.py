@@ -199,7 +199,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertIn("missing_text:Operational Findings / Issues", result.stdout)
 
     def test_static_gates_require_prompt_eval_parity(self) -> None:
-        """AgentCanon static gates must keep parity with local prompt eval checks."""
+        """Static gates must keep parity with local prompt eval checks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)

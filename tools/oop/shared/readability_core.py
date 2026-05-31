@@ -451,6 +451,73 @@ class PythonUsageSourceSet:
 
 
 @dataclass(frozen=True)
+class CppClassDef:
+    """One C++ class or struct definition known to the project analyzer."""
+
+    key: str
+    name: str
+    path: Path
+
+
+@dataclass
+class CppClassUsage:
+    """Dependency-source observations for one C++ class or struct."""
+
+    constructor_calls: int = 0
+    type_refs: int = 0
+    inheritance_refs: int = 0
+    source_files: set[str] | None = None
+
+    def mark_source(self, root: Path, path: Path) -> None:
+        """Record the file that produced one usage observation."""
+        if self.source_files is None:
+            self.source_files = set()
+        resolved_path = path.resolve()
+        try:
+            source_name = str(resolved_path.relative_to(root))
+        except ValueError:
+            source_name = str(resolved_path)
+        self.source_files.add(source_name)
+
+    def boundary_refs(self) -> int:
+        """Return usage count that proves the class is a type boundary."""
+        return self.type_refs + self.inheritance_refs
+
+    def usage_summary(self) -> str:
+        """Return a compact usage summary for findings."""
+        file_count = len(self.source_files) if self.source_files is not None else 0
+        return (
+            f"construct={self.constructor_calls},type={self.type_refs},"
+            f"inherit={self.inheritance_refs},files={file_count}"
+        )
+
+
+@dataclass(frozen=True)
+class CppUsageIndex:
+    """Project-level C++ class definitions and dependency-source usage facts."""
+
+    class_defs: dict[str, CppClassDef]
+    usage_by_key: dict[str, CppClassUsage]
+    unique_name_to_key: dict[str, str]
+    path_name_to_key: dict[tuple[Path, str], str]
+
+    def usage_for(self, path: Path, class_name: str) -> CppClassUsage | None:
+        """Return dependency-source facts for a class in one source file."""
+        key = self.path_name_to_key.get((path.resolve(), class_name))
+        if key is not None and key in self.usage_by_key:
+            return self.usage_by_key[key]
+        key = self.unique_name_to_key.get(class_name)
+        return self.usage_by_key.get(key) if key is not None else None
+
+
+@dataclass(frozen=True)
+class CppUsageSourceSet:
+    """C++ files used only for dependency-source context."""
+
+    files: list[Path]
+
+
+@dataclass(frozen=True)
 class DependencyUsageContext:
     """Additional source context used for class dependency-source analysis."""
 
@@ -596,8 +663,9 @@ def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
         dest="usage_roots",
         default=[],
         help=(
-            "Additional Python source root to include in class dependency-source analysis "
-            "without emitting findings for that root. Repeat for downstream or sibling modules."
+            "Additional Python or C++ source root to include in class dependency-source "
+            "analysis without emitting findings for that root. Repeat for downstream "
+            "or sibling modules."
         ),
     )
     parser.add_argument(
@@ -606,7 +674,7 @@ def add_dependency_context_arguments(parser: argparse.ArgumentParser) -> None:
         dest="dependency_modules",
         default=[],
         help=(
-            "Importable Python module or package to include in class dependency-source "
+            "Importable Python module or package to include in Python class dependency-source "
             "analysis without emitting findings for that module. Repeat for multiple modules."
         ),
     )
@@ -1506,6 +1574,266 @@ def empty_python_usage_index() -> PythonUsageIndex:
         unique_name_to_key={},
         module_names={},
     )
+
+
+def cpp_class_key(root: Path, path: Path, class_name: str) -> str:
+    """Return a stable key for one C++ class definition."""
+    try:
+        relative = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        relative = path.resolve().as_posix()
+    return f"{relative}::{class_name}"
+
+
+def build_cpp_usage_index(
+    root: Path,
+    source_set: CppUsageSourceSet,
+) -> CppUsageIndex:
+    """Build project-level C++ class definitions and dependency-source usage facts."""
+    cpp_files = [path for path in source_set.files if path.suffix in CPP_SUFFIXES]
+    analysis_by_path: dict[Path, str] = {}
+    class_defs: dict[str, CppClassDef] = {}
+    simple_to_keys: dict[str, list[str]] = {}
+    path_name_to_key: dict[tuple[Path, str], str] = {}
+    for path in cpp_files:
+        resolved = path.resolve()
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        analysis_text = cpp_text_without_comments_or_literals(text)
+        analysis_by_path[resolved] = analysis_text
+        for match in CLASS_RE.finditer(analysis_text):
+            name = match.group("name")
+            key = cpp_class_key(root, resolved, name)
+            class_defs[key] = CppClassDef(key=key, name=name, path=resolved)
+            simple_to_keys.setdefault(name, []).append(key)
+            path_name_to_key[(resolved, name)] = key
+    unique_name_to_key = {
+        name: keys[0] for name, keys in simple_to_keys.items() if len(keys) == 1
+    }
+    usage_by_key = {key: CppClassUsage() for key in class_defs}
+    resolver = CppClassResolver(
+        class_defs=class_defs,
+        unique_name_to_key=unique_name_to_key,
+    )
+    for path, analysis_text in analysis_by_path.items():
+        collect_cpp_class_usage(root, path, analysis_text, resolver, usage_by_key)
+    return CppUsageIndex(
+        class_defs=class_defs,
+        usage_by_key=usage_by_key,
+        unique_name_to_key=unique_name_to_key,
+        path_name_to_key=path_name_to_key,
+    )
+
+
+def cpp_usage_source_files(
+    root: Path,
+    selected_files: list[Path],
+    exclude_patterns: Sequence[str],
+    usage_roots: Sequence[str] = (),
+) -> CppUsageSourceSet:
+    """Return C++ files used to resolve dependency-source class usage."""
+    selected_cpp_files = [path.resolve() for path in selected_files if path.suffix in CPP_SUFFIXES]
+    root_cpp_files = iter_directory_sources(
+        root,
+        root,
+        list(exclude_patterns),
+        "cpp",
+    )
+    usage_files: set[Path] = set(selected_cpp_files) | set(root_cpp_files)
+    for usage_root in usage_roots:
+        usage_files.update(cpp_dependency_root_source_files(root, usage_root, exclude_patterns))
+    return CppUsageSourceSet(files=sorted(usage_files))
+
+
+def cpp_dependency_root_source_files(
+    root: Path,
+    raw_usage_root: str,
+    exclude_patterns: Sequence[str],
+) -> list[Path]:
+    """Return C++ source files below one additional usage root."""
+    usage_root = Path(raw_usage_root)
+    if not usage_root.is_absolute():
+        usage_root = root / usage_root
+    resolved = usage_root.resolve()
+    if resolved.is_file():
+        if not visible_source_path(resolved.parent, resolved, list(exclude_patterns), "cpp"):
+            return []
+        return [resolved]
+    if not resolved.is_dir():
+        return []
+    return iter_directory_sources(resolved, resolved, list(exclude_patterns), "cpp")
+
+
+def empty_cpp_usage_index() -> CppUsageIndex:
+    """Return an empty usage index for runs without C++ source files."""
+    return CppUsageIndex(
+        class_defs={},
+        usage_by_key={},
+        unique_name_to_key={},
+        path_name_to_key={},
+    )
+
+
+@dataclass(frozen=True)
+class CppClassResolver:
+    """Resolve simple C++ type references to known project classes."""
+
+    class_defs: dict[str, CppClassDef]
+    unique_name_to_key: dict[str, str]
+
+    def resolve_name(self, name: str) -> str | None:
+        """Resolve a simple or qualified C++ type name to a known class key."""
+        if name in self.unique_name_to_key:
+            return self.unique_name_to_key[name]
+        tail = name.rsplit("::", 1)[-1]
+        return self.unique_name_to_key.get(tail)
+
+
+CPP_TYPE_KEYWORDS = {
+    "auto",
+    "bool",
+    "char",
+    "class",
+    "const",
+    "constexpr",
+    "double",
+    "enum",
+    "extern",
+    "float",
+    "inline",
+    "int",
+    "long",
+    "mutable",
+    "noexcept",
+    "private",
+    "protected",
+    "public",
+    "short",
+    "signed",
+    "static",
+    "struct",
+    "typename",
+    "unsigned",
+    "virtual",
+    "void",
+    "volatile",
+}
+
+
+def collect_cpp_class_usage(
+    root: Path,
+    path: Path,
+    analysis_text: str,
+    resolver: CppClassResolver,
+    usage_by_key: dict[str, CppClassUsage],
+) -> None:
+    """Collect C++ class usage from one source file."""
+    collect_cpp_inheritance_usage(root, path, analysis_text, resolver, usage_by_key)
+    collect_cpp_signature_usage(root, path, analysis_text, resolver, usage_by_key)
+    collect_cpp_constructor_usage(root, path, analysis_text, resolver, usage_by_key)
+
+
+def collect_cpp_inheritance_usage(
+    root: Path,
+    path: Path,
+    analysis_text: str,
+    resolver: CppClassResolver,
+    usage_by_key: dict[str, CppClassUsage],
+) -> None:
+    """Collect C++ base-class type-boundary observations."""
+    for match in CLASS_RE.finditer(analysis_text):
+        bases = match.group("bases") or ""
+        for type_name in cpp_type_names_from_type_text(bases):
+            key = resolver.resolve_name(type_name)
+            if key is not None:
+                record_cpp_class_ref(root, path, usage_by_key, key, "inheritance_refs")
+
+
+def collect_cpp_signature_usage(
+    root: Path,
+    path: Path,
+    analysis_text: str,
+    resolver: CppClassResolver,
+    usage_by_key: dict[str, CppClassUsage],
+) -> None:
+    """Collect C++ return-type and parameter type-boundary observations."""
+    for match in FUNCTION_RE.finditer(analysis_text):
+        for type_name in cpp_type_names_from_type_text(match.group("prefix")):
+            key = resolver.resolve_name(type_name)
+            if key is not None:
+                record_cpp_class_ref(root, path, usage_by_key, key, "type_refs")
+        for parameter in cpp_split_top_level(match.group("params")):
+            for type_name in cpp_type_names_from_declaration(parameter):
+                key = resolver.resolve_name(type_name)
+                if key is not None:
+                    record_cpp_class_ref(root, path, usage_by_key, key, "type_refs")
+
+
+def collect_cpp_constructor_usage(
+    root: Path,
+    path: Path,
+    analysis_text: str,
+    resolver: CppClassResolver,
+    usage_by_key: dict[str, CppClassUsage],
+) -> None:
+    """Collect common C++ construction observations."""
+    for class_def in resolver.class_defs.values():
+        constructor_count = cpp_constructor_usage_count(analysis_text, class_def.name)
+        if constructor_count <= 0:
+            continue
+        usage = usage_by_key[class_def.key]
+        usage.constructor_calls += constructor_count
+        usage.mark_source(root, path)
+
+
+def record_cpp_class_ref(
+    root: Path,
+    path: Path,
+    usage_by_key: dict[str, CppClassUsage],
+    key: str,
+    attr: str,
+) -> None:
+    """Record one C++ class usage observation."""
+    usage = usage_by_key.get(key)
+    if usage is None:
+        return
+    setattr(usage, attr, getattr(usage, attr) + 1)
+    usage.mark_source(root, path)
+
+
+def cpp_type_names_from_type_text(text: str) -> list[str]:
+    """Return candidate project class names from a C++ type expression."""
+    names: list[str] = []
+    for token in re.findall(r"[A-Za-z_][A-Za-z0-9_:]*", text):
+        tail = token.rsplit("::", 1)[-1]
+        if tail not in CPP_TYPE_KEYWORDS:
+            names.append(token)
+    return names
+
+
+def cpp_type_names_from_declaration(declaration: str) -> list[str]:
+    """Return candidate project class names from a parameter declaration."""
+    before_default = declaration.split("=", 1)[0]
+    names = cpp_type_names_from_type_text(before_default)
+    if len(names) >= 2:
+        return names[:-1]
+    return names
+
+
+def cpp_constructor_usage_count(analysis_text: str, class_name: str) -> int:
+    """Count common C++ construction expressions for one class name."""
+    escaped = re.escape(class_name)
+    count = 0
+    expression_pattern = re.compile(rf"\b{escaped}\s*(?:\(|\{{)")
+    declaration_pattern = re.compile(
+        rf"\b{escaped}\s+[a-z_][A-Za-z0-9_]*\s*(?:[;={{(])"
+    )
+    for match in expression_pattern.finditer(analysis_text):
+        prefix = analysis_text[max(0, match.start() - 16) : match.start()]
+        if re.search(r"(?:class|struct)\s+$", prefix):
+            continue
+        count += 1
+    count += sum(1 for _ in declaration_pattern.finditer(analysis_text))
+    return count
 
 
 def collect_python_class_usage(
@@ -2835,14 +3163,19 @@ def cpp_trivial_format_function(name: str, body: str) -> str | None:
     return None
 
 
-def analyze_cpp_file(root: Path, path: Path, thresholds: Thresholds) -> list[Finding]:
+def analyze_cpp_file(
+    root: Path,
+    path: Path,
+    thresholds: Thresholds,
+    usage_index: CppUsageIndex,
+) -> list[Finding]:
     """Analyze one C or C++ source file with lightweight text heuristics."""
     findings: list[Finding] = []
     context = SourceContext(root=root, path=path, language="cpp", thresholds=thresholds)
     text = path.read_text(encoding="utf-8", errors="ignore")
     analysis_text = cpp_text_without_comments_or_literals(text)
     for match in CLASS_RE.finditer(analysis_text):
-        analyze_cpp_class(context, analysis_text, match, findings)
+        analyze_cpp_class(context, analysis_text, match, findings, usage_index)
     for match in FUNCTION_RE.finditer(analysis_text):
         analyze_cpp_function(context, analysis_text, match, findings)
     return findings
@@ -2885,6 +3218,7 @@ def analyze_cpp_class(
     analysis_text: str,
     match: re.Match[str],
     findings: list[Finding],
+    usage_index: CppUsageIndex,
 ) -> None:
     """Record class-level C++ readability findings for one regex match."""
     shape = cpp_class_shape(analysis_text, match)
@@ -2893,6 +3227,7 @@ def analyze_cpp_class(
         return
     add_cpp_class_identity_findings(context, shape, findings)
     add_cpp_class_surface_findings(context, shape, findings)
+    add_cpp_dependency_source_class_findings(context, shape, findings, usage_index)
 
 
 def cpp_class_shape(
@@ -3034,6 +3369,40 @@ def add_cpp_class_surface_findings(
             "public-behavior-boundary",
             "avoid-carrying-members-that-can-be-owned-by-value-object-or-private-state",
         )
+
+
+def add_cpp_dependency_source_class_findings(
+    context: SourceContext,
+    shape: CppClassShape,
+    findings: list[Finding],
+    usage_index: CppUsageIndex,
+) -> None:
+    """Record C++ class redundancy that depends on project-level use sites."""
+    if not is_redundant_cpp_class_shape(shape):
+        return
+    usage = usage_index.usage_for(context.path, shape.name)
+    if usage is None or usage.constructor_calls == 0 or usage.boundary_refs() > 0:
+        return
+    add_finding(
+        findings,
+        context.root,
+        context.path,
+        shape.line,
+        context.language,
+        "warn",
+        "redundant_class_boundary",
+        shape.name,
+        usage.usage_summary(),
+        "type-boundary-or-owned-lifecycle",
+        "replace-with-function-or-document-class-lifecycle-contract",
+    )
+
+
+def is_redundant_cpp_class_shape(shape: CppClassShape) -> bool:
+    """Return true for C++ classes whose shape needs dependency-source confirmation."""
+    if shape.base_count > 0 or shape.aggregate_value_object or shape.scalar_operator_value_object:
+        return False
+    return shape.public_methods <= 1 and shape.public_fields <= 1
 
 
 def analyze_cpp_function(
@@ -3779,6 +4148,7 @@ def collect_findings(
     """Collect findings for every selected source file."""
     findings: list[Finding] = []
     python_files = [path for path in files if path.suffix in PYTHON_SUFFIXES]
+    cpp_files = [path for path in files if path.suffix in CPP_SUFFIXES]
     python_usage_index = (
         build_python_usage_index(
             root,
@@ -3793,11 +4163,24 @@ def collect_findings(
         if python_files
         else empty_python_usage_index()
     )
+    cpp_usage_index = (
+        build_cpp_usage_index(
+            root,
+            cpp_usage_source_files(
+                root,
+                cpp_files,
+                exclude_patterns,
+                usage_roots=dependency_context.usage_roots,
+            ),
+        )
+        if cpp_files
+        else empty_cpp_usage_index()
+    )
     for path in files:
         if path.suffix in PYTHON_SUFFIXES:
             findings.extend(analyze_python_file(root, path, thresholds, python_usage_index))
         elif path.suffix in CPP_SUFFIXES:
-            findings.extend(analyze_cpp_file(root, path, thresholds))
+            findings.extend(analyze_cpp_file(root, path, thresholds, cpp_usage_index))
     return findings
 
 
