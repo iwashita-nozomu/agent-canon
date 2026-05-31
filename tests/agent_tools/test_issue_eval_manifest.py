@@ -10,8 +10,8 @@
 from __future__ import annotations
 
 import unittest
-from typing import Any, cast
 from pathlib import Path
+from typing import cast
 
 try:
     import tomllib
@@ -44,7 +44,7 @@ REQUIRED_CLOSEOUT_ISSUES = {
 class IssueEvalManifestTest(unittest.TestCase):
     """Validate the issue eval manifest used for closeout evidence."""
 
-    def load_manifest(self) -> dict[str, Any]:
+    def load_manifest(self) -> dict[str, object]:
         """Load the manifest TOML."""
         return tomllib.loads(MANIFEST.read_text(encoding="utf-8"))
 

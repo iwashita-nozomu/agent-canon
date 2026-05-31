@@ -18,7 +18,7 @@ import fnmatch
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TypeAlias, cast
 
 import yaml
 
@@ -33,6 +33,8 @@ VALID_RISKY_AUTHORITY_KEYS = {
     "workflow_change",
     "shared_canon_change",
 }
+AuthorityPayload: TypeAlias = dict[str, object]
+AuthorityEntry: TypeAlias = dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,7 @@ class TaskAuthority:
     """Loaded task authority payload plus its source path."""
 
     path: Path
-    payload: dict[str, Any]
+    payload: AuthorityPayload
 
     @property
     def active_role(self) -> str:
@@ -65,7 +67,7 @@ class TaskAuthority:
         """Return whether the task globally allows first-party library changes."""
         return self.payload.get("allow_first_party_library_change") is True
 
-    def risky_entries(self, key: str) -> tuple[dict[str, Any], ...]:
+    def risky_entries(self, key: str) -> tuple[AuthorityEntry, ...]:
         """Return risky authority entries for one key, including legacy aliases."""
         entries: list[object] = []
         risky = self.payload.get("risky_authorities")
@@ -80,15 +82,15 @@ class TaskAuthority:
             legacy = self.payload.get("library_change_authority")
             if isinstance(legacy, list):
                 entries.extend(legacy)
-        return tuple(cast(dict[str, Any], item) for item in entries if isinstance(item, dict))
+        return tuple(cast(AuthorityEntry, item) for item in entries if isinstance(item, dict))
 
 
-def load_yaml_mapping(path: Path) -> dict[str, Any]:
+def load_yaml_mapping(path: Path) -> AuthorityPayload:
     """Load one YAML mapping."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         return {}
-    return cast(dict[str, Any], raw)
+    return cast(AuthorityPayload, raw)
 
 
 def find_authority_path(root: Path) -> Path | None:
@@ -118,7 +120,7 @@ def load_task_authority(root: Path) -> TaskAuthority | None:
     return TaskAuthority(path=path.resolve(), payload=load_yaml_mapping(path))
 
 
-def validate_authority_payload(payload: dict[str, Any]) -> tuple[AuthorityFinding, ...]:
+def validate_authority_payload(payload: AuthorityPayload) -> tuple[AuthorityFinding, ...]:
     """Validate the shared task authority schema."""
     findings: list[AuthorityFinding] = []
     if payload.get("version") != 1:
@@ -156,16 +158,16 @@ def validate_authority_payload(payload: dict[str, Any]) -> tuple[AuthorityFindin
     return tuple(findings)
 
 
-def path_authority_entries(raw_entries: object) -> tuple[dict[str, Any], ...]:
+def path_authority_entries(raw_entries: object) -> tuple[AuthorityEntry, ...]:
     """Normalize path authority rows from strings or mappings."""
     if not isinstance(raw_entries, list):
         return ()
-    entries: list[dict[str, Any]] = []
+    entries: list[AuthorityEntry] = []
     for item in raw_entries:
         if isinstance(item, str):
             entries.append({"path": item, "actions": ["modify"]})
         elif isinstance(item, dict):
-            entries.append(cast(dict[str, Any], item))
+            entries.append(cast(AuthorityEntry, item))
     return tuple(entries)
 
 
@@ -181,7 +183,7 @@ def pattern_covers(pattern: str, path: str) -> bool:
     return fnmatch.fnmatch(normalized_path, normalized_pattern)
 
 
-def entry_matches_path(entry: dict[str, Any], path: str) -> bool:
+def entry_matches_path(entry: AuthorityEntry, path: str) -> bool:
     """Return whether an authority entry applies to one path."""
     raw_patterns = entry.get("paths")
     patterns: list[str] = []
@@ -247,7 +249,7 @@ def build_default_task_authority(
     roles: dict[str, bool],
 ) -> str:
     """Render a conservative default task authority document."""
-    payload: dict[str, Any] = {
+    payload: AuthorityPayload = {
         "version": 1,
         "run_id": run_id,
         "task": task,
