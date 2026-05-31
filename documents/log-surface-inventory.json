@@ -1460,46 +1460,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "prose_graph_db",
-      "line": 57,
-      "path": "agents/skills/prose-reasoning-graph.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "prose_graph_diagnostics",
-      "line": 59,
-      "path": "agents/skills/prose-reasoning-graph.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "prose_graph_explanation",
-      "line": 60,
-      "path": "agents/skills/prose-reasoning-graph.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "prose_graph_handoff",
-      "line": 62,
-      "path": "agents/skills/prose-reasoning-graph.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "prose_graph_integration_plan",
-      "line": 61,
-      "path": "agents/skills/prose-reasoning-graph.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "prose_graph_projection",
       "line": 58,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
@@ -1507,7 +1467,23 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "prose_graph_rewrite_packet",
+      "field": "prose_graph_diagnostics",
+      "line": 60,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_explanation",
+      "line": 61,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_handoff",
       "line": 63,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
@@ -1515,8 +1491,32 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "prose_graph_stats",
+      "field": "prose_graph_integration_plan",
+      "line": 62,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_projection",
+      "line": 59,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_rewrite_packet",
       "line": 64,
+      "path": "agents/skills/prose-reasoning-graph.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "prose_graph_stats",
+      "line": 65,
       "path": "agents/skills/prose-reasoning-graph.md",
       "surface": "skill"
     },
@@ -7156,7 +7156,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 381,
+      "line": 401,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7164,15 +7164,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "command",
-      "line": 266,
-      "path": "tools/agent_tools/prose_reasoning_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "command",
-      "line": 1320,
+      "line": 286,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7180,15 +7172,23 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "fields",
-      "line": 266,
+      "line": 286,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "json_object",
-      "field": "fields",
-      "line": 1320,
+      "field": "history_effect",
+      "line": 1373,
+      "path": "tools/agent_tools/prose_reasoning_graph.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "provenance",
+      "line": 1373,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7196,15 +7196,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 266,
-      "path": "tools/agent_tools/prose_reasoning_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "schema",
-      "line": 1320,
+      "line": 286,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7212,15 +7204,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 266,
-      "path": "tools/agent_tools/prose_reasoning_graph.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 1320,
+      "line": 286,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7228,7 +7212,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 267,
+      "line": 287,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7236,7 +7220,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 270,
+      "line": 290,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7244,7 +7228,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 272,
+      "line": 292,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
@@ -7252,7 +7236,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "PROSE_REASONING_GRAPH_STATS",
-      "line": 268,
+      "line": 288,
       "path": "tools/agent_tools/prose_reasoning_graph.py",
       "surface": "tool"
     },
