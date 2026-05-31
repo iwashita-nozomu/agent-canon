@@ -42,6 +42,9 @@ SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
 READ_ONLY_COMMANDS = {"cat", "head", "tail", "wc", "ls", "pwd", "nl", "stat", "rg", "grep"}
 STRICT_BLOCKS_ENV = "AGENT_CANON_HOOK_STRICT_BLOCKS"
 STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
+# Most policy hooks are advisory by default so a bad guardrail cannot freeze
+# ordinary shell/read/validation work. CI and hook development can opt into
+# strict blocking with AGENT_CANON_HOOK_STRICT_BLOCKS=1.
 CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py"})
 ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
@@ -176,9 +179,12 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     "PostToolUse": (
         HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),
@@ -187,9 +193,12 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     ),
     "Stop": (
         HookCommandSpec("goal_completion_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
+        HookCommandSpec("task_authority_schema_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("role_write_policy_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("oop_readability_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("module_boundary_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("library_implementation_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
+        HookCommandSpec("first_party_library_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_inventory_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("helper_first_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("style_checker_guard.py", STYLE_CHECKER_TIMEOUT_SECONDS),

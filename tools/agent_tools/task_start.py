@@ -298,6 +298,7 @@ def main() -> int:
     print(f"AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS={preflight.checklist_status}")
     print(f"RUN_ID={run_id}")
     print(f"REPORT_DIR={report_dir}")
+    print(f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}")
     print(f"WORKSPACE_ROOT={workspace_root}")
     print(f"REQUEST_CONTRACT={request_contract_path}")
     print("REQUEST_CONTRACT_REQUIRED=yes")

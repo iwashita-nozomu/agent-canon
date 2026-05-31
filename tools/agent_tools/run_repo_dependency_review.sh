@@ -16,6 +16,7 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 CHECK_BIDIRECTIONAL=0
+CYCLE_REPORT_ONLY=0
 FAIL_MISSING=0
 ALLOW_FRONTMATTER=0
 EXPLAIN_MISSING=0
@@ -27,7 +28,7 @@ SEARCH_HITS_FILE=""
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -39,6 +40,8 @@ from dependency headers. With --search-hits-file, text-search hit paths are
 expanded into dependency edit-scope candidates and saved beside the graph when
 --report-dir is set. Without --search-hits-file, the report directory still
 receives changed-file dependency edit-scope evidence.
+With --cycle-report-only, dependency cycles stay visible but do not block the
+wrapper. Use this only with a durable graph report artifact.
 EOF
 }
 
@@ -50,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --check-bidirectional)
       CHECK_BIDIRECTIONAL=1
+      shift
+      ;;
+    --cycle-report-only)
+      CYCLE_REPORT_ONLY=1
       shift
       ;;
     --fail-missing)
@@ -133,6 +140,9 @@ graph_args=(tools/agent_tools/check_dependency_graph.sh)
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
 fi
+if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+  graph_args+=(--cycle-report-only)
+fi
 if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
   graph_args+=(--allow-frontmatter)
 fi
@@ -143,6 +153,9 @@ bash "${graph_args[@]}" "${checkable_paths[@]}"
 
 if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
   related_args=(tools/agent_tools/check_dependency_graph.sh --list-related --focus-changed)
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    related_args+=(--cycle-report-only)
+  fi
   if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
     related_args+=(--allow-frontmatter)
   fi
@@ -151,6 +164,9 @@ fi
 
 if [[ -n "$SEARCH_HITS_FILE" ]]; then
   edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --search-hits-file "$SEARCH_HITS_FILE")
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    edit_scope_args+=(--cycle-report-only)
+  fi
   if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
     edit_scope_args+=(--allow-frontmatter)
   fi
@@ -161,6 +177,9 @@ if [[ -n "$SEARCH_HITS_FILE" ]]; then
   fi
 elif [[ -n "$REPORT_DIR" ]]; then
   edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --edit-scope-changed)
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    edit_scope_args+=(--cycle-report-only)
+  fi
   if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
     edit_scope_args+=(--allow-frontmatter)
   fi

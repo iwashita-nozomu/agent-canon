@@ -94,6 +94,9 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 - `Hypothesis:` なぜその file / symbol / workflow が原因または修正点だと考えるか。
 - `Expected Mechanism:` その変更がどう改善へつながるか。可読性、正しさ、性能、保守性などの改善軸を明示する。
 - `Expected Fix Surface:` 修正候補 path、symbol、doc section。
+- `API Surface Traversal:` dependency/API capability 仮説では
+  `documents/api-surface-traversal-policy.md` に従い、public import/export、
+  signature、nested config、example を確認してから negative conclusion を出す。
 - `Expected Non-Surface:` 触らない path と理由。
 - `Disconfirming Evidence:` この仮説が間違いだと分かる条件。
 - `Support Evidence:` 変更後に仮説が支持されたと見なす command、metric、test、static analysis、review finding。

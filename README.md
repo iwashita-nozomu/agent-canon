@@ -51,6 +51,12 @@ selector です。`agents/canonical/README.md` は layout appendix として扱�
 - `CONTAINER_OPERATIONS.md`
 - `documents/github-first-module-and-devcontainer-policy.md`
 - `documents/agent-canon-github-remote.md`
+- `documents/agent-canon-update-route.md`
+- `documents/agent-canon-submodule-rollback.md`
+- `documents/derived-repo-bootstrap-runbook.md`
+- `documents/mcp-preflight-and-fallback-policy.md`
+- `documents/issue-label-taxonomy.md`
+- `documents/prompt-skill-evaluation-checklist.md`
 - `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
 - `documents/runtime-profiles-and-check-matrix.md`

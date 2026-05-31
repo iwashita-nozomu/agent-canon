@@ -84,3 +84,17 @@ tool = "tools/docs/fix_markdown_math.py"
 doc = "documents/tools/fix_markdown_math.md"
 language = "python"
 summary = "Markdown math notation fixer documentation."
+
+[[tool]]
+id = "render-dependency-manifest-graph"
+tool = "tools/agent_tools/render_dependency_manifest_graph.py"
+doc = "documents/tools/render_dependency_manifest_graph.md"
+language = "python"
+summary = "Dependency manifest graph Markdown and DOT renderer documentation."
+
+[[tool]]
+id = "classify-path-risk"
+tool = "tools/agent_tools/classify_path_risk.py"
+doc = "documents/tools/classify_path_risk.md"
+language = "python"
+summary = "Path/risk check matrix classifier documentation."

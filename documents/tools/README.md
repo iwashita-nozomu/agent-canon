@@ -52,6 +52,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - mounted log archive の ensure / status / import / push 操作を担当します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
 - `tools/agent_tools/repo_structure_contract.py`
   - `documents/repo-structure-contract.toml` を正本にして、top-level から `tree -a -J` で取得した directory / file 構成を AgentCanon-supported profile と比較します。保存済み `tree -J` JSON も `--tree-json` で読めます。期待 path、ignore、profile detection、unexpected top-level severity は tool code ではなく TOML contract から解決します。
+- `tools/agent_tools/render_dependency_manifest_graph.py`
+  - `check_dependency_graph.sh --graph-tsv` の edge artifact から Markdown summary と Graphviz DOT を生成します。大規模 review では raw edge listing の前にこの report を読みます。
+- `tools/agent_tools/classify_path_risk.py`
+  - changed path list から docs / Python / Docker / GitHub / shared-canon / full-confidence 候補を分類し、targeted validation command を出します。`.github/workflows/path-risk-check-matrix-smoke.yml` もこの classifier を使います。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm eval`
