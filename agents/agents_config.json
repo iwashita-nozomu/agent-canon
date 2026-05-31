@@ -741,6 +741,29 @@
       }
     },
     {
+      "id": "prompt_config_reviewer",
+      "codex_agents": [
+        "prompt_config_reviewer"
+      ],
+      "activation": "prompt_routing_or_subagent_config_change_needed",
+      "owns": [
+        "prompt_config_drift_review",
+        "role_description_review",
+        "routing_prompt_review",
+        "subagent_contract_review"
+      ],
+      "required_outputs": [
+        "prompt_config_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "prompt_config_review"
+        ],
+        "notes": "The prompt-config reviewer records prompt, routing, and subagent-config findings only in the prompt-config review artifact."
+      }
+    },
+    {
       "id": "python_reviewer",
       "codex_agents": [
         "python_reviewer"
@@ -1678,6 +1701,7 @@
     "infra_review": "infra_review.md",
     "project_review": "project_review.md",
     "docs_workflow_review": "docs_workflow_review.md",
+    "prompt_config_review": "prompt_config_review.md",
     "test_plan": "test_plan.md",
     "python_review": "python_review.md",
     "cpp_review": "cpp_review.md",

@@ -424,6 +424,9 @@ repo-changing task では `$agent-orchestration` と `$subagent-bootstrap` を `
 
 repo-changing task では bundle 作成と explicit subagent activation を既定にします。
 ただし stage の具体的な責務と禁止事項は prose ではなく `.codex/agents/*.toml` を正本にします。
+この文書は executable stage flow の正本です。workflow family 選定は
+`agent-orchestration`、prompt / config drift 監査は `prompt_config_reviewer`
+を先に通し、ここを第二の routing policy 文書にしません。
 goal-driven task では `/goal` 確定前でも provisional bundle を作り、read-only requirements / repo survey / planning review subagent の handoff plan を先に作ります。active runtime が明示許可を要求する場合は、許可があるときだけ実際に起動します。
 
 - repo を編集する
@@ -438,7 +441,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model split は `.codex/config.toml` の `agents.model_policy` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier bucket に残し、bounded review / report traceability / checklist gate は mini review bucket、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして設計 packet で完全に切れる狭い実装 slice は Spark bucket に寄せます。
+default の model split は `.codex/config.toml` の `agent_model_policy` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier bucket に残し、bounded review / report traceability / checklist gate は mini review bucket、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして設計 packet で完全に切れる狭い実装 slice は Spark bucket に寄せます。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
@@ -525,6 +528,7 @@ run bundle を起こしたら、`intent_brief.md` だけで進めず、`user_req
 - `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
+- `prompt_config_reviewer`
 - `python_reviewer`
 - `cpp_reviewer`
 - `worker`
@@ -566,7 +570,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 新規 helper や新規 module を足すときは、既存実装では足りない理由と、導入済みライブラリの設定変更や薄い wrapper で済まない理由を design packet に結び付ける
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
 - checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
-- role ごとの model policy は `.codex/config.toml` の `agents.model_policy` に従う
+- role ごとの model policy は `.codex/config.toml` の `agent_model_policy` に従う
 - broad worker は frontier implementation bucket、design-traced narrow slice と execution-only experiment/log work の first candidate は Spark coding bucket とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す

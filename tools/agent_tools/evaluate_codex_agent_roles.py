@@ -4,6 +4,7 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../agents/evals/README.md eval directory contract
 # upstream implementation ./agent_team.py loads team and task routing metadata
+# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
 """Evaluate Codex custom agent role definitions and routing cost policy."""
@@ -11,10 +12,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -32,48 +36,19 @@ from agent_team import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
+from runtime_log_paths import eval_results_dir  # noqa: E402
 
+DEFAULT_RESULTS_FAMILY = "codex-agent-role"
 FRONTIER_MODEL = "gpt-5.5"
 MINI_MODEL = "gpt-5.4-mini"
 SPARK_MODEL = "gpt-5.3-codex-spark"
 HIGH = "high"
 MEDIUM = "medium"
 LOW = "low"
+RUN_ID_DIGEST_LENGTH = 10
+GIT_COMMAND_TIMEOUT_SECONDS = 5
 
-MODEL_POLICY: dict[str, tuple[str, str, str]] = {
-    "artifact_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "benchmark_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "citation_evidence_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "cpp_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "detailed_design_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "detailed_designer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "diff_triage_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "docs_workflow_steward": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "document_flow_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "execution_planner": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "experiment_runner": ("execution_only", SPARK_MODEL, LOW),
-    "explorer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "fair_data_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "literature_researcher": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "logic_gap_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "long_form_writer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "manager_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "ml_science_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "notation_definition_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "oop_readability_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "plan_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "project_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "python_reviewer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "report_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "reproducibility_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "requirements_organizer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "scientific_computing_reviewer": ("conditional_frontier", MINI_MODEL, MEDIUM),
-    "ship_reviewer": ("frontier_required", FRONTIER_MODEL, HIGH),
-    "spark_worker": ("execution_only", SPARK_MODEL, LOW),
-    "test_designer": ("cheap_first_review", SPARK_MODEL, LOW),
-    "worker": ("frontier_required", FRONTIER_MODEL, HIGH),
-}
+ModelPolicy = dict[str, tuple[str, str, str]]
 
 
 @dataclass(frozen=True)
@@ -103,9 +78,25 @@ class RuntimeSummary:
 
 
 @dataclass(frozen=True)
+class EvalRunMetadata:
+    """Metadata recorded with one role eval run."""
+
+    created_at: str
+    eval_run_id: str
+    run_id: str
+    argv: tuple[str, ...]
+    cwd: str
+    root: str
+    git_branch: str
+    git_commit: str
+    git_dirty: str
+
+
+@dataclass(frozen=True)
 class EvalReport:
     """Complete role eval report."""
 
+    metadata: EvalRunMetadata
     status: str
     findings: tuple[Finding, ...]
     model_matrix: tuple[str, ...]
@@ -124,6 +115,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSONL file with role runtime metrics.",
     )
     parser.add_argument("--report-out", type=Path)
+    parser.add_argument("--accumulate", action="store_true")
+    parser.add_argument(
+        "--results-dir",
+        default="",
+        help=(
+            "Directory for accumulated reports. Defaults to the mounted "
+            "AgentCanon log archive eval-results/codex-agent-role path."
+        ),
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run bundle id recorded in accumulated reports.",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -147,6 +152,42 @@ def load_agent_configs(root: Path) -> dict[str, dict[str, object]]:
     return configs
 
 
+def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
+    """Load role model policy from the centralized Codex config."""
+    findings: list[Finding] = []
+    config_path = root / ".codex" / "config.toml"
+    if not config_path.is_file():
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
+    payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    model_policy = payload.get("agent_model_policy")
+    if not isinstance(model_policy, dict) or not model_policy:
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
+    role_policy: ModelPolicy = {}
+    for bucket_id, raw_bucket in sorted(cast(dict[str, object], model_policy).items()):
+        if not isinstance(raw_bucket, dict):
+            findings.append(Finding("model-policy", str(bucket_id), "bucket-not-table"))
+            continue
+        bucket = cast(dict[str, object], raw_bucket)
+        model = bucket.get("model")
+        effort = bucket.get("model_reasoning_effort")
+        roles = bucket.get("roles")
+        if not isinstance(model, str) or not model:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-model"))
+            continue
+        if not isinstance(effort, str) or not effort:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-effort"))
+            continue
+        if not isinstance(roles, list) or not all(isinstance(role, str) and role for role in roles):
+            findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
+            continue
+        for role in cast(list[str], roles):
+            if role in role_policy:
+                findings.append(Finding("model-policy", role, "duplicate-policy-role"))
+                continue
+            role_policy[role] = (str(bucket_id), model, effort)
+    return role_policy, findings
+
+
 def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
     """Return roles keyed by id."""
     return {role.id: role for role in roles}
@@ -155,6 +196,7 @@ def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
 def evaluate_static_agent_configs(
     root: Path,
     configs: dict[str, dict[str, object]],
+    model_policy: ModelPolicy,
 ) -> list[Finding]:
     """Evaluate static role TOML schema, behavior, and model policy."""
     findings: list[Finding] = []
@@ -164,10 +206,10 @@ def evaluate_static_agent_configs(
                 findings.append(Finding("schema", agent_id, f"missing-{field}"))
         if config.get("name") != config.get("__stem"):
             findings.append(Finding("schema", agent_id, "name-file-stem-mismatch"))
-        if agent_id not in MODEL_POLICY:
+        if agent_id not in model_policy:
             findings.append(Finding("model-policy", agent_id, "unclassified-agent"))
             continue
-        bucket, expected_model, expected_effort = MODEL_POLICY[agent_id]
+        bucket, expected_model, expected_effort = model_policy[agent_id]
         if config.get("model") != expected_model:
             findings.append(
                 Finding("model-policy", agent_id, f"{bucket}-model-expected-{expected_model}")
@@ -177,7 +219,7 @@ def evaluate_static_agent_configs(
                 Finding("model-policy", agent_id, f"{bucket}-effort-expected-{expected_effort}")
             )
         findings.extend(evaluate_role_behavior(root, agent_id, config))
-    missing_policy = sorted(set(MODEL_POLICY) - set(configs))
+    missing_policy = sorted(set(model_policy) - set(configs))
     for agent_id in missing_policy:
         findings.append(Finding("model-policy", agent_id, "missing-agent-toml"))
     return findings
@@ -363,31 +405,71 @@ def int_metric(entry: dict[str, object], *keys: str) -> tuple[int, str | None]:
     return 0, None
 
 
-def model_matrix(configs: dict[str, dict[str, object]]) -> tuple[str, ...]:
+def model_matrix(configs: dict[str, dict[str, object]], model_policy: ModelPolicy) -> tuple[str, ...]:
     """Render agent model bucket matrix."""
     rows: list[str] = []
     for agent_id in sorted(configs):
-        bucket, _, _ = MODEL_POLICY.get(agent_id, ("unclassified", "", ""))
+        bucket, _, _ = model_policy.get(agent_id, ("unclassified", "", ""))
         rows.append(
             f"{agent_id}:{bucket}:{configs[agent_id].get('model')}:{configs[agent_id].get('model_reasoning_effort')}"
         )
     return tuple(rows)
 
 
-def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
+def git_output(root: Path, *args: str) -> str:
+    """Return one git command output, or '-' outside a usable git checkout."""
+    try:
+        result = subprocess.run(
+            ("git", "-C", root.as_posix(), *args),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=GIT_COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "-"
+    if result.returncode != 0:
+        return "-"
+    return result.stdout.strip() or "-"
+
+
+def build_eval_run_metadata(root: Path, run_id: str) -> EvalRunMetadata:
+    """Build metadata with a unique, filename-safe eval run id."""
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat()
+    timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
+    digest_source = "|".join(("codex-agent-role", run_id.strip(), created_at, root.as_posix()))
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
+    return EvalRunMetadata(
+        created_at=created_at,
+        eval_run_id=f"codex-agent-role-eval-{timestamp}-{digest}",
+        run_id=run_id.strip(),
+        argv=tuple(sys.argv),
+        cwd=Path.cwd().as_posix(),
+        root=root.as_posix(),
+        git_branch=git_output(root, "rev-parse", "--abbrev-ref", "HEAD"),
+        git_commit=git_output(root, "rev-parse", "HEAD"),
+        git_dirty="yes" if git_output(root, "status", "--short", "--untracked-files=all") else "no",
+    )
+
+
+def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalReport:
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
+    model_policy, policy_findings = load_model_policy(canon_root)
     findings = [
-        *evaluate_static_agent_configs(canon_root, configs),
+        *policy_findings,
+        *evaluate_static_agent_configs(canon_root, configs, model_policy),
         *evaluate_routing(canon_root),
     ]
     metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs)
     findings.extend(metric_findings)
     return EvalReport(
+        metadata=build_eval_run_metadata(canon_root, run_id),
         status="pass" if not findings else "fail",
         findings=tuple(findings),
-        model_matrix=model_matrix(configs),
+        model_matrix=model_matrix(configs, model_policy),
         runtime_metrics_status=metrics_status,
         runtime_metrics=metrics,
     )
@@ -396,6 +478,7 @@ def evaluate(root: Path, runtime_logs: list[str]) -> EvalReport:
 def render_text(report: EvalReport) -> str:
     """Render text output."""
     lines = [
+        f"CODEX_AGENT_ROLE_EVAL_RUN_ID={report.metadata.eval_run_id}",
         f"CODEX_AGENT_ROLE_EVAL={report.status}",
         f"CODEX_AGENT_ROLE_FINDINGS={len(report.findings)}",
         f"ROLE_RUNTIME_METRICS_STATUS={report.runtime_metrics_status}",
@@ -413,14 +496,26 @@ def render_text(report: EvalReport) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_markdown_report(path: Path, report: EvalReport) -> None:
+def write_markdown_report(path: Path, report: EvalReport) -> Path:
     """Write a Markdown role eval report."""
     lines = [
         "# Codex Agent Role Eval",
         "",
+        "<!--",
+        "@dependency-start",
+        "responsibility Records one Codex subagent role eval run.",
+        "upstream implementation ../../../../tools/agent_tools/evaluate_codex_agent_roles.py generates this report",
+        "@dependency-end",
+        "-->",
+        "",
+        f"CODEX_AGENT_ROLE_EVAL_RUN_ID={report.metadata.eval_run_id}",
         f"CODEX_AGENT_ROLE_EVAL={report.status}",
         f"CODEX_AGENT_ROLE_FINDINGS={len(report.findings)}",
         f"ROLE_RUNTIME_METRICS_STATUS={report.runtime_metrics_status}",
+        f"run_id: `{report.metadata.run_id or '-'}`",
+        f"git_branch: `{report.metadata.git_branch}`",
+        f"git_commit: `{report.metadata.git_commit}`",
+        f"git_dirty: `{report.metadata.git_dirty}`",
         "",
         "## Model Matrix",
         "",
@@ -438,19 +533,48 @@ def write_markdown_report(path: Path, report: EvalReport) -> None:
     else:
         lines.append("- none")
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path = path.with_name(f"{path.stem}-{report.metadata.eval_run_id}{path.suffix}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def resolve_results_dir(root: Path, value: str) -> Path:
+    """Resolve the CLI results directory or the default archive location."""
+    stripped = value.strip()
+    if stripped:
+        path = Path(stripped)
+        return path if path.is_absolute() else root / path
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
+
+
+def accumulated_report_path(results_dir: Path, report: EvalReport) -> Path:
+    """Return the unique accumulated report path."""
+    return results_dir / f"{report.metadata.eval_run_id}-{report.status}.md"
 
 
 def main() -> int:
     """Run the role eval."""
     args = build_parser().parse_args()
-    report = evaluate(args.root, cast(list[str], args.runtime_log))
+    report = evaluate(args.root, cast(list[str], args.runtime_log), str(args.run_id))
+    report_paths: list[Path] = []
     if args.report_out is not None:
-        write_markdown_report(args.report_out, report)
+        report_paths.append(write_markdown_report(args.report_out, report))
+    if args.accumulate:
+        report_paths.append(
+            write_markdown_report(
+                accumulated_report_path(resolve_results_dir(args.root, str(args.results_dir)), report),
+                report,
+            )
+        )
     if args.format == "json":
         print(json.dumps(asdict(report), indent=2, sort_keys=True))
     else:
         print(render_text(report), end="")
+        for path in report_paths:
+            print(f"CODEX_AGENT_ROLE_EVAL_REPORT={path}")
+        if args.accumulate and report_paths:
+            print(f"CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT={report_paths[-1]}")
     return 0 if report.status == "pass" else 1
 
 

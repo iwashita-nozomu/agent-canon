@@ -16,6 +16,12 @@ downstream implementation ../tools/agent_tools/generate_agent_runtime_dashboard.
 
 # Runtime Log Archive
 
+This document owns archive location, branch policy, mount behavior, and push
+rules. Retention classes for general reports and experiment artifacts belong to
+`documents/result-log-retention-and-visualization.md`. The one-time migration
+procedure for old in-tree logs belongs to
+`documents/runtime-log-archive-migration.md`.
+
 AgentCanon runtime hook JSONL and accumulated eval reports are stored in the separate GitHub repository
 `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
 
@@ -40,6 +46,11 @@ Normal eval writers use:
 ```text
 .agent-canon/archive/<env-key>/eval-results/<family>/<eval-run-id>-<status>*.md
 ```
+
+Valid `<family>` values and their filename / run-id contracts are declared in
+`agents/evals/eval_result_families.toml`. Add a family there before adding a
+new accumulated eval producer, then make `eval_accumulation_check.py` validate
+that family instead of adding a private result path.
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,

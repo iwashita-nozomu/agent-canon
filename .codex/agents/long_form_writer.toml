@@ -25,5 +25,6 @@ Rules:
 - define a short summary statement and section order before expanding sections
 - create a roadmap-first draft and then tighten it with a reverse-outline pass before handing it to reviewers
 - prefer scannable structure, explicit headings, and clear reader path over dense prose
+- if the task reveals prompt/config or routing drift, hand that drift to `prompt_config_reviewer` instead of rewriting shared policy surfaces ad hoc
 - do not review your own draft as document_flow_reviewer or as the separate completeness reviewer
 """

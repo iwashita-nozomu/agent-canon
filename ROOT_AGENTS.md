@@ -88,6 +88,13 @@ contract listed in `documents/README.md`.
 - 数値的 test / experiment / benchmark の緑化は禁止です。tolerance 緩和、assertion 削除、case skip、expected 値の追従変更、CPU fallback などで pass させる前に、code・数学仕様・文書 contract のどこを直すべきかを判定し、必要なら failure として残します。
 - すべての変更では、コードと文書それぞれの責務を第一に考えます。実行できることや説明できることだけで完了扱いにせず、実装 surface と document surface が担うべき責務、境界、読者への契約に合っているかを優先して確認します。
 
+## Mechanical Guardrail Policy
+
+- AGENTS / ROOT_AGENTS に禁止事項を増やす前に、機械的 checker、warning hook、closeout artifact gate、role TOML、または workflow eval に逃がせるかを判定します。実行時 hook は作業を進めるための context / evidence 収集を既定とし、プロンプト内 secret など高確信で公開事故になるもの以外は原則 block しません。
+- process / search / reuse / planning / review completeness の規律は、runtime hook blocker ではなく warning、run bundle evidence、`check_convention_compliance.py`、`task_close.py`、PR gate、または reviewer finding として扱います。hook finding が出ても、read-only 調査、validation、修復作業、PR evidence 作成のために hook 設定を退避・無効化してはいけません。
+- hook や checker が非重大 finding を返した場合は、現在の作業を止めずに closeout 前の修復対象として扱います。明示的な hook 開発・強制検証以外で strict block mode を有効にしてはいけません。
+- 新しい guardrail を追加するときは、`documents/codex-configuration-reference.md` の hook severity policy に従い、block / warning / closeout gate のどれか、修復 command、ログ保存先、false-positive 時の記録先を同じ差分に含めます。
+
 ## Default Search And Routing
 
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
@@ -164,7 +171,7 @@ contract listed in `documents/README.md`.
 - agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` で `memory/AGENT_PHILOSOPHY.md` へ追記し、closeout 前に `python3 tools/agent_tools/persist_agent_memory.py --commit --push` で AgentCanon 側へ永続化します。
 - hook、skill eval、OOP/readability guard、workflow monitor が `.agent-canon/log-archive/**` または `reports/agents/<run-id>/` に記録を出した場合、その記録は closeout evidence です。append-only / unique-id file として扱い、上書き・削除・未説明の dirty log を残したまま完了報告しません。
 - tool / hook / review / CI の finding は、まず severity と修正先を決めます。S0/S1 または `fix-now` finding は新規機能や追加整理より先に直し、直せない場合は `issues/open/AC-YYYYMMDD-*.md`、PR body、run bundle のすべてに blocker として残します。
-- PreToolUse / PostToolUse / Stop hook が block または `decision=block` 相当の feedback を返した場合は、その hook が要求した修復を現在の最優先作業にします。元の編集・検証・PR 操作へ戻る前に、指示された正本 file、baseline、ログ、依存 header、style/OOP finding、または issue evidence を修正し、同じ hook / 対応する checker を再実行して pass evidence を残します。false positive と判断する場合も、回避ではなく issue または run artifact に根拠と再発防止を記録してから進めます。
+- PreToolUse / PostToolUse / Stop hook が guardrail finding を返した場合は、hook 設定の退避や無効化ではなく、指示された正本 file、baseline、ログ、依存 header、style/OOP finding、または issue evidence を修正対象にします。非重大 finding は作業を止めずに closeout 前の修復 / 記録対象とし、prompt secret など実 runtime が block を維持した場合だけ同じ hook / 対応 checker の pass evidence が出るまで元操作へ戻りません。false positive と判断する場合も、回避ではなく issue または run artifact に根拠と再発防止を記録してから進めます。
 - workflow defect、ログ欠落、hook 誤判定、PR gate 欠陥、検索/依存展開の欠落を見つけた場合は、同じ task 内で durable finding を作るか、既存 issue に追記します。会話上の指摘だけ、または run bundle だけに残して closeout しません。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/user_request_contract.md` を最初に埋め、must-do / must-not-do / completion-evidence clause を固定します。Routine docs / trivial parent-direct edit では user-facing summary で代替できます。
 - Shared canon、Large delivery、goal task、multi-step work では `reports/agents/<run-id>/schedule.md` を TODO の正本として埋め、stage と planned work units を空のままにしません。
@@ -245,6 +252,8 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - closeout 前に、正本でない設計文書、実装 copy、dated snapshot、backup path が tracked tree に残っていないことを review artifact と `closeout_gate.md` で確認します。
 
 ## Close-Out Prohibitions
+
+この節は closeout gate の禁止事項です。runtime hook blocker を増やす根拠ではなく、可能なものは warning hook、checker、artifact gate、または reviewer finding に逃がします。
 
 - 会話だけを根拠に実装へ進めてはいけません。
 - 導入済みライブラリ棚卸しと既存実装棚卸しをせずに、新規実装や新規 helper 追加へ進めてはいけません。

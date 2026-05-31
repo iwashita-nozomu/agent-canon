@@ -17,6 +17,7 @@ import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,6 +39,10 @@ SAFE_GIT_GLOBAL_OPTION_PREFIXES = (
 )
 SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
 READ_ONLY_COMMANDS = {"cat", "head", "tail", "wc", "ls", "pwd", "nl", "stat", "rg", "grep"}
+STRICT_BLOCKS_ENV = "AGENT_CANON_HOOK_STRICT_BLOCKS"
+STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
+CRITICAL_BLOCKING_CHILD_HOOKS = frozenset({"prompt_secret_guard.py"})
+ADDITIONAL_CONTEXT_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
 SAFE_GIT_READ_SUBCOMMANDS = {"log", "ls-files", "rev-parse", "show", "status"}
 SAFE_GIT_BRANCH_LIST_OPTIONS = {
     "--all",
@@ -443,6 +448,11 @@ def bypass_child_guards_payload(raw_payload: bytes) -> bool:
     return read_only_shell_command(command) or validation_command(command)
 
 
+def env_truthy(name: str) -> bool:
+    """Return whether an environment flag is truthy."""
+    return os.environ.get(name, "").strip().casefold() in {"1", "true", "yes", "on"}
+
+
 def repo_root() -> Path:
     """Return the active repository root for child hook execution."""
     result = subprocess.run(
@@ -541,6 +551,95 @@ def failure_payload(result: HookResult) -> dict[str, object]:
     }
 
 
+def visible_context_payload(
+    event: str,
+    *,
+    reason: str,
+    remediation: Sequence[str] = (),
+    child_outputs: Sequence[dict[str, str]] = (),
+    next_action: str | None = None,
+) -> dict[str, object]:
+    """Return an official non-blocking context payload for a hook event."""
+    context_parts = [reason.strip()] if reason.strip() else []
+    if remediation:
+        context_parts.append(
+            "Remediation:\n" + "\n".join(f"- {item}" for item in remediation)
+        )
+    payload: dict[str, object] = {
+        "systemMessage": reason.strip(),
+    }
+    if event in ADDITIONAL_CONTEXT_EVENTS:
+        payload["hookSpecificOutput"] = {
+            "hookEventName": event,
+            "additionalContext": "\n\n".join(context_parts),
+        }
+    if next_action is not None:
+        payload["next_action"] = next_action
+    if remediation:
+        payload["remediation"] = list(remediation)
+    if child_outputs:
+        payload["child_output_count"] = len(child_outputs)
+        payload["child_outputs"] = list(child_outputs)
+    return payload
+
+
+def failure_warning_payload(event: str, result: HookResult) -> dict[str, object]:
+    """Return a non-blocking warning payload for child process failures."""
+    blocking = failure_payload(result)
+    reason = (
+        "Hook child command failed, but AgentCanon hook policy is fail-open by default. "
+        "Continue the requested work and repair the hook/checker before closeout.\n"
+        f"{blocking['reason']}"
+    )
+    remediation = [
+        f"Run `.codex/hooks/{result.spec.script}` directly with the same payload.",
+        "Fix the child hook failure before closeout or record a durable follow-up.",
+        f"Set `{STRICT_FAILURES_ENV}=1` only in explicit hook-development validation.",
+    ]
+    return visible_context_payload(
+        event,
+        reason=reason,
+        remediation=remediation,
+        next_action="repair_child_hook_failure_without_blocking_current_work",
+    )
+
+
+def should_preserve_block(result: HookResult) -> bool:
+    """Return whether a child block is critical enough to keep blocking."""
+    return result.spec.script in CRITICAL_BLOCKING_CHILD_HOOKS or env_truthy(STRICT_BLOCKS_ENV)
+
+
+def downgraded_block_payload(event: str, result: HookResult) -> dict[str, object]:
+    """Return a non-blocking warning for a non-critical child block."""
+    payload = result.json_stdout() or {}
+    reason = payload.get("reason")
+    reason_text = reason if isinstance(reason, str) and reason.strip() else result.stdout.strip()
+    remediation_raw = payload.get("remediation")
+    remediation = (
+        [str(item) for item in remediation_raw]
+        if isinstance(remediation_raw, list)
+        else []
+    )
+    remediation.extend(
+        [
+            "Treat this as a guardrail finding, not a tool-stop condition.",
+            "Run the named checker or hook directly before closeout if the finding affects the change.",
+            f"Set `{STRICT_BLOCKS_ENV}=1` only for explicit hook enforcement tests.",
+        ]
+    )
+    return visible_context_payload(
+        event,
+        reason=(
+            "Non-critical hook requested a block, but AgentCanon hook policy "
+            "downgraded it to a warning so repository work can continue.\n"
+            f"child_hook={result.spec.script}\n{reason_text}"
+        ).strip(),
+        remediation=remediation,
+        child_outputs=[{"script": result.spec.script, "stdout": result.stdout.strip()}],
+        next_action="address_guardrail_finding_before_closeout",
+    )
+
+
 def non_block_payload(result: HookResult) -> dict[str, object] | None:
     """Return a non-blocking JSON payload emitted by a child hook."""
     payload = result.json_stdout()
@@ -549,7 +648,7 @@ def non_block_payload(result: HookResult) -> dict[str, object] | None:
     return payload
 
 
-def visible_output_payload(results: list[HookResult]) -> dict[str, object] | None:
+def visible_output_payload(event: str, results: list[HookResult]) -> dict[str, object] | None:
     """Combine non-blocking child outputs into one visible approve payload."""
     visible_results = [result for result in results if result.visible()]
     if not visible_results:
@@ -564,9 +663,6 @@ def visible_output_payload(results: list[HookResult]) -> dict[str, object] | Non
         for result in visible_results
         if non_block_payload(result) is None and result.stdout.strip()
     ]
-    if len(visible_results) == 1 and not text_outputs:
-        return payloads[0] if payloads else None
-
     reason_parts: list[str] = []
     remediation: list[str] = []
     for payload in payloads:
@@ -577,18 +673,6 @@ def visible_output_payload(results: list[HookResult]) -> dict[str, object] | Non
         if isinstance(raw_remediation, list):
             remediation.extend(str(item) for item in raw_remediation)
     reason_parts.extend(text_outputs)
-    combined: dict[str, object] = {
-        "decision": "approve",
-        "reason": "\n\n".join(reason_parts),
-        "child_output_count": len(visible_results),
-        "child_outputs": [
-            {
-                "script": result.spec.script,
-                "stdout": result.stdout.strip(),
-            }
-            for result in visible_results
-        ],
-    }
     next_action = next(
         (
             payload.get("next_action")
@@ -597,11 +681,19 @@ def visible_output_payload(results: list[HookResult]) -> dict[str, object] | Non
         ),
         None,
     )
-    if next_action is not None:
-        combined["next_action"] = next_action
-    if remediation:
-        combined["remediation"] = remediation
-    return combined
+    return visible_context_payload(
+        event,
+        reason="\n\n".join(reason_parts),
+        remediation=remediation,
+        child_outputs=[
+            {
+                "script": result.spec.script,
+                "stdout": result.stdout.strip(),
+            }
+            for result in visible_results
+        ],
+        next_action=next_action,
+    )
 
 
 def emit_json_payload(payload: dict[str, object]) -> None:
@@ -622,15 +714,21 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     ]
     blocking = next((result for result in results if result.blocks()), None)
     failure = next((result for result in results if result.failed()), None)
-    visible_payload = visible_output_payload(results)
+    visible_payload = visible_output_payload(event, results)
 
     if blocking is not None:
-        sys.stdout.write(blocking.stdout)
-        if not blocking.stdout.endswith("\n"):
-            sys.stdout.write("\n")
+        if should_preserve_block(blocking):
+            sys.stdout.write(blocking.stdout)
+            if not blocking.stdout.endswith("\n"):
+                sys.stdout.write("\n")
+        else:
+            emit_json_payload(downgraded_block_payload(event, blocking))
         return 0
     if failure is not None:
-        emit_json_payload(failure_payload(failure))
+        if env_truthy(STRICT_FAILURES_ENV):
+            emit_json_payload(failure_payload(failure))
+        else:
+            emit_json_payload(failure_warning_payload(event, failure))
         return 0
     if visible_payload is not None:
         emit_json_payload(visible_payload)

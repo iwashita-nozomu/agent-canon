@@ -318,9 +318,9 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - hook JSONL と eval report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/archive/<env-key>/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py ensure|status|import-legacy|import-eval-results|push` を使います。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
-  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。
+  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL と `agents/evals/eval_result_families.toml` の eval family report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。
   - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/archive/<env-key>/eval-results/workflow-selection/` に詳細結果を蓄積します。
-  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。
+  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。role / routing / model policy の変更時は `--accumulate` で `codex-agent-role` family に結果を積みます。
   - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
   - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
   - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。
@@ -334,7 +334,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/agent_tools/tool_catalog.py`
   - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
 - `tools/agent_tools/tool_drift.py`
-  - GitHub PR flow、AgentCanon PR check、dependency review、convention compliance、tool catalog の dependency-header trace を検査します。
+  - GitHub PR flow、AgentCanon PR check、dependency review、skill/workflow prompt eval、runtime alignment、skill mirror parity、convention compliance、tool catalog の dependency-header trace を検査します。
 - `tools/agent_tools/check_hardcoded_numbers.py`
   - Python / C++ source の裸の数値リテラルを検出します。既定では小さい普遍的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
 - `tools/agent_tools/check_static_any.py`

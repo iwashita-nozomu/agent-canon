@@ -11,6 +11,8 @@ upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection han
 ## Purpose
 
 specialist delegation が必要な task で、run bundle、役割分担、write-scope を崩さずに起動します。
+この skill は launch mechanics の正本であり、workflow family の選定や prompt /
+config policy の第二の正本にはしません。
 
 ## Use When
 
@@ -19,6 +21,7 @@ specialist delegation が必要な task で、run bundle、役割分担、write-
 - reviewer / implementer の責務を分けたい
 - 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent を分けたい
 - `/goal` 確定前に read-only subagent、または明示許可待ちの handoff plan で goal draft、repo survey、first-slice plan を固めたい
+- prompt、routing、subagent-config drift の修正前に dedicated prompt-audit subagent を挟みたい
 
 ## Core References
 
@@ -78,11 +81,14 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 repo-changing task では、`--task-id` を使って task catalog の default specialist と default review pack をそのまま有効化します。
+prompt / routing / subagent-config drift を直す task では、shared policy prose を
+直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
+対象 surface と最小差分を先に固定します。
 goal-driven repo-changing task では、`/goal` がまだ exact でなくても provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only handoff plan を先に作ります。active runtime が明示許可を持つ場合だけ、その wave を起動します。
 write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
-subagent の model / reasoning は `.codex/config.toml` の `agents.model_policy` を先に読みます。
+subagent の model / reasoning は `.codex/config.toml` の `agent_model_policy` を先に読みます。
 repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、明示許可がある場合に Spark bucket の read-only wave へ先に切ります。bounded review、report traceability、checklist-style review gate は mini review bucket へ先に切ります。parent は結果統合、設計判断、scope 判断、最終責任へ集中します。
 実装 slice は 1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を `.codex/config.toml` の Spark bucket の `model` と `model_reasoning_effort` で再起動します。

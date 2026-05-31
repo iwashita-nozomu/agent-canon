@@ -98,11 +98,9 @@ def load_project_config_toml() -> dict[str, object]:
 
 def iter_model_policy_buckets(config: dict[str, object]) -> list[tuple[str, dict[str, object]]]:
     """Return model policy buckets from `.codex/config.toml`."""
-    agents = config.get("agents", {})
-    ensure(isinstance(agents, dict), "agents config must be a mapping")
-    model_policy = agents.get("model_policy", {})
-    ensure(isinstance(model_policy, dict), "agents.model_policy must be a mapping")
-    ensure(model_policy, "agents.model_policy must not be empty")
+    model_policy = config.get("agent_model_policy", {})
+    ensure(isinstance(model_policy, dict), "agent_model_policy must be a mapping")
+    ensure(model_policy, "agent_model_policy must not be empty")
     buckets: list[tuple[str, dict[str, object]]] = []
     for bucket_id, raw_bucket in sorted(model_policy.items()):
         ensure(isinstance(raw_bucket, dict), f"model policy {bucket_id} must be a mapping")
@@ -168,7 +166,7 @@ def validate_project_config() -> None:
     registry = {
         key: value
         for key, value in agents.items()
-        if isinstance(value, dict) and key != "model_policy"
+        if isinstance(value, dict)
     }
     missing_registry = sorted(set(codex_agents) - set(registry))
     extra_registry = sorted(set(registry) - set(codex_agents))
