@@ -1440,13 +1440,13 @@ required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate
 id = "EVALS-README-ACCUMULATE-1"
 critical = true
 description = "Documents accumulated prompt eval results for skill use."
-required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/"]
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/"]
 
 [[evals.checklist]]
 id = "EVALS-README-HOOK-GUIDE-1"
 critical = true
 description = "Documents hook result accumulation and PR/push improvement guide generation."
-required_regex = [".agent-canon/archive/<env-key>", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+required_regex = [".agent-canon/log-archive", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
 
 [[evals.checklist]]
 id = "EVALS-README-PROMPT-FEEDBACK-1"
@@ -1500,7 +1500,7 @@ required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplica
 id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
 critical = true
 description = "Requires unique accumulated prompt eval report naming."
-required_regex = ["--accumulate", ".agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
+required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
 
 [[evals]]
 id = "agent-log-analysis-archive-api-skill"

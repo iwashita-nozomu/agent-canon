@@ -39,6 +39,9 @@ from agent_team import (  # noqa: E402
 from runtime_log_paths import eval_results_dir  # noqa: E402
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25
+DEFAULT_RESULTS_FAMILY = "codex-agent-role"
+RUN_ID_DIGEST_LENGTH = 10
+GIT_COMMAND_TIMEOUT_SECONDS = 5
 ModelPolicy = dict[str, tuple[str, str, str]]
 
 
@@ -111,6 +114,20 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional JSON summary path. When set, stdout omits full finding and model-matrix detail.",
     )
+    parser.add_argument("--accumulate", action="store_true")
+    parser.add_argument(
+        "--results-dir",
+        default="",
+        help=(
+            "Directory for accumulated reports. Defaults to the mounted "
+            "AgentCanon log archive eval-results/codex-agent-role path."
+        ),
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional run bundle id recorded in accumulated reports.",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -135,33 +152,36 @@ def load_agent_configs(root: Path) -> dict[str, dict[str, object]]:
 
 
 def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
-    """Return role model policy from centralized Codex config."""
-    policy: ModelPolicy = {}
+    """Load role model policy from the centralized Codex config."""
     findings: list[Finding] = []
     config_path = root / ".codex" / "config.toml"
+    if not config_path.is_file():
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    agents = config.get("agents", {})
-    if not isinstance(agents, dict):
-        return policy, [Finding("model-policy", ".codex/config.toml", "agents-not-mapping")]
-    buckets = agents.get("model_policy", {})
-    if not isinstance(buckets, dict):
-        return policy, [Finding("model-policy", ".codex/config.toml", "model-policy-not-mapping")]
-    for bucket_id, raw_bucket in sorted(buckets.items()):
+    buckets = config.get("agent_model_policy")
+    if not isinstance(buckets, dict) or not buckets:
+        return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
+    policy: ModelPolicy = {}
+    for bucket_id, raw_bucket in sorted(cast(dict[str, object], buckets).items()):
         if not isinstance(raw_bucket, dict):
-            findings.append(Finding("model-policy", str(bucket_id), "bucket-not-mapping"))
+            findings.append(Finding("model-policy", str(bucket_id), "bucket-not-table"))
             continue
-        model = raw_bucket.get("model")
-        effort = raw_bucket.get("model_reasoning_effort")
-        roles = raw_bucket.get("roles")
-        if not isinstance(model, str) or not isinstance(effort, str) or not isinstance(roles, list):
-            findings.append(Finding("model-policy", str(bucket_id), "bucket-missing-model-effort-or-roles"))
+        bucket = cast(dict[str, object], raw_bucket)
+        model = bucket.get("model")
+        effort = bucket.get("model_reasoning_effort")
+        roles = bucket.get("roles")
+        if not isinstance(model, str) or not model:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-model"))
             continue
-        for role in roles:
-            if not isinstance(role, str) or not role:
-                findings.append(Finding("model-policy", str(bucket_id), "role-not-string"))
-                continue
+        if not isinstance(effort, str) or not effort:
+            findings.append(Finding("model-policy", str(bucket_id), "missing-effort"))
+            continue
+        if not isinstance(roles, list) or not all(isinstance(role, str) and role for role in roles):
+            findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
+            continue
+        for role in cast(list[str], roles):
             if role in policy:
-                findings.append(Finding("model-policy", role, "duplicate-role-policy"))
+                findings.append(Finding("model-policy", role, "duplicate-policy-role"))
                 continue
             policy[role] = (str(bucket_id), model, effort)
     return policy, findings
@@ -516,7 +536,7 @@ def write_compact_summary(path: Path, report: EvalReport) -> None:
     )
 
 
-def write_markdown_report(path: Path, report: EvalReport) -> None:
+def write_markdown_report(path: Path, report: EvalReport) -> Path:
     """Write a Markdown role eval report."""
     lines = [
         "# Codex Agent Role Eval",
@@ -579,9 +599,16 @@ def main() -> int:
     report = evaluate(args.root, cast(list[str], args.runtime_log), str(args.run_id))
     report_paths: list[Path] = []
     if args.report_out is not None:
-        write_markdown_report(args.report_out, report)
+        report_paths.append(write_markdown_report(args.report_out, report))
     if args.compact_out is not None:
         write_compact_summary(args.compact_out, report)
+    if args.accumulate:
+        report_paths.append(
+            write_markdown_report(
+                accumulated_report_path(resolve_results_dir(args.root, str(args.results_dir)), report),
+                report,
+            )
+        )
     if args.format == "json":
         print(json.dumps(asdict(report), indent=2, sort_keys=True))
     else:
@@ -593,6 +620,10 @@ def main() -> int:
             ),
             end="",
         )
+        for path in report_paths:
+            print(f"CODEX_AGENT_ROLE_EVAL_REPORT={path}")
+        if args.accumulate and report_paths:
+            print(f"CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT={report_paths[-1]}")
     return 0 if report.status == "pass" else 1
 
 

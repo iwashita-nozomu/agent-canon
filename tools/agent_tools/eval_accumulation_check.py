@@ -57,6 +57,7 @@ WORKFLOW_SELECTION_REPORT_RE = re.compile(
 REPORT_QUALITY_REPORT_RE = re.compile(
     r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
+DEFAULT_FAMILY_REGISTRY = Path("agents") / "evals" / "eval_result_families.toml"
 COMPACT_FINDING_SAMPLE_LIMIT = 25
 
 
@@ -422,10 +423,12 @@ def render_json(report: EvalAccumulationReport) -> str:
             "hook_files": report.hook_files,
             "hook_entries": report.hook_entries,
             "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
-            "skill_reports": report.skill_reports,
-            "local_llm_reports": report.local_llm_reports,
-            "workflow_selection_reports": report.workflow_selection_reports,
-            "report_quality_reports": report.report_quality_reports,
+            "eval_report_counts": report.eval_report_counts,
+            "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
+            "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
+            "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
+            "report_quality_reports": eval_report_count(report, "report-quality"),
+            "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
             "blocking_finding_count": len(blocking),
             "warning_count": len(warnings),
             "findings": [asdict(item) for item in report.findings],
@@ -433,6 +436,19 @@ def render_json(report: EvalAccumulationReport) -> str:
         indent=2,
         sort_keys=True,
     )
+
+
+def eval_report_count(report: EvalAccumulationReport, family_id: str) -> int:
+    """Return a report count for one family id."""
+    return report.eval_report_counts.get(family_id, 0)
+
+
+def eval_family_count_lines(report: EvalAccumulationReport) -> list[str]:
+    """Return generic per-family count lines without dynamic field names."""
+    return [
+        f"EVAL_ACCUMULATION_FAMILY_REPORTS={family_id}:{count}"
+        for family_id, count in sorted(report.eval_report_counts.items())
+    ]
 
 
 def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
@@ -451,10 +467,12 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
         "hook_files": report.hook_files,
         "hook_entries": report.hook_entries,
         "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
-        "skill_reports": report.skill_reports,
-        "local_llm_reports": report.local_llm_reports,
-        "workflow_selection_reports": report.workflow_selection_reports,
-        "report_quality_reports": report.report_quality_reports,
+        "eval_report_counts": report.eval_report_counts,
+        "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
+        "local_llm_reports": eval_report_count(report, "local-llm-responsibility"),
+        "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
+        "report_quality_reports": eval_report_count(report, "report-quality"),
+        "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
         "blocking_finding_samples": [
             asdict(finding) for finding in blocking[:COMPACT_FINDING_SAMPLE_LIMIT]
         ],
@@ -494,10 +512,14 @@ def render_text(
             f"EVAL_ACCUMULATION_HOOK_ENTRIES={report.hook_entries}",
             "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
             f"{report.hook_legacy_missing_namespace}",
-            f"EVAL_ACCUMULATION_SKILL_REPORTS={report.skill_reports}",
-            f"EVAL_ACCUMULATION_LOCAL_LLM_REPORTS={report.local_llm_reports}",
-            f"EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS={report.workflow_selection_reports}",
-            f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={report.report_quality_reports}",
+            f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
+            "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS="
+            f"{eval_report_count(report, 'local-llm-responsibility')}",
+            "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS="
+            f"{eval_report_count(report, 'workflow-selection')}",
+            f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}",
+            f"EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS={eval_report_count(report, 'codex-agent-role')}",
+            *eval_family_count_lines(report),
             f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}",
             f"EVAL_ACCUMULATION_BLOCKING_FINDINGS={len(blocking)}",
             f"EVAL_ACCUMULATION_WARNINGS={len(warnings)}",
@@ -512,7 +534,7 @@ def render_text(
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the eval accumulation checker."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root)
+    report = validate(args.root, str(args.family_registry))
     if args.compact_out is not None:
         write_compact_summary(args.compact_out, report)
     if args.format == "json":

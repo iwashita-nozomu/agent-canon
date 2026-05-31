@@ -109,6 +109,22 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertEqual(payload["finding_count"], 0)
             self.assertIn("frontier_judgment", payload["model_buckets"])
 
+    def test_accumulate_writes_role_eval_report(self) -> None:
+        """Role evals should accumulate through the shared eval result contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results_dir = Path(tmp_dir) / "role-results"
+
+            result = run_eval("--accumulate", "--results-dir", str(results_dir), "--run-id", "test-run")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-", result.stdout)
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT=", result.stdout)
+            reports = tuple(results_dir.glob("codex-agent-role-eval-*-pass.md"))
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-", text)
+            self.assertIn("run_id: `test-run`", text)
+
     def test_runtime_metrics_report_invalid_numeric_values(self) -> None:
         """Malformed metric values should produce findings instead of tracebacks."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -27,7 +27,15 @@ class EvalAccumulationCheckTest(unittest.TestCase):
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
         return subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(root), *args],
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--root",
+                str(root),
+                "--family-registry",
+                str(PROJECT_ROOT / "agents" / "evals" / "eval_result_families.toml"),
+                *args,
+            ],
             check=False,
             capture_output=True,
             text=True,
@@ -276,7 +284,7 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
                 encoding="utf-8",
             )
 
-            result = self.run_checker(root, registry_path)
+            result = self.run_checker(root, "--family-registry", str(registry_path))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION_FAMILY_REPORTS=abstract-review:1", result.stdout)

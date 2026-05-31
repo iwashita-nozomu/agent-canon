@@ -26,7 +26,7 @@ JSONL and accumulated eval archive branch policy belong to
 - `reports/` stores repo-wide automation reports, dependency reviews, lint
   reports, merge audits, and other project-level checks.
 - external runtime hook JSONL and accumulated eval reports live under
-  `.agent-canon/archive/<env-key>/...` as defined by
+  `.agent-canon/log-archive/...` as defined by
   `documents/runtime-log-archive.md`.
 - `experiments/<topic>/result/<run-id>/` stores raw experiment outputs, JSONL,
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
