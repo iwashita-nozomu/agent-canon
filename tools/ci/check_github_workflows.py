@@ -281,7 +281,7 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "tools/bin/agent-canon local-llm eval",
     "evaluate_workflow_selection.py",
     "evaluate_report_quality.py",
-    "run_repo_dependency_review.sh --fail-missing",
+    "run_repo_dependency_review.sh --fail-missing --cycle-report-only",
     "check_github_workflows.py",
     "container_config.py",
 )
