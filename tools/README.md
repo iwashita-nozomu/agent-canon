@@ -192,7 +192,7 @@ artifact skills.
   - `container_config.py` は standalone AgentCanon では repo-local Docker absence を許容し、template / derived repo では repo-local `docker/Dockerfile` / `docker/packs/*.toml` と AgentCanon-owned `.devcontainer/` の静的整合を検査します。
   - `scan_secrets.sh` は `gitleaks`、`trufflehog`、`detect-secrets` を使って current tracked tree と git history を検査します。公開 repo 化、credential rotation、release 前 security audit で実行します。shared devcontainer の `post-create.sh` はこれら 3 scanner を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin` と `/usr/local/bin` に入れます。
 - `docs/`
-  - Markdown lint、math check、link audit、format、mirror sync、design document consolidation helpers
+  - Markdown lint、math check、math fixer、link audit、format、mirror sync、design document consolidation helpers
 - `data/`
   - JSONL-to-Markdown conversion and compact result-data transforms
 - `hlo/`
