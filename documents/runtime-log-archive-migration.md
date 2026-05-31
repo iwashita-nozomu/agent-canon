@@ -11,6 +11,12 @@ downstream implementation ../tools/agent_tools/eval_accumulation_check.py valida
 
 # Runtime Log Archive Migration
 
+This document is procedure-only. It covers one-time or occasional migration of
+old in-tree runtime logs into the external archive. Archive ownership, branch
+policy, and steady-state mount rules stay in `documents/runtime-log-archive.md`.
+General artifact retention rules stay in
+`documents/result-log-retention-and-visualization.md`.
+
 This document is the AgentCanon-side migration procedure for old hook JSONL and
 accumulated eval reports that still exist under `agents/evals/results/`.
 

@@ -614,8 +614,60 @@ class CodexHooksTest(unittest.TestCase):
             ],
         )
 
-    def test_hook_dispatcher_child_launch_failure_returns_block_after_later_hooks(self) -> None:
-        """Dispatcher should report child launch failures without skipping later hooks."""
+    def test_hook_dispatcher_downgrades_noncritical_child_blocks(self) -> None:
+        """Dispatcher should keep non-secret guard findings from stopping work."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            child_payloads = {
+                "log_archive_mount_warning.py": None,
+                "prompt_secret_guard.py": None,
+                "skill_usage_logger.py": None,
+                "reference_capture_guard.py": {
+                    "decision": "block",
+                    "reason": "missing reference registration",
+                    "remediation": ["register the reference"],
+                },
+            }
+            for script_name, output_payload in child_payloads.items():
+                output_json = json.dumps(output_payload) if output_payload else ""
+                (hook_dir / script_name).write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            f"output = {output_json!r}",
+                            "if output:",
+                            "    print(output)",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "UserPromptSubmit"],
+                cwd=temp_root,
+                input="payload-data",
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+
+        self.assertNotIn("decision", payload)
+        self.assertEqual(payload["next_action"], "address_guardrail_finding_before_closeout")
+        self.assertIn("downgraded it to a warning", cast(str, payload["systemMessage"]))
+        self.assertIn("reference_capture_guard.py", cast(str, payload["systemMessage"]))
+        self.assertIn("register the reference", cast("list[str]", payload["remediation"]))
+
+    def test_hook_dispatcher_child_launch_failure_warns_after_later_hooks(self) -> None:
+        """Dispatcher should fail open on child hook failures after later hooks run."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             hook_dir = temp_root / "hooks"
@@ -667,8 +719,15 @@ class CodexHooksTest(unittest.TestCase):
             payload = cast("dict[str, object]", json.loads(result.stdout))
             invocations = log_path.read_text(encoding="utf-8").splitlines()
 
-        self.assertEqual(payload["decision"], "block")
-        self.assertIn("log_archive_mount_warning.py", cast(str, payload["reason"]))
+        self.assertNotIn("decision", payload)
+        self.assertIn("hookSpecificOutput", payload)
+        self.assertIn("log_archive_mount_warning.py", cast(str, payload["systemMessage"]))
+        hook_output = cast("dict[str, object]", payload["hookSpecificOutput"])
+        self.assertEqual(hook_output["hookEventName"], "UserPromptSubmit")
+        self.assertIn(
+            "fail-open by default",
+            cast(str, hook_output["additionalContext"]),
+        )
         self.assertEqual(
             invocations,
             [
@@ -727,10 +786,11 @@ class CodexHooksTest(unittest.TestCase):
 
             payload = cast("dict[str, object]", json.loads(result.stdout))
 
-        self.assertEqual(payload["decision"], "approve")
+        self.assertNotIn("decision", payload)
+        self.assertIn("hookSpecificOutput", payload)
         self.assertEqual(payload["child_output_count"], 2)
-        self.assertIn("first warning", cast(str, payload["reason"]))
-        self.assertIn("plain diagnostic", cast(str, payload["reason"]))
+        self.assertIn("first warning", cast(str, payload["systemMessage"]))
+        self.assertIn("plain diagnostic", cast(str, payload["systemMessage"]))
         self.assertEqual(payload["next_action"], "first_action")
 
     def test_hook_dispatcher_skips_git_status_tool_payloads(self) -> None:

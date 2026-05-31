@@ -13,10 +13,20 @@ upstream design ../README.md shared canon overview
 この template では、Python 実装、pytest/pyright/ruff、Markdown 文書と report review を常設前提にします。
 skill を user-facing に明示するときは `$skill-name` を使います。
 
+## Recommended Read Order
+
+1. `README.md`
+1. `documents/README.md`
+1. `agents/README.md`
+1. `agents/workflows/README.md`
+
+`agents/canonical/README.md` は layout appendix です。最初の人間向け hub として
+使わず、この file から必要になったときだけ参照します。
+
 ## 正本
 
 - [canonical/README.md](canonical/README.md)
-  - 共通レイアウトと正本の置き場
+  - 共通レイアウトと正本の置き場を説明する appendix
 - [agents_config.json](agents_config.json)
   - チーム定義と write policy
 - [TASK_WORKFLOWS.md](TASK_WORKFLOWS.md)
@@ -81,7 +91,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - Lite scoped always-on roles:
   - `manager`, `implementer`, `change_reviewer`, `verifier`, `auditor`
 - Specialist roles:
-  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
+  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `prompt_config_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`, `critical_guardian`
 - `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
 - `designer` は常に `implementer` より前に走ります。
 - review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
@@ -95,8 +105,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
-- 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward`、`python_reviewer`、`cpp_reviewer` を明示します。
-- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、言語差分に応じた reviewer を固定 stack にします。
+- 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、`python_reviewer`、`cpp_reviewer` を明示します。
+- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を固定 stack にします。
 - planning を含む Codex session では、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
@@ -168,6 +178,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ## 運用ルール
 
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
+- workflow family 選択はこの hub と `workflows/README.md` を正本にし、`canonical/README.md` を第二の hub にしません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
 - 実行環境固有の都合がある場合だけ、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` に最小限の差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/`、dependency surface、local implementation を先に探索します。

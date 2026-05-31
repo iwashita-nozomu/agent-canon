@@ -121,10 +121,7 @@ def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
     if not config_path.is_file():
         return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
     payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    agents = payload.get("agents")
-    if not isinstance(agents, dict):
-        return {}, [Finding("model-policy", ".codex/config.toml", "missing-agents-table")]
-    model_policy = agents.get("model_policy")
+    model_policy = payload.get("agent_model_policy")
     if not isinstance(model_policy, dict) or not model_policy:
         return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
     role_policy: ModelPolicy = {}

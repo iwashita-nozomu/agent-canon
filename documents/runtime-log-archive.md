@@ -16,6 +16,12 @@ downstream implementation ../tools/agent_tools/generate_agent_runtime_dashboard.
 
 # Runtime Log Archive
 
+This document owns archive location, branch policy, mount behavior, and push
+rules. Retention classes for general reports and experiment artifacts belong to
+`documents/result-log-retention-and-visualization.md`. The one-time migration
+procedure for old in-tree logs belongs to
+`documents/runtime-log-archive-migration.md`.
+
 AgentCanon runtime hook JSONL and accumulated eval reports are stored in the separate GitHub repository
 `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
 

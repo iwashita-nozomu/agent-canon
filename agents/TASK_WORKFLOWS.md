@@ -194,6 +194,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - `test_designer`
 - `project_reviewer`
 - `docs_workflow_steward`
+- `prompt_config_reviewer`
 - `python_reviewer`
 - `cpp_reviewer`
 - `worker`
