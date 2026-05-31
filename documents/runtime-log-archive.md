@@ -11,6 +11,7 @@ downstream implementation ../.codex/hooks/hook_event_log.py writes hook JSONL in
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
 downstream implementation ../tools/agent_tools/generate_agent_runtime_dashboard.py displays mounted archive evidence
+downstream implementation ../tools/agent_tools/export_codex_runtime_summary.py exports bounded Codex runtime summaries
 @dependency-end
 -->
 
@@ -20,7 +21,7 @@ AgentCanon runtime hook JSONL and accumulated eval reports are stored in the sep
 `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
 
 ```text
-.agent-canon/archive/<env-key>/
+.agent-canon/log-archive/
 ```
 
 The mount is intentionally ignored by AgentCanon Git. It is not a submodule and
@@ -32,13 +33,19 @@ repo AgentCanon pins.
 Normal hook writers use:
 
 ```text
-.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
+.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl
 ```
 
 Normal eval writers use:
 
 ```text
-.agent-canon/archive/<env-key>/eval-results/<family>/<eval-run-id>-<status>*.md
+.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md
+```
+
+Codex runtime summary exporters use:
+
+```text
+.agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl
 ```
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
@@ -87,6 +94,11 @@ python3 tools/agent_tools/runtime_log_archive_git.py push
 Do not copy raw hook JSONL or accumulated eval reports back into AgentCanon
 source. Analysis artifacts such as SQLite caches and dashboards belong to each source repo's ignored
 `reports/.cache/` or `reports/agent-runtime-dashboard/` paths.
+
+Codex runtime summaries are derived from the local Codex runtime state
+(`history.jsonl`, `logs_2.sqlite`, and optional legacy session JSONL). They
+store bounded counters, token observations, and runtime attribution only; prompt
+text and raw tool output stay out of the archive.
 
 ## Legacy In-Tree Migration
 

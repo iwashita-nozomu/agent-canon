@@ -63,3 +63,10 @@ tool = "tools/agent_tools/semantic_provider_html_report.py"
 doc = "documents/tools/semantic_provider_html_report.md"
 language = "python"
 summary = "HTML renderer for semantic-index provider comparison evidence."
+
+[[tool]]
+id = "repo-structure-contract"
+tool = "tools/agent_tools/repo_structure_contract.py"
+doc = "documents/tools/repo_structure_contract.md"
+language = "python"
+summary = "Repository tree versus AgentCanon structure contract checker documentation."

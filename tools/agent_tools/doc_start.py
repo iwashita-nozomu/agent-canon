@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_team import (
@@ -21,7 +21,6 @@ from agent_team import (
     select_roles,
     specialist_role_ids,
 )
-
 
 DOC_KIND_MAP = {
     "long-form": {
@@ -116,7 +115,7 @@ def main() -> int:
     """Run the doc-start command."""
     config = load_team_config()
     args = build_parser(specialist_role_ids(config)).parse_args()
-    created_at = datetime.now(timezone.utc).replace(microsecond=0)
+    created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     workspace_root = Path(args.workspace_root).resolve()
     report_root = resolve_report_root(args.report_root, workspace_root)

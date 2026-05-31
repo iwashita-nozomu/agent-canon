@@ -28,7 +28,7 @@ from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 
@@ -36,7 +36,9 @@ REQUIRED_APT_PACKAGES = (
     "rsync",
     "openssh-client",
     "graphviz",
-    "python3-venv",
+    "python3.11",
+    "python3.11-dev",
+    "python3.11-venv",
 )
 REQUIRED_DOCKERFILE_SNIPPETS = (
     ("docker/register_safe_directories.sh", "must-install-safe-directory-helper"),

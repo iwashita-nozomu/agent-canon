@@ -21,7 +21,7 @@ import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -513,7 +513,7 @@ def write_state(path: Path, report: BuildReport, root: Path, model: str) -> None
     state = {
         "schema_version": SCHEMA_VERSION,
         "root": str(root),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "cards": len(report.cards),
         "llm_requested": report.llm_requested,
         "llm_used": report.llm_used,

@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_canon_preflight import run_agent_canon_preflight
@@ -197,7 +197,7 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 1
-    created_at = datetime.now(timezone.utc).replace(microsecond=0)
+    created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     report_root = resolve_report_root(args.report_root, workspace_root)
     run_id = args.run_id or make_run_id(args.task, created_at)

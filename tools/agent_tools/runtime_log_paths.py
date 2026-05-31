@@ -4,6 +4,7 @@
 # upstream design ../../documents/runtime-log-archive.md runtime log archive ownership and branch policy
 # downstream implementation ../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
 # downstream implementation ./generate_agent_improvement_guide.py reads mounted hook log archives
+# downstream implementation ./export_codex_runtime_summary.py writes bounded Codex runtime summaries
 # downstream implementation ./eval_accumulation_check.py validates mounted hook log archives
 # downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
@@ -22,7 +23,8 @@ from pathlib import Path
 
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
-LOG_ARCHIVE_PARENT = Path(".agent-canon") / "archive"
+LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
+LEGACY_LOG_ARCHIVE_PARENT = Path(".agent-canon") / "archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 NAMESPACE_HASH_LENGTH = 8
 MAX_KEY_LENGTH = 80
@@ -52,8 +54,8 @@ def repo_log_key(root: Path) -> str:
     return f"{name}-{short_hash(str(canonical))}"
 
 
-def log_environment_key(root: Path) -> str:
-    """Return the local environment key used under .agent-canon/archive/."""
+def _log_environment_key(root: Path) -> str:
+    """Return the local environment key used by legacy fallback archives."""
     override = os.environ.get(LOG_ENV_ENV, "").strip()
     if override:
         return safe_slug(override)
@@ -67,7 +69,12 @@ def log_environment_key(root: Path) -> str:
 
 def mounted_log_archive_root(canon_root: Path) -> Path:
     """Return the preferred AgentCanon-local log archive mount path."""
-    return canon_root / LOG_ARCHIVE_PARENT / log_environment_key(canon_root)
+    return canon_root / LOG_ARCHIVE_PARENT
+
+
+def legacy_mounted_log_archive_root(canon_root: Path) -> Path:
+    """Return the previous env-keyed archive mount path."""
+    return canon_root / LEGACY_LOG_ARCHIVE_PARENT / _log_environment_key(canon_root)
 
 
 def is_agent_canon_root(root: Path) -> bool:
@@ -96,7 +103,7 @@ def agent_canon_root(root: Path) -> Path:
 
 def state_log_archive_root(canon_root: Path) -> Path:
     """Return the non-repository fallback log archive root."""
-    env_key = log_environment_key(canon_root)
+    env_key = _log_environment_key(canon_root)
     xdg_state_home = os.environ.get("XDG_STATE_HOME", "").strip()
     if xdg_state_home:
         return Path(xdg_state_home) / "agent-canon" / "archive" / env_key
@@ -114,12 +121,20 @@ def _log_archive_root(canon_root: Path) -> Path:
     mount = mounted_log_archive_root(canon_root)
     if mount.is_dir():
         return mount
+    legacy_mount = legacy_mounted_log_archive_root(canon_root)
+    if legacy_mount.is_dir():
+        return legacy_mount
     return state_log_archive_root(canon_root)
 
 
 def hook_results_dir(active_root: Path, canon_root: Path) -> Path:
     """Return the hook JSONL result directory for one source repository."""
     return _log_archive_root(canon_root) / "hook-runs" / repo_log_key(active_root)
+
+
+def codex_runtime_summary_dir(active_root: Path, canon_root: Path) -> Path:
+    """Return the Codex runtime summary JSONL directory for one source repository."""
+    return _log_archive_root(canon_root) / "codex-runtime" / repo_log_key(active_root)
 
 
 def eval_results_dir(canon_root: Path, family: str) -> Path:
@@ -130,15 +145,20 @@ def eval_results_dir(canon_root: Path, family: str) -> Path:
 def eval_result_search_dirs(canon_root: Path, family: str) -> tuple[Path, ...]:
     """Return eval result directories to read for one family."""
     family_slug = safe_slug(family)
+    archive_root = _log_archive_root(canon_root)
     candidates: list[Path] = [
-        eval_results_dir(canon_root, family_slug),
+        archive_root / "eval-results" / family_slug,
+        archive_root / "eval-results" / "legacy-import" / family_slug,
     ]
     return tuple(dict.fromkeys(candidates))
 
 
 def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Path, ...]:
     """Return hook result directories to read for one repository context."""
+    archive_root = _log_archive_root(canon_root)
     candidates: list[Path] = [
-        hook_results_dir(requested_root, canon_root),
+        archive_root / "hook-runs" / repo_log_key(requested_root),
+        archive_root / "hook-runs" / "legacy-import",
+        archive_root / "hook-runs",
     ]
     return tuple(dict.fromkeys(candidates))

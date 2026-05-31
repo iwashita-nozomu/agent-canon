@@ -85,6 +85,22 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             self.assertIn("format_violations=1", result.stdout)
             self.assertIn("output_used=1", result.stdout)
 
+    def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
+        """Compact mode writes role stats to JSON and keeps stdout bounded."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            compact = Path(tmp_dir) / "roles.json"
+
+            result = run_eval("--compact-out", str(compact))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
+            self.assertIn("CODEX_AGENT_ROLE_COMPACT_OUT=", result.stdout)
+            self.assertNotIn("ROLE_MODEL_MATRIX=", result.stdout)
+            payload = json.loads(compact.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["finding_count"], 0)
+            self.assertIn("frontier_required", payload["model_buckets"])
+
     def test_runtime_metrics_report_invalid_numeric_values(self) -> None:
         """Malformed metric values should produce findings instead of tracebacks."""
         with tempfile.TemporaryDirectory() as tmp_dir:

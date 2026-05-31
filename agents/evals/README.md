@@ -41,6 +41,15 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
   --manifest agents/evals/skill_workflow_prompt_eval.toml
 ```
 
+Agent-facing eval runs should write bounded statistics before the agent reads
+details:
+
+```bash
+python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
+  --manifest agents/evals/skill_workflow_prompt_eval.toml \
+  --compact-out reports/agents/<run-id>/skill-workflow-prompt-compact.json
+```
+
 When a run uses skills, run the same prompt eval with accumulated evidence.
 Detailed reports are stored in the mounted runtime log archive under
 `.agent-canon/archive/<env-key>/eval-results/skill-workflow-prompt/` and are never

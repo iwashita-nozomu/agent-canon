@@ -15,13 +15,13 @@ import json
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 DEFAULT_MANIFEST = Path("documents/agent-canon-update-tasks.toml")
@@ -608,7 +608,7 @@ def render_task_tables(prefix: str, table: Mapping[str, Mapping[str, str]]) -> l
 
 def timestamp() -> str:
     """Return a stable UTC timestamp string."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def update_task_state(

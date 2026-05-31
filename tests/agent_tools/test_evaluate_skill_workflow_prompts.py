@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ from typing import cast
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python 3.10 compatibility.
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -211,6 +212,27 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("## Run Manifest", text)
             self.assertIn("git_commit:", text)
 
+    def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
+        """Compact mode writes stats to JSON and keeps stdout bounded."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            compact = Path(tmp_dir) / "compact.json"
+
+            result = run_eval(
+                "--manifest",
+                "agents/evals/skill_workflow_prompt_eval.toml",
+                "--compact-out",
+                str(compact),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_STATUS=pass", result.stdout)
+            self.assertIn("EVAL_COMPACT_OUT=", result.stdout)
+            self.assertNotIn("EVAL_CHECK eval=", result.stdout)
+            payload = json.loads(compact.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["critical_failed"], 0)
+            self.assertGreater(payload["checks_total"], 0)
+
     def test_existing_report_out_gets_unique_sibling(self) -> None:
         """An existing report path should not be overwritten."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -363,12 +385,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(len(reports), 1)
             text = reports[0].read_text(encoding="utf-8")
             header = text.split("-->", 1)[0]
-            self.assertIn(
-                "upstream implementation ../../../../../tools/agent_tools/"
-                "evaluate_skill_workflow_prompts.py",
-                header,
-            )
-            self.assertIn("upstream design ../../../../../agents/evals/skill_workflow_prompt_eval.toml", header)
+            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", header)
+            self.assertIn("agents/evals/skill_workflow_prompt_eval.toml", header)
             self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:

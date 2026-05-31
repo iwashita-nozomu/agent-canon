@@ -10,7 +10,7 @@ downstream implementation agent_tools/tool_drift.py validates tool/convention tr
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation agent_tools/agent_canon_log_management_check.py validates hook/eval log management boundaries
+downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
@@ -59,9 +59,10 @@ python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/parent_repo_readiness.py
+python3 tools/agent_tools/repo_structure_contract.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
-python3 tools/agent_tools/agent_canon_log_management_check.py
+python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
 agent-canon local-llm build-index
 python3 tools/agent_tools/route.py --area search
@@ -69,6 +70,12 @@ agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
 python3 tools/agent_tools/evaluate_codex_agent_roles.py
 ```
+
+For agent-facing diagnostics, prefer compact artifact options over detailed
+stdout: `evaluate_skill_workflow_prompts.py --compact-out <path>.json`,
+`evaluate_codex_agent_roles.py --compact-out <path>.json`, and
+`eval_accumulation_check.py --compact-out <path>.json` write bounded summary
+statistics for the agent to read before drilling into full reports.
 
 `tool_catalog.py` validates catalog shape, path existence, per-entry summaries,
 docs/tests, default wiring, retired legacy paths, and tool-doc one-to-one
@@ -85,6 +92,10 @@ and linked operational issues.
 the expected AgentCanon submodule shape, shared root views, parent-owned
 document contracts, update state, MCP launcher, and Docker/devcontainer
 environment surfaces before an agent treats the repo as ready.
+`repo_structure_contract.py` runs `tree -a -J` and compares the observed
+directory / file layout with `documents/repo-structure-contract.toml`.
+The TOML contract owns profiles, ignored generated paths, required paths, and
+unexpected top-level severity.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -92,9 +103,8 @@ for PR summaries.
 `eval_accumulation_check.py` validates that hook JSONL, skill prompt eval, and local LLM eval
 reports are readable from the mounted runtime log archive. The source tree
 must not contain `agents/evals/results/` result artifacts.
-`agent_canon_log_management_check.py` validates that dirty hook/eval JSONL
-stays on `agent-logs/*` branches and that each hook entry's
-`hook_log_namespace` matches its JSONL namespace directory.
+`runtime_log_archive_git.py status` validates that the mounted log archive has
+a usable Git branch/worktree state before log evidence is pushed.
 `agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
@@ -151,14 +161,15 @@ under `.agent-canon/archive/<env-key>/eval-results/report-quality/`.
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
   - `parent_repo_readiness.py` は template / derived parent repo に AgentCanon が期待する submodule shape、root view、parent-owned document contract、update state、MCP launcher、Docker/devcontainer environment surface が揃っているかをまとめて検査します。
+  - `repo_structure_contract.py` は top-level から `tree -a -J` で取得した構成を `documents/repo-structure-contract.toml` の profile と比較し、想定 repo 構成、ignore、unexpected top-level を source-code hardcode なしで検査します。
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
-  - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。
-  - `agent_canon_log_management_check.py` は dirty hook/eval JSONL が product branch / detached checkout に残っていないこと、hook path namespace と `hook_log_namespace` が一致することを検査します。
+  - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
+  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / push 操作を担当します。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
-  - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を評価します。
+  - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning bucket、cheap-first routing、optional runtime metric JSONL を評価します。agent-facing run では `--compact-out` の JSON summary を読み、model matrix と finding detail は artifact へ分離します。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。

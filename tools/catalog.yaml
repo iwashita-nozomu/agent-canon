@@ -159,6 +159,25 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: repo-structure-contract
+    summary: Compares an observed repository tree with the AgentCanon structure contract.
+    path: tools/agent_tools/repo_structure_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/repo_structure_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repo_structure_contract.md
+      - documents/repo-structure-contract.toml
+    tests:
+      - tests/agent_tools/test_repo_structure_contract.py
+
   - id: import-responsibility
     summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
     path: tools/agent_tools/import_responsibility.py
@@ -217,26 +236,6 @@ entries:
       - documents/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
-
-  - id: agent-canon-log-management-check
-    summary: Validates hook/eval log branch ownership and hook namespace consistency.
-    path: tools/agent_tools/agent_canon_log_management_check.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent_tools/agent_canon_log_management_check.py
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/evals/README.md
-      - documents/runtime-log-archive.md
-      - documents/runtime-log-archive-migration.md
-    tests:
-      - tests/agent_tools/test_agent_canon_log_management_check.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.

@@ -3,6 +3,7 @@
 # responsibility Dispatches Codex lifecycle hook events to the configured guard scripts.
 # upstream implementation ../hooks.json invokes this dispatcher once per active hook event.
 # upstream design ../README.md documents dispatcher-based hook wiring.
+# downstream implementation ./codex_runtime_summary_logger.py exports bounded Codex runtime summaries on Stop
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch order and hook count.
 # @dependency-end
 
@@ -191,6 +192,7 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
         HookCommandSpec("notebook_quality_guard.py", STANDARD_GUARD_TIMEOUT_SECONDS),
         HookCommandSpec("reference_capture_guard.py", REFERENCE_CAPTURE_TIMEOUT_SECONDS),
         HookCommandSpec("skill_usage_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("codex_runtime_summary_logger.py", FAST_HOOK_TIMEOUT_SECONDS),
     ),
 }
 

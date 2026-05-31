@@ -18,7 +18,7 @@ from pathlib import Path
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 MANAGED_RUN_ARTIFACTS = frozenset({"run_manifest.json", "eval_manifest.json", "run.log"})

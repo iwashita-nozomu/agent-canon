@@ -3,7 +3,7 @@
 @dependency-start
 responsibility Documents agent-log-analysis for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../evals/results/README.md accumulated eval and hook result storage
+upstream design ../../documents/runtime-log-archive.md accumulated eval and hook result storage
 upstream design ../../documents/search-coordination.md coordinated search policy
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates compact runtime summaries
 downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill

@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -241,7 +241,7 @@ def main() -> int:
             for role_id in BASE_RESEARCH_ROLE_IDS + PERSPECTIVE_ROLE_IDS
         )
         roles = config.always_on_roles + specialist_roles
-        created_at = datetime.now(timezone.utc).replace(microsecond=0)
+        created_at = datetime.now(UTC).replace(microsecond=0)
         created_at_iso = created_at.isoformat().replace("+00:00", "Z")
         report_dir = (report_root / args.run_id).resolve()
 
