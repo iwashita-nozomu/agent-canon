@@ -17,7 +17,7 @@ downstream implementation ../../tests/agent_tools/test_route.py should cover the
 -->
 
 issue_id: AC-20260518-api-surface-negative-conclusion
-status: open
+status: resolved
 source: user
 severity: S2
 evidence: reports/dependency-review/api-surface-negative-conclusion-20260518/search_hits.txt
@@ -26,6 +26,8 @@ edit_scope: reports/dependency-review/api-surface-negative-conclusion-20260518/d
 required_action: Add an API-surface traversal gate that prevents negative capability claims until public exports, config fields, and nested public config factories have been inspected and cited.
 close_condition: Workflow or tooling requires any API "cannot do" conclusion to cite the exact inspected public path, and a focused route or eval test catches the PDIPM-style nested-config miss.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/97
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/153
+resolved_at: 2026-05-31
 
 ## Finding
 
@@ -140,3 +142,10 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 The review produced `REPO_DEPENDENCY_REVIEW=pass` and wrote the expanded edit
 scope to
 `reports/dependency-review/api-surface-negative-conclusion-20260518/dependency_edit_scope.txt`.
+
+## Resolution
+
+PR #153 added the API-surface traversal policy, first-party library guard, task
+authority schema guard, role write policy guard, issue eval coverage, and
+validation-gate parity needed to prevent the recorded negative-capability miss.
+GitHub issue #97 was closed after PR #153 merged.

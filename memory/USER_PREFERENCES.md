@@ -153,6 +153,9 @@ upstream design README.md memory surface index
 - 2026-05-18 | 当面は skill_usage.jsonl などの通常 session usage log も AgentCanon-owned hook result として毎回 AgentCanon branch / PR に commit/push して蓄積する。
   - source: chat
 
+- 2026-05-31 | PDIPM/KKT diagnostics must not use KKT solve accuracy, residual tolerance, or direction acceptance as the fix axis; focus on the mathematical reconstruction of the full Newton update direction from the reduced KKT solution.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
