@@ -1217,6 +1217,102 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("redundant_class_boundary:Port", result.stdout)
 
+    def test_cpp_redundant_class_uses_dependency_sources(self) -> None:
+        """C++ class redundancy should use construction and type-boundary facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            include = root / "include"
+            src = root / "src"
+            include.mkdir()
+            src.mkdir()
+            header = include / "api.hpp"
+            header.write_text(
+                "\n".join(
+                    [
+                        "struct Projection {",
+                        "  int run(int value) const { return value; }",
+                        "};",
+                        "",
+                        "struct Port {",
+                        "  int run(int value) const { return value; }",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (src / "consumer.cpp").write_text(
+                "\n".join(
+                    [
+                        '#include "include/api.hpp"',
+                        "",
+                        "int compute(int value) {",
+                        "  Projection projection;",
+                        "  return projection.run(value);",
+                        "}",
+                        "",
+                        "int accepts_port(const Port& port, int value) {",
+                        "  return port.run(value);",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(root, "--min-score", "100", str(header))
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+            self.assertNotIn("redundant_class_boundary:Port", result.stdout)
+
+    def test_cpp_usage_root_extends_redundant_class_construction_sources(self) -> None:
+        """Explicit usage roots should inform selected-file C++ class analysis."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            library = root / "library"
+            consumer = root / "consumer"
+            library.mkdir()
+            consumer.mkdir()
+            header = library / "model.hpp"
+            header.write_text(
+                "\n".join(
+                    [
+                        "struct Projection {",
+                        "  int run(int value) const { return value; }",
+                        "};",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (consumer / "consumer.cpp").write_text(
+                "\n".join(
+                    [
+                        '#include "../library/model.hpp"',
+                        "",
+                        "int compute(int value) {",
+                        "  Projection projection{};",
+                        "  return projection.run(value);",
+                        "}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_cpp_analyzer(
+                library,
+                "--min-score",
+                "100",
+                "--usage-root",
+                str(consumer),
+                str(header),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("redundant_class_boundary:Projection", result.stdout)
+
     def test_cpp_trivial_format_function_is_flagged(self) -> None:
         """C++ format-only wrappers are reported as mathematical redundancy."""
         with tempfile.TemporaryDirectory() as tmp_dir:

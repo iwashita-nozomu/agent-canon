@@ -4540,7 +4540,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "codex_agent_role_reports",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4548,7 +4548,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "eval_report_counts",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4556,7 +4556,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4564,7 +4564,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_entries",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4572,7 +4572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_files",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4580,7 +4580,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_legacy_missing_namespace",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4588,7 +4588,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "local_llm_reports",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4596,7 +4596,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_quality_reports",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4604,7 +4604,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "skill_reports",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4612,7 +4612,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4620,7 +4620,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "workflow_selection_reports",
-      "line": 386,
+      "line": 373,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4636,30 +4636,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION",
-      "line": 441,
-      "path": "tools/agent_tools/eval_accumulation_check.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS",
-      "line": 437,
-      "path": "tools/agent_tools/eval_accumulation_check.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "EVAL_ACCUMULATION_FINDINGS",
-      "line": 440,
-      "path": "tools/agent_tools/eval_accumulation_check.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "EVAL_ACCUMULATION_HOOK_ENTRIES",
       "line": 428,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
@@ -4667,7 +4643,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "EVAL_ACCUMULATION_HOOK_FILES",
+      "field": "EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS",
+      "line": 424,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EVAL_ACCUMULATION_FINDINGS",
       "line": 427,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
@@ -4675,8 +4659,24 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "EVAL_ACCUMULATION_HOOK_ENTRIES",
+      "line": 415,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EVAL_ACCUMULATION_HOOK_FILES",
+      "line": 414,
+      "path": "tools/agent_tools/eval_accumulation_check.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE",
-      "line": 429,
+      "line": 416,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4684,7 +4684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_LOCAL_LLM_REPORTS",
-      "line": 434,
+      "line": 421,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4692,7 +4692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS",
-      "line": 436,
+      "line": 423,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4700,7 +4700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_SKILL_REPORTS",
-      "line": 433,
+      "line": 420,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4708,7 +4708,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS",
-      "line": 435,
+      "line": 422,
       "path": "tools/agent_tools/eval_accumulation_check.py",
       "surface": "tool"
     },
@@ -4764,7 +4764,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 570,
+      "line": 584,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4772,7 +4772,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 570,
+      "line": 584,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4780,7 +4780,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 481,
+      "line": 495,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4788,7 +4788,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL",
-      "line": 511,
+      "line": 525,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4796,7 +4796,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 480,
+      "line": 494,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4804,7 +4804,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_EVAL_RUN_ID",
-      "line": 510,
+      "line": 524,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4812,7 +4812,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDING",
-      "line": 63,
+      "line": 65,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4820,7 +4820,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 482,
+      "line": 496,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4828,7 +4828,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "CODEX_AGENT_ROLE_FINDINGS",
-      "line": 512,
+      "line": 526,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4836,7 +4836,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_MODEL_MATRIX",
-      "line": 484,
+      "line": 498,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4844,7 +4844,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRIC",
-      "line": 488,
+      "line": 502,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4852,7 +4852,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 483,
+      "line": 497,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4860,7 +4860,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ROLE_RUNTIME_METRICS_STATUS",
-      "line": 513,
+      "line": 527,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4868,7 +4868,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT",
-      "line": 576,
+      "line": 590,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -4876,7 +4876,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CODEX_AGENT_ROLE_EVAL_REPORT",
-      "line": 574,
+      "line": 588,
       "path": "tools/agent_tools/evaluate_codex_agent_roles.py",
       "surface": "tool"
     },
@@ -5372,7 +5372,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_IMPROVEMENT_GUIDE",
-      "line": 888,
+      "line": 898,
       "path": "tools/agent_tools/generate_agent_improvement_guide.py",
       "surface": "tool"
     },
@@ -11268,7 +11268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11276,7 +11276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "summary",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11284,7 +11284,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11292,7 +11292,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "summary",
-      "line": 3823,
+      "line": 4206,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11300,7 +11300,15 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 2528,
+      "line": 1585,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 2856,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11322,9 +11330,17 @@
     },
     {
       "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "construct",
+      "line": 490,
+      "path": "tools/oop/shared/readability_core.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY",
-      "line": 3855,
+      "line": 4238,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11332,7 +11348,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FILES",
-      "line": 3850,
+      "line": 4233,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11340,7 +11356,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_FINDINGS",
-      "line": 3851,
+      "line": 4234,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11348,7 +11364,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_GRADE",
-      "line": 3853,
+      "line": 4236,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11356,7 +11372,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_SCORE",
-      "line": 3852,
+      "line": 4235,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },
@@ -11364,7 +11380,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "OOP_READABILITY_WARN_OR_ERROR_PER_KLOC",
-      "line": 3854,
+      "line": 4237,
       "path": "tools/oop/shared/readability_core.py",
       "surface": "tool"
     },

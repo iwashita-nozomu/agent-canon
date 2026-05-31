@@ -49,6 +49,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("diff_triage_reviewer:spark_read", result.stdout)
         self.assertIn("experiment_runner:spark_coding", result.stdout)
         self.assertIn("manager_reviewer:mini_review", result.stdout)
+        self.assertIn("plan_reviewer:mini_review", result.stdout)
         self.assertIn("ship_reviewer:frontier_judgment", result.stdout)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
