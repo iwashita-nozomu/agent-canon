@@ -18,6 +18,7 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py run
 downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
+downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
 @dependency-end
 -->
 
@@ -64,6 +65,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Markdown/plain text を SQLite-backed prose graph に取り込み、projection、
     diagnostics、natural-language explanation、split/merge/bridge/reorder
     operation、既存 writing/review skill への handoff packet を出します。
+  - DSL vocabulary and validation are defined in
+    [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md).
 - `agent-canon local-llm search`
   - `--purpose` を受け取り、text、LLM semantic card、TF-IDF vector、tool catalog、dependency header、Python code fact を協調させて候補 path と evidence を返します。
 - `agent-canon local-llm build-index`

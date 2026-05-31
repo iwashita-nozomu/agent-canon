@@ -1,6 +1,7 @@
 <!--
 @dependency-start
 responsibility Documents prose_reasoning_graph.py usage and contract.
+upstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed prose reasoning graphs
 upstream design ../../agents/workflows/workflow-references.md discourse, argument, and writing prior art
 upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
@@ -15,6 +16,11 @@ SQLite-backed prose reasoning graph. The database is an intermediate analysis
 artifact, not a durable source of truth. Use the exported projection,
 diagnostics, explanation, and rewrite packets as evidence for writing skills,
 reviewers, and LLM rewrite passes.
+
+The durable graph/DSL contract lives in
+[Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md).
+This tool document explains command usage and operator flow; it must not become
+a second copy of the DSL vocabulary.
 
 The graph has explicit layers for source spans, form, concepts, genre moves,
 discourse relations, argument claims, evidence, experiment planning,

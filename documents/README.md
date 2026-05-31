@@ -12,6 +12,7 @@ downstream design ./runtime-profiles-and-check-matrix.md runtime profile and val
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
 downstream design ./rust-agent-tool-migration.md Rust tool migration policy
+downstream design ./prose-reasoning-graph/dsl-spec.md prose graph DSL contract
 @dependency-end
 -->
 
@@ -61,6 +62,9 @@ For the broader agent routing path, return to `agents/README.md`.
   public tool/skill names, compatibility aliases, and routing policy.
 - [Rust Agent Tool Migration](./rust-agent-tool-migration.md): Rust CLI,
   devcontainer toolchain, and Python-to-Rust migration boundaries.
+- [Prose Reasoning Graph](./prose-reasoning-graph/): DSL vocabulary,
+  graph-layer contract, projection rules, diagnostics, edit operations, and
+  future adapter boundaries.
 - [GitHub-First Modules And Devcontainer Boundary](./github-first-module-and-devcontainer-policy.md):
   reusable module distribution, local Git compatibility, Dockerfile ownership,
   and shared devcontainer ownership.
