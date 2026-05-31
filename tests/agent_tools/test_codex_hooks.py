@@ -8,6 +8,9 @@
 # upstream implementation ../../.codex/hooks/helper_inventory_guard.py blocks helper inventory findings
 # upstream implementation ../../.codex/hooks/module_boundary_guard.py blocks forced module rewrites
 # upstream implementation ../../.codex/hooks/library_implementation_guard.py blocks library implementation rewrites
+# upstream implementation ../../.codex/hooks/first_party_library_guard.py blocks first-party API rewrites
+# upstream implementation ../../.codex/hooks/task_authority_schema_guard.py validates task authority
+# upstream implementation ../../.codex/hooks/role_write_policy_guard.py enforces role write policy
 # upstream implementation ../../.codex/hooks/helper_first_guard.py blocks helper-first implementation drift
 # upstream implementation ../../.codex/hooks/cause_investigation_guard.py blocks code edits without cause evidence
 # upstream implementation ../../.codex/hooks/notebook_quality_guard.py blocks notebook quality findings
@@ -46,7 +49,10 @@ OOP_READABILITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "oop_readability_gua
 HELPER_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_inventory_guard.py"
 MODULE_BOUNDARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "module_boundary_guard.py"
 LIBRARY_IMPLEMENTATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "library_implementation_guard.py"
+FIRST_PARTY_LIBRARY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "first_party_library_guard.py"
 HELPER_FIRST_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "helper_first_guard.py"
+TASK_AUTHORITY_SCHEMA_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "task_authority_schema_guard.py"
+ROLE_WRITE_POLICY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "role_write_policy_guard.py"
 CAUSE_INVESTIGATION_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "cause_investigation_guard.py"
 LOG_SURFACE_INVENTORY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "log_surface_inventory_guard.py"
 NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_guard.py"
@@ -446,9 +452,12 @@ class CodexHooksTest(unittest.TestCase):
             [
                 "skill_usage_logger.py",
                 "reference_capture_guard.py",
+                "task_authority_schema_guard.py",
+                "role_write_policy_guard.py",
                 "oop_readability_guard.py",
                 "module_boundary_guard.py",
                 "library_implementation_guard.py",
+                "first_party_library_guard.py",
                 "helper_inventory_guard.py",
                 "helper_first_guard.py",
                 "style_checker_guard.py",
@@ -462,9 +471,12 @@ class CodexHooksTest(unittest.TestCase):
             stop_scripts,
             [
                 "goal_completion_guard.py",
+                "task_authority_schema_guard.py",
+                "role_write_policy_guard.py",
                 "oop_readability_guard.py",
                 "module_boundary_guard.py",
                 "library_implementation_guard.py",
+                "first_party_library_guard.py",
                 "helper_inventory_guard.py",
                 "helper_first_guard.py",
                 "style_checker_guard.py",
@@ -1319,6 +1331,225 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["status"], "fail")
         self.assertEqual(log_entry["changed_library_file_count"], 1)
 
+    def test_task_authority_schema_guard_blocks_invalid_authority_payload(self) -> None:
+        """Task authority schema guard should reject malformed authority files."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            module = temp_root / "app.py"
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("VALUE = 2\n", encoding="utf-8")
+            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority.parent.mkdir(parents=True)
+            authority.write_text("version: 2\nallowed_paths: {}\nroles: []\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "authority.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_AUTHORITY_SCHEMA_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
+                    "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("TASK_AUTHORITY_FINDING=invalid-version", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertIn("next_action", payload)
+        self.assertEqual(log_entry["status"], "fail")
+
+    def test_task_authority_schema_guard_allows_valid_authority_schema(self) -> None:
+        """Task authority schema guard should accept a valid schema."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            module = temp_root / "app.py"
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("VALUE = 2\n", encoding="utf-8")
+            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority.parent.mkdir(parents=True)
+            authority.write_text(
+                "version: 1\n"
+                "run_id: run-1\n"
+                "active_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n"
+                "  - path: app.py\n"
+                "    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities:\n"
+                "  helper_change: []\n"
+                "  first_party_library_change: []\n"
+                "  public_api_change: []\n"
+                "  workflow_change: []\n"
+                "  shared_canon_change: []\n"
+                "roles:\n"
+                "  implementer:\n"
+                "    can_modify_repo: true\n",
+                encoding="utf-8",
+            )
+            log_path = temp_root / "reports" / "hooks" / "authority.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_AUTHORITY_SCHEMA_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
+                    "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+
+    def test_role_write_policy_guard_blocks_artifact_only_repo_edit(self) -> None:
+        """Role write policy guard should block artifact-only roles editing repo files."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            module = temp_root / "app.py"
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            report_dir = temp_root / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            authority = report_dir / "task_authority.yaml"
+            authority.write_text(
+                "version: 1\nrun_id: run-1\nactive_role: change_reviewer\n"
+                "request_clauses: []\nallowed_paths: []\nforbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {change_reviewer: {can_modify_repo: false}}\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("VALUE = 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "role.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
+                    "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("write-scope-violation", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertEqual(log_entry["status"], "fail")
+
+    def test_first_party_library_guard_blocks_api_rewrite_without_authority(self) -> None:
+        """First-party guard should block reusable API edits without task authority."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            api = temp_root / "python" / "pkg" / "api.py"
+            api.parent.mkdir(parents=True)
+            api.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+            (temp_root / "responsibility-scope.toml").write_text(
+                'catalog_kind = "agent_canon_responsibility_scope"\n'
+                "version = 1\n"
+                "[[scope]]\n"
+                'id = "product-python"\n'
+                'owner = "derived-project"\n'
+                'class = "tooling"\n'
+                'paths = ["python/**"]\n',
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            api.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "first-party.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(FIRST_PARTY_LIBRARY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_FIRST_PARTY_LIBRARY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("first-party-library-change-without-authority", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertEqual(log_entry["status"], "fail")
+
+    def test_first_party_library_guard_reports_malformed_scope_manifest(self) -> None:
+        """First-party guard should report malformed scope manifests instead of crashing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            api = temp_root / "python" / "pkg" / "api.py"
+            api.parent.mkdir(parents=True)
+            api.write_text("def value() -> int:\n    return 1\n", encoding="utf-8")
+            (temp_root / "responsibility-scope.toml").write_text("[[scope]\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            api.write_text("def value() -> int:\n    return 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "first-party.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(FIRST_PARTY_LIBRARY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": "",
+                    "AGENT_CANON_FIRST_PARTY_LIBRARY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        rendered = "\n".join(cast("list[str]", payload["findings"]))
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("first-party-manifest-parse-error", rendered)
+        self.assertIn("first-party-library-change-without-authority", rendered)
+        self.assertEqual(log_entry["status"], "fail")
+
     def test_cause_investigation_guard_blocks_code_edit_without_evidence(self) -> None:
         """Cause guard should block code edits before cause evidence exists."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1723,6 +1954,30 @@ class CodexHooksTest(unittest.TestCase):
             doc = temp_root / "documents" / "module-boundary.md"
             doc.parent.mkdir()
             doc.write_text("boundary evidence\n", encoding="utf-8")
+            authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
+            authority.parent.mkdir(parents=True)
+            authority.write_text(
+                "version: 1\n"
+                "run_id: run-1\n"
+                "request_clauses: []\n"
+                "allowed_paths: []\n"
+                "forbidden_paths: []\n"
+                "risky_authorities:\n"
+                "  helper_change:\n"
+                "    - id: helper-format-value\n"
+                "      path: app/module.py\n"
+                "      qualname: _format_value\n"
+                "      owning_module: app/module.py\n"
+                "      caller_paths: [app/module.py]\n"
+                "      existing_helper_gap: no existing formatter owns this module\n"
+                "      tests: [tests/test_module.py]\n"
+                "  first_party_library_change: []\n"
+                "  public_api_change: []\n"
+                "  workflow_change: []\n"
+                "  shared_canon_change: []\n"
+                "roles: {}\n",
+                encoding="utf-8",
+            )
             subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
             subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
             module.write_text("def _format_value(value: int) -> str:\n    return str(value)\n", encoding="utf-8")
@@ -1744,6 +1999,7 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-container",
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
                     "AGENT_CANON_HELPER_FIRST_HOOK_LOG_PATH": str(log_path),
                 },
             )
@@ -1758,6 +2014,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(log_entry["hook_log_namespace"], "test-container")
         self.assertEqual(log_entry["helper_candidate_record_count"], 1)
         self.assertEqual(log_entry["helper_first_candidate_count"], 0)
+        self.assertTrue(cast("list[dict[str, object]]", log_entry["helper_authority_checks"])[0]["matched"])
         self.assertTrue(log_entry["boundary_evidence_changed"])
 
     def test_style_checker_guard_selects_cpp_and_notebook_checkers(self) -> None:

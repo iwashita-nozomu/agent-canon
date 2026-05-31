@@ -606,8 +606,10 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("RUNTIME_MAX_THREADS=24", result.stdout)
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
+            self.assertIn(f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}", result.stdout)
             self.assertTrue(report_dir.is_dir())
             self.assertTrue((report_dir / "work_log.md").is_file())
+            self.assertTrue((report_dir / "task_authority.yaml").is_file())
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)

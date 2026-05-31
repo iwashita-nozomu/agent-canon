@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - exercised on Python < 3.11
@@ -805,6 +807,20 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         ),
         encoding="utf-8",
     )
+    authority_roles = {
+        role.id: role.write_policy.mode
+        in {"worktree_scope_plus_artifacts", "runtime_outputs_plus_artifacts"}
+        for role in spec.roles
+    }
+    (spec.report_dir / AUTHORITY_FILE_NAME).write_text(
+        build_default_task_authority(
+            run_id=spec.run_id,
+            task=spec.task,
+            roles=authority_roles,
+        ),
+        encoding="utf-8",
+    )
+    created_files.append(AUTHORITY_FILE_NAME)
     unique_created_files: list[str] = []
     for artifact in created_files:
         if artifact not in unique_created_files:

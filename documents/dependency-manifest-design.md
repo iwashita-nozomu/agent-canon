@@ -178,6 +178,12 @@ downstream<TAB>implementation<TAB>tools/example.py<TAB>tests/tools/test_example.
 This graph is header-manifest evidence only.
 It must not be merged with language import/include/source edges from `scan_code_dependencies.sh`.
 
+When a repo has known graph-cycle debt, PR gates may run
+`run_repo_dependency_review.sh --cycle-report-only --report-dir <dir>` and
+publish `render_dependency_manifest_graph.py` output from the generated TSV.
+This keeps missing/invalid/self-reference findings blocking while making cycles
+visible as review debt instead of silently blocking unrelated PR work.
+
 ## Search-To-Edit-Scope Expansion
 
 Repo-wide text search must feed dependency triage instead of stopping at raw `rg` hits.
@@ -351,6 +357,8 @@ Phase 2: implement Bash tools first:
 `scan_dependency_headers.sh` starts as full-repo report-only so it can list missing manifests without blocking unrelated work.
 `check_dependency_headers.py --changed` and `check_dependency_header_format.sh --changed` reject changed files that do not have valid `@dependency-start` blocks.
 `check_dependency_graph.sh` default mode rejects self references and cycles.
+`check_dependency_graph.sh --cycle-report-only` reports cycles without failing
+and is valid only when paired with a durable graph report artifact.
 `check_dependency_graph.sh --check-bidirectional` is used as a stricter migration report until reverse edges are complete.
 
 Phase 3: migrate files one by one from checker findings.

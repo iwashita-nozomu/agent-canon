@@ -18,7 +18,16 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from hook_event_log import HookLogContext, fingerprint_json, utc_now
+HOOK_DIR = Path(__file__).resolve().parent
+ROOT = HOOK_DIR.parents[1]
+sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
+
+from hook_event_log import HookLogContext, fingerprint_json, utc_now  # noqa: E402
+from task_authority import (  # noqa: E402
+    TaskAuthority,
+    helper_authority_matches,
+    load_task_authority,
+)
 
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 PAYLOAD_STATUS_VALID = "valid"
@@ -62,6 +71,16 @@ class HelperFirstFinding:
             "HELPER_FIRST_FINDING="
             f"{self.path}:{self.line}:{self.qualname}:{self.verdict}:{self.detail}"
         )
+
+
+@dataclass(frozen=True)
+class HelperAuthorityCheck:
+    """One helper-authority comparison result."""
+
+    path: str
+    qualname: str
+    matched: bool
+    detail: str
 
 
 @dataclass(frozen=True)
@@ -264,11 +283,51 @@ def implementation_order_findings(
     records: tuple[dict[str, object], ...],
     *,
     boundary_evidence: bool,
+    authority: TaskAuthority | None,
 ) -> tuple[HelperFirstFinding, ...]:
     """Return helper-first findings from helper inventory records."""
-    if boundary_evidence:
-        return ()
-    return implementation_order_candidates(records)
+    findings: list[HelperFirstFinding] = []
+    for candidate in implementation_order_candidates(records):
+        matched, detail = helper_authority_matches(
+            authority,
+            path=candidate.path,
+            qualname=candidate.qualname,
+        )
+        if matched:
+            continue
+        findings.append(
+            HelperFirstFinding(
+                path=candidate.path,
+                line=candidate.line,
+                qualname=candidate.qualname,
+                verdict=candidate.verdict,
+                detail=f"{candidate.detail}:boundary_evidence:{str(boundary_evidence).lower()}:{detail}",
+            )
+        )
+    return tuple(findings)
+
+
+def helper_authority_checks(
+    records: tuple[dict[str, object], ...],
+    authority: TaskAuthority | None,
+) -> tuple[HelperAuthorityCheck, ...]:
+    """Return helper authority comparison rows for hook logs."""
+    checks: list[HelperAuthorityCheck] = []
+    for candidate in implementation_order_candidates(records):
+        matched, detail = helper_authority_matches(
+            authority,
+            path=candidate.path,
+            qualname=candidate.qualname,
+        )
+        checks.append(
+            HelperAuthorityCheck(
+                path=candidate.path,
+                qualname=candidate.qualname,
+                matched=matched,
+                detail=detail,
+            )
+        )
+    return tuple(checks)
 
 
 def implementation_order_candidates(
@@ -318,11 +377,13 @@ def _log_entry(
     inventory_run: InventoryRun,
     *,
     checked: bool,
+    authority: TaskAuthority | None,
 ) -> dict[str, object]:
     """Build one helper-first hook JSONL entry."""
     timestamp = utc_now()
     payload_fingerprint = fingerprint_json(payload)
     candidates = implementation_order_candidates(inventory_run.records)
+    authority_checks = helper_authority_checks(inventory_run.records, authority)
     return {
         "hook_run_id": context.run_id(timestamp, payload_fingerprint),
         "hook_log_namespace": context.runtime_namespace(),
@@ -335,6 +396,7 @@ def _log_entry(
         "changed_file_count": len(changed_paths),
         "changed_python_count": len(changed_python_paths),
         "boundary_evidence_changed": evidence_changed(changed_paths),
+        "task_authority_path": str(authority.path) if authority is not None else "",
         "inventory_command": list(inventory_run.command),
         "inventory_returncode": inventory_run.returncode,
         "inventory_output_snippet": "\n".join(inventory_run.output.splitlines()[:MAX_OUTPUT_LINES]),
@@ -342,6 +404,9 @@ def _log_entry(
         "helper_candidate_record_count": len(candidates),
         "helper_candidate_records": [
             candidate.__dict__ for candidate in candidates[:MAX_RECORDED_HELPERS]
+        ],
+        "helper_authority_checks": [
+            check.__dict__ for check in authority_checks[:MAX_RECORDED_HELPERS]
         ],
         "helper_first_candidate_count": len(inventory_run.findings),
         "helper_first_records": [
@@ -372,7 +437,7 @@ def block_payload(findings: tuple[HelperFirstFinding, ...]) -> dict[str, object]
         "remediation": [
             "Identify the owning module or object before adding helper-like functions.",
             "Search for existing helpers and extend them when possible.",
-            "Add issue, design, docs, or test evidence showing why the new helper is owned here.",
+            "Add helper_change authority tied to helper path, qualname, owner, caller, existing-helper gap, and tests.",
         ],
         "findings": [finding.render() for finding in findings],
     }
@@ -394,9 +459,14 @@ def main() -> int:
     checked = bool(python_path_list)
     inventory_run = InventoryRun(command=(), returncode=0, output="", records=(), findings=())
     if checked:
+        authority = load_task_authority(root)
         command, returncode, output = run_inventory(root)
         records = inventory_records(output)
-        findings = implementation_order_findings(records, boundary_evidence=evidence_changed(paths))
+        findings = implementation_order_findings(
+            records,
+            boundary_evidence=evidence_changed(paths),
+            authority=authority,
+        )
         inventory_run = InventoryRun(
             command=command,
             returncode=returncode,
@@ -405,7 +475,15 @@ def main() -> int:
             findings=findings,
         )
     maybe_log(
-        _log_entry(context, payload, paths, python_path_list, inventory_run, checked=checked),
+        _log_entry(
+            context,
+            payload,
+            paths,
+            python_path_list,
+            inventory_run,
+            checked=checked,
+            authority=load_task_authority(root),
+        ),
         context,
     )
     if inventory_run.returncode != 0:

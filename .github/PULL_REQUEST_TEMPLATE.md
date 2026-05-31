@@ -90,6 +90,8 @@ Orchestration evidence:
 ## Operational Findings / Issues
 
 - [ ] `issues/README.md` was reviewed.
+- [ ] AgentCanon maintenance issues use `.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml` fields or explain why an older issue shape is sufficient.
+- [ ] Skill/prompt/workflow behavior defects are evaluated against `documents/prompt-skill-evaluation-checklist.md` and `agents/evals/issue_eval_manifest.toml`, or the PR explains why no eval applies.
 - [ ] Existing durable findings were searched in `issues/open/`, `issues/closed/`, `memory/`, `notes/failures/`, relevant workflow docs, and prior run-bundle evidence when available.
 - [ ] New user / reviewer / runtime / CI workflow defect findings were written to `issues/open/AC-YYYYMMDD-<slug>.md`, `memory/`, or `notes/failures/` before closeout.
 - [ ] Raw `rg` hits, if used to choose the fix surface, were expanded with `run_repo_dependency_review.sh --search-hits-file` and dependency-expanded edit scope is cited below.
@@ -114,7 +116,8 @@ Impact notes:
 
 ## Validation Evidence
 
-- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing`
+- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir reports/dependency-review/agent-canon-pr`
+- [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot`
 - [ ] `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml`
@@ -126,6 +129,7 @@ Impact notes:
 - [ ] `python3 tools/agent_tools/eval_accumulation_check.py`
 - [ ] `tools/bin/agent-canon local-llm eval`
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
+- [ ] Path/risk smoke, when relevant: `python3 tools/agent_tools/classify_path_risk.py --paths-file <changed-paths>`
 - [ ] `bash tools/ci/run_docs_checks.sh`
 - [ ] `bash tools/ci/run_all_checks.sh --quick`
 - [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots, or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source, instead of automatic `actions/checkout` submodules.

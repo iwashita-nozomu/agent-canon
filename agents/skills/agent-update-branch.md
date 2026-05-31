@@ -15,6 +15,12 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 - `canon-pin`: updates the `vendor/agent-canon` submodule pin, `.agent-canon/update-state.toml`, `.gitmodules`, and root AgentCanon link/copy views.
 - `integration`: merges one or more `agent-updates/*` branches into an integration branch before `main`.
 
+`canon-pin` is a parent-repo pin lane only. AgentCanon source edits, local
+`vendor/agent-canon` commits, prompt/skill/tool source changes, and update-route
+repairs move through a standalone AgentCanon branch/PR first. After that PR
+lands, the parent repo uses `make agent-canon-ensure-latest` and root-view sync
+to advance the pin. See `documents/agent-canon-update-route.md`.
+
 ## Required Gates
 
 - Validate the lane with `bash tools/agent_tools/agent_update_branch.sh validate <lane>`.
