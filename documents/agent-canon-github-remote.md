@@ -42,11 +42,15 @@ git config -f .gitmodules submodule.vendor/agent-canon.url \
 git submodule sync vendor/agent-canon
 git -C vendor/agent-canon remote set-url origin \
   https://github.com/iwashita-nozomu/agent-canon.git
-bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
+make agent-canon-update-plan
+make agent-canon-latest
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
+
+The canonical command responsibility split is
+`documents/agent-canon-update-route.md`. `apply` is compatibility/low-level;
+normal parent repo updates use the high-level `latest` route.
 
 If the repo keeps a local bare remote for fast validation, add it with a clear
 non-canonical name instead of making it the canonical remote:

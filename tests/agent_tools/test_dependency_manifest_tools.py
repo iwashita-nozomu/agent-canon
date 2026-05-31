@@ -1427,6 +1427,52 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("cycle includes", result.stdout)
             self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
 
+    def test_graph_can_report_cycles_without_failing(self) -> None:
+        """Cycle report-only mode keeps known graph debt visible without blocking."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            a = root / "a.py"
+            b = root / "b.py"
+            a.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Defines a fixture with a known cycle.",
+                        "# upstream implementation b.py b is prerequisite",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            b.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# responsibility Defines b fixture with a known cycle.",
+                        "# upstream implementation a.py a is prerequisite",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(
+                str(GRAPH),
+                "--root",
+                str(root),
+                "--cycle-report-only",
+                str(a),
+                str(b),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("cycle includes", result.stdout)
+            self.assertIn("DEPENDENCY_GRAPH_UPSTREAM_CYCLES=report_only", result.stdout)
+            self.assertIn("DEPENDENCY_GRAPH=pass", result.stdout)
+
     def test_repo_review_runs_all_dependency_tools(self) -> None:
         """The wrapper applies dependency tools to tracked checkable files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1487,6 +1533,81 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
+
+    def test_repo_review_can_report_cycles_without_failing(self) -> None:
+        """The wrapper supports report-only cycles when a durable graph artifact is used."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
+            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
+            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
+            a = root / "a.md"
+            b = root / "b.md"
+            a.write_text(
+                "\n".join(
+                    [
+                        "# A",
+                        "",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines a cycle-report-only fixture.",
+                        "upstream design b.md b is prerequisite",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            b.write_text(
+                "\n".join(
+                    [
+                        "# B",
+                        "",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Defines b cycle-report-only fixture.",
+                        "upstream design a.md a is prerequisite",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "a.md", "b.md"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--cycle-report-only",
+                "--report-dir",
+                str(root / "reports" / "dependency-review" / "run"),
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_GRAPH_UPSTREAM_CYCLES=report_only", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_repo_review_skips_dependency_review_artifacts(self) -> None:

@@ -1,0 +1,12 @@
+# @dependency-start
+# responsibility Configures GitHub issue template entrypoints for AgentCanon maintenance.
+# upstream design ../../documents/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../../issues/README.md durable operational issue storage policy.
+# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# @dependency-end
+
+blank_issues_enabled: true
+contact_links:
+  - name: AgentCanon maintenance runbook
+    url: https://github.com/iwashita-nozomu/agent-canon/tree/main/documents
+    about: Use the documents index when the issue is an operational runbook update.

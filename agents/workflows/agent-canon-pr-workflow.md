@@ -56,6 +56,9 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
 - PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Agent または Copilot PR が別 branch で行います。
 - standalone AgentCanon PR / branch push では `.github/workflows/agent-canon-static-gates.yml` が tool catalog、tool drift、dependency review、skill mirror、runtime role alignment、skill/workflow prompt eval、convention compliance、GitHub workflow convention、container config を軽量 gate として走らせます。local の `make agent-canon-pr-check` は引き続き merge 前の広い gate です。
+- Issue template / eval capture work uses `documents/issue-label-taxonomy.md`,
+  `documents/prompt-skill-evaluation-checklist.md`, and
+  `agents/evals/issue_eval_manifest.toml` as the closeout route.
 
 ## Freshness Gate Route
 
@@ -67,6 +70,10 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 make agent-canon-update-plan
 make agent-canon-latest
 ```
+
+The command responsibility split is maintained in
+`documents/agent-canon-update-route.md`. Keep `merge-main-into-current` on the
+AgentCanon PR branch route, not in the normal parent pin update sequence.
 
 `make agent-canon-latest` は safe な AgentCanon `main` 更新、root view check、
 親 repo update TODO acknowledge まで進めます。local shared-canon branch、dirty
@@ -179,7 +186,15 @@ bash tools/sync_agent_canon.sh check
 standalone AgentCanon repo:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --fail-missing \
+  --cycle-report-only \
+  --report-dir reports/dependency-review/agent-canon-pr
+python3 tools/agent_tools/render_dependency_manifest_graph.py \
+  --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv \
+  --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md \
+  --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot
+python3 tools/agent_tools/classify_path_risk.py --path agents/workflows/agent-canon-pr-workflow.md --format text
 python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py

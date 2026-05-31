@@ -1,0 +1,83 @@
+# @dependency-start
+# responsibility Defines issue form for converting agent failures into eval cases.
+# upstream design ../../documents/prompt-skill-evaluation-checklist.md eval capture checklist.
+# upstream design ../../agents/evals/README.md eval evidence storage contract.
+# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# @dependency-end
+
+name: Agent behavior eval capture
+description: Convert an observed agent/workflow failure into a reusable eval case.
+title: "[eval] "
+labels: ["agent-quality", "eval"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Failure category
+      options:
+        - scope-creep
+        - helper-sprawl
+        - upstream-mutation
+        - api-surface-miss
+        - responsibility-boundary
+        - workflow-bypass
+        - doc-drift
+        - insufficient-evidence
+        - wrong-artifact
+        - non-reproducible-review
+    validations:
+      required: true
+  - type: textarea
+    id: trigger
+    attributes:
+      label: Trigger
+      value: |
+        user request:
+        repo state / relevant files:
+        likely bad assumption:
+    validations:
+      required: true
+  - type: textarea
+    id: bad_behavior
+    attributes:
+      label: Bad behavior to catch
+      value: |
+        forbidden action 1:
+        forbidden action 2:
+    validations:
+      required: true
+  - type: textarea
+    id: required_behavior
+    attributes:
+      label: Required behavior
+      value: |
+        must inspect:
+        must ask / must not ask:
+        allowed outputs:
+        disallowed outputs:
+    validations:
+      required: true
+  - type: textarea
+    id: eval_shape
+    attributes:
+      label: Eval shape
+      value: |
+        input prompt:
+        fixtures / repo snapshot:
+        expected route:
+        assertions:
+        negative assertions:
+        oracle type: machine / rubric / human-reviewed
+    validations:
+      required: true
+  - type: textarea
+    id: close_condition
+    attributes:
+      label: Close condition
+      value: |
+        eval added:
+        eval fails before fix:
+        eval passes after fix:
+        linked rule / workflow / tool updated:
+    validations:
+      required: true

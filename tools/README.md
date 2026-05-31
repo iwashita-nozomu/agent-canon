@@ -61,6 +61,8 @@ python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/parent_repo_readiness.py
 python3 tools/agent_tools/repo_structure_contract.py
+python3 tools/agent_tools/render_dependency_manifest_graph.py
+python3 tools/agent_tools/classify_path_risk.py
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
@@ -98,6 +100,10 @@ environment surfaces before an agent treats the repo as ready.
 directory / file layout with `documents/repo-structure-contract.toml`.
 The TOML contract owns profiles, ignored generated paths, required paths, and
 unexpected top-level severity.
+`render_dependency_manifest_graph.py` turns a dependency graph TSV from
+`check_dependency_graph.sh --graph-tsv` into Markdown and DOT review artifacts.
+`classify_path_risk.py` maps changed paths to runtime profiles and targeted
+validation checks; the manual GitHub smoke workflow uses the same classifier.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -722,9 +728,11 @@ Dependency manifest checks live under `tools/agent_tools/` and are Bash-first.
 - `scan_dependency_headers.sh` reports missing `@dependency-start` / `@dependency-end` markers.
 - `check_dependency_header_format.sh` validates manifest syntax, relative paths, kinds, and target existence.
 - `check_dependency_graph.sh` builds upstream and downstream graphs and fails isolated manifests, self references, and cycles by default.
+- `check_dependency_graph.sh --cycle-report-only` reports existing cycle debt without failing; pair it with `--graph-tsv` and a rendered graph report.
 - `check_dependency_graph.sh --check-bidirectional` additionally checks reverse-edge presence and kind consistency during bidirectional migration.
 - `check_dependency_graph.sh --list-related --focus <path>` lists every manifest edge declared by, or pointing at, a changed code/doc path so reviewers can see all dependent surfaces before implementation review.
 - `run_repo_dependency_review.sh` runs scan, format, and graph checks against all tracked checkable repo files. Use this during checkpoint and final review, not only closeout.
+- `run_repo_dependency_review.sh --cycle-report-only --report-dir <dir>` keeps cycle debt visible while preventing known repo-wide cycles from blocking unrelated PR readiness.
 - `run_repo_dependency_review.sh --list-changed-dependencies` adds the same related-surface listing for current changed files.
 - GitHub path-constraint root copies such as
   `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` keep AgentCanon-source

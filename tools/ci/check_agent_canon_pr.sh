@@ -274,7 +274,11 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  strict dependency review"
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "reports/dependency-review/agent-canon-pr"
+python3 tools/agent_tools/render_dependency_manifest_graph.py \
+  --graph-tsv "reports/dependency-review/agent-canon-pr/dependency_graph.tsv" \
+  --markdown-out "reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md" \
+  --dot-out "reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot"
 echo ""
 
 echo "7️⃣  documentation checks"

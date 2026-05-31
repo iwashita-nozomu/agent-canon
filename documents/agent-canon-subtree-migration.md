@@ -73,20 +73,18 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 template repo 側では submodule-first の入口を使います。
 
 ```bash
-bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
-bash tools/update_agent_canon.sh merge-main-into-current
-bash tools/sync_agent_canon.sh status
+make agent-canon-update-plan
+make agent-canon-latest
 bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 ```
 
 - `plan`:
   - derived repo から見た AgentCanon update route を read-only で表示する
-- `apply`:
-  - upstream AgentCanon main を取り込み、template / derived repo の submodule pin を更新する
+- `latest`:
+  - upstream AgentCanon main を取り込み、template / derived repo の submodule pin、root views、parent TODO boundary を high-level route として処理する
 - `merge-main-into-current`:
-  - `vendor/agent-canon/` の current branch に GitHub `main` を merge し、backup ref、merge result、parent pin pending 状態、次 action を machine-readable に出す
+  - 通常 sequence ではなく、`vendor/agent-canon/` に local AgentCanon source commit がある場合の AgentCanon PR route で使う
 - `link-root`:
   - root の symlink view と synced copy を vendor 正本から再構成する
 - `check`:
@@ -222,12 +220,12 @@ bash tools/sync_agent_canon.sh check
 ### 7.4 upstream から更新取得
 
 ```bash
-bash tools/update_agent_canon.sh plan
-bash tools/update_agent_canon.sh apply
+make agent-canon-update-plan
+make agent-canon-latest
 ```
 
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
-通常の動線は `plan -> apply` です。
+通常の動線は high-level `plan -> latest` です。
 `sync_agent_canon.sh ensure-latest` は task 開始時の freshness gate、`link-root` は root view drift 修復、`push` は shared canon を直接 upstream に戻す保守者向け低レベル入口です。
 通常の派生 repo update で `sync_agent_canon.sh pull` を直接選びません。
 derived repo の `vendor/agent-canon/` に local commit がある場合は、`bash tools/update_agent_canon.sh merge-main-into-current` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
@@ -347,7 +345,7 @@ exit 条件:
 - `vendor/agent-canon/` の変更は専用 commit に分ける
 - `bash tools/update_agent_canon.sh merge-main-into-current` で GitHub main を取り込む
 - current AgentCanon branch を GitHub に push し、AgentCanon PR を開く
-- AgentCanon main に取り込まれたら `bash tools/update_agent_canon.sh apply` で pin を main に揃える
+- AgentCanon main に取り込まれたら `make agent-canon-ensure-latest` で pin を main に揃える
 
 ## 9.1 Legacy Subtree Appendix
 

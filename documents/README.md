@@ -68,6 +68,22 @@ For the broader agent routing path, return to `agents/README.md`.
   / config schema / hooks / MCP / skills / subagents reference.
 - [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical
   remote and local bare mirror compatibility.
+- [AgentCanon Update Route](./agent-canon-update-route.md): canonical update
+  command hierarchy, parent pin route, TODO route, and AgentCanon PR branch
+  separation.
+- [AgentCanon Submodule Rollback](./agent-canon-submodule-rollback.md):
+  copy-paste rollback route for parent repos that need to move back to a known
+  good AgentCanon SHA.
+- [Derived Repository Bootstrap Runbook](./derived-repo-bootstrap-runbook.md):
+  shortest safe onboarding and triage path for repos that vendor AgentCanon.
+- [MCP Preflight And Fallback Policy](./mcp-preflight-and-fallback-policy.md):
+  MCP required/optional/not-applicable decision table and closeout evidence.
+- [Issue Label Taxonomy](./issue-label-taxonomy.md): AgentCanon maintenance
+  issue templates, label taxonomy, and issue backfill policy.
+- [Prompt And Skill Evaluation Checklist](./prompt-skill-evaluation-checklist.md):
+  prompt/skill behavior eval checklist, failure taxonomy, and manifest format.
+- [API Surface Traversal Policy](./api-surface-traversal-policy.md): public API
+  traversal evidence before negative capability claims.
 - [GitHub Copilot Configuration](./github-copilot-configuration.md): Copilot
   repository instructions, path-specific instructions, custom agents, MCP, setup
   workflow, and PR template routing.
