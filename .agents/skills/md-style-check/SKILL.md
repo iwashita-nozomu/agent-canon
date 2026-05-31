@@ -17,5 +17,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, markdown math, or docs-check failures.
 1. Run markdown lint and link checks appropriate to the changed files.
+1. When markdown math drift appears, run `python3 tools/docs/check_markdown_math.py <paths>` and use `python3 tools/docs/fix_markdown_math.py <paths>` only for mechanical delimiter repair.
 1. Check heading hierarchy, command/path formatting, and broken links together.
 1. Treat broken links and heading drift as real findings.

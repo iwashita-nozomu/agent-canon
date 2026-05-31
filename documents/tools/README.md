@@ -171,6 +171,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 言語未指定の fenced code block を補正します。
 - `tools/docs/fix_markdown_headers.py`
   - Markdown header level の飛びを補正します。
+- `tools/docs/fix_markdown_math.py`
+  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正します。
 - `tools/docs/format_markdown.py`
   - 軽い整形だけをまとめて当てます。
 - `tools/docs/fix_markdown_docs.py`

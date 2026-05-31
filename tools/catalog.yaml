@@ -935,6 +935,26 @@ entries:
     tests:
       - tests/tools/test_mirror_skill_shims.py
 
+  - id: fix-markdown-math
+    summary: Rewrites Markdown math notation to the repo-standard dollar delimiters.
+    path: tools/docs/fix_markdown_math.py
+    family: docs
+    role: helper
+    status: canonical
+    command: python3 tools/docs/fix_markdown_math.py <files...>
+    writes: true
+    callable_by_default: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/fix_markdown_math.md
+      - agents/skills/md-style-check.md
+    tests:
+      - tests/tools/test_fix_markdown_math.py
+
   - id: run-docs-checks
     summary: Runs the shared Markdown, math, and link documentation checks.
     path: tools/ci/run_docs_checks.sh
