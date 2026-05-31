@@ -4,9 +4,10 @@
 responsibility Documents prose-reasoning-graph analysis and skill handoff workflow.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
-upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections
+downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../.claude/skills/prose-reasoning-graph/SKILL.md mirrors this workflow for Claude-compatible runtimes
+downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI usage
 @dependency-end
 -->
 

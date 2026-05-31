@@ -2,9 +2,6 @@
 # @dependency-start
 # responsibility Builds and reports SQLite-backed prose reasoning graphs.
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
-# upstream design ../../agents/skills/structure-planning.md structure contract workflow
-# upstream design ../../agents/skills/report-writing.md report source and claim hygiene
-# upstream design ../../agents/skills/experiment-lifecycle.md experiment planning workflow
 # upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
 # downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py tests CLI behavior
 # downstream design ../../documents/tools/prose_reasoning_graph.md documents tool contract
