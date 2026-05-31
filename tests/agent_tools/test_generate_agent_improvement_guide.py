@@ -17,6 +17,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_improvement_guide.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -183,11 +185,15 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
         root.mkdir(parents=True, exist_ok=True)
+        evals_root = root / "agents" / "evals"
+        evals_root.mkdir(parents=True, exist_ok=True)
+        (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
         (root / "memory").mkdir()
-        skill_results = root / "agents" / "evals" / "results" / "skill-workflow-prompt"
-        hook_results = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
+        archive_root = mounted_log_archive_root(root)
+        skill_results = archive_root / "eval-results" / "skill-workflow-prompt"
+        hook_results = archive_root / "hook-runs" / "legacy-import" / "test-container"
         skill_results.mkdir(parents=True)
         hook_results.mkdir(parents=True)
         (root / "issues" / "open" / "AC-20260513-open.md").write_text(
@@ -330,6 +336,9 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
     ) -> None:
         """Write a Git-backed fixture with hook evidence older than skill source."""
         root.mkdir(parents=True, exist_ok=True)
+        evals_root = root / "agents" / "evals"
+        evals_root.mkdir(parents=True, exist_ok=True)
+        (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         skill_path = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
         skill_path.parent.mkdir(parents=True, exist_ok=True)
         skill_path.write_text(
@@ -368,7 +377,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        hook_results = root / "agents" / "evals" / "results" / "hook-runs" / "test-container"
+        hook_results = mounted_log_archive_root(root) / "hook-runs" / "legacy-import" / "test-container"
         hook_results.mkdir(parents=True)
         entries: list[dict[str, object]] = [
             {

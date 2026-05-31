@@ -8,6 +8,7 @@
 # downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
+# downstream implementation ./evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
 # downstream implementation ./local_llm_eval.py writes accumulated eval reports through this resolver
 # downstream implementation ../../tests/agent_tools/test_runtime_log_paths.py tests path resolution ordering
 # @dependency-end
@@ -53,7 +54,7 @@ def repo_log_key(root: Path) -> str:
     return f"{name}-{short_hash(str(canonical))}"
 
 
-def log_environment_key(root: Path) -> str:
+def _log_environment_key(root: Path) -> str:
     """Return the local environment key used under .agent-canon/archive/."""
     override = os.environ.get(LOG_ENV_ENV, "").strip()
     if override:
@@ -68,7 +69,7 @@ def log_environment_key(root: Path) -> str:
 
 def mounted_log_archive_root(canon_root: Path) -> Path:
     """Return the preferred AgentCanon-local log archive mount path."""
-    return canon_root / LOG_ARCHIVE_PARENT / log_environment_key(canon_root)
+    return canon_root / LOG_ARCHIVE_PARENT / _log_environment_key(canon_root)
 
 
 def is_agent_canon_root(root: Path) -> bool:
@@ -97,7 +98,7 @@ def agent_canon_root(root: Path) -> Path:
 
 def state_log_archive_root(canon_root: Path) -> Path:
     """Return the non-repository fallback log archive root."""
-    env_key = log_environment_key(canon_root)
+    env_key = _log_environment_key(canon_root)
     xdg_state_home = os.environ.get("XDG_STATE_HOME", "").strip()
     if xdg_state_home:
         return Path(xdg_state_home) / "agent-canon" / "archive" / env_key
@@ -139,7 +140,11 @@ def eval_result_search_dirs(canon_root: Path, family: str) -> tuple[Path, ...]:
 
 def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Path, ...]:
     """Return hook result directories to read for one repository context."""
+    archive_root = _log_archive_root(canon_root)
     candidates: list[Path] = [
         hook_results_dir(requested_root, canon_root),
+        archive_root / "hook-runs" / "legacy-import",
+        canon_root / "agents" / "evals" / "results" / "hook-runs",
+        archive_root / "legacy-import" / "hook-runs",
     ]
     return tuple(dict.fromkeys(candidates))

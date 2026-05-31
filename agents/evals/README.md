@@ -33,6 +33,15 @@ Codex subagent role evals are implemented by `evaluate_codex_agent_roles.py`
 and cover each `.codex/agents/*.toml` role's expected behavior, forbidden
 behavior, model / reasoning bucket, task-routing defaults, optional runtime
 metrics, and whether output-use evidence is available.
+Accumulated eval result families are declared in
+`eval_result_families.toml`. Treat that registry as the abstract contract
+between eval producers, archive paths, filename / run-id checks, and consumers
+such as `eval_accumulation_check.py` and dashboards.
+The checker must not need a new code branch for every future eval domain.
+Add a registry family for structural analysis, writing-flow analysis, routing
+analysis, role behavior, local-LLM responsibility, or other non-code evidence,
+then have the producer emit reports that satisfy the declared filename and
+run-id contract.
 
 Use these evals when changing a skill, workflow, or routing prompt:
 
@@ -116,9 +125,10 @@ read or write location; old results must be imported into the archive and
 deleted from source.
 Run `python3 tools/agent_tools/eval_accumulation_check.py --root .` before
 using accumulated evidence in a PR or guide. The gate validates directory
-mounted JSONL readability when available, unique run ids, non-ignored tracked
-evidence paths, and intentionally ignored archive paths, without compacting or
-deleting archive results.
+mounted JSONL readability when available, every family declared in
+`eval_result_families.toml`, unique run ids, non-ignored tracked evidence
+paths, and intentionally ignored archive paths, without compacting or deleting
+archive results.
 Local LLM responsibility prompt evals are configured separately:
 
 ```bash
@@ -169,6 +179,17 @@ with `--runtime-log <path>` using fields such as `agent`, `tokens`,
 `output_used`. When no runtime metric log exists, the eval reports
 `ROLE_RUNTIME_METRICS_STATUS=missing` without failing; this keeps old logs
 append-only while making the measurement gap visible.
+Use `--accumulate` when role routing or model policy changes should become
+durable evidence under
+`.agent-canon/archive/<env-key>/eval-results/codex-agent-role/`:
+
+```bash
+python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
+```
+
+The accumulated role report uses
+`codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md`
+and records `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`.
 GitHub Actions reads these hook results recursively, memory notes,
 skill eval reports, and `issues/open|closed/` to generate a read-only Agent Improvement Guide on PRs and branch pushes.
 That guide must not stop at raw pass/fail counts: it summarizes skill usage,

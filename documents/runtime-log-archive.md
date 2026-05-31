@@ -47,6 +47,11 @@ Normal eval writers use:
 .agent-canon/archive/<env-key>/eval-results/<family>/<eval-run-id>-<status>*.md
 ```
 
+Valid `<family>` values and their filename / run-id contracts are declared in
+`agents/evals/eval_result_families.toml`. Add a family there before adding a
+new accumulated eval producer, then make `eval_accumulation_check.py` validate
+that family instead of adding a private result path.
+
 `<repo-key>` is derived from the source repository root name plus a short hash.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
 devcontainer/Compose metadata, or the existing host/repo fallback.

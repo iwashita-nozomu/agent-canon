@@ -17,6 +17,11 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"
+FIRST_RUNTIME_TOKENS = 100
+FIRST_RUNTIME_LATENCY_MS = 25
+SECOND_RUNTIME_TOKENS = 50
+SECOND_RUNTIME_LATENCY_MS = 15
+EXPECTED_RUNTIME_TOKENS = FIRST_RUNTIME_TOKENS + SECOND_RUNTIME_TOKENS
 
 
 def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
@@ -56,8 +61,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                         json.dumps(
                             {
                                 "agent": "python_reviewer",
-                                "tokens": 100,
-                                "latency_ms": 25,
+                                "tokens": FIRST_RUNTIME_TOKENS,
+                                "latency_ms": FIRST_RUNTIME_LATENCY_MS,
                                 "retry_count": 1,
                                 "output_used": True,
                             }
@@ -65,8 +70,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                         json.dumps(
                             {
                                 "agent": "python_reviewer",
-                                "total_tokens": 50,
-                                "latency_ms": 15,
+                                "total_tokens": SECOND_RUNTIME_TOKENS,
+                                "latency_ms": SECOND_RUNTIME_LATENCY_MS,
                                 "parent_intervention": True,
                                 "format_violation": True,
                             }
@@ -81,10 +86,29 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("ROLE_RUNTIME_METRICS_STATUS=observed", result.stdout)
-            self.assertIn("ROLE_RUNTIME_METRIC=python_reviewer:calls=2:tokens=150", result.stdout)
+            self.assertIn(
+                f"ROLE_RUNTIME_METRIC=python_reviewer:calls=2:tokens={EXPECTED_RUNTIME_TOKENS}",
+                result.stdout,
+            )
             self.assertIn("parent_interventions=1", result.stdout)
             self.assertIn("format_violations=1", result.stdout)
             self.assertIn("output_used=1", result.stdout)
+
+    def test_accumulate_writes_role_eval_report(self) -> None:
+        """Role evals should accumulate through the shared eval result contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results_dir = Path(tmp_dir) / "role-results"
+
+            result = run_eval("--accumulate", "--results-dir", str(results_dir), "--run-id", "test-run")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-", result.stdout)
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_ACCUMULATED_REPORT=", result.stdout)
+            reports = tuple(results_dir.glob("codex-agent-role-eval-*-pass.md"))
+            self.assertEqual(len(reports), 1)
+            text = reports[0].read_text(encoding="utf-8")
+            self.assertIn("CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-", text)
+            self.assertIn("run_id: `test-run`", text)
 
     def test_runtime_metrics_report_invalid_numeric_values(self) -> None:
         """Malformed metric values should produce findings instead of tracebacks."""

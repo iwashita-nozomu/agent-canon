@@ -199,7 +199,7 @@ entries:
       - tests/agent_tools/test_issue_sync.py
 
   - id: eval-accumulation-check
-    summary: Validates append-only AgentCanon hook and skill eval result accumulation.
+    summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
     path: tools/agent_tools/eval_accumulation_check.py
     family: agent_tools
     role: checker
@@ -900,7 +900,7 @@ entries:
       - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
   - id: evaluate-codex-agent-roles
-    summary: Evaluates Codex subagent role behavior, routing, cost buckets, and optional runtime metrics.
+    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, cost buckets, and runtime metrics.
     path: tools/agent_tools/evaluate_codex_agent_roles.py
     family: agent_tools
     role: checker
