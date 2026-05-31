@@ -1229,7 +1229,12 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 "split_paragraph",
                 [paragraph.node_id],
                 f"`{paragraph.node_id}` has {len(sentences)} sentence units and may need a split.",
-                {"preserve": "source spans and section path", "sentence_count": len(sentences)},
+                operation_payload(
+                    {
+                        "preserve": "source spans and section path",
+                        "sentence_count": len(sentences),
+                    }
+                ),
             )
             break
     for left, right in zip(paragraphs, paragraphs[1:]):
@@ -1241,7 +1246,12 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 "merge_paragraphs",
                 [left.node_id, right.node_id],
                 f"`{left.node_id}` and `{right.node_id}` share focus and may be integrated.",
-                {"lexical_overlap": overlap, "preserve": "claims and evidence from both paragraphs"},
+                operation_payload(
+                    {
+                        "lexical_overlap": overlap,
+                        "preserve": "claims and evidence from both paragraphs",
+                    }
+                ),
             )
             break
     for left, right in zip(paragraphs, paragraphs[1:]):
@@ -1252,7 +1262,9 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 "add_bridge",
                 [left.node_id, right.node_id],
                 f"`{left.node_id}` to `{right.node_id}` needs an explicit bridge.",
-                {"bridge_intent": "state the discourse relation and shared question"},
+                operation_payload(
+                    {"bridge_intent": "state the discourse relation and shared question"}
+                ),
             )
             break
     if len(paragraphs) > 2:
@@ -1262,8 +1274,18 @@ def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Nod
             "reorder_paragraphs",
             [paragraph.node_id for paragraph in paragraphs],
             "Presentation order can be checked against phase order and hard-before edges.",
-            {"strategy": "priority topological sort with phase preference"},
+            operation_payload({"strategy": "priority topological sort with phase preference"}),
         )
+
+
+def operation_payload(values: dict[str, object]) -> dict[str, object]:
+    """Return common payload fields for an edit operation candidate."""
+    payload: dict[str, object] = {
+        "provenance": "source_graph_nodes",
+        "history_effect": "records_candidate_without_mutating_source",
+    }
+    payload.update(values)
+    return payload
 
 
 def add_explanation_layer(connection: sqlite3.Connection, document_id: str, profile: str) -> None:

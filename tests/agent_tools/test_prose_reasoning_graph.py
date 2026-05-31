@@ -108,8 +108,23 @@ class ProseReasoningGraphTest(unittest.TestCase):
             integrate = run_graph("integrate", "--db", str(db), "--profile", "all", "--out", str(integration))
             self.assertEqual(integrate.returncode, 0, integrate.stdout + integrate.stderr)
             integration_text = integration.read_text(encoding="utf-8")
-            self.assertIn("merge_paragraphs", integration_text)
-            self.assertIn("add_bridge", integration_text)
+            operation_payload_by_kind = operation_payloads(db)
+            for operation_kind in (
+                "split_paragraph",
+                "merge_paragraphs",
+                "add_bridge",
+                "reorder_paragraphs",
+            ):
+                self.assertIn(operation_kind, integration_text)
+                self.assertIn(operation_kind, operation_payload_by_kind)
+                self.assertEqual(
+                    operation_payload_by_kind[operation_kind]["provenance"],
+                    "source_graph_nodes",
+                )
+                self.assertEqual(
+                    operation_payload_by_kind[operation_kind]["history_effect"],
+                    "records_candidate_without_mutating_source",
+                )
 
             op_id = first_operation_id(db, "merge_paragraphs")
             packet = run_graph("rewrite-packet", "--db", str(db), "--op", op_id, "--out", str(rewrite))
@@ -251,6 +266,13 @@ def diagnostic_rules(db: Path) -> list[str]:
     with sqlite3.connect(db) as connection:
         rows = connection.execute("SELECT rule FROM diagnostics ORDER BY rule").fetchall()
     return [str(row[0]) for row in rows]
+
+
+def operation_payloads(db: Path) -> dict[str, dict[str, object]]:
+    """Return edit-operation payloads by operation kind."""
+    with sqlite3.connect(db) as connection:
+        rows = connection.execute("SELECT kind, payload_json FROM edit_operations").fetchall()
+    return {str(kind): cast(dict[str, object], json.loads(str(payload))) for kind, payload in rows}
 
 
 def first_operation_id(db: Path, kind: str) -> str:
