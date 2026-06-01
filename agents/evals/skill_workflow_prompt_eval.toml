@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 39
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 60
+expected_count = 61
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 39
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -536,6 +536,48 @@ id = "EXPERIMENT-STRUCTURE-2"
 critical = true
 description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
 required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
+
+[[evals]]
+id = "computational-optimization-shim"
+target = ".agents/skills/computational-optimization/SKILL.md"
+kind = "skill"
+description = "Computational optimization skill must fix numerical contracts and route validation before code or experiment changes."
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-1"
+critical = true
+description = "Requires the optimization contract before implementation or experiment runs."
+required_regex = ["optimization contract", "objective", "constraints", "derivatives", "stopping policy", "failure semantics"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-2"
+critical = true
+description = "Forbids numerical test greenwashing."
+required_regex = ["relaxing tolerances", "deleting assertions", "skipping cases", "changing expected values", "falling back to CPU"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-3"
+critical = true
+description = "Requires first-bad-iteration diagnosis and separates correctness from performance."
+required_regex = ["first bad iteration", "residual components", "status flag", "correctness evidence", "performance evidence"]
+
+[[evals]]
+id = "computational-optimization-doc"
+target = "agents/skills/computational-optimization.md"
+kind = "skill"
+description = "Human computational optimization skill must define boundary, contract, workflow, validation, review, and outputs."
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-1"
+critical = true
+description = "Defines boundary with research, experiment, adaptive loop, test design, and language review skills."
+required_regex = ["\\$research-workflow", "\\$experiment-lifecycle", "\\$adaptive-improvement-loop", "\\$test-design", "\\$python-review", "\\$cpp-review"]
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-2"
+critical = true
+description = "Requires numerical failure/status review beyond final values."
+required_regex = ["first bad iteration", "converged=false", "KKT", "preconditioner", "Performance claim"]
 
 [[evals]]
 id = "document-writing-structure-planning"

@@ -3339,6 +3339,31 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
         self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
 
+    def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
+        """Optimization prompts should route to the computational optimization skill."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "計算最適化スキルを使って solver の residual と KKT 収束を見直して",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("computational-optimization", entry["candidate_skills"])
+
     def test_skill_usage_logger_carries_recent_workflow_to_tool_events(self) -> None:
         """Tool events should inherit the latest declared workflow in the same log shard."""
         with tempfile.TemporaryDirectory() as temp_dir:

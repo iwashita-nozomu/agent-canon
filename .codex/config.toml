@@ -81,6 +81,10 @@ path = "../.agents/skills/experiment-lifecycle/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/computational-optimization/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/html-experiment-report/SKILL.md"
 enabled = true
 
