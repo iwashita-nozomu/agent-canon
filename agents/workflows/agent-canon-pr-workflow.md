@@ -199,8 +199,8 @@ python3 tools/agent_tools/tool_catalog.py
 python3 tools/agent_tools/tool_drift.py
 python3 tools/agent_tools/responsibility_scope.py
 python3 tools/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check
+python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
 python3 tools/agent_tools/eval_accumulation_check.py
-tools/bin/agent-canon local-llm eval
 python3 tools/ci/check_github_workflows.py
 bash tools/ci/run_docs_checks.sh
 bash tools/ci/run_all_checks.sh --quick
@@ -224,8 +224,8 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - `python3 tools/agent_tools/tool_drift.py`
 - `python3 tools/agent_tools/responsibility_scope.py`
 - `python3 tools/agent_tools/issue_sync.py`
+- `python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate`
 - `python3 tools/agent_tools/eval_accumulation_check.py`
-- `tools/bin/agent-canon local-llm eval`
 - `python3 tools/ci/check_github_workflows.py`
 - docs checks
 - quick CI

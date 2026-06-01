@@ -295,6 +295,46 @@ entries:
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
 
+  - id: run-accumulated-agent-evals
+    summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
+    path: tools/agent_tools/run_accumulated_agent_evals.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_run_accumulated_agent_evals.py
+
+  - id: runtime-log-archive-git
+    summary: Manages the external runtime log archive clone, including hook/eval import, agent report snapshots, and log branch pushes.
+    path: tools/agent_tools/runtime_log_archive_git.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime-log-archive.md
+      - documents/runtime-log-archive-migration.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+    tests:
+      - tests/agent_tools/test_runtime_log_archive_git.py
+
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
     path: tools/agent_tools/evaluate_workflow_selection.py

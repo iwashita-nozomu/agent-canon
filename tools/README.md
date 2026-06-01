@@ -10,7 +10,7 @@ downstream implementation agent_tools/tool_drift.py validates tool/convention tr
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
@@ -64,6 +64,7 @@ python3 tools/agent_tools/repo_structure_contract.py
 python3 tools/agent_tools/render_dependency_manifest_graph.py
 python3 tools/agent_tools/classify_path_risk.py
 python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
@@ -114,6 +115,16 @@ reports are readable from the mounted runtime log archive. The source tree
 must not contain `agents/evals/results/` result artifacts.
 `runtime_log_archive_git.py status` validates that the mounted log archive has
 a usable Git branch/worktree state before log evidence is pushed.
+`runtime_log_archive_git.py archive-agent-report --report-dir
+reports/agents/<run-id>` snapshots a run bundle into
+`.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
+and appends `agent-reports/<repo-key>/index.jsonl`; agents do not hand-generate
+archive copies of their reports.
+`run_accumulated_agent_evals.py` is the mechanical producer entrypoint for
+required eval families. It runs role, skill/workflow prompt, local LLM,
+workflow-selection, and report-quality evals with `--accumulate`, captures
+their stdout/stderr under `reports/agent-eval-runs/<run-id>/`, then leaves
+`eval_accumulation_check.py` to validate the resulting archive structure.
 `agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
@@ -366,15 +377,18 @@ append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 When a run uses skills, prompt eval evidence is required. Run
 `evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
-Hook outcomes and accumulated eval reports live in the mounted runtime log archive.
+Hook outcomes, accumulated eval reports, and archived agent report snapshots
+live in the mounted runtime log archive.
 Hook JSONL uses
 `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
-and eval reports use `.agent-canon/log-archive/eval-results/<family>/` by
+eval reports use `.agent-canon/log-archive/eval-results/<family>/`, and agent
+report snapshots use `.agent-canon/log-archive/agent-reports/<repo-key>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
 rules live in `documents/runtime-log-archive.md`, and
 `tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
-`ensure`, `status`, `import-legacy`, `import-eval-results`, and `push`.
+`ensure`, `status`, `import-legacy`, `import-eval-results`,
+`archive-agent-report`, and `push`.
 Temporary local hook output
 belongs in `reports/hooks/` only when a task explicitly overrides the destination
 with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
@@ -407,6 +421,8 @@ debugging, or corruption audits with an explicit rationale.
 surface. It confirms hook JSONL and every eval family registered in
 `agents/evals/eval_result_families.toml` are readable, uniquely identified, and
 not hidden by ignore rules before the improvement guide tries to mine them.
+PR and CI gates run `run_accumulated_agent_evals.py` before this checker so the
+required reports are written by tools, not composed by agents.
 `evaluate_workflow_selection.py` checks the prompt-intake classifier against
 frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
 Use `--accumulate` only when the measurement should become durable evidence
@@ -716,7 +732,9 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 ```
 
 The dashboard also includes local LLM and workflow-selection eval families when
-their accumulated reports exist.
+their accumulated reports exist. `run_accumulated_agent_evals.py` is the normal
+way for static gates to create that required eval family evidence before
+`eval_accumulation_check.py` reads it.
 Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
 When one prompt surface needs more coverage, consolidate the checks into that surface's existing
 eval entry instead of adding a parallel duplicate-target eval.
