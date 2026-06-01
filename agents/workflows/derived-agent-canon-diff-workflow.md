@@ -117,7 +117,11 @@ bash tools/sync_agent_canon.sh link-root
 bash tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci
-git push origin main
+python3 tools/agent_tools/github_publish.py push \
+  --user-task "publish derived AgentCanon parent gitlink update" \
+  --repo iwashita-nozomu/project_template \
+  --branch main \
+  --allow-main
 ```
 
 template bare remote を使う環境では、`origin/main` が current commit を指すことも確認します。

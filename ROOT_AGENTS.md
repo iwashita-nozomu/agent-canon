@@ -93,6 +93,7 @@ contract listed in `documents/README.md`.
 - AGENTS / ROOT_AGENTS に禁止事項を増やす前に、機械的 checker、warning hook、closeout artifact gate、role TOML、または workflow eval に逃がせるかを判定します。実行時 hook は作業を進めるための context / evidence 収集を既定とし、プロンプト内 secret など高確信で公開事故になるもの以外は原則 block しません。
 - process / search / reuse / planning / review completeness の規律は、runtime hook blocker ではなく warning、run bundle evidence、`check_convention_compliance.py`、`task_close.py`、PR gate、または reviewer finding として扱います。hook finding が出ても、read-only 調査、validation、修復作業、PR evidence 作成のために hook 設定を退避・無効化してはいけません。
 - hook や checker が非重大 finding を返した場合は、現在の作業を止めずに closeout 前の修復対象として扱います。明示的な hook 開発・強制検証以外で strict block mode を有効にしてはいけません。
+- GitPush、GitHub branch publish、`gh pr create/edit/checks/comment`、および `github_publish.py` による PR evidence 作成は user task の実行そのものです。prompt secret 以外の hook / checker finding を理由に publish / PR 作業を止めず、finding は warning、PR body、run bundle、または closeout 修復対象へ回します。
 - 新しい guardrail を追加するときは、`documents/codex-configuration-reference.md` の hook severity policy に従い、block / warning / closeout gate のどれか、修復 command、ログ保存先、false-positive 時の記録先を同じ差分に含めます。
 
 ## Default Search And Routing
@@ -100,6 +101,7 @@ contract listed in `documents/README.md`.
 - AgentCanon を使うすべての repo task では、standalone / template / derived repo の種別に関係なく、実装設計より先に skill、tool、workflow の既存 surface を検索します。最低限、`agents/skills/`、`tools/catalog.yaml`、`agents/TASK_WORKFLOWS.md`、`agents/workflows/` を task keyword と目的語で確認し、既存の責務、入口 command、review route に沿って作業を設計します。
 - 検索結果に基づいて `workflow=...`、`skills=...`、`review=...`、source packet、validation route を固定します。chat 上の印象だけで skill、tool、workflow を選ぶことを禁止します。
 - 広い概念、長い user request、文書統合、薄い文書洗い出し、既存 helper / workflow / tool の再利用候補探索では、広域 `rg` の前に `agent-canon semantic-index search --query-file <file> --top-k <N> --format text`、`agent-canon semantic-index thin-docs --top-k <N> --format text`、または該当する bounded semantic-index command を試します。長い文章は shell に直書きせず `--query-file` または `--query-stdin` で渡します。
+- semantic-index が `unable to open database file`、missing DB、または stale cache で失敗した場合は、その場で `agent-canon semantic-index build --root .` を実行してから同じ bounded semantic-index command を再試行します。build 自体が toolchain / permission / model endpoint 理由で失敗した場合だけ、失敗理由を run bundle に残して bounded `rg -l` 比較へ降ります。
 - semantic-index の JSON が必要な場合は、`--top-k` を必ず小さくし、全体 JSON を agent が読むのではなく `--format jsonl` または `jq -r '.results[] | ...'` で必要 field だけ取り出します。JSONL / compact text で足りない場合だけ、tool 実装や schema debugging の根拠を残して full JSON を開きます。
 - 当面は検索 Eval 収集のため、semantic-index の bounded 結果を先に残したうえで `rg -l` も併走してよいです。この場合も raw `rg` は比較 evidence であり、編集対象は dependency review と source packet で確定します。
 - 通常検索は `rg -l "<pattern>" <source dirs>` で一致 file を先に絞ります。repo root から `rg -n` で一致行を大量に出すことを既定にしてはいけません。

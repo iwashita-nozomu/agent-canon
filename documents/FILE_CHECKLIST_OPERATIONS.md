@@ -104,11 +104,14 @@ git status --short
 make ci-quick
 git add <files>
 git commit -m "<type>: <summary>"
-bash tools/push_origin.sh
+python3 tools/agent_tools/github_publish.py push \
+  --user-task "<current user task>" \
+  --repo <owner/name>
 ```
 
 確認:
 
 - push 前に dirty worktree を残していない
+- push は `github_publish.py` の verified remote route で実行している
 - commit / push 済みの状態で完了報告する
 - carry-over note や action log が current state に追随している

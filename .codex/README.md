@@ -11,11 +11,11 @@ downstream implementation ./hooks/mcp_session_context.sh provides optional MCP c
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
-downstream implementation ./hooks/cause_investigation_guard.py blocks code edits without cause investigation evidence
-downstream implementation ./hooks/module_boundary_guard.py blocks forced module rewrites
-downstream implementation ./hooks/library_implementation_guard.py blocks library implementation rewrites
-downstream implementation ./hooks/helper_first_guard.py blocks helper-first implementation drift
-downstream implementation ./hooks/notebook_quality_guard.py blocks notebook-as-test misuse
+downstream implementation ./hooks/cause_investigation_guard.py warns on code edits without cause investigation evidence
+downstream implementation ./hooks/module_boundary_guard.py warns on forced module rewrites
+downstream implementation ./hooks/library_implementation_guard.py warns on library implementation rewrites
+downstream implementation ./hooks/helper_first_guard.py warns on helper-first implementation drift
+downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as-test misuse
 downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
 @dependency-end
 -->
@@ -138,6 +138,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
 - `hooks.json` は active lifecycle event ごとに `hooks/hook_dispatcher.py` を 1 回だけ起動し、dispatcher が既存 guard scripts を順番に実行します。これにより hook 設定は少数の event entry に保ちつつ、個別 guard の責務、ログ、環境変数 override は維持します。
 - dispatcher は `GitStatus` tool、read-only な file / Git inspection、AgentCanon plan/status/latest-check を含む既知の validation command では child guard を起動しません。読み取りや検証のために `hooks.json` を退避したり hook 設定を一時無効化したりしてはいけません。
+- dispatcher は `GitPush` tool、単純な `git push`、安全な `gh pr` inspection / create / edit / checks / comment、`python3 tools/agent_tools/github_publish.py ...` でも child guard を起動しません。GitHub publish / PR evidence は publish tool と PR gate の責務であり、非重大 hook finding で止めません。
 - dispatcher は fail-open が既定です。子 hook の `decision=block` はログと修復 context として保持しますが、prompt secret など `CRITICAL_BLOCKING_CHILD_HOOKS` に入った高確信の公開事故だけを runtime block として維持します。明示的な hook 開発・強制検証では `AGENT_CANON_HOOK_STRICT_BLOCKS=1` または `AGENT_CANON_HOOK_STRICT_FAILURES=1` を設定できます。
 - process / search / reuse / planning / review completeness の規律は、hook blocker ではなく warning、run bundle evidence、closeout gate、または reviewer finding として扱います。hook finding は closeout 前に直すべき evidence ですが、通常の read-only 調査、validation、修復作業を止めません。
 - `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。

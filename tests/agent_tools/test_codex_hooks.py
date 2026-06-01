@@ -898,6 +898,99 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
 
+    def test_hook_dispatcher_skips_git_push_tool_payloads(self) -> None:
+        """GitPush-style publish tools should not run blocking hook children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "cause_investigation_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "GitPush",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_github_publish_commands(self) -> None:
+        """Gh PR and github_publish.py commands are publish work, not hook-stop points."""
+        commands = [
+            "git push -u origin topic",
+            "gh pr create --repo owner/repo --base main --head topic --title T --body-file body.md",
+            "python3 tools/agent_tools/github_publish.py publish-pr --user-task task --repo owner/repo --title T --body-file body.md",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "style_checker_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertEqual(result.stdout, "")
+                self.assertFalse(log_path.exists())
+
     def test_hook_dispatcher_skips_read_only_file_inspection_commands(self) -> None:
         """Read-only file inspection should not require disabling hook config."""
         with tempfile.TemporaryDirectory() as temp_dir:

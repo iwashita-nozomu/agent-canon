@@ -665,6 +665,36 @@ critical = true
 description = "Includes dependency manifest markers and a title."
 required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-SEARCH-1"
+critical = true
+description = "Builds a missing semantic-index cache before exact-search fallback."
+required_regex = ["semantic-index build --root \\.", "bounded `rg -l`"]
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-PUBLISH-1"
+critical = true
+description = "Keeps GitHub publish and PR evidence work out of non-critical hook blocking."
+required_regex = ["GitPush", "github_publish\\.py", "PR evidence", "hook / checker finding"]
+
+[[evals]]
+id = "agent-canon-pr-gh-publish-workflow"
+target = "agents/workflows/agent-canon-pr-workflow.md"
+kind = "workflow"
+description = "The AgentCanon PR workflow must route push and PR operations through the gh-backed publish tool without fallback push routes."
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-1"
+critical = true
+description = "Requires gh-backed publish tool, explicit user task, and remote verification evidence."
+required_regex = ["tools/agent_tools/github_publish\\.py", "--user-task", "remote_verified=yes", "gh repo view", "git remote get-url origin"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-2"
+critical = true
+description = "Forbids fallback remote inference and literal URL push as standard routes."
+required_regex = ["fallback", "literal URL push is not a standard route", "hardcoded repository name"]
+
 [[evals]]
 id = "agents-readme-routing-entrypoint"
 target = "agents/README.md"

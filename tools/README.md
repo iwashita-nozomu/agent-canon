@@ -72,6 +72,7 @@ python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
 python3 tools/agent_tools/evaluate_codex_agent_roles.py
+python3 tools/agent_tools/github_publish.py --help
 python3 tools/agent_tools/prose_reasoning_graph.py --help
 ```
 

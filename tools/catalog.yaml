@@ -255,6 +255,26 @@ entries:
     tests:
       - tests/agent_tools/test_issue_sync.py
 
+  - id: github-publish
+    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and no fallback push route.
+    path: tools/agent_tools/github_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/github_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/github_publish.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/agent-canon-github-remote.md
+    tests:
+      - tests/agent_tools/test_github_publish.py
+
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
     path: tools/agent_tools/eval_accumulation_check.py

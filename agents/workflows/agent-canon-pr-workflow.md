@@ -160,10 +160,10 @@ finding の粒度は、affected surfaces と dependency-expanded edit scope を�
 ## Push / GitHub write 前の remote 確認
 
 - push、PR branch update、または GitHub write を始める前に `remote_verified=yes` の根拠を揃えます。
-- まず `git status --short --branch` で upstream / tracking branch を確認します。`...origin/<branch>` のような tracking 情報がある通常ケースでは、その tracking branch を優先し、`git push` を既定候補にします。
-- 次に `git remote -v` または `git remote get-url <name>` で現在 repo の canonical remote を確認します。
-- hook 出力などで `git remote -v` の本文を読めない場合は、`git config --get-regexp '^remote\\..*\\.url$'`、`.git/config`、repo metadata の順に fallback 確認し、確認できるまで write 操作へ進みません。
-- literal URL push は例外扱いです。remote / upstream が無い、または通常の `git push` では目的を達成できないことを確認した場合だけ使い、work log または PR evidence に理由を残します。
+- 標準入口は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` です。この tool は `gh repo view` と `git remote get-url origin` が同じ `owner/name` を指す場合だけ publish / PR 操作へ進み、stdout に `REMOTE_VERIFIED=yes` と user task を出します。
+- `git status --short --branch` は branch 状態の補助 evidence として見ますが、push 先 repository の決定には使いません。
+- hook 出力などで remote 確認が読みづらい場合でも、`.git/config` や repo metadata を読む fallback へ降りません。`github_publish.py` が `NEXT_ACTION=configure_origin_remote_for_the_user_task` または `NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push` を出したら、その user task と remote 設定を修復して同じ tool を再実行します。
+- literal URL push is not a standard route. GitHub publish / PR 作業は `github_publish.py` の verified remote route に戻します。
 - PR 文脈、過去作業、branch 名、template 名、hardcoded repository name から push 先 repository を推定してはいけません。`project_template` のような名前は remote verification evidence ではありません。
 
 ## 標準手順
@@ -242,9 +242,9 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。
 - issue file または durable finding 不要判断、dependency-expanded edit scope、tool / memory / eval route を PR 本文に書きます。
-- standalone AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
-- template / derived repo の AgentCanon PR で GitHub CLI を使える場合は `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
-- default template / repo-local PR では `gh pr create --base main --head <branch> --template .github/PULL_REQUEST_TEMPLATE.md` を使います。
+- PR body は run bundle の `pr_body.md` などの明示 file に展開します。template の path だけを `gh pr create --template` に渡して、agent が最終 body を確認しない状態にしません。
+- standalone AgentCanon PR、template / derived repo の AgentCanon PR、default template / repo-local PR のいずれも、作成または更新は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。
+- 既存 PR がある場合、tool は既存 PR を報告します。PR body を更新する意図がある場合だけ `--update-existing` を付けます。
 - `goal.md` が `pr_mutation_authority: github_copilot_merge_when_green`
   を持つ場合、PR body の `Copilot / Automation Output` に authority と
   `gh pr checks` summary を残し、merge は GitHub-hosted Copilot / PR

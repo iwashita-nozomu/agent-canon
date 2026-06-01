@@ -46,6 +46,17 @@ agent-canon semantic-index context-pack --query-file reports/query.txt --max-cel
 agent-canon semantic-index thin-docs --top-k 20 --format text
 ```
 
+If the SQLite cache is missing or stale, build it immediately and retry the
+same bounded semantic-index command before falling back to exact search:
+
+```bash
+agent-canon semantic-index build --root .
+```
+
+Only use bounded `rg -l` as the next route when the build itself fails because
+of toolchain, permission, or embedding-provider availability. Record that
+reason in the run bundle.
+
 During search-routing Eval collection, run `rg -l` after the bounded semantic
 result so the two surfaces can be compared. Do not use broad raw `rg` output as
 edit authority.
