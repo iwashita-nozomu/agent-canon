@@ -24,6 +24,9 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 - `documents/` 内の編成は、参照先の一覧ではなく、責務ごとの分割を優先します。
 - 実装への参照は、実装ファイル名や実装上の制約を明示する必要がある場合に限ります。
 - 各 `.md` ファイルは、タイトル、短い導入、`##` 見出しごとの本文という流れを基本にします。
+- workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
+- Mermaid 図は Markdown 内の fenced `mermaid` code block として保持し、画像化した PNG / SVG だけを正本にすることを禁止します。
+- Mermaid 図は本文の代替ではありません。図の直前または直後に、図が答える問い、読者が最初に見るべき node / edge、図では表していない制約を短く書きます。
 - リポジトリ root の `.markdownlint.json` を Markdown 体裁チェックの既定設定として扱います。
 - Markdown は `markdownlint` に準拠させ、例外が必要な場合は設定ファイルと規約文書を同時に更新します。
 - まとまった Markdown 変更の前後では、少なくとも変更したファイルに対して `markdownlint` を実行して体裁崩れを確認します。
@@ -46,6 +49,7 @@ upstream design ../../SHARED_RUNTIME_SURFACES.md shared documents ownership poli
 
 - 遵守確認の対象になる規約で、`原則`、`望ましい`、`できれば`、`構いません`、`してよい`、`必要なら` を禁止表現や必須表現の代わりに使うことを禁止します。
 - 規約の必須条件や禁止条件に `推奨` を使うことを禁止します。
+- Mermaid 図を追加したときに、図だけを正本として本文の責務説明、入力、出力、例外、検証経路を省略することを禁止します。
 
 ## 検証
 

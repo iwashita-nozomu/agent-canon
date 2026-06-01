@@ -283,7 +283,7 @@ description = "Structure planning runtime skill must cover reports, experiments,
 id = "STRUCTURE-PLANNING-SHIM-1"
 critical = true
 description = "Defines a structure contract with first artifact, source map, metric or delta contract, invalid interpretations, and validation gate."
-required_regex = ["structure contract", "first artifact", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
+required_regex = ["structure contract", "first artifact", "visual_plan", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
 
 [[evals.checklist]]
 id = "STRUCTURE-PLANNING-SHIM-2"
@@ -303,6 +303,12 @@ critical = true
 description = "Routes nontrivial paragraph order and connective evidence through semantic-index discourse-relations without making it authority."
 required_regex = ["discourse-relations", "--profile", "advisory structure evidence", "not as prose or policy authority"]
 
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-5"
+critical = true
+description = "Uses Mermaid as the default first visual for nontrivial reader-facing flow, dependency, ownership, routing, state, review-gate, or handoff structure."
+required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
+
 [[evals]]
 id = "structure-planning-doc"
 target = "agents/skills/structure-planning.md"
@@ -319,7 +325,7 @@ required_regex = ["report", "experiment", "document", "paper", "HTML", "refactor
 id = "STRUCTURE-PLANNING-DOC-2"
 critical = true
 description = "Defines the structure contract fields and closeout tokens."
-required_regex = ["structure_kind", "first_artifact", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
+required_regex = ["structure_kind", "first_artifact", "visual_plan", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
 
 [[evals.checklist]]
 id = "STRUCTURE-PLANNING-DOC-3"
@@ -332,6 +338,12 @@ id = "STRUCTURE-PLANNING-DOC-4"
 critical = true
 description = "Documents discourse-relations as optional paragraph-order and transition evidence."
 required_regex = ["discourse-relations", "connective profile", "therefore", "because", "structure evidence"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-5"
+critical = true
+description = "Documents Mermaid as the default visual plan for nontrivial reader-facing process, dependency, ownership, routing, state, review-gate, or handoff structure."
+required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
 
 [[evals]]
 id = "literature-survey-source-record-shim"
@@ -554,6 +566,12 @@ id = "DOCUMENT-STRUCTURE-2"
 critical = true
 description = "Connects long-form paragraph flow to discourse-relations when transition evidence matters."
 required_regex = ["discourse-relations", "paragraph flow", "transition choice", "structure-planning"]
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-3"
+critical = true
+description = "Routes nontrivial long-form workflow/dependency/ownership/routing/state/review-gate explanations to Mermaid through structure-planning visual_plan."
+required_regex = ["Mermaid", "visual_plan", "workflow", "dependency", "ownership", "routing", "state transition", "review gate", "fenced `mermaid`"]
 
 [[evals]]
 id = "paper-writing-structure-planning"
