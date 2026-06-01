@@ -152,6 +152,14 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - `safe.directory` setup must be dynamic for `/workspace` and
   `/workspace/vendor/<name>`.
 - `/mnt/git` is compatibility-only. Configure it only when the host path exists.
+- A private host directory for confidential local Git repositories or other
+  operator-local material may be mounted only through
+  `AGENT_CANON_SECRET_DIR`. The shared generator must skip the mount when the
+  variable is unset or the path is absent, must not print the host path, and must
+  use `AGENT_CANON_SECRET_MOUNT` for the container target
+  (`/mnt/agent-canon-secrets` by default). Use
+  `AGENT_CANON_SECRET_DIR_MODE=rw` only when the container must update local
+  Git remotes; otherwise keep the default read-only mode.
 - Shared post-create logic must tolerate a repository that has no local bare
   mirror and no host-specific optional mount.
 - Devcontainer-generated Compose must forward repo-local runtime environment

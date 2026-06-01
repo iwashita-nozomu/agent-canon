@@ -87,6 +87,35 @@ done
 if [ -d /mnt/git ]; then
   volume_lines+=("      - /mnt/git:/mnt/git")
 fi
+secret_mount_status="disabled"
+secret_target="${AGENT_CANON_SECRET_MOUNT:-/mnt/agent-canon-secrets}"
+secret_mode="${AGENT_CANON_SECRET_DIR_MODE:-ro}"
+secret_read_only="true"
+case "$secret_mode" in
+  ro|readonly) secret_read_only="true" ;;
+  rw|readwrite) secret_read_only="false" ;;
+  *)
+    printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_DIR_MODE must be ro or rw\n' >&2
+    secret_mode="invalid"
+    ;;
+esac
+if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
+  if [ ! -d "${AGENT_CANON_SECRET_DIR}" ]; then
+    printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_DIR is not an existing directory\n' >&2
+  elif [[ "$secret_target" != /* ]]; then
+    printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_MOUNT must be an absolute container path\n' >&2
+  else
+    secret_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "${AGENT_CANON_SECRET_DIR}")"
+    secret_target_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$secret_target")"
+    volume_lines+=(
+      "      - type: bind"
+      "        source: ${secret_source_yaml}"
+      "        target: ${secret_target_yaml}"
+      "        read_only: ${secret_read_only}"
+    )
+    secret_mount_status="enabled"
+  fi
+fi
 if [ -d "${HOME}/.codex" ]; then
   volume_lines+=("      - ${HOME}/.codex:/root/.codex")
 fi
@@ -108,6 +137,8 @@ fi
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
+  "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
+  "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   "${pack_environment_lines[@]}"
 )
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
@@ -144,4 +175,4 @@ fi
   printf '%s\n' "${environment_lines[@]}"
 } > "$output"
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$pack"
+printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"
