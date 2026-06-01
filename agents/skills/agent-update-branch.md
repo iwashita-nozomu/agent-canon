@@ -17,9 +17,10 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 
 `canon-pin` is a parent-repo pin lane only. AgentCanon source edits, local
 `vendor/agent-canon` commits, prompt/skill/tool source changes, and update-route
-repairs move through a standalone AgentCanon branch/PR first. After that PR
-lands, the parent repo uses `make agent-canon-ensure-latest` and root-view sync
-to advance the pin. See `documents/agent-canon-update-route.md`.
+repairs move through `$agent-canon-update` and a standalone AgentCanon
+branch/PR first. After that PR lands, the parent repo uses
+`make agent-canon-ensure-latest` and root-view sync to advance the pin. See
+`documents/agent-canon-update-route.md`.
 
 ## Required Gates
 

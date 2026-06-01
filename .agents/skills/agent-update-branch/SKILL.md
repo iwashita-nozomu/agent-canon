@@ -17,6 +17,10 @@ upstream implementation ../../../tools/agent_tools/agent_update_branch.sh valida
    - `memory-eval`: only `memory/`, `agents/evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts intended for feedback capture
    - `canon-pin`: `.gitmodules`, `.agent-canon/update-state.toml`, `vendor/agent-canon`, and root AgentCanon symlink/copy surfaces
    - `integration`: a branch that merges one or more `agent-updates/*` branches back toward `main`
+1. Use `$agent-canon-update` instead when the work is updating AgentCanon source,
+   merging AgentCanon main into a local `vendor/agent-canon` branch, opening an
+   AgentCanon PR, or deciding the parent latest route. This skill only owns the
+   parent-repo update branch lane after that route is known.
 1. Use a template-derived branch name:
    - `agent-updates/memory-eval/<slug>`
    - `agent-updates/canon-pin/<slug>`
