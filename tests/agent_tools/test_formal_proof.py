@@ -106,6 +106,140 @@ class FormalProofToolTest(unittest.TestCase):
         self.assertIn("FORMAL_PROOF_VERIFY=z3 -smt2", result.stdout)
         self.assertIn("counterexample assumptions", result.stdout)
 
+    def test_python_symbol_writes_ast_sourced_scaffold_without_importing(self) -> None:
+        """Python AST source should parse symbols without executing module side effects."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            sample = root / "sample.py"
+            sentinel = root / "side_effect.txt"
+            out_dir = root / "proof"
+            sample.write_text(
+                "\n".join(
+                    [
+                        f"open({str(sentinel)!r}, 'w').write('imported')",
+                        "",
+                        "def lemma(x: int) -> int:",
+                        '    """Claim: lemma returns x + 1 for integer x."""',
+                        "    if x > 0:",
+                        "        return x + 1",
+                        "    return 1",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--python-symbol",
+                    f"{sample}::lemma",
+                    "--target",
+                    "lean",
+                    "--out-dir",
+                    str(out_dir),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "scaffold_only_unverified")
+            self.assertEqual(payload["source_kind"], "python_ast")
+            self.assertEqual(payload["source_symbol"], "lemma")
+            self.assertIn("def lemma(x: int) -> int", payload["source_summary"])
+            self.assertIn("x + 1", "\n".join(payload["proof_obligations"]))
+            self.assertIn("Branch nodes: 1", payload["claim_text"])
+            self.assertFalse(sentinel.exists())
+            self.assertTrue((out_dir / "lemma.lean").is_file())
+
+    def test_python_symbol_supports_nested_qualname_default_name(self) -> None:
+        """Dotted class/function qualnames should resolve through AST bodies."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            sample = Path(tmp_dir) / "sample.py"
+            sample.write_text(
+                "\n".join(
+                    [
+                        "class Container:",
+                        "    def lemma(self, value: int) -> int:",
+                        '        """Claim: nested lemma preserves value."""',
+                        "        return value",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--python-symbol",
+                    f"{sample}::Container.lemma",
+                    "--format",
+                    "json",
+                    "--out-dir",
+                    str(Path(tmp_dir) / "proof"),
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["source_symbol"], "Container.lemma")
+            self.assertTrue(payload["theorem_stub_path"].endswith("container_lemma.lean"))
+            self.assertIn("nested lemma preserves value", payload["claim_text"])
+
+    def test_python_symbol_errors_do_not_fall_back_to_claim_route(self) -> None:
+        """Invalid Python symbol references should fail before scaffold output."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--python-symbol",
+                "missing_separator",
+                "--format",
+                "json",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("path.py::qualname", result.stderr)
+        self.assertNotIn("scaffold_only_unverified", result.stdout)
+
+    def test_python_symbol_qualname_not_found_fails(self) -> None:
+        """Missing AST symbols should be reported as source errors."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            sample = Path(tmp_dir) / "sample.py"
+            sample.write_text("def available() -> int:\n    return 1\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--python-symbol",
+                    f"{sample}::missing",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Python AST symbol not found", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

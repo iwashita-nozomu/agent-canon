@@ -14,7 +14,8 @@ downstream implementation ../../.claude/skills/formal-proof-workflow/SKILL.md mi
 
 ## Purpose
 
-自然言語の数学的主張、証明スケッチ、設計上の lemma を、形式証明へ進めるための workflow です。
+自然言語の数学的主張、証明スケッチ、設計上の lemma、または
+Python AST から抽出した証明候補を、形式証明へ進めるための workflow です。
 この skill は、claim を assumptions / definitions / theorem target /
 proof obligations / existing proof search / checker command に分解します。
 LLM 生成文、自然言語証明、未実行の theorem stub を証明済みとは扱いません。
@@ -25,6 +26,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - 既存 formal library に theorem や lemma があるかを先に探したい
 - proof assistant を使う前に proof obligation、前提、定義不足を棚卸ししたい
 - 論文、scholarly note、optimization / numerical method design の理論 claim を検査可能な形に落としたい
+- Python 実装の特定 symbol から side-effect-free な AST 抽出で proof scaffold を作りたい
 
 ## Core References
 
@@ -38,6 +40,8 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 ## Mandatory Checklist
 
 - 形式化前に、claim、assumptions、definitions、target theorem、proof sketch を分けます。
+- 実装由来の claim は `formal_proof.py --python-symbol path.py::qualname` で
+  AST から抽出できます。この route は対象 module を import / execute しません。
 - `python3 tools/agent_tools/formal_proof.py` で scaffold と query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
@@ -53,6 +57,7 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 
 1. Claim intake:
    - natural-language claim を一文の target に縮約する
+   - Python 実装由来の claim は AST source (`--python-symbol path.py::qualname`) から provenance、signature、branch、return-expression obligation を抽出する
    - assumptions、definitions、notation、domain、expected theorem name を分ける
 1. Scaffold:
    - `formal_proof.py` で plan、stub、existing proof queries、literature queries を生成する
@@ -90,6 +95,7 @@ proof_checker_command=<command>
 proof_checker_log=<path|not_run>
 proof_status=<unverified|not_run|verified|blocked>
 proof_source_packet=<path>
+proof_source_kind=<natural_language|python_ast>
 ```
 
 ## Target Selection

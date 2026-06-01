@@ -1,6 +1,6 @@
 ---
 name: formal-proof-workflow
-description: Use when natural-language mathematical claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
+description: Use when natural-language mathematical claims, Python AST-derived implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, existing-proof search packets, proof-assistant stubs, and checker-gated evidence.
 ---
 <!--
 @dependency-start
@@ -15,7 +15,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 
 1. Read `agents/skills/formal-proof-workflow.md`.
 1. Read `agents/skills/literature-survey.md` before web or paper search.
-1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations.
+1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations; for implementation-derived claims, use `--python-symbol path.py::qualname` to extract side-effect-free AST provenance first.
 1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan, target-language scaffold, existing-proof queries, and literature queries.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean/mathlib include docs, LeanSearch/Loogle/Moogle-style tools, Zulip archive, and in-editor tactic search when available. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
