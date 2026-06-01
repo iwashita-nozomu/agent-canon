@@ -502,21 +502,24 @@ def perform_checks(
         command.append("--watch")
     else:
         command.append("--watch=false")
-    result = run_command(
-        runner,
-        command,
-        next_action="fix_gh_pr_checks_auth_or_wait_for_github_checks",
-    )
+    result = runner(command)
+    if result.returncode not in {0, 8}:
+        raise CommandFailure(
+            result=result,
+            next_action="fix_gh_pr_checks_auth_or_wait_for_github_checks",
+        )
     summary = base_summary(args, verification, branch)
     summary.update(
         {
             "action": "checks",
-            "status": "ok",
+            "status": "pending" if result.returncode == 8 else "ok",
             "pr_selector": pr_selector,
             "command": command,
             "checks_stdout": result.stdout.strip(),
         }
     )
+    if result.returncode == 8:
+        summary["next_action"] = "wait_for_github_checks_or_rerun_with_--watch"
     return summary
 
 

@@ -183,6 +183,37 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(summary["action"], "pr-create")
         self.assertEqual(summary["pr_url"], "https://github.com/owner/repo/pull/1")
 
+    def test_checks_reports_pending_without_failure(self) -> None:
+        """Pending GitHub checks should be a state, not a tool failure."""
+        runner = FakeRunner()
+        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+        runner.add(
+            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl"],
+            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git"}',
+        )
+        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add(
+            ["gh", "pr", "checks", "1", "--repo", "owner/repo", "--watch=false"],
+            stdout="static-gates\tpending\t0\turl\t\n",
+            returncode=8,
+        )
+        args = argparse.Namespace(
+            action="checks",
+            root=".",
+            user_task="inspect checks",
+            repo="owner/repo",
+            remote="origin",
+            branch=None,
+            pr="1",
+            watch=False,
+            summary_out=None,
+        )
+
+        summary = github_publish.run(args, runner)
+
+        self.assertEqual(summary["status"], "pending")
+        self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
+
 
 if __name__ == "__main__":
     unittest.main()
