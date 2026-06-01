@@ -98,3 +98,10 @@ tool = "tools/agent_tools/classify_path_risk.py"
 doc = "documents/tools/classify_path_risk.md"
 language = "python"
 summary = "Path/risk check matrix classifier documentation."
+
+[[tool]]
+id = "formal-proof"
+tool = "tools/agent_tools/formal_proof.py"
+doc = "documents/tools/formal_proof.md"
+language = "python"
+summary = "Formal proof scaffold planner documentation."

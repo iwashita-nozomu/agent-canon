@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 39
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 60
+expected_count = 61
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 39
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -374,6 +374,54 @@ id = "LITERATURE-SOURCE-DOC-3"
 critical = true
 description = "Defines reader-facing source sweep and adoption/exclusion sections."
 required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "formal-proof-workflow-shim"
+target = ".agents/skills/formal-proof-workflow/SKILL.md"
+kind = "skill"
+description = "Formal proof runtime skill must route natural-language claims through scaffold, existing-proof search, literature survey, and checker-gated proof status."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-1"
+critical = true
+description = "Requires formal_proof.py scaffold generation and existing formal proof search."
+required_regex = ["formal_proof\\.py", "existing formal proofs", "literature queries"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-2"
+critical = true
+description = "Requires literature-survey handoff and durable source decisions."
+required_regex = ["\\$literature-survey", "official docs", "adoption/exclusion"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-3"
+critical = true
+description = "Forbids verification claims without checker execution and proof-status evidence."
+required_regex = ["Do not mark a claim verified", "proof assistant or solver", "proof_status=not_run"]
+
+[[evals]]
+id = "formal-proof-workflow-doc"
+target = "agents/skills/formal-proof-workflow.md"
+kind = "skill"
+description = "Human formal proof skill must define claim decomposition, existing-proof search, literature handoff, and checker authority."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-1"
+critical = true
+description = "Defines natural-language claim decomposition and proof obligations."
+required_regex = ["assumptions", "definitions", "target theorem", "proof obligations"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-2"
+critical = true
+description = "Connects existing-proof web/library search to literature-survey."
+required_regex = ["existing proof search", "\\$literature-survey", "formal library docs"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-3"
+critical = true
+description = "Keeps proof authority with checker logs and placeholders unverified."
+required_regex = ["proof_status=unverified", "checker log", "placeholder"]
 
 [[evals]]
 id = "academic-writing-tex-routing-shim"

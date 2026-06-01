@@ -63,6 +63,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `experiment-lifecycle` | 単一 run と review / rerun 分岐 | `agents/skills/experiment-lifecycle.md` | `.agents/skills/experiment-lifecycle/SKILL.md` |
 | `adaptive-improvement-loop` | 実験、調査、チューニングを backlog-driven に回す outer loop | `agents/skills/adaptive-improvement-loop.md` | `.agents/skills/adaptive-improvement-loop/SKILL.md` |
 | `literature-survey` | 先行研究、関連文献、反証候補の整理 | `agents/skills/literature-survey.md` | `.agents/skills/literature-survey/SKILL.md` |
+| `formal-proof-workflow` | 自然言語 claim を形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence へ接続する | `agents/skills/formal-proof-workflow.md` | `.agents/skills/formal-proof-workflow/SKILL.md` |
 | `research-workflow` | 外部調査、比較設計、run loop、decision state の整理 | `agents/skills/research-workflow.md` | `.agents/skills/research-workflow/SKILL.md` |
 | `comprehensive-development` | code / docs / tools / runtime をまたぐ包括的開発フロー | `agents/skills/comprehensive-development.md` | `.agents/skills/comprehensive-development/SKILL.md` |
 | `environment-maintenance` | Docker / CI / dependency / runtime 更新 | `agents/skills/environment-maintenance.md` | `.agents/skills/environment-maintenance/SKILL.md` |
@@ -89,6 +90,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
 - repo-changing task では `$agent-orchestration`、`$codex-task-workflow`、`$subagent-bootstrap` の順で使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
+- 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
 - 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
 - paper section まで含む論文 draft では `paper-writing` を先に見ます。
