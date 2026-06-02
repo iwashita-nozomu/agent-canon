@@ -1,0 +1,89 @@
+# AgentCanon Update Skill
+<!--
+@dependency-start
+responsibility Documents AgentCanon Update Skill for this repository.
+upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/agent-canon-update-route.md canonical AgentCanon update route
+upstream design ../../documents/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
+upstream implementation ../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
+upstream implementation ../../tools/sync_agent_canon.sh root-view and submodule sync helper
+downstream design ./agent-update-branch.md separates parent update branch lanes from source AgentCanon PR work
+@dependency-end
+-->
+
+Use this skill when the task is about bringing AgentCanon itself, a vendored
+`vendor/agent-canon` pin, root runtime views, or parent-repo AgentCanon update
+TODO state up to date.
+
+## Use When
+
+- The user asks to update, latest, refresh, or sync AgentCanon.
+- `make agent-canon-ensure-latest`, `make agent-canon-latest`,
+  `tools/update_agent_canon.sh`, or `tools/sync_agent_canon.sh` is the likely
+  entrypoint.
+- A parent repo has AgentCanon submodule pin drift, root-view drift, or pending
+  `.agent-canon/update-state.toml` TODOs.
+- `vendor/agent-canon/` contains local AgentCanon source commits that need an
+  standalone AgentCanon branch/PR before the parent pin can move.
+
+## Core References
+
+- `documents/agent-canon-update-route.md`
+- `documents/agent-canon-parent-repo-latest-checklist.md`
+- `documents/SHARED_RUNTIME_SURFACES.md`
+- `tools/update_agent_canon.sh`
+- `tools/sync_agent_canon.sh`
+- `agents/skills/agent-update-branch.md`
+
+## Route
+
+1. Classify the repo shape before editing:
+   - standalone AgentCanon source repo
+   - parent repo with `vendor/agent-canon` submodule
+   - legacy subtree or committed snapshot compatibility repo
+1. In parent repos, classify the dirty state by update surface, not by the
+   whole worktree. Unrelated parent dirty paths do not block the update.
+1. Use the high-level route first:
+
+```bash
+make agent-canon-update-plan
+make agent-canon-ensure-latest
+```
+
+1. If `vendor/agent-canon/` has local source commits or source dirty state,
+   stop the parent pin update path and move that work through an AgentCanon
+   source branch/PR:
+
+```bash
+bash tools/update_agent_canon.sh merge-main-into-current
+git -C vendor/agent-canon push origin HEAD
+```
+
+1. After a safe update or PR merge, repair and verify root runtime views:
+
+```bash
+bash tools/sync_agent_canon.sh link-root
+bash tools/sync_agent_canon.sh check
+```
+
+1. Handle parent update TODOs before unrelated work:
+
+```bash
+python3 tools/agent_tools/agent_canon_update_todos.py status
+python3 tools/agent_tools/agent_canon_update_todos.py plan --write
+```
+
+1. For parent-repo pin isolation, pair this skill with
+   `$agent-update-branch` and use the `canon-pin` lane. Do not use
+   `$agent-update-branch` as the source AgentCanon PR route.
+
+## Closeout Evidence
+
+Record:
+
+- update route decision and dirty-surface classification
+- `git submodule status vendor/agent-canon` or standalone AgentCanon commit
+- AgentCanon PR URL or GitHub `main` SHA when source work was involved
+- `bash tools/sync_agent_canon.sh check`
+- parent update TODO status and completed / deferred task IDs
+- validation selected from `documents/runtime-profiles-and-check-matrix.md`

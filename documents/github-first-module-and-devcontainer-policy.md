@@ -97,6 +97,9 @@ The shared devcontainer owns:
   clones do not all create the same visible container names;
 - host auth mount conventions for Codex, GitHub CLI, and SSH;
 - optional `/mnt/git` compatibility mounts when the host path exists;
+- optional private host-directory mounts through `AGENT_CANON_SECRET_DIR`, for
+  confidential local Git remotes or other operator-local material that must not
+  become a repository default;
 - Docker socket mount detection and reporting;
 - workspace attach status reporting;
 - agent bootstrap ergonomics that should stay consistent across template
