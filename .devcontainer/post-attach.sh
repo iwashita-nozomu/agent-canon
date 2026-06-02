@@ -16,6 +16,12 @@ if [ -d /mnt/git ]; then
   mnt_git_status="mounted"
 fi
 
+secret_mount_target="${AGENT_CANON_SECRET_MOUNT:-/mnt/agent-canon-secrets}"
+secret_mount_status="not-mounted"
+if [ -d "$secret_mount_target" ]; then
+  secret_mount_status="mounted"
+fi
+
 docker_socket_status="unavailable"
 if [ -S /var/run/docker.sock ]; then
   docker_socket_status="mounted"
@@ -73,6 +79,7 @@ echo "----------------------------------------"
 echo "workspace: ${repo_root}"
 echo "gpu: ${gpu_status}"
 echo "/mnt/git: ${mnt_git_status}"
+echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT_CANON_SECRET_DIR_MODE:-ro})"
 echo "docker-socket: ${docker_socket_status}"
 echo "host-codex-home: ${codex_home_status}"
 echo "codex-login: ${codex_login_status}"
