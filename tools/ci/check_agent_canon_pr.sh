@@ -56,9 +56,9 @@ run_direct_agent_checks() {
   fi
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/evaluate_codex_agent_roles.py
+  python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
 }
 
@@ -167,16 +167,16 @@ run_standalone_static_gate_ci() {
   git fetch origin "${BASE_REF}" --depth=1 || true
   python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
   python3 tools/agent_tools/issue_sync.py
-  python3 tools/agent_tools/eval_accumulation_check.py
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/evaluate_codex_agent_roles.py
+  python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
-  tools/bin/agent-canon local-llm eval
-  python3 tools/agent_tools/evaluate_workflow_selection.py
-  python3 tools/agent_tools/evaluate_report_quality.py
+  tools/bin/agent-canon local-llm eval --accumulate
+  python3 tools/agent_tools/evaluate_workflow_selection.py --accumulate
+  python3 tools/agent_tools/evaluate_report_quality.py --accumulate
+  python3 tools/agent_tools/eval_accumulation_check.py
   python3 tools/ci/check_github_workflows.py
   python3 tools/ci/container_config.py
 }

@@ -155,7 +155,7 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_codex_agent_roles.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/evaluate_codex_agent_roles.py --accumulate 2>&1; then
   echo "✅ Codex agent role eval 成功"
 else
   echo "❌ Codex agent role eval 失敗"
@@ -247,12 +247,6 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
-  echo "✅ eval accumulation checks 成功"
-else
-  echo "❌ eval accumulation checks 失敗"
-  EXIT_CODE=1
-fi
 if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
   echo "✅ Rust format checks 成功"
 else
@@ -271,22 +265,28 @@ else
   echo "❌ Rust tests 失敗"
   EXIT_CODE=1
 fi
-if tools/bin/agent-canon local-llm eval 2>&1; then
+if tools/bin/agent-canon local-llm eval --accumulate 2>&1; then
   echo "✅ local LLM responsibility eval checks 成功"
 else
   echo "❌ local LLM responsibility eval checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_workflow_selection.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/evaluate_workflow_selection.py --accumulate 2>&1; then
   echo "✅ workflow selection eval checks 成功"
 else
   echo "❌ workflow selection eval checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_report_quality.py 2>&1; then
+if "$PYTHON_BIN" tools/agent_tools/evaluate_report_quality.py --accumulate 2>&1; then
   echo "✅ report quality eval checks 成功"
 else
   echo "❌ report quality eval checks 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
+  echo "✅ eval accumulation checks 成功"
+else
+  echo "❌ eval accumulation checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then
