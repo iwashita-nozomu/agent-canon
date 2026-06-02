@@ -11,6 +11,7 @@
 # downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
 # downstream implementation ./evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
 # downstream implementation ./local_llm_eval.py writes accumulated eval reports through this resolver
+# downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""
 
@@ -136,6 +137,11 @@ def hook_results_dir(active_root: Path, canon_root: Path) -> Path:
 def codex_runtime_summary_dir(active_root: Path, canon_root: Path) -> Path:
     """Return the Codex runtime summary JSONL directory for one source repository."""
     return _log_archive_root(canon_root) / "codex-runtime" / repo_log_key(active_root)
+
+
+def agent_report_archive_dir(active_root: Path, canon_root: Path) -> Path:
+    """Return the archived reports/agents directory for one source repository."""
+    return _log_archive_root(canon_root) / "agent-reports" / repo_log_key(active_root)
 
 
 def eval_results_dir(canon_root: Path, family: str) -> Path:
