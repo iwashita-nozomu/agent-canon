@@ -23,12 +23,20 @@ if __package__ in (None, ""):
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
     _log_environment_key,
+    agent_report_archive_dir,
     mounted_log_archive_root,
     repo_log_key,
 )
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
+DEFAULT_AGENT_REPORT_ROOT = Path("reports") / "agents"
+DEFAULT_AGENT_REPORT_DESTINATION = Path("agent-reports")
+AGENT_REPORT_EXCLUDED_DIRS = frozenset(
+    {".cache", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+)
+AGENT_REPORT_EXCLUDED_FILES = frozenset({".active_run", ".mcp_inventory_cache.json"})
+DEFAULT_AGENT_REPORT_MAX_FILE_BYTES = 10 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -82,6 +90,27 @@ def build_parser() -> argparse.ArgumentParser:
     status = subparsers.add_parser("status", help="Print archive clone, branch, and dirty state.")
     status.add_argument("--porcelain", action="store_true", help="Include git status --porcelain output.")
 
+    agent_reports = subparsers.add_parser(
+        "archive-agent-reports",
+        help="Copy reports/agents run bundles into the source repository's archive branch.",
+    )
+    agent_reports.add_argument(
+        "--report-root",
+        type=Path,
+        help="Agent report root. Defaults to <source-root>/reports/agents.",
+    )
+    agent_reports.add_argument(
+        "--destination-prefix",
+        default=DEFAULT_AGENT_REPORT_DESTINATION.as_posix(),
+        help="Archive-relative destination prefix for copied agent reports.",
+    )
+    agent_reports.add_argument(
+        "--max-file-bytes",
+        type=int,
+        default=DEFAULT_AGENT_REPORT_MAX_FILE_BYTES,
+        help="Skip individual report files larger than this many bytes.",
+    )
+
     legacy = subparsers.add_parser(
         "import-legacy",
         help="Copy old AgentCanon in-tree hook JSONL into legacy-import/hook-runs.",
@@ -128,6 +157,26 @@ def build_parser() -> argparse.ArgumentParser:
     push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
     push.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
     push.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
+
+    sync = subparsers.add_parser(
+        "sync",
+        help="Ensure the archive, copy current agent reports, commit, and push log artifacts.",
+    )
+    sync.add_argument("--message", help="Commit message. Defaults to 'Append <repo-key> runtime logs'.")
+    sync.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
+    sync.add_argument("--no-push", action="store_true", help="Copy artifacts into the archive without pushing.")
+    sync.add_argument("--no-agent-reports", action="store_true", help="Do not copy reports/agents artifacts.")
+    sync.add_argument(
+        "--report-root",
+        type=Path,
+        help="Agent report root. Defaults to <source-root>/reports/agents.",
+    )
+    sync.add_argument(
+        "--max-file-bytes",
+        type=int,
+        default=DEFAULT_AGENT_REPORT_MAX_FILE_BYTES,
+        help="Skip individual report files larger than this many bytes.",
+    )
     return parser
 
 
@@ -493,19 +542,127 @@ def command_import_eval_results(context: ArchiveContext, args: argparse.Namespac
     return 0
 
 
-def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
-    """Commit and push source repo runtime logs."""
+@dataclass(frozen=True)
+class AgentReportArchiveSummary:
+    """Counts from copying run-local agent reports into the archive."""
+
+    report_root: Path
+    destination: Path
+    files: int
+    copied: int
+    updated: int
+    existing: int
+    skipped: int
+
+
+def report_root_for_context(context: ArchiveContext, report_root: Path | None) -> Path:
+    """Return the source report root for agent run artifacts."""
+    return (report_root.resolve() if report_root else context.source_root / DEFAULT_AGENT_REPORT_ROOT)
+
+
+def should_skip_agent_report(relative: Path, source: Path, max_file_bytes: int) -> bool:
+    """Return whether one report artifact should stay out of the log archive."""
+    if any(part in AGENT_REPORT_EXCLUDED_DIRS for part in relative.parts):
+        return True
+    if relative.name in AGENT_REPORT_EXCLUDED_FILES:
+        return True
+    try:
+        return source.stat().st_size > max(0, max_file_bytes)
+    except OSError:
+        return True
+
+
+def copy_agent_reports(
+    context: ArchiveContext,
+    *,
+    report_root: Path | None,
+    destination_prefix: Path,
+    max_file_bytes: int,
+) -> AgentReportArchiveSummary:
+    """Copy run-local reports/agents artifacts to the archive branch."""
     ensure_archive(context)
+    root = report_root_for_context(context, report_root)
+    default_destination = agent_report_archive_dir(context.source_root, context.canon_root)
+    destination = (
+        default_destination
+        if destination_prefix == DEFAULT_AGENT_REPORT_DESTINATION
+        else context.archive_root / destination_prefix / context.repo_key
+    )
+    if context.archive_root.resolve() == root or context.archive_root.resolve() in root.parents:
+        raise ArchiveGitError("agent report root cannot be inside the archive clone")
+    if not root.exists():
+        return AgentReportArchiveSummary(root, destination, 0, 0, 0, 0, 0)
+
+    files = copied = updated = existing = skipped = 0
+    for source in sorted(path for path in root.rglob("*") if path.is_file()):
+        relative = source.relative_to(root)
+        if should_skip_agent_report(relative, source, max_file_bytes):
+            skipped += 1
+            continue
+        files += 1
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if target.read_bytes() == source.read_bytes():
+                existing += 1
+                continue
+            shutil.copy2(source, target)
+            updated += 1
+            continue
+        shutil.copy2(source, target)
+        copied += 1
+
+    if destination.exists():
+        git(context.archive_root, ["add", "--", destination_prefix.as_posix()])
+    return AgentReportArchiveSummary(root, destination, files, copied, updated, existing, skipped)
+
+
+def print_agent_report_archive_summary(summary: AgentReportArchiveSummary) -> None:
+    """Print stable status lines for agent report archiving."""
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_ROOT={summary.report_root}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION={summary.destination}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES={summary.files}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED={summary.copied}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_UPDATED={summary.updated}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING={summary.existing}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED={summary.skipped}")
+
+
+def command_archive_agent_reports(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Archive current reports/agents artifacts."""
+    destination_prefix = safe_archive_relative_path(args.destination_prefix)
+    summary = copy_agent_reports(
+        context,
+        report_root=args.report_root,
+        destination_prefix=destination_prefix,
+        max_file_bytes=args.max_file_bytes,
+    )
+    print_context(context)
+    print_agent_report_archive_summary(summary)
+    print("RUNTIME_LOG_ARCHIVE_AGENT_REPORTS=pass")
+    return 0
+
+
+def stage_archive_paths(context: ArchiveContext) -> None:
+    """Stage all AgentCanon-managed log archive families that exist."""
     log_paths = [
         Path("hook-runs") / context.repo_key,
+        Path("codex-runtime") / context.repo_key,
+        DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key,
         Path("eval-results"),
         Path("legacy-import"),
     ]
-    message = args.message or f"Append {context.repo_key} runtime logs"
-
     for logs_path in log_paths:
         if (context.archive_root / logs_path).exists():
             git(context.archive_root, ["add", "--", logs_path.as_posix()])
+
+
+def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Commit and push source repo runtime logs."""
+    ensure_archive(context)
+    message = args.message or f"Append {context.repo_key} runtime logs"
+
+    stage_archive_paths(context)
     staged = git(context.archive_root, ["diff", "--cached", "--quiet"], check=False)
     committed = "no"
     if staged.returncode != 0:
@@ -520,6 +677,29 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
     print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={committed}")
     print("RUNTIME_LOG_ARCHIVE_PUSH=pass")
     return 0
+
+
+def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Run the normal unattended archive sync flow."""
+    ensure_archive(context)
+    print_context(context)
+    if not args.no_agent_reports:
+        summary = copy_agent_reports(
+            context,
+            report_root=args.report_root,
+            destination_prefix=DEFAULT_AGENT_REPORT_DESTINATION,
+            max_file_bytes=args.max_file_bytes,
+        )
+        print_agent_report_archive_summary(summary)
+    if args.no_push:
+        stage_archive_paths(context)
+        print("RUNTIME_LOG_ARCHIVE_SYNC_PUSH=skipped")
+        print("RUNTIME_LOG_ARCHIVE_SYNC=pass")
+        return 0
+    push_args = argparse.Namespace(message=args.message, no_pull=args.no_pull)
+    result = command_push(context, push_args)
+    print("RUNTIME_LOG_ARCHIVE_SYNC=pass")
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -538,8 +718,12 @@ def main(argv: list[str] | None = None) -> int:
             return command_import_legacy(context, args)
         if args.command == "import-eval-results":
             return command_import_eval_results(context, args)
+        if args.command == "archive-agent-reports":
+            return command_archive_agent_reports(context, args)
         if args.command == "push":
             return command_push(context, args)
+        if args.command == "sync":
+            return command_sync(context, args)
     except ArchiveGitError as exc:
         print(f"RUNTIME_LOG_ARCHIVE_ERROR={exc}")
         print("RUNTIME_LOG_ARCHIVE=fail")
