@@ -52,7 +52,14 @@ class ProseReasoningGraphTest(unittest.TestCase):
             rewrite = root / "rewrite.md"
             source.write_text(sample_text(), encoding="utf-8")
 
-            ingest = run_graph("ingest", str(source), "--db", str(db))
+            ingest = run_graph(
+                "ingest",
+                str(source),
+                "--db",
+                str(db),
+                "--prompt",
+                "学術分野のコーパスを決め、Python/Rust code documentationにも使う。",
+            )
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_INGEST=pass", ingest.stdout)
 
@@ -91,8 +98,33 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
             payload = cast(dict[str, object], yaml.safe_load(projection.read_text(encoding="utf-8")))
             self.assertEqual(payload["profile"], "all")
+            self.assertEqual(payload["canonical_graph"], "text_anchored_semantic_graph")
+            corpus_hints = typed_items(payload, "corpus_hints")
+            self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
+            self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
             self.assertIn("$long-form-writing", handoff_targets(payload))
             self.assertIn("$experiment-lifecycle", handoff_targets(payload))
+            source_anchors = typed_items(payload, "source_anchors")
+            self.assertTrue(any(item.get("kind") == "sentence" for item in source_anchors))
+            sentence_anchor = next(item for item in source_anchors if item.get("kind") == "sentence")
+            sentence_payload = cast(dict[str, object], sentence_anchor["payload"])
+            self.assertEqual(sentence_payload["span_kind"], "sentence")
+            self.assertEqual(sentence_payload["segmentation_basis"], "sentence_split")
+            projection_views = typed_items(payload, "projection_views")
+            self.assertGreaterEqual(len(projection_views), 1)
+            first_view = projection_views[0]
+            self.assertTrue(str(first_view["view_id"]).startswith("view:all:"))
+            self.assertIn("p:1", cast(list[str], first_view["members"]))
+            self.assertIn("recommended_format", first_view)
+            self.assertIn("format_reason", first_view)
+            inference_basis = cast(dict[str, object], first_view["inference_basis"])
+            self.assertEqual(inference_basis["source"], "canonical_graph_projection")
+            self.assertTrue(
+                any(
+                    view.get("recommended_format") in {"figure", "table", "bulleted_list"}
+                    for view in projection_views
+                )
+            )
 
             lint = run_graph("lint", "--db", str(db), "--profile", "all", "--out", str(diagnostics))
             self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
@@ -168,12 +200,54 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("PROSE_REASONING_GRAPH_STATS=", result.stdout)
             payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
             self.assertIn("layers", payload)
+            self.assertEqual(payload["canonical_graph"], "text_anchored_semantic_graph")
+            self.assertIn("projection_views", payload)
+            self.assertIn("source_anchors", payload)
             layers = payload["layers"]
             self.assertIsInstance(layers, dict)
             self.assertIn("edit-operation", cast(dict[str, object], layers))
             self.assertIn("$report-writing", handoff_targets(payload))
             stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
             self.assertEqual(stats_payload["schema"], "prose_reasoning_graph.stats.v1")
+
+    def test_projection_views_are_derived_from_canonical_anchors(self) -> None:
+        """Projection views should keep anchor membership and not become source nodes."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "sample.md"
+            db = root / "graph.sqlite"
+            output = root / "projection.json"
+            source.write_text(sample_text(), encoding="utf-8")
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            result = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "writing",
+                "--format",
+                "json",
+                "--out",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            views = typed_items(payload, "projection_views")
+            nodes = typed_items(payload, "nodes")
+            node_ids = {str(item["node_id"]) for item in nodes}
+            view_ids = {str(item["view_id"]) for item in views}
+
+            self.assertGreater(len(views), 0)
+            self.assertFalse(view_ids & node_ids)
+            for view in views:
+                members = cast(list[str], view["members"])
+                self.assertGreater(len(members), 0)
+                for member in members:
+                    self.assertIn(member, node_ids)
+                basis = cast(dict[str, object], view["inference_basis"])
+                self.assertIn("member_anchor_ids", basis)
 
     def test_experiment_diagnostics_have_unique_rules(self) -> None:
         """Experiment coverage diagnostics should not overwrite one another."""
@@ -198,6 +272,116 @@ class ProseReasoningGraphTest(unittest.TestCase):
             ):
                 self.assertIn(rule, rules)
             self.assertEqual(len(rules), len(set(rules)))
+
+    def test_japanese_sentence_units_and_discourse_cues(self) -> None:
+        """Japanese prose should split sentences and recognize local bridge cues."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "japanese_report.md"
+            db = root / "graph.sqlite"
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    # 状態報告
+
+                    根拠として測定結果があり、したがって文章構造グラフは検査できる。
+
+                    このため、現在の文章構造グラフの差分を説明する。
+
+                    例えば、仮説は構造化で論理穴が減ることである。
+
+                    例えば、指標は unsupported claim の件数で見る。
+
+                    例えば、ベースラインは初稿の診断件数である。
+
+                    例えば、期待結果は blocker が減ることである。
+
+                    ただし、制限はヒューリスティックが残ることである。
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+
+            rules = diagnostic_rules(db)
+            self.assertNotIn("topic_jump_without_bridge", rules)
+            self.assertNotIn("experiment_without_hypothesis", rules)
+            self.assertNotIn("experiment_without_metric", rules)
+            self.assertNotIn("metric_without_baseline", rules)
+            self.assertNotIn("experiment_without_expected_result", rules)
+            self.assertNotIn("unsupported_claim", rules)
+            self.assertGreaterEqual(len(nodes_by_layer_kind(db, "form", "sentence")), 7)
+
+    def test_ascii_sentence_units_preserve_abbreviations_and_versions(self) -> None:
+        """ASCII prose should not split common abbreviations or version strings."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "ascii_report.md"
+            db = root / "graph.sqlite"
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    # ASCII Report
+
+                    The method cites e.g. v1.2.3 and Fig. 2. It must still split here.
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+
+            sentences = node_texts_by_layer_kind(db, "form", "sentence")
+            self.assertIn("The method cites e.g. v1.2.3 and Fig. 2.", sentences)
+            self.assertIn("It must still split here.", sentences)
+            self.assertNotIn("The method cites e.g.", sentences)
+            self.assertNotIn("v1.2.3 and Fig.", sentences)
+
+    def test_prompt_file_influences_corpus_hints_and_missing_file_errors(self) -> None:
+        """Prompt files should feed corpus hints and fail clearly when absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "sample.md"
+            prompt = root / "prompt.txt"
+            db = root / "graph.sqlite"
+            projection = root / "projection.json"
+            source.write_text("# Note\n\nPlain prose for routing.", encoding="utf-8")
+            prompt.write_text("Python code documentation for an academic paper.", encoding="utf-8")
+
+            ingest = run_graph(
+                "ingest",
+                str(source),
+                "--db",
+                str(db),
+                "--prompt",
+                "学術",
+                "--prompt-file",
+                str(prompt),
+            )
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+            project = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "writing",
+                "--format",
+                "json",
+                "--out",
+                str(projection),
+            )
+            self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
+
+            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            corpus_hints = typed_items(payload, "corpus_hints")
+            self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
+            self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
+
+            missing = run_graph("ingest", str(source), "--db", str(db), "--prompt-file", str(root / "missing.txt"))
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("prompt file does not exist", missing.stderr)
 
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""
@@ -262,10 +446,42 @@ def handoff_targets(payload: dict[str, object]) -> set[str]:
     return targets
 
 
+def typed_items(payload: dict[str, object], key: str) -> list[dict[str, object]]:
+    """Return a projection payload list of dictionaries."""
+    raw_items = payload.get(key, [])
+    if not isinstance(raw_items, list):
+        return []
+    items: list[dict[str, object]] = []
+    for item in cast(list[object], raw_items):
+        if isinstance(item, dict):
+            items.append(cast(dict[str, object], item))
+    return items
+
+
 def diagnostic_rules(db: Path) -> list[str]:
     """Return diagnostic rules from the graph database."""
     with sqlite3.connect(db) as connection:
         rows = connection.execute("SELECT rule FROM diagnostics ORDER BY rule").fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def nodes_by_layer_kind(db: Path, layer: str, kind: str) -> list[str]:
+    """Return node ids for one layer and kind."""
+    with sqlite3.connect(db) as connection:
+        rows = connection.execute(
+            "SELECT id FROM nodes WHERE layer = ? AND kind = ? ORDER BY id",
+            (layer, kind),
+        ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def node_texts_by_layer_kind(db: Path, layer: str, kind: str) -> list[str]:
+    """Return node text for one layer and kind."""
+    with sqlite3.connect(db) as connection:
+        rows = connection.execute(
+            "SELECT text FROM nodes WHERE layer = ? AND kind = ? ORDER BY id",
+            (layer, kind),
+        ).fetchall()
     return [str(row[0]) for row in rows]
 
 

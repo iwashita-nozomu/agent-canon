@@ -55,6 +55,44 @@ SKILL_HANDOFF_TARGETS = (
     "$experiment-lifecycle",
     "$result-artifact-writeout",
 )
+CORPUS_KEYWORDS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "academic_writing",
+        "Academic writing and discourse-structure corpus",
+        ("academic", "paper", "论文", "論文", "学術", "文献", "citation", "rst", "pdtb", "文章構造", "コーパス"),
+    ),
+    (
+        "software_engineering",
+        "Software engineering documents and code corpus",
+        ("python", "rust", "cpp", "c++", "shell", "code", "コード", "実装", "依存", "agentcanon", "dsl"),
+    ),
+    (
+        "experimental_report",
+        "Experimental planning and evaluation report corpus",
+        ("experiment", "hypothesis", "metric", "baseline", "実験", "仮説", "指標", "ベースライン", "評価"),
+    ),
+    (
+        "formal_reasoning",
+        "Formal reasoning, mathematics, and equation-heavy corpus",
+        ("theorem", "proof", "lemma", "equation", "formula", "定理", "証明", "数式", "数学"),
+    ),
+)
+ASCII_SENTENCE_ABBREVIATIONS = frozenset(
+    {
+        "dr",
+        "e.g",
+        "fig",
+        "figs",
+        "i.e",
+        "mr",
+        "mrs",
+        "ms",
+        "no",
+        "prof",
+        "sec",
+        "vs",
+    }
+)
 CLAIM_CUES = (
     "should",
     "must",
@@ -68,6 +106,7 @@ CLAIM_CUES = (
     "必要",
     "べき",
     "はず",
+    "したがって",
 )
 EVIDENCE_CUES = (
     "because",
@@ -160,6 +199,8 @@ class Node:
     label: str
     text: str
     payload: dict[str, object]
+    source_start: int = 0
+    source_end: int = 0
 
 
 @dataclass(frozen=True)
@@ -199,6 +240,23 @@ class EditOperation:
     payload: dict[str, object]
 
 
+@dataclass(frozen=True)
+class ProjectionView:
+    """One derived macro prose view over canonical graph anchors."""
+
+    view_id: str
+    profile: str
+    members: tuple[str, ...]
+    role: str
+    reader_state_before: str
+    reader_state_after: str
+    abstraction_level: str
+    recommended_format: str
+    format_reason: str
+    inference_basis: dict[str, object]
+    confidence: float
+
+
 class MarkdownBlock(TypedDict):
     """One Markdown block with source offsets."""
 
@@ -216,6 +274,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("input", type=Path)
     ingest.add_argument("--db", type=Path, required=True)
     ingest.add_argument("--kind", default="document")
+    ingest.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
+    ingest.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
     add_stats_out(ingest)
 
     analyze = subparsers.add_parser("analyze", help="Analyze graph layers.")
@@ -544,10 +604,13 @@ def command_ingest(args: argparse.Namespace) -> int:
     """Run ingest command."""
     input_path = cast(Path, args.input)
     text = input_path.read_text(encoding="utf-8")
+    prompt_text = prompt_context(args)
+    corpus_hints = infer_corpus_hints(text, prompt_text)
     with connect(cast(Path, args.db)) as connection:
         initialize_schema(connection)
         connection.executescript(
             """
+            DELETE FROM metadata;
             DELETE FROM judgements;
             DELETE FROM edit_operations;
             DELETE FROM diagnostics;
@@ -555,6 +618,15 @@ def command_ingest(args: argparse.Namespace) -> int:
             DELETE FROM nodes;
             DELETE FROM documents;
             """
+        )
+        set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(
+            connection,
+            "corpus_hint_inputs",
+            {
+                "document_path": str(input_path),
+                "prompt_supplied": bool(prompt_text.strip()),
+            },
         )
         document_id = "doc:1"
         title = infer_title(text, input_path)
@@ -574,9 +646,83 @@ def command_ingest(args: argparse.Namespace) -> int:
             len(text),
             payload={"path": str(input_path), "kind": cast(str, args.kind)},
         )
-        ingest_blocks(connection, document_id, text)
+        ingest_blocks(connection, document_id, text, str(input_path))
     emit_command_stats(args, "PROSE_REASONING_GRAPH_INGEST", {"PROSE_REASONING_GRAPH_DB": str(args.db)})
     return 0
+
+
+def prompt_context(args: argparse.Namespace) -> str:
+    """Return optional user prompt context for corpus inference."""
+    prompt_parts: list[str] = []
+    prompt = getattr(args, "prompt", "")
+    if isinstance(prompt, str) and prompt:
+        prompt_parts.append(prompt)
+    prompt_file = getattr(args, "prompt_file", None)
+    if isinstance(prompt_file, Path):
+        if not prompt_file.is_file():
+            raise ValueError(f"prompt file does not exist: {prompt_file}")
+        prompt_parts.append(prompt_file.read_text(encoding="utf-8"))
+    return "\n".join(prompt_parts)
+
+
+def set_metadata(connection: sqlite3.Connection, key: str, value: object) -> None:
+    """Store one JSON metadata value."""
+    connection.execute(
+        "INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)",
+        (key, write_json(value)),
+    )
+
+
+def metadata_json(connection: sqlite3.Connection, key: str, default: object) -> object:
+    """Return one JSON metadata value."""
+    row = connection.execute("SELECT value FROM metadata WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return default
+    return json.loads(str(row["value"]))
+
+
+def infer_corpus_hints(text: str, prompt: str) -> list[dict[str, object]]:
+    """Infer likely academic/domain corpus hints from source text and prompt."""
+    prompt_lower = prompt.lower()
+    text_lower = text.lower()
+    hints: list[dict[str, object]] = []
+    for corpus_id, label, keywords in CORPUS_KEYWORDS:
+        prompt_hits = [keyword for keyword in keywords if keyword.lower() in prompt_lower]
+        text_hits = [keyword for keyword in keywords if keyword.lower() in text_lower]
+        score = len(prompt_hits) * 2 + len(text_hits)
+        if score:
+            hints.append(
+                {
+                    "corpus_id": corpus_id,
+                    "label": label,
+                    "score": score,
+                    "basis": {
+                        "prompt_keywords": prompt_hits,
+                        "source_keywords": text_hits,
+                    },
+                }
+            )
+    if not hints:
+        hints.append(
+            {
+                "corpus_id": "general_academic",
+                "label": "General academic prose corpus",
+                "score": 0,
+                "basis": {"prompt_keywords": [], "source_keywords": []},
+            }
+        )
+    hints.sort(key=corpus_hint_sort_key)
+    hints[0]["selected"] = True
+    for item in hints[1:]:
+        item["selected"] = False
+    return hints
+
+
+def corpus_hint_sort_key(item: dict[str, object]) -> tuple[int, str]:
+    """Return sort key for corpus hints."""
+    raw_score = item.get("score", 0)
+    score = raw_score if isinstance(raw_score, int) else 0
+    return (-score, str(item.get("corpus_id", "")))
 
 
 def infer_title(text: str, path: Path) -> str:
@@ -587,7 +733,7 @@ def infer_title(text: str, path: Path) -> str:
     return path.stem.replace("_", " ").replace("-", " ").strip() or "document"
 
 
-def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -> None:
+def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, source_locator: str) -> None:
     """Ingest headings, paragraphs, and sentences."""
     blocks = markdown_blocks(text)
     section_stack: list[str] = []
@@ -614,7 +760,12 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -
                 block_text,
                 start,
                 end,
-                payload={"level": level, "section_path": section_stack.copy()},
+                payload=anchor_payload(
+                    "section",
+                    source_locator,
+                    "markdown_heading",
+                    {"level": level, "section_path": section_stack.copy()},
+                ),
             )
         else:
             paragraph_index += 1
@@ -629,7 +780,12 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -
                 block_text,
                 start,
                 end,
-                payload={"section_path": section_stack.copy(), "ordinal": paragraph_index},
+                payload=anchor_payload(
+                    "paragraph",
+                    source_locator,
+                    "markdown_block",
+                    {"section_path": section_stack.copy(), "ordinal": paragraph_index},
+                ),
             )
             if previous_block_id:
                 insert_edge(
@@ -640,7 +796,11 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -
                     previous_block_id,
                     node_id,
                     order_kind="hard_before",
-                    payload={"source": "ingest_order"},
+                    payload={
+                        "source": "ingest_order",
+                        "participates_in_ordering_dag": True,
+                        "ordering_subgraph": "presentation",
+                    },
                 )
             previous_block_id = node_id
             for sentence in split_sentences(block_text):
@@ -658,7 +818,12 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -
                     sentence,
                     max(sentence_start, start),
                     sentence_end,
-                    payload={"paragraph_id": node_id, "ordinal": sentence_index},
+                    payload=anchor_payload(
+                        "sentence",
+                        source_locator,
+                        "sentence_split",
+                        {"paragraph_id": node_id, "ordinal": sentence_index},
+                    ),
                 )
                 insert_edge(
                     connection,
@@ -667,8 +832,29 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str) -
                     "contains",
                     node_id,
                     sentence_id,
-                    payload={"source": "sentence_split"},
+                    payload={
+                        "source": "sentence_split",
+                        "participates_in_projection_order": True,
+                        "ordering_subgraph": "form_containment",
+                    },
                 )
+
+
+def anchor_payload(
+    span_kind: str,
+    source_locator: str,
+    segmentation_basis: str,
+    extra: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Return canonical source-anchor payload fields."""
+    payload: dict[str, object] = {
+        "span_kind": span_kind,
+        "source_locator": source_locator,
+        "segmentation_basis": segmentation_basis,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 def markdown_blocks(text: str) -> list[MarkdownBlock]:
@@ -704,8 +890,74 @@ def markdown_blocks(text: str) -> list[MarkdownBlock]:
 
 def split_sentences(text: str) -> tuple[str, ...]:
     """Split paragraph text into simple sentence units."""
-    sentences = [item.strip() for item in re.split(r"(?<=[.!?。！？])\s+", text) if item.strip()]
-    return tuple(sentences or (text.strip(),))
+    stripped = text.strip()
+    if not stripped:
+        return ()
+
+    sentences: list[str] = []
+    start = 0
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char in "。！？":
+            end = index + 1
+        elif char in ".!?" and is_ascii_sentence_boundary(text, index):
+            end = include_closing_punctuation(text, index + 1)
+        else:
+            index += 1
+            continue
+
+        candidate = text[start:end].strip()
+        if candidate:
+            sentences.append(candidate)
+        start = skip_sentence_gap(text, end)
+        index = start
+
+    remainder = text[start:].strip()
+    if remainder:
+        sentences.append(remainder)
+    return tuple(sentences or (stripped,))
+
+
+def is_ascii_sentence_boundary(text: str, index: int) -> bool:
+    """Return whether ASCII punctuation marks a sentence boundary."""
+    char = text[index]
+    next_index = include_closing_punctuation(text, index + 1)
+    if next_index < len(text) and not text[next_index].isspace():
+        return False
+    if char != ".":
+        return True
+    if index > 0 and index + 1 < len(text) and text[index - 1].isdigit() and text[index + 1].isdigit():
+        return False
+    return not is_ascii_abbreviation_period(text, index)
+
+
+def is_ascii_abbreviation_period(text: str, index: int) -> bool:
+    """Return whether a period belongs to a common abbreviation."""
+    before = text[:index].rstrip()
+    if not before:
+        return False
+    token = re.split(r"\s+", before)[-1].strip("\"'([{<")
+    normalized = token.lower()
+    if normalized in ASCII_SENTENCE_ABBREVIATIONS:
+        return True
+    if len(token) == 1 and token.isupper():
+        return True
+    return bool(re.search(r"[A-Za-z]\d+(?:\.\d+)*$", token))
+
+
+def include_closing_punctuation(text: str, index: int) -> int:
+    """Include closing quotes and brackets after sentence punctuation."""
+    while index < len(text) and text[index] in "\"')]}”’":
+        index += 1
+    return index
+
+
+def skip_sentence_gap(text: str, index: int) -> int:
+    """Return the next non-space index after a sentence boundary."""
+    while index < len(text) and text[index].isspace():
+        index += 1
+    return index
 
 
 def first_words(text: str, count: int) -> str:
@@ -778,6 +1030,8 @@ def fetch_nodes(
             label=str(row["label"]),
             text=str(row["text"]),
             payload=read_json_object(str(row["payload_json"])),
+            source_start=int(row["source_start"]),
+            source_end=int(row["source_end"]),
         )
         for row in rows
     )
@@ -795,7 +1049,12 @@ def add_projection_layer(connection: sqlite3.Connection, document_id: str, profi
         f"Projection profile: {profile}",
         0,
         0,
-        payload={"profile": profile, "outputs": ["yaml", "json", "markdown"]},
+        payload={
+            "profile": profile,
+            "canonical_graph": "text_anchored_semantic_graph",
+            "projection_view_export": "projection_views",
+            "outputs": ["yaml", "json", "markdown"],
+        },
     )
 
 
@@ -917,6 +1176,8 @@ def add_discourse_layer(connection: sqlite3.Connection, paragraphs: Sequence[Nod
                 "shared_terms": sorted(set(tokens(left.text)) & set(tokens(right.text)))[:DISCOURSE_SHARED_TERM_LIMIT],
                 "lexical_overlap": overlap,
                 "surface_signal": first_discourse_signal(right.text),
+                "participates_in_ordering_dag": True,
+                "ordering_subgraph": "discourse_adjacency",
             },
         )
 
@@ -926,9 +1187,9 @@ def infer_discourse_relation(text: str) -> str:
     lowered = text.lower()
     if any(cue in lowered for cue in ("however", "but", "although", "ただし", "一方")):
         return "contrasts"
-    if any(cue in lowered for cue in ("because", "therefore", "thus", "so ", "なので", "したがって")):
+    if any(cue in lowered for cue in ("because", "therefore", "thus", "so ", "なので", "したがって", "このため", "根拠")):
         return "causes"
-    if any(cue in lowered for cue in ("for example", "e.g.", "例えば")):
+    if any(cue in lowered for cue in ("for example", "e.g.", "例えば", "具体例")):
         return "exemplifies"
     if any(cue in lowered for cue in ("limitation", "risk", "制限", "リスク")):
         return "limits"
@@ -938,7 +1199,20 @@ def infer_discourse_relation(text: str) -> str:
 def first_discourse_signal(text: str) -> str:
     """Return the first explicit discourse cue."""
     lowered = text.lower()
-    cues = ("however", "because", "therefore", "for example", "limitation", "ただし", "例えば")
+    cues = (
+        "however",
+        "because",
+        "therefore",
+        "for example",
+        "limitation",
+        "ただし",
+        "一方",
+        "例えば",
+        "具体例",
+        "このため",
+        "根拠",
+        "制限",
+    )
     for cue in cues:
         if cue in lowered:
             return cue
@@ -972,10 +1246,10 @@ def add_argument_layer(
                 "claim",
                 first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
                 sentence.text,
-                0,
-                0,
+                sentence.source_start,
+                sentence.source_end,
                 confidence=EXTRACTED_NODE_CONFIDENCE,
-                payload={"sentence_id": sentence.node_id},
+                payload=derived_anchor_payload(sentence.node_id, "cue_heuristic"),
             )
             insert_edge(
                 connection,
@@ -993,7 +1267,9 @@ def add_argument_layer(
                     "claim",
                     first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
                     sentence.text,
-                    {"sentence_id": sentence.node_id},
+                    derived_anchor_payload(sentence.node_id, "cue_heuristic"),
+                    sentence.source_start,
+                    sentence.source_end,
                 )
             )
     return tuple(claims)
@@ -1018,10 +1294,13 @@ def add_evidence_layer(
                 "evidence",
                 first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
                 sentence.text,
-                0,
-                0,
+                sentence.source_start,
+                sentence.source_end,
                 confidence=EXTRACTED_NODE_CONFIDENCE,
-                payload={"sentence_id": sentence.node_id, "strength": "candidate"},
+                payload={
+                    **derived_anchor_payload(sentence.node_id, "evidence_cue"),
+                    "strength": "candidate",
+                },
             )
             evidence_nodes.append(
                 Node(
@@ -1030,12 +1309,18 @@ def add_evidence_layer(
                     "evidence",
                     first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
                     sentence.text,
-                    {"sentence_id": sentence.node_id},
+                    {
+                        **derived_anchor_payload(sentence.node_id, "evidence_cue"),
+                        "strength": "candidate",
+                    },
+                    sentence.source_start,
+                    sentence.source_end,
                 )
             )
     for claim in claims:
         evidence = best_supporting_evidence(claim, evidence_nodes)
         if evidence is not None:
+            basis = "document_neighborhood"
             insert_edge(
                 connection,
                 f"support:{evidence.node_id}->{claim.node_id}",
@@ -1044,9 +1329,54 @@ def add_evidence_layer(
                 evidence.node_id,
                 claim.node_id,
                 confidence=0.5,
-                payload={"basis": "document_neighborhood"},
+                payload={"basis": basis, "member_anchor_ids": member_anchor_ids(evidence, claim)},
             )
+            evidence_anchor = anchor_id_for_derived_node(evidence)
+            claim_anchor = anchor_id_for_derived_node(claim)
+            if evidence_anchor and claim_anchor and evidence_anchor != claim_anchor:
+                insert_edge(
+                    connection,
+                    f"anchor-support:{evidence_anchor}->{claim_anchor}",
+                    "evidence",
+                    "supports",
+                    evidence_anchor,
+                    claim_anchor,
+                    confidence=0.5,
+                    evidence_node_id=evidence.node_id,
+                    payload={
+                        "basis": basis,
+                        "claim_node_id": claim.node_id,
+                        "evidence_node_id": evidence.node_id,
+                        "participates_in_ordering_dag": False,
+                    },
+                )
     return tuple(evidence_nodes)
+
+
+def derived_anchor_payload(anchor_id: str, basis: str) -> dict[str, object]:
+    """Return payload fields for analysis nodes derived from source anchors."""
+    return {
+        "sentence_id": anchor_id,
+        "member_anchor_ids": [anchor_id],
+        "source_anchor_id": anchor_id,
+        "derivation_basis": basis,
+    }
+
+
+def anchor_id_for_derived_node(node: Node) -> str:
+    """Return the source anchor id for a derived analysis node."""
+    anchor = node.payload.get("source_anchor_id", node.payload.get("sentence_id", ""))
+    return anchor if isinstance(anchor, str) else ""
+
+
+def member_anchor_ids(*nodes: Node) -> list[str]:
+    """Return unique source anchor ids from derived nodes."""
+    output: list[str] = []
+    for node in nodes:
+        anchor = anchor_id_for_derived_node(node)
+        if anchor and anchor not in output:
+            output.append(anchor)
+    return output
 
 
 def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Node | None:
@@ -1088,10 +1418,10 @@ def add_experiment_layer(connection: sqlite3.Connection, document_id: str, sente
                 kind,
                 first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
                 sentence.text,
-                0,
-                0,
+                sentence.source_start,
+                sentence.source_end,
                 confidence=EXTRACTED_NODE_CONFIDENCE,
-                payload={"sentence_id": sentence.node_id},
+                payload=derived_anchor_payload(sentence.node_id, f"experiment_{kind}_cue"),
             )
 
 
@@ -1113,7 +1443,11 @@ def add_section_edges(connection: sqlite3.Connection, sections: Sequence[Node], 
                     "contains",
                     section_id,
                     paragraph.node_id,
-                    payload={"source": "markdown_heading"},
+                    payload={
+                        "source": "markdown_heading",
+                        "participates_in_projection_order": True,
+                        "ordering_subgraph": "form_containment",
+                    },
                 )
 
 
@@ -1382,20 +1716,177 @@ def command_project(args: argparse.Namespace) -> int:
 def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Path) -> dict[str, object]:
     """Build a structured projection payload."""
     counts = layer_counts(connection)
-    nodes = [asdict(node) for node in fetch_nodes(connection)]
+    graph_nodes = fetch_nodes(connection)
+    nodes = [asdict(node) for node in graph_nodes]
     edges = [asdict(edge) for edge in fetch_edges(connection)]
     diagnostics = [asdict(item) for item in fetch_diagnostics(connection)]
     operations = [asdict(item) for item in fetch_operations(connection)]
+    projection_views = [asdict(item) for item in build_projection_views(connection, profile)]
     return {
         "profile": profile,
         "graph_db": str(db_path),
+        "canonical_graph": "text_anchored_semantic_graph",
+        "corpus_hints": metadata_json(connection, "corpus_hints", []),
         "layers": {layer: counts.get(layer, 0) for layer in LAYERS},
         "skill_handoffs": skill_handoffs(profile, db_path),
+        "source_anchors": [asdict(node) for node in source_anchor_nodes(graph_nodes)],
+        "projection_views": projection_views,
         "nodes": nodes,
         "edges": edges,
         "diagnostics": diagnostics,
         "edit_operations": operations,
     }
+
+
+def source_anchor_nodes(nodes: Sequence[Node]) -> tuple[Node, ...]:
+    """Return canonical text anchors from graph nodes."""
+    return tuple(
+        node
+        for node in nodes
+        if node.layer == "form" and node.kind in {"section", "paragraph", "sentence", "edu"}
+    )
+
+
+def build_projection_views(connection: sqlite3.Connection, profile: str) -> tuple[ProjectionView, ...]:
+    """Build derived macro prose views over canonical graph anchors."""
+    paragraphs = fetch_nodes(connection, layer="form", kind="paragraph")
+    sentences = fetch_nodes(connection, layer="form", kind="sentence")
+    phases = fetch_nodes(connection, layer="phase", kind="move")
+    phase_by_paragraph: dict[str, Node] = {}
+    for phase in phases:
+        paragraph_id = phase.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            phase_by_paragraph[paragraph_id] = phase
+
+    sentences_by_paragraph: dict[str, list[str]] = {}
+    for sentence in sentences:
+        paragraph_id = sentence.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            sentences_by_paragraph.setdefault(paragraph_id, []).append(sentence.node_id)
+
+    views: list[ProjectionView] = []
+    for index, paragraph in enumerate(paragraphs, start=1):
+        role = str(phase_by_paragraph.get(paragraph.node_id, paragraph).label)
+        sentence_ids = sentences_by_paragraph.get(paragraph.node_id, [])
+        members = tuple([paragraph.node_id, *sentence_ids])
+        recommended_format, format_reason = presentation_recommendation(
+            paragraph.text,
+            role,
+            len(sentence_ids),
+        )
+        views.append(
+            ProjectionView(
+                view_id=f"view:{profile}:{index}",
+                profile=profile,
+                members=members,
+                role=role,
+                reader_state_before=reader_state_before(role),
+                reader_state_after=reader_state_after(role),
+                abstraction_level=abstraction_level_for_role(role),
+                recommended_format=recommended_format,
+                format_reason=format_reason,
+                inference_basis={
+                    "source": "canonical_graph_projection",
+                    "member_anchor_ids": list(members),
+                    "basis_edges": basis_edges_for_members(connection, members),
+                    "basis_nodes": [phase_by_paragraph[paragraph.node_id].node_id]
+                    if paragraph.node_id in phase_by_paragraph
+                    else [],
+                },
+                confidence=PHASE_INFERENCE_CONFIDENCE if paragraph.node_id in phase_by_paragraph else 0.4,
+            )
+        )
+    return tuple(views)
+
+
+def presentation_recommendation(text: str, role: str, sentence_count: int) -> tuple[str, str]:
+    """Recommend a reader-facing presentation form for one projection view."""
+    lowered = text.lower()
+    if has_formula_signal(text):
+        return ("equation", "formula-like symbols or quantitative relation detected")
+    if role == "operationalization" or any(
+        cue in lowered for cue in ("metric", "baseline", "expected", "指標", "ベースライン", "期待")
+    ):
+        return ("table", "structured planning or comparison fields detected")
+    if any(
+        cue in lowered
+        for cue in (
+            "graph",
+            "dag",
+            "node",
+            "edge",
+            "anchor",
+            "projection view",
+            "グラフ",
+            "ノード",
+            "エッジ",
+            "図",
+        )
+    ):
+        return ("figure", "graph or spatial-relation vocabulary detected")
+    if role == "recommendation" or any(cue in lowered for cue in ("option", "choice", "選択肢", "次の選択")):
+        return ("ordered_list", "decision options or action order detected")
+    if sentence_count > SPLIT_PARAGRAPH_SENTENCE_LIMIT:
+        return ("bulleted_list", "multiple sentence units can be scanned as sibling points")
+    return ("prose", "continuous explanation preserves local flow")
+
+
+def has_formula_signal(text: str) -> bool:
+    """Return true when text looks better represented as a formula."""
+    return bool(re.search(r"[∑∏√≤≥≈→↦]|(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:=|<=|>=|<|>))", text))
+
+
+def basis_edges_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> list[str]:
+    """Return relation ids that support one projection view."""
+    if not members:
+        return []
+    placeholders = ", ".join("?" for _ in members)
+    rows = connection.execute(
+        f"""
+        SELECT id FROM edges
+        WHERE from_node_id IN ({placeholders}) OR to_node_id IN ({placeholders})
+        ORDER BY id
+        """,
+        [*members, *members],
+    ).fetchall()
+    return [str(row["id"]) for row in rows]
+
+
+def reader_state_before(role: str) -> str:
+    """Return a compact reader-state input label for a projection role."""
+    if role == "context":
+        return "topic not yet framed"
+    if role == "operationalization":
+        return "claim not yet measurable"
+    if role == "recommendation":
+        return "decision not yet stated"
+    if role == "limitation":
+        return "risk not yet bounded"
+    return "current thread established"
+
+
+def reader_state_after(role: str) -> str:
+    """Return a compact reader-state output label for a projection role."""
+    if role == "context":
+        return "topic framed"
+    if role == "operationalization":
+        return "claim mapped to observable terms"
+    if role == "recommendation":
+        return "next decision stated"
+    if role == "limitation":
+        return "risk or boundary introduced"
+    return "thread developed"
+
+
+def abstraction_level_for_role(role: str) -> str:
+    """Return projection abstraction level for a role."""
+    if role in {"operationalization", "hypothesis"}:
+        return "operational"
+    if role in {"recommendation", "limitation"}:
+        return "meta"
+    if role == "context":
+        return "conceptual"
+    return "surface"
 
 
 def fetch_edges(connection: sqlite3.Connection) -> tuple[Edge, ...]:

@@ -25,15 +25,31 @@ a second copy of the DSL vocabulary.
 The graph has explicit layers for source spans, form, concepts, genre moves,
 discourse relations, argument claims, evidence, experiment planning,
 presentation order, diagnostics, edit operations, natural-language explanation,
-and projection metadata. This follows the design choice from RST, PDTB, eRST,
-Toulmin/AIF, argumentative zoning, and reproducible experiment-planning
-literature: prose structure is easier to inspect as a typed graph with overlays
-than as a single tree.
+and projection metadata. The canonical prose source is one text-anchored
+semantic graph: sentence or EDU anchors and typed relations carry the
+source-truth, while macro-claims, subtopics, and reader-state transitions are
+derived projection views over the same graph. Section and paragraph nodes remain
+source form containers in the current MVP. This follows the design choice from
+Annotation Graphs, RST, PDTB, RST dependency views, eRST, Toulmin/AIF,
+argumentative zoning, and reproducible experiment-planning literature: prose
+structure is easier to inspect as a typed graph with overlays than as a single
+tree or a sequential label pipeline.
+
+Projection views may recommend a reader-facing format such as prose,
+bulleted list, ordered list, table, figure, or equation. The recommendation is
+advisory evidence for a rewrite or renderer: the canonical graph still owns the
+source anchors and typed relations, while the presentation format says how that
+subgraph may be easier to read.
+
+`ingest` also accepts `--prompt` and `--prompt-file` for corpus/domain
+inference. The exported projection includes `corpus_hints`, ranked from user
+prompt and source-text keywords. Treat these hints as a default corpus profile
+for retrieval, examples, and evaluation norms; they are not citations or proof.
 
 ## Command Flow
 
 ```bash
-python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md --db reports/agents/<run-id>/prose.sqlite --stats-out reports/agents/<run-id>/prose_ingest.stats.json
+python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md --db reports/agents/<run-id>/prose.sqlite --prompt-file reports/agents/<run-id>/user_request_contract.md --stats-out reports/agents/<run-id>/prose_ingest.stats.json
 python3 tools/agent_tools/prose_reasoning_graph.py analyze --db reports/agents/<run-id>/prose.sqlite --profile all --stats-out reports/agents/<run-id>/prose_analyze.stats.json
 python3 tools/agent_tools/prose_reasoning_graph.py project --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_projection.yaml --stats-out reports/agents/<run-id>/prose_project.stats.json
 python3 tools/agent_tools/prose_reasoning_graph.py lint --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_diagnostics.md --stats-out reports/agents/<run-id>/prose_lint.stats.json

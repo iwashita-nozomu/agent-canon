@@ -25,6 +25,14 @@ projection from that graph, not the graph itself. This keeps discourse
 relations, claims, evidence, experiment planning, edit operations, and natural
 language explanations inspectable before an LLM or writing skill rewrites text.
 
+The canonical graph is a text-anchored semantic graph: prose content is anchored
+in source text units, normally sentences or elementary discourse units (EDUs),
+and semantic, discourse, argument, experiment, and presentation relations are
+typed edges anchored to those text units. Macro-claims, rhetorical moves,
+reader-state transitions, subtopics, and argument blocks are projection views
+over that same graph. The durable boundary is canonical graph versus projection
+view, not one prose layer versus another.
+
 ## Normative Scope
 
 This specification is binding for:
@@ -42,6 +50,35 @@ This specification does not define final prose quality, citation approval,
 experiment acceptance, PR merge authority, or repository policy. Those
 decisions remain with the receiving skill, reviewer, or workflow.
 
+## Linguistic Grounding
+
+The DSL intentionally borrows constraints from several discourse traditions
+without implementing any one of them wholesale:
+
+- Annotation Graphs and LAF-style annotation motivate source anchoring with
+  multiple typed annotation layers over the same text.
+- RST motivates relations over text spans and the distinction between local
+  realization and higher text organization.
+- PDTB motivates discourse relations with text-span arguments, sense labels,
+  attribution, and connective evidence.
+- RST dependency views and eRST motivate graph-shaped discourse overlays rather
+  than treating macro constituency spans as primitive source objects.
+- SDRT motivates graph-shaped discourse interpretation and consistency
+  constraints over discourse segments.
+- Centering theory motivates local reader-attention and coherence state
+  transitions.
+- Kintsch and van Dijk style macrostructure theory motivates deriving a gist or
+  macrostructure view from detailed text meaning.
+- TextTiling motivates derived passage or subtopic segmentation from source text
+  evidence.
+- Argumentative Zoning motivates scholarly rhetorical-status labels as derived
+  projections over sentence or span anchors.
+
+These sources justify a text-anchored canonical graph plus projection-view
+design. They do not authorize a single scalar prose-quality score, a full
+RST/SDRT parser, or a sequential pipeline where early macro labels become
+unquestioned truth.
+
 ## Storage Boundary
 
 The MVP persists graph data in SQLite because agents need durable intermediate
@@ -53,8 +90,13 @@ Durable state consists of:
 
 - the source prose, code, design document, or adapter input;
 - this DSL specification;
-- exported projection, diagnostics, explanation, integration plan, handoff,
-  and rewrite packet artifacts when a workflow records them as evidence.
+- exported projection, diagnostics, explanation, integration plan, handoff, and
+  rewrite packet artifacts when a workflow records them as evidence.
+
+The graph database may materialize derived analysis objects for convenience, but
+source-truth must remain recoverable from source text anchors and source spans.
+Projection artifacts may be regenerated with a new projection profile without
+rewriting the source document.
 
 ## Graph Object Model
 
@@ -72,7 +114,18 @@ A document object anchors one ingested source.
 
 ### Node
 
-A node represents one typed item in one layer.
+A node represents one typed item in one layer. The current MVP implementation
+materializes source, form, concept, phase, argument, evidence, experiment,
+explanation, and projection nodes. The canonical semantic graph contract
+classifies these nodes by authority:
+
+- text-bearing `form` nodes are source-truth nodes for prose content;
+- `section` and `paragraph` nodes are source form containers and reader-order
+  anchors, not derived macro-claims;
+- `sentence` and future `edu` nodes are the smallest default authoring anchors;
+- non-form analysis nodes such as `claim`, `evidence`, `phase`, `concept`, and
+  `experiment` are derived analysis conveniences unless their payload declares
+  source spans and member anchor ids.
 
 | Field | Required | Meaning |
 | ----- | -------- | ------- |
@@ -91,6 +144,62 @@ Nodes that derive from source text must preserve source offsets when the input
 adapter can provide them. Generated metadata nodes must set offsets to `0` and
 must record their generation basis in `payload_json`.
 
+The current MVP stores simpler payloads for existing form nodes. Future
+canonical-span implementations must add these anchor payload fields for every
+source-truth prose node they create or rewrite:
+
+- `span_kind`: `sentence`, `edu`, `paragraph`, `section`, or adapter-specific
+  documented span kind;
+- `source_locator`: path, URI, or adapter locator for the source span;
+- `segmentation_basis`: tool, parser, reviewer, or adapter rule that produced
+  the boundary.
+
+### Derived View Object
+
+A derived view object represents a macro prose unit inferred from a canonical
+graph subgraph. It is a normative target for the projection-view model, not a
+current MVP export. A workflow may export it in projection JSON/YAML or store it
+in a projection table, but it must be explicitly marked as derived and must not
+be treated as an additional source node.
+
+| Field | Required | Meaning |
+| ----- | -------- | ------- |
+| `id` | yes | Projection-local id such as `view:<profile>:<n>`. |
+| `profile` | yes | Projection profile that created the view. |
+| `members_json` | yes | Ordered canonical node ids included in the view. |
+| `role` | yes | Inferred role such as `setup`, `claim`, `warrant`, `evidence`, `implication`, `plan`, or `conclusion`. |
+| `reader_state_before` | no | Compact inferred reader-state input. |
+| `reader_state_after` | no | Compact inferred reader-state output. |
+| `abstraction_level` | no | `surface`, `example`, `operational`, `conceptual`, or `meta`. |
+| `recommended_format` | no | Reader-facing form recommendation: `prose`, `bulleted_list`, `ordered_list`, `table`, `figure`, or `equation`. |
+| `format_reason` | no | Short reason grounded in graph structure, role, or source cues. |
+| `inference_basis_json` | yes | Edges, diagnostics, rules, or reviewer judgements used to create the view. |
+| `confidence` | yes | Floating-point confidence in `[0.0, 1.0]`. |
+
+When implemented, derived views must be invalidated or regenerated when any
+member canonical node, ordering edge, or inference-basis edge changes. They must
+not be edited as if they were source prose.
+
+### Corpus Hint Object
+
+A corpus hint object records the academic or domain corpus that should calibrate
+analysis, retrieval, examples, and evaluation. It may be inferred from the
+source document, the user prompt, or an explicit workflow setting. User-prompt
+matches are allowed because the user often names the intended field before the
+draft itself contains field-specific vocabulary.
+
+| Field | Required | Meaning |
+| ----- | -------- | ------- |
+| `corpus_id` | yes | Stable corpus/profile id, such as `academic_writing`, `software_engineering`, `experimental_report`, or `formal_reasoning`. |
+| `label` | yes | Human-readable corpus label. |
+| `score` | yes | Heuristic ranking score. |
+| `basis` | yes | Prompt and source keywords that supported the hint. |
+| `selected` | yes | Whether this hint is the current default corpus for downstream analysis. |
+
+Corpus hints are calibration metadata, not evidence. A downstream literature
+search, evaluator, or reviewer may use them to choose examples and norms, but
+must still cite or inspect actual sources before making scholarly claims.
+
 ### Edge
 
 An edge represents a typed relation between two nodes.
@@ -107,9 +216,12 @@ An edge represents a typed relation between two nodes.
 | `evidence_node_id` | no | Optional node supporting the relation. |
 | `payload_json` | yes | JSON object for relation-specific fields. |
 
-Edges may form a DAG for presentation and projection layers, but the whole
-graph may contain cross-layer cycles. Projection algorithms must select the
-ordering subgraph explicitly instead of assuming the entire graph is sortable.
+Edges that express dependency, support, prerequisite, refinement,
+generalization, conclusion, or presentation order form the selected ordering DAG
+for a projection profile. The whole graph may contain cross-layer cycles because
+contrast, coreference, equivalence, and diagnostic references are not ordering
+constraints. Projection algorithms must select the ordering subgraph explicitly
+instead of assuming the entire graph is sortable.
 
 ### Diagnostic
 
@@ -170,24 +282,31 @@ workflow explicitly records that authority.
 ## MVP Layer Registry
 
 The MVP layer registry is closed. New first-class layers require an update to
-this specification and the implementation. Adapter-specific experiments must
-use payload fields or documented extension layers until promoted.
+this specification and the implementation. Adapter-specific experiments must use
+payload fields or documented extension layers until promoted. The registry
+distinguishes source-truth layers from derived analysis and projection layers.
 
 | Layer | Primary Nodes | Primary Edges | Responsibility |
 | ----- | ------------- | ------------- | -------------- |
 | `source` | source document | none | Preserve source identity and offsets. |
-| `form` | section, paragraph, sentence | `contains` | Represent document form and source spans. |
-| `concept` | term | `related_to` | Track repeated terms and concept adjacency. |
-| `phase` | move | `realizes_move` | Label genre or rhetorical moves. |
+| `form` | section, paragraph, sentence, edu | `contains` | Represent document form and source spans. |
+| `concept` | term | `related_to` | Track repeated terms and concept adjacency as derived analysis. |
+| `phase` | move | `realizes_move` | Label genre or rhetorical moves as derived analysis. |
 | `discourse` | none in MVP | discourse relation edges | Represent paragraph-to-paragraph relations. |
-| `argument` | claim | `stated_in` | Represent claims and their source sentence. |
-| `evidence` | evidence | `supports` | Link evidence candidates to claims. |
-| `experiment` | hypothesis, metric, baseline, experiment, expected result | none in MVP | Represent experiment-plan completeness. |
+| `argument` | claim | `stated_in` | Represent derived claim views and their source sentence or EDU anchors. |
+| `evidence` | evidence | `supports` | Link evidence candidates to claim views. |
+| `experiment` | hypothesis, metric, baseline, experiment, expected result | none in MVP | Represent derived experiment-plan completeness. |
 | `presentation` | none in MVP | `precedes` | Preserve or propose reader order. |
 | `diagnostics` | none in MVP | none | Store findings over graph objects. |
 | `edit-operation` | none in MVP | none | Store candidate split, merge, bridge, and reorder operations. |
 | `explanation` | summary | none | Store generated natural-language explanation metadata. |
 | `projection` | profile | none | Store projection profile and export metadata. |
+
+Only `source` and text-bearing `form` nodes are canonical source-truth for prose
+content. `section` and `paragraph` are source form containers; they are not the
+same thing as derived macro prose units such as subtopics, macro-claims, or
+argument blocks. Other layer nodes are derived analysis conveniences unless
+their payload explicitly declares source spans and member anchor ids.
 
 ## Identifier Conventions
 
@@ -200,6 +319,7 @@ compact enough for rewrite packets and human review.
 | `section:<n>` | Markdown section node in source order. |
 | `p:<n>` | Paragraph node in source order. |
 | `s:<n>` | Sentence node in source order. |
+| `edu:<n>` | Elementary discourse unit in source order. |
 | `concept:<n>` | Concept term node. |
 | `phase:<n>` | Rhetorical move node aligned to paragraph order. |
 | `claim:<n>` | Claim node. |
@@ -207,6 +327,7 @@ compact enough for rewrite packets and human review.
 | `experiment:<kind>:<n>` | Experiment layer node. |
 | `projection:profile` | Projection metadata node. |
 | `explanation:summary` | Explanation metadata node. |
+| `view:<profile>:<n>` | Derived projection-view id in exported projections. |
 | `diag:<rule>` | Document-level diagnostic. |
 | `diag:<rule>:<target>` | Targeted diagnostic. |
 | `op:<kind>:<targets>` | Edit operation id. |
@@ -224,6 +345,13 @@ The MVP relation registry includes:
   `order_kind=hard_before`.
 - `related_to`: concept co-occurrence or concept adjacency.
 - `realizes_move`: paragraph realizes a phase or genre move.
+- `requires`: one text unit requires a prior premise, definition, condition,
+  or reader-state update.
+- `refines`: one text unit narrows, qualifies, or operationalizes another.
+- `generalizes`: one text unit abstracts from examples, evidence, or local
+  observations.
+- `concludes`: one text unit states a conclusion or decision that depends on
+  earlier units.
 - `elaborates`: next paragraph develops the previous material.
 - `contrasts`: next paragraph contrasts or qualifies previous material.
 - `causes`: next paragraph states cause, result, or inference.
@@ -234,6 +362,70 @@ The MVP relation registry includes:
 
 Relation payloads must explain the basis for inferred relations when the
 relation was not directly encoded in the source.
+
+Relations used for projection ordering must state whether they participate in
+the selected ordering DAG. Symmetric or non-ordering relations such as contrast,
+coreference, paraphrase, and equivalence must use `order_kind=none` unless a
+profile-specific projection explicitly promotes them to an ordering constraint.
+
+## Canonical Graph And Projection Views
+
+The canonical graph is the analysis substrate for prose. It contains
+text-anchored source units and typed semantic, discourse, argument, experiment,
+and presentation relations among them. A projection may select an ordering DAG
+from that graph for dependency-like relations, while non-ordering overlays
+remain normal typed edges.
+
+Required canonical graph invariants:
+
+- every source-truth prose node carries actual source text and provenance;
+- sentence and EDU nodes are the smallest default authoring anchors;
+- paragraph and section nodes are containers and reader-order anchors;
+- dependency-like relation subgraphs must either be acyclic or report strongly
+  connected components as diagnostics before projection;
+- inferred relation edges must include basis and confidence;
+- missing implicit premises, warrants, definitions, baselines, or reader-state
+  steps must be diagnostics, not invented source nodes.
+
+Macro prose structure is derived through projection. A projection may contract a
+connected canonical subgraph into a view, assign a role, and describe reader
+state or abstraction-level movement. It must retain the member canonical node
+ids so an agent can return to the source text.
+
+Projection may also recommend a non-prose presentation form. Bulleted lists are
+appropriate for parallel sibling points, ordered lists for dependency or action
+sequences, tables for aligned attributes or comparison rows, figures for graph,
+architecture, causal, or spatial relations, and equations for compact formal
+definitions or quantitative constraints. These recommendations are presentation
+views over canonical anchors, not source-truth replacements. A renderer or LLM
+rewrite pass may accept, reject, or combine them, but must preserve provenance
+back to the member anchors.
+
+Projection may also carry corpus hints. Corpus hints select the field-specific
+norms used to interpret rhetorical moves, expected evidence, diagrams, formulas,
+and evaluation criteria. They should be inferred from both source text and user
+prompt when available, because prompt context may identify the intended
+academic field before the draft does.
+
+Projection implementations may use:
+
+- graph contraction over support, prerequisite, refinement, and conclusion
+  edges;
+- quotient graph construction over anchor nodes grouped by shared purpose,
+  topic, rhetorical move, or reader-state transition;
+- topological sorting only on the selected ordering subgraph;
+- strongly connected component contraction when dependency-like edges produce
+  cycles;
+- source order as a tie-breaker, never as sole evidence for macro roles.
+
+Projection implementations must not:
+
+- classify macro prose roles sequentially and then treat those labels as
+  canonical truth;
+- require every possible projection object to be written out;
+- let a generated projection view mutate source text without an explicit edit
+  operation;
+- hide the member anchor ids and inference basis for a projection view.
 
 ## Projection And Ordering
 
@@ -256,6 +448,12 @@ diagnostic instead of silently dropping edges. A reorder edit operation may
 propose a priority topological sort, but the rewrite packet must preserve
 source ids and explain which constraints were relaxed.
 
+Current MVP projection exports emit nodes, edges, diagnostics, and edit
+operations. Projection-view implementations should extend that export with
+derived macro views while still emitting source anchors, selected ordering
+edges, diagnostics, and edit operations. Full internal analysis nodes are
+optional unless the receiving skill or reviewer asks for a debug export.
+
 ## Profiles And Skill Handoff
 
 Profiles choose the receiving skill set and diagnostic emphasis.
@@ -276,7 +474,8 @@ receiving skill remains authoritative for its own review gate.
 
 ## Diagnostics Contract
 
-Diagnostic rule ids are stable public contract. The MVP includes:
+Diagnostic rule ids are stable public contract. The current MVP implementation
+emits:
 
 - `unsupported_claim`: a claim lacks a supporting evidence edge.
 - `experiment_without_hypothesis`: experiment language appears without a
@@ -291,6 +490,15 @@ Diagnostic rule ids are stable public contract. The MVP includes:
 - `claim_without_evidence_layer`: claims exist but no evidence nodes exist.
 - `missing_layer_representation`: one or more required MVP layers has no
   representation.
+
+The canonical-graph and projection-view contract reserves these rule ids for
+implementations that enforce the new projection model:
+
+- `missing_implicit_premise`: a text unit requires an unstated premise.
+- `missing_warrant`: a support relation lacks the warrant that licenses the
+  inference.
+- `projection_cycle`: the selected ordering subgraph contains a cycle that must
+  be contracted or relaxed before reader-order projection.
 
 New diagnostics must define severity, target type, triggering condition,
 suggested action shape, and false-positive boundary in this directory before
