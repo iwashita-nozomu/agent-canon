@@ -50,6 +50,7 @@ audience=<reader-or-reviewer>
 decision_context=<decision or action the structure supports>
 first_artifact=<figure|table|summary-card|section|experiment-slice|refactor-slice> <short name>
 first_artifact_question=<one sentence>
+visual_plan=<mermaid|table|text-only|html|image|not-applicable> <why this visual shape fits>
 source_to_structure_map=<source path/id -> section, visual, claim, experiment slice, or refactor slice>
 metric_or_delta_contract=<denominator, directionality, baseline, caveat, allowed structural delta, forbidden semantic delta>
 ordered_structure=<ordered headings, visuals, experiment slices, or refactor slices>
@@ -66,6 +67,13 @@ experiment scripts, or refactor edits.
 1. Fix the audience and decision context.
 1. Choose the first artifact: figure, table, summary card, first section,
    experiment slice, or refactor slice.
+1. For reader-facing documents, reports, plans, workflow guides, and refactor
+   maps, choose Mermaid as the default first visual when the structure includes
+   nontrivial process flow, dependencies, ownership, routing, state transitions,
+   review gates, or multi-step handoffs. Use `flowchart`, `sequenceDiagram`,
+   `stateDiagram-v2`, or `classDiagram` according to the relation being shown.
+   Choose `text-only` only when a diagram would duplicate a simple list, and
+   record that reason in `visual_plan`.
 1. Define the question answered by that first artifact.
 1. Map each source artifact to the section, visual, claim, experiment slice, or
    refactor slice it supports.
@@ -116,6 +124,7 @@ Record these in `workflow_monitoring.md`, a run bundle, or the artifact itself:
 structure_planning=complete
 structure_contract=<path-or-inline>
 structure_first_artifact=<name>
+structure_visual_plan=<mermaid|table|text-only|html|image|not-applicable>
 structure_source_map=<path-or-inline>
 discourse_relations=<path|not_required>
 structure_invalid_interpretations_recorded=yes

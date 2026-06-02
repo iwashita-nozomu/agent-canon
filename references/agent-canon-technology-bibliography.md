@@ -39,6 +39,8 @@ record.
 - Semantic indexing and discourse structure: Transformer/BERT/SBERT,
   vector-space search, discourse relations/connectives, SQLite, llama.cpp,
   GGUF, SHA-256, Rust crates used by the Rust CLI.
+- Formal proof support: Lean 4, mathlib theorem search, LeanSearch,
+  Isabelle/Sledgehammer, CoqHammer, and informal-to-formal proof sketching.
 - Static/dependency analysis: Python AST, Pyright, Ruff, pytest, program
   dependence graphs, code property graphs.
 - Runtime and operations: Rust/Cargo, Dev Containers, GitHub Actions, Git
@@ -106,6 +108,19 @@ Access date for this section: 2026-06-01.
 | Toward a Model of Text Comprehension and Production | <https://eric.ed.gov/?id=EJ191792> | Prose Reasoning Graph projection-view design | Kintsch and van Dijk distinguish detailed text meaning from condensed gist generated through comprehension processes. | Cognitive macrostructure theory is not a direct graph schema. | Use as rationale for deriving macro prose views from source text evidence instead of storing them as source truth. |
 | Text Tiling: Segmenting Text into Multi-paragraph Subtopic Passages | <https://aclanthology.org/J97-1003/> | Prose Reasoning Graph projection segmentation | TextTiling treats multi-paragraph subtopic passages as derived segmentation over source text evidence. | Lexical cohesion alone is insufficient for argument, evidence, and reader-state structure. | Use as a segmentation prior for projection views, not as a replacement for typed discourse relations. |
 | Summarizing Scientific Articles: Experiments with Relevance and Rhetorical Status | <https://aclanthology.org/J02-4002/> | Prose Reasoning Graph scholarly move projections | Argumentative zoning supports sentence/span-level rhetorical status labels for scientific articles. | Role labels do not encode support, prerequisite, or discourse-relation edges by themselves. | Use as background for derived scholarly phase projections, not as canonical source nodes. |
+
+## Formal Proof Support
+
+Access date for this section: 2026-06-01.
+
+| Source | URL or DOI | AgentCanon surface | Claim used | Limitations | Decision |
+| --- | --- | --- | --- | --- | --- |
+| Theorem Proving in Lean 4 | <https://lean-lang.org/theorem_proving_in_lean4/> | `$formal-proof-workflow`, `formal_proof.py` Lean target scaffolds | Lean 4 has a documented theorem-proving workflow covering propositions, tactics, interaction, induction, structures, and type classes. | Tutorial material does not imply that a user claim is already formalized or easy to prove. | Use Lean 4 as the default target stub language when no project-specific prover is mandated. |
+| Searching for Theorems in Mathlib | <https://leanprover-community.github.io/blog/posts/searching-for-theorems-in-mathlib/> | Existing proof search stage and query packet | Mathlib theorem search should combine documentation search, natural-language search tools, type/signature search, community archive search, and in-editor tactics such as `exact?`. | Search tools are heuristic and can miss a theorem if names, statement shape, or imports differ. | Require existing proof search before new formalization for likely-library claims. |
+| LeanSearch | <https://leansearch.net/> | Optional mathlib natural-language search target | LeanSearch provides natural-language query over Mathlib4 theorem/definition content. | The service may collect search terms and feedback; it is not a checker. | Include as an optional web target with privacy caveat. |
+| Hammering Away: A User's Guide to Sledgehammer for Isabelle/HOL | <https://isabelle.in.tum.de/dist/Isabelle2025-2/doc/sledgehammer.pdf> | Isabelle target route and automation boundary | Sledgehammer applies ATPs, SMT solvers, and Isabelle proof methods to current goals and can return Isabelle proof text that reconstructs in Isabelle. | Works on loaded context and selected facts; generated proof text may need reconstruction/minimization and can fail. | Use as source for assistant-backed search/reconstruction, with checker log as authority. |
+| CoqHammer | <https://coqhammer.github.io/> | Coq/Rocq target route and automation caveats | CoqHammer integrates external automated theorem provers and reconstruction tactics for Coq/Rocq. | It is limited on some fragments and does not try induction by design; SMT-heavy goals may need SMTCoq instead. | Include Coq/Rocq route when project context selects it, not as universal default. |
+| Draft, sketch, and prove: Guiding formal theorem provers with informal proofs | <https://doi.org/10.17863/CAM.94959> | Natural-language proof sketch to formal obligation workflow | Informal proofs can guide formal proof sketches and automated prover search, but success is measured by checked formal proof. | Research setting does not guarantee arbitrary natural-language formalization. | Shape workflow as sketch -> obligations -> checker, never direct proof assertion. |
 
 ## Static Analysis, Dependency, And Code Intelligence
 

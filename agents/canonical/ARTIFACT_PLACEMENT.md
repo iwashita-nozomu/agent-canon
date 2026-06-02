@@ -56,6 +56,10 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 - role write policy は `agents/agents_config.json` に従います。
 - artifact-only role は許可された artifact だけを更新します。
 - run 固有の追補は既存 artifact の節追加で吸収します。
+- cross-run で残す必要がある agent report は、agent が手で別 report を作らず
+  `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
+  で `.agent-canon/log-archive/agent-reports/<repo-key>/...` へ機械的に snapshot
+  します。push は同じ helper の `push` command が担当します。
 
 ### `documents/`
 

@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -235,6 +237,9 @@ def write_valid_devcontainer_files(root: Path) -> None:
                 'DEVCONTAINER_PROJECT_NAME="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"',
                 "compose_mode=agent-canon-source-only",
                 "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+                "AGENT_CANON_SECRET_DIR",
+                "AGENT_CANON_SECRET_MOUNT",
+                "AGENT_CANON_SECRET_DIR_MODE",
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\"",
                 "",
             ]
@@ -314,6 +319,9 @@ def write_valid_devcontainer_only(root: Path) -> None:
                 'DEVCONTAINER_PROJECT_NAME="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"',
                 "compose_mode=agent-canon-source-only",
                 "image=mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+                "AGENT_CANON_SECRET_DIR",
+                "AGENT_CANON_SECRET_MOUNT",
+                "AGENT_CANON_SECRET_DIR_MODE",
                 "printf '%s\\n' \"$pack\" \"$output\" \"$DEVCONTAINER_PROJECT_NAME\" \"$compose_mode\" \"$image\"",
                 "",
             ]
@@ -376,6 +384,52 @@ def test_devcontainer_generator_rejects_fixed_ipam(tmp_path: Path) -> None:
     assert result.returncode == 1, result.stdout + result.stderr
     assert "forbidden:DEVCONTAINER_SUBNET" in result.stdout
     assert "forbidden:ipam:" in result.stdout
+
+
+def test_shared_generator_mounts_configured_secret_directory(tmp_path: Path) -> None:
+    """Generated compose should mount the optional host secret directory when configured."""
+    write_valid_runtime_pack(tmp_path)
+    script = tmp_path / ".devcontainer" / "generate-runtime-compose.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        (PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    secret_dir = tmp_path / "private-git"
+    secret_dir.mkdir()
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    env = {
+        **os.environ,
+        "HOME": str(home_dir),
+        "AGENT_CANON_SECRET_DIR": str(secret_dir),
+        "AGENT_CANON_SECRET_MOUNT": "/mnt/private-git",
+        "AGENT_CANON_SECRET_DIR_MODE": "rw",
+    }
+    env.pop("SSH_AUTH_SOCK", None)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (tmp_path / ".devcontainer" / "docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "secret_mount=enabled" in result.stdout
+    assert f"source: {json.dumps(str(secret_dir))}" in compose
+    assert 'target: "/mnt/private-git"' in compose
+    assert "read_only: false" in compose
+    assert 'AGENT_CANON_SECRET_MOUNT: "/mnt/private-git"' in compose
+    assert 'AGENT_CANON_SECRET_DIR_MODE: "rw"' in compose
 
 
 def test_valid_runtime_config_passes(tmp_path: Path) -> None:

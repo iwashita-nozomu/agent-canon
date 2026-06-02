@@ -19,6 +19,7 @@
 # upstream implementation ../../.codex/hooks/style_checker_guard.py logs style checker coverage
 # upstream implementation ../../.codex/hooks/skill_usage_logger.py logs observed skill usage
 # upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
+# upstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs unattended runtime log archive sync
 # upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
@@ -35,9 +36,9 @@ import unittest
 from pathlib import Path
 from typing import cast
 
+from tools.agent_tools.runtime_log_paths import mounted_log_archive_root
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
@@ -59,6 +60,7 @@ NOTEBOOK_QUALITY_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "notebook_quality_g
 STYLE_CHECKER_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "style_checker_guard.py"
 SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 CODEX_RUNTIME_SUMMARY_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
+RUNTIME_LOG_AUTO_SYNC = PROJECT_ROOT / ".codex" / "hooks" / "runtime_log_auto_sync.py"
 LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
@@ -386,6 +388,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(HOOK_SCRIPT.exists())
         self.assertTrue(HOOK_DISPATCHER.exists())
         self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
+        self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
 
     def _dispatcher_scripts(self, event: str) -> list[str]:
         """Return the child hook scripts configured for one dispatcher event."""
@@ -485,6 +488,7 @@ class CodexHooksTest(unittest.TestCase):
                 "reference_capture_guard.py",
                 "skill_usage_logger.py",
                 "codex_runtime_summary_logger.py",
+                "runtime_log_auto_sync.py",
             ],
         )
 
@@ -532,6 +536,29 @@ class CodexHooksTest(unittest.TestCase):
                 env={
                     **os.environ,
                     "AGENT_CANON_LOG_ARCHIVE_WARNING_CANON_ROOT": str(canon_root),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+
+    def test_runtime_log_auto_sync_is_fail_open_by_default(self) -> None:
+        """Auto-sync hook should not block or emit context when archive sync fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_root = Path(temp_dir) / "project"
+            canon_root = Path(temp_dir) / "missing-canon"
+            source_root.mkdir()
+            subprocess.run(["git", "init"], cwd=source_root, check=True, capture_output=True)
+
+            result = subprocess.run(
+                [sys.executable, str(RUNTIME_LOG_AUTO_SYNC)],
+                cwd=source_root,
+                input=json.dumps({"hookEventName": "Stop"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_RUNTIME_LOG_AUTO_SYNC_CANON_ROOT": str(canon_root),
                 },
             )
 
@@ -897,6 +924,99 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_git_push_tool_payloads(self) -> None:
+        """GitPush-style publish tools should not run blocking hook children."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            hook_dir = temp_root / "hooks"
+            hook_dir.mkdir()
+            log_path = temp_root / "invocations.txt"
+            (hook_dir / "cause_investigation_guard.py").write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env python3",
+                        "import os",
+                        "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                        "    stream.write('called\\n')",
+                        "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PreToolUse",
+                        "tool_name": "GitPush",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                    "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                },
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(log_path.exists())
+
+    def test_hook_dispatcher_skips_github_publish_commands(self) -> None:
+        """Gh PR and github_publish.py commands are publish work, not hook-stop points."""
+        commands = [
+            "git push -u origin topic",
+            "gh pr create --repo owner/repo --base main --head topic --title T --body-file body.md",
+            "python3 tools/agent_tools/github_publish.py publish-pr --user-task task --repo owner/repo --title T --body-file body.md",
+        ]
+        for command in commands:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temp_dir:
+                temp_root = Path(temp_dir)
+                hook_dir = temp_root / "hooks"
+                hook_dir.mkdir()
+                log_path = temp_root / "invocations.txt"
+                (hook_dir / "style_checker_guard.py").write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env python3",
+                            "import os",
+                            "with open(os.environ['HOOK_DISPATCH_TEST_LOG'], 'a', encoding='utf-8') as stream:",
+                            "    stream.write('called\\n')",
+                            "print('{\"decision\":\"block\",\"reason\":\"should not run\"}')",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(HOOK_DISPATCHER), "PostToolUse"],
+                    cwd=temp_root,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PostToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "AGENT_CANON_HOOK_DISPATCHER_DIR": str(hook_dir),
+                        "HOOK_DISPATCH_TEST_LOG": str(log_path),
+                    },
+                )
+
+                self.assertEqual(result.stdout, "")
+                self.assertFalse(log_path.exists())
 
     def test_hook_dispatcher_skips_read_only_file_inspection_commands(self) -> None:
         """Read-only file inspection should not require disabling hook config."""
@@ -3338,6 +3458,31 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("run_docs_checks.sh", entries[0]["candidate_tools"])
         self.assertIn("run_docs_checks.sh", entries[1]["candidate_tools"])
         self.assertIn("run_docs_checks.sh", entries[1]["selected_tools"])
+
+    def test_skill_usage_logger_records_computational_optimization_signals(self) -> None:
+        """Optimization prompts should route to the computational optimization skill."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            log_path = temp_root / "reports" / "hooks" / "skills.jsonl"
+            result = subprocess.run(
+                [sys.executable, str(SKILL_USAGE_LOGGER)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "UserPromptSubmit",
+                        "prompt": "計算最適化スキルを使って solver の residual と KKT 収束を見直して",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "AGENT_CANON_SKILL_LOG_PATH": str(log_path)},
+            )
+            entry = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(result.stdout, "")
+        self.assertIn("computational-optimization", entry["candidate_skills"])
 
     def test_skill_usage_logger_carries_recent_workflow_to_tool_events(self) -> None:
         """Tool events should inherit the latest declared workflow in the same log shard."""

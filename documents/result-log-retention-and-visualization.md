@@ -21,11 +21,14 @@ JSONL and accumulated eval archive branch policy belong to
 
 ## Storage Classes
 
-- `reports/agents/<run-id>/` stores agent workflow evidence, reviews, validation,
-  monitoring, and closeout material.
+- `reports/agents/<run-id>/` stores source-repo-local agent workflow evidence,
+  reviews, validation, monitoring, and closeout material. `runtime_log_archive_git.py
+  sync` copies those run bundles into the external log archive under
+  `agent-reports/<repo-key>/<run-id>/` for accumulated retention.
 - `reports/` stores repo-wide automation reports, dependency reviews, lint
   reports, merge audits, and other project-level checks.
-- external runtime hook JSONL and accumulated eval reports live under
+- external runtime hook JSONL, accumulated eval reports, Codex runtime summaries,
+  and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
   `documents/runtime-log-archive.md`.
 - `experiments/<topic>/result/<run-id>/` stores raw experiment outputs, JSONL,
@@ -87,6 +90,10 @@ directly from inside a container and tunneling to the container IP.
   and local notebook checkpoints are cleanup targets before closeout.
 - If a generated artifact is needed for review but should not be tracked, put
   its path and checksum in `verification.txt` or the experiment report.
+- If a run-local `reports/agents/<run-id>/` bundle is needed after the current
+  task, archive it mechanically with `runtime_log_archive_git.py
+  archive-agent-report`; do not create a hand-written duplicate report in the
+  source tree.
 
 ## Closeout Evidence
 

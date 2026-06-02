@@ -17,10 +17,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.runtime_log_paths import mounted_log_archive_root, repo_log_key
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 
 class RuntimeLogArchiveGitTest(unittest.TestCase):
@@ -160,6 +160,81 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(remote_ref.returncode, 0, remote_ref.stderr)
 
+    def test_archive_agent_reports_copies_run_bundles(self) -> None:
+        """archive-agent-reports should copy reports/agents into the log branch."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            run_dir = source / "reports" / "agents" / "run-1"
+            run_dir.mkdir(parents=True)
+            (source / "reports" / "agents" / ".active_run").write_text("run-1\n", encoding="utf-8")
+            (run_dir / "summary.md").write_text("# Summary\n", encoding="utf-8")
+            (run_dir / "state.json").write_text('{"ok": true}\n', encoding="utf-8")
+
+            archived = self.run_tool(
+                "archive-agent-reports",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(archived.returncode, 0, archived.stdout + archived.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES=2", archived.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED=2", archived.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED=1", archived.stdout)
+
+            archive = mounted_log_archive_root(canon)
+            self.assertTrue((archive / "agent-reports" / key / "run-1" / "summary.md").exists())
+            self.assertTrue((archive / "agent-reports" / key / "run-1" / "state.json").exists())
+            self.assertFalse((archive / "agent-reports" / key / ".active_run").exists())
+
+            pushed = self.run_tool(
+                "push",
+                "--message",
+                "Archive agent reports",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+
+    def test_sync_pushes_codex_runtime_and_agent_reports(self) -> None:
+        """sync should be the unattended path for runtime summaries and agent reports."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
+            archive = mounted_log_archive_root(canon)
+            runtime_summary = archive / "codex-runtime" / key / "thread-1.jsonl"
+            runtime_summary.parent.mkdir(parents=True)
+            runtime_summary.write_text('{"thread_id": "thread-1"}\n', encoding="utf-8")
+            run_dir = source / "reports" / "agents" / "run-2"
+            run_dir.mkdir(parents=True)
+            (run_dir / "closeout_gate.md").write_text("closeout=yes\n", encoding="utf-8")
+
+            synced = self.run_tool("sync", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", synced.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", synced.stdout)
+
+            clone = root / "verification"
+            subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "switch", f"logs/{key}"], check=True, capture_output=True)
+            self.assertTrue((clone / "codex-runtime" / key / "thread-1.jsonl").exists())
+            self.assertTrue((clone / "agent-reports" / key / "run-2" / "closeout_gate.md").exists())
+
     def test_import_legacy_copies_and_deletes_old_jsonl(self) -> None:
         """import-legacy should move old in-tree hook JSONL to the archive."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -271,6 +346,85 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+
+    def test_archive_agent_report_snapshots_run_bundle_and_pushes(self) -> None:
+        """archive-agent-report should copy a run bundle into agent-reports."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            report_dir = source / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "verification.txt").write_text("status=pass\n", encoding="utf-8")
+            (report_dir / "work_log.md").write_text("# Work Log\n\n- done\n", encoding="utf-8")
+
+            archived = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(report_dir),
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(archived.returncode, 0, archived.stdout + archived.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass", archived.stdout)
+            snapshot_line = next(
+                line
+                for line in archived.stdout.splitlines()
+                if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
+            )
+            snapshot = snapshot_line.split("=", 1)[1]
+            archive = mounted_log_archive_root(canon) / "agent-reports" / key / "run-1" / snapshot
+            self.assertTrue((archive / "verification.txt").exists())
+            self.assertTrue((archive / "archive_manifest.json").exists())
+            index_path = mounted_log_archive_root(canon) / "agent-reports" / key / "index.jsonl"
+            first_index = index_path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(first_index), 1)
+
+            archived_again = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(report_dir),
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(archived_again.returncode, 0, archived_again.stdout + archived_again.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", archived_again.stdout)
+            self.assertEqual(index_path.read_text(encoding="utf-8").splitlines(), first_index)
+
+            pushed = self.run_tool(
+                "push",
+                "--message",
+                "Archive agent report",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            remote_tree = subprocess.run(
+                [
+                    "git",
+                    "--git-dir",
+                    str(remote),
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    f"logs/{key}",
+                    "--",
+                    "agent-reports",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("agent-reports", remote_tree.stdout)
 
 
 if __name__ == "__main__":

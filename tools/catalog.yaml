@@ -197,6 +197,26 @@ entries:
     tests:
       - tests/agent_tools/test_classify_path_risk.py
 
+  - id: formal-proof
+    summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
+    path: tools/agent_tools/formal_proof.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/formal_proof.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/formal_proof.md
+      - agents/skills/formal-proof-workflow.md
+      - references/agent-canon-technology-bibliography.md
+    tests:
+      - tests/agent_tools/test_formal_proof.py
+
   - id: repo-structure-contract
     summary: Compares an observed repository tree with the AgentCanon structure contract.
     path: tools/agent_tools/repo_structure_contract.py
@@ -255,6 +275,26 @@ entries:
     tests:
       - tests/agent_tools/test_issue_sync.py
 
+  - id: github-publish
+    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and no fallback push route.
+    path: tools/agent_tools/github_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/github_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/github_publish.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/agent-canon-github-remote.md
+    tests:
+      - tests/agent_tools/test_github_publish.py
+
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
     path: tools/agent_tools/eval_accumulation_check.py
@@ -274,6 +314,46 @@ entries:
       - documents/runtime-log-archive-migration.md
     tests:
       - tests/agent_tools/test_eval_accumulation_check.py
+
+  - id: run-accumulated-agent-evals
+    summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
+    path: tools/agent_tools/run_accumulated_agent_evals.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/evals/README.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_run_accumulated_agent_evals.py
+
+  - id: runtime-log-archive-git
+    summary: Ensures, imports, syncs, commits, and pushes AgentCanon runtime logs and agent reports to the external log archive.
+    path: tools/agent_tools/runtime_log_archive_git.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/runtime_log_archive_git.py sync
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime-log-archive.md
+      - documents/runtime-log-archive-migration.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+    tests:
+      - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.

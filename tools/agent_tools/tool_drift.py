@@ -228,6 +228,21 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
+        name="run_accumulated_agent_evals",
+        tool="tools/agent_tools/run_accumulated_agent_evals.py",
+        links=(
+            LinkCheck("agents/evals/README.md"),
+            LinkCheck("documents/runtime-log-archive.md"),
+            LinkCheck("tools/README.md"),
+            LinkCheck("documents/tools/README.md"),
+            LinkCheck("tools/catalog.yaml"),
+            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck(".github/workflows/agent-canon-static-gates.yml"),
+            LinkCheck("tests/agent_tools/test_run_accumulated_agent_evals.py"),
+        ),
+    ),
+    ToolContract(
         name="agent_canon_pr_check",
         tool="tools/ci/check_agent_canon_pr.sh",
         links=(
@@ -235,6 +250,7 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
+            LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
@@ -260,8 +276,8 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml",
-                "missing-skill-workflow-prompt-eval",
+                "run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
+                "missing-accumulated-agent-eval-producer",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",

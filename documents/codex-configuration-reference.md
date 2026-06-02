@@ -550,6 +550,11 @@ severity rules:
 - Child `decision=block` output is downgraded to official warning context unless
   the child script is listed in `CRITICAL_BLOCKING_CHILD_HOOKS` or
   `AGENT_CANON_HOOK_STRICT_BLOCKS=1` is set for explicit enforcement tests.
+- GitPush, GitHub branch publish, safe `gh pr` create/edit/view/list/checks/comment
+  operations, and `github_publish.py` are publish/evidence work owned by the
+  GitHub publish tool and PR gate. Hook dispatcher child guards skip these
+  operations so non-critical style, OOP, log-surface, planning, or closeout
+  findings cannot block branch publication or PR evidence updates.
 - AGENTS / ROOT_AGENTS policy prose should first ask whether a rule belongs in
   a checker, warning hook, closeout gate, role TOML, workflow eval, or PR gate
   before adding more prompt-only prohibitions.
@@ -564,6 +569,9 @@ Template-specific hook behavior:
   inspection, and known validation commands including AgentCanon
   plan/status/latest-check inspection. Do not rename, move, or temporarily
   disable `hooks.json` to inspect hook state or run validation.
+- The dispatcher also bypasses child guards for GitHub publish/PR commands.
+  Publish tools must still verify the GitHub remote and user task explicitly;
+  the bypass only prevents unrelated hook findings from stopping the write.
 - `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
   reference capture checks.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
@@ -582,11 +590,15 @@ Template-specific hook behavior:
   missing code, or missing visualization. Detailed test coverage belongs in `tests/`.
 - Style checker logs record selected Python / C++ / notebook / Markdown checkers and `unchecked_files` for changed paths with no automatic checker.
 - Hook logs append to the mounted runtime log archive
-  `.agent-canon/archive/<env-key>/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
+  `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
   Accumulated eval reports append under
-  `.agent-canon/archive/<env-key>/eval-results/<family>/`.
+  `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime summaries
+  under `.agent-canon/log-archive/codex-runtime/<repo-key>/`, and agent run
+  reports under `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`.
   `log_archive_mount_warning.py` warns, without blocking, when that archive is
   missing and asks the agent to run `runtime_log_archive_git.py ensure` first.
+  `runtime_log_auto_sync.py` runs `runtime_log_archive_git.py sync` from Stop
+  so normal accumulation does not require a separate agent action.
   The archive remote and branch policy are documented in
   `documents/runtime-log-archive.md`; source-tree `agents/evals/results/`
   paths are not normal read or write locations.

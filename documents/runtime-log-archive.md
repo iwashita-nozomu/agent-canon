@@ -7,6 +7,7 @@ downstream implementation ../tools/agent_tools/runtime_log_paths.py resolves arc
 downstream implementation ../tools/agent_tools/runtime_log_archive_git.py manages clone, branch, status, and push operations
 downstream design runtime-log-archive-migration.md documents in-tree hook JSONL migration into the archive
 downstream implementation ../.codex/hooks/log_archive_mount_warning.py warns when the archive mount is absent
+downstream implementation ../.codex/hooks/runtime_log_auto_sync.py runs best-effort Stop-time archive sync
 downstream implementation ../.codex/hooks/hook_event_log.py writes hook JSONL into the archive
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
@@ -23,8 +24,10 @@ rules. Retention classes for general reports and experiment artifacts belong to
 procedure for old in-tree logs belongs to
 `documents/runtime-log-archive-migration.md`.
 
-AgentCanon runtime hook JSONL and accumulated eval reports are stored in the separate GitHub repository
-`git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted locally at:
+AgentCanon runtime hook JSONL, accumulated eval reports, Codex runtime
+summaries, and archived agent run bundles are stored in the separate GitHub
+repository `git@github.com:iwashita-nozomu/agent-canon-log.git`, mounted
+locally at:
 
 ```text
 .agent-canon/log-archive/
@@ -48,10 +51,34 @@ Normal eval writers use:
 .agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md
 ```
 
+For required PR / CI eval family coverage, use the mechanical producer entry:
+
+```bash
+python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
+python3 tools/agent_tools/eval_accumulation_check.py
+```
+
+That command runs each registered eval producer with `--accumulate` and
+captures producer stdout/stderr under `reports/agent-eval-runs/<run-id>/`.
+Agents do not hand-author accumulated eval reports.
+
+Agent report archive snapshots use:
+
+```text
+.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/
+.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl
+```
+
 Codex runtime summary exporters use:
 
 ```text
 .agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl
+```
+
+Agent run reports use:
+
+```text
+.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/
 ```
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
@@ -98,13 +125,36 @@ python3 tools/agent_tools/runtime_log_archive_git.py push
 ```
 
 Do not copy raw hook JSONL or accumulated eval reports back into AgentCanon
-source. Analysis artifacts such as SQLite caches and dashboards belong to each source repo's ignored
-`reports/.cache/` or `reports/agent-runtime-dashboard/` paths.
+source. Do not copy or rewrite agent run bundles into source-tree mirror reports
+for retention; use `archive-agent-report --report-dir reports/agents/<run-id>`.
+Analysis artifacts such as SQLite caches and dashboards belong to each source
+repo's ignored `reports/.cache/` or `reports/agent-runtime-dashboard/` paths.
 
 Codex runtime summaries are derived from the local Codex runtime state
 (`history.jsonl`, `logs_2.sqlite`, and optional legacy session JSONL). They
 store bounded counters, token observations, and runtime attribution only; prompt
 text and raw tool output stay out of the archive.
+
+Normal unattended operation uses one command:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+```
+
+`sync` ensures the archive clone, copies current `reports/agents/` run bundles
+to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
+summaries, and agent reports, then commits and pushes the source repository's
+`logs/<repo-key>` branch. It skips `.active_run`, cache files, Python cache
+directories, and oversized single files. The source repo's ignored
+`reports/agents/` directory remains run-local working evidence; the log archive
+is the durable accumulated store.
+
+`hooks/runtime_log_auto_sync.py` runs the same `sync` path from the Codex Stop
+hook on a best-effort, fail-open basis. It emits no output on success and does
+not block repository work on network, SSH, or archive availability failures.
+Use `AGENT_CANON_DISABLE_RUNTIME_LOG_AUTO_SYNC=1` to disable it for explicit
+hook-development tests, or `AGENT_CANON_RUNTIME_LOG_AUTO_SYNC_NO_PUSH=1` to copy
+artifacts locally without pushing.
 
 ## Legacy In-Tree Migration
 
@@ -136,3 +186,24 @@ When invoking the helper from a wrapper repository, keep the AgentCanon
 submodule as the working directory and let the tool derive the superproject
 source root. For unusual layouts, pass `--source-root <repo>` and
 `--canon-root <agent-canon>` explicitly.
+
+## Agent Report Archiving
+
+Run-local `reports/agents/<run-id>/` bundles remain local task evidence while
+the task is active. At closeout or PR evidence publication, archive the bundle
+mechanically instead of hand-copying summaries:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py ensure
+python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report \
+  --report-dir reports/agents/<run-id>
+python3 tools/agent_tools/runtime_log_archive_git.py push \
+  --message "Archive <run-id> agent report"
+```
+
+The archive command copies the bundle into a content-addressed snapshot
+directory and appends one JSONL index entry. Re-running it with identical
+content is idempotent; re-running it after the run bundle changes creates a new
+snapshot. Agents should not generate a separate archive report by prose. Eval,
+hook, runtime summary, and run-bundle archive entries must be created by tools
+that write the archive paths directly.

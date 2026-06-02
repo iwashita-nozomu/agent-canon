@@ -59,6 +59,11 @@ agent-canon semantic-index build \
   --include agents
 ```
 
+When `search`, `context-pack`, `thin-docs`, or related commands fail because the
+SQLite database is missing, build the index in the current worktree and retry
+the bounded command. Do not treat a missing generated cache as permission to
+skip semantic-index and immediately read broad raw `rg` output.
+
 Add an LLM-backed embedding provider to an existing index:
 
 ```bash

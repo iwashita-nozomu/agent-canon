@@ -10,7 +10,7 @@ downstream implementation agent_tools/tool_drift.py validates tool/convention tr
 downstream implementation agent_tools/responsibility_scope.py validates responsibility scopes and protecting tools
 downstream implementation agent_tools/issue_sync.py validates local issue sync state
 downstream implementation agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
@@ -18,6 +18,7 @@ downstream implementation agent_tools/search.py coordinates purpose-based search
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
+downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
 @dependency-end
 -->
 
@@ -63,7 +64,9 @@ python3 tools/agent_tools/parent_repo_readiness.py
 python3 tools/agent_tools/repo_structure_contract.py
 python3 tools/agent_tools/render_dependency_manifest_graph.py
 python3 tools/agent_tools/classify_path_risk.py
+python3 tools/agent_tools/formal_proof.py --help
 python3 tools/agent_tools/issue_sync.py
+python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
 agent-canon local-llm search --purpose "find tool for dependency graph edit scope"
@@ -72,6 +75,7 @@ python3 tools/agent_tools/route.py --area search
 agent-canon local-llm eval
 python3 tools/agent_tools/evaluate_report_quality.py
 python3 tools/agent_tools/evaluate_codex_agent_roles.py
+python3 tools/agent_tools/github_publish.py --help
 python3 tools/agent_tools/prose_reasoning_graph.py --help
 ```
 
@@ -104,6 +108,10 @@ unexpected top-level severity.
 `check_dependency_graph.sh --graph-tsv` into Markdown and DOT review artifacts.
 `classify_path_risk.py` maps changed paths to runtime profiles and targeted
 validation checks; the manual GitHub smoke workflow uses the same classifier.
+`formal_proof.py` converts natural-language mathematical claims into
+unverified proof plans, existing-proof search queries, target-language theorem
+scaffolds, and checker commands. It never upgrades a claim to verified without
+proof-assistant evidence.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -113,6 +121,16 @@ reports are readable from the mounted runtime log archive. The source tree
 must not contain `agents/evals/results/` result artifacts.
 `runtime_log_archive_git.py status` validates that the mounted log archive has
 a usable Git branch/worktree state before log evidence is pushed.
+`runtime_log_archive_git.py archive-agent-report --report-dir
+reports/agents/<run-id>` snapshots a run bundle into
+`.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
+and appends `agent-reports/<repo-key>/index.jsonl`; agents do not hand-generate
+archive copies of their reports.
+`run_accumulated_agent_evals.py` is the mechanical producer entrypoint for
+required eval families. It runs role, skill/workflow prompt, local LLM,
+workflow-selection, and report-quality evals with `--accumulate`, captures
+their stdout/stderr under `reports/agent-eval-runs/<run-id>/`, then leaves
+`eval_accumulation_check.py` to validate the resulting archive structure.
 `agent-canon local-llm search` accepts a `--purpose` string and coordinates exact text, local LLM
 semantic cards, TF-IDF vector search, tool catalog lookup, dependency headers,
 and Python code dependency facts into ranked candidates.
@@ -169,6 +187,7 @@ artifact skills.
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
+  - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
@@ -177,7 +196,7 @@ artifact skills.
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
-  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / push 操作を担当します。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
+  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の `logs/<repo-key>` branch にまとめて commit / push する通常経路です。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
@@ -365,15 +384,21 @@ append evidence when given `--report-dir` or `AGENT_RUN_REPORT_DIR`.
 When a run uses skills, prompt eval evidence is required. Run
 `evaluate_skill_workflow_prompts.py --accumulate` and record the emitted
 `EVAL_RUN_ID`, `EVAL_STATUS`, and `EVAL_ACCUMULATED_REPORT` as behavior events.
-Hook outcomes and accumulated eval reports live in the mounted runtime log archive.
+Hook outcomes, accumulated eval reports, and archived agent report snapshots
+live in the mounted runtime log archive.
 Hook JSONL uses
 `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
-and eval reports use `.agent-canon/log-archive/eval-results/<family>/` by
+eval reports use `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime
+summaries use `.agent-canon/log-archive/codex-runtime/<repo-key>/`, and agent run
+reports use `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
 rules live in `documents/runtime-log-archive.md`, and
 `tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
-`ensure`, `status`, `import-legacy`, `import-eval-results`, and `push`.
+`ensure`, `status`, `import-legacy`, `import-eval-results`,
+`archive-agent-report`, `archive-agent-reports`, `sync`, and `push`. The Codex Stop hook calls `sync`
+best-effort, so normal runtime log and report accumulation does not require an
+agent to remember a separate push step.
 Temporary local hook output
 belongs in `reports/hooks/` only when a task explicitly overrides the destination
 with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or
@@ -406,6 +431,8 @@ debugging, or corruption audits with an explicit rationale.
 surface. It confirms hook JSONL and every eval family registered in
 `agents/evals/eval_result_families.toml` are readable, uniquely identified, and
 not hidden by ignore rules before the improvement guide tries to mine them.
+PR and CI gates run `run_accumulated_agent_evals.py` before this checker so the
+required reports are written by tools, not composed by agents.
 `evaluate_workflow_selection.py` checks the prompt-intake classifier against
 frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
 Use `--accumulate` only when the measurement should become durable evidence
@@ -715,7 +742,9 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 ```
 
 The dashboard also includes local LLM and workflow-selection eval families when
-their accumulated reports exist.
+their accumulated reports exist. `run_accumulated_agent_evals.py` is the normal
+way for static gates to create that required eval family evidence before
+`eval_accumulation_check.py` reads it.
 Keep duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs at zero.
 When one prompt surface needs more coverage, consolidate the checks into that surface's existing
 eval entry instead of adding a parallel duplicate-target eval.

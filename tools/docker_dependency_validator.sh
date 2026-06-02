@@ -203,6 +203,10 @@ check_post_create_python_install() {
         || report_issue ".devcontainer/generate-runtime-compose.sh must support standalone AgentCanon source-only mode"
       grep -q 'mcr.microsoft.com/devcontainers/base:ubuntu-22.04' "$generate_compose" \
         || report_issue ".devcontainer/generate-runtime-compose.sh must provide a standalone base image"
+      grep -q 'AGENT_CANON_SECRET_DIR' "$generate_compose" \
+        || report_issue ".devcontainer/generate-runtime-compose.sh must support optional host secret directory mounts"
+      grep -q 'AGENT_CANON_SECRET_MOUNT' "$generate_compose" \
+        || report_issue ".devcontainer/generate-runtime-compose.sh must expose the optional secret mount target"
     fi
     if [ ! -f "$post_attach" ]; then
       report_issue ".devcontainer/post-attach.sh not found"

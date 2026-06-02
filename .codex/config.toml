@@ -37,6 +37,10 @@ path = "../.agents/skills/agent-learning/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/agent-canon-update/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/agent-log-analysis/SKILL.md"
 enabled = true
 
@@ -78,6 +82,14 @@ enabled = true
 
 [[skills.config]]
 path = "../.agents/skills/experiment-lifecycle/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/computational-optimization/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/formal-proof-workflow/SKILL.md"
 enabled = true
 
 [[skills.config]]

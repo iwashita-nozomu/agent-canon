@@ -66,7 +66,7 @@ remote execution contract が「repo が外部 server から実行される条�
 ## Git And Mirror Rule
 
 - bare repo root、mirror hook path、mirror remote の関係を必ず記録します
-- `tools/push_origin.sh` を canonical push 入口にし、mirror は bare repo hook 側へ寄せます
+- GitHub publish / PR 作業は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` を canonical 入口にし、mirror は bare repo hook 側へ寄せます
 - host 固有の mirror 手順は `notes/github-mirror-procedure.md` に残します
 
 ## Validation

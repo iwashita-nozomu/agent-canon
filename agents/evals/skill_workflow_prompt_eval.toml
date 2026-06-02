@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 41
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 60
+expected_count = 63
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 38
+expected_count = 41
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
@@ -283,7 +283,7 @@ description = "Structure planning runtime skill must cover reports, experiments,
 id = "STRUCTURE-PLANNING-SHIM-1"
 critical = true
 description = "Defines a structure contract with first artifact, source map, metric or delta contract, invalid interpretations, and validation gate."
-required_regex = ["structure contract", "first artifact", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
+required_regex = ["structure contract", "first artifact", "visual_plan", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
 
 [[evals.checklist]]
 id = "STRUCTURE-PLANNING-SHIM-2"
@@ -303,6 +303,12 @@ critical = true
 description = "Routes nontrivial paragraph order and connective evidence through semantic-index discourse-relations without making it authority."
 required_regex = ["discourse-relations", "--profile", "advisory structure evidence", "not as prose or policy authority"]
 
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-SHIM-5"
+critical = true
+description = "Uses Mermaid as the default first visual for nontrivial reader-facing flow, dependency, ownership, routing, state, review-gate, or handoff structure."
+required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
+
 [[evals]]
 id = "structure-planning-doc"
 target = "agents/skills/structure-planning.md"
@@ -319,7 +325,7 @@ required_regex = ["report", "experiment", "document", "paper", "HTML", "refactor
 id = "STRUCTURE-PLANNING-DOC-2"
 critical = true
 description = "Defines the structure contract fields and closeout tokens."
-required_regex = ["structure_kind", "first_artifact", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
+required_regex = ["structure_kind", "first_artifact", "visual_plan", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
 
 [[evals.checklist]]
 id = "STRUCTURE-PLANNING-DOC-3"
@@ -332,6 +338,12 @@ id = "STRUCTURE-PLANNING-DOC-4"
 critical = true
 description = "Documents discourse-relations as optional paragraph-order and transition evidence."
 required_regex = ["discourse-relations", "connective profile", "therefore", "because", "structure evidence"]
+
+[[evals.checklist]]
+id = "STRUCTURE-PLANNING-DOC-5"
+critical = true
+description = "Documents Mermaid as the default visual plan for nontrivial reader-facing process, dependency, ownership, routing, state, review-gate, or handoff structure."
+required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
 
 [[evals]]
 id = "literature-survey-source-record-shim"
@@ -374,6 +386,54 @@ id = "LITERATURE-SOURCE-DOC-3"
 critical = true
 description = "Defines reader-facing source sweep and adoption/exclusion sections."
 required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "formal-proof-workflow-shim"
+target = ".agents/skills/formal-proof-workflow/SKILL.md"
+kind = "skill"
+description = "Formal proof runtime skill must route natural-language claims through scaffold, existing-proof search, literature survey, and checker-gated proof status."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-1"
+critical = true
+description = "Requires formal_proof.py scaffold generation and existing formal proof search."
+required_regex = ["formal_proof\\.py", "existing formal proofs", "literature queries"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-2"
+critical = true
+description = "Requires literature-survey handoff and durable source decisions."
+required_regex = ["\\$literature-survey", "official docs", "adoption/exclusion"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-3"
+critical = true
+description = "Forbids verification claims without checker execution and proof-status evidence."
+required_regex = ["Do not mark a claim verified", "proof assistant or solver", "proof_status=not_run"]
+
+[[evals]]
+id = "formal-proof-workflow-doc"
+target = "agents/skills/formal-proof-workflow.md"
+kind = "skill"
+description = "Human formal proof skill must define claim decomposition, existing-proof search, literature handoff, and checker authority."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-1"
+critical = true
+description = "Defines natural-language claim decomposition and proof obligations."
+required_regex = ["assumptions", "definitions", "target theorem", "proof obligations"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-2"
+critical = true
+description = "Connects existing-proof web/library search to literature-survey."
+required_regex = ["existing proof search", "\\$literature-survey", "formal library docs"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-3"
+critical = true
+description = "Keeps proof authority with checker logs and placeholders unverified."
+required_regex = ["proof_status=unverified", "checker log", "placeholder"]
 
 [[evals]]
 id = "academic-writing-tex-routing-shim"
@@ -538,6 +598,48 @@ description = "Connects experiment planning/reporting to discourse-relations pro
 required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
 
 [[evals]]
+id = "computational-optimization-shim"
+target = ".agents/skills/computational-optimization/SKILL.md"
+kind = "skill"
+description = "Computational optimization skill must fix numerical contracts and route validation before code or experiment changes."
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-1"
+critical = true
+description = "Requires the optimization contract before implementation or experiment runs."
+required_regex = ["optimization contract", "objective", "constraints", "derivatives", "stopping policy", "failure semantics"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-2"
+critical = true
+description = "Forbids numerical test greenwashing."
+required_regex = ["relaxing tolerances", "deleting assertions", "skipping cases", "changing expected values", "falling back to CPU"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-3"
+critical = true
+description = "Requires first-bad-iteration diagnosis and separates correctness from performance."
+required_regex = ["first bad iteration", "residual components", "status flag", "correctness evidence", "performance evidence"]
+
+[[evals]]
+id = "computational-optimization-doc"
+target = "agents/skills/computational-optimization.md"
+kind = "skill"
+description = "Human computational optimization skill must define boundary, contract, workflow, validation, review, and outputs."
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-1"
+critical = true
+description = "Defines boundary with research, experiment, adaptive loop, test design, and language review skills."
+required_regex = ["\\$research-workflow", "\\$experiment-lifecycle", "\\$adaptive-improvement-loop", "\\$test-design", "\\$python-review", "\\$cpp-review"]
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-2"
+critical = true
+description = "Requires numerical failure/status review beyond final values."
+required_regex = ["first bad iteration", "converged=false", "KKT", "preconditioner", "Performance claim"]
+
+[[evals]]
 id = "document-writing-structure-planning"
 target = ".agents/skills/long-form-writing/SKILL.md"
 kind = "skill"
@@ -554,6 +656,12 @@ id = "DOCUMENT-STRUCTURE-2"
 critical = true
 description = "Connects long-form paragraph flow to discourse-relations when transition evidence matters."
 required_regex = ["discourse-relations", "paragraph flow", "transition choice", "structure-planning"]
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-3"
+critical = true
+description = "Routes nontrivial long-form workflow/dependency/ownership/routing/state/review-gate explanations to Mermaid through structure-planning visual_plan."
+required_regex = ["Mermaid", "visual_plan", "workflow", "dependency", "ownership", "routing", "state transition", "review gate", "fenced `mermaid`"]
 
 [[evals]]
 id = "paper-writing-structure-planning"
@@ -664,6 +772,36 @@ id = "ROOT-AGENTS-SHARED-1"
 critical = true
 description = "Includes dependency manifest markers and a title."
 required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-SEARCH-1"
+critical = true
+description = "Builds a missing semantic-index cache before exact-search fallback."
+required_regex = ["semantic-index build --root \\.", "bounded `rg -l`"]
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-PUBLISH-1"
+critical = true
+description = "Keeps GitHub publish and PR evidence work out of non-critical hook blocking."
+required_regex = ["GitPush", "github_publish\\.py", "PR evidence", "hook / checker finding"]
+
+[[evals]]
+id = "agent-canon-pr-gh-publish-workflow"
+target = "agents/workflows/agent-canon-pr-workflow.md"
+kind = "workflow"
+description = "The AgentCanon PR workflow must route push and PR operations through the gh-backed publish tool without fallback push routes."
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-1"
+critical = true
+description = "Requires gh-backed publish tool, explicit user task, and remote verification evidence."
+required_regex = ["tools/agent_tools/github_publish\\.py", "--user-task", "remote_verified=yes", "gh repo view", "git remote get-url origin"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-2"
+critical = true
+description = "Forbids fallback remote inference and literal URL push as standard routes."
+required_regex = ["fallback", "literal URL push is not a standard route", "hardcoded repository name"]
 
 [[evals]]
 id = "agents-readme-routing-entrypoint"
@@ -1537,3 +1675,45 @@ id = "AGENT-LOG-API-DOC-2"
 critical = true
 description = "Keeps raw JSONL inspection exceptional."
 required_regex = ["log_archive_api_missing", "raw JSONL", "schema debugging", "破損 audit"]
+
+[[evals]]
+id = "agent-canon-update-route-skill"
+target = ".agents/skills/agent-canon-update/SKILL.md"
+kind = "skill"
+description = "The runtime AgentCanon update skill must route parent pin updates, source PR work, root-view repair, and update TODO state through the canonical high-level commands."
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-1"
+critical = true
+description = "Requires the high-level parent latest route and root-view verification commands."
+required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-plan", "sync_agent_canon\\.sh link-root", "sync_agent_canon\\.sh check"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-2"
+critical = true
+description = "Separates local AgentCanon source commits from parent pin updates."
+required_regex = ["merge-main-into-current", "git -C vendor/agent-canon push origin HEAD", "AgentCanon branch/PR", "\\$agent-update-branch"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-3"
+critical = true
+description = "Requires parent update TODO state handling before unrelated work."
+required_regex = ["agent_canon_update_todos\\.py status", "agent_canon_update_todos\\.py plan --write", "before unrelated work"]
+
+[[evals]]
+id = "agent-canon-update-route-doc"
+target = "agents/skills/agent-canon-update.md"
+kind = "skill-doc"
+description = "The human AgentCanon update skill doc must point to the update route, latest checklist, and source-PR versus parent-pin separation."
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-DOC-1"
+critical = true
+description = "Documents the canonical route references and high-level commands."
+required_regex = ["documents/agent-canon-update-route\\.md", "documents/agent-canon-parent-repo-latest-checklist\\.md", "make agent-canon-ensure-latest", "tools/update_agent_canon\\.sh"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-DOC-2"
+critical = true
+description = "Documents source PR and parent pin boundaries."
+required_regex = ["AgentCanon branch/PR", "parent-repo pin", "canon-pin", "standalone AgentCanon branch"]

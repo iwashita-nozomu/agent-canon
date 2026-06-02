@@ -8,14 +8,12 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import (  # noqa: E402
+from tools.agent_tools.runtime_log_paths import (
+    agent_report_archive_dir,
     hook_result_search_dirs,
     mounted_log_archive_root,
     repo_log_key,
@@ -53,6 +51,22 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(dirs[0], archive_root / "hook-runs" / repo_log_key(canon_root))
         self.assertEqual(dirs[1], archive_root / "hook-runs" / "legacy-import")
         self.assertEqual(dirs[2], canon_root / "agents" / "evals" / "results" / "hook-runs")
+
+    def test_agent_report_archive_dir_uses_repo_key_namespace(self) -> None:
+        """Agent report archives should be namespaced by source repository key."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "project"
+            canon_root = Path(temp_dir) / "agent-canon"
+            parent.mkdir()
+            canon_root.mkdir()
+            mounted_log_archive_root(canon_root).mkdir(parents=True)
+
+            report_dir = agent_report_archive_dir(parent, canon_root)
+
+        self.assertEqual(
+            report_dir,
+            mounted_log_archive_root(canon_root) / "agent-reports" / repo_log_key(parent),
+        )
 
 
 if __name__ == "__main__":

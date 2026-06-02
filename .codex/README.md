@@ -11,11 +11,11 @@ downstream implementation ./hooks/mcp_session_context.sh provides optional MCP c
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
-downstream implementation ./hooks/cause_investigation_guard.py blocks code edits without cause investigation evidence
-downstream implementation ./hooks/module_boundary_guard.py blocks forced module rewrites
-downstream implementation ./hooks/library_implementation_guard.py blocks library implementation rewrites
-downstream implementation ./hooks/helper_first_guard.py blocks helper-first implementation drift
-downstream implementation ./hooks/notebook_quality_guard.py blocks notebook-as-test misuse
+downstream implementation ./hooks/cause_investigation_guard.py warns on code edits without cause investigation evidence
+downstream implementation ./hooks/module_boundary_guard.py warns on forced module rewrites
+downstream implementation ./hooks/library_implementation_guard.py warns on library implementation rewrites
+downstream implementation ./hooks/helper_first_guard.py warns on helper-first implementation drift
+downstream implementation ./hooks/notebook_quality_guard.py warns on notebook-as-test misuse
 downstream implementation ../tools/agent_tools/check_mcp_inventory.py MCP inventory preflight
 @dependency-end
 -->
@@ -138,6 +138,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
 - `hooks.json` は active lifecycle event ごとに `hooks/hook_dispatcher.py` を 1 回だけ起動し、dispatcher が既存 guard scripts を順番に実行します。これにより hook 設定は少数の event entry に保ちつつ、個別 guard の責務、ログ、環境変数 override は維持します。
 - dispatcher は `GitStatus` tool、read-only な file / Git inspection、AgentCanon plan/status/latest-check を含む既知の validation command では child guard を起動しません。読み取りや検証のために `hooks.json` を退避したり hook 設定を一時無効化したりしてはいけません。
+- dispatcher は `GitPush` tool、単純な `git push`、安全な `gh pr` inspection / create / edit / checks / comment、`python3 tools/agent_tools/github_publish.py ...` でも child guard を起動しません。GitHub publish / PR evidence は publish tool と PR gate の責務であり、非重大 hook finding で止めません。
 - dispatcher は fail-open が既定です。子 hook の `decision=block` はログと修復 context として保持しますが、prompt secret など `CRITICAL_BLOCKING_CHILD_HOOKS` に入った高確信の公開事故だけを runtime block として維持します。明示的な hook 開発・強制検証では `AGENT_CANON_HOOK_STRICT_BLOCKS=1` または `AGENT_CANON_HOOK_STRICT_FAILURES=1` を設定できます。
 - process / search / reuse / planning / review completeness の規律は、hook blocker ではなく warning、run bundle evidence、closeout gate、または reviewer finding として扱います。hook finding は closeout 前に直すべき evidence ですが、通常の read-only 調査、validation、修復作業を止めません。
 - `hooks.json` は `SessionStart` で MCP context hook を起動しません。MCP preflight は hook ではなく、workflow が evidence を必要とする場合、または MCP surface 自体を変更する場合に明示的に実行します。
@@ -145,6 +146,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `UserPromptSubmit` と `PreToolUse` は `hooks/log_archive_mount_warning.py` で `.agent-canon/log-archive/` が mounted Git clone として見えるか確認します。missing / invalid の場合も block せず、先に `python3 tools/agent_tools/runtime_log_archive_git.py ensure` を実行してから hook / eval logs を蓄積するよう促す警告だけを返します。
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
+- `Stop` は `hooks/codex_runtime_summary_logger.py` で bounded runtime summary を書いた後、`hooks/runtime_log_auto_sync.py` で `runtime_log_archive_git.py sync` を best-effort 実行します。これにより hook JSONL、eval report、Codex runtime summary、`reports/agents/` run bundle は通常 agent の手動 push なしで log archive の `logs/<repo-key>` branch に集約されます。network / SSH / archive 不在の失敗は fail-open で作業を止めません。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を確認します。普通の相談、read-only search、validation command では child guard を起動しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行します。current finding は warning context と hook log に残し、closeout 前の修復対象にします。
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
