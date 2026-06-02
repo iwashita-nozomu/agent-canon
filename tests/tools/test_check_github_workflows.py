@@ -198,8 +198,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Operational Findings / Issues", result.stdout)
 
-    def test_static_gates_require_prompt_eval_parity(self) -> None:
-        """Static gates must keep parity with local prompt eval checks."""
+    def test_static_gates_require_accumulated_eval_parity(self) -> None:
+        """Static gates must keep parity with accumulated eval checks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
@@ -211,8 +211,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
-                    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml\n",
-                    "",
+                    "run_accumulated_agent_evals.py",
+                    "run_accumulated_agent_evals_REMOVED.py",
                 ),
                 encoding="utf-8",
             )
@@ -226,7 +226,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "missing_text:evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml",
+                "missing_text:run_accumulated_agent_evals.py",
                 result.stdout,
             )
 
@@ -683,6 +683,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/instructions/pr-processing.instructions.md",
             ".github/agents/pr-maintainer.md",
             ".github/scripts/checkout_agent_canon_submodule.sh",
+            "tools/ci/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
