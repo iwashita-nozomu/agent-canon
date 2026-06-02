@@ -198,7 +198,7 @@ entries:
       - tests/agent_tools/test_classify_path_risk.py
 
   - id: formal-proof
-    summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, existing-proof search queries, and checker commands.
+    summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
     path: tools/agent_tools/formal_proof.py
     family: agent_tools
     role: helper

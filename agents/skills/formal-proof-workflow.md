@@ -91,6 +91,7 @@ proof_plan_md=<path>
 proof_existing_queries=<path>
 proof_literature_queries=<path>
 proof_stub=<path>
+proof_library_trace_module=<path>
 proof_checker_command=<command>
 proof_checker_log=<path|not_run>
 proof_status=<unverified|not_run|verified|blocked>

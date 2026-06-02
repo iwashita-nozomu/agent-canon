@@ -10,11 +10,13 @@
 from __future__ import annotations
 
 import json
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "formal_proof.py"
@@ -84,6 +86,35 @@ class FormalProofToolTest(unittest.TestCase):
             self.assertIn("not proof evidence", stub)
             self.assertTrue((out_dir / "formal_proof_plan.md").is_file())
             self.assertTrue((out_dir / "existing_proof_queries.txt").is_file())
+            trace_path = out_dir / "spd_quadratic_form_positive_proof_trace.py"
+            self.assertTrue(trace_path.is_file())
+            trace_globals = runpy.run_path(str(trace_path))
+            trace = cast(dict[str, object], trace_globals["FORMAL_PROOF_TRACE"])
+            self.assertEqual(
+                trace["status"],
+                "scaffold_only_unverified",
+            )
+            self.assertEqual(
+                trace["theorem_stub_path"],
+                str(out_dir / "spd_quadratic_form_positive.lean"),
+            )
+            self.assertEqual(
+                trace["library_trace_module_path"],
+                str(trace_path),
+            )
+            self.assertEqual(
+                trace["origin_library_trace_module_path"],
+                str(trace_path),
+            )
+            self.assertEqual(
+                trace["library_trace_module_name"],
+                "spd_quadratic_form_positive_proof_trace.py",
+            )
+            self.assertEqual(
+                trace["runtime_theorem_stub_candidate_path"],
+                str(out_dir / "spd_quadratic_form_positive.lean"),
+            )
+            self.assertIn("origin_*", str(trace["trace_path_semantics"]))
 
     def test_text_output_for_smt_includes_solver_commands(self) -> None:
         """SMT target should expose SMT solver verification commands."""
@@ -157,6 +188,15 @@ class FormalProofToolTest(unittest.TestCase):
             self.assertIn("Branch nodes: 1", payload["claim_text"])
             self.assertFalse(sentinel.exists())
             self.assertTrue((out_dir / "lemma.lean").is_file())
+            self.assertEqual(
+                payload["library_trace_module_path"],
+                str(out_dir / "lemma_proof_trace.py"),
+            )
+            self.assertEqual(payload["library_trace_module_name"], "lemma_proof_trace.py")
+            self.assertEqual(
+                payload["origin_library_trace_module_path"],
+                str(out_dir / "lemma_proof_trace.py"),
+            )
 
     def test_python_symbol_supports_nested_qualname_default_name(self) -> None:
         """Dotted class/function qualnames should resolve through AST bodies."""

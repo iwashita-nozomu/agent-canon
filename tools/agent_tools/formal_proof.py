@@ -74,6 +74,12 @@ class FormalProofPlan:
     literature_queries: tuple[str, ...]
     verification_commands: tuple[str, ...]
     theorem_stub_path: str | None
+    theorem_stub_name: str | None
+    library_trace_module_path: str | None
+    library_trace_module_name: str | None
+    origin_theorem_stub_path: str | None
+    origin_library_trace_module_path: str | None
+    trace_path_semantics: str
     notes: tuple[str, ...]
 
 
@@ -535,6 +541,14 @@ def build_plan(
         literature_queries=build_literature_queries(claim_text, domains),
         verification_commands=build_verification_commands(verification_stub, target),
         theorem_stub_path=stub_path,
+        theorem_stub_name=None,
+        library_trace_module_path=None,
+        library_trace_module_name=None,
+        origin_theorem_stub_path=None,
+        origin_library_trace_module_path=None,
+        trace_path_semantics=(
+            "No library trace module has been written. Paths are scaffold-generation context."
+        ),
         notes=(
             "This scaffold is not proof evidence.",
             "Use $literature-survey before new formalization when the claim may already exist.",
@@ -551,9 +565,13 @@ def render_markdown(plan: FormalProofPlan) -> str:
         f"- status: `{plan.status}`",
         f"- target: `{plan.target_label}`",
         f"- theorem_stub_path: `{plan.theorem_stub_path or '<not-written>'}`",
+        f"- theorem_stub_name: `{plan.theorem_stub_name or '<not-written>'}`",
+        f"- library_trace_module_path: `{plan.library_trace_module_path or '<not-written>'}`",
+        f"- library_trace_module_name: `{plan.library_trace_module_name or '<not-written>'}`",
         f"- source_kind: `{plan.source_kind}`",
         f"- source_path: `{plan.source_path or '<none>'}`",
         f"- source_symbol: `{plan.source_symbol or '<none>'}`",
+        f"- trace_path_semantics: `{plan.trace_path_semantics}`",
         "",
         "## Claim",
         "",
@@ -588,6 +606,9 @@ def render_text(plan: FormalProofPlan) -> str:
         f"FORMAL_PROOF_STATUS={plan.status}",
         f"FORMAL_PROOF_TARGET={plan.target}",
         f"FORMAL_PROOF_STUB={plan.theorem_stub_path or '<not-written>'}",
+        f"FORMAL_PROOF_LIBRARY_TRACE_MODULE={plan.library_trace_module_path or '<not-written>'}",
+        "FORMAL_PROOF_LIBRARY_TRACE_MODULE_NAME="
+        f"{plan.library_trace_module_name or '<not-written>'}",
         f"FORMAL_PROOF_SOURCE_KIND={plan.source_kind}",
     ]
     if plan.source_path:
@@ -603,20 +624,79 @@ def render_text(plan: FormalProofPlan) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_library_trace_module(plan: FormalProofPlan) -> str:
+    """Build an importable Python module containing the proof-planning trace."""
+    trace_json = json.dumps(asdict(plan), indent=2, sort_keys=True)
+    return "\n".join(
+        [
+            '"""Generated formal-proof trace for Python package distribution.',
+            "",
+            "This module is provenance and planning evidence only. It is not proof",
+            "evidence until the checker command recorded in FORMAL_PROOF_TRACE succeeds",
+            "on a completed artifact without placeholders or unchecked proof escapes.",
+            '"""',
+            "",
+            "from __future__ import annotations",
+            "",
+            "import json",
+            "from pathlib import Path",
+            "from typing import Any",
+            "",
+            f"FORMAL_PROOF_TRACE_JSON = {trace_json!r}",
+            "FORMAL_PROOF_TRACE: dict[str, Any] = json.loads(FORMAL_PROOF_TRACE_JSON)",
+            "_TRACE_MODULE_PATH = Path(__file__).resolve()",
+            "_ORIGIN_LIBRARY_TRACE_MODULE_PATH = FORMAL_PROOF_TRACE.get(",
+            "    \"library_trace_module_path\"",
+            ")",
+            "_ORIGIN_THEOREM_STUB_PATH = FORMAL_PROOF_TRACE.get(\"theorem_stub_path\")",
+            "FORMAL_PROOF_TRACE[\"origin_library_trace_module_path\"] = (",
+            "    _ORIGIN_LIBRARY_TRACE_MODULE_PATH",
+            ")",
+            "FORMAL_PROOF_TRACE[\"origin_theorem_stub_path\"] = _ORIGIN_THEOREM_STUB_PATH",
+            "FORMAL_PROOF_TRACE[\"library_trace_module_path\"] = _TRACE_MODULE_PATH.as_posix()",
+            "FORMAL_PROOF_TRACE[\"library_trace_module_name\"] = _TRACE_MODULE_PATH.name",
+            "_THEOREM_STUB_NAME = FORMAL_PROOF_TRACE.get(\"theorem_stub_name\")",
+            "if isinstance(_THEOREM_STUB_NAME, str):",
+            "    FORMAL_PROOF_TRACE[\"runtime_theorem_stub_candidate_path\"] = (",
+            "        _TRACE_MODULE_PATH.parent / _THEOREM_STUB_NAME",
+            "    ).as_posix()",
+            "FORMAL_PROOF_TRACE[\"trace_path_semantics\"] = (",
+            "    \"library_trace_module_path is computed from this installed module's \"",
+            "    \"__file__; origin_* fields preserve generation-context paths.\"",
+            ")",
+            "",
+        ]
+    )
+
+
 def write_outputs(plan: FormalProofPlan, out_dir: Path, name: str) -> FormalProofPlan:
     """Write JSON, Markdown, query, and theorem-stub artifacts."""
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_name = normalize_identifier(name)
     stub_path = out_dir / f"{safe_name}.{TARGET_EXTENSIONS[plan.target]}"
+    trace_module_path = out_dir / f"{safe_name}_proof_trace.py"
+    stub_relpath = path_relative_to(stub_path, Path.cwd())
+    trace_relpath = path_relative_to(trace_module_path, Path.cwd())
     written_plan = replace(
         plan,
-        theorem_stub_path=path_relative_to(stub_path, Path.cwd()),
+        theorem_stub_path=stub_relpath,
+        theorem_stub_name=stub_path.name,
+        library_trace_module_path=trace_relpath,
+        library_trace_module_name=trace_module_path.name,
+        origin_theorem_stub_path=stub_relpath,
+        origin_library_trace_module_path=trace_relpath,
+        trace_path_semantics=(
+            "library_trace_module_path is generation-context until the generated trace "
+            "module is imported; the module rewrites that field from __file__ and keeps "
+            "origin_* paths for generation provenance."
+        ),
         verification_commands=build_verification_commands(
-            path_relative_to(stub_path, Path.cwd()),
+            stub_relpath,
             plan.target,
         ),
     )
     stub_path.write_text(build_stub(plan.target, name, written_plan), encoding="utf-8")
+    trace_module_path.write_text(build_library_trace_module(written_plan), encoding="utf-8")
     (out_dir / "formal_proof_plan.json").write_text(
         json.dumps(asdict(written_plan), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
