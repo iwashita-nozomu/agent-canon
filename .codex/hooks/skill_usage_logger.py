@@ -40,6 +40,7 @@ KNOWN_SKILL_IDS = frozenset(
     (
         "academic-writing",
         "adaptive-improvement-loop",
+        "agent-canon-update",
         "agent-learning",
         "agent-orchestration",
         "agent-update-branch",
@@ -101,6 +102,19 @@ SKILL_KEYWORD_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("サブエージェント", "起動"),
         ("subagent", "routing"),
         ("workflow=", "skills="),
+    ),
+    "agent-canon-update": (
+        ("agentcanon", "update"),
+        ("agent-canon", "update"),
+        ("agentcanon", "latest"),
+        ("agent-canon", "latest"),
+        ("agent-canon-ensure-latest",),
+        ("vendor/agent-canon",),
+        ("update_agent_canon.sh",),
+        ("sync_agent_canon.sh",),
+        ("サブモジュール", "agentcanon"),
+        ("agentcanon", "最新"),
+        ("agentcanon", "更新"),
     ),
     "md-style-check": (
         ("md-style",),
