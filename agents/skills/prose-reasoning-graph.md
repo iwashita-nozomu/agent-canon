@@ -24,6 +24,19 @@ The normative DSL contract is
 [documents/prose-reasoning-graph/dsl-spec.md](../../documents/prose-reasoning-graph/dsl-spec.md).
 This skill owns when and how to use the graph; the DSL spec owns layer,
 relation, identifier, projection, validation, and adapter vocabulary.
+The source-truth graph is a text-anchored semantic graph: sentence or EDU
+anchors and their typed relations are canonical for prose content, while
+macro-claims, rhetorical moves, reader-state transitions, and similar prose
+objects are projection views over the same graph. Section and paragraph nodes
+remain source form containers and reader-order anchors, not derived macro
+claims.
+Projection views may also recommend presentation forms such as prose,
+bulleted lists, ordered lists, tables, figures, or equations. Treat these as
+rewrite hints grounded in source anchors, not as permission to replace the
+canonical graph or drop provenance.
+Corpus/domain hints may be inferred from the user prompt as well as the draft.
+Use them to choose the academic or technical corpus that calibrates examples,
+review expectations, and evaluation criteria.
 
 It does not replace `$long-form-writing`, `$report-writing`,
 `$academic-writing`, `$paper-writing`, `$literature-survey`,
@@ -47,7 +60,9 @@ packets.
 
 1. Store graph DB and generated outputs under the active run bundle, report, or
    other task-local artifact directory.
-1. Run `ingest` on the source Markdown/plain text with `--stats-out`.
+1. Run `ingest` on the source Markdown/plain text with `--prompt` or
+   `--prompt-file` when user request context can identify the intended corpus.
+   Always use `--stats-out`.
 1. Run `analyze --profile <writing|logic|experiment|report|academic|paper|all>`
    with `--stats-out`.
 1. Export `project`, `lint`, `explain`, and `integrate` outputs with
@@ -75,8 +90,9 @@ prose_graph_stats=<path>
 
 The graph layers are intentionally plural. RST motivates rhetorical relations
 and nucleus/satellite-style organization, PDTB motivates local discourse
-relations, eRST motivates graph-shaped discourse overlays, Toulmin/AIF motivates
-claim/evidence reasoning, argumentative zoning motivates scholarly move labels,
-and reproducible experiment literature motivates hypothesis/metric/baseline
-planning. Do not collapse these layers into one total order until a projection
-or receiving skill asks for reader order.
+relations, Annotation Graphs motivate source-span anchored overlays, eRST and
+RST dependency views motivate graph-shaped discourse overlays, Toulmin/AIF
+motivates claim/evidence reasoning, argumentative zoning motivates scholarly
+move labels, and reproducible experiment literature motivates
+hypothesis/metric/baseline planning. Do not collapse these layers into one total
+order until a projection or receiving skill asks for reader order.

@@ -25,6 +25,13 @@ contract live here.
 
 - This directory owns the Prose Reasoning Graph DSL vocabulary and validation
   contract.
+- The DSL treats prose as one text-anchored semantic graph; macro prose
+  structure is a derived projection view, not a second source graph.
+- Derived projection views may recommend prose, list, table, figure, or
+  equation renderings, but those recommendations remain presentation hints over
+  source anchors.
+- Corpus hints may be inferred from source text and user prompt, then exported
+  as projection metadata for retrieval and evaluation calibration.
 - `documents/tools/prose_reasoning_graph.md` owns CLI usage and operator flow.
 - `agents/skills/prose-reasoning-graph.md` owns skill selection, handoff, and
   authority boundaries.
