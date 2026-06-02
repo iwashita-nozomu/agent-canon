@@ -35,6 +35,8 @@ upstream design README.md canonical workflow index
   - tool / checker / hook / static analysis で finding を探し、raw / structured full artifact、mechanical priority order、repair packet を作る。impact artifact は比較が明示されたときだけ作る
 - `agent-log-analysis`
   - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
+- `agent-canon-update`
+  - AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する
 - `agent-update-branch`
   - memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する
 - `report-writing`
@@ -55,10 +57,14 @@ upstream design README.md canonical workflow index
   - worktree の scope drift と cleanup risk を確認
 - `experiment-lifecycle`
   - 単一 run と review / rerun 分岐
+- `computational-optimization`
+  - 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約
 - `adaptive-improvement-loop`
   - 実験、調査、チューニング、比較改善の outer loop
 - `literature-survey`
   - 先行研究、関連文献、反証候補の整理
+- `formal-proof-workflow`
+  - 自然言語 claim から形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence を作る
 - `research-workflow`
   - 外部調査、比較設計、run loop、decision state の整理
 - `comprehensive-development`

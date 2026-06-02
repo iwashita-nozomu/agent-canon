@@ -51,6 +51,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
   - skill family の機械可読カタログ
 - [skills/literature-survey.md](skills/literature-survey.md)
   - 文献調査と先行研究整理の入口
+- [skills/formal-proof-workflow.md](skills/formal-proof-workflow.md)
+  - 自然言語 claim から形式証明 scaffold と checker evidence へ進む入口
 - [skills/research-workflow.md](skills/research-workflow.md)
   - 研究系変更の outer loop
 - [skills/adaptive-improvement-loop.md](skills/adaptive-improvement-loop.md)
@@ -117,6 +119,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 ```text
 $repo-onboarding
 $research-workflow
+$formal-proof-workflow
 $adaptive-improvement-loop
 $paper-writing
 ```

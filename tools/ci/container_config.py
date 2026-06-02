@@ -486,6 +486,9 @@ def validate_generate_runtime_compose_script(devcontainer_dir: Path) -> list[Fin
         "default_project_name",
         "agent-canon-source-only",
         "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+        "AGENT_CANON_SECRET_DIR",
+        "AGENT_CANON_SECRET_MOUNT",
+        "AGENT_CANON_SECRET_DIR_MODE",
         "vendor/agent-canon",
     ):
         findings.extend(validate_generate_runtime_compose_snippet(script, snippet))

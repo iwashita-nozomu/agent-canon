@@ -57,12 +57,9 @@ run_direct_agent_checks() {
   fi
   python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/evaluate_codex_agent_roles.py \
-    --compact-out reports/agent-eval-runs/agent-canon-agent-checks/codex-agent-role-compact.json
+  python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-    --manifest agents/evals/skill_workflow_prompt_eval.toml \
-    --compact-out reports/agent-eval-runs/agent-canon-agent-checks/skill-workflow-prompt-compact.json
+  python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml --accumulate
   python3 tools/agent_tools/check_convention_compliance.py
 }
 

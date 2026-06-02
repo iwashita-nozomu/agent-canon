@@ -96,6 +96,16 @@ required_regex = [
 ]
 
 [[evals.checklist]]
+id = "REPORT-CHECKLIST-4B"
+critical = true
+description = "Checklist covers Mermaid or an explicit alternative for nontrivial reader-facing flow structure."
+required_regex = [
+  "Mermaid diagram",
+  "process, dependency, ownership, routing, state, review-gate",
+  "table or text-only outline",
+]
+
+[[evals.checklist]]
 id = "REPORT-CHECKLIST-5"
 critical = true
 description = "Checklist covers reader interpretation guidance for evaluation and experiment reports."

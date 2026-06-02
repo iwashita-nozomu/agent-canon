@@ -31,6 +31,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 - section order、reader path、source map、invalid interpretation が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph flow や transition choice が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile general` または `--profile academic-argument` を使う
 - prose graph handoff がある場合は、diagnostics / explanation / integration plan を section order、paragraph bridge、split / merge の evidence として使う
+- process、dependency、ownership、routing、state transition、review gate、multi-step flow が読者理解の中心なら、`structure-planning` の `visual_plan` で Mermaid 図を既定候補にし、Markdown 内に fenced `mermaid` block として残す
 - 見出し列を roadmap として先に作る
 - section ごとに `focus`、`purpose`、`support` を固定する
 - draft 後に reverse outline を取る
@@ -43,6 +44,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 
 1. `summary statement` を短く書く
 1. 必要なら `structure-planning` で first section、source-to-structure map、section order、invalid interpretation を固定する
+1. workflow、dependency、ownership、routing、state、review gate、handoff の説明がある場合は、first visual として Mermaid 図を置くか、`visual_plan=text-only` の理由を残す
 1. paragraph order / transition evidence が必要なら discourse-relations JSONL を構造 contract に添付する
 1. roadmap と section contract を作る
 1. 必要なら `python3 tools/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす

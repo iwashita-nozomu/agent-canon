@@ -65,6 +65,10 @@ Before drafting, fix these inputs:
 - structure contract: required when the report has a nontrivial reader
   structure; use `structure-planning` to fix first artifact, source-to-section
   map, metric contract, section order, and invalid interpretations
+- visual plan: for reports that explain workflow, dependency, ownership,
+  routing, state, review gate, handoff, or multi-step evidence flow, use
+  `structure-planning` to decide whether the first visual should be a Mermaid
+  diagram, table, or text-only outline
 
 ## Report Quality Checklist
 
@@ -87,6 +91,9 @@ Use this checklist before publishing or handing off a reader-facing report:
   overwritten.
 - [ ] The report does not become a second policy truth surface. Any rule change
   is routed to the canonical skill, workflow, tool, document, or issue.
+- [ ] Nontrivial process, dependency, ownership, routing, state, review-gate, or
+  multi-step evidence flow is shown with a Mermaid diagram, or the source packet
+  explains why a table or text-only outline is clearer.
 
 ## Required Structure
 
@@ -109,6 +116,11 @@ inference label, or a stated limitation. If the structure contract records
 `discourse_relations=<path>`, use that JSONL as paragraph-order and transition
 evidence; do not treat discourse edge scores as source evidence for factual
 claims.
+
+When a report uses Mermaid, keep the diagram source in a fenced `mermaid` block
+inside the Markdown report or the source artifact that renders the report. The
+diagram must have nearby prose that names the question it answers and the
+constraints it does not represent.
 
 ## Review Route
 

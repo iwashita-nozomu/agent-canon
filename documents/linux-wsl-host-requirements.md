@@ -32,6 +32,8 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
   - `/mnt/l/workspace`
 - optional local bare mirror root:
   - `/mnt/git`
+- optional confidential local Git / secret root:
+  - configured per shell with `AGENT_CANON_SECRET_DIR`
 
 `/mnt/git` は互換 mirror / proposal target の既定 path です。
 GitHub canonical remote と AgentCanon submodule pin が source of truth であり、local mirror を使わない repo では `/mnt/git` を必須にしません。
@@ -42,6 +44,9 @@ GitHub canonical remote と AgentCanon submodule pin が source of truth であ�
 - Docker state と build cache を Linux filesystem 側に置く
 - `~/.codex/` と `~/.ssh/` を Linux 側 home に持つ
 - GitHub CLI を host 側で認証し、`~/.config/gh/` を Linux 側 home に持つ
+- confidential な local Git repo や operator-local material は repository
+  tree ではなく host 側 directory に置き、必要な session だけ
+  `AGENT_CANON_SECRET_DIR` で dev container へ渡す
 - SSH agent を使う場合は `SSH_AUTH_SOCK` が現在の shell で有効な socket を指す
 - `git config user.name` と `git config user.email` を設定する
 - `rg` を入れる
@@ -87,6 +92,8 @@ dev container は `.devcontainer/` を使います。起動時に generated comp
 - `/mnt/git` があれば bind mount
 - `~/.codex`、`~/.config/gh`、`~/.ssh` があれば bind mount
 - `SSH_AUTH_SOCK` が有効なら agent socket を forward
+- `AGENT_CANON_SECRET_DIR` が既存 directory を指すときだけ、既定では
+  `/mnt/agent-canon-secrets` へ read-only mount
 - subnet / gateway は固定せず、Docker Compose の default network 自動割当に任せる
 
 で動きます。
@@ -112,6 +119,10 @@ GPU が無いこと自体を failure 条件にしません。
 - `~/.ssh` は read-only mount 前提なので、key 追加や GitHub host key 登録は host 側で行います
 - GitHub canonical remote と AgentCanon submodule を使う前提なので、host から GitHub へ到達できることを確認します
 - local bare mirror を併用する repo だけ、host から対象 repository の bare remote と `/mnt/git/agent-canon.git` へ到達できることを確認します
+- confidential local Git remote を dev container から使う場合は、起動前に
+  `AGENT_CANON_SECRET_DIR` と、書き込みが必要なときだけ
+  `AGENT_CANON_SECRET_DIR_MODE=rw` を設定します。container 側 path は
+  `AGENT_CANON_SECRET_MOUNT` で上書きできます。
 
 ## 9. 最低限の初期確認
 
@@ -124,6 +135,7 @@ docker version
 gh auth status
 ssh -T git@github.com
 test -d /mnt/git || true
+test -z "${AGENT_CANON_SECRET_DIR:-}" || test -d "$AGENT_CANON_SECRET_DIR"
 git status --short
 make ci-quick
 make docker-build-check
@@ -140,6 +152,8 @@ docker context ls
 
 - workspace は Linux filesystem 側に置く
 - local bare mirror を使う場合は `/mnt/git` に集約する
+- confidential local Git repo や secret material は repo tree に置かず、
+  `AGENT_CANON_SECRET_DIR` で明示した host directory に置く
 - `docker` state、Codex state、SSH key は Linux 側に置く
 - template の canonical docs は host-global install を正本にしない
 

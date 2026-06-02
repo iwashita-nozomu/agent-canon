@@ -197,6 +197,26 @@ entries:
     tests:
       - tests/agent_tools/test_classify_path_risk.py
 
+  - id: formal-proof
+    summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
+    path: tools/agent_tools/formal_proof.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/formal_proof.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/formal_proof.md
+      - agents/skills/formal-proof-workflow.md
+      - references/agent-canon-technology-bibliography.md
+    tests:
+      - tests/agent_tools/test_formal_proof.py
+
   - id: repo-structure-contract
     summary: Compares an observed repository tree with the AgentCanon structure contract.
     path: tools/agent_tools/repo_structure_contract.py
@@ -316,12 +336,12 @@ entries:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
 
   - id: runtime-log-archive-git
-    summary: Manages the external runtime log archive clone, including hook/eval import, agent report snapshots, and log branch pushes.
+    summary: Ensures, imports, syncs, commits, and pushes AgentCanon runtime logs and agent reports to the external log archive.
     path: tools/agent_tools/runtime_log_archive_git.py
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+    command: python3 tools/agent_tools/runtime_log_archive_git.py sync
     writes: true
     default_wiring:
       ci: false

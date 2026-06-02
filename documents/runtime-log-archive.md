@@ -7,6 +7,7 @@ downstream implementation ../tools/agent_tools/runtime_log_paths.py resolves arc
 downstream implementation ../tools/agent_tools/runtime_log_archive_git.py manages clone, branch, status, and push operations
 downstream design runtime-log-archive-migration.md documents in-tree hook JSONL migration into the archive
 downstream implementation ../.codex/hooks/log_archive_mount_warning.py warns when the archive mount is absent
+downstream implementation ../.codex/hooks/runtime_log_auto_sync.py runs best-effort Stop-time archive sync
 downstream implementation ../.codex/hooks/hook_event_log.py writes hook JSONL into the archive
 downstream implementation ../tools/agent_tools/eval_accumulation_check.py validates archive JSONL and eval reports when mounted
 downstream implementation ../tools/agent_tools/generate_agent_improvement_guide.py reads mounted archive JSONL and eval reports
@@ -74,6 +75,12 @@ Codex runtime summary exporters use:
 .agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl
 ```
 
+Agent run reports use:
+
+```text
+.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/
+```
+
 `<repo-key>` is derived from the source repository root name plus a short hash.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
 devcontainer/Compose metadata, or the existing host/repo fallback.
@@ -127,6 +134,27 @@ Codex runtime summaries are derived from the local Codex runtime state
 (`history.jsonl`, `logs_2.sqlite`, and optional legacy session JSONL). They
 store bounded counters, token observations, and runtime attribution only; prompt
 text and raw tool output stay out of the archive.
+
+Normal unattended operation uses one command:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py sync
+```
+
+`sync` ensures the archive clone, copies current `reports/agents/` run bundles
+to `agent-reports/<repo-key>/`, stages hook JSONL, eval reports, Codex runtime
+summaries, and agent reports, then commits and pushes the source repository's
+`logs/<repo-key>` branch. It skips `.active_run`, cache files, Python cache
+directories, and oversized single files. The source repo's ignored
+`reports/agents/` directory remains run-local working evidence; the log archive
+is the durable accumulated store.
+
+`hooks/runtime_log_auto_sync.py` runs the same `sync` path from the Codex Stop
+hook on a best-effort, fail-open basis. It emits no output on success and does
+not block repository work on network, SSH, or archive availability failures.
+Use `AGENT_CANON_DISABLE_RUNTIME_LOG_AUTO_SYNC=1` to disable it for explicit
+hook-development tests, or `AGENT_CANON_RUNTIME_LOG_AUTO_SYNC_NO_PUSH=1` to copy
+artifacts locally without pushing.
 
 ## Legacy In-Tree Migration
 
