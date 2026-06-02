@@ -40,6 +40,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`
      - iterative tuning or backlog-driven empirical improvement -> `$adaptive-improvement-loop`
+     - optimizer, solver, preconditioner, gradient, Jacobian, Hessian, KKT, convergence, tolerance, numerical benchmark, or numerical-test diagnosis -> `$computational-optimization`
      - code-improvement hypothesis, cause analysis, hypothesis validation, fix-surface selection, multi-candidate comparison, change-impact packet creation, or repair-planning/subagent handoff context -> `$dependency-analysis` plus `agents/workflows/hypothesis-validation-workflow.md` as an overlay when a cause hypothesis is involved
      - Markdown file edits, docs lint/link/heading repair, docs-check failures, or Markdown style drift -> `$md-style-check`
      - accumulated skill/tool/workflow/hook/eval log analysis, routing misses, selection gaps, or weak-skill diagnosis -> `$agent-log-analysis`

@@ -57,6 +57,8 @@ upstream design README.md canonical workflow index
   - worktree の scope drift と cleanup risk を確認
 - `experiment-lifecycle`
   - 単一 run と review / rerun 分岐
+- `computational-optimization`
+  - 数値最適化、solver、preconditioner、収束、derivative、KKT、tolerance、benchmark の数学契約と検証契約
 - `adaptive-improvement-loop`
   - 実験、調査、チューニング、比較改善の outer loop
 - `literature-survey`
