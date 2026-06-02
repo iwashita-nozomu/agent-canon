@@ -184,7 +184,7 @@ artifact skills.
   - `import_responsibility.py` は Python import を AST で読み、未使用 alias、wildcard import、local file に解決できる import の responsibility-scope 越境を検査します。`responsibility-scope.toml` の `[[import_rule]]` が source scope から import 可能な target scope の正本です。
   - `issue_sync.py` は `issues/open|closed/` の required field、status、filename、closed issue の `resolved_by`、任意の `github_issue:` mirror field を検査し、GitHub Issue 作成 plan を出します。
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
-  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / push 操作を担当します。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
+  - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の `logs/<repo-key>` branch にまとめて commit / push する通常経路です。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
   - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
@@ -375,12 +375,17 @@ When a run uses skills, prompt eval evidence is required. Run
 Hook outcomes and accumulated eval reports live in the mounted runtime log archive.
 Hook JSONL uses
 `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
-and eval reports use `.agent-canon/log-archive/eval-results/<family>/` by
+eval reports use `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime
+summaries use `.agent-canon/log-archive/codex-runtime/<repo-key>/`, and agent run
+reports use `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
 rules live in `documents/runtime-log-archive.md`, and
 `tools/agent_tools/runtime_log_archive_git.py` is the normal helper for
-`ensure`, `status`, `import-legacy`, `import-eval-results`, and `push`.
+`ensure`, `status`, `import-legacy`, `import-eval-results`,
+`archive-agent-reports`, `sync`, and `push`. The Codex Stop hook calls `sync`
+best-effort, so normal runtime log and report accumulation does not require an
+agent to remember a separate push step.
 Temporary local hook output
 belongs in `reports/hooks/` only when a task explicitly overrides the destination
 with `AGENT_CANON_HOOK_RESULTS_DIR`, `AGENT_CANON_OOP_HOOK_LOG_PATH`, or

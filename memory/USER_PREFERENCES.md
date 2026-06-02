@@ -156,6 +156,9 @@ upstream design README.md memory surface index
 - 2026-05-31 | PDIPM/KKT diagnostics must not use KKT solve accuracy, residual tolerance, or direction acceptance as the fix axis; focus on the mathematical reconstruction of the full Newton update direction from the reduced KKT solution.
   - source: chat
 
+- 2026-06-01 | Reader-facing documents, reports, workflow guides, and plans should actively use Mermaid diagrams for nontrivial process, dependency, ownership, routing, state, or review-gate structure when the diagram adds reader value.
+  - source: chat
+
 ## Promotion Candidates
 
 - まだなし
