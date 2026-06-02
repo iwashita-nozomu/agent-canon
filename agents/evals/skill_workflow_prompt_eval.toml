@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 39
+expected_count = 40
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 61
+expected_count = 62
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -89,7 +89,7 @@ forbidden_regex = [
 [[evals]]
 id = "all-claude-skill-mirrors"
 target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 39
+expected_count = 40
 kind = "skill"
 description = "Every Claude skill mirror must remain loadable and dependency-linked."
 
