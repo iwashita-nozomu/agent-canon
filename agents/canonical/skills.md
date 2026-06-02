@@ -63,6 +63,8 @@ upstream design README.md canonical workflow index
   - 実験、調査、チューニング、比較改善の outer loop
 - `literature-survey`
   - 先行研究、関連文献、反証候補の整理
+- `formal-proof-workflow`
+  - 自然言語 claim から形式証明 obligation、既存 proof 検索、proof assistant scaffold、checker evidence を作る
 - `research-workflow`
   - 外部調査、比較設計、run loop、decision state の整理
 - `comprehensive-development`

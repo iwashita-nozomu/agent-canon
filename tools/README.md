@@ -18,6 +18,7 @@ downstream implementation agent_tools/search.py coordinates purpose-based search
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation agent_tools/evaluate_report_quality.py runs report quality evals
 downstream implementation agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
+downstream implementation agent_tools/formal_proof.py builds formal-proof scaffold plans
 @dependency-end
 -->
 
@@ -63,6 +64,7 @@ python3 tools/agent_tools/parent_repo_readiness.py
 python3 tools/agent_tools/repo_structure_contract.py
 python3 tools/agent_tools/render_dependency_manifest_graph.py
 python3 tools/agent_tools/classify_path_risk.py
+python3 tools/agent_tools/formal_proof.py --help
 python3 tools/agent_tools/issue_sync.py
 python3 tools/agent_tools/eval_accumulation_check.py
 python3 tools/agent_tools/runtime_log_archive_git.py status
@@ -104,6 +106,10 @@ unexpected top-level severity.
 `check_dependency_graph.sh --graph-tsv` into Markdown and DOT review artifacts.
 `classify_path_risk.py` maps changed paths to runtime profiles and targeted
 validation checks; the manual GitHub smoke workflow uses the same classifier.
+`formal_proof.py` converts natural-language mathematical claims into
+unverified proof plans, existing-proof search queries, target-language theorem
+scaffolds, and checker commands. It never upgrades a claim to verified without
+proof-assistant evidence.
 `issue_sync.py` validates `issues/open|closed/` offline, prints a deterministic
 GitHub Issue creation plan for local issues that do not yet have a
 `github_issue:` mirror field, and can run read-only GitHub mirror drift checks
@@ -169,6 +175,7 @@ artifact skills.
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
   - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
+  - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `tool_catalog.py` は `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を検査し、canonical tool、compatibility wrapper、retired legacy path、tool-doc 対応のずれを止めます。
   - `tool_drift.py` は dependency manifest を trace map として使い、tool / workflow / PR checklist / convention docs の抜け漏れを検出します。
   - `responsibility_scope.py` は top-level `responsibility-scope.toml` を検査し、runtime、issues、eval、tooling、GitHub surface、vendor skill の owner class と protecting tool を固定します。
