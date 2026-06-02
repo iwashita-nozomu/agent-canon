@@ -347,6 +347,85 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
 
+    def test_archive_agent_report_snapshots_run_bundle_and_pushes(self) -> None:
+        """archive-agent-report should copy a run bundle into agent-reports."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+
+            report_dir = source / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_dir / "verification.txt").write_text("status=pass\n", encoding="utf-8")
+            (report_dir / "work_log.md").write_text("# Work Log\n\n- done\n", encoding="utf-8")
+
+            archived = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(report_dir),
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(archived.returncode, 0, archived.stdout + archived.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass", archived.stdout)
+            snapshot_line = next(
+                line
+                for line in archived.stdout.splitlines()
+                if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
+            )
+            snapshot = snapshot_line.split("=", 1)[1]
+            archive = mounted_log_archive_root(canon) / "agent-reports" / key / "run-1" / snapshot
+            self.assertTrue((archive / "verification.txt").exists())
+            self.assertTrue((archive / "archive_manifest.json").exists())
+            index_path = mounted_log_archive_root(canon) / "agent-reports" / key / "index.jsonl"
+            first_index = index_path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(first_index), 1)
+
+            archived_again = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(report_dir),
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(archived_again.returncode, 0, archived_again.stdout + archived_again.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", archived_again.stdout)
+            self.assertEqual(index_path.read_text(encoding="utf-8").splitlines(), first_index)
+
+            pushed = self.run_tool(
+                "push",
+                "--message",
+                "Archive agent report",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
+            remote_tree = subprocess.run(
+                [
+                    "git",
+                    "--git-dir",
+                    str(remote),
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    f"logs/{key}",
+                    "--",
+                    "agent-reports",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("agent-reports", remote_tree.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

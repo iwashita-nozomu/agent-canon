@@ -15,6 +15,7 @@
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
+# upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../rust/agent-canon/src/local_llm.rs validates Rust local LLM CLI routing
@@ -155,12 +156,6 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_codex_agent_roles.py --accumulate 2>&1; then
-  echo "✅ Codex agent role eval 成功"
-else
-  echo "❌ Codex agent role eval 失敗"
-  EXIT_CODE=1
-fi
 if "$PYTHON_BIN" tools/agent_tools/check_dependency_headers.py --changed 2>&1; then
   echo "✅ dependency header checks 成功"
 else
@@ -247,6 +242,18 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
+if "$PYTHON_BIN" tools/agent_tools/run_accumulated_agent_evals.py --run-id run-all-checks 2>&1; then
+  echo "✅ accumulated agent eval producers 成功"
+else
+  echo "❌ accumulated agent eval producers 失敗"
+  EXIT_CODE=1
+fi
+if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
+  echo "✅ eval accumulation checks 成功"
+else
+  echo "❌ eval accumulation checks 失敗"
+  EXIT_CODE=1
+fi
 if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
   echo "✅ Rust format checks 成功"
 else
@@ -263,30 +270,6 @@ if cargo test --manifest-path "$AGENT_CANON_CARGO_MANIFEST" 2>&1; then
   echo "✅ Rust tests 成功"
 else
   echo "❌ Rust tests 失敗"
-  EXIT_CODE=1
-fi
-if tools/bin/agent-canon local-llm eval --accumulate 2>&1; then
-  echo "✅ local LLM responsibility eval checks 成功"
-else
-  echo "❌ local LLM responsibility eval checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_workflow_selection.py --accumulate 2>&1; then
-  echo "✅ workflow selection eval checks 成功"
-else
-  echo "❌ workflow selection eval checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" tools/agent_tools/evaluate_report_quality.py --accumulate 2>&1; then
-  echo "✅ report quality eval checks 成功"
-else
-  echo "❌ report quality eval checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" tools/agent_tools/eval_accumulation_check.py 2>&1; then
-  echo "✅ eval accumulation checks 成功"
-else
-  echo "❌ eval accumulation checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" tools/ci/check_github_workflows.py 2>&1; then

@@ -9,7 +9,7 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/c
 downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
 downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
@@ -51,7 +51,11 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/eval_accumulation_check.py`
   - mounted runtime log archive の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。source tree の `agents/evals/results/` は正規の読み書き場所ではありません。
 - `tools/agent_tools/runtime_log_archive_git.py`
-  - mounted log archive の ensure / status / import / push 操作を担当します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
+  - mounted log archive の ensure / status / import / agent report archive / push 操作を担当します。`archive-agent-report --report-dir reports/agents/<run-id>` は run bundle を `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` に snapshot し、`index.jsonl` を機械的に追記します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
+- `tools/agent_tools/run_accumulated_agent_evals.py`
+  - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は `reports/agent-eval-runs/<run-id>/` に退避します。PR / CI gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
+- `tools/agent_tools/github_publish.py`
+  - `gh` で GitHub repo を確認し、`origin` が同じ `owner/name` を指す場合だけ branch push、PR create/update、PR checks を実行します。`--user-task` は必須で、literal URL push、remote 推測、`.git/config` fallback は使いません。GitHub publish / PR evidence はこの tool と PR gate の責務であり、非重大 hook finding では止めません。
 - `tools/agent_tools/repo_structure_contract.py`
   - `documents/repo-structure-contract.toml` を正本にして、top-level から `tree -a -J` で取得した directory / file 構成を AgentCanon-supported profile と比較します。保存済み `tree -J` JSON も `--tree-json` で読めます。期待 path、ignore、profile detection、unexpected top-level severity は tool code ではなく TOML contract から解決します。
 - `tools/agent_tools/render_dependency_manifest_graph.py`
@@ -327,9 +331,10 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
   - MCP 経由で `goal_loop.py status` を返し、`NEXT_ACTION=run_next_iteration` / `NEXT_ACTION=close_goal_loop` を adaptive loop の機械 gate にします。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
-  - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-reports|push` を使います。
+  - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-report|archive-agent-reports|push` を使います。
   - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
+  - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、local LLM、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
   - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。
   - `evaluate_workflow_selection.py` は `agents/evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/log-archive/eval-results/workflow-selection/` に詳細結果を蓄積します。
   - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` narrow implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。agent-facing run では `--compact-out <path>.json` を使い、model matrix と finding detail は artifact で読む運用にします。
@@ -364,7 +369,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/experiments/update_latest_result.py`
   - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
 - `tools/push_origin.sh`
-  - commit 後の canonical push 入口です。
+  - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
 
 ## 結果ログと可視化
 

@@ -1,80 +1,31 @@
 #!/usr/bin/env bash
 # @dependency-start
-# responsibility Provides push origin repository automation.
-# upstream design README.md shared automation index
+# responsibility Retires the former shell Git push implementation in favor of the gh-backed publish tool.
+# upstream implementation agent_tools/github_publish.py publishes GitHub branches and pull requests.
+# upstream design ../agents/workflows/agent-canon-pr-workflow.md defines the canonical publish route.
+# upstream design ../documents/tools/github_publish.md documents the replacement command.
 # @dependency-end
 
 set -euo pipefail
 
-WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$WORKSPACE_ROOT"
+cat >&2 <<'EOF'
+tools/push_origin.sh no longer performs GitHub publish work.
 
-ALLOW_DIRTY=0
-TARGET_BRANCH=""
+Use the gh-backed tool instead, and pass the current user task explicitly:
 
-show_help() {
-  cat <<'EOF'
-Usage: bash tools/push_origin.sh [OPTIONS]
+  python3 tools/agent_tools/github_publish.py push \
+    --user-task "<current user task>" \
+    --repo <owner/name>
 
-Push the current branch to origin as the canonical remote reflection step.
+For PR work:
 
-Options:
-  --branch <name>   Push the specified local branch instead of the current branch
-  --allow-dirty     Allow push even when the worktree is not clean
-  -h, --help        Show this help
+  python3 tools/agent_tools/github_publish.py publish-pr \
+    --user-task "<current user task>" \
+    --repo <owner/name> \
+    --title "<title>" \
+    --body-file <body.md>
+
+This entrypoint intentionally has no fallback push route.
 EOF
-}
 
-require_value() {
-  local option_name="$1"
-  if [[ $# -lt 2 || -z "${2:-}" ]]; then
-    echo "Missing value for ${option_name}" >&2
-    exit 1
-  fi
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --branch)
-      require_value "$1" "${2:-}"
-      TARGET_BRANCH="$2"
-      shift 2
-      ;;
-    --allow-dirty)
-      ALLOW_DIRTY=1
-      shift
-      ;;
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      show_help >&2
-      exit 1
-      ;;
-  esac
-done
-
-if [[ -z "$TARGET_BRANCH" ]]; then
-  TARGET_BRANCH="$(git symbolic-ref --quiet --short HEAD)" || {
-    echo "Detached HEAD is not allowed. Check out a branch before pushing." >&2
-    exit 1
-  }
-fi
-
-if [[ "$ALLOW_DIRTY" -eq 0 ]] && [[ -n "$(git status --short --untracked-files=all)" ]]; then
-  echo "Worktree is not clean. Commit artifacts, explicitly stash non-artifact local changes, or pass --allow-dirty before pushing." >&2
-  exit 1
-fi
-
-if [[ "$TARGET_BRANCH" == "main" ]]; then
-  echo "Pushing main to origin..."
-  git push origin main
-else
-  echo "Pushing branch '${TARGET_BRANCH}' to origin..."
-  git push -u origin "$TARGET_BRANCH"
-fi
-
-echo ""
-echo "Origin push completed."
+exit 2

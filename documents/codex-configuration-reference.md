@@ -550,6 +550,11 @@ severity rules:
 - Child `decision=block` output is downgraded to official warning context unless
   the child script is listed in `CRITICAL_BLOCKING_CHILD_HOOKS` or
   `AGENT_CANON_HOOK_STRICT_BLOCKS=1` is set for explicit enforcement tests.
+- GitPush, GitHub branch publish, safe `gh pr` create/edit/view/list/checks/comment
+  operations, and `github_publish.py` are publish/evidence work owned by the
+  GitHub publish tool and PR gate. Hook dispatcher child guards skip these
+  operations so non-critical style, OOP, log-surface, planning, or closeout
+  findings cannot block branch publication or PR evidence updates.
 - AGENTS / ROOT_AGENTS policy prose should first ask whether a rule belongs in
   a checker, warning hook, closeout gate, role TOML, workflow eval, or PR gate
   before adding more prompt-only prohibitions.
@@ -564,6 +569,9 @@ Template-specific hook behavior:
   inspection, and known validation commands including AgentCanon
   plan/status/latest-check inspection. Do not rename, move, or temporarily
   disable `hooks.json` to inspect hook state or run validation.
+- The dispatcher also bypasses child guards for GitHub publish/PR commands.
+  Publish tools must still verify the GitHub remote and user task explicitly;
+  the bypass only prevents unrelated hook findings from stopping the write.
 - `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
   reference capture checks.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,

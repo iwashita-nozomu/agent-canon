@@ -38,7 +38,11 @@ tree to both remotes.
 
 ```bash
 git fetch origin main
-git push origin main
+python3 tools/agent_tools/github_publish.py push \
+  --user-task "publish template remote migration" \
+  --repo iwashita-nozomu/project_template \
+  --branch main \
+  --allow-main
 git push local-bare main
 ```
 

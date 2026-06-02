@@ -152,14 +152,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_check_must_run_prompt_eval(self) -> None:
-        """The AgentCanon PR check must include skill/workflow prompt eval."""
+    def test_pr_check_must_run_accumulated_agent_evals(self) -> None:
+        """The AgentCanon PR check must mechanically accumulate eval reports."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml\n",
+                "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate\n",
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -170,7 +170,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
-                "missing-skill-workflow-prompt-eval",
+                "missing-accumulated-agent-eval-producer",
                 result.stdout,
             )
 
@@ -303,6 +303,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone template",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template checklist",
                     "# upstream implementation ../agent_tools/run_repo_dependency_review.sh dependency review",
+                    "# upstream implementation ../agent_tools/run_accumulated_agent_evals.py accumulated evals",
                     "# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py prompt eval",
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
@@ -311,6 +312,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
                     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+                    "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
                     "python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check",
                     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml",
@@ -324,6 +326,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "tools/agent_tools/run_repo_dependency_review.sh",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
             "tools/agent_tools/evaluate_skill_workflow_prompts.py",
             "tools/agent_tools/check_agent_runtime_alignment.py",
             "tools/agent_tools/check_convention_compliance.py",

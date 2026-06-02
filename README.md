@@ -143,6 +143,12 @@ tools/bin/agent-canon semantic-index search --root . \
 tools/bin/agent-canon semantic-index thin-docs --root . --top-k 10 --format text
 ```
 
+semantic-index の DB が無い場合は先に build します:
+
+```bash
+tools/bin/agent-canon semantic-index build --root .
+```
+
 JSON が必要な場合でも full dump をそのまま読まず、`--top-k` を小さくし、
 `--format jsonl` で必要 field だけ扱います。旧 `vector_search.py` は軽量な
 互換 helper として残っていますが、新しい検索導線の正本ではありません。

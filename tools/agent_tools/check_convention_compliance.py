@@ -183,11 +183,11 @@ TOOL_GATES = {
 AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
 AGENT_CANON_PUSH_REMOTE_MARKERS = (
     "remote_verified=yes",
-    "git status --short --branch",
-    "git remote -v",
-    r"git config --get-regexp '^remote\\..*\\.url$'",
-    ".git/config",
-    "literal URL push",
+    "tools/agent_tools/github_publish.py",
+    "gh repo view",
+    "git remote get-url origin",
+    "NEXT_ACTION=fix_origin_remote_or_pass_the_correct_--repo_without_fallback_push",
+    "literal URL push is not a standard route",
     "hardcoded repository name",
 )
 

@@ -90,6 +90,10 @@ directly from inside a container and tunneling to the container IP.
   and local notebook checkpoints are cleanup targets before closeout.
 - If a generated artifact is needed for review but should not be tracked, put
   its path and checksum in `verification.txt` or the experiment report.
+- If a run-local `reports/agents/<run-id>/` bundle is needed after the current
+  task, archive it mechanically with `runtime_log_archive_git.py
+  archive-agent-report`; do not create a hand-written duplicate report in the
+  source tree.
 
 ## Closeout Evidence
 

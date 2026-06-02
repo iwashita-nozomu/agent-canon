@@ -60,7 +60,8 @@ python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
 ```
 
 When a run uses skills, run the same prompt eval with accumulated evidence.
-Detailed reports are stored in the mounted runtime log archive under
+Detailed reports are tool-written, not agent-authored prose, and are stored in
+the mounted runtime log archive under
 `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` and are never
 overwritten during normal agent work:
 
@@ -122,8 +123,9 @@ Hook and tool outcomes must also close the protocol feedback loop. Record
 `protocol_feedback_reason=...` so the run shows whether parent workflow rules,
 subagent handoff rules, role TOML, evals, or memory changed because of the
 observed results.
-Hook outcomes and accumulated eval reports use the external runtime log archive
-documented in `documents/runtime-log-archive.md`. Hook entries carry unique
+Hook outcomes, accumulated eval reports, Codex runtime summaries, and archived
+agent run-bundle snapshots use the external runtime log archive documented in
+`documents/runtime-log-archive.md`. Hook entries carry unique
 `hook_run_id` values. Normal hook writers shard JSONL files by source repo key
 and runtime namespace under
 `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`
@@ -132,12 +134,22 @@ conflicting AgentCanon source-tree filename. AgentCanon source does not keep an
 `agents/evals/results/` tree. Tools do not use that historical path as a normal
 read or write location; old results must be imported into the archive and
 deleted from source.
-Run `python3 tools/agent_tools/eval_accumulation_check.py --root .` before
-using accumulated evidence in a PR or guide. The gate validates directory
-mounted JSONL readability when available, every family declared in
-`eval_result_families.toml`, unique run ids, non-ignored tracked evidence
-paths, and intentionally ignored archive paths, without compacting or deleting
-archive results.
+Run the mechanical producer before using accumulated evidence in a PR or guide:
+
+```bash
+python3 tools/agent_tools/run_accumulated_agent_evals.py \
+  --root . \
+  --run-id <run-id>
+python3 tools/agent_tools/eval_accumulation_check.py --root .
+```
+
+The producer runs the registered role, skill/workflow prompt, local LLM,
+workflow-selection, and report-quality evals with `--accumulate`; stdout/stderr
+go to `reports/agent-eval-runs/<run-id>/`. Agents do not hand-generate these
+reports. The gate validates directory mounted JSONL readability when available,
+every family declared in `eval_result_families.toml`, unique run ids,
+non-ignored tracked evidence paths, and intentionally ignored archive paths,
+without compacting or deleting archive results.
 Local LLM responsibility prompt evals are configured separately:
 
 ```bash

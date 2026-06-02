@@ -27,6 +27,7 @@ DISPATCHER_DIR_ENV = "AGENT_CANON_HOOK_DISPATCHER_DIR"
 GIT_ROOT_TIMEOUT_SECONDS = 5
 MAX_REASON_LINES = 20
 READ_ONLY_TOOL_NAMES = {"gitstatus", "read", "grep", "glob", "list", "ls"}
+PUBLISH_TOOL_NAMES = {"gitpush", "githubpublish", "githubpr", "pullrequest"}
 SAFE_GIT_GLOBAL_OPTIONS_WITH_VALUES = {
     "-C",
     "-c",
@@ -41,6 +42,7 @@ SAFE_GIT_GLOBAL_OPTION_PREFIXES = (
 )
 SHELL_COMPOUND_MARKERS = ("\n", "&&", "||", ";", "|", "`", "$(", ">", "<")
 READ_ONLY_COMMANDS = {"cat", "head", "tail", "wc", "ls", "pwd", "nl", "stat", "rg", "grep"}
+SAFE_GH_PR_SUBCOMMANDS = {"checks", "comment", "create", "edit", "list", "view"}
 STRICT_BLOCKS_ENV = "AGENT_CANON_HOOK_STRICT_BLOCKS"
 STRICT_FAILURES_ENV = "AGENT_CANON_HOOK_STRICT_FAILURES"
 # Most policy hooks are advisory by default so a bad guardrail cannot freeze
@@ -372,6 +374,30 @@ def read_only_shell_command(command: str) -> bool:
     return tokens[0] in READ_ONLY_COMMANDS
 
 
+def publish_shell_command(command: str) -> bool:
+    """Return whether a Bash command is a GitHub publish/PR operation.
+
+    Publish operations are owned by `github_publish.py` and PR workflow gates,
+    not by edit-time guard hooks. This keeps hook findings from blocking branch
+    publication while preserving explicit tool-level remote verification.
+    """
+    git_tokens = git_subcommand_tokens(command)
+    if git_tokens and git_tokens[0] == "push":
+        return True
+    tokens = simple_shell_tokens(command)
+    if not tokens:
+        return False
+    if tokens[0] == "gh" and len(tokens) >= 3 and tokens[1] == "pr":
+        return tokens[2] in SAFE_GH_PR_SUBCOMMANDS
+    if tokens[0] in {"python", "python3"} and len(tokens) >= SCRIPT_MIN_TOKENS:
+        script = Path(tokens[SCRIPT_PATH_INDEX])
+        return script.as_posix() == "tools/agent_tools/github_publish.py"
+    if tokens[0] == "bash" and len(tokens) >= SCRIPT_MIN_TOKENS:
+        script = Path(tokens[SCRIPT_PATH_INDEX])
+        return script.as_posix() == "tools/push_origin.sh"
+    return False
+
+
 def read_only_sed_arguments(arguments: tuple[str, ...]) -> bool:
     """Return whether `sed` arguments are limited to range printing."""
     if any(sed_in_place_argument(argument) for argument in arguments):
@@ -455,10 +481,11 @@ def validation_command(command: str) -> bool:
 def bypass_child_guards_payload(raw_payload: bytes) -> bool:
     """Return whether this hook payload should skip child guard execution."""
     payload = json_payload(raw_payload)
-    if compact_tool_name(tool_name(payload)) in READ_ONLY_TOOL_NAMES:
+    compact_name = compact_tool_name(tool_name(payload))
+    if compact_name in READ_ONLY_TOOL_NAMES or compact_name in PUBLISH_TOOL_NAMES:
         return True
     command = tool_command(payload)
-    return read_only_shell_command(command) or validation_command(command)
+    return read_only_shell_command(command) or validation_command(command) or publish_shell_command(command)
 
 
 def env_truthy(name: str) -> bool:

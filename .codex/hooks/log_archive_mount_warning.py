@@ -93,7 +93,7 @@ def warning_payload(status: str, archive: Path, root: Path) -> dict[str, object]
         "reason": (
             "AgentCanon log archive mount is not ready "
             f"(LOG_ARCHIVE_MOUNT_STATUS={status}, path={archive}). "
-            "Before accumulating hook/eval logs, mount or ensure the shared log archive."
+            "Before accumulating hook/eval/report logs, mount or ensure the shared log archive."
         ),
         "next_action": "ensure_agent_canon_log_archive_mount_before_accumulating_logs",
         "remediation": [

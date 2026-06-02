@@ -18,6 +18,7 @@ rust/agent-canon/target/
 
 # Local run artifacts
 reports/agents/
+reports/agent-eval-runs/
 reports/agent-improvement-guide/
 reports/dependency-review/
 reports/hooks/
