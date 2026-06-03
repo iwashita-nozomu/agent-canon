@@ -159,6 +159,12 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User objected to adding _Nested* test-only amp.Info/Config classes and pointed out that unit and integration tests should be separated instead.
 
+- 2026-06-03 | interaction-observation | For repo searches, do not run broad rg -n over data-heavy trees; follow AGENTS.md by using semantic-index or rg -l to bound files first, then inspect selected files.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User pointed out direct rg prohibition after a broad rg -n hit bmu_tracked_intermediate CSV data and produced huge output.
+
 ## Task Retrospectives
 
 
