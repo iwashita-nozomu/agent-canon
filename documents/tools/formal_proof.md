@@ -87,3 +87,12 @@ The generated query files are inputs for `$formal-proof-workflow` and
 new lemmas. Verification authority remains with the target checker command
 reported in the plan, for example `lake env lean <stub>.lean`, `isabelle
 process`, `coqc`, `z3`, or `cvc5`.
+
+When a scaffold becomes a checked proof fragment, keep the package-retained
+trace current instead of leaving the evidence only in a work log. Add the
+checked theorem or solver artifact to the trace module, record the checker
+command and version, and keep any remaining implementation-instantiation
+obligations as explicit proof boundaries. Do not let a checked mathematical
+fragment imply that the corresponding runtime code path, residual unit,
+stopping guard, backend arithmetic, or final-status projection has also been
+instantiated unless that bridge is separately checked.

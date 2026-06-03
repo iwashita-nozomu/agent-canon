@@ -21,4 +21,5 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean/mathlib include docs, LeanSearch/Loogle/Moogle-style tools, Zulip archive, and in-editor tactic search when available. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or narrowing evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
+1. When a checked fragment is adopted, register it in the package-retained proof trace with consumed fragments, checker command, and any remaining implementation-instantiation obligations instead of hiding those boundaries in prose.
 1. If the checker cannot be run, record `proof_status=not_run`, the exact command, and the missing environment or dependency.
