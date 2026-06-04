@@ -21,6 +21,7 @@
 # upstream implementation ../../.codex/hooks/codex_runtime_summary_logger.py exports bounded Codex runtime summaries
 # upstream implementation ../../.codex/hooks/runtime_log_auto_sync.py runs unattended runtime log archive sync
 # upstream implementation ../../.codex/hooks/log_archive_mount_warning.py warns when log archive is not mounted
+# upstream implementation ../../.codex/hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
 # upstream implementation ../../.codex/hooks/reference_capture_guard.py logs reference capture coverage
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py dispatches hook events and skips read-only GitStatus checks
 # @dependency-end
@@ -62,6 +63,7 @@ SKILL_USAGE_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "skill_usage_logger.py"
 CODEX_RUNTIME_SUMMARY_LOGGER = PROJECT_ROOT / ".codex" / "hooks" / "codex_runtime_summary_logger.py"
 RUNTIME_LOG_AUTO_SYNC = PROJECT_ROOT / ".codex" / "hooks" / "runtime_log_auto_sync.py"
 LOG_ARCHIVE_MOUNT_WARNING = PROJECT_ROOT / ".codex" / "hooks" / "log_archive_mount_warning.py"
+DIRECT_RG_CONTEXT_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "direct_rg_context_guard.py"
 REFERENCE_CAPTURE_GUARD = PROJECT_ROOT / ".codex" / "hooks" / "reference_capture_guard.py"
 NOTEBOOK_MAJOR_VERSION = 4
 NOTEBOOK_MINOR_VERSION = 5
@@ -389,6 +391,7 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(HOOK_DISPATCHER.exists())
         self.assertTrue(CODEX_RUNTIME_SUMMARY_LOGGER.exists())
         self.assertTrue(RUNTIME_LOG_AUTO_SYNC.exists())
+        self.assertTrue(DIRECT_RG_CONTEXT_GUARD.exists())
 
     def _dispatcher_scripts(self, event: str) -> list[str]:
         """Return the child hook scripts configured for one dispatcher event."""
@@ -444,7 +447,14 @@ class CodexHooksTest(unittest.TestCase):
         self.assertIn("apply_patch", pre_tool["matcher"])
         self.assertEqual(len(pre_tool_commands), 1)
         self.assertIn("hook_dispatcher.py", pre_tool_commands[0])
-        self.assertEqual(pre_tool_scripts, ["log_archive_mount_warning.py", "cause_investigation_guard.py"])
+        self.assertEqual(
+            pre_tool_scripts,
+            [
+                "log_archive_mount_warning.py",
+                "direct_rg_context_guard.py",
+                "cause_investigation_guard.py",
+            ],
+        )
         self.assertIn("apply_patch", post_tool["matcher"])
         self.assertIn("spawn_agent", post_tool["matcher"])
         self.assertIn("close_agent", post_tool["matcher"])
@@ -924,6 +934,90 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "")
         self.assertFalse(log_path.exists())
+
+    def test_direct_rg_context_guard_warns_on_broad_line_search(self) -> None:
+        """Broad `rg -n` should warn before dumping repository matches."""
+        commands = [
+            "rg -n duplicate .",
+            "bash -lc 'rg -n duplicate .'",
+            "true && rg -n duplicate .",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(DIRECT_RG_CONTEXT_GUARD)],
+                    cwd=PROJECT_ROOT,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+                payload = cast("dict[str, object]", json.loads(result.stdout))
+                self.assertEqual(payload["decision"], "approve")
+                self.assertIn("DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["reason"]))
+                self.assertEqual(
+                    payload["next_action"],
+                    "replace_broad_rg_with_bounded_or_compact_search",
+                )
+
+    def test_direct_rg_context_guard_allows_compact_and_bounded_searches(self) -> None:
+        """Compact discovery or bounded file searches should stay quiet."""
+        commands = [
+            "rg -l duplicate agents/skills",
+            "rg -n duplicate agents/skills",
+            "rg -n duplicate agents/skills/agent-orchestration.md",
+            "rg -n duplicate ./agents/skills/agent-orchestration.md",
+            "bash -lc 'rg -n duplicate agents/skills/agent-orchestration.md'",
+            "rg --files",
+            "rg -n --max-count 20 duplicate .",
+            "rg -n duplicate . -g '!reports/**' -g '!.agent-canon/log-archive/**' -g '!*.jsonl'",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(DIRECT_RG_CONTEXT_GUARD)],
+                    cwd=PROJECT_ROOT,
+                    input=json.dumps(
+                        {
+                            "hookEventName": "PreToolUse",
+                            "tool_name": "Bash",
+                            "tool_input": {"cmd": command},
+                        }
+                    ),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(result.stdout, "")
+
+    def test_hook_dispatcher_surfaces_direct_rg_warning(self) -> None:
+        """PreToolUse dispatcher should not bypass risky direct rg commands."""
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
+            cwd=PROJECT_ROOT,
+            input=json.dumps(
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": "rg -n duplicate ."},
+                }
+            ),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = cast("dict[str, object]", json.loads(result.stdout))
+        self.assertIn("DIRECT_RG_CONTEXT_RISK=warn", cast(str, payload["systemMessage"]))
+        self.assertIn("hookSpecificOutput", payload)
 
     def test_hook_dispatcher_skips_git_push_tool_payloads(self) -> None:
         """GitPush-style publish tools should not run blocking hook children."""

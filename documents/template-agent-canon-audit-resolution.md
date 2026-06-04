@@ -31,7 +31,7 @@ Resolution means one of:
 
 | Audit IDs | Resolution |
 | --- | --- |
-| I-001-I-010 | `profiled`: agent, Codex, Claude, MCP, memory, and shared tool views are installed capability, not project runtime requirements. |
+| I-001-I-010 | `profiled`: agent, Codex, MCP, memory, and shared tool views are installed capability, not project runtime requirements. |
 | I-011-I-020 | `profiled`: C++, experiments, reports, references, Docker, editor, server, and notebook surfaces are optional profiles. |
 | I-021-I-030 | `risk_based`: validation entrypoints are selected by changed path; `make ci` remains full confidence, not mandatory for every small edit. |
 | I-031-I-040 | `profiled`: observability, profiling, GitHub CLI, root repair, and copy sync belong to environment, GitHub, or maintenance profiles. |
@@ -51,7 +51,7 @@ Resolution means one of:
 | I-301-I-330 | `profiled`: optional tools move to maintenance, experiment, docs, or skill/vendor profiles; catalog can mark optional or maintainer-only tools. |
 | I-331-I-350 | `compatibility_only`: retired tool names and docs helpers are removed from primary guidance or kept only in historical ledgers. |
 | I-351-I-390 | `profiled`: Docker, Python environment, C++, and experiment checks are profile-specific. |
-| I-391-I-420 | `profiled`: Makefile, GitHub, Copilot, and PR authority surfaces are selected by repo capability and task scope. |
+| I-391-I-420 | `profiled`: Makefile, GitHub automation, and PR authority surfaces are selected by repo capability and task scope. |
 | I-421-I-450 | `profiled`: multi-runtime mirrors, GitHub checks, remote assumptions, and PR automation are runtime or GitHub profiles. |
 | I-451-I-500 | `profiled`: historical ledgers, memory/notes, search expansion, generated results, and strict canonical-doc rules are scoped to maintenance, learning, refactor, or audit tasks. |
 

@@ -13,7 +13,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 41
+expected_count = 42
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -38,7 +38,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 63
+expected_count = 64
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -85,31 +85,6 @@ forbidden_regex = [
   "(?i)(do not|don't|never|skip|omit)\\s+.*check_convention_compliance\\.py",
   "(?i)check_convention_compliance\\.py.*(optional|not required)",
 ]
-
-[[evals]]
-id = "all-claude-skill-mirrors"
-target_glob = ".claude/skills/*/SKILL.md"
-expected_count = 41
-kind = "skill"
-description = "Every Claude skill mirror must remain loadable and dependency-linked."
-
-[[evals.checklist]]
-id = "CLAUDE-SKILL-GENERIC-1"
-critical = true
-description = "Starts with YAML frontmatter and includes required name/description fields."
-required_regex = ["\\A---\\n", "\\nname:\\s*[-a-z0-9]+", "\\ndescription:\\s*\\S"]
-
-[[evals.checklist]]
-id = "CLAUDE-SKILL-GENERIC-2"
-critical = true
-description = "Includes dependency manifest markers near the top of the file."
-required_regex = ["@dependency-start", "@dependency-end"]
-
-[[evals.checklist]]
-id = "CLAUDE-SKILL-GENERIC-3"
-critical = true
-description = "Provides an executable numbered instruction list."
-required_regex = ["(?m)^1\\.\\s+"]
 
 [[evals]]
 id = "result-artifact-writeout-skill"
@@ -1348,24 +1323,6 @@ required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only ta
 
 [[evals.checklist]]
 id = "OOP-RUNTIME-SKILL-2"
-critical = true
-description = "Requires the final response to include the artifact path."
-required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
-
-[[evals]]
-id = "oop-readability-claude-skill-artifact"
-target = ".claude/skills/oop-readability-check/SKILL.md"
-kind = "skill"
-description = "The Claude OOP readability runtime skill mirror must create Markdown report artifacts by default."
-
-[[evals.checklist]]
-id = "OOP-CLAUDE-SKILL-1"
-critical = true
-description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
-required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
-
-[[evals.checklist]]
-id = "OOP-CLAUDE-SKILL-2"
 critical = true
 description = "Requires the final response to include the artifact path."
 required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]

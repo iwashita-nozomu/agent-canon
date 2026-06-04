@@ -136,7 +136,6 @@ bash tools/sync_agent_canon.sh check
 python3 tools/agent_tools/check_dependency_headers.py --changed
 bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
 bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
-python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
 make agent-checks
 make docs-check
 make ci-quick

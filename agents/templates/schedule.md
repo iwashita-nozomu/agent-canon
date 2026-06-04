@@ -35,7 +35,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 ## Explicit Subagents
 
-<!-- Record the concrete Codex / Claude subagents or permanent team roles used for each stage. -->
+<!-- Record the concrete Codex subagents or permanent team roles used for each stage. -->
 
 ## Reuse And Continuity Constraints
 

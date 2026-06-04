@@ -113,6 +113,10 @@ path = "../.agents/skills/md-style-check/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/mvp-skeleton/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/oop-readability-check/SKILL.md"
 enabled = true
 

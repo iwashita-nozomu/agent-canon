@@ -13,6 +13,7 @@ downstream implementation agent_tools/eval_accumulation_check.py validates eval 
 downstream implementation agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
+downstream implementation ../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
 downstream implementation agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation agent_tools/search.py coordinates purpose-based search providers
 downstream implementation agent_tools/search_index.py builds repo-local semantic search cards
@@ -77,6 +78,8 @@ python3 tools/agent_tools/evaluate_report_quality.py
 python3 tools/agent_tools/evaluate_codex_agent_roles.py
 python3 tools/agent_tools/github_publish.py --help
 python3 tools/agent_tools/prose_reasoning_graph.py --help
+agent-canon structured-analysis build --root . --profile manual
+agent-canon structured-analysis document-inventory --root .
 ```
 
 For agent-facing diagnostics, prefer compact artifact options over detailed
@@ -145,7 +148,18 @@ under `.agent-canon/log-archive/eval-results/report-quality/`.
 `prose_reasoning_graph.py` ingests Markdown/plain text into a SQLite-backed
 prose structure graph, exports diagnostics and natural-language explanations,
 and writes handoff packets for writing, review, literature, experiment, and
-artifact skills.
+artifact skills. DB creation defaults to the user-home prose graph cache and
+accepts an explicit `--db` path when a workflow needs one.
+`agent-canon structured-analysis build --root . --profile manual` rebuilds the
+SQLite intermediate representation from git-visible files into the user-home
+structured-analysis cache. It materializes an `artifact` layer and imports
+document-canon findings, then writes current warnings to `diagnostics.sqlite`
+without rewriting the repository tree.
+`agent-canon structured-analysis document-inventory --root .` is the canonical
+Rust entrypoint for document-canon inventory. It reports runtime mirrors,
+generated evidence, closed issue records, missing dependency manifests,
+duplicate headings, and stale document names, and can feed those findings into
+the structured-analysis SQLite graph through `import-document-inventory`.
 
 ## 含めるもの
 - `bin/`
@@ -174,6 +188,11 @@ artifact skills.
     `local-llm classify-responsibility` は単一 file 責務分析の canonical
     Rust CLI です。`search`、`build-index`、`eval` も同じ CLI surface から
     呼び、現在の Python engine は内部互換実装として扱います。
+    `structured-analysis build` は repo source を書き換えず、user-home
+    cache に全ファイルの中間表現 DB と warning DB を再生成します。
+    `structured-analysis document-inventory` は document-canon cleanup の
+    canonical Rust CLI です。旧 `noncanonical_document_inventory.py` は
+    caller warning 付きの legacy migration shim として残します。
     `python-structure-hash` は normalized AST duplicate、single-caller
     ownership、similar-responsibility caller evidence を Rust で検出します。
     `python-structure-hash-report` は text output を structured JSON に変換し、
@@ -204,16 +223,16 @@ artifact skills.
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
   - `file_surface_inventory.py` は root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
-  - `noncanonical_document_inventory.py` は Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補と正本候補を出します。
+  - `noncanonical_document_inventory.py` は Markdown / text 文書棚卸しの legacy migration shim です。operator は `agent-canon structured-analysis document-inventory --root .` を使います。
   - `helper_function_inventory.py` は Python helper 関数 / クラスを AST/call graph/side effect facts と domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。`redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
-  - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`.claude/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
-  - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、skill mirror sync、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。
+  - `log_surface_inventory.py` は `.codex/hooks/`、`.agents/skills/`、`agents/skills/`、`tools/` から hook / skill / tool が出力する machine-readable field を静的に棚卸しし、`documents/log-surface-inventory.json` との差分を検査します。
+  - `tool_rejection_preflight.py` は planned edit path から cause investigation、OOP readability、module boundary、library implementation、helper-first、helper inventory、dependency review、GitHub workflow、hook runtime alignment、tool catalog、agent protocol convention、log-surface inventory などの予測 reject gate を出し、parent 直編集または write-capable subagent handoff に渡す `TOOL_REJECTION_PREDICTED_GATE` 行を生成します。
   - `review_backlog_scan.sh` は file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans、semantic-index review artifacts、任意の provider-comparison artifact を run bundle へ集約します。
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
-  - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence、Copilot discovery surface を検査します。
+  - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence を検査します。
   - `container_config.py` は standalone AgentCanon では repo-local Docker absence を許容し、template / derived repo では repo-local `docker/Dockerfile` / `docker/packs/*.toml` と AgentCanon-owned `.devcontainer/` の静的整合を検査します。
   - `scan_secrets.sh` は `gitleaks`、`trufflehog`、`detect-secrets` を使って current tracked tree と git history を検査します。公開 repo 化、credential rotation、release 前 security audit で実行します。shared devcontainer の `post-create.sh` はこれら 3 scanner を `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin` と `/usr/local/bin` に入れます。
 - `docs/`
@@ -389,7 +408,8 @@ live in the mounted runtime log archive.
 Hook JSONL uses
 `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`
 eval reports use `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime
-summaries use `.agent-canon/log-archive/codex-runtime/<repo-key>/`, and agent run
+summaries use `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl`
+plus `.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl`, and agent run
 reports use `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` by
 default. The archive remote is
 `git@github.com:iwashita-nozomu/agent-canon-log.git`; mount, branch, and push
@@ -658,8 +678,8 @@ Those catalog entries are non-default: they are visible for humans and agents,
 but they do not block closeout or become `GW*` work units until copied into
 `Exit Criteria` or `Backlog` for the current objective.
 Goal setup also records `pr_mutation_authority`. The default is
-`inspect_and_prepare_only`; use `github_copilot_merge_when_green` when the user
-wants GitHub-hosted Copilot / PR automation to merge after checks pass. This
+`inspect_and_prepare_only`; use `github_pr_automation_when_green` when the user
+wants GitHub PR automation to merge after checks pass. This
 mode does not authorize local Codex to bypass checks, dismiss reviews, or hide
 merge evidence.
 
@@ -670,7 +690,7 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
 python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
 python3 tools/agent_tools/goal_loop.py init --goal-file goal.md \
   --objective "<objective>" \
-  --pr-mutation-authority github_copilot_merge_when_green
+  --pr-mutation-authority github_pr_automation_when_green
 python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
 ```
 
@@ -730,7 +750,7 @@ python3 tools/agent_tools/generate_agent_improvement_guide.py \
 The guide summarizes `memory/`,
 `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`,
 the mounted runtime hook archive, `issues/open/`, and `issues/closed/`.
-It is read-only evidence. Local Agent or Copilot PR work applies the actual
+It is read-only evidence. Local Codex applies the actual
 skill, workflow, and tool changes.
 For log visibility rather than repair guidance, use:
 

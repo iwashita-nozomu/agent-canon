@@ -33,7 +33,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `AGENTS.md`、`README.md`、`QUICK_START.md` の入口文書
 - `agents/` と `documents/` の正本
-- `.agents/skills/` と `.claude/skills/` の runtime shim
+- `.agents/skills/` の runtime shim
 - script usage と文書中の command 例
 
 ## Mandatory Checklist

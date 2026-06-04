@@ -26,13 +26,11 @@ upstream design README.md durable document index
 ## Runtime Entry Points
 
 - [AGENTS.md](../AGENTS.md)
-- [CLAUDE.md](../CLAUDE.md)
-- [.github/copilot-instructions.md](../.github/copilot-instructions.md)
+- [.codex/README.md](../.codex/README.md)
 
 ## Skills
 
 - Canonical path: `.agents/skills/`
-- Claude compatibility: `.claude/skills/` (generated from `.agents/skills/`)
 
 ## 実行入口
 

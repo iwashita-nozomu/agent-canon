@@ -20,6 +20,7 @@ upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling b
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
 1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
 1. If a prose graph handoff is present, use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
+1. Before writing academic prose from a prose graph handoff, close `fix-now` findings at the DSL/projection stage: revise the claim contract, evidence map, paragraph claim map, or graph-backed rewrite packet, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
 1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
 1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
 1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.

@@ -11,6 +11,7 @@ downstream implementation ../tools/agent_tools/run_repo_dependency_review.sh wra
 downstream implementation ../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream design ./structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
 -->
 

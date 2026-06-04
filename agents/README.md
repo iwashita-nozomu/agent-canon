@@ -71,19 +71,13 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 ## Runtime Entry Points
 
 - [AGENTS.md](../AGENTS.md)
-  - Codex / Copilot agent mode の入口
-- [CLAUDE.md](../CLAUDE.md)
-  - Claude Code の入口
-- [.github/copilot-instructions.md](../.github/copilot-instructions.md)
-  - GitHub Copilot repository instructions
+  - Codex agent mode の入口
 - [.github/AGENTS.md](../.github/AGENTS.md)
   - GitHub 側の薄い入口
 
 ## Skills And Subagents
 
 - Canonical project skills: `.agents/skills/`
-- Claude compatibility mirror: `.claude/skills/` (generated from `.agents/skills/`)
-- Claude subagents: `.claude/agents/`
 - Codex runtime config: `.codex/`
 
 ## Team Shape
@@ -183,7 +177,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - workflow family 選択はこの hub と `workflows/README.md` を正本にし、`canonical/README.md` を第二の hub にしません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
-- 実行環境固有の都合がある場合だけ、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` に最小限の差分を持たせます。
+- 実行環境固有の都合がある場合だけ、`AGENTS.md` に最小限の差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/`、dependency surface、local implementation を先に探索します。
 - reuse sweep をせずに新しい file や module を増やしません。
 - 既存実装を使えるか、導入済みライブラリを拡張できるか、既存では足りない理由が何かを artifact に残さずに新規実装へ進めません。

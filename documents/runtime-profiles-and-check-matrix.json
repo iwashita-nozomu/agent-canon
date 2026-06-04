@@ -30,14 +30,6 @@
       "required_when": "An agent performs or reviews repo work"
     },
     {
-      "profile": "Claude compatibility",
-      "activates": [
-        "`CLAUDE.md`",
-        "`.claude/`"
-      ],
-      "required_when": "Claude Code compatibility is explicitly used"
-    },
-    {
       "profile": "Devcontainer",
       "activates": [
         "`.devcontainer/`",
@@ -57,11 +49,10 @@
       "profile": "GitHub automation",
       "activates": [
         "`.github/`",
-        "Copilot docs",
         "PR templates",
         "Actions helpers"
       ],
-      "required_when": "GitHub Actions, Copilot, PR automation, or GitHub path-constrained copies change"
+      "required_when": "GitHub Actions, PR automation, or GitHub path-constrained copies change"
     },
     {
       "profile": "Experiment",
@@ -181,7 +172,7 @@
       ]
     },
     {
-      "changed_surface": "GitHub workflow/PR/Copilot",
+      "changed_surface": "GitHub workflow/PR",
       "required_check": [
         "`python3 tools/ci/check_github_workflows.py`",
         "relevant GitHub Actions evidence when available"

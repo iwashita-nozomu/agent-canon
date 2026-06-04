@@ -51,6 +51,8 @@ upstream design README.md canonical workflow index
   - 投稿論文、thesis chapter、paper section の作成フロー
 - `md-style-check`
   - Markdown の体裁とリンク確認
+- `mvp-skeleton`
+  - MVP、prototype、v0、first working version、thin slice の初手を 1 core loop と明示 deferral に抑える
 - `worktree-start`
   - worktree 開始時の scope、action log、kickoff を整える
 - `worktree-health`
@@ -92,10 +94,8 @@ upstream design README.md canonical workflow index
 
 ## Discovery Paths
 
-- Codex / Copilot:
+- Codex:
   - `.agents/skills/<skill>/SKILL.md`
-- Claude:
-  - `.claude/skills/<skill>/SKILL.md` (generated mirror from `.agents/skills/`)
 
 ## Human Canon
 

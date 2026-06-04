@@ -14,9 +14,11 @@ import json
 import os
 import subprocess
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from surface_manifest import SurfaceManifest, load_manifest
 
 CHECKABLE_SUFFIXES = frozenset(
     {
@@ -68,11 +70,14 @@ class FileEntry:
     scope: str
     path: str
     kind: str
+    owner: str
+    surface_class: str
     suffix: str
     checkable: bool
     git_mode: str
     symlink_target: str
     real_source_path: str
+    canonical_source_path: str
 
 
 @dataclass(frozen=True)
@@ -85,6 +90,18 @@ class ScopeInventory:
     checkable_files: int
     by_kind: dict[str, int]
     entries: list[FileEntry]
+
+
+@dataclass(frozen=True)
+class SurfaceLookup:
+    """Root surface ownership lookup derived from the shared manifest."""
+
+    by_path: Mapping[str, tuple[str, str, str, str]]
+    prefix: str
+
+    def get(self, relative: Path) -> tuple[str, str, str, str]:
+        """Return ``(kind, owner, class, source)`` for a root path."""
+        return self.by_path.get(relative.as_posix(), ("", "", "", ""))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -104,6 +121,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum file rows to include in Markdown. JSON is always complete.",
     )
     return parser
+
+
+def load_surface_lookup(root: Path) -> SurfaceLookup:
+    """Load shared surface metadata when the manifest is available."""
+    try:
+        manifest = load_manifest(root, "vendor/agent-canon", "documents/shared-runtime-surfaces.toml")
+    except (OSError, ValueError):
+        return SurfaceLookup(by_path={}, prefix="vendor/agent-canon")
+    return SurfaceLookup(by_path=surface_entries(manifest), prefix=manifest.prefix)
+
+
+def surface_entries(manifest: SurfaceManifest) -> dict[str, tuple[str, str, str, str]]:
+    """Return path-indexed surface metadata."""
+    entries: dict[str, tuple[str, str, str, str]] = {}
+    for entry in manifest.entries:
+        kind = {
+            "copy": entry.surface_class,
+            "repo_state": "repo_state",
+            "regular": "product_file",
+            "standalone_only": "standalone_only",
+            "removed_legacy": "removed_legacy",
+            "symlink": "symlink_view",
+        }.get(entry.mode, entry.surface_class)
+        entries[entry.path] = (
+            kind,
+            entry.owner,
+            entry.surface_class,
+            entry.source_or_default(),
+        )
+    return entries
 
 
 def mode_for_untracked_path(path: Path) -> str:
@@ -191,10 +238,19 @@ def surface_exists(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 
 
-def entry_kind(scope_name: str, relative: Path, full_path: Path, git_mode: str) -> str:
+def entry_kind(
+    scope_name: str,
+    relative: Path,
+    full_path: Path,
+    git_mode: str,
+    surface_lookup: SurfaceLookup,
+) -> str:
     """Classify one inventory entry for review routing."""
     if git_mode == "160000":
         return "submodule_pin"
+    manifest_kind = surface_lookup.get(relative)[0] if scope_name == "root" else ""
+    if manifest_kind:
+        return manifest_kind
     if scope_name == "root" and relative == ROOT_TOOLS_PATH and full_path.is_symlink():
         return AGENTCANON_TOOL_VIEW_KIND
     if scope_name == "agentcanon" and relative.parts[:1] == ROOT_TOOLS_PATH.parts:
@@ -208,23 +264,38 @@ def entry_kind(scope_name: str, relative: Path, full_path: Path, git_mode: str) 
     return "product_file"
 
 
-def make_entry(scope_name: str, root: Path, git_mode: str, raw_path: str) -> FileEntry:
+def make_entry(
+    scope_name: str,
+    root: Path,
+    git_mode: str,
+    raw_path: str,
+    surface_lookup: SurfaceLookup,
+) -> FileEntry:
     """Build one file entry."""
     relative = Path(raw_path)
     full_path = root / relative
     suffix = relative.suffix
-    kind = entry_kind(scope_name, relative, full_path, git_mode)
+    kind = entry_kind(scope_name, relative, full_path, git_mode, surface_lookup)
+    _, owner, surface_class, source = (
+        surface_lookup.get(relative) if scope_name == "root" else ("", "", "", "")
+    )
     symlink_target = os.readlink(full_path) if full_path.is_symlink() else ""
     real_source_path = relative_real_path(root, full_path) if surface_exists(full_path) else ""
+    canonical_source_path = (
+        str(Path(surface_lookup.prefix) / source).replace("\\", "/") if source else ""
+    )
     return FileEntry(
         scope=scope_name,
         path=relative.as_posix(),
         kind=kind,
+        owner=owner,
+        surface_class=surface_class,
         suffix=suffix,
         checkable=suffix in CHECKABLE_SUFFIXES and kind != "submodule_pin",
         git_mode=git_mode,
         symlink_target=symlink_target,
         real_source_path=real_source_path,
+        canonical_source_path=canonical_source_path,
     )
 
 
@@ -250,11 +321,11 @@ def selected_mode(args: argparse.Namespace) -> str:
     return "submodule-aware"
 
 
-def inventory_scope(scope_name: str, root: Path) -> ScopeInventory:
+def inventory_scope(scope_name: str, root: Path, surface_lookup: SurfaceLookup) -> ScopeInventory:
     """Inventory one scan scope."""
     rows = run_git_ls_files(root) or fallback_files(root)
     entries = [
-        make_entry(scope_name, root, git_mode, path)
+        make_entry(scope_name, root, git_mode, path, surface_lookup)
         for git_mode, path in rows
         if not set(Path(path).parts) & EXCLUDED_PARTS
         if git_mode == "160000" or surface_exists(root / path)
@@ -306,8 +377,11 @@ def markdown_entry_rows(scopes: Sequence[ScopeInventory], limit: int) -> list[st
                         entry.scope,
                         entry.path,
                         entry.kind,
+                        entry.owner,
+                        entry.surface_class,
                         "yes" if entry.checkable else "no",
                         entry.real_source_path,
+                        entry.canonical_source_path,
                     )
                 )
                 + " |"
@@ -352,8 +426,8 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
             "",
             "## File Rows",
             "",
-            "| Scope | Path | Kind | Checkable | Real Source Path |",
-            "| ----- | ---- | ---- | --------- | ---------------- |",
+            "| Scope | Path | Kind | Owner | Surface Class | Checkable | Real Source Path | Canonical Source Path |",
+            "| ----- | ---- | ---- | ----- | ------------- | --------- | ---------------- | --------------------- |",
             *markdown_entry_rows(scopes, limit),
         ]
     )
@@ -374,7 +448,11 @@ def main() -> int:
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
     mode = selected_mode(args)
-    scopes = [inventory_scope(name, scope_root) for name, scope_root in scope_roots(root, mode)]
+    surface_lookup = load_surface_lookup(root)
+    scopes = [
+        inventory_scope(name, scope_root, surface_lookup)
+        for name, scope_root in scope_roots(root, mode)
+    ]
     json_text = render_json(mode, root, scopes)
     markdown_text = render_markdown(mode, root, scopes, int(args.max_markdown_entries))
     write_optional(args.json_out, json_text)

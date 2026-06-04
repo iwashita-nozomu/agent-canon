@@ -25,7 +25,6 @@ MARKDOWN_TARGETS=(
   README.md
   QUICK_START.md
   AGENTS.md
-  CLAUDE.md
   agents
   docker
   documents

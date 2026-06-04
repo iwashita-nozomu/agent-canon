@@ -3201,7 +3201,6 @@ def skill_source_path_candidates(slug: str) -> tuple[Path, ...]:
     return (
         Path(".agents") / "skills" / slug / "SKILL.md",
         Path("agents") / "skills" / f"{slug}.md",
-        Path(".claude") / "skills" / slug / "SKILL.md",
     )
 
 

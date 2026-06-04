@@ -5,7 +5,6 @@ responsibility Documents the standalone AgentCanon pull request checklist.
 upstream design ../ROOT_AGENTS.md defines AgentCanon closeout requirements
 upstream design ../agents/workflows/agent-canon-pr-workflow.md defines shared canon PR flow
 upstream design ../documents/SHARED_RUNTIME_SURFACES.md defines synced root surfaces
-upstream design ../documents/github-copilot-configuration.md defines Copilot configuration and PR-template routing
 upstream design ../issues/README.md defines durable operational issue storage
 upstream design ../tools/catalog.yaml defines structured tool catalog
 downstream implementation ../tools/ci/check_github_workflows.py validates PR checklist and workflow conventions
@@ -25,7 +24,7 @@ downstream design PULL_REQUEST_TEMPLATE/agent_canon.md supports template-side Ag
 ## Scope
 
 - [ ] Skill / workflow / subagent prompt
-- [ ] Codex / Claude / Copilot runtime entrypoint
+- [ ] Codex runtime entrypoint
 - [ ] Tooling or validation command
 - [ ] Dependency manifest or graph policy
 - [ ] Memory / eval / feedback loop
@@ -47,18 +46,18 @@ Route notes:
 - [ ] This PR only required inspection, branch push, PR creation, title/body update, evidence comments, or draft-state preservation.
 - [ ] Merge / close / ready-for-review / reviewer request / review dismissal / auto-merge / branch deletion was explicitly authorized by the user for this task, or was not performed.
 - [ ] If merge or close is still required, the blocker and required human/maintainer action are recorded below instead of being guessed from `gh` availability.
-- [ ] If `pr_mutation_authority: github_copilot_merge_when_green` is used, the PR has Copilot-visible evidence and local Codex did not perform the merge.
+- [ ] If `pr_mutation_authority: github_pr_automation_when_green` is used, the PR has GitHub automation visible evidence and local Codex did not perform the merge.
 
 Authority / blocker notes:
 
-## Copilot / Automation Output
+## GitHub Automation Output
 
 - goal `pr_mutation_authority`:
-- `COPILOT_PR_AUTHORITY=`:
-- `COPILOT_PR_DECISION=`:
-- `COPILOT_PR_CHECKS=`:
-- `COPILOT_VISIBLE_EVIDENCE=`:
-- `COPILOT_BLOCKER=`:
+- `GITHUB_PR_AUTOMATION_AUTHORITY=`:
+- `GITHUB_PR_AUTOMATION_DECISION=`:
+- `GITHUB_PR_AUTOMATION_CHECKS=`:
+- `GITHUB_AUTOMATION_VISIBLE_EVIDENCE=`:
+- `GITHUB_AUTOMATION_BLOCKER=`:
 - `gh pr checks` summary:
 
 ## Canon Discipline
@@ -67,13 +66,12 @@ Authority / blocker notes:
 - [ ] Template / derived repo follow-up, if needed, will use `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` after this source change lands.
 - [ ] The source of truth was edited in AgentCanon, not only through a derived repo root view.
 - [ ] New shared surfaces are listed in `documents/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
-- [ ] `.agents/skills` and `.claude/skills` mirrors are synchronized when skill prompts changed.
 - [ ] Root-copy surfaces are synchronized through `bash tools/sync_agent_canon.sh link-root` when applicable.
 - [ ] No derived-repo project-specific policy leaked into AgentCanon.
 
 ## Plan Mode Evidence
 
-- [ ] Plan mode was used before non-trivial AgentCanon, Copilot, PR-template, GitHub Actions, or shared runtime-surface changes.
+- [ ] Plan mode was used before non-trivial AgentCanon, PR-template, GitHub Actions, or shared runtime-surface changes.
 - [ ] Written plan is included in the PR body, issue, run bundle, or linked comment when the runtime did not expose an explicit Plan mode.
 - [ ] Trivial-change exception is explained below when Plan mode was not used.
 
@@ -103,22 +101,10 @@ Orchestration evidence:
 
 Issue / edit-scope evidence:
 
-## Copilot Configuration Impact
-
-- [ ] `documents/github-copilot-configuration.md` was reviewed.
-- [ ] `.github/copilot-instructions.md` changed / reviewed / not affected.
-- [ ] `.github/instructions/*.instructions.md` changed / reviewed / not affected.
-- [ ] `.github/agents/*.md` changed / reviewed / not affected.
-- [ ] GitHub Copilot MCP, `copilot-setup-steps.yml`, or Copilot environment settings changed / reviewed / not affected.
-- [ ] PR template routing still separates standalone AgentCanon repository PRs from template / derived repo pin PRs.
-
-Impact notes:
-
 ## Validation Evidence
 
 - [ ] `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir reports/dependency-review/agent-canon-pr`
 - [ ] `python3 tools/agent_tools/render_dependency_manifest_graph.py --graph-tsv reports/dependency-review/agent-canon-pr/dependency_graph.tsv --markdown-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.md --dot-out reports/dependency-review/agent-canon-pr/dependency_manifest_graph.dot`
-- [ ] `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check`
 - [ ] `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest agents/evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent_tools/check_convention_compliance.py`

@@ -4,6 +4,7 @@ responsibility Documents プロジェクト全体の運用規約 for this reposi
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+downstream implementation ../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
 @dependency-end
 -->
 
@@ -79,6 +80,13 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 - C++ build は必ず out-of-source にし、`build/cpp/<profile>/` を使わなければなりません。
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置かなければなりません。optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
 
+## 4.7 Legacy Forwarder Migration Rule
+
+- legacy forwarder / migration wrapper は `LEGACY_FORWARDER_WARNING_REQUIRED` marker を持たなければなりません。
+- legacy forwarder / migration wrapper は実処理へ進む前に stderr へ caller chain、canonical command、`fix-now` severity、移行後に元 task へ戻る prompt message を出さなければなりません。
+- agent は `*_FORWARDER=deprecated`、`*_FORWARDER_SEVERITY=fix-now`、または caller chain 付きの移行警告を見たら、先に呼び出し元を canonical command へ移行しなければなりません。
+- すぐ移行できない場合は、警告の caller chain と移行先 command を run bundle、issue、または PR body に blocker として残さなければなりません。
+
 ## 禁止事項
 
 - Dockerfile に repo 固有の Template / AgentCanon mirror path を焼くことを禁止します。
@@ -86,12 +94,14 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 - host-global install を repo の正本手順として採用することを禁止します。
 - CI でも使う tool を、手元だけの補助 install として導入することを禁止します。
 - `src/` や `include/` の下に別 CMake root を増やすことを禁止します。
+- legacy forwarder / migration wrapper が出した `fix-now` 移行警告を無視して元 task を進めることを禁止します。
 
 ## 5. テストとレビュー
 
 - 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
+- legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
 
 ## 6. 実験運用
 

@@ -177,8 +177,8 @@ node kind. The responsibility scope follows the top-level ownership buckets in
 are separated first; document buckets are further split by surface such as
 skill, workflow, tool docs, issue, memory, note, and general documents. A
 code/document match is alignment evidence, never merge evidence, even when the
-vectors are nearly identical. Runtime mirror surfaces such as
-`.agents/skills/` and `.claude/skills/`, and accumulated eval/report logs, are
+vectors are nearly identical. Runtime discovery surfaces such as
+`.agents/skills/`, and accumulated eval/report logs, are
 also alignment or evidence surfaces rather than merge surfaces. Preserved
 source/split guide pairs are excluded for the same reason. Very small
 heading-only sections are below the merge-candidate floor because they do not

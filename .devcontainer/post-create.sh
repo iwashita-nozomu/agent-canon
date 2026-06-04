@@ -7,6 +7,7 @@
 # upstream environment devcontainer.json postCreateCommand entrypoint
 # upstream implementation ../tools/install_llama_cpp.sh builds llama.cpp local LLM tooling
 # upstream implementation ../tools/ci/scan_secrets.sh runs dedicated secret scanners
+# downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds structured analysis cache DB
 # @dependency-end
 
 set -euo pipefail
@@ -330,6 +331,29 @@ install_llama_cpp() {
     bash "$installer" --allow-fetch
 }
 
+build_structured_analysis_cache() {
+  local canon_root
+
+  canon_root="$(agent_canon_source_root)"
+  if [ -z "$canon_root" ]; then
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=warn"
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP_REASON=agent-canon-source-absent"
+    return
+  fi
+  if ! command -v agent-canon >/dev/null 2>&1; then
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=warn"
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP_REASON=agent-canon-cli-absent"
+    return
+  fi
+  if ! agent-canon structured-analysis build --root "$workspace" --profile devcontainer; then
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP=warn"
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP_REASON=build-failed"
+    echo "STRUCTURED_ANALYSIS_BOOTSTRAP_NEXT_COMMAND=agent-canon structured-analysis build --root \"${workspace}\" --profile devcontainer"
+    return
+  fi
+  echo "STRUCTURED_ANALYSIS_BOOTSTRAP=pass"
+}
+
 publish_agent_tools_profile
 if [ -f "${workspace%/}/docker/register_safe_directories.sh" ]; then
   bash "${workspace%/}/docker/register_safe_directories.sh" "$workspace"
@@ -351,6 +375,7 @@ install_tex_tooling
 install_secret_scanners
 install_agent_canon_cli
 install_llama_cpp
+build_structured_analysis_cache
 jq --version
 latexmk --version | sed -n '1p'
 pdflatex --version | sed -n '1p'

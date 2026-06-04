@@ -22,7 +22,6 @@ DEFAULT_PATHS = [
     "README.md",
     "QUICK_START.md",
     "AGENTS.md",
-    "CLAUDE.md",
     "agents",
     "documents",
     "scripts",

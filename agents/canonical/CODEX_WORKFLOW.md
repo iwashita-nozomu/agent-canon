@@ -78,7 +78,7 @@ Before broad context loading or validation, classify the task with
 
 - Routine docs and Focused code may run parent-direct with targeted validation.
 - Profile changes activate only their matching checker family: Docker,
-  GitHub/Copilot, experiment, C++, devcontainer, memory/eval, or maintenance.
+  GitHub automation, experiment, C++, devcontainer, memory/eval, or maintenance.
 - Shared canon changes activate AgentCanon PR workflow and PR gate.
 - Large delivery activates the full run bundle, independent review, full
   dependency review, and full validation gate.

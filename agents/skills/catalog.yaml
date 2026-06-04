@@ -113,6 +113,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+  - id: mvp-skeleton
+    purpose: Keep first-pass MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
+    canonical_doc: agents/skills/mvp-skeleton.md
+    shim: .agents/skills/mvp-skeleton/SKILL.md
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md

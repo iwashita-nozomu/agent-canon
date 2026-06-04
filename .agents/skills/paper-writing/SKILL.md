@@ -20,5 +20,6 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 1. Use `$structure-planning` before drafting when section order, first figure/table, claim/evidence layout, source-to-structure map, or invalid interpretations are nontrivial.
 1. For paragraph-level claim flow, transition pairs, or logic-gap triage, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument` and treat it as advisory discourse evidence before prose drafting.
 1. If a prose graph handoff is present, include its claim/evidence gaps, weak transitions, experiment-plan gaps, and split/merge/bridge/reorder operations in the section contract and reviewer handoff.
+1. Before writing paper prose from a prose graph handoff, close `fix-now` findings at the DSL/projection stage: revise the section contract, citation/evidence matrix, paragraph claim map, or graph-backed rewrite packet, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
 1. Fix the paper intent brief, claim contract, section contract, citation/evidence matrix, notation ledger, and paragraph claim map before drafting.
 1. Route citation/evidence review, notation review, logic-gap review, and document-flow review as separate review passes before closeout.

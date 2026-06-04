@@ -37,7 +37,6 @@ EXCLUDED_PARTS = {
 }
 SKILL_PATTERNS = (
     ".agents/skills/*/SKILL.md",
-    ".claude/skills/*/SKILL.md",
     "agents/skills/*.md",
 )
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")
@@ -46,7 +45,6 @@ RUST_TOOL_PATTERNS = ("rust/agent-canon/src/*.rs",)
 FALLBACK_SURFACE_DIRS = (
     Path(".codex/hooks"),
     Path(".agents/skills"),
-    Path(".claude/skills"),
     Path("agents/skills"),
     Path("tools"),
     Path("rust/agent-canon/src"),

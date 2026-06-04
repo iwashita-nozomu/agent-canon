@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -35,8 +36,107 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+    """Run the prose reasoning graph CLI with environment overrides."""
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, **env},
+    )
+
+
+def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
+    """Return one KEY=value field from command stdout."""
+    prefix = f"{key}="
+    for line in result.stdout.splitlines():
+        if line.startswith(prefix):
+            return line.removeprefix(prefix)
+    raise AssertionError(f"missing stdout key {key}: {result.stdout}")
+
+
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
+
+    def test_ingest_defaults_db_to_user_home_cache(self) -> None:
+        """DB-creating commands should use the user-home cache unless --db is explicit."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "sample.md"
+            cache_root = root / "cache"
+            stats = root / "ingest.stats.json"
+            source.write_text("# Sample\n\n根拠として本文を DB に入れる。", encoding="utf-8")
+
+            ingest = run_graph_with_env(
+                {"AGENT_CANON_PROSE_GRAPH_HOME": str(cache_root)},
+                "ingest",
+                str(source),
+                "--stats-out",
+                str(stats),
+            )
+
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+            self.assertIn("PROSE_REASONING_GRAPH_STATS=", ingest.stdout)
+            stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
+            stats_fields = cast(dict[str, object], stats_payload["fields"])
+            db_path = Path(cast(str, stats_fields["PROSE_REASONING_GRAPH_DB"]))
+            self.assertTrue(db_path.exists(), db_path)
+            self.assertEqual(db_path.name, "prose_graph.sqlite")
+            self.assertTrue(
+                db_path.resolve().as_posix().startswith(cache_root.resolve().as_posix()),
+                db_path,
+            )
+
+    def test_ingest_set_defaults_db_to_user_home_cache(self) -> None:
+        """Multi-document DB creation should also accept the default cache route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            cache_root = root / "cache"
+            first = root / "first.md"
+            second = root / "second.md"
+            first.write_text("# First\n\n第一文書は根拠を持つ。", encoding="utf-8")
+            second.write_text("# Second\n\n第二文書も根拠を持つ。", encoding="utf-8")
+
+            ingest = run_graph_with_env(
+                {"AGENT_CANON_PROSE_GRAPH_HOME": str(cache_root)},
+                "ingest-set",
+                str(first),
+                str(second),
+            )
+
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+            db_path = Path(stdout_value(ingest, "PROSE_REASONING_GRAPH_DB"))
+            self.assertTrue(db_path.exists(), db_path)
+            self.assertEqual(stdout_value(ingest, "PROSE_REASONING_GRAPH_DOCUMENTS"), "2")
+            self.assertTrue(
+                db_path.resolve().as_posix().startswith(cache_root.resolve().as_posix()),
+                db_path,
+            )
+
+    def test_ingest_uses_home_cache_when_cache_env_is_unset(self) -> None:
+        """The default DB route should be under HOME when no cache override is set."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            fake_home = root / "home"
+            source = root / "sample.md"
+            source.write_text("# Sample\n\nHOME 配下の cache に DB を作る。", encoding="utf-8")
+
+            ingest = run_graph_with_env(
+                {"HOME": str(fake_home), "AGENT_CANON_PROSE_GRAPH_HOME": ""},
+                "ingest",
+                str(source),
+            )
+
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+            db_path = Path(stdout_value(ingest, "PROSE_REASONING_GRAPH_DB"))
+            expected_root = fake_home / ".cache" / "agent-canon" / "prose-reasoning-graph"
+            self.assertTrue(db_path.exists(), db_path)
+            self.assertTrue(
+                db_path.resolve().as_posix().startswith(expected_root.resolve().as_posix()),
+                db_path,
+            )
 
     def test_ingest_analyze_project_and_explain(self) -> None:
         """The CLI should persist layers and emit human-readable outputs."""
@@ -104,6 +204,22 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
             self.assertIn("$long-form-writing", handoff_targets(payload))
             self.assertIn("$experiment-lifecycle", handoff_targets(payload))
+            self.assertIn("$formal-proof-workflow", handoff_targets(payload))
+            diagnostics_payload = typed_items(payload, "diagnostics")
+            verification_routes = {
+                cast(dict[str, object], item.get("action", {})).get("verification_route")
+                for item in diagnostics_payload
+                if isinstance(item.get("action"), dict)
+            }
+            self.assertIn("claim_support_verification", verification_routes)
+            self.assertIn("connection_verification", verification_routes)
+            recursive_payloads = [
+                cast(dict[str, object], cast(dict[str, object], item["action"])["recursive_verification"])
+                for item in diagnostics_payload
+                if isinstance(item.get("action"), dict)
+                and isinstance(cast(dict[str, object], item["action"]).get("recursive_verification"), dict)
+            ]
+            self.assertTrue(any(payload.get("max_depth") == 3 for payload in recursive_payloads))
             source_anchors = typed_items(payload, "source_anchors")
             self.assertTrue(any(item.get("kind") == "sentence" for item in source_anchors))
             sentence_anchor = next(item for item in source_anchors if item.get("kind") == "sentence")
@@ -131,6 +247,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
             diagnostics_text = diagnostics.read_text(encoding="utf-8")
             self.assertIn("unsupported_claim", diagnostics_text)
             self.assertIn("metric_without_baseline", diagnostics_text)
+            self.assertIn("verification_route=`claim_support_verification`", diagnostics_text)
+            self.assertIn("verification_route=`connection_verification`", diagnostics_text)
 
             explain = run_graph("explain", "--db", str(db), "--profile", "all", "--out", str(explanation))
             self.assertEqual(explain.returncode, 0, explain.stdout + explain.stderr)
@@ -141,6 +259,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             integrate = run_graph("integrate", "--db", str(db), "--profile", "all", "--out", str(integration))
             self.assertEqual(integrate.returncode, 0, integrate.stdout + integrate.stderr)
             integration_text = integration.read_text(encoding="utf-8")
+            self.assertIn("## Verification Routes", integration_text)
+            self.assertIn("claim_support_verification", integration_text)
+            self.assertIn("connection_verification", integration_text)
+            self.assertIn("$literature-survey", integration_text)
+            self.assertIn("recursive_max_depth", integration_text)
+            self.assertIn("decompose_claim", integration_text)
+            self.assertIn("verify_missing_premise", integration_text)
             operation_payload_by_kind = operation_payloads(db)
             for operation_kind in (
                 "split_paragraph",
@@ -169,6 +294,11 @@ class ProseReasoningGraphTest(unittest.TestCase):
             handoff_text = handoff.read_text(encoding="utf-8")
             self.assertIn("$paper-writing", handoff_text)
             self.assertIn("citation-evidence-review", handoff_text)
+            self.assertIn("projection_views[].recommended_format", handoff_text)
+            self.assertIn("corpus_hints", handoff_text)
+            self.assertIn("## Verification Routes", handoff_text)
+            self.assertIn("$formal-proof-workflow", handoff_text)
+            self.assertIn("recursive_steps", handoff_text)
 
     def test_json_projection_matches_layer_contract(self) -> None:
         """JSON projection should expose all requested layer keys."""
@@ -209,6 +339,45 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("$report-writing", handoff_targets(payload))
             stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
             self.assertEqual(stats_payload["schema"], "prose_reasoning_graph.stats.v1")
+
+    def test_structured_analysis_db_without_edit_operations_can_project_and_integrate(self) -> None:
+        """Document-canon graph DBs may have diagnostics without prose rewrite operations."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            db = root / "structured.sqlite"
+            projection = root / "projection.json"
+            explanation = root / "explanation.md"
+            integration = root / "integration.md"
+            create_structured_analysis_style_db(db)
+
+            project = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--format",
+                "json",
+                "--out",
+                str(projection),
+            )
+            self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
+            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            self.assertEqual(payload["edit_operations"], [])
+            self.assertEqual(cast(dict[str, object], payload["layers"])["edit-operation"], 0)
+            diagnostics_payload = typed_items(payload, "diagnostics")
+            self.assertEqual(diagnostics_payload[0]["layer"], "document-canon")
+
+            explain = run_graph("explain", "--db", str(db), "--profile", "all", "--out", str(explanation))
+            self.assertEqual(explain.returncode, 0, explain.stdout + explain.stderr)
+            self.assertIn("No edit operations recorded.", explanation.read_text(encoding="utf-8"))
+
+            integrate = run_graph("integrate", "--db", str(db), "--profile", "all", "--out", str(integration))
+            self.assertEqual(integrate.returncode, 0, integrate.stdout + integrate.stderr)
+            integration_text = integration.read_text(encoding="utf-8")
+            self.assertIn("No edit operations recorded.", integration_text)
+            self.assertIn("document_responsibility_verification", integration_text)
+            self.assertIn("expand_coverage_rule", integration_text)
 
     def test_projection_views_are_derived_from_canonical_anchors(self) -> None:
         """Projection views should keep anchor membership and not become source nodes."""
@@ -272,6 +441,27 @@ class ProseReasoningGraphTest(unittest.TestCase):
             ):
                 self.assertIn(rule, rules)
             self.assertEqual(len(rules), len(set(rules)))
+
+    def test_corpus_identifier_does_not_trigger_experiment_layer(self) -> None:
+        """Corpus ids should not be mistaken for experiment-plan prose."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "corpus_id.md"
+            db = root / "graph.sqlite"
+            source.write_text(
+                "The selected corpus id is `experimental_report`, used only as metadata.",
+                encoding="utf-8",
+            )
+            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+
+            rules = diagnostic_rules(db)
+
+            self.assertNotIn("experiment_without_hypothesis", rules)
+            self.assertNotIn("experiment_without_metric", rules)
+            self.assertNotIn("metric_without_baseline", rules)
+            self.assertNotIn("experiment_without_expected_result", rules)
+            self.assertEqual(nodes_by_layer(db, "experiment"), [])
 
     def test_japanese_sentence_units_and_discourse_cues(self) -> None:
         """Japanese prose should split sentences and recognize local bridge cues."""
@@ -383,6 +573,65 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotEqual(missing.returncode, 0)
             self.assertIn("prompt file does not exist", missing.stderr)
 
+    def test_ingest_set_stores_multiple_documents_in_one_db(self) -> None:
+        """Multi-document ingest should preserve per-file text and source anchors."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            first = root / "first.md"
+            second = root / "second.md"
+            db = root / "graph.sqlite"
+            projection = root / "projection.json"
+            first.write_text("# First\n\n根拠として第一文書は DB に入る。", encoding="utf-8")
+            second.write_text("# Second\n\n根拠として第二文書も DB に入る。", encoding="utf-8")
+
+            ingest = run_graph(
+                "ingest-set",
+                str(root),
+                "--db",
+                str(db),
+                "--prompt",
+                "structured analysis code dependency report",
+            )
+            self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
+            self.assertIn("PROSE_REASONING_GRAPH_INGEST_SET=pass", ingest.stdout)
+            self.assertIn("PROSE_REASONING_GRAPH_DOCUMENTS=2", ingest.stdout)
+
+            with sqlite3.connect(db) as connection:
+                document_rows = connection.execute("SELECT id, path FROM documents ORDER BY id").fetchall()
+                source_rows = connection.execute(
+                    "SELECT id, document_id, text FROM nodes WHERE layer = 'source' ORDER BY id"
+                ).fetchall()
+                sentence_rows = connection.execute(
+                    "SELECT id, document_id, text FROM nodes WHERE layer = 'form' AND kind = 'sentence' ORDER BY id"
+                ).fetchall()
+
+            self.assertEqual([row[0] for row in document_rows], ["doc:1", "doc:2", "doc:analysis"])
+            self.assertIn(str(first), [row[1] for row in document_rows])
+            self.assertIn(str(second), [row[1] for row in document_rows])
+            self.assertEqual(len(source_rows), 2)
+            self.assertTrue(any("第一文書" in row[2] for row in source_rows))
+            self.assertTrue(any("第二文書" in row[2] for row in source_rows))
+            self.assertTrue(any(str(row[0]).startswith("d1:s:") for row in sentence_rows))
+            self.assertTrue(any(str(row[0]).startswith("d2:s:") for row in sentence_rows))
+
+            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            project = run_graph(
+                "project",
+                "--db",
+                str(db),
+                "--profile",
+                "report",
+                "--format",
+                "json",
+                "--out",
+                str(projection),
+            )
+            self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
+            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            documents = typed_items(payload, "documents")
+            self.assertEqual(len(documents), 3)
+            self.assertTrue(any(item.get("document_id") == "doc:analysis" for item in documents))
+
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -429,6 +678,122 @@ def sample_text() -> str:
         The hypothesis is that graph diagnostics improve revision quality. The experiment compares workflows. The metric is unsupported-claim count. The expected result is fewer gaps.
         """
     ).strip()
+
+
+def create_structured_analysis_style_db(db: Path) -> None:
+    """Create a structured-analysis-like graph DB without edit operations."""
+    with sqlite3.connect(db) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE documents (
+                id TEXT PRIMARY KEY,
+                path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE nodes (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                layer TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                label TEXT NOT NULL,
+                text TEXT NOT NULL,
+                source_start INTEGER NOT NULL,
+                source_end INTEGER NOT NULL,
+                confidence REAL NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE edges (
+                id TEXT PRIMARY KEY,
+                layer TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                from_node_id TEXT NOT NULL,
+                to_node_id TEXT NOT NULL,
+                order_kind TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                evidence_node_id TEXT,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE diagnostics (
+                id TEXT PRIMARY KEY,
+                layer TEXT NOT NULL,
+                target_node_id TEXT NOT NULL,
+                target_edge_id TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                rule TEXT NOT NULL,
+                message TEXT NOT NULL,
+                suggested_action_json TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO metadata(key, value) VALUES (?, ?)",
+            ("corpus_hints", "[]"),
+        )
+        connection.execute(
+            "INSERT INTO documents(id, path, title, kind, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("doc:structured", "documents/tools/example.md", "Tool Example", "document", "2026-06-04T00:00:00Z"),
+        )
+        connection.execute(
+            """
+            INSERT INTO nodes(
+                id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "structured:p:1",
+                "doc:structured",
+                "form",
+                "paragraph",
+                "document responsibility paragraph",
+                "The tool guide explains document responsibility coverage for graph records.",
+                0,
+                73,
+                1.0,
+                json.dumps({"span_kind": "paragraph", "segmentation_basis": "structured_analysis"}),
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO diagnostics(
+                id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "diag:doc:1",
+                "document-canon",
+                "structured:p:1",
+                "",
+                "warn",
+                "document_responsibility_gap",
+                "Document responsibility coverage needs verification before rewrite.",
+                json.dumps(
+                    {
+                        "verification_route": "document_responsibility_verification",
+                        "verification_question": "Does the downstream document cover the upstream rule?",
+                        "verification_targets": ["structured:p:1"],
+                        "recursive_verification": {
+                            "max_depth": 3,
+                            "closure_condition": "all declared coverage groups are verified or limited",
+                            "unresolved_leaf_policy": "record blocker or warn",
+                            "steps": [
+                                {
+                                    "id": "expand_coverage_rule",
+                                    "route": "document-canon",
+                                    "question": "Which coverage group is missing?",
+                                    "if_unresolved": "keep diagnostic active",
+                                }
+                            ],
+                        },
+                    }
+                ),
+            ),
+        )
 
 
 def handoff_targets(payload: dict[str, object]) -> set[str]:
@@ -482,6 +847,13 @@ def node_texts_by_layer_kind(db: Path, layer: str, kind: str) -> list[str]:
             "SELECT text FROM nodes WHERE layer = ? AND kind = ? ORDER BY id",
             (layer, kind),
         ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def nodes_by_layer(db: Path, layer: str) -> list[str]:
+    """Return node ids for one layer."""
+    with sqlite3.connect(db) as connection:
+        rows = connection.execute("SELECT id FROM nodes WHERE layer = ? ORDER BY id", (layer,)).fetchall()
     return [str(row[0]) for row in rows]
 
 

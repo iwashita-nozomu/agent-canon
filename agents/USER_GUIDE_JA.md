@@ -17,17 +17,13 @@ upstream design README.md agent canon overview
 
 ## 入口の使い分け
 
-- Codex / Copilot agent mode:
+- Codex runtime:
   - [AGENTS.md](../AGENTS.md)
-- Claude Code:
-  - [CLAUDE.md](../CLAUDE.md)
-- GitHub Copilot custom instructions:
-  - [.github/copilot-instructions.md](../.github/copilot-instructions.md)
+  - [.codex/README.md](../.codex/README.md)
 
 ## skill の使い方
 
 - 共通 skill の正本は `.agents/skills/` にあります。
-- Claude では `.claude/skills/` の generated mirror を使います。正本は `.agents/skills/` です。
 - skill を明示したいときは `$skill-name` を使います。
 - 例: `$repo-onboarding`、`$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - plain text で skill 名を書く運用もできますが、既定表記は `$skill-name` です。
@@ -50,7 +46,6 @@ upstream design README.md agent canon overview
 
 ## subagent の使い方
 
-- Claude 専用 subagent は `.claude/agents/` にあります。
 - Codex 用 subagent は `.codex/agents/` にあります。
 - subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
 - repo-changing task では run bundle を先に作ります。

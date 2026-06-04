@@ -5,6 +5,7 @@
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation mcp_inventory.rs checks MCP preflight scope and inventory
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
+// downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // @dependency-end
 
 mod local_llm;
@@ -18,6 +19,7 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod rust_migration_plan;
 mod semantic_index;
+mod structured_analysis;
 
 use std::env;
 
@@ -53,6 +55,10 @@ fn main() {
         std::process::exit(semantic_index::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "structured-analysis" {
+        std::process::exit(structured_analysis::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "python-structure-hash" {
         std::process::exit(python_structure_hash::run(&args[2..]));
     }
@@ -79,7 +85,7 @@ fn main() {
 
     eprintln!("agent-canon: unknown or missing command");
     eprintln!(
-        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
+        "usage: agent-canon --version | rust-migration-audit --root <repo-root> | rust-migration-plan --root <repo-root> [--limit N] | mcp-inventory --root <repo-root> --require <server> [--session-cache] | mcp-preflight-policy --request-kind <kind> | local-llm <command> | semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> | structured-analysis <build|analyze|document-inventory|import-document-inventory> | python-structure-hash --root <repo-root> [paths...] | python-structure-hash-report --input <path> [--output <path>] | python-structure-hash-impact --before <path> --after <path> [--output <path>] | python-structure-hash-scope-plan --input <path> --dependency-report-dir <dir> [--output <path>] | python-algorithm-contract-check --root <repo-root> [paths...] | python-module-groups-check --root <repo-root> [--contract path]"
     );
     std::process::exit(2);
 }

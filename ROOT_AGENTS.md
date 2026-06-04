@@ -4,7 +4,7 @@ responsibility Documents Agent Instructions for this repository.
 upstream design README.md repository entrypoint and clone/update guidance.
 upstream design documents/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
 upstream design documents/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
-upstream design documents/github-copilot-configuration.md GitHub Copilot configuration and PR-template routing.
+upstream design documents/SHARED_RUNTIME_SURFACES.md shared runtime surface and PR-template routing.
 upstream design documents/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
 upstream design issues/README.md durable AgentCanon operational finding storage.
 downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
@@ -15,7 +15,7 @@ downstream implementation tools/agent_tools/task_close.py validates run-bundle c
 
 # Agent Instructions
 
-This file is the template-root runtime entrypoint for Codex and GitHub Copilot.
+This file is the template-root runtime entrypoint for Codex.
 The shared agent canon lives in `vendor/agent-canon/`. In this template and migrated derived repositories, that path is the AgentCanon Git submodule pin, and the root discovery paths are runtime views into that pin.
 
 Path note: `documents/...` entries in AgentCanon-owned packets are logical
@@ -42,7 +42,7 @@ contract listed in `documents/README.md`.
 ## Plan Mode
 
 - repo-changing task では、実装前に Plan mode を積極的に使います。Codex runtime では `/plan` を使い、Plan mode が無い runtime では同等の written plan を run bundle、issue、PR body、または作業 update に固定します。
-- GitHub Actions、Copilot settings、PR template、AgentCanon sync、runtime entrypoint、multi-file shared surface の変更では、trivial でない限り Plan mode を先に起動します。
+- GitHub Actions、PR template、AgentCanon sync、runtime entrypoint、multi-file shared surface の変更では、trivial でない限り Plan mode を先に起動します。
 - Plan mode は validation の代替ではありません。実装後に dependency review、static analysis、test、shared-surface sync、PR checklist evidence を別途揃えます。
 
 ## Read Packets
@@ -94,6 +94,8 @@ contract listed in `documents/README.md`.
 - AGENTS / ROOT_AGENTS に禁止事項を増やす前に、機械的 checker、warning hook、closeout artifact gate、role TOML、または workflow eval に逃がせるかを判定します。実行時 hook は作業を進めるための context / evidence 収集を既定とし、プロンプト内 secret など高確信で公開事故になるもの以外は原則 block しません。
 - process / search / reuse / planning / review completeness の規律は、runtime hook blocker ではなく warning、run bundle evidence、`check_convention_compliance.py`、`task_close.py`、PR gate、または reviewer finding として扱います。hook finding が出ても、read-only 調査、validation、修復作業、PR evidence 作成のために hook 設定を退避・無効化してはいけません。
 - hook や checker が非重大 finding を返した場合は、現在の作業を止めずに closeout 前の修復対象として扱います。明示的な hook 開発・強制検証以外で strict block mode を有効にしてはいけません。
+- legacy forwarder / migration wrapper が `*_FORWARDER=deprecated`、`*_FORWARDER_SEVERITY=fix-now`、または caller chain 付きの移行警告を出した場合は、元の作業を続ける前に呼び出し元を特定し、canonical command へ移行します。すぐ移行できない場合は blocker として run bundle、issue、PR body に残します。
+- migration wrapper を呼び得る subagent handoff、tool prompt、workflow prompt には、警告に含まれる caller chain と移行先 command を入れ、「legacy forwarder warning が出たら呼び出し元を移行してから元 task へ戻る」と明記します。
 - GitPush、GitHub branch publish、`gh pr create/edit/checks/comment`、および `github_publish.py` による PR evidence 作成は user task の実行そのものです。prompt secret 以外の hook / checker finding を理由に publish / PR 作業を止めず、finding は warning、PR body、run bundle、または closeout 修復対象へ回します。
 - 新しい guardrail を追加するときは、`documents/codex-configuration-reference.md` の hook severity policy に従い、block / warning / closeout gate のどれか、修復 command、ログ保存先、false-positive 時の記録先を同じ差分に含めます。
 
@@ -148,8 +150,8 @@ contract listed in `documents/README.md`.
 - Agents must not merge PRs, close PRs/issues, mark draft PRs ready for review, dismiss reviews, delete branches, enable auto-merge, request reviewers, or bypass failing/missing checks unless the user explicitly authorizes that mutation in the current task or a repository-maintainer policy in tracked docs grants that exact action.
 - A generic statement that `gh` is available is permission to inspect and prepare PR operations, not permission to merge or close. If merge/close/readiness is the next required step but authority is absent, record the blocker in the PR body, run bundle, issue, or `goal.md` instead of guessing.
 - `goal.md` may record `pr_mutation_authority`. Default `inspect_and_prepare_only` means local agents inspect, push owned branches, create/update PRs, and publish evidence only.
-- `github_copilot_merge_when_green` delegates merge authority to GitHub-hosted Copilot / PR automation after required checks and reviews are green. It does not authorize local Codex to merge from `gh`, dismiss reviews, bypass checks, or rely on chat-only evidence.
-- Copilot / PR automation decisions must be visible in the PR through `COPILOT_PR_AUTHORITY`, `COPILOT_PR_DECISION`, `COPILOT_PR_CHECKS`, `COPILOT_VISIBLE_EVIDENCE`, and `COPILOT_BLOCKER` lines before readiness or merge mutation.
+- `github_pr_automation_when_green` delegates merge authority to GitHub PR automation after required checks and reviews are green. It does not authorize local Codex to merge from `gh`, dismiss reviews, bypass checks, or rely on chat-only evidence.
+- GitHub PR automation decisions must be visible in the PR through `GITHUB_PR_AUTOMATION_AUTHORITY`, `GITHUB_PR_AUTOMATION_DECISION`, `GITHUB_PR_AUTOMATION_CHECKS`, `GITHUB_AUTOMATION_VISIBLE_EVIDENCE`, and `GITHUB_AUTOMATION_BLOCKER` lines before readiness or merge mutation.
 - After an authorized PR merge or close, immediately update the downstream template/submodule pin evidence and rerun the relevant freshness, sync, dependency, and CI gates.
 
 ## Required Before Implementation

@@ -1,7 +1,6 @@
 <!--
 @dependency-start
 responsibility Documents Shared Runtime Surfaces for this repository.
-upstream design ./github-copilot-configuration.md GitHub Copilot configuration surface
 downstream design ./shared-runtime-surfaces.toml machine-readable surface manifest
 downstream design ./runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
 downstream implementation ../tools/agent_tools/surface_manifest.py parses the surface manifest
@@ -63,8 +62,8 @@ Edit the `vendor/agent-canon/` source, then repair the root view with:
 bash tools/sync_agent_canon.sh link-root
 ```
 
-Core runtime surfaces include `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`,
-`.claude/`, `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
+Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
+`.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
 `.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, `mcp/`, and `tools/`.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime-profiles-and-check-matrix.md`.
@@ -88,9 +87,7 @@ Inventory and review tooling should distinguish these roles: `tools/` at the
 root is the AgentCanon tool view, and `vendor/agent-canon/tools/` is the
 AgentCanon tool source.
 
-GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`,
-`.github/copilot-instructions.md`, `.github/instructions/`, and
-`.github/agents/`.
+GitHub-facing AgentCanon symlink views include `.github/AGENTS.md`.
 
 Shared policy documents are not exposed as root `documents/` symlink views in
 template or derived repositories. They remain available under

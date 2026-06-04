@@ -740,7 +740,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / "README.md").write_text("# AgentCanon\n", encoding="utf-8")
         (work_dir / "ROOT_AGENTS.md").write_text("# Root agents\n", encoding="utf-8")
-        (work_dir / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
         (work_dir / "tools" / "agent_tools").mkdir(parents=True)
         shutil.copy2(
             REPO_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
@@ -765,9 +764,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'owner = "agent-canon"',
                     'class = "runtime_surface"',
                     'paths = [',
-                    '  "CLAUDE.md",',
                     '  ".github/AGENTS.md",',
-                    '  ".github/copilot-instructions.md",',
                     ']',
                     '',
                     '[[group]]',
@@ -842,10 +839,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             "# GitHub agents\n",
             encoding="utf-8",
         )
-        (work_dir / ".github" / "copilot-instructions.md").write_text(
-            "# Copilot instructions\n",
-            encoding="utf-8",
-        )
         (work_dir / ".github" / "workflows" / "agent-coordination.yml").write_text(
             "name: agent coordination\n",
             encoding="utf-8",
@@ -860,7 +853,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "add",
                 "README.md",
                 "ROOT_AGENTS.md",
-                "CLAUDE.md",
                 ".github",
                 "documents",
                 "tools",
@@ -1039,10 +1031,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     / "PULL_REQUEST_TEMPLATE"
                     / "agent_canon.md"
                 ).read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                (repo / ".github" / "copilot-instructions.md").readlink().as_posix(),
-                "../vendor/agent-canon/.github/copilot-instructions.md",
             )
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 

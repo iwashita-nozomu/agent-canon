@@ -52,8 +52,8 @@ path_allowed() {
       [[ "$path" == .gitmodules ]] && return 0
       [[ "$path" == .agent-canon/* ]] && return 0
       [[ "$path" == vendor/agent-canon ]] && return 0
-      [[ "$path" == AGENTS.md || "$path" == CLAUDE.md ]] && return 0
-      [[ "$path" == .agents || "$path" == .claude || "$path" == agents ]] && return 0
+      [[ "$path" == AGENTS.md ]] && return 0
+      [[ "$path" == .agents || "$path" == agents ]] && return 0
       [[ "$path" == .codex/* || "$path" == .github/* ]] && return 0
       [[ "$path" == documents/* || "$path" == memory/* || "$path" == notes/* ]] && return 0
       [[ "$path" == mcp || "$path" == tools || "$path" == tests/agent_tools/* || "$path" == tests/tools/* ]] && return 0

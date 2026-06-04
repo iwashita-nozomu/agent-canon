@@ -1,6 +1,6 @@
 ---
 name: agent-orchestration
-description: Mandatory first skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, run bundles, or Codex/Claude/Copilot routing.
+description: Mandatory first skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing.
 ---
 <!--
 @dependency-start
@@ -16,6 +16,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
 1. Read `agents/skills/agent-orchestration.md`.
 1. Read `agents/TASK_WORKFLOWS.md`, `agents/canonical/CLI_ENTRYPOINTS.md`, and `agents/canonical/CODEX_SUBAGENTS.md` before making any routing choice.
 1. For repository tasks, keep convention verification in the execution path: include `python3 tools/agent_tools/check_convention_compliance.py` in the selected workflow closeout gates instead of restating every mechanical convention inside this prompt.
+1. If the user explicitly asks for coding, implementation, or patch work to be delegated to subagents, treat that as explicit subagent implementation routing. Add `$subagent-bootstrap`; do not satisfy the request with read-only survey or review roles only.
 1. First classify the request into one of these modes:
    - `repo-changing execution`: the user is asking to edit the repo, start the run, or produce a concrete kickoff command now
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
@@ -59,5 +60,6 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - for execution tasks, the first work-update declaration `workflow=<family>`, `skills=<...>`, `review=<...>`
 1. For PR-producing repository tasks, carry that first routing declaration into the PR body, run bundle, or linked comment with `skills=$agent-orchestration` first and the result of `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` when prompt-derived routing is relevant.
 1. Mention Codex implementation routing only when implementation is in scope. Read `agents/canonical/CODEX_SUBAGENTS.md` before assigning agents.
-1. For Routine docs or Focused code, parent-direct implementation is allowed after the risk class and check matrix are fixed. For subagent implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
+1. For Routine docs or Focused code, parent-direct implementation is allowed after the risk class and check matrix are fixed. If the user requested subagent coding delegation, parent-direct is a fallback only after the write-capable subagent route is blocked and recorded. For subagent implementation, talk about `spark_worker` only after bootstrap or task-start output exposes `IMPLEMENTATION_CODEX_AGENTS`. Use `spark_worker` first only for approved, design-traced slices that are one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable; use `worker` when design interpretation, broad architecture, scope judgment, or conflict resolution is required.
+1. Once requirements, bounded `allowed_paths`, write scope, validation plan, and tool-rejection preflight are fixed for an explicit subagent coding request, schedule or launch `spark_worker` / `worker` before adding more read-only waves. If runtime authorization or tool gates block the write-capable spawn, record `WRITE_SUBAGENT_AUTHORIZATION=required` or the gate-specific blocker in the run bundle instead of replacing implementation with more read-only analysis.
 1. Do not route detailed design, review, or final judgment to `spark_worker`.

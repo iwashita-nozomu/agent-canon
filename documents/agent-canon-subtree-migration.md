@@ -139,7 +139,6 @@ remote 名や一台の host path に合わせて変えません。
 - `tools/docs/audit_and_fix_links.py`
 - `tools/docs/check_markdown_lint.py`
 - `tools/docs/check_markdown_math.py`
-- `tools/docs/mirror_skill_shims.py`
 - `tools/agent_tools/bootstrap_agent_run.py`
 - `tools/agent_tools/smoke_test_research_perspective_pack.py`
 - `tools/agent_tools/validate_role_write_scope.py`
@@ -156,7 +155,7 @@ remote 名や一台の host path に合わせて変えません。
 root 側は owner class ごとに薄い wrapper、symlink view、copy surface、regular active contract を分けます。
 
 - AgentCanon-owned symlink views:
-  - `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`, `.claude/`, `.codex/`, `mcp/`, `tools/`
+  - `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, `tools/`
   - AgentCanon-owned shared policy docs listed in `documents/shared-runtime-surfaces.toml`
   - AgentCanon-owned `tests/agent_tools/` and `tests/tools/` mirror tests
 - GitHub path constraint copy surfaces:

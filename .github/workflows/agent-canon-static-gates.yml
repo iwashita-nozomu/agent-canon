@@ -8,7 +8,6 @@
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
 # upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-# upstream implementation ../../tools/docs/mirror_skill_shims.py validates skill mirror parity
 # upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates Codex runtime role config
 # upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py validates Codex agent role prompts
 # upstream implementation ../../tools/agent_tools/smoke_test_research_perspective_pack.py validates research review pack routing
@@ -82,7 +81,6 @@ jobs:
           python3 tools/agent_tools/issue_sync.py
           python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id "agent-canon-static-gates-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           python3 tools/agent_tools/eval_accumulation_check.py
-          python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
           python3 tools/agent_tools/check_agent_runtime_alignment.py
           python3 tools/agent_tools/smoke_test_research_perspective_pack.py
           python3 tools/agent_tools/check_convention_compliance.py

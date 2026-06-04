@@ -584,7 +584,7 @@ class AgentImprovementGuide:
             "-->",
             "",
             "This generated guide is read-only evidence. Use it to choose a local",
-            "Agent or Copilot PR repair branch; do not let the workflow rewrite",
+            "Codex repair branch; do not let the workflow rewrite",
             "skills, workflows, tools, or memory directly.",
             "",
             "## Evidence Summary",
@@ -774,7 +774,6 @@ def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
     return (
         Path(".agents") / "skills" / slug / "SKILL.md",
         Path("agents") / "skills" / f"{slug}.md",
-        Path(".claude") / "skills" / slug / "SKILL.md",
     )
 
 
@@ -808,7 +807,7 @@ def guidance(summary: EvidenceSummary) -> list[str]:
     if not lines:
         lines.append("- No immediate memory/eval/hook/issue improvement target was detected.")
     lines.append(
-        "- Local Agent or Copilot PR should make the actual skill/workflow/tool edits and attach validation evidence."
+        "- Local Codex should make the actual skill/workflow/tool edits and attach validation evidence."
     )
     return lines
 

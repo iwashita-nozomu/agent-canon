@@ -42,6 +42,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - Codex の model / reasoning policy は `.codex/config.toml` の `agent_model_policy` を正本にする
 - approved packet で完全に切れる低リスク slice は `agent_model_policy` の Spark coding bucket を first implementation candidate とする
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier bucket は統合判断、設計判断、最終責任に集中する
+- user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence であり完了条件ではありません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に `.codex/config.toml` の Spark bucket で fresh default subagent を再試行する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier bucket に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
@@ -138,6 +139,10 @@ Constraints:
 - Write-capable `worker` / `spark_worker` instances are blocked until
   `goal.md` is parseable, the Codex goal view is mirrored or queued, and the
   Plan-mode output contains evidence mapping.
+- This write-capable block is for goal-driven tasks. Ordinary repo-changing
+  tasks with explicit implementation delegation do not require `goal.md`;
+  they require a run bundle, bounded `allowed_paths`, write scope, validation
+  plan, and tool-rejection preflight before `spark_worker` / `worker`.
 - If rate limits force fewer agents, keep `requirements_organizer` and
   `explorer`; record why `execution_planner` or `plan_reviewer` was deferred.
 - Handoffs must include `agents/workflows/codex-goals-workflow.md`,
@@ -322,6 +327,7 @@ model list を重複管理しません。
 - Spark bucket は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
 - `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
 - 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は mini review wave に切ります。
+- user が coding / implementation / patch work の subagent 委譲を明示した task では、Spark read-only wave は write-capable handoff の準備です。実装可能な scope が固定された後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、read-only role だけで完了扱いにしません。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます

@@ -69,10 +69,12 @@ Agent report archive snapshots use:
 .agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl
 ```
 
-Codex runtime summary exporters use:
+Codex runtime summary exporters use per-chat summary files plus one
+cross-chat index:
 
 ```text
-.agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl
+.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl
+.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl
 ```
 
 Agent run reports use:
@@ -82,6 +84,10 @@ Agent run reports use:
 ```
 
 `<repo-key>` is derived from the source repository root name plus a short hash.
+`<conversation-id>` is the Codex thread/session identifier normalized as one
+path segment. The summary payload also records `conversation_id`, `session_id`,
+and `thread_id` so chat-local raw evidence and cross-chat analysis stay
+traceable without storing prompt text.
 `<runtime-namespace>` is derived from `AGENT_CANON_HOOK_RUN_NAMESPACE`,
 devcontainer/Compose metadata, or the existing host/repo fallback.
 
@@ -133,7 +139,10 @@ repo's ignored `reports/.cache/` or `reports/agent-runtime-dashboard/` paths.
 Codex runtime summaries are derived from the local Codex runtime state
 (`history.jsonl`, `logs_2.sqlite`, and optional legacy session JSONL). They
 store bounded counters, token observations, and runtime attribution only; prompt
-text and raw tool output stay out of the archive.
+text and raw tool output stay out of the archive. Raw local Codex files may
+remain in Codex-owned storage, but AgentCanon accumulation stores chat-scoped
+summaries and a minimal `index.jsonl` rather than mixing all chat evidence into
+one flat summary stream.
 
 Normal unattended operation uses one command:
 

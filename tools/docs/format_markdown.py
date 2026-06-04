@@ -2,13 +2,16 @@
 # @dependency-start
 # responsibility Provides format markdown documentation tooling.
 # upstream design ../README.md shared automation index
+# upstream implementation ./fix_mermaid.py fixes Mermaid fenced blocks.
+# downstream implementation ../../tests/tools/test_fix_mermaid.py validates Mermaid formatter wiring.
 # @dependency-end
 
-"""
-Simple Markdown formatter:
+"""Simple Markdown formatter.
+
 - normalize line endings to LF
 - remove trailing spaces
 - collapse more than 2 consecutive blank lines to 2
+- fix Mermaid fenced blocks
 - ensure file ends with a single newline
 
 Usage: format_markdown.py [paths...]
@@ -17,14 +20,18 @@ If no paths given, formats common doc directories: README.md, documents/, notes/
 import sys
 from pathlib import Path
 
+from fix_mermaid import fix_mermaid_markdown
+
 
 def process_text(text: str) -> str:
+    """Return formatted Markdown text."""
     # Normalize CRLF to LF
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text, _ = fix_mermaid_markdown(text)
     # Remove trailing spaces on each line
-    lines = [ln.rstrip() for ln in text.split("\n")]
+    lines: list[str] = [ln.rstrip() for ln in text.split("\n")]
     # Collapse more than 2 blank lines
-    out_lines = []
+    out_lines: list[str] = []
     blank_count = 0
     for ln in lines:
         if ln == "":
@@ -39,6 +46,7 @@ def process_text(text: str) -> str:
 
 
 def format_file(p: Path) -> bool:
+    """Format one file and return whether it changed."""
     try:
         original = p.read_text(encoding="utf-8")
     except Exception:
@@ -50,12 +58,13 @@ def format_file(p: Path) -> bool:
     return False
 
 
-def gather_targets(args):
+def gather_targets(args: list[str]) -> list[Path]:
+    """Collect Markdown files to format."""
     if args:
-        paths = [Path(a) for a in args]
+        paths: list[Path] = [Path(a) for a in args]
     else:
         paths = [Path("README.md"), Path("documents"), Path("notes"), Path("reviews")]
-    files = []
+    files: list[Path] = []
     for p in paths:
         if p.is_dir():
             for f in p.rglob("*.md"):
@@ -67,9 +76,10 @@ def gather_targets(args):
     return sorted(set(files))
 
 
-def main():
+def main() -> None:
+    """Run the CLI."""
     targets = gather_targets(sys.argv[1:])
-    changed = []
+    changed: list[str] = []
     for f in targets:
         ok = format_file(f)
         if ok:

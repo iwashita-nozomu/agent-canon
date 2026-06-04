@@ -24,7 +24,6 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
 EXPECTED_SKILL_SHIM_COUNT = 37
-EXPECTED_CLAUDE_SKILL_COUNT = 37
 EXPECTED_HUMAN_SKILL_DOC_COUNT = 59
 EXPECTED_WORKFLOW_DOC_COUNT = 22
 EXPECTED_CANONICAL_DOC_COUNT = 6
@@ -80,7 +79,6 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         }
 
         self.assertEqual(globs[".agents/skills/*/SKILL.md"], 41)
-        self.assertEqual(globs[".claude/skills/*/SKILL.md"], 41)
         self.assertEqual(globs["agents/skills/*.md"], 63)
         self.assertEqual(globs["agents/workflows/*.md"], 22)
         self.assertEqual(globs["agents/canonical/*.md"], 6)

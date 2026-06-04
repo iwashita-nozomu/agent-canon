@@ -6,8 +6,8 @@ upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../.claude/skills/prose-reasoning-graph/SKILL.md mirrors this workflow for Claude-compatible runtimes
 downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI usage
 @dependency-end
 -->
@@ -30,6 +30,9 @@ macro-claims, rhetorical moves, reader-state transitions, and similar prose
 objects are projection views over the same graph. Section and paragraph nodes
 remain source form containers and reader-order anchors, not derived macro
 claims.
+Skill handoffs preserve the graph contract vocabulary explicitly: source truth,
+lower graph, typed relation, projection view, node record, edge record, and
+`payload_json`.
 Projection views may also recommend presentation forms such as prose,
 bulleted lists, ordered lists, tables, figures, or equations. Treat these as
 rewrite hints grounded in source anchors, not as permission to replace the
@@ -40,10 +43,23 @@ review expectations, and evaluation criteria.
 
 It does not replace `$long-form-writing`, `$report-writing`,
 `$academic-writing`, `$paper-writing`, `$literature-survey`,
-`$structure-planning`, `logic-gap-review`, `citation-evidence-review`,
-`$experiment-lifecycle`, or `$result-artifact-writeout`. It reduces their
-context burden by giving them structured evidence, edit operations, and rewrite
-packets.
+`$structure-planning`, `$formal-proof-workflow`, `logic-gap-review`,
+`citation-evidence-review`, `$experiment-lifecycle`, or
+`$result-artifact-writeout`. It reduces their context burden by giving them
+structured evidence, verification routes, edit operations, and rewrite packets.
+Document responsibility gaps are `document-canon` graph diagnostics produced by
+Rust `structured-analysis`. They enter the same diagnostic, integration,
+verification, and rewrite loop as prose graph findings. The Python prose parser
+does not emit them directly; workflows use `structured-analysis build` or
+`import-document-inventory` to materialize them in the structured graph DB.
+When that DB comes from `structured-analysis`, it may contain diagnostics
+without prose rewrite operations. `project`, `lint`, `explain`, and `integrate`
+must still consume the shared `diagnostics` table; `rewrite-packet` is only for
+DBs where an analysis pass has emitted a concrete edit operation id.
+`document_responsibility_gap` diagnostics carry
+`document_responsibility_verification` route metadata so this skill can expand
+coverage-rule questions recursively as graph diagnostics with downstream
+rewrite and rerun obligations.
 
 ## Use When
 
@@ -58,18 +74,55 @@ packets.
 
 ## Standard Sequence
 
-1. Store graph DB and generated outputs under the active run bundle, report, or
-   other task-local artifact directory.
+1. Let `ingest` or `ingest-set` create the graph DB under
+   `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
+   unless the workflow explicitly passes `--db <graph.sqlite>`. Store
+   generated outputs and stats under the active run bundle, report, or other
+   task-local artifact directory.
 1. Run `ingest` on the source Markdown/plain text with `--prompt` or
    `--prompt-file` when user request context can identify the intended corpus.
-   Always use `--stats-out`.
+   Always use `--stats-out`, then pass the emitted
+   `PROSE_REASONING_GRAPH_DB` path to later graph commands.
 1. Run `analyze --profile <writing|logic|experiment|report|academic|paper|all>`
-   with `--stats-out`.
-1. Export `project`, `lint`, `explain`, and `integrate` outputs with
-   `--stats-out`; read the stats JSON before opening larger artifacts.
+   with `--stats-out`. This derives prose, logic, evidence, experiment, and
+   presentation layers.
+1. When the task also judges whether repository documents satisfy their declared
+   responsibility, run `agent-canon structured-analysis build` or import the
+   document inventory so `document-canon` diagnostics live in the graph DB.
+   Route those diagnostics through the same integration and verification loop as
+   prose diagnostics. A structured-analysis DB does not have to contain
+   `edit_operations`; operations count `0` is valid for responsibility-only
+   diagnosis.
+1. Export `project`, `lint`, `explain`, and `integrate` outputs with `--out`
+   and `--stats-out`; read the stats JSON before opening larger artifacts.
+   Do not print full projection, diagnostics, explanation, integration,
+   handoff, or rewrite structures to chat or CLI stdout.
 1. For each proposed operation that should be rewritten, export
-   `rewrite-packet --op <operation-id>`.
+   `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
+   only diagnostics and no edit-operation ids.
 1. Export `skill-handoff` and pass it to the receiving skill or reviewer.
+1. If diagnostics include a verification route, verify before rewrite:
+   `logic-gap-review` checks inference validity, `$literature-survey` and
+   `citation-evidence-review` check external evidence, `$formal-proof-workflow`
+   checks mathematical/proof-like or implementation-derived claims,
+   `$experiment-lifecycle` checks testable empirical claims, and
+   `$structure-planning` checks reader-state or discourse-connection validity.
+   `document_responsibility_verification` expands dependency-manifest coverage
+   rules, maps each missing group to the downstream document span that should
+   carry it, and reruns `structured-analysis` to close or preserve the finding.
+1. Expand verification recursively inside this skill. For each unresolved
+   route, create child questions from the route's recursive steps, hand each
+   child to the listed verifier, add verified evidence or limitations back into
+   the structure packet, rerun graph diagnostics, and repeat until every leaf is
+   verified, explicitly limited, or recorded as an unresolved blocker/warn.
+   Unresolved leaves must not become settled prose.
+1. When the receiving skill is a writing skill, rerun graph diagnostics after
+   each DSL/projection rewrite and keep looping until active findings for the
+   selected profile are gone. Revise the structure contract, graph-backed
+   rewrite packet, or source draft at the structural layer before writing final
+   prose. If findings do not converge after targeted sentence, section, or
+   structure rewrites, record a prompt-defect finding instead of treating the
+   report as complete.
 1. Treat graph diagnostics as advisory evidence. Final prose, review, and
    publication authority stays with the receiving skill.
 

@@ -57,7 +57,6 @@ selector です。`agents/canonical/README.md` は layout appendix として扱�
 - `documents/mcp-preflight-and-fallback-policy.md`
 - `documents/issue-label-taxonomy.md`
 - `documents/prompt-skill-evaluation-checklist.md`
-- `documents/github-copilot-configuration.md`
 - `documents/template-github-remote.md`
 - `documents/runtime-profiles-and-check-matrix.md`
 - `documents/template-agent-canon-audit-resolution.md`
@@ -73,7 +72,7 @@ active. The activation and validation policy is
 [Runtime Profiles And Check Matrix](documents/runtime-profiles-and-check-matrix.md).
 
 - Agent runtime surfaces are active when an agent performs or reviews work.
-- Claude, GitHub/Copilot, devcontainer, Docker, experiment, C++, memory, and
+- GitHub automation, devcontainer, Docker, experiment, C++, memory, and
   maintenance surfaces are profile-specific.
 - Full repo validation is still available, but day-to-day checks should be
   selected by changed path and risk class.
@@ -89,11 +88,9 @@ root の入口は symlink view または明示的な synced copy にします。
 Installed root views:
 
 - `vendor/agent-canon/`: AgentCanon submodule pin。shared workflow、skills、tools、MCP、docs の正本。
-- `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex / Copilot 向けの薄い root entrypoint。
-- `CLAUDE.md -> vendor/agent-canon/CLAUDE.md`: Claude Code compatibility entrypoint。
+- `AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md`: Codex 向けの薄い root entrypoint。
 - `agents -> vendor/agent-canon/agents`: workflow、canonical docs、task catalog の root view。
 - `.agents -> vendor/agent-canon/.agents`: Codex skill discovery 用の root view。
-- `.claude -> vendor/agent-canon/.claude`: Claude compatibility mirror の root view。
 - `.codex/config.toml -> vendor/agent-canon/.codex/config.toml`: Codex runtime config の共有 view。
 - `.codex/agents -> vendor/agent-canon/.codex/agents`: Codex subagent role TOML の共有 view。
 - `.devcontainer -> vendor/agent-canon/.devcontainer`: devcontainer profile の共有 view。
@@ -102,8 +99,6 @@ Installed root views:
 - `documents/*`: template / derived repo root では active contract だけを regular file として残し、AgentCanon-owned shared policy docs は `vendor/agent-canon/documents/` から読みます。
 - `memory/*`、`notes/*`、`tests/*`: `vendor/agent-canon/documents/SHARED_RUNTIME_SURFACES.md` に従って shared surface だけを root view にします。
 - `.github/AGENTS.md`: root `.github/AGENTS.md` から symlink される GitHub agent entrypoint。
-- `.github/copilot-instructions.md`: root `.github/copilot-instructions.md` から symlink される Copilot entrypoint。
-- `documents/github-copilot-configuration.md`: standalone AgentCanon の Copilot configuration catalog。template / derived repo root では `vendor/agent-canon/documents/github-copilot-configuration.md` から読み、root `documents/` へ symlink しません。
 - `.github/workflows/agent-coordination.yml`: root `.github/workflows/agent-coordination.yml` へ同期される workflow source。
 - `.github/workflows/agent-canon-static-gates.yml`: standalone AgentCanon PR / push で tool catalog、tool drift、dependency review、workflow convention、container config の軽量 gate を走らせる workflow。
 - `.github/PULL_REQUEST_TEMPLATE.md`: standalone AgentCanon repository 用の独立 PR checklist。template root へ同期しません。

@@ -28,7 +28,7 @@ PR_MUTATION_AUTHORITY_VALUES = (
     "inspect_and_prepare_only",
     "ready_for_review_when_green",
     "merge_when_green",
-    "github_copilot_merge_when_green",
+    "github_pr_automation_when_green",
 )
 DEFAULT_EXIT_CRITERIA = (
     (

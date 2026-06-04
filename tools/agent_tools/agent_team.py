@@ -64,7 +64,6 @@ DOC_SUFFIXES = {".md", ".rst", ".txt"}
 CONFIG_SUFFIXES = {".json", ".toml", ".yaml", ".yml"}
 DOC_OR_RUNTIME_PATH_MARKERS = (
     ".agents/",
-    ".claude/",
     ".codex/",
     ".devcontainer/",
     ".github/",

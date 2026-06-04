@@ -12,7 +12,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import sqlite3
 from collections import Counter
@@ -50,6 +52,7 @@ SKILL_HANDOFF_TARGETS = (
     "$paper-writing",
     "$literature-survey",
     "$structure-planning",
+    "$formal-proof-workflow",
     "logic-gap-review",
     "citation-evidence-review",
     "$experiment-lifecycle",
@@ -128,13 +131,11 @@ EXPERIMENT_CUES = (
     "metric",
     "baseline",
     "expected",
-    "result",
     "仮説",
     "実験",
     "指標",
     "ベースライン",
     "期待",
-    "結果",
 )
 STOPWORDS = {
     "the",
@@ -167,6 +168,10 @@ STOPWORDS = {
 }
 SQLITE_BUSY_TIMEOUT_SECONDS = 30
 WSL_MOUNT_MIN_PATH_PARTS = 3
+DEFAULT_DB_HOME_ENV = "AGENT_CANON_PROSE_GRAPH_HOME"
+DEFAULT_DB_NAME = "prose_graph.sqlite"
+DEFAULT_CACHE_HASH_LENGTH = 12
+VERIFICATION_RECURSION_MAX_DEPTH = 3
 FORM_NODE_LABEL_WORD_LIMIT = 8
 CONCEPT_CANDIDATE_LIMIT = 12
 CONCEPT_MIN_TERM_LENGTH = 3
@@ -194,6 +199,7 @@ class Node:
     """One graph node used in projections."""
 
     node_id: str
+    document_id: str
     layer: str
     kind: str
     label: str
@@ -227,6 +233,7 @@ class Diagnostic:
     message: str
     target_node_id: str
     target_edge_id: str
+    action: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -272,11 +279,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest = subparsers.add_parser("ingest", help="Ingest Markdown/plain text into a graph DB.")
     ingest.add_argument("input", type=Path)
-    ingest.add_argument("--db", type=Path, required=True)
+    ingest.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
     ingest.add_argument("--kind", default="document")
     ingest.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
     ingest.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
     add_stats_out(ingest)
+
+    ingest_set = subparsers.add_parser("ingest-set", help="Ingest multiple Markdown/plain text files into one graph DB.")
+    ingest_set.add_argument("inputs", nargs="+", type=Path)
+    ingest_set.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    ingest_set.add_argument("--kind", default="document")
+    ingest_set.add_argument("--recursive", action="store_true", help="Recurse into input directories.")
+    ingest_set.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
+    ingest_set.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
+    add_stats_out(ingest_set)
 
     analyze = subparsers.add_parser("analyze", help="Analyze graph layers.")
     add_db_profile(analyze)
@@ -358,6 +374,66 @@ def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def graph_db_path(args: argparse.Namespace, inputs: Sequence[Path]) -> Path:
+    """Return the explicit or default graph DB path for DB-creating commands."""
+    explicit_db = getattr(args, "db", None)
+    if isinstance(explicit_db, Path):
+        return explicit_db
+    db_path = default_graph_db_path(inputs)
+    args.db = db_path
+    return db_path
+
+
+def default_graph_db_path(inputs: Sequence[Path]) -> Path:
+    """Return the user-home cache path for an ingested source set."""
+    return default_graph_home().joinpath(repo_cache_key(), source_cache_key(inputs), DEFAULT_DB_NAME)
+
+
+def default_graph_home() -> Path:
+    """Return the root directory for generated prose graph DBs."""
+    configured = os.environ.get(DEFAULT_DB_HOME_ENV)
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".cache" / "agent-canon" / "prose-reasoning-graph"
+
+
+def repo_cache_key() -> str:
+    """Return a stable cache key for the current repository/workspace."""
+    root = Path.cwd().resolve()
+    label = sanitize_cache_segment(root.name or "workspace")
+    return f"{label}-{short_hash(root.as_posix())}"
+
+
+def source_cache_key(inputs: Sequence[Path]) -> str:
+    """Return a stable cache key for one source or a multi-source ingest set."""
+    if len(inputs) == 1:
+        first_input = inputs[0]
+        label = first_input.stem if first_input.is_file() else first_input.name
+    else:
+        label = "ingest-set"
+    digest_basis = "\n".join(resolved_path_text(input_path) for input_path in inputs)
+    return f"{sanitize_cache_segment(label)}-{short_hash(digest_basis)}"
+
+
+def resolved_path_text(path: Path) -> str:
+    """Return a normalized path string for cache hashing."""
+    try:
+        return path.resolve().as_posix()
+    except OSError:
+        return path.absolute().as_posix()
+
+
+def short_hash(value: str) -> str:
+    """Return a short stable hash for cache path disambiguation."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:DEFAULT_CACHE_HASH_LENGTH]
+
+
+def sanitize_cache_segment(value: str) -> str:
+    """Return a filesystem-safe cache path segment."""
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("_")
+    return sanitized or "workspace"
+
+
 def connect(path: Path) -> sqlite3.Connection:
     """Open a SQLite connection and enable foreign keys."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -381,6 +457,15 @@ def sqlite_target(path: Path) -> str | Path:
 def is_wsl_mount(path: Path) -> bool:
     """Return true for Linux paths under /mnt/*."""
     return path.is_absolute() and len(path.parts) >= WSL_MOUNT_MIN_PATH_PARTS and path.parts[1] == "mnt"
+
+
+def table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    """Return true when the connected graph DB has a table."""
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
 
 
 def initialize_schema(connection: sqlite3.Connection) -> None:
@@ -454,6 +539,21 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     connection.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)",
         ("schema_version", str(SCHEMA_VERSION)),
+    )
+
+
+def clear_database(connection: sqlite3.Connection) -> None:
+    """Remove all graph data before a fresh ingest."""
+    connection.executescript(
+        """
+        DELETE FROM metadata;
+        DELETE FROM judgements;
+        DELETE FROM edit_operations;
+        DELETE FROM diagnostics;
+        DELETE FROM edges;
+        DELETE FROM nodes;
+        DELETE FROM documents;
+        """
     )
 
 
@@ -581,6 +681,132 @@ def insert_diagnostic(
     )
 
 
+def verification_action_for_rule(rule: str) -> dict[str, object]:
+    """Return a verification route for uncertain logic, evidence, or connections."""
+    if rule in {"unsupported_claim", "claim_without_evidence_layer"}:
+        return {
+            "add": "evidence, warrant, limitation, or verification result",
+            "verification_route": "claim_support_verification",
+            "verification_question": "Is the claim supported by source evidence, a valid warrant, a formal proof obligation, or a stated limitation?",
+            "verification_targets": ["logic-gap-review", "$literature-survey", "citation-evidence-review"],
+            "conditional_verification_targets": [
+                {
+                    "target": "$formal-proof-workflow",
+                    "when": "the claim is mathematical, proof-like, or implementation-derived",
+                }
+            ],
+            "evidence_required": ["source packet", "citation or measured result", "explicit warrant or proof obligation"],
+            "recursive_verification": recursive_verification_for_route("claim_support_verification"),
+        }
+    if rule == "topic_jump_without_bridge":
+        return {
+            "add": "verified bridge, explicit relation, reorder decision, or separation",
+            "verification_route": "connection_verification",
+            "verification_question": "Do the adjacent units share a valid discourse relation, missing premise, or reader-state transition?",
+            "verification_targets": ["$structure-planning", "logic-gap-review"],
+            "conditional_verification_targets": [
+                {
+                    "target": "$literature-survey",
+                    "when": "the bridge depends on an external factual or scholarly premise",
+                }
+            ],
+            "evidence_required": ["relation label", "shared question or warrant", "reader-state before/after"],
+            "recursive_verification": recursive_verification_for_route("connection_verification"),
+        }
+    if rule.startswith("experiment_") or rule == "metric_without_baseline":
+        return {
+            "add": "experiment-plan field or documented not-applicable decision",
+            "verification_route": "experiment_plan_verification",
+            "verification_question": "Is the experiment claim testable with a hypothesis, metric, baseline, and expected result?",
+            "verification_targets": ["$experiment-lifecycle", "$report-writing"],
+            "evidence_required": ["hypothesis", "metric", "baseline", "expected result", "run or rerun decision"],
+            "recursive_verification": recursive_verification_for_route("experiment_plan_verification"),
+        }
+    return {}
+
+
+def recursive_verification_for_route(route: str) -> dict[str, object]:
+    """Return recursive verification expansion rules for one route."""
+    common: dict[str, object] = {
+        "max_depth": VERIFICATION_RECURSION_MAX_DEPTH,
+        "closure_condition": "all child questions have evidence, checked proof/experiment evidence, an explicit limitation, or an unresolved-leaf record",
+        "unresolved_leaf_policy": "do not rewrite as settled prose; record blocker/warn with owner, route, missing evidence, and next verification command",
+    }
+    if route == "claim_support_verification":
+        return {
+            **common,
+            "steps": [
+                {
+                    "id": "decompose_claim",
+                    "route": "logic-gap-review",
+                    "question": "What are the atomic claim, assumptions, warrants, and evidence requirements?",
+                    "if_unresolved": "create child claim_support_verification items for each missing premise or warrant",
+                },
+                {
+                    "id": "verify_external_support",
+                    "route": "$literature-survey / citation-evidence-review",
+                    "question": "Does a source packet, citation, measurement, or contrary source settle each atomic claim?",
+                    "if_unresolved": "record missing source packet or limitation and keep the child open",
+                },
+                {
+                    "id": "verify_formal_obligation",
+                    "route": "$formal-proof-workflow",
+                    "question": "If the claim is mathematical, proof-like, or implementation-derived, can a proof obligation be checked?",
+                    "if_unresolved": "record proof_status and the exact missing checker, command, lemma, or environment",
+                },
+            ],
+        }
+    if route == "connection_verification":
+        return {
+            **common,
+            "steps": [
+                {
+                    "id": "classify_relation",
+                    "route": "$structure-planning",
+                    "question": "What discourse relation or reader-state transition is claimed between the adjacent units?",
+                    "if_unresolved": "try reorder, separation, or explicit limitation before adding a bridge",
+                },
+                {
+                    "id": "verify_missing_premise",
+                    "route": "logic-gap-review",
+                    "question": "Does the connection require an unstated premise or warrant?",
+                    "if_unresolved": "create child claim_support_verification items for the missing premise",
+                },
+                {
+                    "id": "verify_external_bridge",
+                    "route": "$literature-survey",
+                    "question": "Does the bridge depend on external factual or scholarly support?",
+                    "if_unresolved": "record missing source packet or remove the bridge claim",
+                },
+            ],
+        }
+    if route == "experiment_plan_verification":
+        return {
+            **common,
+            "steps": [
+                {
+                    "id": "decompose_empirical_claim",
+                    "route": "$experiment-lifecycle",
+                    "question": "What hypothesis, metric, baseline, expected result, and stop condition are required?",
+                    "if_unresolved": "create child experiment_plan_verification items for each missing field",
+                },
+                {
+                    "id": "verify_measurement_contract",
+                    "route": "$experiment-lifecycle",
+                    "question": "Can the metric be measured with a valid denominator, directionality, and comparison?",
+                    "if_unresolved": "record rerun or protocol-design blocker",
+                },
+                {
+                    "id": "verify_report_claim",
+                    "route": "$report-writing",
+                    "question": "Does the report claim stay within the verified experiment result and limitations?",
+                    "if_unresolved": "downgrade to limitation or keep the claim out of prose",
+                },
+            ],
+        }
+    return common
+
+
 def insert_operation(
     connection: sqlite3.Connection,
     operation_id: str,
@@ -603,22 +829,13 @@ def insert_operation(
 def command_ingest(args: argparse.Namespace) -> int:
     """Run ingest command."""
     input_path = cast(Path, args.input)
+    db_path = graph_db_path(args, [input_path])
     text = input_path.read_text(encoding="utf-8")
     prompt_text = prompt_context(args)
     corpus_hints = infer_corpus_hints(text, prompt_text)
-    with connect(cast(Path, args.db)) as connection:
+    with connect(db_path) as connection:
         initialize_schema(connection)
-        connection.executescript(
-            """
-            DELETE FROM metadata;
-            DELETE FROM judgements;
-            DELETE FROM edit_operations;
-            DELETE FROM diagnostics;
-            DELETE FROM edges;
-            DELETE FROM nodes;
-            DELETE FROM documents;
-            """
-        )
+        clear_database(connection)
         set_metadata(connection, "corpus_hints", corpus_hints)
         set_metadata(
             connection,
@@ -628,27 +845,116 @@ def command_ingest(args: argparse.Namespace) -> int:
                 "prompt_supplied": bool(prompt_text.strip()),
             },
         )
-        document_id = "doc:1"
-        title = infer_title(text, input_path)
+        ingest_document(
+            connection,
+            input_path,
+            text,
+            document_id="doc:1",
+            source_node_id="src:1",
+            kind=cast(str, args.kind),
+        )
+    emit_command_stats(args, "PROSE_REASONING_GRAPH_INGEST", {"PROSE_REASONING_GRAPH_DB": str(db_path)})
+    return 0
+
+
+def command_ingest_set(args: argparse.Namespace) -> int:
+    """Run multi-document ingest command."""
+    input_args = cast(Sequence[Path], args.inputs)
+    db_path = graph_db_path(args, input_args)
+    input_paths = expand_ingest_inputs(input_args, bool(args.recursive))
+    prompt_text = prompt_context(args)
+    documents = [(path, path.read_text(encoding="utf-8")) for path in input_paths]
+    corpus_hints = infer_corpus_hints("\n\n".join(text for _, text in documents), prompt_text)
+    with connect(db_path) as connection:
+        initialize_schema(connection)
+        clear_database(connection)
+        set_metadata(connection, "corpus_hints", corpus_hints)
+        set_metadata(
+            connection,
+            "corpus_hint_inputs",
+            {
+                "document_paths": [str(path) for path, _ in documents],
+                "prompt_supplied": bool(prompt_text.strip()),
+            },
+        )
         connection.execute(
             "INSERT INTO documents(id, path, title, kind, created_at) VALUES (?, ?, ?, ?, ?)",
-            (document_id, str(input_path), title, cast(str, args.kind), utc_now()),
+            ("doc:analysis", "analysis://collection", "Document collection analysis", "analysis", utc_now()),
         )
-        insert_node(
-            connection,
-            "src:1",
-            document_id,
-            "source",
-            "document",
-            title,
-            text,
-            0,
-            len(text),
-            payload={"path": str(input_path), "kind": cast(str, args.kind)},
-        )
-        ingest_blocks(connection, document_id, text, str(input_path))
-    emit_command_stats(args, "PROSE_REASONING_GRAPH_INGEST", {"PROSE_REASONING_GRAPH_DB": str(args.db)})
+        for index, (path, text) in enumerate(documents, start=1):
+            ingest_document(
+                connection,
+                path,
+                text,
+                document_id=f"doc:{index}",
+                source_node_id=f"src:{index}",
+                kind=cast(str, args.kind),
+                node_prefix=f"d{index}:",
+            )
+    emit_command_stats(
+        args,
+        "PROSE_REASONING_GRAPH_INGEST_SET",
+        {
+            "PROSE_REASONING_GRAPH_DB": str(db_path),
+            "PROSE_REASONING_GRAPH_DOCUMENTS": len(documents),
+        },
+    )
     return 0
+
+
+def expand_ingest_inputs(inputs: Sequence[Path], recursive: bool) -> list[Path]:
+    """Expand file and directory inputs for multi-document ingest."""
+    output: list[Path] = []
+    for input_path in inputs:
+        if input_path.is_dir():
+            pattern = "**/*" if recursive else "*"
+            output.extend(
+                path
+                for path in sorted(input_path.glob(pattern))
+                if path.is_file() and path.suffix.lower() in {".md", ".markdown", ".txt"}
+            )
+            continue
+        if input_path.is_file():
+            output.append(input_path)
+            continue
+        raise ValueError(f"ingest input does not exist: {input_path}")
+    if not output:
+        raise ValueError("ingest-set found no input files")
+    return output
+
+
+def ingest_document(
+    connection: sqlite3.Connection,
+    input_path: Path,
+    text: str,
+    *,
+    document_id: str,
+    source_node_id: str,
+    kind: str,
+    node_prefix: str = "",
+) -> None:
+    """Insert one source document and its source/form nodes."""
+    title = infer_title(text, input_path)
+    connection.execute(
+        "INSERT INTO documents(id, path, title, kind, created_at) VALUES (?, ?, ?, ?, ?)",
+        (document_id, str(input_path), title, kind, utc_now()),
+    )
+    insert_node(
+        connection,
+        source_node_id,
+        document_id,
+        "source",
+        "document",
+        title,
+        text,
+        0,
+        len(text),
+        payload={
+            "path": str(input_path),
+            "kind": kind,
+        },
+    )
+    ingest_blocks(connection, document_id, text, str(input_path), node_prefix=node_prefix)
 
 
 def prompt_context(args: argparse.Namespace) -> str:
@@ -733,7 +1039,14 @@ def infer_title(text: str, path: Path) -> str:
     return path.stem.replace("_", " ").replace("-", " ").strip() or "document"
 
 
-def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, source_locator: str) -> None:
+def ingest_blocks(
+    connection: sqlite3.Connection,
+    document_id: str,
+    text: str,
+    source_locator: str,
+    *,
+    node_prefix: str = "",
+) -> None:
     """Ingest headings, paragraphs, and sentences."""
     blocks = markdown_blocks(text)
     section_stack: list[str] = []
@@ -747,7 +1060,7 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, s
         if block_text.startswith("#"):
             level = len(block_text) - len(block_text.lstrip("#"))
             label = block_text[level:].strip()
-            node_id = f"sec:{index}"
+            node_id = f"{node_prefix}sec:{index}"
             section_stack = section_stack[: max(level - 1, 0)]
             section_stack.append(node_id)
             insert_node(
@@ -769,7 +1082,7 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, s
             )
         else:
             paragraph_index += 1
-            node_id = f"p:{paragraph_index}"
+            node_id = f"{node_prefix}p:{paragraph_index}"
             insert_node(
                 connection,
                 node_id,
@@ -790,7 +1103,7 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, s
             if previous_block_id:
                 insert_edge(
                     connection,
-                    f"order:{previous_block_id}->{node_id}",
+                    f"{node_prefix}order:{previous_block_id}->{node_id}",
                     "presentation",
                     "precedes",
                     previous_block_id,
@@ -807,7 +1120,7 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, s
                 sentence_index += 1
                 sentence_start = text.find(sentence, start, end)
                 sentence_end = sentence_start + len(sentence) if sentence_start >= 0 else end
-                sentence_id = f"s:{sentence_index}"
+                sentence_id = f"{node_prefix}s:{sentence_index}"
                 insert_node(
                     connection,
                     sentence_id,
@@ -827,7 +1140,7 @@ def ingest_blocks(connection: sqlite3.Connection, document_id: str, text: str, s
                 )
                 insert_edge(
                     connection,
-                    f"contains:{node_id}->{sentence_id}",
+                    f"{node_prefix}contains:{node_id}->{sentence_id}",
                     "form",
                     "contains",
                     node_id,
@@ -992,11 +1305,14 @@ def analyze_graph(connection: sqlite3.Connection, profile: str) -> None:
     add_edit_operations(connection, paragraphs)
     add_explanation_layer(connection, document_id, profile)
     add_section_edges(connection, sections, paragraphs)
-    add_diagnostics(connection, paragraphs, claims, evidence)
+    add_diagnostics(connection, paragraphs, claims, evidence, profile)
 
 
 def fetch_document_id(connection: sqlite3.Connection) -> str:
-    """Return the single document id."""
+    """Return the document id that should own analysis overlays."""
+    analysis_row = connection.execute("SELECT id FROM documents WHERE id = ?", ("doc:analysis",)).fetchone()
+    if analysis_row is not None:
+        return str(analysis_row["id"])
     row = connection.execute("SELECT id FROM documents ORDER BY id LIMIT 1").fetchone()
     if row is None:
         raise ValueError("database has no document; run ingest first")
@@ -1020,11 +1336,12 @@ def fetch_nodes(
         values.append(kind)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = connection.execute(
-        f"SELECT * FROM nodes {where} ORDER BY source_start, id", values
+        f"SELECT * FROM nodes {where} ORDER BY document_id, source_start, id", values
     ).fetchall()
     return tuple(
         Node(
             node_id=str(row["id"]),
+            document_id=str(row["document_id"]),
             layer=str(row["layer"]),
             kind=str(row["kind"]),
             label=str(row["label"]),
@@ -1210,6 +1527,9 @@ def first_discourse_signal(text: str) -> str:
         "例えば",
         "具体例",
         "このため",
+        "この図",
+        "また",
+        "次は",
         "根拠",
         "制限",
     )
@@ -1263,6 +1583,7 @@ def add_argument_layer(
             claims.append(
                 Node(
                     claim_id,
+                    document_id,
                     "argument",
                     "claim",
                     first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
@@ -1305,6 +1626,7 @@ def add_evidence_layer(
             evidence_nodes.append(
                 Node(
                     evidence_id,
+                    document_id,
                     "evidence",
                     "evidence",
                     first_words(sentence.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
@@ -1395,17 +1717,16 @@ def add_experiment_layer(connection: sqlite3.Connection, document_id: str, sente
     """Extract experiment-planning nodes."""
     counters: Counter[str] = Counter()
     for sentence in sentences:
-        lowered = sentence.text.lower()
         kind = ""
-        if any(cue in lowered for cue in ("hypothesis", "仮説")):
+        if has_any(sentence.text, ("hypothesis", "仮説")):
             kind = "hypothesis"
-        elif any(cue in lowered for cue in ("metric", "指標")):
+        elif has_any(sentence.text, ("metric", "指標")):
             kind = "metric"
-        elif any(cue in lowered for cue in ("baseline", "ベースライン")):
+        elif has_any(sentence.text, ("baseline", "ベースライン")):
             kind = "baseline"
-        elif any(cue in lowered for cue in ("experiment", "protocol", "実験")):
+        elif has_any(sentence.text, ("experiment", "protocol", "実験")):
             kind = "experiment"
-        elif any(cue in lowered for cue in ("expected", "期待")):
+        elif has_any(sentence.text, ("expected", "期待")):
             kind = "expected_result"
         if kind:
             counters[kind] += 1
@@ -1454,7 +1775,20 @@ def add_section_edges(connection: sqlite3.Connection, sections: Sequence[Node], 
 def has_any(text: str, cues: Iterable[str]) -> bool:
     """Return true when text contains any cue."""
     lowered = text.lower()
-    return any(cue in lowered for cue in cues)
+    return any(cue_present(lowered, cue) for cue in cues)
+
+
+def cue_present(lowered_text: str, cue: str) -> bool:
+    """Return true when cue appears as a standalone cue."""
+    lowered_cue = cue.lower()
+    if lowered_cue.isascii() and re.fullmatch(r"[a-z0-9_-]+", lowered_cue):
+        return bool(
+            re.search(
+                rf"(?<![a-z0-9_-]){re.escape(lowered_cue)}(?![a-z0-9_-])",
+                lowered_text,
+            )
+        )
+    return lowered_cue in lowered_text
 
 
 def add_diagnostics(
@@ -1462,6 +1796,7 @@ def add_diagnostics(
     paragraphs: Sequence[Node],
     claims: Sequence[Node],
     evidence_nodes: Sequence[Node],
+    profile: str,
 ) -> None:
     """Add rule-based diagnostics."""
     support_edges = connection.execute(
@@ -1478,7 +1813,7 @@ def add_diagnostics(
                 "blocker",
                 "unsupported_claim",
                 f"Claim `{claim.node_id}` has no supporting evidence edge.",
-                action={"add": "evidence or limitation"},
+                action=verification_action_for_rule("unsupported_claim"),
             )
     if any(has_any(paragraph.text, EXPERIMENT_CUES) for paragraph in paragraphs):
         experiment_kinds = {
@@ -1510,7 +1845,16 @@ def add_diagnostics(
                 "Experiment planning lacks an expected-result node.",
             )
     for index, (left, right) in enumerate(zip(paragraphs, paragraphs[1:]), start=1):
-        if lexical_overlap(left.text, right.text) < TOPIC_JUMP_MAX_OVERLAP and not first_discourse_signal(right.text):
+        if left.document_id != right.document_id:
+            continue
+        if section_path(left) != section_path(right):
+            continue
+        if (
+            lexical_overlap(left.text, right.text) < TOPIC_JUMP_MAX_OVERLAP
+            and not first_discourse_signal(right.text)
+            and not is_structured_presentation_block(left.text)
+            and not is_structured_presentation_block(right.text)
+        ):
             insert_diagnostic(
                 connection,
                 f"diag:topic-jump:{index}",
@@ -1519,14 +1863,37 @@ def add_diagnostics(
                 "warn",
                 "topic_jump_without_bridge",
                 f"Paragraph `{left.node_id}` to `{right.node_id}` has low shared terms and no bridge cue.",
-                action={"add": "bridge sentence or explicit relation"},
+                action=verification_action_for_rule("topic_jump_without_bridge"),
             )
     if claims and not evidence_nodes:
         insert_document_diagnostic(connection, "claim_without_evidence_layer", "Claims exist but the evidence layer has no evidence nodes.")
-    add_layer_coverage_diagnostic(connection)
+    add_layer_coverage_diagnostic(connection, profile)
 
 
-def insert_document_diagnostic(connection: sqlite3.Connection, rule: str, message: str) -> None:
+def is_structured_presentation_block(text: str) -> bool:
+    """Return true for blocks whose boundary is expected to be visually abrupt."""
+    return bool(re.match(r"(?:```|\||[-*]\s+|\d+[.]\s+)", text.lstrip()))
+
+
+def safe_identifier(value: str) -> str:
+    """Return a compact id-safe suffix."""
+    return re.sub(r"[^A-Za-z0-9_.:-]+", "_", value)
+
+
+def section_path(node: Node) -> tuple[str, ...]:
+    """Return a node's section path from source-anchor payload."""
+    raw_path = node.payload.get("section_path", [])
+    if not isinstance(raw_path, list):
+        return ()
+    return tuple(str(item) for item in cast(list[object], raw_path))
+
+
+def insert_document_diagnostic(
+    connection: sqlite3.Connection,
+    rule: str,
+    message: str,
+    action: dict[str, object] | None = None,
+) -> None:
     """Insert a document-level diagnostic."""
     row = connection.execute("SELECT id FROM nodes WHERE layer = 'source' LIMIT 1").fetchone()
     target = str(row["id"]) if row else ""
@@ -1538,19 +1905,41 @@ def insert_document_diagnostic(connection: sqlite3.Connection, rule: str, messag
         "warn",
         rule,
         message,
+        action=action if action is not None else verification_action_for_rule(rule),
     )
 
 
-def add_layer_coverage_diagnostic(connection: sqlite3.Connection) -> None:
+def add_layer_coverage_diagnostic(connection: sqlite3.Connection, profile: str) -> None:
     """Record layer coverage as diagnostic metadata."""
     counts = layer_counts(connection)
-    missing = [layer for layer in LAYERS if counts.get(layer, 0) == 0 and layer != "diagnostics"]
+    missing = [layer for layer in required_layers_for_profile(profile) if counts.get(layer, 0) == 0]
     if missing:
         insert_document_diagnostic(
             connection,
             "missing_layer_representation",
             f"Missing graph layer representations: {', '.join(missing)}.",
         )
+
+
+def required_layers_for_profile(profile: str) -> tuple[str, ...]:
+    """Return layers expected for one analysis profile."""
+    base_layers = (
+        "source",
+        "form",
+        "concept",
+        "phase",
+        "discourse",
+        "presentation",
+        "projection",
+        "explanation",
+    )
+    if profile == "experiment":
+        return (*base_layers, "experiment")
+    if profile in {"logic", "academic", "paper"}:
+        return (*base_layers, "argument", "evidence")
+    if profile == "all":
+        return (*base_layers, "argument", "evidence", "experiment")
+    return base_layers
 
 
 def add_edit_operations(connection: sqlite3.Connection, paragraphs: Sequence[Node]) -> None:
@@ -1647,9 +2036,10 @@ def layer_counts(connection: sqlite3.Connection) -> dict[str, int]:
     for row in connection.execute("SELECT layer, COUNT(*) AS count FROM edges GROUP BY layer"):
         counts[str(row["layer"])] += int(row["count"])
     diagnostics_count = connection.execute("SELECT COUNT(*) AS count FROM diagnostics").fetchone()
-    operations_count = connection.execute("SELECT COUNT(*) AS count FROM edit_operations").fetchone()
     counts["diagnostics"] += int(diagnostics_count["count"]) if diagnostics_count else 0
-    counts["edit-operation"] += int(operations_count["count"]) if operations_count else 0
+    if table_exists(connection, "edit_operations"):
+        operations_count = connection.execute("SELECT COUNT(*) AS count FROM edit_operations").fetchone()
+        counts["edit-operation"] += int(operations_count["count"]) if operations_count else 0
     return dict(counts)
 
 
@@ -1676,11 +2066,25 @@ def render_diagnostics(connection: sqlite3.Connection, profile: str) -> str:
         lines.append("No diagnostics recorded.")
     else:
         for item in diagnostics:
+            verification_suffix = diagnostic_verification_summary(item)
             lines.append(
-                f"- `{item.severity}` `{item.rule}` target=`{item.target_node_id or item.target_edge_id}`: {item.message}"
+                f"- `{item.severity}` `{item.rule}` target=`{item.target_node_id or item.target_edge_id}`: "
+                f"{item.message}{verification_suffix}"
             )
     lines.append("")
     return "\n".join(lines)
+
+
+def diagnostic_verification_summary(diagnostic: Diagnostic) -> str:
+    """Return a compact verification route suffix for one diagnostic."""
+    route = diagnostic.action.get("verification_route")
+    if not route:
+        return ""
+    targets = diagnostic.action.get("verification_targets", [])
+    target_text = ", ".join(str(target) for target in cast(list[object], targets)) if isinstance(targets, list) else ""
+    if target_text:
+        return f" verification_route=`{route}` targets=`{target_text}`"
+    return f" verification_route=`{route}`"
 
 
 def fetch_diagnostics(connection: sqlite3.Connection) -> tuple[Diagnostic, ...]:
@@ -1695,6 +2099,7 @@ def fetch_diagnostics(connection: sqlite3.Connection) -> tuple[Diagnostic, ...]:
             message=str(row["message"]),
             target_node_id=str(row["target_node_id"]),
             target_edge_id=str(row["target_edge_id"]),
+            action=read_json_object(str(row["suggested_action_json"])),
         )
         for row in rows
     )
@@ -1726,6 +2131,7 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
         "profile": profile,
         "graph_db": str(db_path),
         "canonical_graph": "text_anchored_semantic_graph",
+        "documents": fetch_document_records(connection),
         "corpus_hints": metadata_json(connection, "corpus_hints", []),
         "layers": {layer: counts.get(layer, 0) for layer in LAYERS},
         "skill_handoffs": skill_handoffs(profile, db_path),
@@ -1736,6 +2142,21 @@ def projection_payload(connection: sqlite3.Connection, profile: str, db_path: Pa
         "diagnostics": diagnostics,
         "edit_operations": operations,
     }
+
+
+def fetch_document_records(connection: sqlite3.Connection) -> list[dict[str, object]]:
+    """Return document records in projection-friendly form."""
+    rows = connection.execute("SELECT id, path, title, kind, created_at FROM documents ORDER BY id").fetchall()
+    return [
+        {
+            "document_id": str(row["id"]),
+            "path": str(row["path"]),
+            "title": str(row["title"]),
+            "kind": str(row["kind"]),
+            "created_at": str(row["created_at"]),
+        }
+        for row in rows
+    ]
 
 
 def source_anchor_nodes(nodes: Sequence[Node]) -> tuple[Node, ...]:
@@ -1908,6 +2329,8 @@ def fetch_edges(connection: sqlite3.Connection) -> tuple[Edge, ...]:
 
 def fetch_operations(connection: sqlite3.Connection) -> tuple[EditOperation, ...]:
     """Fetch edit operations."""
+    if not table_exists(connection, "edit_operations"):
+        return ()
     rows = connection.execute("SELECT * FROM edit_operations ORDER BY id").fetchall()
     output: list[EditOperation] = []
     for row in rows:
@@ -1944,6 +2367,16 @@ def skill_handoffs(profile: str, db_path: Path) -> list[dict[str, object]]:
             "diagnostics": "run prose_reasoning_graph.py lint",
             "explanation": "run prose_reasoning_graph.py explain",
             "rewrite_plan": "run prose_reasoning_graph.py integrate",
+            "projection_fields": [
+                "canonical_graph",
+                "source_anchors",
+                "projection_views",
+                "projection_views[].recommended_format",
+                "projection_views[].format_reason",
+                "corpus_hints",
+                "diagnostics",
+                "edit_operations",
+            ],
         }
         for target in targets
     ]
@@ -2009,8 +2442,10 @@ def render_explanation(connection: sqlite3.Connection, profile: str, db_path: Pa
         lines.append("- No discourse edges recorded.")
     lines.extend(["", "## Gaps", ""])
     for diagnostic in diagnostics[:EXPLANATION_DIAGNOSTIC_LIMIT]:
+        verification_suffix = diagnostic_verification_summary(diagnostic)
         lines.append(
-            f"- `{diagnostic.severity}` `{diagnostic.rule}` on `{diagnostic.target_node_id}`: {diagnostic.message}"
+            f"- `{diagnostic.severity}` `{diagnostic.rule}` on `{diagnostic.target_node_id}`: "
+            f"{diagnostic.message}{verification_suffix}"
         )
     if not diagnostics:
         lines.append("- No graph diagnostics recorded.")
@@ -2047,6 +2482,7 @@ def command_integrate(args: argparse.Namespace) -> int:
 def render_integration_plan(connection: sqlite3.Connection, profile: str) -> str:
     """Render edit operation plan."""
     operations = fetch_operations(connection)
+    diagnostics = fetch_diagnostics(connection)
     lines = [
         "# Prose Reasoning Graph Integration Plan",
         "",
@@ -2069,7 +2505,85 @@ def render_integration_plan(connection: sqlite3.Connection, profile: str) -> str
         )
     if not operations:
         lines.append("No edit operations recorded.")
+    lines.extend(render_verification_routes(diagnostics))
     return "\n".join(lines)
+
+
+def render_verification_routes(diagnostics: Sequence[Diagnostic]) -> list[str]:
+    """Render verification routes for uncertain logic, evidence, or connections."""
+    routed = [diagnostic for diagnostic in diagnostics if diagnostic.action.get("verification_route")]
+    lines = ["", "## Verification Routes", ""]
+    if not routed:
+        lines.append("No verification routes recorded.")
+        return lines
+    for diagnostic in routed:
+        action = diagnostic.action
+        targets = action.get("verification_targets", [])
+        conditional_targets = action.get("conditional_verification_targets", [])
+        evidence_required = action.get("evidence_required", [])
+        lines.extend(
+            [
+                f"### `{diagnostic.rule}` on `{diagnostic.target_node_id or diagnostic.target_edge_id}`",
+                "",
+                f"- route: `{action.get('verification_route')}`",
+                f"- question: {action.get('verification_question')}",
+                f"- targets: {format_list(targets)}",
+                f"- conditional_targets: {format_conditional_targets(conditional_targets)}",
+                f"- evidence_required: {format_list(evidence_required)}",
+            ]
+        )
+        lines.extend(format_recursive_verification(action.get("recursive_verification")))
+        lines.append("")
+    return lines
+
+
+def format_list(value: object) -> str:
+    """Format a JSON list as Markdown text."""
+    if isinstance(value, list) and value:
+        return ", ".join(f"`{item}`" for item in cast(list[object], value))
+    return "`not_recorded`"
+
+
+def format_conditional_targets(value: object) -> str:
+    """Format conditional target payloads as Markdown text."""
+    if not isinstance(value, list) or not value:
+        return "`not_recorded`"
+    parts: list[str] = []
+    for item in cast(list[object], value):
+        if isinstance(item, dict):
+            payload = cast(dict[str, object], item)
+            target = payload.get("target", "unknown")
+            condition = payload.get("when", "unspecified")
+            parts.append(f"`{target}` when {condition}")
+    return "; ".join(parts) if parts else "`not_recorded`"
+
+
+def format_recursive_verification(value: object) -> list[str]:
+    """Format recursive verification payload as Markdown lines."""
+    if not isinstance(value, dict):
+        return ["- recursive_verification: `not_recorded`"]
+    payload = cast(dict[str, object], value)
+    lines = [
+        f"- recursive_max_depth: `{payload.get('max_depth', 'not_recorded')}`",
+        f"- closure_condition: {payload.get('closure_condition', 'not_recorded')}",
+        f"- unresolved_leaf_policy: {payload.get('unresolved_leaf_policy', 'not_recorded')}",
+        "- recursive_steps:",
+    ]
+    steps = payload.get("steps", [])
+    if not isinstance(steps, list) or not steps:
+        lines.append("  - `not_recorded`")
+        return lines
+    for item in cast(list[object], steps):
+        if not isinstance(item, dict):
+            continue
+        step = cast(dict[str, object], item)
+        lines.append(
+            "  - "
+            f"`{step.get('id', 'step')}` route=`{step.get('route', 'not_recorded')}` "
+            f"question={step.get('question', 'not_recorded')} "
+            f"if_unresolved={step.get('if_unresolved', 'not_recorded')}"
+        )
+    return lines
 
 
 def command_rewrite_packet(args: argparse.Namespace) -> int:
@@ -2088,6 +2602,8 @@ def command_rewrite_packet(args: argparse.Namespace) -> int:
 
 def fetch_operation(connection: sqlite3.Connection, operation_id: str) -> EditOperation:
     """Fetch one operation."""
+    if not table_exists(connection, "edit_operations"):
+        raise ValueError("graph DB has no edit_operations table; run analyze on an ingest DB before rewrite-packet")
     row = connection.execute("SELECT * FROM edit_operations WHERE id = ?", (operation_id,)).fetchone()
     if row is None:
         raise ValueError(f"missing edit operation: {operation_id}")
@@ -2152,6 +2668,8 @@ def command_skill_handoff(args: argparse.Namespace) -> int:
 def render_skill_handoff(profile: str, db_path: Path) -> str:
     """Render skill handoff Markdown."""
     handoffs = skill_handoffs(profile, db_path)
+    with connect(db_path) as connection:
+        diagnostics = fetch_diagnostics(connection)
     lines = [
         "# Prose Reasoning Graph Skill Handoff",
         "",
@@ -2171,9 +2689,11 @@ def render_skill_handoff(profile: str, db_path: Path) -> str:
                 f"- prose_graph_diagnostics: {item['diagnostics']}",
                 f"- prose_graph_explanation: {item['explanation']}",
                 f"- prose_graph_rewrite_plan: {item['rewrite_plan']}",
+                f"- projection_fields: `{', '.join(cast(list[str], item['projection_fields']))}`",
                 "",
             ]
         )
+    lines.extend(render_verification_routes(diagnostics))
     lines.extend(
         [
             "## Authority Boundary",
@@ -2198,6 +2718,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "ingest":
             return command_ingest(args)
+        if args.command == "ingest-set":
+            return command_ingest_set(args)
         if args.command == "analyze":
             return command_analyze(args)
         if args.command == "lint":

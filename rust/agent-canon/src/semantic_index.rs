@@ -4276,7 +4276,6 @@ fn is_alignment_or_log_surface(path: &str) -> bool {
         || path.starts_with("reports/")
         || path.starts_with(".agent-canon/")
         || path.starts_with(".agents/skills/")
-        || path.starts_with(".claude/skills/")
         || path.starts_with("agents/templates/_partials/")
         || path.starts_with("codex-cli-guide/source/")
         || path.starts_with("codex-cli-guide/sections/")
@@ -4295,11 +4294,9 @@ fn is_thin_doc_protected_surface(path: &str) -> bool {
     path == "README.md"
         || path == "AGENTS.md"
         || path == "ROOT_AGENTS.md"
-        || path == "CLAUDE.md"
         || path.ends_with("/README.md")
         || path.starts_with(".github/")
         || path.starts_with(".codex/")
-        || path.starts_with(".claude/")
 }
 
 fn is_thin_doc_non_candidate_surface(path: &str) -> bool {
@@ -4657,10 +4654,8 @@ fn responsibility_scope_bucket(path: &str) -> &'static str {
         return "external-skill-vendor";
     }
     if normalized == "AGENTS.md"
-        || normalized == "CLAUDE.md"
         || normalized == "ROOT_AGENTS.md"
         || normalized.starts_with(".agents/")
-        || normalized.starts_with(".claude/")
         || normalized.starts_with(".codex/")
         || normalized.starts_with(".devcontainer/")
         || normalized == "agent-canon-environment.toml"
@@ -6885,7 +6880,6 @@ mod tests {
         let root = unique_temp_dir("semantic-index-skip-alignment");
         fs::create_dir_all(root.join("documents")).unwrap();
         fs::create_dir_all(root.join(".agents/skills/example")).unwrap();
-        fs::create_dir_all(root.join(".claude/skills/example")).unwrap();
         fs::create_dir_all(root.join("agents/evals/results/example")).unwrap();
         fs::create_dir_all(root.join("agents/templates/_partials")).unwrap();
         fs::create_dir_all(root.join("codex-cli-guide/source")).unwrap();
@@ -6896,11 +6890,6 @@ mod tests {
         fs::write(root.join("documents").join("two.md"), mergeable_duplicate).unwrap();
         fs::write(
             root.join(".agents/skills/example").join("SKILL.md"),
-            mergeable_duplicate,
-        )
-        .unwrap();
-        fs::write(
-            root.join(".claude/skills/example").join("SKILL.md"),
             mergeable_duplicate,
         )
         .unwrap();
@@ -6964,7 +6953,6 @@ mod tests {
             let paths = [&pair.left.path, &pair.right.path];
             !paths.iter().any(|path| {
                 path.starts_with(".agents/")
-                    || path.starts_with(".claude/")
                     || path.starts_with("agents/evals/results/")
                     || path.starts_with("agents/templates/_partials/")
                     || path.starts_with("codex-cli-guide/source/")

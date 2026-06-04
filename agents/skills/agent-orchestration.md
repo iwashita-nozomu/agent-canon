@@ -20,7 +20,8 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 - skill、subagent、review、model / team policy、run bundle、runtime entrypoint を選ぶ
 - prompt、routing、subagent-config の refactor task で、まずどの policy surface を直すか決めたい
 - run bundle や review artifact の要否を決めたい
-- Codex / Claude / Copilot 間で共通ルールを保ちたい
+- Codex 内で共通ルールを保ちたい
+- user が coding / implementation / patch work の subagent 委譲を明示した
 
 ## Core References
 
@@ -128,6 +129,8 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - implementation が scope に入るときだけ routing を出します
 - `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
+- user が coding / implementation / patch work の subagent 委譲を明示した task は、read-only survey / review role だけで完了扱いにしません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
+- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残します。parent-direct 実装は、その blocker を記録した後の fallback として扱います。
 - Routine docs / Focused code では parent-direct を許可します。subagent 実装では、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。

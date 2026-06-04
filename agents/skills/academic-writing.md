@@ -7,7 +7,6 @@ upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design ../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
 downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex skill shim
-downstream implementation ../../.claude/skills/academic-writing/SKILL.md generated Claude skill mirror
 @dependency-end
 -->
 
@@ -39,6 +38,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 - section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
 - prose graph handoff がある場合は、unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
+- prose graph handoff から本文を書く場合は、reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。claim contract、evidence map、paragraph claim map、または graph-backed rewrite packet を直し、graph diagnostics を再実行してから draft する
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
@@ -63,6 +63,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 1. paragraph order や discourse connective が論点なら discourse-relations JSONL を構造 evidence として添付する
 1. `evidence map` と `notation ledger` を作る
 1. `section contract` と `paragraph claim map` を作る
+1. prose graph handoff が active なら、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
 1. run bundle を作る
 1. reader order で draft する

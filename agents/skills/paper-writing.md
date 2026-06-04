@@ -35,6 +35,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 - section order、first figure/table、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph-level claim flow、transition pair、logic gap が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
 - prose graph handoff がある場合は、claim/evidence gaps、weak transitions、experiment-plan gaps、split/merge/bridge/reorder operations を section contract と reviewer handoff に入れる
+- prose graph handoff から本文を書く場合は、reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。section contract、citation/evidence matrix、paragraph claim map、または graph-backed rewrite packet を直し、graph diagnostics を再実行してから draft する
 - `section contract` を `abstract`, `introduction`, `related work`, `method`, `results`, `discussion`, `limitations`, `conclusion` の粒度で決める
 - `citation and evidence matrix` を作り、主要 claim がどの citation / figure / table / derivation / appendix に支えられるかを書く
 - `notation ledger` と `paragraph claim map` を作る
@@ -50,6 +51,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 1. `section contract` を書く
 1. `citation and evidence matrix` と `notation ledger` を作る
 1. `paragraph claim map` を作る
+1. prose graph handoff が active なら、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. run bundle を作る
 1. reader order で draft する
 1. reverse outline を取る

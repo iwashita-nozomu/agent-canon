@@ -1106,8 +1106,6 @@ class DependencyManifestToolTest(unittest.TestCase):
         """Agent runtime docs and skill surfaces stay compatible with manifest tools."""
         paths = [
             ".agents/skills/codex-task-workflow/SKILL.md",
-            ".claude/skills/adaptive-improvement-loop/SKILL.md",
-            ".claude/skills/codex-task-workflow/SKILL.md",
             ".codex/README.md",
             "ROOT_AGENTS.md",
             "agents/TASK_WORKFLOWS.md",
