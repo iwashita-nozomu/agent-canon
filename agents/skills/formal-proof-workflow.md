@@ -31,8 +31,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 ## Core References
 
 - `agents/skills/literature-survey.md`
-- `agents/skills/research-workflow.md`
 - `agents/skills/academic-writing.md`
+- `agents/skills/long-form-writing.md`
+- `agents/skills/report-writing.md`
+- `agents/skills/research-workflow.md`
 - `agents/skills/paper-writing.md`
 - `documents/tools/formal_proof.md`
 - `references/agent-canon-technology-bibliography.md`
@@ -52,6 +54,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 - theorem stub に `<FORMAL_TARGET>`、`sorry`、`Admitted`、placeholder が残る限り `proof_status=unverified` とします。
 - 証明済み claim として採用するには、target proof assistant / solver の実行 log、tool version、import context、source file path を残します。
 - checker 済み fragment を採用したら、package-retained proof trace に theorem 名、checker command、消費 fragment、残る implementation-instantiation obligation を登録します。
+- proof note、証明整理ノート、reader-facing proof text を作る場合は文書作成系 skill を併用します。
+  - 数式が多く学術的な証明本文なら `$academic-writing` を使います。
+  - 長い note / guide / workflow 形なら `$long-form-writing` を使います。
+  - checker evidence や audit 結果を reader-facing にまとめる場合は `$report-writing` を使います。
 - 一つの proof topic では、証明本文、仮定、未証明 gap、checker evidence を
   原則として一つの canonical proof note に統合します。実装 code path の説明は
   Design 文書に置いてよいですが、KKT や収束性の証明本文を Design 側へ分散させません。
@@ -95,6 +101,8 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
      theorem target、gap ledger は proof note 側を正本にし、Design 側へ重複させない。
 1. Handoff:
    - 学術文章へ戻す場合は `$academic-writing` / `$paper-writing`
+   - proof note や長い証明整理文書へ戻す場合は `$academic-writing` または
+     `$long-form-writing`
    - 文献・既存 proof の source trail は `$literature-survey`
    - reader-facing report は `$report-writing`
 
