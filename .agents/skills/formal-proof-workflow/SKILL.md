@@ -17,6 +17,7 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
 1. Read `agents/skills/literature-survey.md` before web or paper search.
 1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations; for implementation-derived claims, use `--python-symbol path.py::qualname` to extract side-effect-free AST provenance first.
 1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan, target-language scaffold, existing-proof queries, and literature queries.
+1. Keep each proof topic's theorem target, assumptions, checked fragments, and remaining gaps in one canonical proof note whenever possible; implementation code-path explanation may live in Design docs, but the proof note must link that Design entry and the mathematical proof text must not be split across competing truth surfaces.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean/mathlib include docs, LeanSearch/Loogle/Moogle-style tools, Zulip archive, and in-editor tactic search when available. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or narrowing evidence.
