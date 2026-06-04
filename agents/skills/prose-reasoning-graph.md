@@ -126,6 +126,27 @@ rewrite and rerun obligations.
 1. Treat graph diagnostics as advisory evidence. Final prose, review, and
    publication authority stays with the receiving skill.
 
+## Runtime Tool Result Contract
+
+Runtime agents use the tool as a black box through bounded result artifacts.
+They do not need to read the tool design document during ordinary execution.
+The skill contract is:
+
+| Command | Runtime result | How the skill consumes it |
+| ------- | -------------- | ------------------------- |
+| `ingest` / `ingest-set` | Pass marker plus stats JSON containing `PROSE_REASONING_GRAPH_DB`; DB stored under the default cache unless `--db` is explicit. | Save the DB path and pass it to later commands. Do not read raw SQLite tables. |
+| `analyze` | Pass marker plus stats JSON; graph layers are added or refreshed inside the DB. | Treat the DB as updated intermediate state. Do not stream graph contents to chat. |
+| `lint --out` | Diagnostics Markdown plus stats JSON. | Read severity, rule, target, message, and `verification_route` summaries; classify active findings before rewrite. |
+| `integrate --out` | Integration Markdown with operation count and verification routes. | Follow recursive verification routes first. Operations count `0` is valid for structured-analysis DBs that contain diagnostics without rewrite operations. |
+| `skill-handoff --out` | Handoff Markdown naming receiving skills, DB path, projection fields, diagnostics, and routes. | Pass the bounded packet to the receiving skill; do not replace that skill's authority. |
+| `rewrite-packet --op` | One bounded rewrite packet with target ids, reason, preserve constraints, and do-not rules. | Use only when `integrate` exposed a concrete operation id. Skip for diagnostics-only DBs. |
+| `project --out` | Full projection JSON/YAML. | Reserve for reviewers or implementers that need complete graph evidence; default runtime flow reads stats, diagnostics, integration, and handoff first. |
+| `explain --out` | Natural-language graph explanation. | Use for user-facing or reviewer-readable summaries after diagnostics are already classified. |
+
+Full projection, diagnostics, explanation, integration, handoff, and rewrite
+packet bodies must be written with `--out`. Stdout is a status channel for pass
+markers and artifact paths.
+
 ## Required Outputs
 
 ```text

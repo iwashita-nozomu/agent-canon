@@ -23,6 +23,7 @@ from agent_team import (  # noqa: E402
     resolve_role,
     resolve_role_document_packet,
 )
+from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
 
 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
@@ -40,6 +41,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+
+    def test_permanent_team_mapping_requires_every_configured_role(self) -> None:
+        """The CODEX_SUBAGENTS mapping should not omit configured team roles."""
+        config = load_team_config()
+        subagents_path = PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        text = subagents_path.read_text(encoding="utf-8")
+        text_without_verifier = text.replace("| `verifier` | parent validation runner |\n", "")
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "permanent-team mapping missing roles: verifier",
+        ):
+            validate_permanent_team_mapping(config, text_without_verifier)
 
     def test_template_workspace_can_use_agent_canon_shared_docs(self) -> None:
         """Derived workspaces need not expose shared AgentCanon docs at root."""

@@ -69,6 +69,7 @@ TOOL_RESULT_ROUTE_MARKERS = (
     "OOP mechanical reports -> oop_readability_reviewer",
     "repo-wide drift and integration risk -> project_reviewer",
 )
+PERMANENT_TEAM_MAPPING_HEADING = "## Permanent Team To Codex Mapping"
 
 
 @dataclass(frozen=True)
@@ -526,6 +527,49 @@ def validate_subagent_protocol_docs() -> None:
     )
     for marker in TOOL_RESULT_ROUTE_MARKERS:
         ensure(marker in subagents_text, f"CODEX_SUBAGENTS.md missing tool route marker: {marker}")
+    validate_permanent_team_mapping(load_team_config(), subagents_text)
+
+
+def parse_permanent_team_mapping_roles(markdown_text: str) -> set[str]:
+    """Return role IDs listed in the CODEX_SUBAGENTS permanent-team mapping table."""
+    in_mapping = False
+    roles: set[str] = set()
+    for line in markdown_text.splitlines():
+        stripped = line.strip()
+        if stripped == PERMANENT_TEAM_MAPPING_HEADING:
+            in_mapping = True
+            continue
+        if in_mapping and stripped.startswith("## "):
+            break
+        if not in_mapping or not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) < 2 or cells[0] == "Permanent Team Role" or set(cells[0]) <= {"-", " "}:
+            continue
+        if cells[0].startswith("`") and cells[0].endswith("`"):
+            roles.add(cells[0].strip("`"))
+    return roles
+
+
+def validate_permanent_team_mapping(config: TeamConfig, markdown_text: str) -> None:
+    """Check every configured permanent-team role has a Codex route mapping row."""
+    expected_roles = {
+        role.id
+        for role in config.always_on_roles + config.specialist_roles
+    }
+    mapped_roles = parse_permanent_team_mapping_roles(markdown_text)
+    missing_roles = sorted(expected_roles - mapped_roles)
+    stale_roles = sorted(mapped_roles - expected_roles)
+    ensure(
+        not missing_roles,
+        "CODEX_SUBAGENTS.md permanent-team mapping missing roles: "
+        + ", ".join(missing_roles),
+    )
+    ensure(
+        not stale_roles,
+        "CODEX_SUBAGENTS.md permanent-team mapping has stale roles: "
+        + ", ".join(stale_roles),
+    )
 
 
 def validate_vendor_skill_adapters() -> None:

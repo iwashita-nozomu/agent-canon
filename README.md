@@ -2,6 +2,7 @@
 <!--
 @dependency-start
 responsibility Documents agent-canon for this repository.
+upstream design PHILOSOPHY.md AgentCanon design-time philosophy.
 upstream design AGENTS.md shared canon runtime contract
 upstream design LICENSE AgentCanon license text
 upstream design documents/agent-canon-licensing-policy.md AgentCanon license boundary
@@ -18,14 +19,15 @@ template や派生 repo に配布する shared agent canon の正本をここに
 人がこの repo を読む入口は次の順で固定します。
 
 1. `README.md`
+1. `PHILOSOPHY.md`
 1. `documents/README.md`
 1. `agents/README.md`
 1. `agents/workflows/README.md`
 
-`documents/README.md` は root `documents/` の索引、`agents/README.md` は
-workflow / skill / runtime hub、`agents/workflows/README.md` は workflow
-selector です。`agents/canonical/README.md` は layout appendix として扱い、
-最初の hub にはしません。
+`PHILOSOPHY.md` は設計時哲学の正本、`documents/README.md` は root
+`documents/` の索引、`agents/README.md` は workflow / skill / runtime hub、
+`agents/workflows/README.md` は workflow selector です。
+`agents/canonical/README.md` は layout appendix として扱い、最初の hub にはしません。
 
 ## このディレクトリの役割
 
@@ -33,11 +35,14 @@ selector です。`agents/canonical/README.md` は layout appendix として扱�
 - skill / subagent / runtime instruction の正本
 - shared runtime helper と validation helper の正本
 - shared canon の upstream sync と PR 運用の正本
+- design-time philosophy の正本
 
 ## 主な入口
 
 - `documents/README.md`
   - root `documents/` の索引
+- `PHILOSOPHY.md`
+  - 設計時哲学と安定原則の正本
 - `agents/README.md`
   - workflow / skill / runtime hub
 - `agents/workflows/README.md`

@@ -167,22 +167,39 @@ Constraints:
 | ------------------- | ---------------------------- |
 | `manager` | parent + `requirements_organizer` |
 | `manager_reviewer` | `manager_reviewer` |
-| `scheduler` | `execution_planner` |
-| `schedule_reviewer` | `plan_reviewer` |
 | `designer` | `detailed_designer` |
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
-| `citation_evidence_reviewer` | `citation_evidence_reviewer` |
 | `test_designer` | `test_designer` |
-| `notation_definition_reviewer` | `notation_definition_reviewer` |
-| `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `implementer` | `spark_worker` first for design-traced narrow slices; `worker` fallback for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
 | `final_reviewer` | `ship_reviewer`, then `reviewer` / `project_reviewer` when final gate escalation is needed |
-| `critical_guardian` | `project_reviewer` |
+| `verifier` | parent validation runner |
+| `auditor` | parent closeout and workflow-monitoring gate |
 | `researcher` | `literature_researcher` or `explorer` |
+| `research_reviewer` | `reviewer` |
+| `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
+| `experiment_reviewer` | `reviewer` |
+| `scheduler` | `execution_planner` |
+| `schedule_reviewer` | `plan_reviewer` |
+| `citation_evidence_reviewer` | `citation_evidence_reviewer` |
+| `notation_definition_reviewer` | `notation_definition_reviewer` |
+| `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `infra_steward` | parent + `docs_workflow_steward` or infrastructure-focused `worker` planning |
+| `infra_reviewer` | `reviewer` |
+| `reproducibility_reviewer` | `reproducibility_reviewer` |
+| `scientific_computing_reviewer` | `scientific_computing_reviewer` |
+| `benchmark_reviewer` | `benchmark_reviewer` |
+| `artifact_reviewer` | `artifact_reviewer` |
+| `fair_data_reviewer` | `fair_data_reviewer` |
+| `ml_science_reviewer` | `ml_science_reviewer` |
+| `project_reviewer` | `project_reviewer` |
+| `docs_workflow_steward` | `docs_workflow_steward` |
 | `prompt_config_reviewer` | `prompt_config_reviewer` |
+| `python_reviewer` | `python_reviewer` |
+| `cpp_reviewer` | `cpp_reviewer` |
+| `report_reviewer` | `report_reviewer` |
+| `critical_guardian` | `project_reviewer` |
 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`
