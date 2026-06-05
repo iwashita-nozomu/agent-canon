@@ -4,31 +4,27 @@
 # upstream design ../README.md shared automation index
 # @dependency-end
 
-"""
-Markdown Header Level Auto-Fixer
+"""Markdown header level auto-fixer.
 
 MD001 違反（header インクリメント）を自動修正します。
 H1 の後に H3 が続く場合、H3 を H2 に変換します。
 
 使用方法:
     python3 fix_markdown_headers.py [FILES...]
-    python3 fix_markdown_headers.py --dry-run [FILES...]  # プレビューのみ
 
 例:
     python3 fix_markdown_headers.py documents/
-    python3 fix_markdown_headers.py --dry-run *.md
 """
 
+import argparse
+import glob
 import re
 import sys
-import glob
 from pathlib import Path
-import argparse
-from typing import List, Tuple
 
 
-def fix_header_levels(content: str) -> Tuple[str, List[str]]:
-    """ヘッダーレベルを修正"""
+def fix_header_levels(content: str) -> tuple[str, list[str]]:
+    """Fix skipped Markdown header levels."""
     lines = content.split("\n")
     fixed_lines = []
     changes = []
@@ -63,31 +59,27 @@ def fix_header_levels(content: str) -> Tuple[str, List[str]]:
     return "\n".join(fixed_lines), changes
 
 
-def process_file(filepath: str, dry_run: bool = False) -> Tuple[bool, List[str]]:
-    """ファイルを処理"""
+def process_file(filepath: str) -> tuple[bool, list[str]]:
+    """Process one Markdown file."""
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            original_content = f.read()
+        path = Path(filepath)
+        original_content = path.read_text(encoding="utf-8")
 
         fixed_content, changes = fix_header_levels(original_content)
 
         if changes:
-            if not dry_run:
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(fixed_content)
+            path.write_text(fixed_content, encoding="utf-8")
             return True, changes
-        else:
-            return False, []
+        return False, []
     except Exception as e:
         print(f"❌ Error processing {filepath}: {e}", file=sys.stderr)
         return False, []
 
 
-def main():
-    """メイン処理"""
+def main() -> int:
+    """Run the CLI."""
     parser = argparse.ArgumentParser(description="Fix Markdown Header Levels (MD001)")
     parser.add_argument("files", nargs="*", default=["."], help="Files or directories to process")
-    parser.add_argument("--dry-run", action="store_true", help="Preview changes without modifying files")
     args = parser.parse_args()
 
     # ファイル収集
@@ -103,7 +95,11 @@ def main():
                 md_files.append(pattern)
 
     # フィルタリング - Path を str に変換
-    md_files = [str(f) for f in md_files if not any(x in str(f) for x in [".git", ".worktrees", "__pycache__", "Archive"])]
+    md_files = [
+        str(f)
+        for f in md_files
+        if not any(x in str(f) for x in [".git", ".worktrees", "__pycache__", "Archive"])
+    ]
     md_files = list(set(md_files))
 
     if not md_files:
@@ -114,7 +110,7 @@ def main():
     modified_files = 0
 
     for filepath in sorted(md_files):
-        has_changes, changes = process_file(filepath, dry_run=args.dry_run)
+        has_changes, changes = process_file(filepath)
         if has_changes:
             rel_path = filepath.replace("./", "").replace("/workspace/", "")
             print(f"\n📄 {rel_path}:")
@@ -123,9 +119,7 @@ def main():
                 total_changes += 1
             modified_files += 1
 
-    print(f"\n{'📋 Preview' if args.dry_run else '✅ Fixed'}: {total_changes} header level(s) in {modified_files} file(s)")
-    if args.dry_run:
-        print("(Use without --dry-run to apply changes)")
+    print(f"\n✅ Fixed: {total_changes} header level(s) in {modified_files} file(s)")
 
     return 0
 

@@ -7,6 +7,7 @@ upstream design catalog.yaml public skill family catalog
 upstream design structure-planning.md reusable structure contract skill
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design prose-reasoning-graph.md prose graph diagnostics and handoff overlay
+upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream design html-output.md consumes report content for explicit HTML rendering and browser publication
 downstream design ../evals/report_quality_eval.toml report quality checklist eval manifest
 downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
@@ -17,17 +18,21 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py val
 ## Purpose
 
 `report-writing` is the skill for writing reader-facing reports from existing
-evidence. It owns report prose, claim hygiene, quality review criteria, and
-reader actionability. In the common document pipeline, file responsibility
-selects this as the DSL-to-prose projection adapter when the document's job is
-evidence-backed status, audit, evaluation, review, decision, or recommendation.
-For nontrivial structure, call `prose-reasoning-graph` and
-`structure-planning` before prose projection.
+evidence, including decision briefs, experiment summaries, presentation
+narratives, PPT storyboards, and slide-ready visual asset plans. It owns report
+prose, claim hygiene, quality review criteria, reader actionability, and
+presentation asset traceability. In the common document pipeline, file
+responsibility selects this as the DSL-to-prose projection adapter when the
+document's job is evidence-backed status, audit, evaluation, review, decision,
+recommendation, or presentation narrative. For nontrivial structure, call
+`prose-reasoning-graph` and `structure-planning` before prose projection.
 
 Reports can be Markdown or HTML. The default report output is Markdown unless
 the user explicitly asks for HTML, a browser page, dashboard, web view, or
 external browser publication. When HTML is explicit, use `html-output` after the
 source packet and report structure are fixed.
+When a deck or PPT is in scope, use the slide production workflow after the
+report source packet and presentation asset packet are fixed.
 
 It does not own raw result storage. Use `result-artifact-writeout` for
 append-only hook, skill, tool, eval, experiment, and raw machine artifacts, then
@@ -36,12 +41,14 @@ use this skill to turn that evidence into a report a human can evaluate.
 ## Use When
 
 - A user asks for a report, status report, evaluation report, audit report,
-  experiment report, review report, decision brief, or improvement guide.
+  experiment report, review report, decision brief, presentation narrative, PPT
+  storyboard, slide asset plan, or improvement guide.
 - Tool, hook, skill, eval, experiment, or CI outputs need reader-facing
   synthesis.
 - A generated report may influence a workflow, skill, policy, or issue.
 - A report needs explicit quality criteria before it is accepted.
-- A report needs a first figure/table, source-to-section map, metric contract,
+- A report needs a first figure/table, presentation storyboard, ponchi-e or
+  concept diagram, source-to-section map, source-to-slide map, metric contract,
   or invalid interpretation boundary; in that case use `structure-planning`
   before drafting.
 - File / document responsibility classifies the output as a report adapter
@@ -53,6 +60,9 @@ use this skill to turn that evidence into a report a human can evaluate.
   prose.
 - A report needs HTML output only when the user explicitly asks for HTML or a
   browser-readable page; in that case use `html-output` after report planning.
+- A report is meant for external presentation and therefore needs slide-ready
+  visuals, data figures, generated images, figure provenance, reference blocks,
+  and layout/preview gates.
 
 ## Source Packet
 
@@ -76,6 +86,10 @@ Before drafting, fix these inputs:
   routing, state, review gate, handoff, or multi-step evidence flow, use
   `structure-planning` to decide whether the first visual should be a Mermaid
   diagram, table, or text-only outline
+- presentation asset needs: required when a deck, PPT, talk, or external
+  presentation is in scope; list the core story, first visual, ponchi-e/concept
+  diagrams, data-backed figures, generated-image prompts or asset paths, slide
+  slot mapping, reference/footnote plan, and layout/preview gate
 - DSL/projection closure: required when file responsibility selects this report
   adapter for nontrivial output; revise the structure contract,
   source-to-section map, graph-backed rewrite packet, or graph-backed units and
@@ -101,6 +115,10 @@ Use this checklist before publishing or handing off a reader-facing report:
   owner, command, issue, or PR.
 - [ ] Raw artifacts and reader-facing summary paths are not conflated or
   overwritten.
+- [ ] For external presentations, the first visual, ponchi-e/concept diagrams,
+  data-backed figures, generated images, reference blocks, and slide previews
+  are mapped to claims and source artifacts.
+- [ ] Conceptual visuals are labeled separately from data-backed figures.
 - [ ] The report does not become a second policy truth surface. Any rule change
   is routed to the canonical skill, workflow, tool, document, or issue.
 - [ ] Nontrivial process, dependency, ownership, routing, state, review-gate, or
@@ -163,16 +181,33 @@ inside the Markdown report or the source artifact that renders the report. The
 diagram must have nearby prose that names the question it answers and the
 constraints it does not represent.
 
+For external presentations, add a `Presentation Asset Packet` before detailed
+results or slide drafting. It must include:
+
+1. Core story and non-goals
+1. First visual and its question
+1. Required ponchi-e/concept diagrams
+1. Required data-backed figures and tables
+1. Generated-image prompts or asset paths, when generated images are used
+1. Slide/storyboard order and template slot mapping
+1. Reference, footnote, and evidence annotation plan
+1. Layout/preview gate and artifact manifest path
+
 ## Review Route
 
 Use `report_reviewer` when the report is claim-heavy, external-facing,
-high-impact, or used as PR / issue / policy evidence. The reviewer checks:
+slide-backed, high-impact, or used as PR / issue / policy evidence. The reviewer
+checks:
 
 - structure and reader flow
 - source-to-claim traceability
 - overclaiming and unsupported recommendations
 - missing limitations
 - stale or ambiguous evidence paths
+- presentation asset traceability and conceptual/data-backed visual separation
+
+For PPT or deck output, also run a layout review so generated images, equations,
+references, footnotes, and slide previews remain readable after insertion.
 
 Small internal status notes may record `report_reviewer=not_required` with a
 reason.
@@ -186,6 +221,8 @@ reason.
   interpretations.
 - `html-output`: owns explicit HTML rendering, layout checks, optional
   `$imagegen` visual assets, and local/external browser server publication.
+- `slide-production-workflow`: owns fixed template use, slide slot mapping,
+  layout review, reference visibility, and preview evidence for PPT/deck output.
 - `long-form-writing`: owns general explanatory prose for README, guide,
   migration, workflow, or specification responsibilities.
 - `experiment-lifecycle`: owns experiment run protocol and rerun decisions.
@@ -201,6 +238,7 @@ report_writing=complete
 report_output_format=<markdown|html>
 report_quality_checklist=<pass|fail>
 report_source_packet=<path-or-inline>
+presentation_asset_packet=<path|inline|not_required>
 structure_contract=<path|inline|not_required>
 report_reviewer=<path|not_required>
 report_rule_drift=<none|canonical_update_required>
@@ -216,6 +254,10 @@ detailed table. The guide must state:
 - valid and invalid comparisons
 - the main caveat
 - what result would change the next action
+
+When the report is presentation-backed, the reader guide must also state which
+slide or first visual to inspect first, which visuals are conceptual, which are
+data-backed, and what evidence path supports each strong claim.
 
 ## External Source Provenance
 

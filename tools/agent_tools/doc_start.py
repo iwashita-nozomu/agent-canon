@@ -103,11 +103,6 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
         default=".",
         help="Workspace root used to resolve WORKTREE_SCOPE.md and write permissions.",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview the run id and paths without writing files.",
-    )
     return parser
 
 
@@ -129,21 +124,19 @@ def main() -> int:
             enabled_specialists.append(role_id)
 
     roles = select_roles(config, enabled_specialists, full_team=False)
-    created_files: tuple[str, ...] = ()
-    if not args.dry_run:
-        created_files = create_run_bundle(
-            RunBundleSpec(
-                config=config,
-                report_dir=report_dir,
-                run_id=run_id,
-                task=args.task,
-                owner=args.owner,
-                created_at_iso=created_at_iso,
-                roles=roles,
-                workspace_root=workspace_root,
-                workflow_family_id=str(kind_spec["workflow_family_id"]),
-            )
+    created_files = create_run_bundle(
+        RunBundleSpec(
+            config=config,
+            report_dir=report_dir,
+            run_id=run_id,
+            task=args.task,
+            owner=args.owner,
+            created_at_iso=created_at_iso,
+            roles=roles,
+            workspace_root=workspace_root,
+            workflow_family_id=str(kind_spec["workflow_family_id"]),
         )
+    )
 
     review_roles = tuple(
         role.id
@@ -166,11 +159,8 @@ def main() -> int:
     print(f"RECOMMENDED_SPECIALISTS={','.join(kind_spec['enable'])}")
     print(f"SUGGESTED_SKILLS={','.join(kind_spec['skills'])}")
     print(f"START_DECLARATION={start_declaration}")
-    if args.dry_run:
-        print("DRY_RUN=1")
-    else:
-        print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
-        print(f"CREATED_FILES={','.join(created_files)}")
+    print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
+    print(f"CREATED_FILES={','.join(created_files)}")
     return 0
 
 
