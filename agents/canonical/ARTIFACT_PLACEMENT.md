@@ -19,6 +19,11 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   - 開発環境は `docker/`
 - run-local の artifact:
   - `reports/agents/<run-id>/`
+- cross-run に蓄積する agent report:
+  - `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`
+  - log archive branch は `logs/<repo-key>`
+  - 具体値は `python3 tools/agent_tools/runtime_log_archive_git.py status` の
+    `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見る
 - 一時的な runtime output:
   - `WORKTREE_SCOPE.md` の `## Runtime Output Directories` に書かれた場所
 
@@ -57,9 +62,11 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 - artifact-only role は許可された artifact だけを更新します。
 - run 固有の追補は既存 artifact の節追加で吸収します。
 - cross-run で残す必要がある agent report は、agent が手で別 report を作らず
-  `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
-  で `.agent-canon/log-archive/agent-reports/<repo-key>/...` へ機械的に snapshot
-  します。push は同じ helper の `push` command が担当します。
+  通常は `python3 tools/agent_tools/runtime_log_archive_git.py sync` で
+  `reports/agents/` 全体を `.agent-canon/log-archive/agent-reports/<repo-key>/`
+  へ機械的に同期します。特定 run の immutable snapshot が必要なときだけ
+  `archive-agent-report --report-dir reports/agents/<run-id>` を使い、push は同じ
+  helper の `push` command が担当します。
 
 ### `documents/`
 
