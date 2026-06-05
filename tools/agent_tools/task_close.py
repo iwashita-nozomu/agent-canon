@@ -18,7 +18,11 @@ import subprocess
 from pathlib import Path
 
 from agent_team import resolve_report_root
-from report_artifact_checks import check_schedule_artifact, check_work_log_artifact
+from report_artifact_checks import (
+    check_final_review_artifact,
+    check_schedule_artifact,
+    check_work_log_artifact,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -135,11 +139,38 @@ def current_diff_ref(workspace: Path) -> str:
         check=False,
         capture_output=True,
     )
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
     diff_bytes = unstaged.stdout + staged.stdout
+    if untracked.returncode == 0 and untracked.stdout:
+        for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
+            if raw_path.startswith(b"reports/agents/"):
+                continue
+            path = workspace / raw_path.decode("utf-8", errors="surrogateescape")
+            diff_bytes += b"\0UNTRACKED\0" + raw_path + b"\0"
+            if path.is_file():
+                diff_bytes += path.read_bytes()
     if not diff_bytes:
         return head
     diff_hash = hashlib.sha256(diff_bytes).hexdigest()
     return f"{head}-dirty-{diff_hash}"
+
+
+def active_run_name(report_dir: Path) -> str | None:
+    """Return the active run marker for a report root, or None when absent."""
+    active_run_path = report_dir.parent / ".active_run"
+    if not active_run_path.is_file():
+        return None
+    return active_run_path.read_text(encoding="utf-8").strip()
+
+
+def active_run_matches(active_run: str | None, report_dir: Path) -> bool:
+    """Return whether one active-run marker points to this report directory."""
+    return active_run in {report_dir.name, str(report_dir.resolve())}
 
 
 def main() -> int:
@@ -155,12 +186,14 @@ def main() -> int:
             resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
     workspace = Path.cwd().resolve()
+    active_run = active_run_name(report_dir)
 
     verification_path = report_dir / "verification.txt"
     closeout_path = report_dir / "closeout_gate.md"
     request_contract_path = report_dir / "user_request_contract.md"
     schedule_path = report_dir / "schedule.md"
     work_log_path = report_dir / "work_log.md"
+    final_review_path = report_dir / "final_review.md"
     agent_evaluation_path = report_dir / "agent_evaluation.md"
     if not verification_path.is_file():
         raise SystemExit(f"verification.txt not found: {verification_path}")
@@ -183,6 +216,9 @@ def main() -> int:
     subagent_lifecycle = parse_markdown_status_section(
         closeout_path, "Subagent Lifecycle Evidence"
     )
+    agent_canon_latest = parse_markdown_status_section(
+        closeout_path, "AgentCanon Latest And CI Gate Evidence"
+    )
     diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
     diff_check_artifact_path = resolve_run_artifact(
         report_dir, diff_check.get("diff_check_artifact", "")
@@ -197,6 +233,11 @@ def main() -> int:
     request_contract = parse_markdown_status(request_contract_path)
     schedule_blockers = check_schedule_artifact(schedule_path.read_text(encoding="utf-8"))
     work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
+    final_review_blockers = (
+        check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
+        if final_review_path.is_file()
+        else ["final_review.md:missing"]
+    )
 
     checks = {
         "verification_status": verification.get("status") == "pass",
@@ -215,6 +256,20 @@ def main() -> int:
         "repo_wide_static_analysis_complete": closeout.get("repo_wide_static_analysis_complete")
         == "yes",
         "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
+        "agent_canon_latest_command": agent_canon_latest.get(
+            "agent_canon_latest_command", ""
+        )
+        not in {"", "missing", "none"},
+        "agent_canon_latest_status": agent_canon_latest.get("agent_canon_latest_status", "")
+        == "pass",
+        "agent_canon_submodule_status": agent_canon_latest.get(
+            "agent_canon_submodule_status", ""
+        )
+        not in {"", "missing", "none"},
+        "agent_canon_source_head": agent_canon_latest.get("agent_canon_source_head", "")
+        not in {"", "missing", "none"},
+        "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
+        not in {"", "missing", "none"},
         "make_ci_status": closeout.get("make_ci_status")
         in {"pass", "environment_blocked_with_full_static_fallback"},
         "spec_product_coverage_complete": closeout.get("spec_product_coverage_complete")
@@ -316,6 +371,8 @@ def main() -> int:
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "todo_artifact_complete": not schedule_blockers,
         "work_log_complete": not work_log_blockers,
+        "final_review_artifact_complete": not final_review_blockers,
+        "report_active_run_match": active_run_matches(active_run, report_dir),
         "commit_created": closeout.get("commit_created") == "yes",
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
@@ -345,6 +402,26 @@ def main() -> int:
     print(
         "AGENT_CANON_LATEST_COMPLETE="
         f"{closeout.get('agent_canon_latest_complete', '')}"
+    )
+    print(
+        "AGENT_CANON_LATEST_COMMAND="
+        f"{agent_canon_latest.get('agent_canon_latest_command', '')}"
+    )
+    print(
+        "AGENT_CANON_LATEST_STATUS="
+        f"{agent_canon_latest.get('agent_canon_latest_status', '')}"
+    )
+    print(
+        "AGENT_CANON_SUBMODULE_STATUS="
+        f"{agent_canon_latest.get('agent_canon_submodule_status', '')}"
+    )
+    print(
+        "AGENT_CANON_SOURCE_HEAD="
+        f"{agent_canon_latest.get('agent_canon_source_head', '')}"
+    )
+    print(
+        "AGENT_CANON_PARENT_PIN="
+        f"{agent_canon_latest.get('agent_canon_parent_pin', '')}"
     )
     print(f"MAKE_CI_STATUS={closeout.get('make_ci_status', '')}")
     print(
@@ -423,6 +500,10 @@ def main() -> int:
     print(f"TODO_ARTIFACT_BLOCKERS={join_blockers(schedule_blockers)}")
     print(f"WORK_LOG_COMPLETE={'yes' if not work_log_blockers else 'no'}")
     print(f"WORK_LOG_BLOCKERS={join_blockers(work_log_blockers)}")
+    print(f"FINAL_REVIEW_ARTIFACT_COMPLETE={'yes' if not final_review_blockers else 'no'}")
+    print(f"FINAL_REVIEW_ARTIFACT_BLOCKERS={join_blockers(final_review_blockers)}")
+    print(f"REPORT_ACTIVE_RUN={active_run or ''}")
+    print(f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}")
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")

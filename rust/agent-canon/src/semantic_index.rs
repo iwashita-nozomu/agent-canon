@@ -279,6 +279,12 @@ struct ScoredNode {
 }
 
 #[derive(Debug, Clone)]
+struct SearchResults {
+    results: Vec<ScoredNode>,
+    stale_path_count: usize,
+}
+
+#[derive(Debug, Clone)]
 struct ContextCell {
     rank: usize,
     score: f32,
@@ -1680,7 +1686,7 @@ fn embed_existing_nodes(args: &EmbedProviderArgs) -> Result<EmbedStats, String> 
     })
 }
 
-fn search_index(args: &SearchArgs) -> Result<Vec<ScoredNode>, String> {
+fn search_index(args: &SearchArgs) -> Result<SearchResults, String> {
     let conn = open_cache_connection(&args.db)?;
     let query = embed_one_for_provider(
         &args.provider,
@@ -1690,7 +1696,18 @@ fn search_index(args: &SearchArgs) -> Result<Vec<ScoredNode>, String> {
         &args.query,
     )?;
     let nodes = load_nodes(&conn, &args.provider, &args.model, query.len())?;
-    Ok(score_nodes(&nodes, &query, args.top_k))
+    let stale_path_count = nodes
+        .iter()
+        .filter(|node| !indexed_node_path_exists(&args.root, node))
+        .count();
+    let live_nodes: Vec<IndexedNode> = nodes
+        .into_iter()
+        .filter(|node| indexed_node_path_exists(&args.root, node))
+        .collect();
+    Ok(SearchResults {
+        results: score_nodes(&live_nodes, &query, args.top_k),
+        stale_path_count,
+    })
 }
 
 fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, String> {
@@ -1708,7 +1725,7 @@ fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, String> {
     let hits = search_index(&search_args)?;
     let mut cells = Vec::new();
     let mut used_chars = 0_usize;
-    for hit in hits {
+    for hit in hits.results {
         if cells.len() >= args.max_cells || used_chars >= args.max_total_chars {
             break;
         }
@@ -2610,7 +2627,7 @@ fn eval_queries(args: &EvalArgs, expected: &Value) -> Result<Value, String> {
             format: OutputFormat::Json,
         };
         let hits = search_index(&search_args)?;
-        let top5: Vec<&ScoredNode> = hits.iter().take(5).collect();
+        let top5: Vec<&ScoredNode> = hits.results.iter().take(5).collect();
         let found = expected_paths
             .iter()
             .filter(|expected_path| top5.iter().any(|hit| hit.node.path == **expected_path))
@@ -2620,7 +2637,7 @@ fn eval_queries(args: &EvalArgs, expected: &Value) -> Result<Value, String> {
         } else {
             found as f64 / expected_paths.len() as f64
         };
-        let reciprocal_rank = reciprocal_rank(&hits, &expected_paths);
+        let reciprocal_rank = reciprocal_rank(&hits.results, &expected_paths);
         let pass = recall + f64::EPSILON >= min_recall;
         if !pass {
             failed += 1;
@@ -2632,7 +2649,7 @@ fn eval_queries(args: &EvalArgs, expected: &Value) -> Result<Value, String> {
             "recall_at_5": recall,
             "mrr": reciprocal_rank,
             "pass": pass,
-            "top_paths": hits.iter().take(5).map(|hit| hit.node.path.clone()).collect::<Vec<_>>()
+            "top_paths": hits.results.iter().take(5).map(|hit| hit.node.path.clone()).collect::<Vec<_>>()
         }));
     }
     let cases = queries.len() as f64;
@@ -3559,6 +3576,14 @@ fn load_file_paths(conn: &Connection) -> Result<Vec<String>, String> {
         paths.push(row.map_err(|error| error.to_string())?);
     }
     Ok(paths)
+}
+
+fn indexed_node_path_exists(root: &Path, node: &IndexedNode) -> bool {
+    let path = Path::new(&node.path);
+    if path.is_absolute() {
+        return path.exists();
+    }
+    root.join(path).exists()
 }
 
 fn provider_dimensions(
@@ -4875,14 +4900,15 @@ fn sort_discourse_relations(relations: &mut [DiscourseRelation]) {
     });
 }
 
-fn print_search_results(args: &SearchArgs, results: &[ScoredNode]) {
+fn print_search_results(args: &SearchArgs, search_results: &SearchResults) {
     if args.format == OutputFormat::Json {
         println!(
             "{}",
             json!({
                 "semantic_index_search": "ok",
                 "query": args.query,
-                "results": results.iter().map(scored_node_json).collect::<Vec<_>>()
+                "stale_path_count": search_results.stale_path_count,
+                "results": search_results.results.iter().map(scored_node_json).collect::<Vec<_>>()
             })
         );
         return;
@@ -4893,16 +4919,21 @@ fn print_search_results(args: &SearchArgs, results: &[ScoredNode]) {
             json!({
                 "semantic_index_search": "ok",
                 "query_chars": args.query.chars().count(),
-                "result_count": results.len()
+                "result_count": search_results.results.len(),
+                "stale_path_count": search_results.stale_path_count
             })
         );
-        for result in results {
+        for result in &search_results.results {
             println!("{}", scored_node_json(result));
         }
         return;
     }
     println!("SEMANTIC_INDEX_SEARCH=ok");
-    for result in results {
+    println!(
+        "SEMANTIC_INDEX_STALE_PATHS_SKIPPED={}",
+        search_results.stale_path_count
+    );
+    for result in &search_results.results {
         println!(
             "rank={} score={:.4} path={} lines={}-{} kind={}",
             result.rank,
@@ -6454,7 +6485,11 @@ mod tests {
             format: OutputFormat::Json,
         };
         let hits = search_index(&search_args).unwrap();
-        assert!(hits.iter().any(|hit| hit.node.path == "docs/update.md"));
+        assert!(hits
+            .results
+            .iter()
+            .any(|hit| hit.node.path == "docs/update.md"));
+        assert_eq!(hits.stale_path_count, 0);
     }
 
     #[test]
@@ -6683,7 +6718,50 @@ mod tests {
             top_k: 5,
             format: OutputFormat::Json,
         };
-        assert!(search_index(&search_args).unwrap().is_empty());
+        assert!(search_index(&search_args).unwrap().results.is_empty());
+    }
+
+    #[test]
+    fn search_skips_cached_nodes_for_deleted_paths() {
+        let root = unique_temp_dir("semantic-index-stale-paths");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        let stale_path = root.join("docs").join("stale.md");
+        fs::write(
+            &stale_path,
+            "# Stale\nsemantic vector deleted path phrase\nwith enough lines\nfor an indexed node",
+        )
+        .unwrap();
+        let db = root.join("index.sqlite");
+        build_index(&BuildArgs {
+            root: root.clone(),
+            includes: vec![PathBuf::from("docs")],
+            excludes: default_excludes(),
+            db: db.clone(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            embedding_batch: DEFAULT_EMBEDDING_BATCH,
+            max_file_bytes: DEFAULT_MAX_FILE_BYTES,
+        })
+        .unwrap();
+        fs::remove_file(stale_path).unwrap();
+
+        let hits = search_index(&SearchArgs {
+            root,
+            db,
+            query: "deleted path phrase".to_string(),
+            provider: DEFAULT_PROVIDER.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            dim: 64,
+            embedding_url: None,
+            top_k: 5,
+            format: OutputFormat::Json,
+        })
+        .unwrap();
+
+        assert!(hits.results.is_empty());
+        assert!(hits.stale_path_count > 0);
     }
 
     #[test]

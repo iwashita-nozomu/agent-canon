@@ -75,7 +75,7 @@ For the broader agent routing path, return to `agents/README.md`.
 - [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI
   / config schema / hooks / MCP / skills / subagents reference.
 - [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical
-  remote and local bare mirror compatibility.
+  remote and submodule update workflow.
 - [AgentCanon Update Route](./agent-canon-update-route.md): canonical update
   command hierarchy, parent pin route, TODO route, and AgentCanon PR branch
   separation.

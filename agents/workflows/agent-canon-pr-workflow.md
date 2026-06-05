@@ -37,7 +37,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - shared canon の正本は standalone AgentCanon repo です。template 内で作業する場合は `vendor/agent-canon/` submodule worktree がその working copy になります。
 - GitHub 上の canonical shared canon repo は `https://github.com/iwashita-nozomu/agent-canon.git` です。
 - template の canonical repo は `https://github.com/iwashita-nozomu/project_template.git` です。
-- template を GitHub 管理にする場合は、`.gitmodules` の AgentCanon URL を canonical GitHub URL にし、local bare mirror は別名 remote または明示 override として残します。
+- `.gitmodules` の AgentCanon URL は canonical GitHub URL にします。
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
@@ -361,7 +361,6 @@ Validation:
 Propagation:
 - AgentCanon commit / PR: <url-or-sha>
 - Template commit / PR: <url-or-sha>
-- local bare mirror: not used, or compatibility-only evidence recorded
 ```
 
 ### Root-Only Template Workflow Change

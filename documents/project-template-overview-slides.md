@@ -38,8 +38,7 @@ downstream design ./README.md document index links this slide deck
 
 - Template canonical remote: `https://github.com/iwashita-nozomu/project_template.git`.
 - AgentCanon canonical remote: `https://github.com/iwashita-nozomu/agent-canon.git`.
-- `/mnt/git` mirrors are compatibility mirrors, not source of truth or normal proposal targets.
-- PR evidence should record GitHub SHA, submodule pin SHA, and local mirror SHA only when a local mirror is in scope.
+- PR evidence should record GitHub SHA and submodule pin SHA.
 
 ## 5. GitHub Actions And PR Automation
 
@@ -77,7 +76,7 @@ downstream design ./README.md document index links this slide deck
 
 ## 10. Docker And Devcontainer
 
-- Docker is the canonical runtime, not a place to hardcode template or AgentCanon local mirror paths.
+- Docker is the canonical runtime, not a place to hardcode machine-local remote paths.
 - `docker/packs/default.toml` defines build and smoke checks.
 - Devcontainer compose is generated from the runtime pack.
 - Host `~/.codex`, `~/.config/gh`, `~/.ssh`, and `SSH_AUTH_SOCK` are reused when available.

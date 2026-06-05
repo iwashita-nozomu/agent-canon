@@ -10,8 +10,6 @@ downstream implementation ../tools/update_agent_canon.sh manages derived repo up
 # AgentCanon GitHub Remote
 
 `iwashita-nozomu/agent-canon` on GitHub is the canonical AgentCanon repository.
-Local bare repositories under `/mnt/git` are compatibility mirrors, not
-proposal targets and not the source of truth.
 
 ## Canonical Defaults
 
@@ -19,20 +17,16 @@ proposal targets and not the source of truth.
 - Canonical branch: `main`
 - Preferred submodule URL for template and derived repos:
   `https://github.com/iwashita-nozomu/agent-canon.git`
-- Optional local mirror for read-only speed or offline validation:
-  `/mnt/git/agent-canon.git`
 
 `tools/sync_agent_canon.sh` uses the GitHub URL when `AGENT_CANON_REMOTE_URL`
-is unset. Set `AGENT_CANON_REMOTE_URL=/mnt/git/agent-canon.git` only when a
-repo intentionally works against a local mirror.
+is unset.
 AgentCanon latest checks run with `GIT_TERMINAL_PROMPT=0` by default so GitHub
 auth problems fail non-interactively instead of hanging inside task startup.
 
-## Existing Local-Bare Repos
+## Existing Non-GitHub Remotes
 
-Repos that already have `agent-canon` pointed at `/mnt/git/agent-canon.git` do
-not need an emergency rewrite. Leave a small migration commit that records the
-current pin, then switch the remote when the repo is otherwise clean.
+Repos that already have `agent-canon` pointed at a non-GitHub remote should
+switch the remote when the repo is otherwise clean.
 
 ```bash
 git remote get-url agent-canon
@@ -51,13 +45,6 @@ bash tools/sync_agent_canon.sh check
 The canonical command responsibility split is
 `documents/agent-canon-update-route.md`. `apply` is compatibility/low-level;
 normal parent repo updates use the high-level `latest` route.
-
-If the repo keeps a local bare remote for fast validation, add it with a clear
-non-canonical name instead of making it the canonical remote:
-
-```bash
-git remote add agent-canon-local /mnt/git/agent-canon.git
-```
 
 ## Local Branches From Derived Repos
 
@@ -87,15 +74,12 @@ bash tools/update_agent_canon.sh merge-main-into-current
 
 ## Commit Message Note
 
-When migrating an existing repo from local bare to GitHub, include this in the
-commit body:
+When migrating an existing repo to GitHub, include this in the commit body:
 
 ```text
 AgentCanon remote migration:
 - canonical remote: https://github.com/iwashita-nozomu/agent-canon.git
-- previous local mirror: /mnt/git/agent-canon.git
 - vendor/agent-canon remains a submodule pinned to main
-- local bare remotes are compatibility mirrors, not source of truth
 ```
 
 ## Branch Protection Baseline

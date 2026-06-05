@@ -11,7 +11,10 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 
 ## Purpose
 
-論文 draft、thesis chapter、scholarly paper section を、section contract と citation/evidence trace を先に固定しながら複数 subagent で起こす skill です。
+file / document responsibility が submission paper、thesis chapter、または paper-style
+manuscript の文書を、共通 graph/DSL 構造から paper prose へ射影する adapter skill です。
+section contract と citation/evidence trace を先に固定し、複数 reviewer で検証します。
+選択基準は長さではなく、paper section contract と citation/evidence review が必要な責務です。
 
 ## Use When
 
@@ -19,6 +22,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 - abstract、introduction、related work、method、results、discussion を持つ paper-like 文書を書く
 - citation、figure、table、appendix、result の参照関係を author 1 人の勘に任せたくない
 - academic-writing より一段 paper-specific な section discipline が欲しい
+- file responsibility の判定結果が、一般説明 prose や report ではなく paper prose adapter を要求している
 
 ## Core References
 
@@ -34,8 +38,10 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 - `paper intent brief` と `claim contract` を先に固定する
 - section order、first figure/table、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - paragraph-level claim flow、transition pair、logic gap が論点なら、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
-- prose graph handoff がある場合は、claim/evidence gaps、weak transitions、experiment-plan gaps、split/merge/bridge/reorder operations を section contract と reviewer handoff に入れる
-- prose graph handoff から本文を書く場合は、reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。section contract、citation/evidence matrix、paragraph claim map、または graph-backed rewrite packet を直し、graph diagnostics を再実行してから draft する
+- 非自明な paper prose の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る
+- prose graph diagnostics は claim/evidence gaps、weak transitions、experiment-plan gaps、split/merge/bridge/reorder operations を section contract と reviewer handoff に入れる
+- reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。section contract、citation/evidence matrix、paragraph claim map、graph-backed rewrite packet、または graph-backed unit を直し、graph diagnostics を再実行してから draft する
+- DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は `dsl_to_prose_prompt_defect` として paper prose-generation prompt を直す
 - `section contract` を `abstract`, `introduction`, `related work`, `method`, `results`, `discussion`, `limitations`, `conclusion` の粒度で決める
 - `citation and evidence matrix` を作り、主要 claim がどの citation / figure / table / derivation / appendix に支えられるかを書く
 - `notation ledger` と `paragraph claim map` を作る
@@ -51,7 +57,7 @@ upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite han
 1. `section contract` を書く
 1. `citation and evidence matrix` と `notation ledger` を作る
 1. `paragraph claim map` を作る
-1. prose graph handoff が active なら、DSL / projection finding closure loop を回してから reader-facing prose に入る
+1. 非自明な paper prose なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. run bundle を作る
 1. reader order で draft する
 1. reverse outline を取る

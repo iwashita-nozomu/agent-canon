@@ -37,9 +37,14 @@ Projection views may also recommend presentation forms such as prose,
 bulleted lists, ordered lists, tables, figures, or equations. Treat these as
 rewrite hints grounded in source anchors, not as permission to replace the
 canonical graph or drop provenance.
-Corpus/domain hints may be inferred from the user prompt as well as the draft.
-Use them to choose the academic or technical corpus that calibrates examples,
-review expectations, and evaluation criteria.
+Corpus/domain hints and the initial existing-document-to-DSL seed are LocalLLM
+tasks. `ingest` / `ingest-set` call `agent-canon local-llm extract-prose-ir`,
+which splits multiple documents and terms into bounded parts, extracts
+`local_llm_prose_ir`, and merges `corpus_hints`, `term_contexts`, and
+`dsl_seed` into the graph metadata. Use these hints to choose the academic or
+technical corpus that calibrates examples, review expectations, and evaluation
+criteria; do not reintroduce fixed keyword dictionaries in the prose graph
+tool.
 
 It does not replace `$long-form-writing`, `$report-writing`,
 `$academic-writing`, `$paper-writing`, `$literature-survey`,
@@ -74,6 +79,16 @@ rewrite and rerun obligations.
 
 ## Standard Sequence
 
+This skill is the structure-first writing gate. For nontrivial document
+creation or revision, do not ask a writing skill to draft reader-facing prose
+from raw notes while graph findings are still open. The default authoring loop
+is: encode the draft or source packet into the graph/DSL, analyze it, expand /
+delete / reorganize graph-backed structure while it is still DSL/projection
+state, rerun diagnostics, and only then project to prose. After projection,
+rerun the same graph check. If a finding appears only after DSL-to-prose
+projection, classify it as a `dsl_to_prose_prompt_defect` against the receiving
+writing skill prompt rather than treating it as an ordinary document finding.
+
 1. Let `ingest` or `ingest-set` create the graph DB under
    `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
    unless the workflow explicitly passes `--db <graph.sqlite>`. Store
@@ -82,17 +97,21 @@ rewrite and rerun obligations.
 1. Run `ingest` on the source Markdown/plain text with `--prompt` or
    `--prompt-file` when user request context can identify the intended corpus.
    Always use `--stats-out`, then pass the emitted
-   `PROSE_REASONING_GRAPH_DB` path to later graph commands.
+   `PROSE_REASONING_GRAPH_DB` path to later graph commands. The same stats
+   artifact also carries `PROSE_REASONING_GRAPH_LOCAL_LLM_IR`; keep that JSON
+   as the structure/corpus extraction artifact instead of asking the LLM to
+   return raw word lists in chat.
 1. Run `analyze --profile <writing|logic|experiment|report|academic|paper|all>`
    with `--stats-out`. This derives prose, logic, evidence, experiment, and
    presentation layers.
 1. When the task also judges whether repository documents satisfy their declared
-   responsibility, run `agent-canon structured-analysis build` or import the
-   document inventory so `document-canon` diagnostics live in the graph DB.
-   Route those diagnostics through the same integration and verification loop as
-   prose diagnostics. A structured-analysis DB does not have to contain
-   `edit_operations`; operations count `0` is valid for responsibility-only
-   diagnosis.
+   responsibility, prefer `check-document <source.md> --out-dir <artifact-dir>`
+   instead of running the prose and document-canon paths by hand. It runs prose
+   ingest/analysis, Rust `structured-analysis build`, target document-canon
+   import, diagnostics, explanation, integration, handoff, and combined report
+   export through one bounded tool path. A structured-analysis DB does not have
+   to contain `edit_operations`; operations count `0` is valid for
+   responsibility-only diagnosis.
 1. Export `project`, `lint`, `explain`, and `integrate` outputs with `--out`
    and `--stats-out`; read the stats JSON before opening larger artifacts.
    Do not print full projection, diagnostics, explanation, integration,
@@ -119,10 +138,15 @@ rewrite and rerun obligations.
 1. When the receiving skill is a writing skill, rerun graph diagnostics after
    each DSL/projection rewrite and keep looping until active findings for the
    selected profile are gone. Revise the structure contract, graph-backed
-   rewrite packet, or source draft at the structural layer before writing final
-   prose. If findings do not converge after targeted sentence, section, or
-   structure rewrites, record a prompt-defect finding instead of treating the
-   report as complete.
+   rewrite packet, or source draft at the structural layer: add missing nodes or
+   edges, remove unsupported nodes, split or merge projection units, reorder the
+   projection, or route verification children. Only after that closure may the
+   receiving skill write final prose. After prose projection, rerun
+   `check-document` or the same ingest/analyze/lint path. If new findings appear
+   that were absent from the closed DSL/projection state, record a
+   `dsl_to_prose_prompt_defect` finding against the sentence-generation,
+   section-generation, or DSL-to-prose prompt and repair that prompt before more
+   prose rewriting.
 1. Treat graph diagnostics as advisory evidence. Final prose, review, and
    publication authority stays with the receiving skill.
 
@@ -135,6 +159,7 @@ The skill contract is:
 | Command | Runtime result | How the skill consumes it |
 | ------- | -------------- | ------------------------- |
 | `ingest` / `ingest-set` | Pass marker plus stats JSON containing `PROSE_REASONING_GRAPH_DB`; DB stored under the default cache unless `--db` is explicit. | Save the DB path and pass it to later commands. Do not read raw SQLite tables. |
+| `agent-canon local-llm extract-prose-ir` | LocalLLM prose IR JSON with `parts[]`, `documents[]`, `terms[]`, `corpus_hints`, and `dsl_seed`. | Treat as the corpus-management and existing-document-structure extraction artifact. Read it through graph metadata or stats path, not chat stdout. |
 | `analyze` | Pass marker plus stats JSON; graph layers are added or refreshed inside the DB. | Treat the DB as updated intermediate state. Do not stream graph contents to chat. |
 | `lint --out` | Diagnostics Markdown plus stats JSON. | Read severity, rule, target, message, and `verification_route` summaries; classify active findings before rewrite. |
 | `integrate --out` | Integration Markdown with operation count and verification routes. | Follow recursive verification routes first. Operations count `0` is valid for structured-analysis DBs that contain diagnostics without rewrite operations. |
@@ -142,6 +167,7 @@ The skill contract is:
 | `rewrite-packet --op` | One bounded rewrite packet with target ids, reason, preserve constraints, and do-not rules. | Use only when `integrate` exposed a concrete operation id. Skip for diagnostics-only DBs. |
 | `project --out` | Full projection JSON/YAML. | Reserve for reviewers or implementers that need complete graph evidence; default runtime flow reads stats, diagnostics, integration, and handoff first. |
 | `explain --out` | Natural-language graph explanation. | Use for user-facing or reviewer-readable summaries after diagnostics are already classified. |
+| `check-document --out-dir` | Combined document-check report plus diagnostics, explanation, integration, handoff, stats, and `PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS`. | Use when judging whether one document both reads coherently and satisfies its declared document responsibility. Read stats first, then the combined report and active diagnostics. |
 
 Full projection, diagnostics, explanation, integration, handoff, and rewrite
 packet bodies must be written with `--out`. Stdout is a status channel for pass

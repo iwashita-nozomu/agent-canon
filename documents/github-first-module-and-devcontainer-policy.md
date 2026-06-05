@@ -23,27 +23,19 @@ The normal route is:
    submodule pin.
 1. Repair root views with `bash tools/sync_agent_canon.sh link-root`.
 
-Local Git remotes and local bare mirrors are compatibility surfaces. They may
-support fast local validation or legacy repo migration, but they must not define
-the normal distribution path for self-authored reusable modules.
+Local Git remotes must not define the normal distribution path for
+self-authored reusable modules.
 
-## Local Git Compatibility
+## Local Git Boundary
 
 Repo-specific local Git problems are deferred to the repo that owns them.
-AgentCanon shared architecture must not be shaped around a broken local bare
-mirror, a host-only path, or a one-machine remote name.
-
-Allowed compatibility cases:
-
-- an explicitly configured local mirror for faster fetches;
-- a temporary GitHub branch prepared from a repo that cannot push directly from its current runtime;
-- migration support for a repo that has not completed submodule conversion.
+AgentCanon shared architecture must not be shaped around a host-only path or a
+one-machine remote name.
 
 Required boundaries:
 
 - record the GitHub SHA as the canonical evidence;
-- record local mirror SHA only when the task uses that mirror;
-- keep local mirror names out of shared Dockerfiles and shared default config;
+- keep local remote names out of shared Dockerfiles and shared default config;
 - do not block shared-canon design on one repo's local Git repair.
 
 ## Dockerfile Boundary
@@ -71,7 +63,7 @@ Dockerfile content must not include agent-side convenience tooling:
 - TeX / LaTeX installation solely for Academic Writing agent documents or
   diagrams;
 - host auth material;
-- host workspace, `/mnt/git`, or machine-local mount policy.
+- host workspace or machine-local mount policy.
 
 If a project genuinely needs Node, npm, or GitHub CLI as part of its own product
 runtime, that project must document the product requirement in its repo-local
@@ -96,7 +88,6 @@ The shared devcontainer owns:
 - repository-specific devcontainer and Docker Compose project names, so template
   clones do not all create the same visible container names;
 - host auth mount conventions for Codex, GitHub CLI, and SSH;
-- optional `/mnt/git` compatibility mounts when the host path exists;
 - optional private host-directory mounts through `AGENT_CANON_SECRET_DIR`, for
   confidential local Git remotes or other operator-local material that must not
   become a repository default;

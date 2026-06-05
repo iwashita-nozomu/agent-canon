@@ -55,7 +55,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         )
 
     def make_remote(self, root: Path) -> Path:
-        """Create a local bare remote with a main branch."""
+        """Create a temporary Git remote with a main branch."""
         seed = root / "seed"
         remote = root / "agent-canon-log.git"
         seed.mkdir()

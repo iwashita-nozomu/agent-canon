@@ -36,9 +36,9 @@ Resolution means one of:
 | I-021-I-030 | `risk_based`: validation entrypoints are selected by changed path; `make ci` remains full confidence, not mandatory for every small edit. |
 | I-031-I-040 | `profiled`: observability, profiling, GitHub CLI, root repair, and copy sync belong to environment, GitHub, or maintenance profiles. |
 | I-041-I-050 | `profiled`: README and Quick Start use minimal required reads plus conditional references. |
-| I-051-I-060 | `compatibility_only`: local bare, subtree, snapshot, pull, and push routes are legacy compatibility routes, not normal submodule-first work. |
+| I-051-I-060 | `compatibility_only`: subtree, snapshot, pull, and push routes are legacy compatibility routes, not normal submodule-first work. |
 | I-061-I-080 | `risk_based`: AgentCanon update and PR evidence are required for shared-canon or pin changes, not unrelated project work. |
-| I-081-I-100 | `compatibility_only`: start-repository and update docs are GitHub/submodule-first; local bare and subtree details are appendix or migration-only. |
+| I-081-I-100 | `compatibility_only`: start-repository and update docs are GitHub/submodule-first; subtree details are appendix or migration-only. |
 | I-101-I-110 | `higher_priority_override`: repo MCP inventory remains required by current runtime policy; status-only MCP is context authority, not an edit tool. |
 | I-111-I-140 | `profiled`: Codex goals and token modes are Codex overlays; reusable profiles belong to user config, not project runtime requirements. |
 | I-141-I-150 | `profiled`: monitoring tokens, connectors, and MCP no-edit details are emitted only when the related profile is active. |
@@ -63,5 +63,5 @@ Resolution means one of:
   `vendor/agent-canon/` or standalone AgentCanon.
 - Hook, eval, skill, and tool logs that are intentionally append-only evidence
   are not discarded merely because they are generated.
-- Compatibility docs may mention `/mnt/git`, subtree, snapshot, or local mirror
-  routes only as migration/offline appendices.
+- Compatibility docs may mention subtree or snapshot routes only as migration
+  appendices.

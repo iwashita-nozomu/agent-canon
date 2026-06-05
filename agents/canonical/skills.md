@@ -44,7 +44,7 @@ upstream design README.md canonical workflow index
 - `test-design`
   - static 解析で nasty case と regression case を先に固定する
 - `long-form-writing`
-  - README、workflow、guide などの長文作成フロー
+  - README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter。長さではなく file responsibility で選ぶ
 - `academic-writing`
   - 論文、thesis chapter、scholarly note の作成フロー
 - `paper-writing`

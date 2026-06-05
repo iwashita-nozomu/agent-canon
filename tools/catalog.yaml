@@ -534,7 +534,7 @@ entries:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, and writing-skill handoff packets.
+    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -1017,7 +1017,7 @@ entries:
       - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
   - id: evaluate-codex-agent-roles
-    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, cost buckets, and runtime metrics.
+    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
     path: tools/agent_tools/evaluate_codex_agent_roles.py
     family: agent_tools
     role: checker

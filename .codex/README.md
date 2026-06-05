@@ -106,6 +106,7 @@ or high-risk review. Profiles do not waive workflow gates.
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
+- `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
 - write-capable subagent は既定 1 体です。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、spawn budget 内で複数 writer を並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
@@ -166,50 +167,24 @@ or high-risk review. Profiles do not waive workflow gates.
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
-## Model Policy
+## Model Settings
 
-- `gpt-5.5` + `high`: frontier-required planning, synthesis, broad implementation, and ship decision
-  - `requirements_organizer`
-  - `manager_reviewer`
-  - `execution_planner`
-  - `detailed_designer`
-  - `long_form_writer`
-  - `literature_researcher`
-  - `worker`
-  - `reviewer`
-  - `plan_reviewer`
-  - `detailed_design_reviewer`
-  - `citation_evidence_reviewer`
-  - `notation_definition_reviewer`
-  - `logic_gap_reviewer`
-  - `project_reviewer`
-  - `ship_reviewer`
-- `gpt-5.4-mini` + `medium`: conditional specialist review
-  - `document_flow_reviewer`
-  - `docs_workflow_steward`
-  - `report_reviewer`
-  - `reproducibility_reviewer`
-  - `scientific_computing_reviewer`
-  - `benchmark_reviewer`
-  - `artifact_reviewer`
-  - `fair_data_reviewer`
-  - `ml_science_reviewer`
-  - `oop_readability_reviewer`
-- `gpt-5.3-codex-spark` + `low`: cheap-first survey, test, diff review, and execution-only work
-  - `explorer`
-  - `test_designer`
-  - `python_reviewer`
-  - `cpp_reviewer`
-  - `diff_triage_reviewer`
-  - `spark_worker`
-  - `experiment_runner`
-- code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `low` reasoning effort to keep output bounded
-- repo default は `high`
-  - `xhigh` は parent が必要と判断したときだけ manual escalation として使う
+- `.codex/agents/*.toml` is the source of truth for each Codex subagent's
+  `model` and `model_reasoning_effort`.
+- `.codex/config.toml` owns project features, runtime limits, MCP registration,
+  skill registration, and the agent registry only; it does not carry a second
+  model settings table.
+- `tools/agent_tools/check_agent_runtime_alignment.py` and
+  `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
+  agent TOML files directly.
+- Narrow survey, test, diff review, and execution-only roles use Spark agent
+  TOML files; bounded review roles use mini reviewer TOML files; broad design,
+  implementation, and ship-decision roles use frontier TOML files.
+- `xhigh` is a manual session escalation, not a project-wide default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
-- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model override の正本です
+- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model / reasoning 設定の正本です
 
 ## Current Agents
 

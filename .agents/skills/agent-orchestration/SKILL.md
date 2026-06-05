@@ -21,6 +21,13 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - `repo-changing execution`: the user is asking to edit the repo, start the run, or produce a concrete kickoff command now
    - `routing-only/advisory`: the user only wants workflow/skill/review guidance and is not yet starting repo edits
 1. Choose exactly one primary workflow family from `agents/TASK_WORKFLOWS.md`. If a task id is known, treat the task-catalog mapping as the ground truth family.
+1. Resolve subagent concurrency as a hierarchy, not as one flat limit:
+   - runtime hard ceiling: `.codex/config.toml` `[agents].max_threads`
+   - workflow active budget: `agents/task_catalog.yaml` `workflow_families[].spawn_budget.active_subagents`
+   - stage wave plan: parent-owned bounded waves within the active budget
+   - write-capable budget: `workflow_families[].spawn_budget.max_write_subagents`, which limits only writer agents with disjoint write scopes
+   - initial three-agent intake is the first responsibilities wave, not the total concurrent-subagent cap
+   - generated `team_manifest.yaml` must preserve `run.spawn_budget.active_subagents`, `run.spawn_budget.max_write_subagents`, `run.spawn_budget.runtime_max_threads`, and `run.write_scope_policy.max_write_subagents`
 1. Build the public skill set in this order:
    - put `$agent-orchestration` first
    - preserve every user-provided `$skill-name`
@@ -28,7 +35,8 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
    - add `$subagent-bootstrap` only when the task is Shared canon, Large delivery, high-risk, multi-step, or explicitly uses subagents
    - add the minimal task-shape skill that matches the work:
      - research-backed implementation, benchmark, or external-research change -> `$research-workflow`
-     - README, workflow, guide, migration, or other long reader-facing docs -> `$long-form-writing`
+     - nontrivial document creation or revision where paragraph flow, claim support, or document responsibility matters -> `$prose-reasoning-graph` as the common structure-first graph/DSL gate
+     - README, workflow, guide, migration, or other general explanatory reader-facing docs -> `$long-form-writing` as the DSL-to-prose projection adapter; do not select it by length alone
      - submission paper or thesis-chapter draft -> `$paper-writing`
      - broader academic or scholarly-note writing that is not primarily a paper draft -> `$academic-writing`
      - PR body, PR evidence comment, status update, decision brief, or reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence -> `$report-writing`; report output defaults to Markdown unless the user explicitly asks for HTML, browser view, dashboard, web page, or external browser publication; if raw machine results are written or copied, also add `$result-artifact-writeout`
@@ -36,7 +44,7 @@ upstream design ../../../agents/workflows/hypothesis-validation-workflow.md anal
      - explicit HTML experiment or Eval report -> `$html-experiment-report` plus `$html-output`
      - nontrivial report, experiment plan/report, Eval output, decision brief, HTML view, document, paper, or refactor structure; first figure/table/section/slice choice; source map; or invalid interpretation boundary -> `$structure-planning`
      - tool/checker/hook/static-analysis runs to discover problems, create finding packets, compare before/after impact, or feed implementation/refactor planning -> `$tool-finding-report`; if raw results are written, also add `$result-artifact-writeout`; if the output is reader-facing narrative, also add `$report-writing`; if that narrative has a nontrivial finding packet, priority policy, metric/count contract, or source map, also add `$structure-planning`
-     - README, workflow, guide, migration, or specification docs keep their domain writing skill; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
+     - README, workflow, guide, migration, or specification docs keep their domain projection adapter; add `$report-writing` as an overlay when the document includes evidence-backed status, evaluation, audit, review, decision, or recommendation sections
      - large refactor -> `$refactor-loop`
      - environment / CI / Docker / dependency work -> `$environment-maintenance`
      - repo-wide workflow/tooling rearchitecture -> `$comprehensive-development`

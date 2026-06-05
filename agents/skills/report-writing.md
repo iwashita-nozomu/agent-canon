@@ -18,8 +18,11 @@ downstream implementation ../../tools/agent_tools/evaluate_report_quality.py val
 
 `report-writing` is the skill for writing reader-facing reports from existing
 evidence. It owns report prose, claim hygiene, quality review criteria, and
-reader actionability. For nontrivial structure, call `structure-planning` first
-and use its structure contract as the report skeleton.
+reader actionability. In the common document pipeline, file responsibility
+selects this as the DSL-to-prose projection adapter when the document's job is
+evidence-backed status, audit, evaluation, review, decision, or recommendation.
+For nontrivial structure, call `prose-reasoning-graph` and
+`structure-planning` before prose projection.
 
 Reports can be Markdown or HTML. The default report output is Markdown unless
 the user explicitly asks for HTML, a browser page, dashboard, web view, or
@@ -41,11 +44,13 @@ use this skill to turn that evidence into a report a human can evaluate.
 - A report needs a first figure/table, source-to-section map, metric contract,
   or invalid interpretation boundary; in that case use `structure-planning`
   before drafting.
-- A report has a prose graph handoff; in that case use the graph diagnostics,
-  explanation, and integration plan as evidence for reader flow and claim
-  support while keeping the report source packet authoritative.
-- A report is being written from a prose graph handoff; in that case close
-  `fix-now` findings at the DSL/projection stage before drafting report prose.
+- File / document responsibility classifies the output as a report adapter
+  target; in that case create or receive a prose graph handoff, then use graph
+  diagnostics, explanation, and integration plan as evidence for reader flow and
+  claim support while keeping the report source packet authoritative.
+- A report is being written from graph/DSL structure; in that case close
+  `fix-now` findings at the DSL/projection stage before projecting to report
+  prose.
 - A report needs HTML output only when the user explicitly asks for HTML or a
   browser-readable page; in that case use `html-output` after report planning.
 
@@ -71,10 +76,11 @@ Before drafting, fix these inputs:
   routing, state, review gate, handoff, or multi-step evidence flow, use
   `structure-planning` to decide whether the first visual should be a Mermaid
   diagram, table, or text-only outline
-- DSL/projection closure: required when a prose graph handoff is active; revise
-  the structure contract, source-to-section map, or graph-backed rewrite packet
-  and rerun graph diagnostics until the selected profile has no active
-  `fix-now` findings before writing report prose
+- DSL/projection closure: required when file responsibility selects this report
+  adapter for nontrivial output; revise the structure contract,
+  source-to-section map, graph-backed rewrite packet, or graph-backed units and
+  rerun graph diagnostics until the selected profile has no active `fix-now`
+  findings before writing report prose
 
 ## Report Quality Checklist
 
@@ -180,7 +186,8 @@ reason.
   interpretations.
 - `html-output`: owns explicit HTML rendering, layout checks, optional
   `$imagegen` visual assets, and local/external browser server publication.
-- `long-form-writing`: owns long guide, README, migration, or workflow prose.
+- `long-form-writing`: owns general explanatory prose for README, guide,
+  migration, workflow, or specification responsibilities.
 - `experiment-lifecycle`: owns experiment run protocol and rerun decisions.
 - `change-review`: owns findings-first code or document review output.
 - `report-writing`: owns reader-facing synthesis and report quality gates.

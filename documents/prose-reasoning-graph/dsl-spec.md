@@ -239,17 +239,19 @@ not be edited as if they were source prose.
 ### Corpus Hint Object
 
 A corpus hint object records the academic or domain corpus that should calibrate
-analysis, retrieval, examples, and evaluation. It may be inferred from the
-source document, the user prompt, or an explicit workflow setting. User-prompt
-matches are allowed because the user often names the intended field before the
-draft itself contains field-specific vocabulary.
+analysis, retrieval, examples, and evaluation. In the MVP, corpus management is
+a LocalLLM IR extraction task: `agent-canon local-llm extract-prose-ir` receives
+the source documents, user prompt, and optional terms, splits them into bounded
+parts, and returns merged `corpus_hints`. User-prompt context is allowed because
+the user often names the intended field before the draft itself contains
+field-specific vocabulary.
 
 | Field | Required | Meaning |
 | ----- | -------- | ------- |
 | `corpus_id` | yes | Stable corpus/profile id, such as `academic_writing`, `software_engineering`, `experimental_report`, or `formal_reasoning`. |
 | `label` | yes | Human-readable corpus label. |
-| `score` | yes | Heuristic ranking score. |
-| `basis` | yes | Prompt and source keywords that supported the hint. |
+| `score` | yes | LocalLLM IR ranking score or confidence-like ordering value. |
+| `basis` | yes | LocalLLM IR extraction basis, including signal terms, source path, prompt context indicator, or explicit workflow setting. |
 | `selected` | yes | Whether this hint is the current default corpus for downstream analysis. |
 
 Corpus hints are calibration metadata, not evidence. A downstream literature
@@ -457,11 +459,12 @@ views over canonical anchors, not source-truth replacements. A renderer or LLM
 rewrite pass may accept, reject, or combine them, but must preserve provenance
 back to the member anchors.
 
-Projection may also carry corpus hints. Corpus hints select the field-specific
-norms used to interpret rhetorical moves, expected evidence, diagrams, formulas,
-and evaluation criteria. They should be inferred from both source text and user
-prompt when available, because prompt context may identify the intended
-academic field before the draft does.
+Projection may also carry corpus hints and the LocalLLM prose IR artifact path.
+Corpus hints select the field-specific norms used to interpret rhetorical moves,
+expected evidence, diagrams, formulas, and evaluation criteria. They should be
+inferred from the LocalLLM IR extraction pass over source text, user prompt, and
+optional term inputs, because prompt context may identify the intended academic
+field before the draft does.
 
 Projection implementations may use:
 

@@ -17,9 +17,11 @@ upstream design ../../../agents/skills/prose-reasoning-graph.md defines prose gr
 1. Read `agents/skills/paper-writing.md`.
 1. Read `agents/workflows/paper-writing-workflow.md`.
 1. Read `agents/workflows/academic-writing-workflow.md`.
+1. Select this as the DSL-to-prose projection adapter when file/document responsibility is submission paper, thesis chapter, or paper-style manuscript with paper section contracts and citation/evidence review; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, first figure/table, claim/evidence layout, source-to-structure map, or invalid interpretations are nontrivial.
 1. For paragraph-level claim flow, transition pairs, or logic-gap triage, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument` and treat it as advisory discourse evidence before prose drafting.
-1. If a prose graph handoff is present, include its claim/evidence gaps, weak transitions, experiment-plan gaps, and split/merge/bridge/reorder operations in the section contract and reviewer handoff.
-1. Before writing paper prose from a prose graph handoff, close `fix-now` findings at the DSL/projection stage: revise the section contract, citation/evidence matrix, paragraph claim map, or graph-backed rewrite packet, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
+1. For nontrivial paper prose creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting; include its claim/evidence gaps, weak transitions, experiment-plan gaps, and split/merge/bridge/reorder operations in the section contract and reviewer handoff.
+1. Before writing paper prose, close `fix-now` findings at the DSL/projection stage: revise the section contract, citation/evidence matrix, paragraph claim map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
+1. After projecting DSL/projection state to paper prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's paper prose-generation prompt and repair it before continuing.
 1. Fix the paper intent brief, claim contract, section contract, citation/evidence matrix, notation ledger, and paragraph claim map before drafting.
 1. Route citation/evidence review, notation review, logic-gap review, and document-flow review as separate review passes before closeout.

@@ -11,9 +11,10 @@ import importlib.util
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
-from typing import Any, cast
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIX_MERMAID = PROJECT_ROOT / "tools" / "docs" / "fix_mermaid.py"
@@ -33,7 +34,10 @@ def load_module(path: Path) -> ModuleType:
 def test_mermaid_formatter_normalizes_typo_fence_and_reserved_graph_node() -> None:
     """The formatter should detect Mermaid fences and avoid reserved node ids."""
     module = load_module(FIX_MERMAID)
-    fix_mermaid_markdown = cast(Any, module).fix_mermaid_markdown
+    fix_mermaid_markdown = cast(
+        Callable[[str], tuple[str, list[str]]],
+        getattr(module, "fix_mermaid_markdown"),
+    )
     source = """# Diagram
 
 ```mermeid
@@ -58,7 +62,10 @@ flowchart LR
 def test_mermaid_formatter_preserves_directive_graph_keyword() -> None:
     """Diagram directives should not be rewritten as node ids."""
     module = load_module(FIX_MERMAID)
-    fix_mermaid_markdown = cast(Any, module).fix_mermaid_markdown
+    fix_mermaid_markdown = cast(
+        Callable[[str], tuple[str, list[str]]],
+        getattr(module, "fix_mermaid_markdown"),
+    )
     source = """```mermaid
 graph TD
   start --> graph[(Graph label)]
@@ -74,7 +81,10 @@ graph TD
 def test_mermaid_formatter_rewrites_line_initial_graph_node() -> None:
     """A line-initial reserved word with an edge is a node id, not a directive."""
     module = load_module(FIX_MERMAID)
-    fix_mermaid_markdown = cast(Any, module).fix_mermaid_markdown
+    fix_mermaid_markdown = cast(
+        Callable[[str], tuple[str, list[str]]],
+        getattr(module, "fix_mermaid_markdown"),
+    )
     source = """```mermaid
 flowchart LR
   ingest --> graph

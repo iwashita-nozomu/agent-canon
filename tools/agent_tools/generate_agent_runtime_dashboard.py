@@ -962,7 +962,7 @@ class RuntimeDashboardVisuals:
             self.family_row(
                 "Codex role eval",
                 "codex-agent-role",
-                "repair subagent role TOML, model buckets, routing, or runtime metric capture",
+                "repair subagent role TOML, model settings, routing, or runtime metric capture",
             ),
             self.issue_row(),
         )

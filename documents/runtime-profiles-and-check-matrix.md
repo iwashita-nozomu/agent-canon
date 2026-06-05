@@ -33,10 +33,9 @@ activate only the profile required by the current change.
 | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope |
 | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work |
 
-Compatibility surfaces such as local bare mirrors, legacy subtree routes, and
-multi-runtime mirrors may remain documented, but only under the matching
-compatibility profile. They are not the default path for GitHub/submodule-first
-repositories.
+Compatibility surfaces such as legacy subtree routes may remain documented, but
+only under the matching compatibility profile. They are not the default path for
+GitHub/submodule-first repositories.
 
 
 ## Risk Classes

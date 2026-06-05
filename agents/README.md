@@ -60,7 +60,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - [skills/worktree-start.md](skills/worktree-start.md)
   - worktree kickoff、scope 初期化、action log 起点の固定
 - [skills/long-form-writing.md](skills/long-form-writing.md)
-  - README、workflow、guide などの長文作成フロー
+  - README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter
 - [skills/academic-writing.md](skills/academic-writing.md)
   - 論文、thesis chapter、scholarly note の作成フロー
 - [skills/comprehensive-development.md](skills/comprehensive-development.md)
@@ -77,8 +77,10 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 ## Skills And Subagents
 
-- Canonical project skills: `.agents/skills/`
-- Codex runtime config: `.codex/`
+- Public Codex skill discovery: `.agents/skills/`
+- Human-readable public, internal, and compatibility skill docs: `agents/skills/`
+- Codex runtime config and subagent registry: `.codex/config.toml`
+- Codex role behavior: `.codex/agents/*.toml`
 
 ## Team Shape
 
@@ -101,8 +103,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
-- 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、`python_reviewer`、`cpp_reviewer` を明示します。
-- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を固定 stack にします。
+- 包括的開発の route は [skills/comprehensive-development.md](skills/comprehensive-development.md) に集約し、この hub では bootstrap command と review stack の入口だけを示します。
+- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を bundle に明示します。
 - planning を含む Codex session では、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 

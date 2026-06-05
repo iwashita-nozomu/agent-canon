@@ -177,7 +177,6 @@ def collect_findings(layout: dict[str, object] | None) -> tuple[list[Finding], l
             findings.append(Finding("warning", f"docker version failed: {format_command_result(docker_version)}"))
 
     default_paths = {
-        "bare_repo_root": Path("/mnt/git"),
         "workspace_root": Path("/mnt/l/workspace"),
         "docker_state_root": Path("/var/lib/docker"),
     }

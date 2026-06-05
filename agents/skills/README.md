@@ -52,7 +52,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 | `test-design` | static 解析で nasty case と regression case を固定 | `agents/skills/test-design.md` | `.agents/skills/test-design/SKILL.md` |
 | `refactor-loop` | 大規模 refactor を挙動保存つき構造変更として扱う | `agents/skills/refactor-loop.md` | `.agents/skills/refactor-loop/SKILL.md` |
 | `user-guided-debugging` | ユーザー明示時に、1 件ずつ問題点を提示してから修正し、検証後に次の課題を提示する | `agents/skills/user-guided-debugging.md` | `.agents/skills/user-guided-debugging/SKILL.md` |
-| `long-form-writing` | README、workflow、guide などの長文作成フロー | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
+| `long-form-writing` | README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter | `agents/skills/long-form-writing.md` | `.agents/skills/long-form-writing/SKILL.md` |
 | `academic-writing` | 論文、thesis chapter、scholarly note の作成フロー | `agents/skills/academic-writing.md` | `.agents/skills/academic-writing/SKILL.md` |
 | `paper-writing` | 投稿論文、thesis chapter、paper section の作成フロー | `agents/skills/paper-writing.md` | `.agents/skills/paper-writing/SKILL.md` |
 | `md-style-check` | Markdown の体裁とリンク確認 | `agents/skills/md-style-check.md` | `.agents/skills/md-style-check/SKILL.md` |
@@ -75,9 +75,22 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/canonical/` と `documents/REVIEW_PROCESS.md` の責務に寄せます。
+- `.agents/skills/<skill>/SKILL.md` shim がない `agents/skills/*.md` は internal、compatibility、または workflow-owned reference doc です。人間は `agents/skills/` から発見できますが、Codex の public skill discovery には出さず、public skill へ昇格するときだけ shim と `.codex/config.toml` の `[[skills.config]]` を追加します。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が必ず拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
+
+Internal / compatibility review docs that remain routable by workflow, but are not public Codex skills:
+
+| Doc | Status | Public Route |
+| --- | ------ | ------------ |
+| `project-review` | internal repo-wide review routine | `$comprehensive-development` / `project_reviewer` |
+| `report-review` | internal report-quality review routine | `$report-writing` / `report_reviewer` |
+| `critical-review` | internal experiment/report critique routine | `$research-workflow` / `critical_guardian` |
+| `static-check` | internal checker-result interpretation routine | `$tool-finding-report` |
+| `docs-completeness-review` | internal docs review routine | `$document-canon-cleanup` |
+| `docs-consistency-review` | internal docs review routine | `$document-canon-cleanup` |
+| `code-review` | compatibility review doc | `$change-review` |
 
 ## Codex Defaults
 
@@ -92,7 +105,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - repo-changing task では `$agent-orchestration`、`$codex-task-workflow`、`$subagent-bootstrap` の順で使います。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
-- 長めの README、workflow、guide、migration 文書では `long-form-writing` を先に見ます。
+- README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として見ます。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
 - paper section まで含む論文 draft では `paper-writing` を先に見ます。
 - 研究系の task では `research-workflow` を outer loop に使います。
@@ -117,7 +130,7 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 - HTML で experiment / Eval 結果を表示するときは `html-experiment-report` を使い、最初の図、既存資産調査、責務境界、最小 renderer、ignored artifact 出力を固定します。
 - worktree を新設・再開するときは `worktree-start` で scope と action log を先に固定し、scope drift や cleanup 判断は `worktree-health` を使います。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
-- repo-wide な実装・文書・tooling・runtime の統合変更では `comprehensive-development` を使います。
+- repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `agents/templates/environment_change_proposal.md` を使います。
 - `memory/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。
 - `memory/AGENT_PHILOSOPHY.md` の更新や agent-side learning の整理では `agent-learning` を使います。

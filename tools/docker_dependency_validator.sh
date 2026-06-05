@@ -274,13 +274,41 @@ check_result_visualization_requirements() {
   fi
 
   for requirement in jupyterlab notebook ipykernel pydeps snakeviz pyyaml; do
-    if ! grep -Eiq "^${requirement}([<>=~![:space:]]|$)" "$req_file"; then
+    if ! grep -Eiq "^${requirement}(\\[[^]]+\\])?([<>=~![:space:]]|$)" "$req_file"; then
       report_issue "docker/requirements.txt must include ${requirement}"
       missing=1
     fi
   done
 
   [ "$missing" -eq 0 ] && printf '   result-log / visualization requirements present\n'
+}
+
+check_python_dependency_manifest_contract() {
+  local validator="tools/requirement_sync_validator.py"
+  local output_file=""
+
+  printf '\n6. Checking pyproject/docker dependency contract...\n'
+  if [ "$has_docker_surface" -eq 0 ]; then
+    printf '   docker/ absent; skipping repo-local dependency manifest contract\n'
+    return
+  fi
+  if [ ! -f "pyproject.toml" ]; then
+    report_issue "pyproject.toml not found"
+    return
+  fi
+  if [ ! -f "$validator" ]; then
+    report_issue "requirement sync validator missing: $validator"
+    return
+  fi
+
+  output_file="$(mktemp)"
+  if python3 "$validator" >"$output_file" 2>&1; then
+    grep -E '^(PYPROJECT_|DOCKER_REQUIREMENTS_)' "$output_file" || true
+  else
+    cat "$output_file"
+    report_issue "pyproject/docker dependency contract failed"
+  fi
+  rm -f "$output_file"
 }
 
 is_container_runtime() {
@@ -296,7 +324,7 @@ check_repo_local_venv_policy() {
   local pattern='python3?[[:space:]]+-m[[:space:]]+venv|virtualenv|conda[[:space:]]+create|uv[[:space:]]+venv|pipenv|poetry[[:space:]]+env'
   local canonical_tool="tools/ci/python_env_policy.py"
 
-  printf '\n6. Checking repo-local virtual-environment policy...\n'
+  printf '\n7. Checking repo-local virtual-environment policy...\n'
 
   for path in venv env .conda conda-env .venv-*; do
     if [ -e "$path" ]; then
@@ -350,7 +378,7 @@ check_pythonpath_documentation() {
   local docker_documented=0
   local file=""
 
-  printf '\n7. Checking PYTHONPATH and Docker documentation...\n'
+  printf '\n8. Checking PYTHONPATH and Docker documentation...\n'
   if [ "$has_docker_surface" -eq 0 ]; then
     printf '   docker/ absent; skipping repo-local Docker documentation checks\n'
     return
@@ -377,6 +405,7 @@ check_dockerfile_coherence
 check_post_create_python_install
 check_docker_build_context_isolation
 check_result_visualization_requirements
+check_python_dependency_manifest_contract
 check_repo_local_venv_policy
 check_pythonpath_documentation
 

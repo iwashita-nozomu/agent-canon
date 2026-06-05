@@ -93,7 +93,7 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "remote",
         "remote policy",
-        "Keep GitHub-first remote and compatibility mirror rules separate.",
+        "Keep GitHub-first remote rules separate from machine-local remote repair.",
         "route_remote_policy",
         ("bash tools/update_agent_canon.sh plan",),
         ("remote_policy_router.py", "remote-policy-cleanup", "pr_update_route.py", "pr-route-minimize"),

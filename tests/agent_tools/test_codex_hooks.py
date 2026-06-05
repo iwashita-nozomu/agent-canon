@@ -999,7 +999,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
 
     def test_hook_dispatcher_surfaces_direct_rg_warning(self) -> None:
-        """PreToolUse dispatcher should not bypass risky direct rg commands."""
+        """Dispatcher should not bypass risky direct rg commands."""
         result = subprocess.run(
             [sys.executable, str(HOOK_DISPATCHER), "PreToolUse"],
             cwd=PROJECT_ROOT,

@@ -96,10 +96,9 @@
     }
   ],
   "compatibility_note": [
-    "Compatibility surfaces such as local bare mirrors, legacy subtree routes, and",
-    "multi-runtime mirrors may remain documented, but only under the matching",
-    "compatibility profile. They are not the default path for GitHub/submodule-first",
-    "repositories."
+    "Compatibility surfaces such as legacy subtree routes may remain documented, but",
+    "only under the matching compatibility profile. They are not the default path for",
+    "GitHub/submodule-first repositories."
   ],
   "risk_classes": [
     {

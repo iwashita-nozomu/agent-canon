@@ -170,7 +170,7 @@ python3 tools/docs/audit_and_fix_links.py --check documents notes
 
 ## Relationship To Other Workflows
 
-- 長文一般の構成技法は `agents/workflows/long-form-writing-workflow.md`
+- 一般説明 prose の構成技法が必要な場合は `agents/workflows/long-form-writing-workflow.md`
 - 学術文章一般の原則は `agents/workflows/academic-writing-workflow.md`
 - 文献探索が主 task なら `agents/workflows/research-workflow.md`
 

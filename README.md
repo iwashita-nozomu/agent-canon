@@ -128,8 +128,7 @@ remote の正本:
 
 - AgentCanon canonical remote は `documents/agent-canon-github-remote.md` を見ます。
 - Template canonical remote は `documents/template-github-remote.md` を見ます。
-- local `/mnt/git/*.git` は compatibility mirror であり、source of truth ではありません。
-- reusable module distribution は GitHub PR / main SHA を正本にします。local Git / bare mirror の問題は repo-specific repair として扱い、shared module architecture を曲げません。
+- reusable module distribution は GitHub PR / main SHA を正本にします。repo-specific local Git repair は shared module architecture から分離します。
 
 ## 検索導線
 

@@ -22,7 +22,7 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 - shared canon の source of truth を upstream `agent-canon` repo と `vendor/agent-canon/` submodule pin に固定する
 - template root には runtime discovery に必要な surface だけを残す
 - template 利用者向けの入口文書は root regular file として残す
-- reusable module distribution は GitHub PR / GitHub `main` SHA を正本にし、local bare mirror は compatibility-only にする
+- reusable module distribution は GitHub PR / GitHub `main` SHA を正本にする
 
 ## 固定構成
 
@@ -31,7 +31,7 @@ downstream implementation ../tools/update_agent_canon.sh derived repo update hel
 - template / 派生 repo 側の pin:
   - `vendor/agent-canon/`
 - submodule URL:
-  - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。local `/mnt/git` bare repo は compatibility mirror として明示 opt-in します。
+  - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。
 - root 側の shared runtime surface:
   - `documents/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
 - root 側の shared devcontainer:
@@ -96,14 +96,10 @@ bash tools/sync_agent_canon.sh check
 
 AgentCanon の source of truth は GitHub の
 `https://github.com/iwashita-nozomu/agent-canon.git` です。
-`/mnt/git/agent-canon.git` は高速 validation や offline 作業用の local mirror であり、
-canonical remote ではありません。
-local Git や local bare mirror の不具合は、その repo の compatibility repair として扱います。
 shared module architecture、Dockerfile boundary、devcontainer ownership を local-only
 remote 名や一台の host path に合わせて変えません。
 
-既存 repo が `agent-canon` remote や `.gitmodules` を `/mnt/git/agent-canon.git`
-または `../agent-canon.git` に向けている場合は、AgentCanon update surface が安全に更新できるタイミングで
+既存 repo が `agent-canon` remote や `.gitmodules` を GitHub canonical 以外に向けている場合は、AgentCanon update surface が安全に更新できるタイミングで
 `documents/agent-canon-github-remote.md` の migration runbook に従います。
 
 ## PR ルール
@@ -124,7 +120,6 @@ remote 名や一台の host path に合わせて変えません。
 - `make agent-canon-pr-check` が pass
 - root 側の shared surface が構成どおりに再同期されている
 - AgentCanon GitHub `main` SHA、template submodule pin SHA、`git submodule status vendor/agent-canon` が PR / closeout evidence に残っている
-- local bare mirror を使った場合だけ、その mirror SHA と GitHub SHA の関係が明示されている
 
 ## 参照先
 
@@ -281,14 +276,13 @@ git -C vendor/agent-canon push origin HEAD
 bash tools/sync_agent_canon.sh status
 ```
 
-### 7.7 local bare compatibility
+### 7.7 GitHub Canonical Update Route
 
-Project-local bare repo registration is no longer a user-facing AgentCanon
-update path. Existing repos that still rely on `/mnt/git/<project>-agent-canon.git`
-must treat it as a compatibility mirror and migrate `.gitmodules` back to the
-canonical GitHub URL before normal AgentCanon PR work. New AgentCanon changes
-go through GitHub branches and PRs, with `merge-main-into-current` used before
-push when the branch was created from a derived repo.
+Project-local remotes are not a user-facing AgentCanon update path. Existing
+repos must migrate `.gitmodules` back to the canonical GitHub URL before normal
+AgentCanon PR work. New AgentCanon changes go through GitHub branches and PRs,
+with `merge-main-into-current` used before push when the branch was created
+from a derived repo.
 
 ## 8. 移行フェーズ
 

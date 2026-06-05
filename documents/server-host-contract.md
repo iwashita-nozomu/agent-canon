@@ -63,11 +63,10 @@ remote execution contract が「repo が外部 server から実行される条�
 - bare repo や共有 workspace を network share に置く場合、Docker state と build cache は local ext4 側に残します
 - symlink、file permission、case sensitivity、I/O 特性の差を前提にします
 
-## Git And Mirror Rule
+## Git Rule
 
-- bare repo root、mirror hook path、mirror remote の関係を必ず記録します
-- GitHub publish / PR 作業は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` を canonical 入口にし、mirror は bare repo hook 側へ寄せます
-- host 固有の mirror 手順は `notes/github-mirror-procedure.md` に残します
+- GitHub canonical remote と authentication state を記録します
+- GitHub publish / PR 作業は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` を canonical 入口にします
 
 ## Validation
 
@@ -84,4 +83,3 @@ make docker-build-check-host-docker
 - `documents/remote-execution-repo-contract.md`
 - `documents/templates/server_host_inventory.template.md`
 - `documents/templates/server_runtime_layout.template.toml`
-- `notes/github-mirror-procedure.md`

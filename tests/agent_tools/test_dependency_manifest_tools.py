@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +27,8 @@ REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_revi
 CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
 WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
+REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
+DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
 
 
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -307,6 +310,178 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_requirement_sync_reports_pyproject_docker_summary(self) -> None:
+        """The Python dependency validator reports pyproject/docker ownership summary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "python").mkdir()
+            (root / "docker").mkdir()
+            (root / "pyproject.toml").write_text(
+                "\n".join(
+                    [
+                        "[project]",
+                        "dependencies = [\"requests>=2\"]",
+                        "[project.optional-dependencies]",
+                        "dev = [\"pytest>=8\"]",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "docker" / "requirements.txt").write_text(
+                "requests>=2\npytest>=8\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(REQUIREMENT_SYNC)],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=pass", result.stdout)
+            self.assertIn("PYPROJECT_RUNTIME_DEPENDENCIES=1", result.stdout)
+            self.assertIn("PYPROJECT_DOCKER_RUNTIME_MISSING=0", result.stdout)
+
+    def test_requirement_sync_fails_when_runtime_dependency_missing_from_docker(self) -> None:
+        """Runtime package declarations in pyproject must be present in docker requirements."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "python").mkdir()
+            (root / "docker").mkdir()
+            (root / "pyproject.toml").write_text(
+                "[project]\ndependencies = [\"requests>=2\"]\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "requirements.txt").write_text("", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(REQUIREMENT_SYNC)],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=fail", result.stdout)
+            self.assertIn(
+                "pyproject project dependency 'requests' missing from docker/requirements.txt",
+                result.stdout,
+            )
+
+    def test_docker_validator_accepts_requirement_extras_for_required_packages(self) -> None:
+        """The Docker validator should accept valid extras syntax in requirements."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "python").mkdir()
+            (root / "docker").mkdir()
+            (root / ".devcontainer").mkdir()
+            (root / "tools" / "ci").mkdir(parents=True)
+            (root / "pyproject.toml").write_text(
+                "[project]\ndependencies = []\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "requirements.txt").write_text(
+                "\n".join(
+                    [
+                        "jupyterlab",
+                        "notebook",
+                        "ipykernel",
+                        "pydeps",
+                        "snakeviz",
+                        "pyyaml[secure]>=6",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "docker" / "Dockerfile").write_text(
+                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+                encoding="utf-8",
+            )
+            (root / "docker" / "install_python_dependencies.sh").write_text(
+                "\n".join(
+                    [
+                        "python3 -m pip install --no-cache-dir -r docker/requirements.txt",
+                        "sha256sum docker/requirements.txt",
+                        "python3 -m pip check",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / ".devcontainer" / "post-create.sh").write_text(
+                "\n".join(
+                    [
+                        "run_as_root",
+                        "docker/register_safe_directories.sh",
+                        "docker/install_python_dependencies.sh",
+                        'git config --global --add safe.directory "$workspace"',
+                        "repo-local Python dependency installer absent",
+                        "cli.github.com/packages",
+                        "apt_install gh",
+                        "npm install -g @openai/codex",
+                        "gh --version",
+                        "codex --version",
+                        "rustup toolchain install",
+                        "rustfmt",
+                        "clippy",
+                        "rust-analyzer",
+                        "cargo build --release",
+                        "AGENT_CANON_TOOLS_HOME",
+                        "${tools_home}/agent-canon/bin/agent-canon",
+                        "/usr/local/bin/agent-canon",
+                        "install_llama_cpp",
+                        "tools/install_llama_cpp.sh",
+                        "ggml-org/SmolLM3-3B-GGUF:Q4_K_M",
+                        "${tools_home}/bin/llama-cli",
+                        "/etc/profile.d/agent-canon-rust.sh",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / ".devcontainer" / "devcontainer.json").write_text(
+                '{"postCreateCommand": "bash .devcontainer/post-create.sh /workspace"}\n',
+                encoding="utf-8",
+            )
+            (root / ".dockerignore").write_text(
+                "vendor/agent-canon\n.git\n.state\n*.gguf\n",
+                encoding="utf-8",
+            )
+            (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
+            (root / "README.md").write_text(
+                "PYTHONPATH=/workspace/python\nUse docker run for execution.\n",
+                encoding="utf-8",
+            )
+            (root / "tools" / "install_llama_cpp.sh").write_text(
+                "ggml-org/llama.cpp\ncmake --build\n",
+                encoding="utf-8",
+            )
+            (root / "tools" / "ci" / "python_env_policy.py").write_text(
+                "# env policy fixture\n",
+                encoding="utf-8",
+            )
+            (root / "tools" / "requirement_sync_validator.py").symlink_to(
+                REQUIREMENT_SYNC
+            )
+
+            result = subprocess.run(
+                ["bash", str(DOCKER_VALIDATOR)],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("result-log / visualization requirements present", result.stdout)
+            self.assertIn("Summary: 0 issues found", result.stdout)
+
     def test_format_accepts_line_comment_manifest(self) -> None:
         """Line-comment manifests are valid for Python-like files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -348,6 +523,35 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "@dependency-start",
                         "responsibility Exercises H1 before manifest parsing.",
                         "upstream design target.md target context",
+                        "@dependency-end",
+                        "-->",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_accepts_coverage_rule_manifest_lines(self) -> None:
+        """Coverage-rule manifest lines are valid non-edge dependency metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            readme = root / "README.md"
+            source = root / "source.md"
+            readme.write_text("# Readme\n", encoding="utf-8")
+            source.write_text(
+                "\n".join(
+                    [
+                        "# Source",
+                        "<!--",
+                        "@dependency-start",
+                        "responsibility Exercises coverage-rule metadata in dependency manifests.",
+                        "upstream design README.md readme context",
+                        "coverage graph_trace requires node record|edge record",
                         "@dependency-end",
                         "-->",
                         "",

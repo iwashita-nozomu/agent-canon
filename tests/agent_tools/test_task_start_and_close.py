@@ -14,6 +14,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
@@ -47,7 +49,21 @@ def current_diff_ref(workspace: Path = PROJECT_ROOT) -> str:
         check=False,
         capture_output=True,
     )
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+    )
     diff_bytes = unstaged.stdout + staged.stdout
+    if untracked.returncode == 0 and untracked.stdout:
+        for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
+            if raw_path.startswith(b"reports/agents/"):
+                continue
+            path = workspace / raw_path.decode("utf-8", errors="surrogateescape")
+            diff_bytes += b"\0UNTRACKED\0" + raw_path + b"\0"
+            if path.is_file():
+                diff_bytes += path.read_bytes()
     if not diff_bytes:
         return head
     return f"{head}-dirty-{hashlib.sha256(diff_bytes).hexdigest()}"
@@ -59,6 +75,13 @@ def ready_closeout_evidence_lines(
     """Return structured closeout evidence lines for a ready bundle."""
     latest_diff_ref = diff_ref or current_diff_ref(workspace)
     return [
+        "",
+        "## AgentCanon Latest And CI Gate Evidence",
+        "- agent_canon_latest_command: make agent-canon-ensure-latest",
+        "- agent_canon_latest_status: pass",
+        "- agent_canon_submodule_status: fixture-clean",
+        "- agent_canon_source_head: fixture-source-head",
+        "- agent_canon_parent_pin: fixture-parent-pin",
         "",
         "## Mechanical Completion Loop Evidence",
         "- mechanical_loop_iterations: 1",
@@ -194,10 +217,34 @@ def write_ready_diff_check_artifact(
     )
 
 
+def write_ready_final_review(report_dir: Path) -> None:
+    """Write a concrete approving final-review artifact."""
+    (report_dir / "final_review.md").write_text(
+        "\n".join(
+            [
+                "# Final Review",
+                "",
+                "## Decision",
+                "",
+                "approve",
+                "",
+                "## Evidence",
+                "",
+                "- Closeout fixture has concrete review evidence.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_ready_closeout_bundle(
     report_dir: Path, run_id: str, workspace: Path = PROJECT_ROOT
 ) -> None:
     """Write ready closeout artifacts except the diff-check artifact."""
+    active_run_path = report_dir.parent / ".active_run"
+    if not active_run_path.exists():
+        active_run_path.write_text(f"{run_id}\n", encoding="utf-8")
     (report_dir / "verification.txt").write_text(
         "\n".join(
             [
@@ -266,6 +313,7 @@ def write_ready_closeout_bundle(
     write_ready_schedule(report_dir)
     _log_ready_work(report_dir)
     write_ready_agent_evaluation(report_dir)
+    write_ready_final_review(report_dir)
 
 
 class TaskStartAndCloseTest(unittest.TestCase):
@@ -528,6 +576,18 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REQUEST_CONTRACT=", result.stdout)
             self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
+            manifest_text = (report_root / "test-task-start" / "team_manifest.yaml").read_text(
+                encoding="utf-8",
+            )
+            manifest = yaml.safe_load(manifest_text)
+            spawn_budget = manifest["run"]["spawn_budget"]
+            write_scope_policy = manifest["run"]["write_scope_policy"]
+            self.assertEqual(spawn_budget["active_subagents"], 12)
+            self.assertEqual(spawn_budget["max_write_subagents"], 4)
+            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
+            self.assertEqual(write_scope_policy["max_write_subagents"], 4)
+            self.assertNotIn("active_subagents", write_scope_policy)
 
     def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
@@ -570,6 +630,24 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
             self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=10", result.stdout)
             self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=3", result.stdout)
+            manifest_text = (
+                report_root / "test-large-refactor" / "team_manifest.yaml"
+            ).read_text(encoding="utf-8")
+            manifest = yaml.safe_load(manifest_text)
+            spawn_budget = manifest["run"]["spawn_budget"]
+            write_scope_policy = manifest["run"]["write_scope_policy"]
+            self.assertEqual(spawn_budget["active_subagents"], 10)
+            self.assertEqual(spawn_budget["max_write_subagents"], 3)
+            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertEqual(write_scope_policy["max_write_subagents"], 3)
+            self.assertNotIn("active_subagents", write_scope_policy)
+            self.assertIn("spawn_budget:", manifest_text)
+            self.assertIn("active_subagents: 10", manifest_text)
+            self.assertIn("max_write_subagents: 3", manifest_text)
+            self.assertIn(
+                "max_write_subagents_scope: 'write-capable subagents only'",
+                manifest_text,
+            )
             self.assertIn(
                 "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
                 result.stdout,
@@ -670,6 +748,28 @@ class TaskStartAndCloseTest(unittest.TestCase):
             manifest_text = (
                 report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
+            manifest = yaml.safe_load(manifest_text)
+            spawn_budget = manifest["run"]["spawn_budget"]
+            write_scope_policy = manifest["run"]["write_scope_policy"]
+            self.assertEqual(spawn_budget["active_subagents"], 10)
+            self.assertEqual(spawn_budget["max_write_subagents"], 2)
+            self.assertGreater(
+                spawn_budget["active_subagents"],
+                spawn_budget["max_write_subagents"],
+            )
+            self.assertEqual(spawn_budget["runtime_max_threads"], 24)
+            self.assertLessEqual(
+                spawn_budget["active_subagents"],
+                spawn_budget["runtime_max_threads"],
+            )
+            self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
+            self.assertEqual(write_scope_policy["max_write_subagents"], 2)
+            self.assertNotIn("active_subagents", write_scope_policy)
+            self.assertIn("spawn_budget:", manifest_text)
+            self.assertIn("active_subagents: 10", manifest_text)
+            self.assertIn("max_write_subagents: 2", manifest_text)
+            self.assertIn("runtime_max_threads: 24", manifest_text)
+            self.assertIn("max_write_subagents_scope: 'write-capable subagents only'", manifest_text)
             self.assertIn("write_scope_policy:", manifest_text)
             self.assertIn("parent_managed: true", manifest_text)
             self.assertIn("workflow_family:", manifest_text)
@@ -868,6 +968,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_final_review(report_dir)
             write_ready_diff_check_artifact(report_dir)
 
             result = subprocess.run(
@@ -994,6 +1095,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             write_ready_schedule(report_dir)
             _log_ready_work(report_dir)
             write_ready_agent_evaluation(report_dir)
+            write_ready_final_review(report_dir)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
             result = subprocess.run(
@@ -1021,6 +1123,166 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("DIFF_CHECK_AGENT_COMPLETE=yes", result.stdout)
             self.assertIn("CANONICAL_TREE_HEAD_COMPLETE=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
+
+    def test_task_close_rejects_placeholder_final_review(self) -> None:
+        """task_close should not accept an untouched final_review.md template."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-placeholder-final-review"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+            (report_dir / "final_review.md").write_text(
+                "# Final Review\n\n## Decision\n\n<!-- reviewer decision -->\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("final_review_artifact_complete", result.stdout)
+
+    def test_task_close_rejects_negative_final_review_decision_text(self) -> None:
+        """Final review decisions containing approve as a substring must not pass."""
+        cases = {
+            "revise-do-not-approve": "revise: do not approve",
+            "not-approved": "not approved",
+        }
+        for case_id, decision in cases.items():
+            with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as tmp_dir:
+                report_root = Path(tmp_dir) / "reports"
+                run_id = f"test-task-close-negative-final-review-{case_id}"
+                report_dir = report_root / run_id
+                report_dir.mkdir(parents=True, exist_ok=True)
+                write_ready_closeout_bundle(report_dir, run_id)
+                write_ready_diff_check_artifact(report_dir)
+                (report_dir / "final_review.md").write_text(
+                    f"# Final Review\n\n## Decision\n\n{decision}\n",
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(TASK_CLOSE_SCRIPT),
+                        "--report-dir",
+                        str(report_dir),
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("CLOSEOUT_READY=no", result.stdout)
+                self.assertIn("final_review.md:decision_not_approve", result.stdout)
+
+    def test_task_close_rejects_stale_inactive_report_bundle(self) -> None:
+        """task_close should reject a report bundle when .active_run points elsewhere."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-inactive-run"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_root / ".active_run").write_text("another-run\n", encoding="utf-8")
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("REPORT_ACTIVE_RUN=another-run", result.stdout)
+            self.assertIn("REPORT_ACTIVE_RUN_MATCH=no", result.stdout)
+            self.assertIn("report_active_run_match", result.stdout)
+
+    def test_task_close_rejects_missing_active_run_marker(self) -> None:
+        """task_close should reject a report bundle when .active_run is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-missing-active-run"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+            (report_root / ".active_run").unlink()
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("REPORT_ACTIVE_RUN=", result.stdout)
+            self.assertIn("REPORT_ACTIVE_RUN_MATCH=no", result.stdout)
+            self.assertIn("report_active_run_match", result.stdout)
+
+    def test_task_close_rejects_failed_agent_canon_latest_status(self) -> None:
+        """task_close should require an explicit pass latest-route status."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-failed-agent-canon-latest-status"
+            report_dir = report_root / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir)
+            closeout_path = report_dir / "closeout_gate.md"
+            closeout_path.write_text(
+                closeout_path.read_text(encoding="utf-8").replace(
+                    "- agent_canon_latest_status: pass",
+                    "- agent_canon_latest_status: fail",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_CANON_LATEST_STATUS=fail", result.stdout)
+            self.assertIn("agent_canon_latest_status", result.stdout)
 
     def test_task_close_rejects_missing_mechanical_loop_or_diff_check(self) -> None:
         """task_close should fail when parent-only closeout skips the final diff loop."""
@@ -1303,6 +1565,59 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     str(report_dir),
                 ],
                 cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("diff_check_latest_diff_ref", result.stdout)
+
+    def test_task_close_diff_ref_includes_untracked_files(self) -> None:
+        """Untracked workspace files should make captured diff-check refs stale."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_id = "test-task-close-untracked-diff-ref"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            (workspace_root / "new-untracked.md").write_text("new file\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--run-id",
+                    run_id,
+                ],
+                cwd=workspace_root,
                 check=False,
                 capture_output=True,
                 text=True,

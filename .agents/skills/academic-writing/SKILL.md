@@ -17,10 +17,12 @@ upstream environment ../../../CONTAINER_OPERATIONS.md TeX devcontainer tooling b
 # Academic Writing
 
 1. Read `agents/skills/academic-writing.md`.
+1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
 1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
-1. If a prose graph handoff is present, use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
-1. Before writing academic prose from a prose graph handoff, close `fix-now` findings at the DSL/projection stage: revise the claim contract, evidence map, paragraph claim map, or graph-backed rewrite packet, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
+1. For nontrivial academic prose creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting; use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
+1. Before writing academic prose, close `fix-now` findings at the DSL/projection stage: revise the claim contract, evidence map, paragraph claim map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
+1. After projecting DSL/projection state to academic prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's academic prose-generation prompt and repair it before continuing.
 1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
 1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
 1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.

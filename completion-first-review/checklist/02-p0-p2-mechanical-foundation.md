@@ -19,7 +19,7 @@ This checklist starts only after P-1 has at least a draft Definition of Done and
 - Target: `.codex/config.toml`, runtime entrypoints, agent config.
 - Problem: runtime settings are scattered across config and prose.
 - Action: create `runtime_config_matrix.yaml`.
-- Acceptance: Codex, Claude, Copilot, GitHub Actions, and local shell surfaces list their entrypoint, profile support, MCP support, secret mounts, and closeout profile implications.
+- Acceptance: Codex, GitHub Actions, and local shell surfaces list their entrypoint, profile support, MCP support, secret mounts, and closeout profile implications.
 
 ### [ ] P0-002: closeout profile in task catalog
 

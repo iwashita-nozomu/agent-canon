@@ -110,7 +110,12 @@ def is_mounted_archive_path(path_label: str) -> bool:
 
 def is_warning_finding(finding: Finding) -> bool:
     """Return whether a finding is nonblocking archive evidence debt."""
-    return finding.check == "hook_jsonl" and is_mounted_archive_path(finding.path)
+    if finding.check == "hook_jsonl" and is_mounted_archive_path(finding.path):
+        return True
+    return (
+        finding.detail == "missing-eval-run-id"
+        and finding.path.startswith(".agent-canon/log-archive/eval-results/legacy-import/")
+    )
 
 
 def blocking_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:

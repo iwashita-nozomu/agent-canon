@@ -130,7 +130,7 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 - [Higher Order Concerns | Purdue OWL](https://owl.purdue.edu/owl/subject_specific_writing/professional_technical_writing/prioritizing_your_concerns_for_effective_business_writing/index.html)
   - line edit より先に focus、purpose、organization を直す review 順序の根拠です。
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
-  - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
+  - reader path が長い文書に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
 
 ## Agent Learning, Memory, And Philosophy
 

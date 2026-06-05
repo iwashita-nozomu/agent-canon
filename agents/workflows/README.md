@@ -14,7 +14,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 ## 使い方
 
 - まず 1 つの primary workflow を選びます。
-- 長文、学術文書、paper のように文書種別が強い task では overlay workflow を追加します。
+- 一般説明 prose、学術文書、paper のように file / document responsibility が強い task では overlay workflow を追加します。
 - shared canon maintenance や `main` 統合のような特殊操作だけ、maintenance workflow を追加します。
 - 大規模 refactor では `comprehensive-refactoring-workflow.md` を overlay として追加し、設計見直し、OOP 境界、解析 score gate を固定します。
 - 考察、原因仮説、修正箇所の妥当性検証が必要な task では `hypothesis-validation-workflow.md` を overlay として追加し、code dependency と header dependency を別々に抜いてから実装へ進みます。
@@ -46,7 +46,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - `agents/workflows/codex-goals-workflow.md`
 - token 消費を抑えつつ必要な gate を維持する
   - `agents/workflows/token-efficient-codex-workflow.md`
-- README、guide、workflow、migration 文書のような長文
+- README、guide、workflow、migration、specification など file responsibility が一般説明 prose の文書
   - `agents/workflows/long-form-writing-workflow.md`
 - スライド、PPT、presentation のような固定テンプレート型の文書
   - `agents/workflows/slide-production-workflow.md`

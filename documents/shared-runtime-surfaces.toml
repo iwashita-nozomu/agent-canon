@@ -151,7 +151,6 @@ paths = [
   "notes/branches/BRANCH_NOTE_TEMPLATE.md",
   "notes/failures/README.md",
   "notes/failures/FAILURE_NOTE_TEMPLATE.md",
-  "notes/github-mirror-procedure.md",
   "notes/guardrails/README.md",
   "notes/guardrails/engineering_avoidances.md",
   "notes/knowledge/README.md",

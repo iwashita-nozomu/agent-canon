@@ -11,7 +11,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 `git clone <template>` 直後に、新しい repo として使い始めるための初期化手順を固定します。
 project slug、display name、project remote の登録を同じ入口で扱います。
-AgentCanon の source of truth は GitHub remote で、project-local bare repo は新規 bootstrap surface として扱いません。
+AgentCanon の source of truth は GitHub remote です。
 
 ## Use When
 
@@ -59,5 +59,4 @@ bash scripts/start_repository.sh --validate-only
 ## Safety Rules
 
 - `--dry-run` では file rewrite や remote mutation を行いません。
-- local bare mirror は compatibility appendix のみです。新規 bootstrap surface としては扱いません。
 - template 固有の clone bootstrap は `scripts/` に置き、shared automation の `tools/` へ移しません。
