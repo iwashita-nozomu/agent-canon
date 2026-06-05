@@ -98,7 +98,7 @@ skill_families:
     canonical_doc: agents/skills/user-guided-debugging.md
     shim: .agents/skills/user-guided-debugging/SKILL.md
   - id: long-form-writing
-    purpose: Draft long-form reader-facing docs with roadmap-first structure and mandatory review.
+    purpose: Project graph/DSL structure into general explanatory repository prose for README, workflow, guide, migration, and specification responsibilities.
     canonical_doc: agents/skills/long-form-writing.md
     shim: .agents/skills/long-form-writing/SKILL.md
   - id: academic-writing
@@ -113,6 +113,10 @@ skill_families:
     purpose: Check Markdown formatting, heading structure, and link hygiene.
     canonical_doc: agents/skills/md-style-check.md
     shim: .agents/skills/md-style-check/SKILL.md
+  - id: mvp-skeleton
+    purpose: Keep first-pass MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
+    canonical_doc: agents/skills/mvp-skeleton.md
+    shim: .agents/skills/mvp-skeleton/SKILL.md
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md

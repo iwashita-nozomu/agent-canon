@@ -20,8 +20,7 @@ upstream design README.md durable document index
 - artifact placement canon: `agents/canonical/ARTIFACT_PLACEMENT.md`
 - CLI entrypoint canon: `agents/canonical/CLI_ENTRYPOINTS.md`
 - Codex workflow canon: `agents/canonical/CODEX_WORKFLOW.md`
-- Codex / Copilot discovery path: `.agents/skills/`
-- Claude compatibility path: `.claude/skills/` (generated mirror)
+- Codex discovery path: `.agents/skills/`
 
 ## 方針
 
@@ -58,6 +57,5 @@ upstream design README.md durable document index
 ## 整理ルール
 
 - 新しい skill を追加するときは `agents/canonical/skills.md` を更新します。
-- Claude mirror が必要なら `python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune` を実行します。
-- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`skill_mirror_sync` と `log_surface_inventory_guard` が予測された場合は mirror check と log-surface baseline check を同じ変更内で通します。
+- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
 - Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/log-surface-inventory.json` を通し、意図した field change なら `documents/log-surface-inventory.json` を再生成します。

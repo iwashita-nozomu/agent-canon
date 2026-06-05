@@ -4,7 +4,6 @@
 @dependency-start
 responsibility Defines the ordered cleanup workflow for linked AgentCanon source PRs and dependent template PRs.
 upstream design agent-canon-pr-workflow.md defines AgentCanon source PR and template pin PR gates.
-upstream design github-copilot-workflow.md defines GitHub-visible PR evidence requirements.
 upstream design codex-goals-workflow.md defines goal.md authority and loop-state handling.
 upstream design goal-plan-implementation-loop.md defines blocked-goal next-action handling.
 downstream design README.md lists this workflow in the maintenance catalog.
@@ -58,7 +57,7 @@ as part of default cleanup.
    - mergeability is `MERGEABLE`;
    - no review requests block it;
    - required checks pass or no checks are configured for that repository;
-   - the PR body contains validation evidence and Copilot / automation evidence
+   - the PR body contains validation evidence and GitHub automation evidence
      when applicable.
 1. After source merge, update the template / derived repo:
    - fetch AgentCanon `main`;
@@ -77,7 +76,7 @@ as part of default cleanup.
    - template pin SHA;
    - validation pass lines or exact blockers;
    - goal loop status;
-   - Copilot / Automation Output fields when relevant.
+   - GitHub Automation Output fields when relevant.
 1. Mark ready or merge only after all required gates pass. If any gate fails,
    keep the dependent PR draft or blocked and record the exact next action.
 

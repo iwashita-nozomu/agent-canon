@@ -27,11 +27,11 @@ template / derived repo では `vendor/agent-canon/` submodule pin として参�
 ## Scope
 
 - root AGENTS runtime wrapper
-- Claude / Copilot runtime entrypoints
+- Codex runtime entrypoints
 - shared Codex config defaults
 - shared agent workflow
 - shared skill canon
-- Codex / Claude subagent inventory
+- Codex subagent inventory
 - agent review / coordination documents
 - shared runtime surface ownership document
 - submodule update and legacy migration operation canon
@@ -57,4 +57,5 @@ template / derived repo では `vendor/agent-canon/` submodule pin として参�
 - skill、tool、workflow、HTML report、実験 script を追加または変更するときは、先に既存資産の調査、次に責務境界の解析、その後に実装へ入る。この順序と再利用しなかった候補は run bundle または work log に残す
 - prompt、routing、subagent-config の shared canon を直す task では、親が policy prose を直接広く書き換える前に `prompt_config_reviewer` で prompt/config audit を切り、重複 surface と最小差分を先に確定する
 - AGENTS / ROOT_AGENTS に禁止事項を増やす前に、warning hook、checker、closeout artifact gate、role TOML、または workflow eval に逃がせるかを決める。hook は原則 fail-open の context / evidence 収集面とし、prompt secret など高確信の公開事故以外を runtime blocker にしない
+- legacy forwarder / migration wrapper が `*_FORWARDER=deprecated`、`*_FORWARDER_SEVERITY=fix-now`、または caller chain 付きの移行警告を出した場合は、元の作業を続ける前に呼び出し元を特定し、canonical command へ移行する。subagent handoff や workflow prompt には、警告の caller chain、移行先 command、「移行してから元 task へ戻る」指示を含める
 - root entrypoint wrapper の変更は、この tree ではなく template / 派生 repo 側の wrapper task として扱う

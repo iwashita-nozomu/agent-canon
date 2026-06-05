@@ -7,6 +7,7 @@ downstream environment ../.devcontainer/post-create.sh installs Rust toolchain a
 downstream implementation ../rust/agent-canon/src/main.rs Rust CLI entrypoint
 downstream implementation ../rust/agent-canon/src/migration_audit.rs validates migration boundaries
 downstream implementation ../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
+downstream implementation ../rust/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
 downstream implementation ../tools/bin/agent-canon stable shell wrapper
 @dependency-end
 -->
@@ -59,6 +60,14 @@ Python compatibility helper for eval and index internals, not the primary
 operator entrypoint. Post-create fetches and builds llama.cpp through
 `tools/install_llama_cpp.sh`; AgentCanon update/rebuild paths reuse the same
 installer and rebuild an existing local llama.cpp checkout after pin updates.
+
+After the AgentCanon CLI is built, DevContainer post-create also runs
+`agent-canon structured-analysis build --root <workspace> --profile devcontainer`
+as a warning-only cache rebuild. This rebuild creates the SQLite intermediate
+representation under
+`${AGENT_CANON_STRUCTURED_ANALYSIS_HOME:-$HOME/.cache/agent-canon/structured-analysis}`
+then materializes warning rows in a separate `diagnostics.sqlite` DB. It does
+not rewrite repository source files or generated README surfaces.
 
 In a template or derived repository, the normal adoption path is:
 
@@ -142,9 +151,31 @@ tools that should stay Python-first.
 
 Port one tool family at a time. A port is ready for review only when the Rust
 tool preserves the old command's machine-readable output contract, the Python
-entrypoint is either retired or kept as a compatibility wrapper, and the tool
-catalog, docs, tests, and hook or workflow references point at the current
-canonical command.
+entrypoint is either retired or kept as a caller-warning legacy migration shim,
+and the tool catalog, docs, tests, and hook or workflow references point at the
+current canonical command.
+
+## Completed Rust Migrations
+
+- `noncanonical_document_inventory.py` has been absorbed into
+  `agent-canon structured-analysis document-inventory`. The Python path remains
+  only as a legacy migration shim that emits caller chain, `fix-now` severity,
+  and the canonical command before forwarding.
+- `agent-canon structured-analysis build` materializes the git-visible file
+  tree as an `artifact` layer and imports document inventory findings into the
+  `document-canon` layer of `prose_graph.sqlite`, then writes current warnings
+  into `diagnostics.sqlite`.
+- Tool-document responsibility checks have been absorbed into
+  `agent-canon structured-analysis document-inventory` as generic
+  `document_responsibility_gap` findings. The Rust checker derives these gaps
+  from dependency-manifest responsibility and reusable coverage rules declared
+  by upstream design documents. For example, any document that cites the Prose
+  Reasoning Graph DSL as `upstream design` must cover the DSL spec's declared
+  coverage groups, such as source-truth anchors, lower graph typed relations,
+  derived projection views, and graph format records. It must not warn merely
+  because a named heading or visual block is absent. No Python
+  `prose_reasoning_graph.py` compatibility route emits those responsibility
+  findings.
 
 ## First Rust Targets
 
@@ -152,7 +183,6 @@ Recommended first migrations:
 
 - vector_search.py
 - file_surface_inventory.py
-- noncanonical_document_inventory.py
 - helper_function_inventory.py
 - log_surface_inventory.py
 - tools/oop/python/readability.py

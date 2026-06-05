@@ -60,7 +60,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - [skills/worktree-start.md](skills/worktree-start.md)
   - worktree kickoff、scope 初期化、action log 起点の固定
 - [skills/long-form-writing.md](skills/long-form-writing.md)
-  - README、workflow、guide などの長文作成フロー
+  - README、workflow、guide、migration、specification など一般説明 prose の DSL-to-prose adapter
 - [skills/academic-writing.md](skills/academic-writing.md)
   - 論文、thesis chapter、scholarly note の作成フロー
 - [skills/comprehensive-development.md](skills/comprehensive-development.md)
@@ -71,20 +71,16 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 ## Runtime Entry Points
 
 - [AGENTS.md](../AGENTS.md)
-  - Codex / Copilot agent mode の入口
-- [CLAUDE.md](../CLAUDE.md)
-  - Claude Code の入口
-- [.github/copilot-instructions.md](../.github/copilot-instructions.md)
-  - GitHub Copilot repository instructions
+  - Codex agent mode の入口
 - [.github/AGENTS.md](../.github/AGENTS.md)
   - GitHub 側の薄い入口
 
 ## Skills And Subagents
 
-- Canonical project skills: `.agents/skills/`
-- Claude compatibility mirror: `.claude/skills/` (generated from `.agents/skills/`)
-- Claude subagents: `.claude/agents/`
-- Codex runtime config: `.codex/`
+- Public Codex skill discovery: `.agents/skills/`
+- Human-readable public, internal, and compatibility skill docs: `agents/skills/`
+- Codex runtime config and subagent registry: `.codex/config.toml`
+- Codex role behavior: `.codex/agents/*.toml`
 
 ## Team Shape
 
@@ -107,8 +103,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
 - repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
-- 包括的開発では、bundle に加えて `project_reviewer`、必要なら `docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、`python_reviewer`、`cpp_reviewer` を明示します。
-- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を固定 stack にします。
+- 包括的開発の route は [skills/comprehensive-development.md](skills/comprehensive-development.md) に集約し、この hub では bootstrap command と review stack の入口だけを示します。
+- 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を bundle に明示します。
 - planning を含む Codex session では、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
 - Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、提供しない runtime では `.codex/agents/*.toml` を見ます。
 
@@ -183,7 +179,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - workflow family 選択はこの hub と `workflows/README.md` を正本にし、`canonical/README.md` を第二の hub にしません。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
-- 実行環境固有の都合がある場合だけ、`AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` に最小限の差分を持たせます。
+- 実行環境固有の都合がある場合だけ、`AGENTS.md` に最小限の差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/`、dependency surface、local implementation を先に探索します。
 - reuse sweep をせずに新しい file や module を増やしません。
 - 既存実装を使えるか、導入済みライブラリを拡張できるか、既存では足りない理由が何かを artifact に残さずに新規実装へ進めません。

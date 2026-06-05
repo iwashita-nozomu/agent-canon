@@ -138,8 +138,8 @@ class GoalLoopTest(unittest.TestCase):
             self.assertIn("GOAL_NEXT_OPEN_ITEM=none", status.stdout)
             self.assertIn("NEXT_ACTION=close_goal_loop", status.stdout)
 
-    def test_init_can_record_github_copilot_merge_authority(self) -> None:
-        """Goal setup can pre-authorize GitHub Copilot merge when green."""
+    def test_init_can_record_github_pr_automation_authority(self) -> None:
+        """Goal setup can pre-authorize GitHub PR automation when green."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             goal = Path(tmp_dir) / "goal.md"
 
@@ -148,20 +148,20 @@ class GoalLoopTest(unittest.TestCase):
                 "--goal-file",
                 str(goal),
                 "--objective",
-                "Let Copilot merge after checks.",
+                "Let GitHub automation merge after checks.",
                 "--pr-mutation-authority",
-                "github_copilot_merge_when_green",
+                "github_pr_automation_when_green",
             )
             status = run_goal_loop("status", "--goal-file", str(goal))
 
             self.assertEqual(init.returncode, 0, init.stderr)
             self.assertEqual(status.returncode, 0, status.stderr)
             self.assertIn(
-                "GOAL_PR_MUTATION_AUTHORITY=github_copilot_merge_when_green",
+                "GOAL_PR_MUTATION_AUTHORITY=github_pr_automation_when_green",
                 status.stdout,
             )
             self.assertIn(
-                "pr_mutation_authority: github_copilot_merge_when_green",
+                "pr_mutation_authority: github_pr_automation_when_green",
                 goal.read_text(encoding="utf-8"),
             )
 

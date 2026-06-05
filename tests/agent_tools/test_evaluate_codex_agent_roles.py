@@ -46,11 +46,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
         self.assertIn("CODEX_AGENT_ROLE_FINDINGS=0", result.stdout)
         self.assertIn("ROLE_RUNTIME_METRICS_STATUS=missing", result.stdout)
-        self.assertIn("diff_triage_reviewer:spark_read", result.stdout)
-        self.assertIn("experiment_runner:spark_coding", result.stdout)
-        self.assertIn("manager_reviewer:mini_review", result.stdout)
-        self.assertIn("plan_reviewer:mini_review", result.stdout)
-        self.assertIn("ship_reviewer:frontier_judgment", result.stdout)
+        self.assertIn("diff_triage_reviewer:gpt-5.3-codex-spark:low", result.stdout)
+        self.assertIn("experiment_runner:gpt-5.3-codex-spark:low", result.stdout)
+        self.assertIn("manager_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("plan_reviewer:gpt-5.4-mini:medium", result.stdout)
+        self.assertIn("ship_reviewer:gpt-5.5:high", result.stdout)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
@@ -109,7 +109,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             payload = json.loads(compact.read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["finding_count"], 0)
-            self.assertIn("frontier_judgment", payload["model_buckets"])
+            self.assertIn("gpt-5.5", payload["model_counts"])
 
     def test_accumulate_writes_role_eval_report(self) -> None:
         """Role evals should accumulate through the shared eval result contract."""

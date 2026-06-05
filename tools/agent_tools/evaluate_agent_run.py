@@ -24,8 +24,10 @@ except ModuleNotFoundError:
 
 from agent_team import resolve_report_root
 from report_artifact_checks import (
+    check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,
+    has_approve_decision,
     section_has_content,
 )
 
@@ -621,16 +623,18 @@ def build_review_and_closeout_criteria(
     evidence: RunEvidence,
 ) -> list[CriterionResult]:
     """Build review feedback and closeout criteria."""
+    final_review_blockers = check_final_review_artifact(evidence.final_review_text)
     return [
         criterion(
             "review_feedback_loop",
             10,
-            "approve" in evidence.final_decision
+            has_approve_decision(evidence.final_review_text)
+            and not final_review_blockers
             and not has_open_review_findings(
                 evidence.change_review_text,
                 evidence.final_review_text,
             ),
-            "Resolve or escalate review feedback and record an approving final review decision.",
+            "Resolve or escalate review feedback and record a concrete approving final review decision.",
         ),
         *build_closeout_criteria(evidence),
     ]

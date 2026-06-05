@@ -740,7 +740,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / "README.md").write_text("# AgentCanon\n", encoding="utf-8")
         (work_dir / "ROOT_AGENTS.md").write_text("# Root agents\n", encoding="utf-8")
-        (work_dir / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
         (work_dir / "tools" / "agent_tools").mkdir(parents=True)
         shutil.copy2(
             REPO_ROOT / "tools" / "agent_tools" / "surface_manifest.py",
@@ -765,9 +764,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'owner = "agent-canon"',
                     'class = "runtime_surface"',
                     'paths = [',
-                    '  "CLAUDE.md",',
                     '  ".github/AGENTS.md",',
-                    '  ".github/copilot-instructions.md",',
                     ']',
                     '',
                     '[[group]]',
@@ -842,10 +839,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             "# GitHub agents\n",
             encoding="utf-8",
         )
-        (work_dir / ".github" / "copilot-instructions.md").write_text(
-            "# Copilot instructions\n",
-            encoding="utf-8",
-        )
         (work_dir / ".github" / "workflows" / "agent-coordination.yml").write_text(
             "name: agent coordination\n",
             encoding="utf-8",
@@ -860,7 +853,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "add",
                 "README.md",
                 "ROOT_AGENTS.md",
-                "CLAUDE.md",
                 ".github",
                 "documents",
                 "tools",
@@ -1040,10 +1032,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     / "agent_canon.md"
                 ).read_text(encoding="utf-8"),
             )
-            self.assertEqual(
-                (repo / ".github" / "copilot-instructions.md").readlink().as_posix(),
-                "../vendor/agent-canon/.github/copilot-instructions.md",
-            )
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
     def test_link_root_materializes_missing_and_legacy_regular_active_contracts(self) -> None:
@@ -1132,6 +1120,42 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(link_root.returncode, 0, link_root.stderr)
             self.assertFalse(policy_path.exists())
             self.assertFalse(policy_path.is_symlink())
+
+    def test_check_rejects_broken_tracked_root_view_symlink(self) -> None:
+        """Check should catch retired tracked symlink views into AgentCanon."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, _work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            link_root = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "link-root"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(link_root.returncode, 0, link_root.stderr)
+            retired = repo / "tests" / "tools" / "test_retired_mirror.py"
+            retired.parent.mkdir(parents=True)
+            os.symlink(
+                "../../vendor/agent-canon/tests/tools/test_retired_mirror.py",
+                retired,
+            )
+            subprocess.run(["git", "add", "tests/tools/test_retired_mirror.py"], cwd=repo, check=True)
+
+            check = subprocess.run(
+                ["bash", "tools/sync_agent_canon.sh", "check"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(check.returncode, 0)
+            self.assertIn(
+                "root-symlink[tests/tools/test_retired_mirror.py]=broken",
+                check.stderr,
+            )
 
     def test_plan_reports_submodule_update_without_root_commit_lookup_errors(self) -> None:
         """Plan should compare submodule commits inside the submodule repo."""

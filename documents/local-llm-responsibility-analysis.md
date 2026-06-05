@@ -1,66 +1,108 @@
-# Local LLM Responsibility Analysis
+# Local LLM Analysis Design
 
 <!--
 @dependency-start
-responsibility Documents the local LLM single-file responsibility analysis boundary.
+responsibility Documents local LLM responsibility review, prose IR extraction, graph handoff, and result-surface boundaries.
+coverage local_llm_design_trace requires command surface; result surface; authority boundary; prompt contract; Prose IR|intermediate representation; graph DB|SQLite|nodes table; skill integration
 upstream design responsibility-scope-management.md responsibility scope policy
 upstream design rust-agent-tool-migration.md compiled tool installation boundary
+upstream design prose-reasoning-graph/dsl-spec.md prose graph DSL and IR vocabulary
+upstream design search-coordination.md local LLM search provider routing
 upstream design ../CONTAINER_OPERATIONS.md devcontainer and Dockerfile ownership boundary
 downstream environment ../.devcontainer/post-create.sh installs llama.cpp under AGENT_CANON_TOOLS_HOME
-downstream implementation ../rust/agent-canon/src/local_llm.rs runs the Rust CLI single-file advisory analysis
+downstream implementation ../rust/agent-canon/src/local_llm.rs runs the Rust CLI local LLM commands
+downstream implementation ../tools/agent_tools/prose_reasoning_graph.py consumes LocalLLM prose IR
 downstream implementation ../tools/agent_tools/file_responsibility_llm.py keeps the Python compatibility prompt helper
-downstream implementation ../tests/agent_tools/test_file_responsibility_llm.py tests prompt and scope limits
+downstream implementation ../tests/agent_tools/test_prose_reasoning_graph.py validates LocalLLM prose IR ingestion
+downstream implementation ../tests/agent_tools/test_file_responsibility_llm.py tests compatibility prompt limits
 @dependency-end
 -->
 
-Local LLM responsibility analysis is advisory and single-file only. Model
-output is provider-backed diagnostic evidence, not a repository label.
+この文書は `agent-canon local-llm` の設計正本です。
+Local LLM は advisory な抽出器です。repo policy、依存 closure、CI、
+PR readiness、citation approval、document acceptance を決める authority
+ではありません。
 
-The deterministic sources remain primary:
+## 読者
 
-- dependency headers
-- top-level `responsibility-scope.toml`
-- `tools/catalog.yaml`
-- issue `edit_scope`
-- dependency review output
+- 実装者:
+  Rust CLI、prompt、IR schema、prose graph 連携を変更するときに読みます。
+- tool / skill 設計者:
+  Local LLM の出力をどこまで信頼し、どこから graph checker や reviewer に渡すかを確認します。
+- runtime agent:
+  通常はこの文書を読みません。runtime agent は `$prose-reasoning-graph` skill
+  と tool の compact result surface を通じて black box として使います。
 
-The local LLM may suggest whether one file's responsibility text, ownership
-class, and protecting-tool relationship look inconsistent. It must not decide
-repo-wide ownership, dependency closure, CI pass/fail, or PR readiness.
+## 設計原則
 
-SQLite semantic-index LLM embeddings are a separate provider-vector path. They
-can compare candidate rankings against the deterministic baseline, but they do
-not extend `classify-responsibility` into repo-wide ownership analysis.
+- 決定論的に規定できる処理は agent task ではなく tool task です。
+- Local LLM は source document や corpus term を直接正本化せず、structured IR を返します。
+- tool stdout は stats と artifact path に絞り、巨大 JSON や graph 全体を chat に流しません。
+- corpus 管理と既存文書からの DSL seed 抽出は、固定辞書ではなく Local LLM task です。
+- Local LLM の候補は prose graph DSL、dependency header、structured-analysis、
+  reviewer の verification route で検証します。
+- 未確定の論理接続は settled claim に変換しません。diagnostic candidate と verification
+  route として残します。
 
-## Default Runtime
+## 責務
 
-The shared devcontainer installs llama.cpp into:
+Local LLM command surface が担う責務は 2 つです。
 
-```text
-${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
-${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
+- `classify-responsibility`:
+  単一 file の責務記述を advisory に確認します。
+- `extract-prose-ir`:
+  複数 document と複数 term から Prose IR を抽出し、graph seed と corpus hint を返します。
+
+責務外の処理は次です。
+
+- repo-wide ownership の確定。
+- dependency closure の確定。
+- prose graph diagnostics の採否。
+- rewrite の採否。
+- reviewer / workflow の承認判断。
+
+## System Flow
+
+```mermaid
+flowchart LR
+  docs["documents"]
+  terms["terms"]
+  prompts["prompt context"]
+  partition["tool partition"]
+  llm_task["local-llm extract-prose-ir"]
+  merged_ir["merged Prose IR artifact"]
+  graph_ingest["prose graph ingest"]
+  db_node["SQLite graph DB"]
+  diagnostics["diagnostics"]
+  handoff["skill handoff"]
+  rewrite["rewrite packet"]
+
+  docs --> partition
+  terms --> partition
+  prompts --> partition
+  partition --> llm_task
+  llm_task --> merged_ir
+  merged_ir --> graph_ingest
+  graph_ingest --> db_node
+  db_node --> diagnostics
+  db_node --> handoff
+  diagnostics --> rewrite
+  handoff --> rewrite
 ```
 
-The initial model is:
+この流れでは、Local LLM output は `merged_ir` までです。graph DB に入った後の
+node、edge、diagnostic、edit operation、projection view は
+`prose_reasoning_graph.py` と DSL spec の責務です。
 
-```text
-ggml-org/SmolLM3-3B-GGUF:Q4_K_M
-```
+## Command Surface
 
-This 3B-class model is small enough for local responsibility review and is
-published by ggml-org as Apache-2.0 GGUF. llama.cpp is compiled by the shared
-installer in post-create and rebuilt by the AgentCanon compiled-tool rebuild
-path when a local llama.cpp checkout already exists. The model itself is
-fetched lazily by llama.cpp cache behavior on first use; it is not committed to
-the repository.
-
-## Command
+### classify-responsibility
 
 ```bash
 agent-canon local-llm classify-responsibility path/to/file.py
 ```
 
-Dry prompt inspection:
+prompt inspection:
 
 ```bash
 agent-canon local-llm classify-responsibility \
@@ -68,29 +110,230 @@ agent-canon local-llm classify-responsibility \
   path/to/file.py
 ```
 
-The Rust CLI is the canonical operator entrypoint. The Python
-`tools/agent_tools/file_responsibility_llm.py` entrypoint remains only as a
-compatibility helper for existing eval and index code until those internals are
-ported or removed. The command rejects directories and multiple files. It emits
-`FILE_RESP_LLM_SCOPE=single_file` so downstream logs can tell this is not a
-repo-wide analyzer.
+この command は単一 file だけを受けます。stdout は
+`FILE_RESP_LLM_SCOPE=single_file`、対象 file、model、prompt hash、status を
+出します。advisory Markdown は責務 summary、ownership mismatch 候補、
+protecting tool / issue evidence の不足候補、deterministic follow-up check を
+述べます。
 
-## Allowed Use
+### extract-prose-ir
 
-- Review one changed file's responsibility statement.
-- Ask for possible owner-class mismatch in that file.
-- Ask for missing protecting-tool or issue evidence hints for that file.
-- Feed the suggestion into a human or deterministic checker follow-up.
+```bash
+agent-canon local-llm extract-prose-ir \
+  --root vendor/agent-canon \
+  --json-out /tmp/local_llm_prose_ir.json \
+  --term DSL \
+  --term corpus \
+  documents/tools/prose_reasoning_graph.md \
+  documents/prose-reasoning-graph/dsl-spec.md
+```
+
+この command は複数 document と複数 term を受けます。単語 list ではなく、
+後続 tool が扱える intermediate representation を返します。
+
+### search / build-index / eval
+
+`search` と `build-index` は search-coordination の provider routing に従います。
+`eval` は prompt と compatibility surface の確認用です。これらは
+`extract-prose-ir` の DSL authority ではありません。
+
+## Prose IR Contract
+
+`extract-prose-ir` の JSON artifact は
+`agent_canon.local_llm.prose_ir.v1` です。
+
+| Field | Meaning |
+| ----- | ------- |
+| `schema` | IR schema name. |
+| `task_owner` | Always `local_llm`. |
+| `status` | Tool status for the extraction run. |
+| `model` | Local model name or advisory fallback marker. |
+| `prompt_sha` | Stable prompt digest. |
+| `document_count` | Number of input documents. |
+| `term_count` | Number of input terms. |
+| `part_count` | Number of partitioned prompt parts. |
+| `partition` | Document and term batch settings. |
+| `parts[]` | Per-part extraction summaries and unresolved items. |
+| `documents[]` | Per-document responsibility, section role, and coverage cues. |
+| `terms[]` | Term contexts grounded in document spans. |
+| `corpus_hints[]` | Domain calibration hints with evidence. |
+| `analysis_intents[]` | Applicability judgements such as `experiment_plan`, with status and basis. |
+| `dsl_seed` | Candidate graph nodes and typed relations. |
+
+`corpus_hints[]` は echo ではありません。domain、source path、supporting snippet、
+confidence、basis を持ち、retrieval や writing norm の calibration に使います。
+
+## Part 分割と Merge
+
+`extract-prose-ir` は document と term を一度に巨大 prompt へ入れません。
+
+```bash
+--document-batch-size <N>
+--term-batch-size <N>
+```
+
+各 part は `part:d<document-batch>:t<term-batch>` という id を持ちます。
+part prompt は、その part に入っていない document や term を推測してはいけません。
+未解決の関係は unresolved item として残し、merge stage が `parts[]` と
+`dsl_seed` を統合します。
+
+この分割は tool responsibility です。agent が chat 上で document chunk や
+term chunk を手作業で管理してはいけません。
+
+## Prompt Contract
+
+Local LLM prompt は、次の抽出を要求します。
+
+- command surface:
+  command 名、flag、default path、stats key、generated artifact。
+- result surface:
+  stdout に出る compact stats と、file / SQLite に保存される大型 artifact の区別。
+- authority boundary:
+  tool が診断することと、skill / reviewer が決めること。
+- partition boundary:
+  part 内だけで判断することと、merge stage に残すこと。
+- graph seed:
+  source/form/concept/argument/evidence/empirical-plan/presentation の candidate。
+- analysis intent:
+  `experiment_plan` が actual plan assignment なのか、profile vocabulary explanation なのかを区別する。
+- typed relation:
+  contains、follows、supports、requires、refines、generalizes、concludes、
+  mentions、verifies などの candidate edge。
+- diagnostic candidate:
+  unsupported claim、weak bridge、missing artifact contract、unresolved boundary。
+- presentation candidate:
+  list、table、figure、equation へ射影した方が読みやすい箇所。
+
+dependency-header boilerplate、code fences、Markdown mechanics は、それ自体が
+responsibility、coverage、command、result surface を述べる場合だけ抽出対象です。
+
+## Graph 接続
+
+Local LLM IR は prose graph の正本ではありません。正本 graph は source text から
+materialize された source/form node、typed edge、diagnostic、edit operation、
+projection view です。
+
+```mermaid
+flowchart TB
+  source_anchor["source-truth anchor"]
+  lower_graph["lower graph"]
+  node_record["node record"]
+  edge_record["edge record"]
+  projection_view["projection view"]
+  payload["payload_json"]
+  prose_output["reader-facing prose"]
+
+  source_anchor --> lower_graph
+  lower_graph --> node_record
+  lower_graph --> edge_record
+  node_record --> payload
+  edge_record --> payload
+  lower_graph --> projection_view
+  projection_view --> prose_output
+```
+
+DSL spec との対応は次です。
+
+- source-truth anchor:
+  sentence または EDU anchor が source-truth です。
+- lower graph:
+  lower text unit 間の typed relation を保持します。
+- projection view:
+  macro-claim、subtopic、reader-state、rhetorical role は lower graph からの
+  derived projection view です。
+- node record:
+  実装では `nodes table` に id、layer、kind、text、source span、
+  `payload_json` を持ちます。
+- edge record:
+  実装では `edges table` に kind、from/to node、confidence、`payload_json` を持ちます。
+
+Local LLM の `dsl_seed.nodes[]` と `dsl_seed.edges[]` はこの object model への
+candidate です。source span、profile、diagnostic route、structured-analysis の結果と
+照合してから graph layer に反映します。
+
+## Skill 接続
+
+文章作成 skill の大枠は同じです。
+
+1. 既存文書または draft を DSL / graph に構造化する。
+1. graph diagnostics を出す。
+1. DSL 表現のまま graph の拡充、削除、再編を行う。
+1. Finding が残る場合は verification route を展開する。
+1. Finding がなくなったら DSL から prose へ射影する。
+1. prose 再解析で Finding が出る場合は、DSL から文章へ射影する prompt の問題として扱う。
+
+Local LLM は 1 の構造化と corpus hint 抽出を助けます。4 の再帰展開では、
+queue、visited、depth、downstream selection、child finding 生成は skill 側の責務です。
+Local LLM は unresolved item と candidate route を返すだけです。
+
+`analysis_intents[]` が無い旧 artifact または LocalLLM 失敗時は、receiving tool が
+非 LLM fallback check を使ってもよいです。ただし、その場合は warning を出し、
+LocalLLM IR の再生成または subagent fallback へ route します。この warning は
+fallback result ではなく fallback を使った事実に対して出します。fallback result は通常の
+settled LocalLLM judgement として扱いません。
+
+## Result Surface
+
+根拠として、`prose_reasoning_graph.py` の `--stats-out` contract と
+`$prose-reasoning-graph` skill の bounded artifact contract があるため、
+runtime agent が読むべき最小 output は command stats と artifact path です。
+
+| Command | Compact stdout / stats | Large artifact |
+| ------- | ---------------------- | -------------- |
+| `classify-responsibility` | scope, file, model, prompt hash, status | optional prompt or advisory Markdown |
+| `extract-prose-ir` | JSON path, document count, term count, part count, prompt hash | `local_llm_prose_ir.json` |
+| `prose_reasoning_graph.py ingest` | DB path and LocalLLM IR path | SQLite graph DB and LocalLLM IR JSON |
+| `prose_reasoning_graph.py check-document` | stats and report paths | diagnostics, explanation, integration, handoff, combined report |
+
+full projection、diagnostics、integration、handoff、IR JSON は artifact として開きます。
+chat には compact summary だけを出します。
+
+## Runtime
+
+devcontainer は llama.cpp を次へインストールします。
+
+```text
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-cli
+${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/bin/llama-server
+```
+
+既定 model は次です。
+
+```text
+ggml-org/SmolLM3-3B-GGUF:Q4_K_M
+```
+
+model output がなくても、Rust CLI は同じ command surface で deterministic な
+IR artifact を作ります。これにより post-create、unit test、local validation は
+model availability に依存しません。
 
 ## Prohibited Use
 
-- Do not run this as a required CI gate.
-- Do not use it to replace dependency review.
-- Do not give it multiple files as one prompt.
-- Do not let it create issue files or edit source directly.
-- Do not treat model output as authoritative evidence.
-- Do not present embedding-provider output as file labels or classification
-  authority.
+- Local LLM output を repo-wide ownership label として使わない。
+- dependency review、structured-analysis、prose graph diagnostics を置き換えない。
+- model output だけで CI、PR readiness、citation approval、policy change を決めない。
+- `extract-prose-ir` の JSON 全体を chat や stdout に流さない。
+- chunk 分割を agent の手作業に戻さない。
+- fixed keyword dictionary で corpus 管理を復活させない。
+- unsupported claim を prompt 内で settled claim に変換しない。
 
-If future work needs multi-file or repo-wide LLM analysis, create a separate
-issue, manifest scope, eval, and tool contract first.
+## Validation
+
+設計に対応する確認 route は次です。
+
+```bash
+cargo test --manifest-path rust/agent-canon/Cargo.toml local_llm
+python3 -m unittest tests/agent_tools/test_prose_reasoning_graph.py
+make docs-check
+```
+
+prompt contract を変える場合は、`local_llm.rs` の prompt regression test を更新し、
+`extract-prose-ir --print-prompt` で command surface、result surface、
+authority boundary、verification route、partition boundary が prompt に入ることを
+確認します。
+
+## Compatibility
+
+`tools/agent_tools/file_responsibility_llm.py` は compatibility helper です。新しい
+runtime entrypoint は Rust CLI の `agent-canon local-llm ...` です。旧 helper を呼ぶ
+場所は、呼び出し元を特定して migration warning を出し、Rust CLI へ移行します。

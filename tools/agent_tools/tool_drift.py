@@ -89,12 +89,8 @@ CONTRACTS = (
         name="github_pr_flow",
         tool="tools/ci/check_github_workflows.py",
         links=(
-            LinkCheck("agents/workflows/github-copilot-workflow.md"),
             LinkCheck("agents/workflows/agent-canon-pr-workflow.md"),
             LinkCheck(".github/AGENTS.md"),
-            LinkCheck(".github/copilot-instructions.md"),
-            LinkCheck(".github/instructions/pr-processing.instructions.md"),
-            LinkCheck(".github/agents/pr-maintainer.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE/agent_canon.md"),
             LinkCheck(".github/workflows/agent-coordination.yml"),
@@ -254,7 +250,6 @@ CONTRACTS = (
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
-            LinkCheck("tools/docs/mirror_skill_shims.py"),
             LinkCheck("tools/ci/check_github_workflows.py"),
             LinkCheck("tools/ci/run_all_checks.sh"),
         ),
@@ -263,11 +258,6 @@ CONTRACTS = (
                 "tools/ci/check_agent_canon_pr.sh",
                 "run_repo_dependency_review.sh --fail-missing",
                 "missing-strict-dependency-review",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                "mirror_skill_shims.py --target .claude/skills --prune --check",
-                "missing-skill-mirror-check",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",

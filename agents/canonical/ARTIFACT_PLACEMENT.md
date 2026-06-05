@@ -19,6 +19,11 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   - 開発環境は `docker/`
 - run-local の artifact:
   - `reports/agents/<run-id>/`
+- cross-run に蓄積する agent report:
+  - `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`
+  - log archive branch は `logs/<repo-key>`
+  - 具体値は `python3 tools/agent_tools/runtime_log_archive_git.py status` の
+    `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見る
 - 一時的な runtime output:
   - `WORKTREE_SCOPE.md` の `## Runtime Output Directories` に書かれた場所
 
@@ -26,7 +31,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 
 - その run だけで意味を持つメモは、新しい repo-wide 文書にしません。
 - run 固有の判断、review、handoff は既存 artifact に追記します。
-- 追加の長文説明が必要なら、まず次のどれに属するか判断します。
+- 追加の reader-facing 説明が必要なら、まず file / document responsibility から次のどれに属するか判断します。
 
 ## どこへ置くか
 
@@ -57,9 +62,11 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 - artifact-only role は許可された artifact だけを更新します。
 - run 固有の追補は既存 artifact の節追加で吸収します。
 - cross-run で残す必要がある agent report は、agent が手で別 report を作らず
-  `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
-  で `.agent-canon/log-archive/agent-reports/<repo-key>/...` へ機械的に snapshot
-  します。push は同じ helper の `push` command が担当します。
+  通常は `python3 tools/agent_tools/runtime_log_archive_git.py sync` で
+  `reports/agents/` 全体を `.agent-canon/log-archive/agent-reports/<repo-key>/`
+  へ機械的に同期します。特定 run の immutable snapshot が必要なときだけ
+  `archive-agent-report --report-dir reports/agents/<run-id>` を使い、push は同じ
+  helper の `push` command が担当します。
 
 ### `documents/`
 
@@ -82,7 +89,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 - agent 間で共有する CLI / skill / subagent の運用
 
 判断基準:
-- Codex / Claude / Copilot 間で揃えたい
+- Codex で再利用したい
 - runtime entrypoint には重複させたくない
 
 ### `notes/`
@@ -99,7 +106,6 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 
 ## Subagent と補助文書
 
-- Claude 固有の subagent 定義は `.claude/agents/` に置きます。
 - subagent 自体の利用方針は `agents/` に置きます。
 - 特定エージェント専用の prompt 断片を repo-wide 正本に昇格させないでください。
 

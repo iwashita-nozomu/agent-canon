@@ -154,6 +154,7 @@ check_file() {
   local file="$1"
   local start_count end_count start_line end_line line_no line stripped
   local direction kind rel_path reason target
+  local coverage_keyword coverage_id coverage_requires coverage_terms
   local responsibility_count responsibility_text
   [[ -f "$file" && ! -L "$file" ]] || return 0
 
@@ -220,6 +221,18 @@ check_file() {
         return 1
       fi
       responsibility_count=$((responsibility_count + 1))
+      continue
+    fi
+    if [[ "$stripped" == coverage[[:space:]]* ]]; then
+      read -r coverage_keyword coverage_id coverage_requires coverage_terms <<< "$stripped"
+      if [[ -z "${coverage_id:-}" || -z "${coverage_requires:-}" || -z "${coverage_terms:-}" ]]; then
+        echo "$file:$line_no: coverage line must be: coverage id requires term group"
+        return 1
+      fi
+      if [[ "$coverage_requires" != "requires" ]]; then
+        echo "$file:$line_no: coverage line must use 'requires'"
+        return 1
+      fi
       continue
     fi
     read -r direction kind rel_path reason <<< "$stripped"

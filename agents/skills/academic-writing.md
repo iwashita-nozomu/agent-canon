@@ -7,14 +7,16 @@ upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design ../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
 downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex skill shim
-downstream implementation ../../.claude/skills/academic-writing/SKILL.md generated Claude skill mirror
 @dependency-end
 -->
 
 
 ## Purpose
 
-論文、thesis chapter、scholarly note、proposal のような学術文章を、claim と notation と logic を分離 review しながら書くための skill です。
+file / document responsibility が academic prose、scholarly note、thesis chapter、
+method note、symbol-dense claim-heavy explanation の文書を、共通 graph/DSL 構造から
+学術 prose へ射影する adapter skill です。claim、notation、logic を分離 review します。
+選択基準は長さではなく、文書責務と review gate です。
 
 ## Use When
 
@@ -22,6 +24,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 - claim-heavy な survey、method note、appendix を書く
 - 記号、略語、technical term、仮定、根拠の接続が reader の理解を左右する
 - 一般の guide より、論理の欠落や定義順の破綻が問題になる
+- file responsibility の判定結果が、一般説明 prose や report ではなく academic prose adapter を要求している
 
 ## Core References
 
@@ -38,7 +41,10 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 - `claim contract` で central contribution、gap、reader、non-goal を先に固定する
 - section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
-- prose graph handoff がある場合は、unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
+- 非自明な academic prose の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る
+- prose graph diagnostics は unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
+- reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。claim contract、evidence map、paragraph claim map、graph-backed rewrite packet、または graph-backed unit を直し、graph diagnostics を再実行してから draft する
+- DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は `dsl_to_prose_prompt_defect` として academic prose-generation prompt を直す
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
@@ -63,6 +69,7 @@ downstream implementation ../../.claude/skills/academic-writing/SKILL.md generat
 1. paragraph order や discourse connective が論点なら discourse-relations JSONL を構造 evidence として添付する
 1. `evidence map` と `notation ledger` を作る
 1. `section contract` と `paragraph claim map` を作る
+1. 非自明な academic prose なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
 1. run bundle を作る
 1. reader order で draft する

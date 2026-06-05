@@ -29,6 +29,9 @@ LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
 LEGACY_LOG_ARCHIVE_PARENT = Path(".agent-canon") / "archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
+CODEX_RUNTIME_SUMMARY_FILE = "summary.jsonl"
+CODEX_RUNTIME_INDEX_FILE = "index.jsonl"
 NAMESPACE_HASH_LENGTH = 8
 MAX_KEY_LENGTH = 80
 AGENT_CANON_ROOT_MARKERS = (
@@ -136,8 +139,27 @@ def hook_results_dir(active_root: Path, canon_root: Path) -> Path:
 
 
 def codex_runtime_summary_dir(active_root: Path, canon_root: Path) -> Path:
-    """Return the Codex runtime summary JSONL directory for one source repository."""
+    """Return the Codex runtime summary root directory for one source repository."""
     return _log_archive_root(canon_root) / "codex-runtime" / repo_log_key(active_root)
+
+
+def codex_runtime_chat_dir(active_root: Path, canon_root: Path, conversation_id: str) -> Path:
+    """Return the per-chat Codex runtime summary directory for one conversation."""
+    return (
+        codex_runtime_summary_dir(active_root, canon_root)
+        / CODEX_RUNTIME_CHAT_DIR_NAME
+        / safe_slug(conversation_id)
+    )
+
+
+def codex_runtime_summary_path(active_root: Path, canon_root: Path, conversation_id: str) -> Path:
+    """Return the per-chat Codex runtime summary JSONL path."""
+    return codex_runtime_chat_dir(active_root, canon_root, conversation_id) / CODEX_RUNTIME_SUMMARY_FILE
+
+
+def codex_runtime_index_path(active_root: Path, canon_root: Path) -> Path:
+    """Return the cross-chat Codex runtime summary index path."""
+    return codex_runtime_summary_dir(active_root, canon_root) / CODEX_RUNTIME_INDEX_FILE
 
 
 def agent_report_archive_dir(active_root: Path, canon_root: Path) -> Path:

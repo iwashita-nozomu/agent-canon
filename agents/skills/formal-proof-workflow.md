@@ -7,8 +7,7 @@ upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
-downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex/Copilot runtimes.
-downstream implementation ../../.claude/skills/formal-proof-workflow/SKILL.md mirrors the skill for Claude-compatible runtimes.
+downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
 
@@ -36,8 +35,10 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
 ## Core References
 
 - `agents/skills/literature-survey.md`
-- `agents/skills/research-workflow.md`
 - `agents/skills/academic-writing.md`
+- `agents/skills/long-form-writing.md`
+- `agents/skills/report-writing.md`
+- `agents/skills/research-workflow.md`
 - `agents/skills/paper-writing.md`
 - `documents/tools/formal_proof.md`
 - `references/agent-canon-technology-bibliography.md`
@@ -206,6 +207,8 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
      theorem target、gap ledger は proof note 側を正本にし、Design 側へ重複させない。
 1. Handoff:
    - 学術文章へ戻す場合は `$academic-writing` / `$paper-writing`
+   - proof note や長い証明整理文書へ戻す場合は `$academic-writing` または
+     `$long-form-writing`
    - 文献・既存 proof の source trail は `$literature-survey`
    - reader-facing report は `$report-writing`
 

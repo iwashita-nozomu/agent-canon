@@ -351,6 +351,46 @@ path_is_tracked() {
   git -C "$ROOT_DIR" ls-files --error-unmatch -- "$path" >/dev/null 2>&1
 }
 
+is_agentcanon_root_view_target() {
+  local target="$1"
+  case "$target" in
+    "$PREFIX"|"$PREFIX"/*|"./$PREFIX"/*|"../$PREFIX"/*|"../../$PREFIX"/*|"../../../$PREFIX"/*|"../../../../$PREFIX"/*|"$ROOT_DIR/$PREFIX"|"$ROOT_DIR/$PREFIX"/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+root_view_symlink_candidate_paths() {
+  git -C "$ROOT_DIR" ls-files -s | awk '$1 == "120000" {print $4}'
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    [ -L "$ROOT_DIR/$path" ] || continue
+    echo "$path"
+  done < <(git -C "$ROOT_DIR" ls-files --others --exclude-standard --)
+}
+
+check_agentcanon_root_view_symlink_targets() {
+  local path=""
+  local target=""
+  local abs_path=""
+  local had_broken=0
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    abs_path="$ROOT_DIR/$path"
+    [ -L "$abs_path" ] || continue
+    target="$(readlink "$abs_path")"
+    is_agentcanon_root_view_target "$target" || continue
+    if [ ! -e "$abs_path" ]; then
+      echo "root-symlink[$path]=broken" >&2
+      had_broken=1
+    fi
+  done < <(root_view_symlink_candidate_paths | sort -u)
+
+  return "$had_broken"
+}
+
 ensure_surface_sync_safe() {
   local force="${1:-0}"
   local -a paths=()
@@ -491,6 +531,10 @@ cmd_check() {
 
   if goal_is_shared_symlink; then
     echo "goal.md=shared-symlink" >&2
+    failed=1
+  fi
+
+  if ! check_agentcanon_root_view_symlink_targets; then
     failed=1
   fi
 

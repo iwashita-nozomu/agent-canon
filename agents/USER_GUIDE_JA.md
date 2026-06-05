@@ -17,17 +17,13 @@ upstream design README.md agent canon overview
 
 ## 入口の使い分け
 
-- Codex / Copilot agent mode:
+- Codex runtime:
   - [AGENTS.md](../AGENTS.md)
-- Claude Code:
-  - [CLAUDE.md](../CLAUDE.md)
-- GitHub Copilot custom instructions:
-  - [.github/copilot-instructions.md](../.github/copilot-instructions.md)
+  - [.codex/README.md](../.codex/README.md)
 
 ## skill の使い方
 
 - 共通 skill の正本は `.agents/skills/` にあります。
-- Claude では `.claude/skills/` の generated mirror を使います。正本は `.agents/skills/` です。
 - skill を明示したいときは `$skill-name` を使います。
 - 例: `$repo-onboarding`、`$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - plain text で skill 名を書く運用もできますが、既定表記は `$skill-name` です。
@@ -37,7 +33,7 @@ upstream design README.md agent canon overview
 - C / C++ 差分では `cpp-review` を既定で使います。
 - 局所 diff を findings-first で見るときは `change-review` を使います。
 - Markdown 差分では `md-style-check` を使います。
-- README、workflow、guide、migration 文書のような長文では `long-form-writing` を使います。
+- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。
 - 文献調査や関連研究整理では `literature-survey` を使います。
@@ -50,7 +46,6 @@ upstream design README.md agent canon overview
 
 ## subagent の使い方
 
-- Claude 専用 subagent は `.claude/agents/` にあります。
 - Codex 用 subagent は `.codex/agents/` にあります。
 - subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
 - repo-changing task では run bundle を先に作ります。
@@ -64,7 +59,7 @@ upstream design README.md agent canon overview
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。
 - write scope が重なる場合は serialize するか worktree を分けます。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
-- 長文では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
+- 一般説明 prose adapter を使う文書では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
 - 論文 draft では、さらに `citation_evidence_reviewer` を別 instance で通します。
 - 最後の user-facing 完了報告は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで出しません。

@@ -4,7 +4,7 @@
 # responsibility Tests natural-language to formal-proof scaffold planning.
 # upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow requirements.
-# downstream design ../../documents/tools/formal_proof.md documents the CLI contract.
+# upstream design ../../documents/tools/formal_proof.md documents the CLI contract.
 # @dependency-end
 
 from __future__ import annotations
@@ -67,6 +67,10 @@ class FormalProofToolTest(unittest.TestCase):
             self.assertEqual(payload["target"], "lean")
             self.assertIn(
                 "Search existing formal libraries",
+                "\n".join(payload["proof_obligations"]),
+            )
+            self.assertIn(
+                "package-retained proof trace",
                 "\n".join(payload["proof_obligations"]),
             )
             self.assertTrue(

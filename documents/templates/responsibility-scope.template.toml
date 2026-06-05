@@ -82,12 +82,10 @@ paths = [
   "vendor/agent-canon/**",
   "agents/**",
   ".agents/**",
-  ".claude/**",
   ".codex/**",
   "mcp/**",
   "tools/**",
   "AGENTS.md",
-  "CLAUDE.md",
 ]
 protecting_tools = [
   "tools/agent_tools/responsibility_scope.py",

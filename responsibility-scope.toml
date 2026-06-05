@@ -32,7 +32,6 @@ class_values = [
 
 required_coverage = [
   ".agents",
-  ".claude",
   ".codex",
   ".devcontainer",
   ".github",
@@ -50,7 +49,6 @@ required_coverage = [
   "vendor",
   "AGENTS.md",
   "agent-canon-environment.toml",
-  "CLAUDE.md",
   "CONTAINER_OPERATIONS.md",
   "README.md",
   "responsibility-scope.toml",
@@ -125,10 +123,8 @@ class = "shared_runtime"
 description = "Agent runtime entrypoints, workflow canon, skills, hooks, MCP bridge, and shared runtime configuration."
 paths = [
   "AGENTS.md",
-  "CLAUDE.md",
   "ROOT_AGENTS.md",
   ".agents/**",
-  ".claude/**",
   ".codex/**",
   ".devcontainer/**",
   "agent-canon-environment.toml",

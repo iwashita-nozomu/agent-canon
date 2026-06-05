@@ -5,23 +5,35 @@ responsibility Documents document-canon cleanup workflow for this repository.
 upstream design README.md shared skill canon
 upstream design ../canonical/CODEX_WORKFLOW.md shared workflow contract
 downstream implementation ../../.agents/skills/document-canon-cleanup/SKILL.md exposes runtime skill
-downstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py finds non-canonical document candidates
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs finds non-canonical document candidates
+downstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py legacy migration shim
 @dependency-end
 -->
 
 
 ## Purpose
 
-正本でない文書、generated evidence、runtime mirror、重複見出し、stale 名称の文書を機械的に棚卸しし、どの正本を編集すべきかを先に固定します。
+正本でない文書、generated evidence、root view、重複見出し、stale 名称の文書を機械的に棚卸しし、どの正本を編集すべきかを先に固定します。
 
 ## Use When
 
 - 文書整理を行う
-- root view、runtime mirror、generated report、eval result、closed issue record が正本文書と混ざって見える
+- root view、generated report、eval result、closed issue record が正本文書と混ざって見える
 - ある文書を編集してよいか、正本へ戻すべきか判断したい
 - README、workflow、skill、tool docs の重複や stale path を探したい
 
 ## Core Tool
+
+```bash
+agent-canon structured-analysis document-inventory \
+  --root . \
+  --json-out reports/noncanonical-documents.json \
+  --markdown-out reports/noncanonical-documents.md
+```
+
+The old Python entrypoint is a legacy migration shim. If it emits a forwarder
+warning, update the caller to the Rust command before returning to the original
+task:
 
 ```bash
 python3 tools/agent_tools/noncanonical_document_inventory.py \
@@ -34,7 +46,6 @@ python3 tools/agent_tools/noncanonical_document_inventory.py \
 
 ## Classification Rules
 
-- `runtime_mirror`: `.claude/skills/*/SKILL.md` のような生成 mirror。正本は `.agents/skills/*/SKILL.md`。
 - `accumulated_eval_result`: `.agent-canon/archive/<env-key>/eval-results/` の蓄積結果。正本 policy ではなく evidence。
 - `generated_report`: `reports/` 配下。再生成または evidence として扱い、source policy にしません。
 - `closed_issue_record`: `issues/closed/` 配下。履歴 record として保持し、新 scope は新 issue にします。
@@ -44,9 +55,8 @@ python3 tools/agent_tools/noncanonical_document_inventory.py \
 
 ## Cleanup Sequence
 
-1. `noncanonical_document_inventory.py` を実行し、JSON と Markdown report を作ります。
+1. `agent-canon structured-analysis document-inventory` を実行し、JSON と Markdown report を作ります。
 1. Findings を class ごとに分けます。
-1. `runtime_mirror` は正本を編集し、`python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune` で再生成します。
 1. `accumulated_eval_result`、`generated_report`、`closed_issue_record` は原則編集しません。必要なら generator、eval manifest、issue の open record、または正本文書を編集します。
 1. `missing_dependency_manifest` は文書として残すか、artifact として移すかを決めます。残す場合は nearest canonical anchor への `upstream` を足します。
 1. `duplicate_heading_candidate` は正本候補へ統合するか、reader が区別できる H1 に変更します。
@@ -55,10 +65,9 @@ python3 tools/agent_tools/noncanonical_document_inventory.py \
 ## Closeout Checks
 
 ```bash
-python3 tools/agent_tools/noncanonical_document_inventory.py --root .
-python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
+agent-canon structured-analysis document-inventory --root .
 bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
 python3 tools/agent_tools/check_convention_compliance.py
 ```
 
-残す finding は、生成 evidence や runtime mirror のように「非正本だが必要」なものだけにします。
+残す finding は、生成 evidence のように「非正本だが必要」なものだけにします。

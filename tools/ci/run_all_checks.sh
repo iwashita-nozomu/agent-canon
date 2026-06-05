@@ -23,7 +23,6 @@
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
-# upstream implementation ../docs/mirror_skill_shims.py validates skill shim mirrors
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail
@@ -144,12 +143,6 @@ fi
 
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
-if "$PYTHON_BIN" tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check 2>&1; then
-  echo "✅ skill mirror sync 成功"
-else
-  echo "❌ skill mirror sync 失敗"
-  EXIT_CODE=1
-fi
 if "$PYTHON_BIN" tools/agent_tools/smoke_test_research_perspective_pack.py 2>&1; then
   echo "✅ research perspective pack smoke test 成功"
 else

@@ -30,7 +30,6 @@ ABSOLUTE_WORKSPACE_LINK = re.compile(r"\]\(/mnt/l/workspace/[^)]+\)")
 DERIVED_REPO_STALE_STRINGS = (
     "Project Template",
     "project-template",
-    "/mnt/git/template.git",
     "/mnt/l/workspace/project_template/",
 )
 

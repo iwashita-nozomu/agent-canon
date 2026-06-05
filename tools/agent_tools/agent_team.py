@@ -64,7 +64,6 @@ DOC_SUFFIXES = {".md", ".rst", ".txt"}
 CONFIG_SUFFIXES = {".json", ".toml", ".yaml", ".yml"}
 DOC_OR_RUNTIME_PATH_MARKERS = (
     ".agents/",
-    ".claude/",
     ".codex/",
     ".devcontainer/",
     ".github/",
@@ -487,6 +486,17 @@ def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, in
         raise RuntimeError(f"workflow family active_subagents must be >= 1 for {family_id}")
     if not isinstance(max_write, int) or max_write < 1:
         raise RuntimeError(f"workflow family max_write_subagents must be >= 1 for {family_id}")
+    if max_write > active:
+        raise RuntimeError(
+            "workflow family max_write_subagents exceeds active_subagents "
+            f"for {family_id}: {max_write} > {active}"
+        )
+    runtime_max_threads = codex_runtime_max_threads()
+    if active > runtime_max_threads:
+        raise RuntimeError(
+            "workflow family active_subagents exceeds runtime max_threads "
+            f"for {family_id}: {active} > {runtime_max_threads}"
+        )
     return active, max_write
 
 
@@ -874,14 +884,20 @@ def manifest_run_lines(
     if communication_protocol is not None:
         lines.append(f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}")
     if workflow_family is not None:
+        active_subagents, max_write_subagents = workflow_spawn_budget(
+            load_task_catalog(spec.config),
+            spec.workflow_family_id,
+        )
+        lines.append("  spawn_budget:")
+        lines.append("    source: 'agents/task_catalog.yaml workflow_families[].spawn_budget'")
+        lines.append(f"    active_subagents: {active_subagents}")
+        lines.append(f"    max_write_subagents: {max_write_subagents}")
+        lines.append(f"    runtime_max_threads: {codex_runtime_max_threads()}")
+        lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
         lines.append("    disjoint_write_scopes_required: true")
         lines.append("    overlapping_write_scopes: serialize_or_split_worktree")
-        _, max_write_subagents = workflow_spawn_budget(
-            load_task_catalog(spec.config),
-            spec.workflow_family_id,
-        )
         lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append("  workflow_family:")
         lines.append(f"    id: {spec.workflow_family_id}")

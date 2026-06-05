@@ -24,10 +24,10 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 - 現在有効なレビューであることを前面に出す場合に限り、`CURRENT_<TOPIC>__<agent>.md` を許可します。
 - 例:
   - `LINEAROPERATOR_REVIEW__codex.md`
-  - `TEST_GAP_ANALYSIS__copilot.md`
-  - `STATIC_ANALYSIS_NOTE__claude.md`
+  - `TEST_GAP_ANALYSIS__codex.md`
+  - `STATIC_ANALYSIS_NOTE__codex.md`
   - `CURRENT_REVIEW__codex.md`
-  - `CURRENT_TEST_REVIEW__copilot.md`
+  - `CURRENT_TEST_REVIEW__codex.md`
 - 既存の歴史的文書は直ちに改名しません。今後追加する文書はこの規則に従います。
 
 ## 3. Git 管理

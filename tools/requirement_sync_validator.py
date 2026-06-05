@@ -17,10 +17,31 @@ from __future__ import annotations
 import ast
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 
 PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+")
+
+
+def normalize_package_name(name: str) -> str:
+    """Normalize one Python package name for manifest comparisons."""
+    return name.lower().replace("-", "_")
+
+
+def requirement_name(requirement: str) -> str | None:
+    """Return the normalized package name from one requirement string."""
+    stripped = requirement.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if "#" in stripped:
+        stripped = stripped.split("#", 1)[0].strip()
+    if not stripped:
+        return None
+    match = PACKAGE_NAME_RE.match(stripped)
+    if match is None:
+        return None
+    return normalize_package_name(match.group(0))
 
 
 def _stdlib_modules() -> set[str]:
@@ -158,11 +179,94 @@ def extract_requirements() -> dict[str, str]:
         match = PACKAGE_NAME_RE.match(line)
         if match:
             pkg_token = match.group(0)
-            pkg_name = pkg_token.lower().replace("-", "_")
+            pkg_name = normalize_package_name(pkg_token)
             version_spec = line[len(pkg_token) :]
             packages[pkg_name] = version_spec
 
     return packages
+
+
+def extract_pyproject_dependency_groups() -> dict[str, set[str]]:
+    """Extract normalized dependency names grouped by pyproject owner field."""
+    pyproject = Path("pyproject.toml")
+    if not pyproject.exists():
+        return {}
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    groups: dict[str, set[str]] = {}
+
+    project = data.get("project", {})
+    if isinstance(project, dict):
+        dependencies = project.get("dependencies", [])
+        if isinstance(dependencies, list):
+            groups["project.dependencies"] = {
+                name
+                for item in dependencies
+                if isinstance(item, str)
+                for name in [requirement_name(item)]
+                if name is not None
+            }
+        optional = project.get("optional-dependencies", {})
+        if isinstance(optional, dict):
+            for group_name, dependencies in sorted(optional.items()):
+                if not isinstance(dependencies, list):
+                    continue
+                groups[f"project.optional-dependencies.{group_name}"] = {
+                    name
+                    for item in dependencies
+                    if isinstance(item, str)
+                    for name in [requirement_name(item)]
+                    if name is not None
+                }
+
+    dependency_groups = data.get("dependency-groups", {})
+    if isinstance(dependency_groups, dict):
+        for group_name, dependencies in sorted(dependency_groups.items()):
+            if not isinstance(dependencies, list):
+                continue
+            groups[f"dependency-groups.{group_name}"] = {
+                name
+                for item in dependencies
+                if isinstance(item, str)
+                for name in [requirement_name(item)]
+                if name is not None
+            }
+
+    return groups
+
+
+def check_pyproject_docker_contract(
+    pyproject_groups: dict[str, set[str]],
+    docker_requirements: dict[str, str],
+) -> list[str]:
+    """Return hard dependency-contract issues between pyproject and docker manifests."""
+    issues: list[str] = []
+    runtime_dependencies = pyproject_groups.get("project.dependencies", set())
+    docker_packages = set(docker_requirements)
+    for package_name in sorted(runtime_dependencies - docker_packages):
+        issues.append(
+            f"pyproject project dependency '{package_name}' missing from docker/requirements.txt"
+        )
+    return issues
+
+
+def print_pyproject_docker_summary(
+    pyproject_groups: dict[str, set[str]],
+    docker_requirements: dict[str, str],
+    issues: list[str],
+) -> None:
+    """Print machine-readable dependency-manifest ownership summary lines."""
+    runtime_dependencies = pyproject_groups.get("project.dependencies", set())
+    all_pyproject_dependencies = set().union(*pyproject_groups.values()) if pyproject_groups else set()
+    docker_packages = set(docker_requirements)
+    docker_only = docker_packages - all_pyproject_dependencies
+    status = "fail" if issues else "pass"
+    print(f"PYPROJECT_DOCKER_DEPENDENCY_SUMMARY={status}")
+    print(f"PYPROJECT_DEPENDENCY_GROUPS={len(pyproject_groups)}")
+    print(f"PYPROJECT_RUNTIME_DEPENDENCIES={len(runtime_dependencies)}")
+    print(f"PYPROJECT_ALL_DEPENDENCIES={len(all_pyproject_dependencies)}")
+    print(f"DOCKER_REQUIREMENTS_PACKAGES={len(docker_packages)}")
+    print(f"PYPROJECT_DOCKER_RUNTIME_MISSING={len(runtime_dependencies - docker_packages)}")
+    print(f"DOCKER_REQUIREMENTS_NOT_IN_PYPROJECT={len(docker_only)}")
 
 
 def check_missing_imports(
@@ -276,8 +380,21 @@ def main() -> int:
         print(f"   ℹ️ {issue}")
         all_issues.append(issue)
 
+    # pyproject / docker manifest contract
+    print("\n6️⃣ Checking pyproject/docker dependency contract...")
+    pyproject_groups = extract_pyproject_dependency_groups()
+    issues = check_pyproject_docker_contract(pyproject_groups, required_packages)
+    print_pyproject_docker_summary(pyproject_groups, required_packages, issues)
+    for issue in issues:
+        print(f"   ⚠️ {issue}")
+        all_issues.append(issue)
+
     print(f"\n📊 Summary: {len(all_issues)} issues found")
-    return 1 if any(i for i in all_issues if i.startswith("used package")) else 0
+    hard_issue_prefixes = (
+        "used package",
+        "pyproject project dependency",
+    )
+    return 1 if any(i.startswith(hard_issue_prefixes) for i in all_issues) else 0
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 @dependency-start
 responsibility Documents the Prose Reasoning Graph canon document set.
 upstream design ../README.md AgentCanon document index
+upstream design ../structured-analysis/README.md structured analysis package boundary
 downstream design dsl-spec.md normative DSL and graph contract
 downstream design ../tools/prose_reasoning_graph.md tool usage documentation
 downstream design ../../agents/skills/prose-reasoning-graph.md skill handoff contract
@@ -25,6 +26,8 @@ contract live here.
 
 - This directory owns the Prose Reasoning Graph DSL vocabulary and validation
   contract.
+- The broader extraction-oriented package boundary lives in
+  [Structured Analysis](../structured-analysis/).
 - The DSL treats prose as one text-anchored semantic graph; macro prose
   structure is a derived projection view, not a second source graph.
 - Derived projection views may recommend prose, list, table, figure, or

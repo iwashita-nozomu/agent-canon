@@ -10,7 +10,6 @@
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
-# upstream implementation ../docs/mirror_skill_shims.py Claude skill mirror parity check
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
 # @dependency-end
@@ -55,7 +54,6 @@ run_direct_agent_checks() {
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
-  python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
@@ -170,7 +168,6 @@ run_standalone_static_gate_ci() {
   python3 tools/agent_tools/issue_sync.py
   python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate
   python3 tools/agent_tools/eval_accumulation_check.py
-  python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune --check
   python3 tools/agent_tools/check_agent_runtime_alignment.py
   python3 tools/agent_tools/smoke_test_research_perspective_pack.py
   python3 tools/agent_tools/check_convention_compliance.py

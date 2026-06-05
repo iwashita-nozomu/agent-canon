@@ -4,6 +4,7 @@ responsibility Documents プロジェクト全体の運用規約 for this reposi
 upstream design ./SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
+downstream implementation ../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
 @dependency-end
 -->
 
@@ -47,7 +48,7 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口を Python 専用にはしません。
 - canonical container の `safe.directory` は `docker/register_safe_directories.sh` で管理します。Docker image build 時は repo workspace の `/workspace` を登録し、devcontainer 作成時や smoke test では mount 済み workspace の `vendor/*` を列挙して `/workspace/vendor/<name>` を動的に登録しなければなりません。
-- Template / AgentCanon 固有の local mirror path、たとえば `/mnt/git/template.git` や `/mnt/git/agent-canon.git` は Dockerfile に焼きません。具体の remote / mirror 名は `documents/template-github-remote.md` と `documents/agent-canon-github-remote.md` を正本にし、必要な repo だけ host git config や run profile で opt-in します。
+- Template / AgentCanon 固有の machine-local remote path は Dockerfile に焼きません。具体の remote 名は `documents/template-github-remote.md` と `documents/agent-canon-github-remote.md` を正本にします。
 - Docker container 内から Docker を使う手順を正本にする場合は、同梱するのは CLI だけとし、host socket mount または別 daemon が必要であることを文書へ明記しなければなりません。
 - canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱しなければなりません。host runtime で `rsync` が無い場合は script の fallback で検証を継続できますが、Dockerfile 側の欠落を放置してはいけません。
 - `docker/Dockerfile` に Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針を入れることを禁止します。具体的な境界、例外、validation は `CONTAINER_OPERATIONS.md` を正本にします。
@@ -79,6 +80,13 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 - C++ build は必ず out-of-source にし、`build/cpp/<profile>/` を使わなければなりません。
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置かなければなりません。optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
 
+## 4.7 Legacy Forwarder Migration Rule
+
+- legacy forwarder / migration wrapper は `LEGACY_FORWARDER_WARNING_REQUIRED` marker を持たなければなりません。
+- legacy forwarder / migration wrapper は実処理へ進む前に stderr へ caller chain、canonical command、`fix-now` severity、移行後に元 task へ戻る prompt message を出さなければなりません。
+- agent は `*_FORWARDER=deprecated`、`*_FORWARDER_SEVERITY=fix-now`、または caller chain 付きの移行警告を見たら、先に呼び出し元を canonical command へ移行しなければなりません。
+- すぐ移行できない場合は、警告の caller chain と移行先 command を run bundle、issue、または PR body に blocker として残さなければなりません。
+
 ## 禁止事項
 
 - Dockerfile に repo 固有の Template / AgentCanon mirror path を焼くことを禁止します。
@@ -86,12 +94,14 @@ upstream design ../CONTAINER_OPERATIONS.md canonical container and devcontainer 
 - host-global install を repo の正本手順として採用することを禁止します。
 - CI でも使う tool を、手元だけの補助 install として導入することを禁止します。
 - `src/` や `include/` の下に別 CMake root を増やすことを禁止します。
+- legacy forwarder / migration wrapper が出した `fix-now` 移行警告を無視して元 task を進めることを禁止します。
 
 ## 5. テストとレビュー
 
 - 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
+- legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
 
 ## 6. 実験運用
 

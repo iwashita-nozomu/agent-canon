@@ -4,7 +4,7 @@
 # responsibility Tests dependency manifest graph report rendering.
 # upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT reports.
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh produces graph TSV inputs.
-# downstream design ../../documents/tools/render_dependency_manifest_graph.md documents usage.
+# upstream design ../../documents/tools/render_dependency_manifest_graph.md documents usage.
 # @dependency-end
 
 from __future__ import annotations

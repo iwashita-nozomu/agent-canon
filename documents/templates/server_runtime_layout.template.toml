@@ -12,15 +12,10 @@ codex_cli_required = true
 python_bin = "python3"
 
 [paths]
-bare_repo_root = "/mnt/git"
 workspace_root = "/mnt/l/workspace"
 local_state_root = "/var/lib/project-template"
 docker_state_root = "/var/lib/docker"
 artifact_root = "/mnt/l/workspace/project_template/reports"
-
-[mounts.bare_repo_root]
-type = "cifs"
-required = true
 
 [mounts.workspace_root]
 type = "cifs"

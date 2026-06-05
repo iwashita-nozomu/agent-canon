@@ -3,6 +3,7 @@
 responsibility Documents prose_reasoning_graph.py usage and contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed prose reasoning graphs
+upstream implementation ../../rust/agent-canon/src/structured_analysis.rs checks document responsibility gaps for tool docs
 upstream design ../../agents/workflows/workflow-references.md discourse, argument, and writing prior art
 upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill contract
 downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py validates CLI behavior
@@ -11,79 +12,271 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 
 # prose_reasoning_graph.py
 
-`prose_reasoning_graph.py` turns Markdown or plain text into a temporary
-SQLite-backed prose reasoning graph. The database is an intermediate analysis
-artifact, not a durable source of truth. Use the exported projection,
-diagnostics, explanation, and rewrite packets as evidence for writing skills,
-reviewers, and LLM rewrite passes.
+`prose_reasoning_graph.py` は、Markdown または plain text を一時的な
+SQLite-backed prose reasoning graph に変換する文章解析ツールです。
+根拠として graph DB は中間解析 artifact であり、したがって source document や DSL spec の代替ではありません。
+この文書は DSL を再定義せず、tool の責務、command surface、result surface、
+verification route、skill handoff を説明します。
 
-The durable graph/DSL contract lives in
-[Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md).
-This tool document explains command usage and operator flow; it must not become
-a second copy of the DSL vocabulary.
+## 根拠 Surface
 
-The graph has explicit layers for source spans, form, concepts, genre moves,
-discourse relations, argument claims, evidence, experiment planning,
-presentation order, diagnostics, edit operations, natural-language explanation,
-and projection metadata. The canonical prose source is one text-anchored
-semantic graph: sentence or EDU anchors and typed relations carry the
-source-truth, while macro-claims, subtopics, and reader-state transitions are
-derived projection views over the same graph. Section and paragraph nodes remain
-source form containers in the current MVP. This follows the design choice from
-Annotation Graphs, RST, PDTB, RST dependency views, eRST, Toulmin/AIF,
-argumentative zoning, and reproducible experiment-planning literature: prose
-structure is easier to inspect as a typed graph with overlays than as a single
-tree or a sequential label pipeline.
+- DSL と graph contract:
+  [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md)
+- CLI behavior:
+  [tools/agent_tools/prose_reasoning_graph.py](../../tools/agent_tools/prose_reasoning_graph.py)
+- expected behavior:
+  [tests/agent_tools/test_prose_reasoning_graph.py](../../tests/agent_tools/test_prose_reasoning_graph.py)
+- result split:
+  source surface と test surface が command behavior を検証するため、この文書は tool result を
+  compact stats、artifact、verification route に分けて説明します。
 
-Projection views may recommend a reader-facing format such as prose,
-bulleted list, ordered list, table, figure, or equation. The recommendation is
-advisory evidence for a rewrite or renderer: the canonical graph still owns the
-source anchors and typed relations, while the presentation format says how that
-subgraph may be easier to read.
+## 読者と責務境界
 
-`ingest` also accepts `--prompt` and `--prompt-file` for corpus/domain
-inference. The exported projection includes `corpus_hints`, ranked from user
-prompt and source-text keywords. Treat these hints as a default corpus profile
-for retrieval, examples, and evaluation norms; they are not citations or proof.
+- maintainer / reviewer:
+  DB schema、diagnostic rule、edit operation、structured-analysis 接続を確認します。
+- skill designer:
+  graph result を `$long-form-writing`、`$report-writing`、`$paper-writing` などへ渡す境界を確認します。
+- runtime agent:
+  通常はこの文書を読みません。runtime agent は
+  [prose-reasoning-graph skill](../../agents/skills/prose-reasoning-graph.md)
+  の result contract に従い、compact stats と artifact path だけを見ます。
 
-## Command Flow
+この tool は source text を graph DB に materialize し、projection、diagnostics、
+explanation、integration plan、skill handoff、rewrite packet を export します。
+この tool は source document の編集、citation approval、paper acceptance、PR merge、
+repository policy change を判断しません。finding の解釈、verification route の展開、
+rewrite の採否は skill、reviewer、workflow の責務です。
 
-```bash
-python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md --db reports/agents/<run-id>/prose.sqlite --prompt-file reports/agents/<run-id>/user_request_contract.md --stats-out reports/agents/<run-id>/prose_ingest.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py analyze --db reports/agents/<run-id>/prose.sqlite --profile all --stats-out reports/agents/<run-id>/prose_analyze.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py project --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_projection.yaml --stats-out reports/agents/<run-id>/prose_project.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py lint --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_diagnostics.md --stats-out reports/agents/<run-id>/prose_lint.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py explain --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_explanation.md --stats-out reports/agents/<run-id>/prose_explain.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py integrate --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_integration.md --stats-out reports/agents/<run-id>/prose_integrate.stats.json
-python3 tools/agent_tools/prose_reasoning_graph.py skill-handoff --db reports/agents/<run-id>/prose.sqlite --profile all --out reports/agents/<run-id>/prose_handoff.md --stats-out reports/agents/<run-id>/prose_handoff.stats.json
+## Graph Contract
+
+この tool の graph は source-anchored です。source span、form、concept、phase、
+discourse relation、argument claim、evidence、experiment planning、presentation order、
+diagnostics、edit operations、natural-language explanation、projection metadata を層として持ちます。
+
+この source-anchored graph の層構成を DSL spec の語彙へ対応させると次の通りです。
+
+- source-truth anchor:
+  sentence または EDU が source-truth anchor です。
+- lower graph:
+  lower text unit 間の typed relation を保持します。
+- projection view:
+  macro-claim、subtopic、reader-state transition、rhetorical role は lower graph からの
+  derived projection view です。
+- node record:
+  `nodes table` は id、document id、layer、kind、text、source span、confidence、
+  `payload_json` を保持します。
+- edge record:
+  `edges table` は kind、from/to node、ordering metadata、confidence、optional evidence、
+  `payload_json` を保持します。
+- diagnostic record:
+  document、node record、edge record のいずれかを target にし、rule、severity、
+  message、suggested action を保持します。
+
+この対応により、graph DB は DSL spec の materialized view として扱います。
+source file は authoring surface のまま残り、graph DB は削除または再生成できます。
+
+## Runtime Flow
+
+```mermaid
+flowchart TB
+  source["source document"]
+  prompt["prompt context"]
+  local_ir["local-llm prose IR"]
+  ingest["ingest or ingest-set"]
+  graph_db["SQLite graph DB"]
+  analyze["analyze"]
+  diagnostics["lint diagnostics"]
+  explain["natural-language explanation"]
+  integrate["integration plan"]
+  handoff["skill handoff"]
+  rewrite["rewrite packet"]
+
+  source --> ingest
+  prompt --> ingest
+  ingest --> local_ir
+  ingest --> graph_db
+  graph_db --> analyze
+  analyze --> diagnostics
+  analyze --> explain
+  analyze --> integrate
+  diagnostics --> handoff
+  integrate --> handoff
+  integrate --> rewrite
 ```
 
-Use `rewrite-packet --op <operation-id>` after `integrate` when a specific
-split, merge, bridge, or reorder operation should be handed to an LLM.
-Use `--stats-out` by default in agent workflows so stdout stays bounded to the
-pass marker and stats path; read the JSON stats artifact before opening larger
-projection, diagnostics, explanation, or handoff files.
+この図の `local_ir` は `agent-canon local-llm extract-prose-ir` 由来の
+`local_llm_prose_ir` metadata です。corpus hint と既存文書からの DSL seed は
+固定 keyword 辞書ではなく、この LocalLLM task から入ります。LocalLLM output は seed であり、
+graph DB の source-truth record ではありません。
+
+この LocalLLM output と graph DB の境界に加えて、同じ LocalLLM IR の `analysis_intents[]` は、本文が実験計画を述べているのか、
+profile 語彙を説明しているだけなのかを区別します。graph 側はこの intent status を読み、
+`experiment_plan` が `present` の場合だけ experiment layer と experiment diagnostics を起動します。
+
+LocalLLM IR が無い旧 DB や障害時だけ、graph 側は非 LLM fallback check を使えます。
+fallback check を呼んだ時点で、その結果が applicable / not-applicable のどちらでも
+`non_llm_experiment_plan_fallback` warning を diagnostics に残し、subagent fallback または
+LocalLLM IR 再生成へ route します。
+
+## Command Surface
+
+DB 作成 command は、`--db` が省略された場合に
+`${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
+配下へ `prose_graph.sqlite` を作ります。根拠として、この default path は
+`test_ingest_defaults_db_to_user_home_cache` で検証します。run-local artifact として DB path を
+固定する workflow では `--db <path>` を渡します。
+
+この graph DB default と command boundary を前提に、単一 document の文章構造と document-canon responsibility coverage を同時に見る入口は
+`check-document` です。
+
+```bash
+python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-canon/documents/tools/prose_reasoning_graph.md \
+  --out-dir reports/agents/<run-id>/prose_tool_doc_check \
+  --profile all \
+  --stats-out reports/agents/<run-id>/prose_tool_doc_check.stats.json
+```
+
+通常の分割実行では、`ingest` 後に stats JSON の
+`.fields.PROSE_REASONING_GRAPH_DB` を後続 command へ渡します。
+
+```bash
+python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md \
+  --prompt-file reports/agents/<run-id>/user_request_contract.md \
+  --stats-out reports/agents/<run-id>/prose_ingest.stats.json
+GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
+python3 tools/agent_tools/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile all \
+  --stats-out reports/agents/<run-id>/prose_analyze.stats.json
+python3 tools/agent_tools/prose_reasoning_graph.py lint --db "$GRAPH_DB" --profile all \
+  --out reports/agents/<run-id>/prose_diagnostics.md \
+  --stats-out reports/agents/<run-id>/prose_lint.stats.json
+python3 tools/agent_tools/prose_reasoning_graph.py integrate --db "$GRAPH_DB" --profile all \
+  --out reports/agents/<run-id>/prose_integration.md \
+  --stats-out reports/agents/<run-id>/prose_integrate.stats.json
+python3 tools/agent_tools/prose_reasoning_graph.py skill-handoff --db "$GRAPH_DB" --profile all \
+  --out reports/agents/<run-id>/prose_handoff.md \
+  --stats-out reports/agents/<run-id>/prose_handoff.stats.json
+```
+
+複数 source document を 1 DB に入れる report / design packet では `ingest-set` を使います。
+各 file は別々の `documents` row として残り、form node id は file ごとに prefix されます。
+
+```bash
+python3 tools/agent_tools/prose_reasoning_graph.py ingest-set documents/structured-analysis \
+  --prompt-file reports/agents/<run-id>/user_request_contract.md \
+  --stats-out reports/agents/<run-id>/ingest_set.stats.json
+GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
+python3 tools/agent_tools/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile report
+```
+
+`integrate` が split、merge、bridge、reorder などの concrete operation id を返す場合だけ
+`rewrite-packet --op <operation-id>` を使います。operation count が `0` の DB では
+diagnostic route を検証または修正し、checker を rerun します。
+
+## Result Surface
+
+runtime agent が最初に読む surface は stats JSON です。stdout は pass marker と stats path のための
+compact channel として扱います。projection、diagnostics、explanation、integration、handoff、
+rewrite packet の本文は file artifact として開きます。
+
+| Surface | Command | 用途 |
+| ------- | ------- | ---- |
+| DB path and counts | `--stats-out` | DB path、output path、compact status を確認する。 |
+| Diagnostics | `lint --out <file>` | active finding、severity、target、verification route を見る。 |
+| Integration plan | `integrate --out <file>` | rewrite candidate と recursive verification route を見る。 |
+| Skill handoff | `skill-handoff --out <file>` | receiving skill へ bounded graph evidence を渡す。 |
+| Document check | `check-document --out-dir <dir>` | prose diagnostics と target document-canon findings を同じ report へ出す。 |
+| Projection | `project --out <file>` | full graph layers、source anchors、projection views、diagnostics、edit operations を inspection する。 |
+| Explanation | `explain --out <file>` | claim path、gap、recommended next edits を自然言語で読む。 |
+| Rewrite packet | `rewrite-packet --op <id> --out <file>` | 1 つの edit operation を preserve / do-not rule 付きで渡す。 |
+
+## Document Responsibility Check
+
+`check-document` は prose graph path と Rust `structured-analysis` document-canon path を同時に走らせます。
+Rust 側は `document-canon` graph layer を生成し、target document の
+`document_responsibility_gap` を同じ report に入れます。Python parser はこの layer を直接作らず、
+structured-analysis output を import します。
+
+この structured-analysis import boundary により、document-canon coverage rule の責務は upstream design に残り、
+この guide は DSL spec を `upstream design` として参照します。DSL spec は
+`dsl_design_trace` と `graph_format_trace` の coverage rule を宣言しています。そのため、この guide は
+source-truth anchor、lower graph、typed relation、derived projection view、node record、
+edge record、`payload_json` を説明対象に含めます。
+
+checker は見出し名や図の有無だけでは warning を出しません。downstream document が coverage rule
+付き upstream design を参照している場合に、その coverage group を検査します。不足は
+`missing_responsibility_coverage=<coverage-id>` の reason として記録します。
+
+`document_responsibility_gap` の suggested action は
+`verification_route=document_responsibility_verification` です。この route は upstream coverage rule、
+downstream span、rerun command を持ちます。recursive expansion は skill loop の責務です。
 
 ## Profiles
 
-- `writing`: long-form section and paragraph flow.
-- `logic`: claim support, bridge, and logic-gap triage.
-- `experiment`: hypothesis, metric, baseline, expected result, and report
-  readiness.
-- `report`: evidence traceability and reader-facing report structure.
-- `academic`: notation/logic/citation-aware scholarly prose.
-- `paper`: paper section contract and citation-evidence review.
-- `all`: all handoffs and all graph layers.
+- `writing`:
+  long-form section と paragraph flow。
+- `logic`:
+  claim support、bridge、logic-gap triage。
+- `experiment`:
+  hypothesis、metric、baseline、expected result、report readiness の語彙を扱う profile。
+- `report`:
+  evidence traceability と reader-facing report structure。
+- `academic`:
+  notation、logic、citation を意識した scholarly prose。
+- `paper`:
+  paper section contract と citation-evidence review。
+- `all`:
+  graph layers と handoff routes をまとめて見る profile。
+
+profile は analysis surface の選択です。profile 名や verification-route 語彙を説明する文は、
+active experiment plan そのものではありません。この区別は語彙検索ではなく、
+LocalLLM IR の `analysis_intents[].intent=experiment_plan` と `status` で受け取ります。
+
+一方で、その通常経路が使えない場合だけ、非 LLM fallback は warning 付きの互換経路として使えます。
+warning は fallback result ではなく、fallback を使った事実に対して出ます。
+
+## Verification Route
+
+diagnostics が verification route を持つ場合、rewrite の前に route を実行します。
+route は inference validity、external evidence、formal proof obligation、
+experiment-plan fields、discourse connection を該当 skill / reviewer へ渡します。
+
+| Route | 発火条件 | 主 verifier | 再帰展開 |
+| ----- | -------- | ------------ | -------- |
+| `claim_support_verification` | unsupported claim または missing evidence layer。 | `logic-gap-review`, `$literature-survey`, `citation-evidence-review`; proof-like claim では `$formal-proof-workflow`。 | claim を assumptions、warrants、atomic support requirements に分解する。 |
+| `connection_verification` | weak paragraph bridge、missing warrant、unclear reader-state transition。 | `$structure-planning`, `logic-gap-review`; bridge が external support に依存する場合は `$literature-survey`。 | relation を分類し、missing premise と external bridge claim を検証する。 |
+| `experiment_plan_verification` | hypothesis、metric、baseline、expected result の欠落。 | `$experiment-lifecycle`, `$report-writing`。 | empirical claim、measurement contract、report prose と result / limitation の対応を検証する。 |
+| `document_responsibility_verification` | downstream document が coverage rules 付き upstream design を参照しているが、coverage group を欠いている。 | `$prose-reasoning-graph`, `structured-analysis`, owning document workflow。 | coverage rule を展開し、missing responsibility を担う downstream span を選び、structured-analysis rerun で閉じるか保持する。 |
+
+recursive verification は route の `recursive_max_depth` と closure condition で bounded です。
+leaf が閉じない場合は、owner、route、missing evidence、next verification command を持つ
+unresolved blocker または warning として記録します。
 
 ## Skill Handoff
 
-The `skill-handoff` command emits explicit entries for `$long-form-writing`,
-`$report-writing`, `$academic-writing`, `$paper-writing`, `$literature-survey`,
-`$structure-planning`, `logic-gap-review`, `citation-evidence-review`,
-`$experiment-lifecycle`, and `$result-artifact-writeout`. The handoff gives
-each receiving skill the DB path plus commands for projection, diagnostics,
-natural-language explanation, and rewrite planning.
+`skill-handoff` は `$long-form-writing`、`$report-writing`、`$academic-writing`、
+`$paper-writing`、`$literature-survey`、`$structure-planning`、`$formal-proof-workflow`、
+`logic-gap-review`、`citation-evidence-review`、`$experiment-lifecycle`、
+`$result-artifact-writeout` への entry を出します。
 
-The receiving skill remains authoritative for its own review gate. A graph
-diagnostic can say a claim is unsupported or a transition is weak; it cannot
-approve a paper, settle a citation, merge a PR, or change repository policy.
+これらの skill-handoff entry は receiving skill が読む bounded packet です。handoff entry は DB path、projection command、diagnostics command、natural-language explanation、
+verification routing、rewrite planning command を receiving skill に渡します。各 entry は
+`corpus_hints`、`projection_views[].recommended_format`、
+`projection_views[].format_reason` などの projection fields を明示します。
+
+この packet 境界の外側では、receiving skill が自分の review gate に対して authority を持ちます。graph diagnostic は
+unsupported claim や weak transition を示しますが、paper approval、citation settlement、
+PR merge、repository policy change は判断しません。
+
+## Writing Loop
+
+writing workflow では、draft readiness を次の順で判断します。
+
+1. source document を graph DB に materialize する。
+1. `lint` と `integrate` を実行する。
+1. verification route を leaf が verified、limited、explicitly unresolved になるまで辿る。
+1. structure contract、source packet、graph-backed rewrite packet、または draft source を更新する。
+1. graph diagnostics を rerun する。
+1. selected profile の active fix-now finding が無い状態で reader-facing prose を書く。
+
+この loop は DSL / graph を先に直し、その後に prose へ射影するための runtime discipline です。
+prose 再解析で新しい finding が出る場合は、DSL から文章へ射影する prompt または rewrite pass を見直します。

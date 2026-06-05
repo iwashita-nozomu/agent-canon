@@ -88,6 +88,12 @@ downstream design ../../documents/dependency-manifest-design.md defines dependen
 
 <!-- `agent_canon_latest_complete` must be `yes` before user-facing completion. In submodule repos, unrelated parent dirty state is allowed; what must be clean is the AgentCanon update surface: `vendor/agent-canon/`, the parent gitlink, `.gitmodules`, and AgentCanon-owned root symlink/copy views. Dirty or stale AgentCanon update-surface state is not an environment blocker and is not a valid reason to skip commit / push; commit AgentCanon work on a named branch, run `bash tools/update_agent_canon.sh merge-main-into-current` when main must be merged in, open or update the AgentCanon PR, rerun `make agent-canon-ensure-latest`, then rerun `make ci`. `make_ci_status` must be `pass` unless the only blocker is a documented environment/toolchain issue and full-repo pyright plus ruff fallback evidence is recorded as `environment_blocked_with_full_static_fallback`. -->
 
+- agent_canon_latest_command:
+- agent_canon_latest_status:
+- agent_canon_submodule_status:
+- agent_canon_source_head:
+- agent_canon_parent_pin:
+
 ## Spec-To-Product Coverage Evidence
 
 <!-- For each must-do and completion-evidence clause, record the concrete product behavior, file, doc, test, command, or artifact that satisfies it. Do not unlock completion while any requested spec has no implemented product surface or explicit deferred/rejected clause. -->

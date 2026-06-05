@@ -63,10 +63,8 @@ git -C vendor/agent-canon push origin HEAD
 AgentCanon PR merge 後に派生 repo 側へ戻り、`bash tools/update_agent_canon.sh apply` と `bash tools/sync_agent_canon.sh link-root` で pin と root view を更新します。
 
 GitHub 管理では template の canonical remote を
-`https://github.com/iwashita-nozomu/project_template.git` にし、local
-`/mnt/git/template.git` は mirror として残します。`.gitmodules` の AgentCanon URL は
+`https://github.com/iwashita-nozomu/project_template.git` にします。`.gitmodules` の AgentCanon URL は
 `https://github.com/iwashita-nozomu/agent-canon.git` にします。
-local `/mnt/git` bare mirror は高速な日常 validation 用に残してよいですが、
 PR と security 設定の正本は GitHub 側に置きます。
 
 最低限の確認:

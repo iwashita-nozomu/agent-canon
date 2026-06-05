@@ -177,6 +177,7 @@ EVENT_COMMANDS: dict[str, tuple[HookCommandSpec, ...]] = {
     ),
     "PreToolUse": (
         HookCommandSpec("log_archive_mount_warning.py", FAST_HOOK_TIMEOUT_SECONDS),
+        HookCommandSpec("direct_rg_context_guard.py", FAST_HOOK_TIMEOUT_SECONDS),
         HookCommandSpec("cause_investigation_guard.py", CAUSE_INVESTIGATION_TIMEOUT_SECONDS),
     ),
     "PostToolUse": (
@@ -371,6 +372,8 @@ def read_only_shell_command(command: str) -> bool:
         return False
     if tokens[0] == "sed":
         return read_only_sed_arguments(tokens[1:])
+    if tokens[0] == "rg":
+        return False
     return tokens[0] in READ_ONLY_COMMANDS
 
 

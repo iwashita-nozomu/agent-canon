@@ -21,7 +21,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "export_codex_runtime_summary.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import codex_runtime_summary_dir, repo_log_key  # noqa: E402
+from runtime_log_paths import (  # noqa: E402
+    codex_runtime_index_path,
+    codex_runtime_summary_path,
+    repo_log_key,
+)
 
 
 class ExportCodexRuntimeSummaryTest(unittest.TestCase):
@@ -56,20 +60,30 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 thread_id=thread_id,
             )
 
-            output = codex_runtime_summary_dir(source, canon) / f"{thread_id}.jsonl"
+            output = codex_runtime_summary_path(source, canon, thread_id)
             records = [
                 json.loads(line)
                 for line in output.read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
+            index = [
+                json.loads(line)
+                for line in codex_runtime_index_path(source, canon).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
 
         self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY_STATUS=appended", first.stdout)
+        self.assertIn("CODEX_RUNTIME_SUMMARY_INDEX_STATUS=appended", first.stdout)
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY_STATUS=already-present", second.stdout)
+        self.assertIn("CODEX_RUNTIME_SUMMARY_INDEX_STATUS=already-present", second.stdout)
         self.assertEqual(len(records), 1)
+        self.assertEqual(len(index), 1)
         record = records[0]
         self.assertEqual(record["schema"], "codex-runtime-summary.v1")
+        self.assertEqual(record["conversation_id"], thread_id)
+        self.assertEqual(record["session_id"], thread_id)
         self.assertEqual(record["thread_id"], thread_id)
         self.assertEqual(record["source_repo_key"], repo_log_key(source))
         self.assertEqual(record["history"]["entry_count"], 1)
@@ -79,6 +93,10 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
         self.assertEqual(record["tokens"]["latest_estimated_token_count"], 110000)
         self.assertEqual(record["runtime"]["tool_call_counts"]["exec_command"], 1)
         self.assertNotIn("secret prompt text", json.dumps(record, sort_keys=True))
+        self.assertEqual(index[0]["schema"], "codex-runtime-summary-index.v1")
+        self.assertEqual(index[0]["conversation_id"], thread_id)
+        self.assertEqual(index[0]["session_id"], thread_id)
+        self.assertEqual(index[0]["summary_path"], f"chats/{thread_id}/summary.jsonl")
 
     def test_all_threads_exports_discovered_history_and_sqlite_threads(self) -> None:
         """Bulk rescue should export every bounded thread discovered in runtime logs."""
@@ -115,12 +133,18 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            output_dir = codex_runtime_summary_dir(source, canon)
-            exported = sorted(path.stem for path in output_dir.glob("*.jsonl"))
+            output_dir = codex_runtime_index_path(source, canon).parent / "chats"
+            exported = sorted(path.name for path in output_dir.iterdir() if path.is_dir())
+            index_records = [
+                json.loads(line)
+                for line in codex_runtime_index_path(source, canon).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY_THREADS=2", result.stdout)
         self.assertEqual(exported, [history_thread, sqlite_thread])
+        self.assertEqual(len(index_records), 2)
 
     def test_missing_thread_id_skips_without_writing(self) -> None:
         """Hook callers can run exporter safely before CODEX_THREAD_ID exists."""

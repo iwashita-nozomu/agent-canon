@@ -5,11 +5,10 @@
 responsibility Records the operational finding that PR mutation authority needs visible Copilot evidence.
 upstream design ../README.md defines durable AgentCanon issue conventions.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority policy.
-upstream design ../../documents/github-copilot-configuration.md defines Copilot PR evidence surfaces.
+upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR automation evidence surfaces.
 upstream implementation ../../tools/ci/check_github_workflows.py validates PR template and Copilot surface coverage.
 downstream design ../../.github/PULL_REQUEST_TEMPLATE.md requires Copilot / Automation Output fields.
 downstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md requires template-side Copilot / Automation Output fields.
-downstream design ../../.github/instructions/pr-processing.instructions.md requires visible Copilot decision blocks.
 @dependency-end
 -->
 
@@ -17,9 +16,9 @@ issue_id: AC-20260513-pr-mutation-authority-visible-output
 status: in_progress
 source: user
 severity: S1
-evidence: documents/github-copilot-configuration.md
-affected_surfaces: ROOT_AGENTS.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, .github/copilot-instructions.md, .github/instructions/pr-processing.instructions.md, .github/agents/pr-maintainer.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, tools/agent_tools/goal_loop.py, tools/ci/check_github_workflows.py
-edit_scope: .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, .github/copilot-instructions.md, .github/instructions/pr-processing.instructions.md, .github/agents/pr-maintainer.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, agents/workflows/goal-plan-implementation-loop.md, documents/github-copilot-configuration.md, tools/README.md, tools/agent_tools/goal_loop.py, tests/agent_tools/test_goal_loop.py, tools/ci/check_github_workflows.py
+evidence: agents/workflows/agent-canon-pr-workflow.md
+affected_surfaces: ROOT_AGENTS.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, tools/agent_tools/goal_loop.py, tools/ci/check_github_workflows.py
+edit_scope: .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, agents/workflows/goal-plan-implementation-loop.md, tools/README.md, tools/agent_tools/goal_loop.py, tests/agent_tools/test_goal_loop.py, tools/ci/check_github_workflows.py
 required_action: Define goal-level PR mutation authority and require GitHub-hosted Copilot / PR automation to publish machine-readable PR-visible output before readiness or merge actions.
 close_condition: PR templates, Copilot instructions, goal loop status, workflow docs, and check_github_workflows.py enforce visible Copilot evidence and validation passes.
 
@@ -48,10 +47,9 @@ AgentCanon-pin PRs:
 - `.github/PULL_REQUEST_TEMPLATE.md` and
   `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` contain
   `Copilot / Automation Output` fields.
-- `.github/copilot-instructions.md`,
-  `.github/instructions/pr-processing.instructions.md`, and
-  `.github/agents/pr-maintainer.md` require visible PR output.
-- `documents/github-copilot-configuration.md` documents what Codex can inspect:
+- `agents/workflows/agent-canon-pr-workflow.md` and
+  `agents/workflows/codex-goals-workflow.md` require visible PR output.
+- `agents/workflows/agent-canon-pr-workflow.md` documents what Codex can inspect:
   GitHub-visible PR bodies, comments, reviews, and check runs, not hidden
   Copilot reasoning.
 - `tools/ci/check_github_workflows.py` fails when the visible-output contract

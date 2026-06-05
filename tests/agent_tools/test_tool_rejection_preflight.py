@@ -137,8 +137,8 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("style_checker_guard", gates)
         self.assertIn("dependency_review", gates)
 
-    def test_skill_path_predicts_mirror_and_log_surface_gates(self) -> None:
-        """Skill edits should require mirror and log-surface validation."""
+    def test_skill_path_predicts_log_surface_gate(self) -> None:
+        """Skill edits should require Codex log-surface validation."""
         result = subprocess.run(
             [
                 sys.executable,
@@ -156,7 +156,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
-        self.assertIn("skill_mirror_sync", gates)
+        self.assertNotIn("skill_mirror_sync", gates)
         self.assertIn("log_surface_inventory_guard", gates)
 
     def test_protocol_path_predicts_convention_gate(self) -> None:

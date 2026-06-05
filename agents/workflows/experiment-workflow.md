@@ -324,7 +324,7 @@ carry-over のルールは次です。
 
 ## 2.5 Log-Derived Prohibitions
 
-`/mnt/git` 配下の repo と対応する worktree logs から抽出した再発防止事項を、実験・性能改善の固定 gate として扱います。
+repo と対応する worktree logs から抽出した再発防止事項を、実験・性能改善の固定 gate として扱います。
 
 - spot run、debug run、smoke run、partial run を正式 evidence にしません。
 - correctness evidence と performance evidence を混同しません。

@@ -54,18 +54,6 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
   - mini / nano の速度、価格、reasoning tier の実地感を補う資料です。
 - [I Tested GPT 5.4 Against Every Rival — Here's My Honest Review | Thomas Wiegold Blog](https://thomas-wiegold.com/blog/i-tested-gpt-5-4-against-every-rival/)
   - task-based routing の必要性と、terminal-heavy task で `gpt-5.3-codex-spark` override を残す判断の補助資料です。
-- [How Claude remembers your project - Claude Code Docs](https://code.claude.com/docs/en/memory)
-  - `CLAUDE.md` を薄い adapter にする判断の参考です。
-- [Copilot customization cheat sheet - GitHub Docs](https://docs.github.com/en/copilot/reference/customization-cheat-sheet)
-  - GitHub Copilot 用 adapter と custom instructions の整理に使った資料です。
-- [Your first custom instructions - GitHub Docs](https://docs.github.com/en/copilot/tutorials/customization-library/custom-instructions/your-first-custom-instructions)
-  - Copilot 側の最小入口設計の参考です。
-- [Adding repository custom instructions for GitHub Copilot - GitHub Docs](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions)
-  - `.github/copilot-instructions.md`、`.github/instructions/*.instructions.md`、`AGENTS.md` の使い分けの根拠です。
-- [About custom agents - GitHub Docs](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-custom-agents)
-  - `.github/agents/*.md` に PR maintenance agent profile を置く根拠です。
-- [About GitHub Copilot cloud agent - GitHub Docs](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-cloud-agent)
-  - Copilot cloud agent が GitHub Actions powered ephemeral environment で PR 作業する前提の根拠です。
 - [Events that trigger workflows - GitHub Docs](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
   - fork-like PR で repository secrets が渡らない場合があることの根拠です。
 - [Secrets - GitHub Docs](https://docs.github.com/en/actions/concepts/security/secrets)
@@ -142,7 +130,7 @@ downstream design ../../references/agent-canon-technology-bibliography.md catalo
 - [Higher Order Concerns | Purdue OWL](https://owl.purdue.edu/owl/subject_specific_writing/professional_technical_writing/prioritizing_your_concerns_for_effective_business_writing/index.html)
   - line edit より先に focus、purpose、organization を直す review 順序の根拠です。
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
-  - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
+  - reader path が長い文書に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる根拠です。
 
 ## Agent Learning, Memory, And Philosophy
 
