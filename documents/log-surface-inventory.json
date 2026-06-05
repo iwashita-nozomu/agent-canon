@@ -1995,8 +1995,16 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "presentation_asset_packet",
+      "line": 242,
+      "path": "agents/skills/report-writing.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "report_output_format",
-      "line": 201,
+      "line": 239,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2004,7 +2012,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_quality_checklist",
-      "line": 202,
+      "line": 240,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2012,7 +2020,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_reviewer",
-      "line": 205,
+      "line": 244,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2020,7 +2028,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_rule_drift",
-      "line": 206,
+      "line": 245,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2028,7 +2036,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_source_packet",
-      "line": 203,
+      "line": 241,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2036,7 +2044,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "report_writing",
-      "line": 200,
+      "line": 238,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2044,7 +2052,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "structure_contract",
-      "line": 204,
+      "line": 243,
       "path": "agents/skills/report-writing.md",
       "surface": "skill"
     },
@@ -2100,7 +2108,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "audience",
-      "line": 48,
+      "line": 52,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
@@ -2108,62 +2116,6 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "decision_context",
-      "line": 49,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "discourse_relations",
-      "line": 128,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact",
-      "line": 50,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "first_artifact_question",
-      "line": 51,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "invalid_interpretations",
-      "line": 56,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "metric_or_delta_contract",
-      "line": 54,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "ordered_structure",
-      "line": 55,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_to_structure_map",
       "line": 53,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2171,63 +2123,55 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_contract",
-      "line": 124,
+      "field": "discourse_relations",
+      "line": 133,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_first_artifact",
-      "line": 125,
+      "field": "first_artifact",
+      "line": 54,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_invalid_interpretations_recorded",
-      "line": 129,
+      "field": "first_artifact_question",
+      "line": 55,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_kind",
-      "line": 47,
+      "field": "invalid_interpretations",
+      "line": 60,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_planning",
-      "line": 123,
+      "field": "metric_or_delta_contract",
+      "line": 58,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_source_map",
-      "line": 127,
+      "field": "ordered_structure",
+      "line": 59,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
-      "field": "structure_visual_plan",
-      "line": 126,
-      "path": "agents/skills/structure-planning.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "validation_gate",
+      "field": "source_to_structure_map",
       "line": 57,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
@@ -2235,8 +2179,72 @@
     {
       "certainty": "static",
       "emitter": "markdown_key_value_example",
+      "field": "structure_contract",
+      "line": 129,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_first_artifact",
+      "line": 130,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_invalid_interpretations_recorded",
+      "line": 134,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_kind",
+      "line": 51,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_planning",
+      "line": 128,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_source_map",
+      "line": 132,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "structure_visual_plan",
+      "line": 131,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
+      "field": "validation_gate",
+      "line": 61,
+      "path": "agents/skills/structure-planning.md",
+      "surface": "skill"
+    },
+    {
+      "certainty": "static",
+      "emitter": "markdown_key_value_example",
       "field": "visual_plan",
-      "line": 52,
+      "line": 56,
       "path": "agents/skills/structure-planning.md",
       "surface": "skill"
     },

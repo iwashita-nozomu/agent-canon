@@ -5,6 +5,7 @@ responsibility Documents reusable structure planning for reports, experiments, d
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
+upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
 downstream design html-output.md consumes structure contracts for explicit HTML output
 @dependency-end
@@ -13,28 +14,31 @@ downstream design html-output.md consumes structure contracts for explicit HTML 
 ## Purpose
 
 `structure-planning` is the skill for building a structure contract before
-writing prose, running an experiment, rendering a report, or starting a
-refactor. It owns the up-front shape of the work: audience, decision context,
-first artifact, section or slice order, source mapping, invalid interpretations,
-allowed structural delta, and validation gate.
+writing prose, running an experiment, rendering a report, planning a
+presentation/deck, or starting a refactor. It owns the up-front shape of the
+work: audience, decision context, first artifact, section or slice order, slide
+or storyboard order, source mapping, invalid interpretations, allowed
+structural delta, and validation gate.
 
 It does not own raw result storage, experiment execution, report prose, document
 drafting, implementation, or domain authority. Use `result-artifact-writeout`
 for raw artifacts, `experiment-lifecycle` for run protocol, `report-writing` for
 reader-facing prose, `html-output` for explicit browser-readable output,
 `html-experiment-report` for experiment-specific HTML evidence planning,
-writing skills for drafts, and `refactor-loop` for behavior-preserving changes.
+slide production workflow for PPT/deck layout, writing skills for drafts, and
+`refactor-loop` for behavior-preserving changes.
 
 ## Use When
 
-- A report, experiment plan, Eval output, decision brief, HTML view, long
-  document, academic document, paper draft, or refactor needs a nontrivial
-  structure before execution.
-- The first figure, first table, first section, experiment slice, or refactor
-  slice must be decided before implementation.
-- Source evidence must be mapped to sections, visuals, claims, or refactor
-  slices so the agent does not invent unsupported structure while drafting or
-  editing.
+- A report, experiment plan, Eval output, decision brief, presentation
+  storyboard, PPT/deck plan, HTML view, long document, academic document, paper
+  draft, or refactor needs a nontrivial structure before execution.
+- The first figure, first table, first ponchi-e/concept diagram, first slide,
+  first section, experiment slice, or refactor slice must be decided before
+  implementation.
+- Source evidence must be mapped to sections, slides, visuals, claims, or
+  refactor slices so the agent does not invent unsupported structure while
+  drafting or editing.
 - A generated artifact could be mistaken for policy, classification, merge,
   deletion, ownership, or behavior-change authority.
 
@@ -44,17 +48,17 @@ Create this contract before drafting, rendering, running follow-up experiments,
 or editing refactor surfaces:
 
 ```text
-structure_kind=<report|experiment-plan|experiment-report|eval-report|html-report|document|paper|refactor|other>
+structure_kind=<report|experiment-plan|experiment-report|eval-report|presentation|html-report|document|paper|refactor|other>
 audience=<reader-or-reviewer>
 decision_context=<decision or action the structure supports>
-first_artifact=<figure|table|summary-card|section|experiment-slice|refactor-slice> <short name>
+first_artifact=<figure|table|ponchi-e|concept-diagram|slide|summary-card|section|experiment-slice|refactor-slice> <short name>
 first_artifact_question=<one sentence>
-visual_plan=<mermaid|table|text-only|html|image|not-applicable> <why this visual shape fits>
-source_to_structure_map=<source path/id -> section, visual, claim, experiment slice, or refactor slice>
+visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable> <why this visual shape fits>
+source_to_structure_map=<source path/id -> section, slide, visual, claim, experiment slice, or refactor slice>
 metric_or_delta_contract=<denominator, directionality, baseline, caveat, allowed structural delta, forbidden semantic delta>
-ordered_structure=<ordered headings, visuals, experiment slices, or refactor slices>
+ordered_structure=<ordered headings, slides/storyboard, visuals, experiment slices, or refactor slices>
 invalid_interpretations=<claims or changes this structure must not support>
-validation_gate=<reviewer, eval, renderer test, docs check, dependency check, or behavior-preservation test>
+validation_gate=<reviewer, eval, renderer test, layout review, docs check, dependency check, or behavior-preservation test>
 ```
 
 For compact work this can be a short block in the report, run bundle, or handoff.
@@ -64,8 +68,8 @@ experiment scripts, or refactor edits.
 ## Default Sequence
 
 1. Fix the audience and decision context.
-1. Choose the first artifact: figure, table, summary card, first section,
-   experiment slice, or refactor slice.
+1. Choose the first artifact: figure, table, ponchi-e/concept diagram, slide,
+   summary card, first section, experiment slice, or refactor slice.
 1. For reader-facing documents, reports, plans, workflow guides, and refactor
    maps, choose Mermaid as the default first visual when the structure includes
    nontrivial process flow, dependencies, ownership, routing, state transitions,
@@ -74,8 +78,8 @@ experiment scripts, or refactor edits.
    Choose `text-only` only when a diagram would duplicate a simple list, and
    record that reason in `visual_plan`.
 1. Define the question answered by that first artifact.
-1. Map each source artifact to the section, visual, claim, experiment slice, or
-   refactor slice it supports.
+1. Map each source artifact to the section, slide, visual, claim, experiment
+   slice, or refactor slice it supports.
 1. When block order, transition choice, or logic-gap evidence is nontrivial,
    run `agent-canon semantic-index discourse-relations` with the matching
    connective profile and use the JSONL edge output as structure evidence for the ordered
@@ -89,8 +93,8 @@ experiment scripts, or refactor edits.
 1. Define metric denominator, directionality, baseline, and caveat for reports
    or experiments; define allowed structural delta and forbidden semantic delta
    for refactors.
-1. Write the ordered structure in reader or execution order, not raw tool-output
-   order.
+1. Write the ordered structure in reader, storyboard, or execution order, not raw
+   tool-output order.
 1. List invalid interpretations explicitly.
 1. Select the validation gate before drafting, rendering, running follow-up
    experiments, or editing files.
@@ -98,7 +102,8 @@ experiment scripts, or refactor edits.
 ## Relationships
 
 - `report-writing` calls this skill before drafting reports with nontrivial
-  structure, comparison tables, or evaluation/experiment reader guides.
+  structure, comparison tables, presentation storyboards, ponchi-e/concept
+  diagrams, source-to-slide maps, or evaluation/experiment reader guides.
 - `html-output` calls this skill before nontrivial page structure, first
   viewport, source-to-section map, or invalid interpretation boundaries.
 - `html-experiment-report` calls this skill before the primary figure contract
@@ -123,7 +128,7 @@ Record these in `workflow_monitoring.md`, a run bundle, or the artifact itself:
 structure_planning=complete
 structure_contract=<path-or-inline>
 structure_first_artifact=<name>
-structure_visual_plan=<mermaid|table|text-only|html|image|not-applicable>
+structure_visual_plan=<mermaid|table|text-only|html|image|slide|not-applicable>
 structure_source_map=<path-or-inline>
 discourse_relations=<path|not_required>
 structure_invalid_interpretations_recorded=yes
