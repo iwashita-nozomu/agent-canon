@@ -400,6 +400,8 @@ def ensure_archive(context: ArchiveContext, *, fetch: bool = True) -> None:
 
 def print_context(context: ArchiveContext) -> None:
     """Print stable context lines."""
+    run_local_agent_reports = context.source_root / DEFAULT_AGENT_REPORT_ROOT
+    archive_agent_reports = agent_report_archive_dir(context.source_root, context.canon_root)
     print(f"RUNTIME_LOG_ARCHIVE_SOURCE_ROOT={context.source_root}")
     print(f"RUNTIME_LOG_ARCHIVE_CANON_ROOT={context.canon_root}")
     print(f"RUNTIME_LOG_ARCHIVE_ROOT={context.archive_root}")
@@ -407,6 +409,10 @@ def print_context(context: ArchiveContext) -> None:
     print(f"RUNTIME_LOG_ARCHIVE_REMOTE={context.remote}")
     print(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={context.repo_key}")
     print(f"RUNTIME_LOG_ARCHIVE_BRANCH={context.branch}")
+    print(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={run_local_agent_reports}")
+    print(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={context.branch}")
+    print(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={archive_agent_reports}")
+    print(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{context.repo_key}")
 
 
 def command_repo_key(context: ArchiveContext) -> int:
