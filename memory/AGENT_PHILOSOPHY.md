@@ -159,6 +159,18 @@ upstream design README.md memory surface index
   - confidence: tentative
   - evidence: User objected to adding _Nested* test-only amp.Info/Config classes and pointed out that unit and integration tests should be separated instead.
 
+- 2026-06-03 | interaction-observation | When a user asks for coding subagent delegation, read-only survey and review waves waste context if they do not escalate to write-capable spark_worker or worker once bounded write scope is fixed, or record the blocker.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback on 2026-06-03: coding tasks delegated to subagents are not starting often enough, while read-only agents consume context.
+
+- 2026-06-03 | interaction-observation | AGENTS.md prose alone is too weak for preventing context-polluting direct rg usage; broad search discipline should be enforced through shell-command guards, compact-output patterns, and closeout evidence instead of relying only on instructions.
+  - source: chat
+  - scope: repo-wide
+  - confidence: tentative
+  - evidence: User feedback on 2026-06-03: direct rg prohibition for context pollution prevention remains weak when written only in AGENTS.md.
+
 - 2026-06-03 | interaction-observation | For repo searches, do not run broad rg -n over data-heavy trees; follow AGENTS.md by using semantic-index or rg -l to bound files first, then inspect selected files.
   - source: chat
   - scope: repo-wide

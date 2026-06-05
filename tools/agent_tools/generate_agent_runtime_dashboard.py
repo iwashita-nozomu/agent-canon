@@ -962,7 +962,7 @@ class RuntimeDashboardVisuals:
             self.family_row(
                 "Codex role eval",
                 "codex-agent-role",
-                "repair subagent role TOML, model buckets, routing, or runtime metric capture",
+                "repair subagent role TOML, model settings, routing, or runtime metric capture",
             ),
             self.issue_row(),
         )
@@ -3201,7 +3201,6 @@ def skill_source_path_candidates(slug: str) -> tuple[Path, ...]:
     return (
         Path(".agents") / "skills" / slug / "SKILL.md",
         Path("agents") / "skills" / f"{slug}.md",
-        Path(".claude") / "skills" / slug / "SKILL.md",
     )
 
 

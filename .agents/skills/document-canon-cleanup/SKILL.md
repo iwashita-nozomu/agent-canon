@@ -1,12 +1,13 @@
 ---
 name: document-canon-cleanup
-description: Use when organizing repository documents, finding non-canonical docs, separating source canon from runtime mirrors, generated reports, eval results, closed issues, duplicate headings, or stale document paths.
+description: Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths.
 ---
 <!--
 @dependency-start
 responsibility Documents Document Canon Cleanup for this repository.
 upstream design ../../../agents/skills/document-canon-cleanup.md human-facing skill canon
-upstream implementation ../../../tools/agent_tools/noncanonical_document_inventory.py finds cleanup candidates
+upstream implementation ../../../rust/agent-canon/src/structured_analysis.rs finds cleanup candidates
+upstream implementation ../../../tools/agent_tools/noncanonical_document_inventory.py legacy migration shim
 @dependency-end
 -->
 
@@ -14,18 +15,18 @@ upstream implementation ../../../tools/agent_tools/noncanonical_document_invento
 # Document Canon Cleanup
 
 1. Read `agents/skills/document-canon-cleanup.md`.
-1. Run:
+1. Prefer the Rust structured-analysis command:
 
 ```bash
-python3 tools/agent_tools/noncanonical_document_inventory.py \
+agent-canon structured-analysis document-inventory \
   --root . \
   --json-out reports/noncanonical-documents.json \
   --markdown-out reports/noncanonical-documents.md
 ```
 
+1. If the legacy Python entrypoint is observed in a caller chain, migrate that caller to the Rust command before returning to the original task.
 1. Treat the report as triage, not deletion authority.
-1. Edit canonical sources, not mirrors or generated evidence:
-   - `.claude/skills/*/SKILL.md` -> edit `.agents/skills/*/SKILL.md`, then run `mirror_skill_shims.py`.
+1. Edit canonical sources, not generated evidence:
    - `.agent-canon/log-archive/eval-results/*` -> edit eval definitions, workflow prompts, or generator logic.
    - `reports/*` -> regenerate or cite as run evidence.
    - `issues/closed/*` -> open/update a new issue for new scope.

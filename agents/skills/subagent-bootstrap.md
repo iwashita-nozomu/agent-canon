@@ -85,17 +85,19 @@ prompt / routing / subagent-config drift を直す task では、shared policy p
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
 対象 surface と最小差分を先に固定します。
 goal-driven repo-changing task では、`/goal` がまだ exact でなくても provisional run bundle を作り、`requirements_organizer`、`explorer`、必要なら `execution_planner` と `plan_reviewer` の read-only handoff plan を先に作ります。active runtime が明示許可を持つ場合だけ、その wave を起動します。
-write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
+goal-driven task では、write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
+通常の repo-changing task で user が coding / implementation / patch work の subagent 委譲を明示した場合は、この goal-driven `goal.md` block を適用しません。run bundle、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、read-only wave の追加より先に `spark_worker` / `worker` を起動または schedule します。read-only wave は setup evidence であり、implementation handoff の代替ではありません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
-subagent の model / reasoning は `.codex/config.toml` の `agent_model_policy` を先に読みます。
-repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、明示許可がある場合に Spark bucket の read-only wave へ先に切ります。bounded review、report traceability、checklist-style review gate は mini review bucket へ先に切ります。parent は結果統合、設計判断、scope 判断、最終責任へ集中します。
+subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
+repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、明示許可がある場合に Spark role TOML の read-only wave へ先に切ります。bounded review、report traceability、checklist-style review gate は mini review role TOML へ先に切ります。parent は結果統合、設計判断、scope 判断、最終責任へ集中します。
 実装 slice は 1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
-`explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を `.codex/config.toml` の Spark bucket の `model` と `model_reasoning_effort` で再起動します。
+`explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を該当 `.codex/agents/*.toml` の `model` と `model_reasoning_effort` で再起動します。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
 handoff prompt には repo root や `/workspace` 全体ではなく、role ごとの bounded `allowed_paths`、対象 checker / compact artifact、該当 canon 節、`do_not_read` surface、expected output schema を含めます。`allowed_paths` は手書き対象だけで閉じず、編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。full tree search、raw accumulated logs、unrelated module scan が必要になった場合は、parent へ escalation して input packet を拡張してから進めます。
-write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `codex_hook_runtime_alignment`、`skill_mirror_sync`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。
+write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `codex_hook_runtime_alignment`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
+write-capable coding subagent を authorization または tool gate で起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、その slice について read-only 分析を増やし続けません。
 調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog 側の default として管理します。
 code change では `test_designer` を実装前に立て、nasty case を `test_plan.md` に残します。
 包括的開発では bundle に加えて `project_reviewer`、`docs_workflow_steward`、`python_reviewer`、必要に応じて `cpp_reviewer` を固定で立てます。

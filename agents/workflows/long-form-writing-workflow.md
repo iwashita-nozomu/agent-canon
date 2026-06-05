@@ -1,13 +1,14 @@
-# 長文作成 workflow
+# 一般説明 Prose Projection Workflow
 <!--
 @dependency-start
-responsibility Documents 長文作成 workflow for this repository.
+responsibility Documents general explanatory prose projection workflow for this repository.
 upstream design README.md workflow catalog
 @dependency-end
 -->
 
 
-この文書は、README、workflow 文書、移行文書、設計補助文書、reader-facing guide のような長めの文章を作るときの正本です。
+この文書は、README、workflow 文書、移行文書、specification、設計補助文書、reader-facing guide のように、file responsibility が一般説明 prose の文書を作るときの正本です。
+ファイル名と skill 名は互換のため `long-form` を含みますが、選択基準は文章の長さではありません。
 単なる Markdown 編集ではなく、読者、構成、段落順、review を先に固定する workflow として扱います。
 
 この workflow は外部の writing guide を、そのまま転載せず repo 向けに再構成したものです。
@@ -17,7 +18,7 @@ upstream design README.md workflow catalog
 
 - 新しい README、guide、workflow 文書を書く
 - 既存文書を大きく組み替える
-- 1 screen を超える長さの reader-facing 文書を書く
+- file / document responsibility が一般説明 prose の reader-facing 文書を書く
 - 複数 section の argument や decision path を持つ文書を書く
 
 学術論文、thesis chapter、scholarly note のような文書は `agents/workflows/academic-writing-workflow.md` を優先します。
@@ -27,9 +28,9 @@ upstream design README.md workflow catalog
 - 先に `何を言う文書か` を固定してから書く
 - 見出し列を、あとで本文が従う roadmap として扱う
 - section ごとに `focus`、`purpose`、`support` を先に固定する
-- 長文では、scan できる構造と linear に読んだときの意味の両方を満たす
+- 一般説明 prose では、scan できる構造と linear に読んだときの意味の両方を満たす
 - line edit より先に、focus、purpose、order、gap を直す
-- 長文作成では subagent review を必須にする
+- 一般説明 prose の構造変更では subagent review を必須にする
 - readability や reader flow の accept / reject は tool check ではなく agent review で決める
 
 ## Standard Flow
@@ -43,7 +44,7 @@ upstream design README.md workflow catalog
 - 想定 reader を 1 つ
 
 repo ではこれを `summary statement` と呼びます。
-長文で途中脱線するのを防ぐための固定点です。
+一般説明 prose で途中脱線するのを防ぐための固定点です。
 
 ### 2. Roadmap と Section Contract を作る
 
@@ -63,7 +64,7 @@ draft では、最初の reader が上から読む順番を基準にします。
 
 - 先に結論、判断軸、要点を置く
 - 必要な前提を、使う前に出す
-- 長い文書には table of contents か同等の navigation を置く
+- reader path が長い場合は table of contents か同等の navigation を置く
 - 見出し、箇条書き、比較項目では parallel structure を使う
 - 段落は短く保ち、dense block を避ける
 
@@ -90,7 +91,7 @@ feedback は action list に落とし、higher-order concern から先に潰し�
 
 ### 6. Mandatory Subagent Review を通す
 
-長文作成では、subagent review を省略しません。
+一般説明 prose の構造変更では、subagent review を省略しません。
 
 開始時は、必要なら次で run bundle と宣言を機械生成します。
 
@@ -151,7 +152,7 @@ validation command が通っても readability は自動では pass しません
 
 - `summary statement` は task note、run artifact、または draft 冒頭メモでよい
 - `section contract` は大げさな別紙でなくてよいが、見出しごとの `focus/purpose/support` は実際に固定する
-- 長文作成 task では `long-form-writing` skill を明示的に読み、reviewer subagent を先に割り当てる
+- 一般説明 prose の task では `long-form-writing` skill を DSL-to-prose adapter として明示的に読み、reviewer subagent を先に割り当てる
 - 記号密度が高い、または claim-heavy な academic 文書では `academic-writing` へ切り替える
 - 設計文書そのものは `implementation-waterfall-workflow.md` の gate に従い、ここでは writing 技法だけを補います
 
@@ -166,7 +167,7 @@ validation command が通っても readability は自動では pass しません
 - [Higher Order Concerns | Purdue OWL](https://owl.purdue.edu/owl/subject_specific_writing/professional_technical_writing/prioritizing_your_concerns_for_effective_business_writing/index.html)
   - line edit より先に focus、purpose、organization を直す review 順序
 - [Scannable content - Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
-  - 長文に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる考え方
+  - reader path が長い文書に navigation、parallel structure、short paragraph、lead-with-what-matters を入れる考え方
 
 ## Convention Compliance Gate
 

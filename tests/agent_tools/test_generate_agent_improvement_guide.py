@@ -90,7 +90,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("hook_tool_feedback=reviewed", guide)
         self.assertIn("failure-a", guide)
         self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
-        self.assertIn("Local Agent or Copilot PR", guide)
+        self.assertIn("Local Codex", guide)
 
     def test_resolves_vendored_agentcanon_root_from_parent_repo(self) -> None:
         """Parent-root invocation should use vendored AgentCanon evidence."""

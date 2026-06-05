@@ -146,11 +146,17 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".codex/hooks/hook_dispatcher.py": (
         "CRITICAL_BLOCKING_CHILD_HOOKS STRICT_BLOCKS_ENV STRICT_FAILURES_ENV "
-        "downgraded_block_payload failure_warning_payload\n"
+        "downgraded_block_payload failure_warning_payload direct_rg_context_guard.py\n"
+    ),
+    ".codex/hooks/direct_rg_context_guard.py": (
+        "DIRECT_RG_CONTEXT_RISK=warn rg -l --max-count .agent-canon/log-archive "
+        "reports *.jsonl\n"
     ),
     "ROOT_AGENTS.md": (
         "## Mechanical Guardrail Policy\n"
         "原則 block しません hook 設定の退避や無効化ではなく strict block mode\n"
+        "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
+        "caller chain canonical command\n"
     ),
 }
 
@@ -327,6 +333,22 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("hook_guardrail_policy:.codex/hooks/hook_dispatcher.py", result.stdout)
             self.assertIn("missing-marker:STRICT_FAILURES_ENV", result.stdout)
 
+    def test_direct_rg_context_guard_policy_marker_fails(self) -> None:
+        """Direct rg guard policy must stay mechanically checkable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / ".codex" / "hooks" / "direct_rg_context_guard.py").write_text(
+                "DIRECT_RG_CONTEXT_RISK=warn rg -l\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("hook_guardrail_policy:.codex/hooks/direct_rg_context_guard.py", result.stdout)
+            self.assertIn("missing-marker:--max-count", result.stdout)
+
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
         """A parent repo may keep AgentCanon docs out of root documents."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -374,6 +396,24 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("prohibition-lines-without-prohibition-section", result.stdout)
+
+    def test_legacy_forwarder_requires_caller_action_warning(self) -> None:
+        """Legacy forwarders must identify callers and migration action."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            forwarder = root / "tools" / "agent_tools" / "legacy_forwarder.py"
+            forwarder.write_text(
+                "LEGACY_FORWARDER_WARNING_REQUIRED = True\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("legacy_forwarder_warning", result.stdout)
+            self.assertIn("missing-marker:FORWARDER_CALLER", result.stdout)
+            self.assertIn("missing-marker:FORWARDER_ACTION", result.stdout)
 
     def copy_minimal_repo(self, root: Path) -> None:
         """Create the minimum tree needed by the checker."""

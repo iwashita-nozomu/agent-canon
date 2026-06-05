@@ -117,6 +117,14 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
   belong in `.devcontainer/post-create.sh` when they are only needed for shared
   AgentCanon tooling.
+- Structured analysis cache rebuilds belong in `.devcontainer/post-create.sh`
+  after the AgentCanon Rust CLI is installed. The rebuild uses
+  `agent-canon structured-analysis build --root <workspace> --profile
+  devcontainer`, writes only to
+  `${AGENT_CANON_STRUCTURED_ANALYSIS_HOME:-$HOME/.cache/agent-canon/structured-analysis}`,
+  materializes `prose_graph.sqlite` plus a separate `diagnostics.sqlite` warning
+  DB, and must be warning-only so container creation continues when the cache
+  can be regenerated later.
 - TeX document and image tooling used by the Academic Writing skill, including
   `latexmk`, pdfLaTeX, XeLaTeX, TikZ packages, `dvisvgm`, `pdfcrop`,
   Ghostscript, and PDF inspection helpers, belongs in `.devcontainer/post-create.sh`.

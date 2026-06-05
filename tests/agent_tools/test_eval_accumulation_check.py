@@ -169,6 +169,31 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
+    def test_legacy_eval_archive_missing_run_id_is_warning(self) -> None:
+        """Legacy imported eval reports without run ids should not block CI."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            legacy_dir = (
+                mounted_log_archive_root(root)
+                / "eval-results"
+                / "legacy-import"
+                / "skill-workflow-prompt"
+            )
+            legacy_dir.mkdir(parents=True)
+            (
+                legacy_dir
+                / "skill-eval-20260511T071608729709Z-1a2183faf0-pass-agent-orchestration.md"
+            ).write_text("# Legacy report without run id\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_ACCUMULATION_FINDINGS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_BLOCKING_FINDINGS=0", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION_WARNINGS=1", result.stdout)
+            self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
     def test_unmounted_archive_without_legacy_eval_dirs_is_nonblocking(self) -> None:
         """Fresh CI checkouts without the external archive should not fail."""
         with tempfile.TemporaryDirectory() as temp_dir:

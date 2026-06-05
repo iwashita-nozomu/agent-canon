@@ -1,7 +1,7 @@
 // @dependency-start
 // responsibility Prints sequential Rust migration candidates for AgentCanon tools.
 // upstream design ../../../documents/rust-agent-tool-migration.md Rust tool migration policy
-// upstream design ../../../agents/evals/results/hook-runs hook and skill usage logs
+// upstream design ../../../documents/runtime-log-archive.md hook and skill usage log archive policy
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
@@ -21,11 +21,6 @@ const PORT_NOW_TARGETS: &[ToolTarget] = &[
         name: "file_surface_inventory.py",
         path: "tools/agent_tools/file_surface_inventory.py",
         reason: "repo-wide filesystem classification with stable output schema",
-    },
-    ToolTarget {
-        name: "noncanonical_document_inventory.py",
-        path: "tools/agent_tools/noncanonical_document_inventory.py",
-        reason: "repo-wide document inventory and duplicate-surface detection",
     },
     ToolTarget {
         name: "helper_function_inventory.py",
@@ -78,6 +73,12 @@ const KEEP_PYTHON_TARGETS: &[ToolTarget] = &[
     },
 ];
 
+const COMPLETED_RUST_TARGETS: &[ToolTarget] = &[ToolTarget {
+    name: "noncanonical_document_inventory.py",
+    path: "tools/agent_tools/noncanonical_document_inventory.py",
+    reason: "absorbed into agent-canon structured-analysis document-inventory; legacy shim remains only to warn and forward",
+}];
+
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
     root: PathBuf,
@@ -106,6 +107,7 @@ struct Plan {
     foundation: FoundationStatus,
     candidates: Vec<Candidate>,
     keep_python: Vec<Candidate>,
+    completed: Vec<Candidate>,
     hook_log_count: usize,
 }
 
@@ -166,6 +168,7 @@ fn build_plan(root: &Path, limit: usize) -> Plan {
     let (log_counts, hook_log_count) = collect_hook_tool_counts(root);
     let keep_names = target_names(KEEP_PYTHON_TARGETS);
     let port_names = target_names(PORT_NOW_TARGETS);
+    let completed_names = target_names(COMPLETED_RUST_TARGETS);
 
     let mut candidates = Vec::new();
     for (index, target) in PORT_NOW_TARGETS.iter().enumerate() {
@@ -185,7 +188,10 @@ fn build_plan(root: &Path, limit: usize) -> Plan {
     }
 
     for (name, count) in log_counts {
-        if port_names.contains(name.as_str()) || keep_names.contains(name.as_str()) {
+        if port_names.contains(name.as_str())
+            || keep_names.contains(name.as_str())
+            || completed_names.contains(name.as_str())
+        {
             continue;
         }
         candidates.push(Candidate {
@@ -218,11 +224,23 @@ fn build_plan(root: &Path, limit: usize) -> Plan {
             source: "policy".to_string(),
         })
         .collect();
+    let completed = COMPLETED_RUST_TARGETS
+        .iter()
+        .map(|target| Candidate {
+            name: target.name.to_string(),
+            path: target.path.to_string(),
+            class: "completed",
+            score: 0,
+            reason: target.reason.to_string(),
+            source: "policy".to_string(),
+        })
+        .collect();
 
     Plan {
         foundation,
         candidates,
         keep_python,
+        completed,
         hook_log_count,
     }
 }
@@ -469,6 +487,12 @@ fn render(plan: Plan, root: &Path) -> i32 {
             candidate.name, candidate.path, candidate.reason
         );
     }
+    for candidate in plan.completed {
+        println!(
+            "RUST_MIGRATION_COMPLETED=name={} path={} reason={}",
+            candidate.name, candidate.path, candidate.reason
+        );
+    }
     0
 }
 
@@ -530,6 +554,24 @@ mod tests {
             .keep_python
             .iter()
             .any(|candidate| candidate.name == "task_close.py"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plan_marks_document_inventory_completed() {
+        let root = make_fixture_root();
+        write_foundation(&root);
+
+        let plan = build_plan(&root, 10);
+
+        assert!(plan
+            .completed
+            .iter()
+            .any(|candidate| candidate.name == "noncanonical_document_inventory.py"));
+        assert!(!plan
+            .candidates
+            .iter()
+            .any(|candidate| candidate.name == "noncanonical_document_inventory.py"));
         let _ = fs::remove_dir_all(root);
     }
 

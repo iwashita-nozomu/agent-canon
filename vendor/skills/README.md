@@ -64,7 +64,6 @@ Run:
 
 ```bash
 python3 tools/agent_tools/vendor_skill_adapters.py --sync
-python3 tools/docs/mirror_skill_shims.py --target .claude/skills --prune
 ```
 
 Then validate:

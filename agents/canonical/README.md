@@ -16,8 +16,6 @@ upstream design ../README.md agent canon overview
 ## なぜ正本を分けるか
 
 - Codex は `AGENTS.md` と `.agents/skills/` を読む
-- Claude Code は `CLAUDE.md`、`.claude/skills/`、`.claude/agents/` を読む
-- GitHub Copilot は `.github/copilot-instructions.md` と `AGENTS.md`、project skills を読む
 
 単一の discovery path はないため、正本は `agents/` に集約し、各ランタイムには薄い互換入口だけを置きます。
 
@@ -34,7 +32,7 @@ upstream design ../README.md agent canon overview
 - `agents/canonical/ARTIFACT_PLACEMENT.md`
   - task 文書と run artifact の置き分け
 - `agents/canonical/CLI_ENTRYPOINTS.md`
-  - Codex / Claude / Copilot の入口差分
+  - Codex の入口差分
 - `agents/canonical/CODEX_WORKFLOW.md`
   - Codex の context-independent workflow
 - `agents/canonical/CODEX_SUBAGENTS.md`
@@ -44,11 +42,7 @@ upstream design ../README.md agent canon overview
 - `agents/skills/catalog.yaml`
   - skill family の機械可読カタログ
 - `.agents/skills/`
-  - Codex / Copilot 向け canonical skill path
-- `.claude/skills/`
-  - Claude compatibility mirror generated from `.agents/skills/`
-- `.claude/agents/`
-  - Claude-native subagents
+  - Codex 向け canonical skill path
 - `.codex/`
   - Codex project-scoped runtime config
 

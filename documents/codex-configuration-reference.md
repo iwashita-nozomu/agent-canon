@@ -574,6 +574,11 @@ Template-specific hook behavior:
   the bypass only prevents unrelated hook findings from stopping the write.
 - `UserPromptSubmit` runs prompt secret scanning, skill usage logging, and
   reference capture checks.
+- `PreToolUse` runs `direct_rg_context_guard.py` to emit
+  `DIRECT_RG_CONTEXT_RISK=warn` when a shell command uses broad direct
+  `rg -n` output. It does not block the tool call; it asks the agent to replace
+  broad output with `rg -l`, bounded paths, `--max-count`, or exclusions for
+  `.agent-canon/log-archive/**`, `reports/**`, and `*.jsonl`.
 - `PostToolUse` runs tool/subagent logging, reference capture, OOP readability,
   module boundary, library implementation, helper inventory, helper-first,
   style, log-surface inventory, and notebook quality checks as warning/evidence
@@ -593,7 +598,8 @@ Template-specific hook behavior:
   `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook>.jsonl`.
   Accumulated eval reports append under
   `.agent-canon/log-archive/eval-results/<family>/`, Codex runtime summaries
-  under `.agent-canon/log-archive/codex-runtime/<repo-key>/`, and agent run
+  under `.agent-canon/log-archive/codex-runtime/<repo-key>/chats/<conversation-id>/summary.jsonl`
+  with `.agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl`, and agent run
   reports under `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/`.
   `log_archive_mount_warning.py` warns, without blocking, when that archive is
   missing and asks the agent to run `runtime_log_archive_git.py ensure` first.

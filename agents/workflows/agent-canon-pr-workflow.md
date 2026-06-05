@@ -37,7 +37,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - shared canon の正本は standalone AgentCanon repo です。template 内で作業する場合は `vendor/agent-canon/` submodule worktree がその working copy になります。
 - GitHub 上の canonical shared canon repo は `https://github.com/iwashita-nozomu/agent-canon.git` です。
 - template の canonical repo は `https://github.com/iwashita-nozomu/project_template.git` です。
-- template を GitHub 管理にする場合は、`.gitmodules` の AgentCanon URL を canonical GitHub URL にし、local bare mirror は別名 remote または明示 override として残します。
+- `.gitmodules` の AgentCanon URL は canonical GitHub URL にします。
 - root 側の symlink view や root copy を直接編集しません。
 - shared canon 変更は dedicated branch と dedicated PR に分けます。
 - shared canon 変更は dedicated commit に分けます。
@@ -54,7 +54,7 @@ standalone AgentCanon repo、template repo 側の branch、PR、merge、submodul
 - PR state の inspect、PR 作成、owned branch push、PR title/body 更新、evidence comment 追加、draft 化は workflow の一部として実行できます。merge、close、ready-for-review、reviewer request、review dismissal、auto-merge、branch deletion、failing check bypass は user の current-task 明示許可または tracked maintainer policy が無い限り実行しません。
 - tool addition、tool behavior change、memory addition、agent-learning update、skill eval result、feedback-loop change は standalone AgentCanon branch / PR の対象です。template / derived repo の pin PR だけで close しません。
 - user、reviewer、runtime、CI が workflow defect を露出した場合は、run bundle だけでなく `issues/`、`memory/`、または `notes/failures/` に durable record を残します。
-- PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Agent または Copilot PR が別 branch で行います。
+- PR / branch push では `.github/workflows/agent-improvement-guide.yml` が memory、skill eval、hook result、issues を読み、read-only improvement guide artifact を生成します。実際の skill / workflow / tool 修正は local Codex が別 branch で行います。
 - standalone AgentCanon PR / branch push では `.github/workflows/agent-canon-static-gates.yml` が tool catalog、tool drift、dependency review、skill mirror、runtime role alignment、skill/workflow prompt eval、convention compliance、GitHub workflow convention、container config を軽量 gate として走らせます。local の `make agent-canon-pr-check` は引き続き merge 前の広い gate です。
 - Issue template / eval capture work uses `documents/issue-label-taxonomy.md`,
   `documents/prompt-skill-evaluation-checklist.md`, and
@@ -245,18 +245,18 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 - PR body は run bundle の `pr_body.md` などの明示 file に展開します。template の path だけを `gh pr create --template` に渡して、agent が最終 body を確認しない状態にしません。
 - standalone AgentCanon PR、template / derived repo の AgentCanon PR、default template / repo-local PR のいずれも、作成または更新は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。
 - 既存 PR がある場合、tool は既存 PR を報告します。PR body を更新する意図がある場合だけ `--update-existing` を付けます。
-- `goal.md` が `pr_mutation_authority: github_copilot_merge_when_green`
-  を持つ場合、PR body の `Copilot / Automation Output` に authority と
-  `gh pr checks` summary を残し、merge は GitHub-hosted Copilot / PR
-  automation の visible evidence に委譲します。
+- `goal.md` が `pr_mutation_authority: github_pr_automation_when_green`
+  を持つ場合、PR body の `GitHub Automation Output` に authority と
+  `gh pr checks` summary を残し、merge は GitHub PR automation の visible
+  evidence に委譲します。
 
 7. merge する
 
 - `gh` / GitHub MCP が使えることは、PR 状態確認と PR body / evidence 更新の許可です。merge / close / ready-for-review / reviewer request / auto-merge は、current task で user がその mutation を明示した場合だけ実行します。
-- `github_copilot_merge_when_green` は GitHub-hosted Copilot / PR automation
+- `github_pr_automation_when_green` は GitHub PR automation
   にだけ merge authority を渡します。local Codex は
-  `COPILOT_PR_AUTHORITY`、`COPILOT_PR_DECISION`、`COPILOT_PR_CHECKS`、
-  `COPILOT_VISIBLE_EVIDENCE`、`COPILOT_BLOCKER` が PR-visible surface に
+  `GITHUB_PR_AUTOMATION_AUTHORITY`、`GITHUB_PR_AUTOMATION_DECISION`、`GITHUB_PR_AUTOMATION_CHECKS`、
+  `GITHUB_AUTOMATION_VISIBLE_EVIDENCE`、`GITHUB_AUTOMATION_BLOCKER` が PR-visible surface に
   出るまで merge 完了扱いにせず、自分では merge しません。
 - 明示許可が無い場合は、merge 可能でも PR body、run bundle、または `goal.md` に "blocked on PR mutation authority" と残して止めます。
 - file 構成変更がある場合は integration worktree で merge します。
@@ -361,7 +361,6 @@ Validation:
 Propagation:
 - AgentCanon commit / PR: <url-or-sha>
 - Template commit / PR: <url-or-sha>
-- local bare mirror: not used, or compatibility-only evidence recorded
 ```
 
 ### Root-Only Template Workflow Change
@@ -378,22 +377,6 @@ Validation:
 - python3 tools/ci/check_github_workflows.py: pass
 - make docs-check: pass
 - make ci: pass
-```
-
-### Copilot-Only Instruction Change
-
-```text
-Summary:
-- Updated .github/copilot-instructions.md routing text only.
-
-Read packet:
-- AGENTS.md
-- agents/README.md
-- agents/workflows/github-copilot-workflow.md
-
-Validation:
-- python3 tools/ci/check_github_workflows.py: pass
-- bash tools/sync_agent_canon.sh check: pass
 ```
 
 ## PR 完了条件

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
-# responsibility Evaluates Codex subagent role configuration, routing, cost buckets, and runtime metrics.
+# responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../agents/evals/README.md eval directory contract
 # upstream implementation ./agent_team.py loads team and task routing metadata
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
-"""Evaluate Codex custom agent role definitions and routing cost policy."""
+"""Evaluate Codex custom agent role definitions and routing policy."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -43,7 +43,7 @@ COMPACT_FINDING_SAMPLE_LIMIT = 25
 DEFAULT_RESULTS_FAMILY = "codex-agent-role"
 RUN_ID_DIGEST_LENGTH = 10
 GIT_COMMAND_TIMEOUT_SECONDS = 5
-ModelPolicy = dict[str, tuple[str, str, str]]
+VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 
 
 @dataclass(frozen=True)
@@ -153,51 +153,17 @@ def load_agent_configs(root: Path) -> dict[str, dict[str, object]]:
     return configs
 
 
-def load_model_policy(root: Path) -> tuple[ModelPolicy, list[Finding]]:
-    """Load role model policy from the centralized Codex config."""
+def validate_no_legacy_model_policy(root: Path) -> list[Finding]:
+    """Check that model settings are not duplicated in project config."""
     findings: list[Finding] = []
     config_path = root / ".codex" / "config.toml"
     if not config_path.is_file():
-        return {}, [Finding("model-policy", ".codex/config.toml", "missing-config")]
+        return [Finding("model-settings", ".codex/config.toml", "missing-config")]
     load_toml = cast(Callable[[str], dict[str, object]], getattr(tomllib, "loads"))
     payload = load_toml(config_path.read_text(encoding="utf-8"))
-    raw_model_policy = payload.get("agent_model_policy")
-    if not isinstance(raw_model_policy, dict) or not raw_model_policy:
-        return {}, [Finding("model-policy", ".codex/config.toml", "missing-model-policy")]
-    role_policy: ModelPolicy = {}
-    model_policy = cast(dict[str, object], raw_model_policy)
-    for bucket_id, raw_bucket in sorted(model_policy.items()):
-        if not isinstance(raw_bucket, dict):
-            findings.append(Finding("model-policy", str(bucket_id), "bucket-not-table"))
-            continue
-        bucket = cast(dict[str, object], raw_bucket)
-        model = bucket.get("model")
-        effort = bucket.get("model_reasoning_effort")
-        raw_roles = bucket.get("roles")
-        if not isinstance(model, str) or not model:
-            findings.append(Finding("model-policy", str(bucket_id), "missing-model"))
-            continue
-        if not isinstance(effort, str) or not effort:
-            findings.append(Finding("model-policy", str(bucket_id), "missing-effort"))
-            continue
-        if not isinstance(raw_roles, list):
-            findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
-            continue
-        raw_role_items = cast(list[object], raw_roles)
-        roles: list[str] = []
-        for raw_role in raw_role_items:
-            if not isinstance(raw_role, str) or not raw_role:
-                findings.append(Finding("model-policy", str(bucket_id), "roles-not-string-list"))
-                break
-            roles.append(raw_role)
-        if len(roles) != len(raw_role_items):
-            continue
-        for role in roles:
-            if role in role_policy:
-                findings.append(Finding("model-policy", role, "duplicate-policy-role"))
-                continue
-            role_policy[role] = (str(bucket_id), model, effort)
-    return role_policy, findings
+    if "agent_model_policy" in payload:
+        findings.append(Finding("model-settings", ".codex/config.toml", "legacy-agent-model-policy"))
+    return findings
 
 
 def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
@@ -208,9 +174,8 @@ def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
 def evaluate_static_agent_configs(
     root: Path,
     configs: dict[str, dict[str, object]],
-    model_policy: ModelPolicy,
 ) -> list[Finding]:
-    """Evaluate static role TOML schema, behavior, and model policy."""
+    """Evaluate static role TOML schema, behavior, and executable model settings."""
     findings: list[Finding] = []
     for agent_id, config in configs.items():
         for field in ("name", "description", "developer_instructions"):
@@ -218,22 +183,13 @@ def evaluate_static_agent_configs(
                 findings.append(Finding("schema", agent_id, f"missing-{field}"))
         if config.get("name") != config.get("__stem"):
             findings.append(Finding("schema", agent_id, "name-file-stem-mismatch"))
-        if agent_id not in model_policy:
-            findings.append(Finding("model-policy", agent_id, "unclassified-agent"))
-            continue
-        bucket, expected_model, expected_effort = model_policy[agent_id]
-        if config.get("model") != expected_model:
-            findings.append(
-                Finding("model-policy", agent_id, f"{bucket}-model-expected-{expected_model}")
-            )
-        if config.get("model_reasoning_effort") != expected_effort:
-            findings.append(
-                Finding("model-policy", agent_id, f"{bucket}-effort-expected-{expected_effort}")
-            )
+        model = config.get("model")
+        effort = config.get("model_reasoning_effort")
+        if not isinstance(model, str) or not model:
+            findings.append(Finding("model-settings", agent_id, "missing-model"))
+        if not isinstance(effort, str) or effort not in VALID_REASONING_EFFORTS:
+            findings.append(Finding("model-settings", agent_id, "invalid-model-reasoning-effort"))
         findings.extend(evaluate_role_behavior(root, agent_id, config))
-    missing_policy = sorted(set(model_policy) - set(configs))
-    for agent_id in missing_policy:
-        findings.append(Finding("model-policy", agent_id, "missing-agent-toml"))
     return findings
 
 
@@ -417,13 +373,12 @@ def int_metric(entry: dict[str, object], *keys: str) -> tuple[int, str | None]:
     return 0, None
 
 
-def model_matrix(configs: dict[str, dict[str, object]], model_policy: ModelPolicy) -> tuple[str, ...]:
-    """Render agent model bucket matrix."""
+def model_matrix(configs: dict[str, dict[str, object]]) -> tuple[str, ...]:
+    """Render agent executable model settings."""
     rows: list[str] = []
     for agent_id in sorted(configs):
-        bucket, _, _ = model_policy.get(agent_id, ("unclassified", "", ""))
         rows.append(
-            f"{agent_id}:{bucket}:{configs[agent_id].get('model')}:{configs[agent_id].get('model_reasoning_effort')}"
+            f"{agent_id}:{configs[agent_id].get('model')}:{configs[agent_id].get('model_reasoning_effort')}"
         )
     return tuple(rows)
 
@@ -447,7 +402,7 @@ def git_output(root: Path, *args: str) -> str:
 
 def build_eval_run_metadata(root: Path, run_id: str) -> EvalRunMetadata:
     """Build metadata with a unique, filename-safe eval run id."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created_at = now.isoformat()
     timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     digest_source = "|".join(("codex-agent-role", run_id.strip(), created_at, root.as_posix()))
@@ -469,10 +424,9 @@ def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalRepor
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
-    model_policy, model_policy_findings = load_model_policy(canon_root)
     findings = [
-        *model_policy_findings,
-        *evaluate_static_agent_configs(canon_root, configs, model_policy),
+        *validate_no_legacy_model_policy(canon_root),
+        *evaluate_static_agent_configs(canon_root, configs),
         *evaluate_routing(canon_root),
     ]
     metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs)
@@ -481,7 +435,7 @@ def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalRepor
         metadata=build_eval_run_metadata(canon_root, run_id),
         status="pass" if not findings else "fail",
         findings=tuple(findings),
-        model_matrix=model_matrix(configs, model_policy),
+        model_matrix=model_matrix(configs),
         runtime_metrics_status=metrics_status,
         runtime_metrics=metrics,
     )
@@ -515,7 +469,7 @@ def render_text(report: EvalReport, *, include_details: bool = True, compact_out
 def compact_summary(report: EvalReport) -> dict[str, object]:
     """Return a bounded JSON-friendly role eval summary."""
     findings_by_check = Counter(finding.check for finding in report.findings)
-    model_buckets = Counter(row.split(":", 2)[1] for row in report.model_matrix)
+    model_counts = Counter(row.split(":", 2)[1] for row in report.model_matrix)
     runtime_totals = {
         "calls": sum(summary.calls for summary in report.runtime_metrics.values()),
         "tokens": sum(summary.tokens for summary in report.runtime_metrics.values()),
@@ -531,7 +485,7 @@ def compact_summary(report: EvalReport) -> dict[str, object]:
         "status": report.status,
         "finding_count": len(report.findings),
         "findings_by_check": dict(sorted(findings_by_check.items())),
-        "model_buckets": dict(sorted(model_buckets.items())),
+        "model_counts": dict(sorted(model_counts.items())),
         "runtime_metrics_status": report.runtime_metrics_status,
         "runtime_totals": runtime_totals,
         "finding_samples": [

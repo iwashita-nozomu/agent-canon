@@ -6,7 +6,6 @@ upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design prose-reasoning-graph.md prose graph overlay and handoff contract
 downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../.claude/skills/structure-planning/SKILL.md mirrors this workflow for Claude-compatible runtimes
 downstream design html-output.md consumes structure contracts for explicit HTML output
 @dependency-end
 -->

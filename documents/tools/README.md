@@ -12,6 +12,7 @@ downstream implementation ../../tools/agent_tools/eval_accumulation_check.py val
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../rust/agent-canon/src/local_llm.rs runs local LLM CLI commands
 downstream implementation ../../rust/agent-canon/src/semantic_index.rs runs semantic vector index commands
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
 downstream implementation ../../tools/agent_tools/file_responsibility_llm.py keeps the Python local LLM compatibility helper
 downstream implementation ../../tools/agent_tools/local_llm_eval.py runs local LLM responsibility eval engine
 downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
@@ -66,6 +67,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
+- `agent-canon local-llm extract-prose-ir`
+  - 複数 document と複数 term を受け取り、LocalLLM 向け part に分割して prose intermediate representation JSON を作ります。
+  - 返す単位は単語 list ではなく、document responsibility、section role、term context、corpus hints、`dsl_seed`、`parts[]` です。
+  - `--document-batch-size` と `--term-batch-size` で分割幅を指定し、merge 済み JSON は `--json-out` に保存します。
 - `agent-canon local-llm eval`
   - `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM 単一 file 責務分析の prompt と任意の model-backed output を eval します。既定は prompt-only です。
 - `tools/agent_tools/evaluate_report_quality.py`
@@ -76,6 +81,9 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Markdown/plain text を SQLite-backed prose graph に取り込み、projection、
     diagnostics、natural-language explanation、split/merge/bridge/reorder
     operation、既存 writing/review skill への handoff packet を出します。
+  - DB 作成の既定は
+    `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`。
+    run-local DB などが必要な場合だけ `--db` で明示します。
   - DSL vocabulary and validation are defined in
     [Prose Reasoning Graph DSL Specification](../prose-reasoning-graph/dsl-spec.md).
 - `agent-canon local-llm search`
@@ -96,6 +104,11 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - `eval-output` は review JSONL artifact 自体を検査し、result count、responsibility metadata、thin-doc action、long-query echo の欠落を検出します。
   - `tools/agent_tools/semantic_provider_html_report.py` は `compare-providers` JSON を self-contained HTML に描画します。先頭図は `Provider Delta To Shared Candidate Logic` で、provider 差分は診断 evidence、責務 bucket / candidate logic が authority であることを明示します。
   - 生成 DB の既定は `~/.cache/agent-canon/semantic-index/<repo-key>/` です。repo-local cache が必要な場合だけ `--db` で明示し、commit しません。削除・統合の authority にはしません。
+- `agent-canon structured-analysis build --root . --profile manual`
+  - git-visible file tree を `artifact` layer、document-canon cleanup finding を `document-canon` layer として user-home cache の SQLite DB に materialize し、解析 warning を別の `diagnostics.sqlite` に保存します。DevContainer post-create でも warning-only で走り、repo tree は書き換えません。
+- `agent-canon structured-analysis document-inventory --root .`
+  - document-canon cleanup の canonical Rust entrypoint です。runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出し、stale document name を棚卸しします。
+  - `agent-canon structured-analysis import-document-inventory --db <graph.sqlite> --json <inventory.json>` で同じ結果を SQLite の `document-canon` layer に取り込み、レポ root から一文までの graph trace と接続します。
 - `tools/agent_tools/route.py --area search`
   - 検索 tool 名を知らない agent / reviewer 向けの短い入口です。`search.py` と `search_index.py` の command を返します。
 - `documents/tools/tool-docs.toml`
@@ -187,8 +200,10 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - Markdown header level の飛びを補正します。
 - `tools/docs/fix_markdown_math.py`
   - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正します。
+- `tools/docs/fix_mermaid.py`
+  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避けます。
 - `tools/docs/format_markdown.py`
-  - 軽い整形だけをまとめて当てます。
+  - 軽い整形と Mermaid fenced block 補正をまとめて当てます。
 - `tools/docs/fix_markdown_docs.py`
   - conservatively な Markdown 整形を当てます。
 - `tools/docs/find_similar_documents.py`
@@ -268,8 +283,10 @@ python3 tools/agent_tools/vector_search.py --surface python --query "initialize 
 - `tools/agent_tools/file_surface_inventory.py`
   - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
   - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
-- `tools/agent_tools/noncanonical_document_inventory.py`
-  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。
+- `agent-canon structured-analysis build --root . --profile manual`
+  - user-home cache に `prose_graph.sqlite`、`diagnostics.sqlite`、`document_inventory.json`、`exports/` を作り、source file から中間表現 DB と warning DB を再生成します。`--out-dir` を指定した場合だけその artifact root に出力します。
+- `agent-canon structured-analysis document-inventory --root .`
+  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。旧 `tools/agent_tools/noncanonical_document_inventory.py` は caller warning 付きの legacy migration shim です。
   - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
 - `tools/agent_tools/reference_materializer.py`
   - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
@@ -332,7 +349,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `agents/evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
   - hook JSONL、eval report、Codex runtime summary、`reports/agents/` の agent run report は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime-log-archive.md` を正本にし、通常操作は `tools/agent_tools/runtime_log_archive_git.py sync` を使います。個別修復時だけ `ensure|status|import-legacy|import-eval-results|archive-agent-report|archive-agent-reports|push` を使います。
-  - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Agent / Copilot PR に渡します。
+  - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
   - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
   - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、local LLM、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
   - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、local LLM eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。

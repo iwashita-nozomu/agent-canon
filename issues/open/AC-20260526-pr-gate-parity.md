@@ -19,7 +19,7 @@ severity: S1
 evidence: GitHub Actions run 26450128761 failed dependency review after PR #143 moved runtime log evidence out of agents/evals/results.
 affected_surfaces: .github/workflows/agent-canon-static-gates.yml, tools/ci/check_agent_canon_pr.sh, tools/ci/check_github_workflows.py, tools/agent_tools/tool_drift.py, tools/agent_tools/evaluate_codex_agent_roles.py, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md
 edit_scope: .github/workflows/agent-canon-static-gates.yml, tools/ci/check_agent_canon_pr.sh, tools/ci/check_github_workflows.py, tools/agent_tools/tool_drift.py, tools/agent_tools/evaluate_codex_agent_roles.py, tests/tools/test_check_github_workflows.py, tests/agent_tools/test_tool_drift.py, tests/agent_tools/test_evaluate_codex_agent_roles.py, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, agents/workflows/agent-canon-pr-workflow.md, tools/README.md, documents/tools/README.md
-required_action: Keep GitHub static gates, local AgentCanon PR checks, PR templates, and drift checkers aligned for dependency headers, skill mirrors, runtime role alignment, prompt eval, and convention compliance.
+required_action: Keep GitHub static gates, local AgentCanon PR checks, PR templates, and drift checkers aligned for dependency headers, Codex skill shims, runtime role alignment, prompt eval, and convention compliance.
 close_condition: Removing any local PR parity check from GitHub static gates or check_agent_canon_pr.sh fails a machine check before merge.
 
 ## Finding
@@ -34,8 +34,8 @@ Observed root causes:
   while dependency headers and issue metadata still pointed at the old path.
   The strict dependency review caught the broken references only after PR
   creation.
-- `.claude/skills/**` mirrors drifted from canonical skill sources until the
-  local mirror check was run manually.
+- legacy non-Codex skill views drifted from canonical skill sources until the
+  local Codex skill-shim check was run manually.
 - Runtime role / model policy checks and skill/workflow prompt evals were
   part of local practice, but not protected by the GitHub static-gates
   workflow.
@@ -54,12 +54,12 @@ Observed root causes:
 The GitHub static-gates workflow must run the same cheap parity checks that
 local PR readiness depends on. The workflow checker must require those command
 snippets, and the tool drift checker must require the local PR check to keep
-strict dependency review, skill mirror parity, runtime alignment, and prompt
+strict dependency review, Codex skill-shim parity, runtime alignment, and prompt
 eval wiring.
 
 ## Mitigation In This Branch
 
-- GitHub static gates now run mirror parity, runtime role alignment, Codex
+- GitHub static gates now run Codex skill-shim parity, runtime role alignment, Codex
   agent role eval, research pack smoke, skill/workflow prompt eval, and
   convention compliance checks.
 - Workflow and tool drift checkers now fail if those parity checks disappear

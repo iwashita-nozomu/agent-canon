@@ -13,7 +13,7 @@ upstream design README.md canonical workflow index
 ## 共通ルール
 
 - repo root で起動する
-- まず `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` の対応入口を読む
+- まず `AGENTS.md` を読む
 - reusable workflow は `agents/` と skill directory で保守する
 - task 固有の run artifact は `reports/agents/<run-id>/` に寄せる
 
@@ -35,45 +35,6 @@ upstream design README.md canonical workflow index
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - planning を含む parent session では、parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
-
-## Claude Code
-
-入口:
-- `CLAUDE.md`
-- `.claude/skills/`
-- `.claude/agents/`
-
-使いどころ:
-- interactive session での task 実行
-- Claude-native subagent の呼び出し
-
-補足:
-- `.claude/skills/` は `.agents/skills/` から生成する互換 mirror
-- shared rules は `AGENTS.md` を参照し、Claude 固有差分だけを `CLAUDE.md` に置く
-- subagent 管理は Claude Code の `/agents` を前提にする
-
-## GitHub Copilot
-
-入口:
-- `.github/copilot-instructions.md`
-- `.github/instructions/*.instructions.md`
-- `.github/agents/*.md`
-- `AGENTS.md`
-- `.agents/skills/`
-- `agents/workflows/github-copilot-workflow.md`
-
-使いどころ:
-- GitHub Copilot CLI
-- GitHub-hosted coding agent
-- IDE / repository instructions
-
-補足:
-- repo instructions は `.github/copilot-instructions.md` に置く
-- PR 処理の path-wide instruction は `.github/instructions/pr-processing.instructions.md` に置く
-- PR maintenance 用 custom agent profile は `.github/agents/pr-maintainer.md` に置く
-- issue / PR / IDE 起点の作業は `agents/workflows/github-copilot-workflow.md` を overlay として扱う
-- old `gh-copilot` extension 前提の説明は正本にしない
-- GitHub-hosted agent は issue / PR 起点で使うことがあるため、repo 正本は特定ローカル wrapper に寄せすぎない
 
 ## Run Bootstrap
 

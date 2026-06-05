@@ -23,3 +23,6 @@ upstream design ../../../agents/canonical/skills.md skill canon registry
 1. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository during checkpoint and final review; changed-file dependency checks alone are not enough.
 1. Separate `fix now` from `follow-up`.
 1. Use `documents/REVIEW_PROCESS.md` for repo review expectations.
+   In template or derived repo roots, `documents/...` is a logical AgentCanon
+   path: resolve it under `vendor/agent-canon/documents/` unless
+   `documents/README.md` lists the path as a template-owned active contract.

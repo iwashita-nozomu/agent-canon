@@ -280,6 +280,41 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
 
+    def test_evaluate_rejects_negative_final_review_decision_text(self) -> None:
+        """Final review decisions containing approve as a substring must not pass."""
+        cases = {
+            "revise-do-not-approve": "revise: do not approve",
+            "not-approved": "not approved",
+        }
+        for case_id, decision in cases.items():
+            with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as tmp_dir:
+                report_dir = Path(tmp_dir) / "run"
+                write_ready_run(report_dir)
+                (report_dir / "final_review.md").write_text(
+                    f"# Final Review\n\n## Decision\n\n{decision}\n",
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--report-dir",
+                        str(report_dir),
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
+                self.assertIn(
+                    "concrete approving final review decision",
+                    result.stdout,
+                )
+
     def test_evaluate_missing_workflow_monitoring_fails(self) -> None:
         """Workflow monitoring is required for closeout-quality evaluation."""
         with tempfile.TemporaryDirectory() as tmp_dir:

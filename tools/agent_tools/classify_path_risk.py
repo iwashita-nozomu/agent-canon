@@ -30,7 +30,7 @@ DOC_SUFFIXES = {".md", ".rst", ".txt"}
 PYTHON_SUFFIXES = {".py", ".pyi"}
 DOCKER_PREFIXES = ("docker/", ".devcontainer/")
 GITHUB_PREFIXES = (".github/",)
-SHARED_CANON_PREFIXES = (".agents/", ".claude/", ".codex/", "agents/", "mcp/", "tools/", "documents/", "memory/", "notes/")
+SHARED_CANON_PREFIXES = (".agents/", ".codex/", "agents/", "mcp/", "tools/", "documents/", "memory/", "notes/")
 FULL_CONFIDENCE_PREFIXES = ("rust/", "tests/", "src/", "include/", "lib/")
 
 

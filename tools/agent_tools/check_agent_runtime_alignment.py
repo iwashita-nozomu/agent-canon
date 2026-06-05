@@ -69,6 +69,7 @@ TOOL_RESULT_ROUTE_MARKERS = (
     "OOP mechanical reports -> oop_readability_reviewer",
     "repo-wide drift and integration risk -> project_reviewer",
 )
+PERMANENT_TEAM_MAPPING_HEADING = "## Permanent Team To Codex Mapping"
 
 
 @dataclass(frozen=True)
@@ -113,48 +114,6 @@ def load_project_config_toml() -> dict[str, object]:
     return tomllib.loads(PROJECT_CONFIG_PATH.read_text(encoding="utf-8"))
 
 
-def iter_model_policy_buckets(config: dict[str, object]) -> list[tuple[str, dict[str, object]]]:
-    """Return model policy buckets from `.codex/config.toml`."""
-    model_policy = config.get("agent_model_policy", {})
-    ensure(isinstance(model_policy, dict), "agent_model_policy must be a mapping")
-    ensure(model_policy, "agent_model_policy must not be empty")
-    buckets: list[tuple[str, dict[str, object]]] = []
-    for bucket_id, raw_bucket in sorted(model_policy.items()):
-        ensure(isinstance(raw_bucket, dict), f"model policy {bucket_id} must be a mapping")
-        model = raw_bucket.get("model")
-        reasoning_effort = raw_bucket.get("model_reasoning_effort")
-        roles = raw_bucket.get("roles")
-        ensure(isinstance(model, str) and model, f"model policy {bucket_id} missing model")
-        ensure(
-            isinstance(reasoning_effort, str) and reasoning_effort,
-            f"model policy {bucket_id} missing model_reasoning_effort",
-        )
-        ensure(
-            isinstance(roles, list) and all(isinstance(role, str) and role for role in roles),
-            f"model policy {bucket_id} roles must be a non-empty string list",
-        )
-        ensure(len(set(roles)) == len(roles), f"model policy {bucket_id} has duplicate roles")
-        buckets.append((str(bucket_id), raw_bucket))
-    return buckets
-
-
-def validate_agent_model(
-    configs: dict[str, dict[str, object]],
-    role_id: str,
-    *,
-    model: str,
-    reasoning_effort: str,
-) -> None:
-    """Check one Codex agent model bucket."""
-    config = configs[role_id]
-    ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
-    ensure(
-        config.get("model_reasoning_effort") == reasoning_effort,
-        f"{role_id} model_reasoning_effort must be {reasoning_effort}",
-    )
-    ensure(config.get("model") == model, f"{role_id} model must be {model}")
-
-
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
@@ -174,6 +133,10 @@ def validate_project_config() -> None:
     ensure(features.get("multi_agent") is True, "features.multi_agent must be true")
     ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
     ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    ensure(
+        "agent_model_policy" not in config,
+        "agent_model_policy must stay out of .codex/config.toml; use .codex/agents/*.toml",
+    )
     validate_skill_config(config)
     agents = config.get("agents", {})
     ensure(isinstance(agents, dict), "agents must be a mapping")
@@ -215,7 +178,6 @@ def validate_project_config() -> None:
             registered.get("description") == agent_config.get("description"),
             f"{role_id} registry description must match agent TOML",
         )
-    _ = iter_model_policy_buckets(config)
 
 
 def expected_skill_config_paths() -> tuple[str, ...]:
@@ -289,37 +251,18 @@ def validate_project_hooks() -> None:
 
 
 def validate_codex_agent_settings() -> None:
-    """Check that Codex agent settings use the expected model split."""
-    project_config = load_project_config_toml()
-    model_policy = iter_model_policy_buckets(project_config)
+    """Check that Codex agent TOML files carry the executable model settings."""
     configs = parse_codex_agents()
-    required_role_ids: set[str] = set()
-    owner_by_role: dict[str, str] = {}
-    for bucket_id, bucket in model_policy:
-        for role_id in bucket["roles"]:
-            if str(role_id) in owner_by_role:
-                raise RuntimeError(
-                    f"role {role_id} appears in multiple model policy buckets: "
-                    f"{owner_by_role[str(role_id)]}, {bucket_id}"
-                )
-            owner_by_role[str(role_id)] = bucket_id
-            required_role_ids.add(str(role_id))
-    missing = sorted(required_role_ids - set(configs))
-    ensure(not missing, f"missing Codex agent definitions: {', '.join(missing)}")
-    unclassified = sorted(set(configs) - required_role_ids)
-    ensure(not unclassified, f"unclassified Codex agent model policy: {', '.join(unclassified)}")
-
-    for bucket_id, bucket in model_policy:
-        for role_id in sorted(str(role) for role in bucket["roles"]):
-            try:
-                validate_agent_model(
-                    configs,
-                    role_id,
-                    model=str(bucket["model"]),
-                    reasoning_effort=str(bucket["model_reasoning_effort"]),
-                )
-            except RuntimeError as exc:
-                raise RuntimeError(f"model policy {bucket_id}: {exc}") from exc
+    valid_efforts = {"low", "medium", "high", "xhigh"}
+    for role_id, config in sorted(configs.items()):
+        ensure(config.get("approval_policy") == "never", f"{role_id} approval_policy must be never")
+        model = config.get("model")
+        effort = config.get("model_reasoning_effort")
+        ensure(isinstance(model, str) and model, f"{role_id} model must be a non-empty string")
+        ensure(
+            isinstance(effort, str) and effort in valid_efforts,
+            f"{role_id} model_reasoning_effort must be one of {sorted(valid_efforts)}",
+        )
 
     for role_id, marker in INITIAL_INTAKE_MARKERS.items():
         instructions = str(configs[role_id].get("developer_instructions", ""))
@@ -526,6 +469,49 @@ def validate_subagent_protocol_docs() -> None:
     )
     for marker in TOOL_RESULT_ROUTE_MARKERS:
         ensure(marker in subagents_text, f"CODEX_SUBAGENTS.md missing tool route marker: {marker}")
+    validate_permanent_team_mapping(load_team_config(), subagents_text)
+
+
+def parse_permanent_team_mapping_roles(markdown_text: str) -> set[str]:
+    """Return role IDs listed in the CODEX_SUBAGENTS permanent-team mapping table."""
+    in_mapping = False
+    roles: set[str] = set()
+    for line in markdown_text.splitlines():
+        stripped = line.strip()
+        if stripped == PERMANENT_TEAM_MAPPING_HEADING:
+            in_mapping = True
+            continue
+        if in_mapping and stripped.startswith("## "):
+            break
+        if not in_mapping or not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) < 2 or cells[0] == "Permanent Team Role" or set(cells[0]) <= {"-", " "}:
+            continue
+        if cells[0].startswith("`") and cells[0].endswith("`"):
+            roles.add(cells[0].strip("`"))
+    return roles
+
+
+def validate_permanent_team_mapping(config: TeamConfig, markdown_text: str) -> None:
+    """Check every configured permanent-team role has a Codex route mapping row."""
+    expected_roles = {
+        role.id
+        for role in config.always_on_roles + config.specialist_roles
+    }
+    mapped_roles = parse_permanent_team_mapping_roles(markdown_text)
+    missing_roles = sorted(expected_roles - mapped_roles)
+    stale_roles = sorted(mapped_roles - expected_roles)
+    ensure(
+        not missing_roles,
+        "CODEX_SUBAGENTS.md permanent-team mapping missing roles: "
+        + ", ".join(missing_roles),
+    )
+    ensure(
+        not stale_roles,
+        "CODEX_SUBAGENTS.md permanent-team mapping has stale roles: "
+        + ", ".join(stale_roles),
+    )
 
 
 def validate_vendor_skill_adapters() -> None:
@@ -626,6 +612,55 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     """Ensure one generated task manifest preserves subagent handoff contracts."""
     manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
         encoding="utf-8",
+    )
+    manifest = yaml.safe_load(manifest_text)
+    ensure(isinstance(manifest, dict), f"task {task_id} manifest must be a mapping")
+    run = manifest.get("run")
+    ensure(isinstance(run, dict), f"task {task_id} manifest missing run mapping")
+    spawn_budget = run.get("spawn_budget")
+    ensure(
+        isinstance(spawn_budget, dict),
+        f"task {task_id} manifest missing run.spawn_budget",
+    )
+    catalog = load_task_catalog(config)
+    task = task_by_id(catalog, task_id)
+    expected_active, expected_max_write = workflow_spawn_budget(
+        catalog,
+        str(task["family"]),
+    )
+    expected_runtime_max_threads = codex_runtime_max_threads()
+    ensure(
+        spawn_budget.get("active_subagents") == expected_active,
+        f"task {task_id} manifest run.spawn_budget.active_subagents mismatch",
+    )
+    ensure(
+        spawn_budget.get("max_write_subagents") == expected_max_write,
+        f"task {task_id} manifest run.spawn_budget.max_write_subagents mismatch",
+    )
+    ensure(
+        spawn_budget.get("runtime_max_threads") == expected_runtime_max_threads,
+        f"task {task_id} manifest run.spawn_budget.runtime_max_threads mismatch",
+    )
+    ensure(
+        "workflow_families[].spawn_budget" in str(spawn_budget.get("source", "")),
+        f"task {task_id} manifest run.spawn_budget source missing catalog reference",
+    )
+    ensure(
+        spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
+        f"task {task_id} manifest run.spawn_budget max_write scope unclear",
+    )
+    write_scope_policy = run.get("write_scope_policy")
+    ensure(
+        isinstance(write_scope_policy, dict),
+        f"task {task_id} manifest missing run.write_scope_policy",
+    )
+    ensure(
+        write_scope_policy.get("max_write_subagents") == expected_max_write,
+        f"task {task_id} manifest run.write_scope_policy.max_write_subagents mismatch",
+    )
+    ensure(
+        "active_subagents" not in write_scope_policy,
+        f"task {task_id} manifest write_scope_policy must not carry active_subagents",
     )
     ensure(
         "subagent_prompt_packet:" in manifest_text,

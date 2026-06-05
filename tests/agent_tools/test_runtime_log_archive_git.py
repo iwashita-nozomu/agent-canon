@@ -55,7 +55,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         )
 
     def make_remote(self, root: Path) -> Path:
-        """Create a local bare remote with a main branch."""
+        """Create a temporary Git remote with a main branch."""
         seed = root / "seed"
         remote = root / "agent-canon-log.git"
         seed.mkdir()
@@ -208,7 +208,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", pushed.stdout)
 
     def test_sync_pushes_codex_runtime_and_agent_reports(self) -> None:
-        """sync should be the unattended path for runtime summaries and agent reports."""
+        """Sync should be the unattended path for runtime summaries and agent reports."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
@@ -221,9 +221,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
             archive = mounted_log_archive_root(canon)
-            runtime_summary = archive / "codex-runtime" / key / "thread-1.jsonl"
+            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl"
             runtime_summary.parent.mkdir(parents=True)
-            runtime_summary.write_text('{"thread_id": "thread-1"}\n', encoding="utf-8")
+            runtime_summary.write_text('{"conversation_id": "thread-1", "thread_id": "thread-1"}\n', encoding="utf-8")
+            runtime_index = archive / "codex-runtime" / key / "index.jsonl"
+            runtime_index.write_text('{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary.jsonl"}\n', encoding="utf-8")
             run_dir = source / "reports" / "agents" / "run-2"
             run_dir.mkdir(parents=True)
             (run_dir / "closeout_gate.md").write_text("closeout=yes\n", encoding="utf-8")
@@ -236,7 +238,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             clone = root / "verification"
             subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(clone), "switch", f"logs/{key}"], check=True, capture_output=True)
-            self.assertTrue((clone / "codex-runtime" / key / "thread-1.jsonl").exists())
+            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary.jsonl").exists())
+            self.assertTrue((clone / "codex-runtime" / key / "index.jsonl").exists())
             self.assertTrue((clone / "agent-reports" / key / "run-2" / "closeout_gate.md").exists())
 
     def test_import_legacy_copies_and_deletes_old_jsonl(self) -> None:

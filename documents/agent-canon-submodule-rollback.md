@@ -51,9 +51,9 @@ Docker, GitHub Actions, MCP, Python tooling, or docs.
 ## Remote Authority
 
 GitHub `iwashita-nozomu/agent-canon` is the canonical shared-canon remote.
-Local `/mnt/git` mirrors are compatibility caches, not rollback authority. Do
-not roll back to an unpushed local bare mirror SHA unless the parent issue or PR
-explicitly records that emergency route.
+Do not roll back to an unpushed local-only SHA unless the parent issue or PR
+explicitly records that emergency route and the recovery branch is published to
+GitHub before normal work resumes.
 
 ## Re-Advance Condition
 

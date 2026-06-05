@@ -88,7 +88,7 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             self.write_minimal_bootstrap_docs(root)
             self.write_file(
                 shared_doc,
-                "Project Template\n/mnt/git/template.git\n",
+                "Project Template\nlegacy template remote\n",
             )
             (root / "documents" / "template-bootstrap.md").unlink()
             (root / "documents" / "template-bootstrap.md").symlink_to(

@@ -26,8 +26,8 @@ agent entrypoint は `tools/agent_tools/agent_canon_preflight.py` 経由でこ�
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `CLAUDE.md`, `agents/`, `.agents/`, `.claude/`, `.codex/`, `mcp/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `.github/AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/`, `.github/agents/` | GitHub agent root views | AgentCanon | `bash tools/sync_agent_canon.sh check` |
+| `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
+| `.github/AGENTS.md` | GitHub agent root view | AgentCanon | `bash tools/sync_agent_canon.sh check` |
 | `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
 | `documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
 | `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
@@ -195,22 +195,15 @@ AgentCanon. Keep each unchecked item open until the repo owner can mark it
 Source window:
 
 - [GitHub Changelog May 2026 index](https://github.blog/changelog/page/24/)
-- [Start Copilot cloud agent tasks via the REST API](https://github.blog/changelog/2026-05-13-start-copilot-cloud-agent-tasks-via-the-rest-api/)
-- [More flexible secrets and variables for Copilot cloud agent](https://github.blog/changelog/2026-05-08-more-flexible-secrets-and-variables-for-copilot-cloud-agent/)
-- [Copilot code review: Comment experience improvements](https://github.blog/changelog/2026-05-12-copilot-code-review-comment-experience-improvements/)
-- [Copilot code review comment types now in usage metrics API](https://github.blog/changelog/2026-05-08-copilot-code-review-comment-types-now-in-usage-metrics-api/)
 - [April reports are now available to prepare for usage-based billing](https://github.blog/changelog/2026-05-12-april-reports-are-now-available-to-prepare-for-usage-based-billing/)
 - [Upcoming deprecation of Grok Code Fast 1](https://github.blog/changelog/2026-05-08-upcoming-deprecation-of-grok-code-fast-1/)
 - [Upcoming deprecation of GPT-4.1](https://github.blog/changelog/2026-05-07-upcoming-deprecation-of-gpt-4-1/)
-- [Claude Sonnet 4 deprecated](https://github.blog/changelog/2026-05-07-claude-sonnet-4-deprecated/)
 - [Secret scanning with GitHub MCP Server is now generally available](https://github.blog/changelog/2026-05-05-secret-scanning-with-github-mcp-server-is-now-generally-available/)
 - [Dependency scanning with GitHub MCP Server is in public preview](https://github.blog/changelog/2026-05-05-dependency-scanning-with-github-mcp-server-is-in-public-preview/)
 - [Synchronous SBOM API deprecated](https://github.blog/changelog/2026-05-12-synchronous-sbom-api-deprecated/)
 - [Deprecation notice: `code_scanning_upload` field will be removed from `rate_limit` API endpoint](https://github.blog/changelog/2026-05-05-deprecation-notice-code_scanning_upload-field-will-be-removed-from-rate_limit-api-endpoint/)
 - [Cross-org Dependabot access for internal repositories](https://github.blog/changelog/2026-05-11-cross-org-dependabot-access-for-internal-repositories/)
 - [Repository rulesets: User bypass and branch renaming](https://github.blog/changelog/2026-05-07-repository-rulesets-user-bypass-and-branch-renaming/)
-- [Enterprise-managed plugins in GitHub Copilot CLI are now in public preview](https://github.blog/changelog/2026-05-06-enterprise-managed-plugins-in-github-copilot-cli-are-now-in-public-preview/)
-- [GitHub Copilot in Visual Studio Code, April releases](https://github.blog/changelog/2026-05-06-github-copilot-in-visual-studio-code-april-releases/)
 - [New enterprise installation API now in public preview](https://github.blog/changelog/2026-05-13-new-enterprise-installation-api-now-in-public-preview/)
 - [CodeQL 2.25.4 adds Swift 6.3.1 support, improvements to C# and Java, and more](https://github.blog/changelog/2026-05-12-codeql-2-25-4-adds-swift-6-3-1-support-improvements-to-c-and-java-and-more/)
 - [CodeQL 2.25.3 adds Swift 6.3 support](https://github.blog/changelog/2026-05-08-codeql-2-25-3-adds-swift-6-3-support/)
@@ -218,9 +211,8 @@ Source window:
 ### P0: Date-Bound Breakage Checks
 
 - [ ] Model deprecations: search `.github/`, `.codex/`, `.agents/`,
-  `.claude/`, `agents/`, `documents/`, `scripts/`, and CI config for
-  `Grok Code Fast 1`, `GPT-4.1`, and `Claude Sonnet 4`.
-  - `Claude Sonnet 4` was deprecated on 2026-05-06.
+  `agents/`, `documents/`, `scripts/`, and CI config for
+  `Grok Code Fast 1` and `GPT-4.1`.
   - `Grok Code Fast 1` is deprecated on 2026-05-15.
   - `GPT-4.1` is deprecated on 2026-06-01.
   - Replace explicit model references with approved alternatives or record
@@ -233,35 +225,10 @@ Source window:
   poll the returned URL, and record the async workflow evidence. The synchronous
   API is deprecated and scheduled for removal on 2026-11-13.
 
-### P1: Copilot Cloud Agent And Review Operations
-
-- [ ] Copilot cloud agent task automation: if the repo or organization starts
-  Copilot cloud agent tasks from scripts, portals, or scheduled workflows,
-  evaluate the Agent tasks REST API and document token type, permission owner,
-  PR mutation authority, and audit trail. Until GitHub App installation token
-  support is available, do not silently convert this into an app-token flow.
-- [ ] Copilot cloud agent secrets and variables: move shared cloud-agent
-  configuration out of ad hoc repository `copilot` environments when org-level
-  `Agents` secrets/variables are available. Keep secret-bearing values out of
-  the repo. Record which variables are org-level, repo-level, or intentionally
-  absent.
-- [ ] Copilot code review severity handling: map GitHub Copilot's `High`,
-  `Medium`, and `Low` review labels to the repo's S0/S1/S2/S3 finding triage.
-  High-severity Copilot findings should be fix-now unless explicitly downgraded
-  with evidence.
-- [ ] Copilot code review metrics: for orgs or enterprises with usage metrics
-  access, add `copilot_suggestions_by_comment_type` to periodic PR/review
-  reporting. Track at least `security`, `bug_risk`, applied suggestion counts,
-  and any category that repeatedly produces ignored suggestions.
-- [ ] Copilot usage-based billing preparation: download April and later Copilot
-  usage reports where the repo owner has access. Identify heavy consumers,
-  agentic workflow surfaces, and review automation that may need budget caps or
-  scheduling changes before 2026-06-01.
-
 ### P1: MCP, Security, And Dependency Scanning
 
 - [ ] GitHub MCP Server secret scanning: if the repo has GitHub Secret Protection
-  enabled, decide whether Copilot CLI / VS Code / other AI agents should run the
+  enabled, decide whether Codex or other approved AI agents should run the
   GitHub MCP Server secret scanning tool before commit or PR. Do not confuse this
   external GitHub MCP Server with the local AgentCanon `repo_mcp_server`.
 - [ ] GitHub MCP Server dependency scanning: if Dependabot alerts are enabled,
@@ -283,14 +250,6 @@ Source window:
   for agents, service accounts, or maintainers. Prefer minimal bypass scope and
   record the reason in PR mutation authority docs. If renaming protected
   branches, confirm the new name remains inside every applicable ruleset.
-- [ ] Enterprise-managed Copilot CLI plugins: if the enterprise uses Copilot
-  Business or Enterprise, decide whether AgentCanon skills, hooks, MCP config,
-  or plugin marketplaces should be distributed through
-  `.github-private/.github/copilot/settings.json`. Keep repo-local plugin
-  experiments out of enterprise baseline settings until validated.
-- [ ] VS Code Copilot agent controls: review whether domain allowlists, terminal
-  read/write permissions, agent debug log retention, and GitHub.com/mobile
-  steering of Copilot CLI sessions need a repo or org policy update.
 - [ ] GitHub App enterprise installation API: if repo tools enumerate GitHub App
   installations for an enterprise, replace broad pagination with the enterprise
   installation API and record fallback behavior for organizations, repositories,
@@ -299,7 +258,7 @@ Source window:
 ### P3: Watch Or Mark Not Applicable
 
 - [ ] GitHub Enterprise Server release candidates: if the repo targets GHES,
-  check whether GHES 3.21 RC / 3.22 timing affects Dependabot, CodeQL, Copilot,
+  check whether GHES 3.21 RC / 3.22 timing affects Dependabot, CodeQL,
   or ruleset features used by the repo.
 - [ ] Repository security advisories: if the repo uses GitHub repository security
   advisories heavily, verify whether the new search/filter bar changes triage

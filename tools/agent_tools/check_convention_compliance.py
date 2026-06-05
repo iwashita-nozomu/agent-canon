@@ -271,6 +271,15 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "STRICT_FAILURES_ENV",
         "downgraded_block_payload",
         "failure_warning_payload",
+        "direct_rg_context_guard.py",
+    ),
+    ".codex/hooks/direct_rg_context_guard.py": (
+        "DIRECT_RG_CONTEXT_RISK=warn",
+        "rg -l",
+        "--max-count",
+        ".agent-canon/log-archive",
+        "reports",
+        "*.jsonl",
     ),
     ".codex/README.md": (
         "dispatcher は fail-open",
@@ -305,6 +314,20 @@ VERIFICATION_RE = re.compile(
     r"CONVENTION_COMPLIANCE|EVAL_STATUS|AGENT_EVALUATION_STATUS)"
 )
 PROHIBITION_SECTION_RE = re.compile(r"(?m)^#{2,6}\s+(?:.*禁止事項|Close-Out Prohibitions)")
+FORWARDER_WARNING_REQUIRED_MARKER = "LEGACY_FORWARDER_WARNING_REQUIRED"
+FORWARDER_WARNING_MARKERS = (
+    "FORWARDER_CALLER",
+    "FORWARDER_ACTION",
+    "FORWARDER_SEVERITY=fix-now",
+    "FORWARDER_PROMPT",
+    "caller_process_chain",
+)
+AGENTS_FORWARDER_POLICY_MARKERS = (
+    "*_FORWARDER=deprecated",
+    "*_FORWARDER_SEVERITY=fix-now",
+    "caller chain",
+    "canonical command",
+)
 
 
 @dataclass(frozen=True)
@@ -576,6 +599,49 @@ def check_convention_assertions(root: Path) -> list[Finding]:
     return findings
 
 
+def check_legacy_forwarder_warning_policy(root: Path) -> list[Finding]:
+    """Verify legacy forwarders emit caller/action migration warnings."""
+    findings: list[Finding] = []
+    tools_root = root / "tools"
+    if tools_root.is_dir():
+        for path in sorted(
+            candidate
+            for pattern in ("*.py", "*.sh")
+            for candidate in tools_root.rglob(pattern)
+            if candidate.is_file()
+        ):
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if FORWARDER_WARNING_REQUIRED_MARKER not in text:
+                continue
+            relative = path.relative_to(root).as_posix()
+            for marker in FORWARDER_WARNING_MARKERS:
+                if marker not in text:
+                    findings.append(
+                        Finding(
+                            "legacy_forwarder_warning",
+                            relative,
+                            f"missing-marker:{marker}",
+                        )
+                    )
+
+    policy_text = "\n".join(
+        resolved.read_text(encoding="utf-8", errors="replace")
+        for path in ("ROOT_AGENTS.md", "AGENTS.md")
+        if (resolved := readable_path(root, path)) is not None
+    )
+    if policy_text:
+        for marker in AGENTS_FORWARDER_POLICY_MARKERS:
+            if marker not in policy_text:
+                findings.append(
+                    Finding(
+                        "legacy_forwarder_warning",
+                        "AGENTS.md",
+                        f"missing-policy-marker:{marker}",
+                    )
+                )
+    return findings
+
+
 def run_checks(root: Path) -> list[Finding]:
     """Run all convention compliance wiring checks."""
     findings: list[Finding] = []
@@ -591,6 +657,7 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_convention_assertions(root))
+    findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(
         findings,
         key=lambda finding: (finding.check, finding.path, finding.detail),

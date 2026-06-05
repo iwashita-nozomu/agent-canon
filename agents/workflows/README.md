@@ -14,7 +14,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 ## 使い方
 
 - まず 1 つの primary workflow を選びます。
-- 長文、学術文書、paper のように文書種別が強い task では overlay workflow を追加します。
+- 一般説明 prose、学術文書、paper のように file / document responsibility が強い task では overlay workflow を追加します。
 - shared canon maintenance や `main` 統合のような特殊操作だけ、maintenance workflow を追加します。
 - 大規模 refactor では `comprehensive-refactoring-workflow.md` を overlay として追加し、設計見直し、OOP 境界、解析 score gate を固定します。
 - 考察、原因仮説、修正箇所の妥当性検証が必要な task では `hypothesis-validation-workflow.md` を overlay として追加し、code dependency と header dependency を別々に抜いてから実装へ進みます。
@@ -22,7 +22,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、MCP `goal.loop_status` を機械 gate として扱います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
 - token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、parent profile、subagent mode、context budget、escalation trigger を先に決めます。
-- GitHub Copilot から issue / PR / IDE 起点で作業する場合は `github-copilot-workflow.md` を overlay とし、`documents/github-copilot-configuration.md`、Copilot instructions、path-specific PR instructions、custom PR maintainer agent、PR checklist、GitHub Actions evidence を揃えます。
 
 ## Quick Routing
 
@@ -47,7 +46,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - `agents/workflows/codex-goals-workflow.md`
 - token 消費を抑えつつ必要な gate を維持する
   - `agents/workflows/token-efficient-codex-workflow.md`
-- README、guide、workflow、migration 文書のような長文
+- README、guide、workflow、migration、specification など file responsibility が一般説明 prose の文書
   - `agents/workflows/long-form-writing-workflow.md`
 - スライド、PPT、presentation のような固定テンプレート型の文書
   - `agents/workflows/slide-production-workflow.md`
@@ -94,8 +93,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - Codex goals feature、top-level `goal.md`、Plan-mode entry、MCP `goal.loop_status` の責務境界と同期手順
 - `token-efficient-codex-workflow.md`
   - Codex parent profile、agent mode、context budget、token-saving escalation trigger
-- `github-copilot-workflow.md`
-  - GitHub Copilot の repository instructions、path-specific PR instructions、custom PR maintainer agent、MCP / setup workflow placement、PR checklist、Actions validation の運用
 
 ### Research And Experiment
 
@@ -129,8 +126,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - `memory/` と guardrail への learning promotion
 - `workflow-references.md`
   - workflow 設計の外部根拠索引
-- `github-copilot-workflow.md`
-  - GitHub Copilot issue / PR / IDE 起点の workflow overlay
 
 ## Maintainer Path
 

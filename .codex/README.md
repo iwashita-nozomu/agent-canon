@@ -10,6 +10,7 @@ downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/mcp_session_context.sh provides optional MCP context text
 downstream implementation ./hooks/hook_dispatcher.py dispatches lifecycle events to guard scripts
 downstream implementation ./hooks/log_archive_mount_warning.py warns when the shared log archive is not mounted
+downstream implementation ./hooks/direct_rg_context_guard.py warns on context-polluting direct rg usage
 downstream implementation ./hooks/skill_usage_logger.py records skill usage hook events
 downstream implementation ./hooks/cause_investigation_guard.py warns on code edits without cause investigation evidence
 downstream implementation ./hooks/module_boundary_guard.py warns on forced module rewrites
@@ -105,6 +106,7 @@ or high-risk review. Profiles do not waive workflow gates.
   - `Scoped Change`: 8
   - `Large Delivery` / `Platform And Environment`: 10
   - `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop`: 12
+- `team_manifest.yaml` の `run.spawn_budget.active_subagents` が総同時起動 budget、`run.spawn_budget.max_write_subagents` と `run.write_scope_policy.max_write_subagents` が write-capable subagent だけの上限です。`max_write_subagents: 3` は総同時起動 cap ではありません。
 - write-capable subagent は既定 1 体です。parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合だけ、spawn budget 内で複数 writer を並列化できます。衝突する target は禁止対象ではなく順序制約として先行 / 後続 wave に分けます。
 - 新規 user request では前 task の subagent を使い回さず、run bundle ごとに fresh subagent を起こします
 - `team_manifest.yaml` には `run.subagent_lifecycle_policy` を出し、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を handoff prompt に含めます
@@ -147,6 +149,7 @@ or high-risk review. Profiles do not waive workflow gates.
 - `UserPromptSubmit` は `hooks/prompt_secret_guard.py` も起動し、明らかな API key / private key を含む prompt を block します。
 - `UserPromptSubmit` と `Stop` は `hooks/skill_usage_logger.py` で `$skill-name`、`skills=...`、`skill_invocation=...` を検出し、さらに入力 prompt から candidate skill / workflow / tool と human feedback label を分類します。`PostToolUse` では同じ logger が `tool_name`、tool input shape、command verb を記録します。既定では mounted runtime log archive `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` に `hook_run_id` 付き JSONL として追記します。User prompt は secret-like value を redaction した bounded excerpt と fingerprint を保存し、tool input は key / fingerprint / command verb だけを保存します。`AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR` が設定されている run では、明示 skill は `workflow_monitor.py --behavior-event`、人間 feedback は `workflow_monitor.py --runtime-feedback` 経由で run bundle にも記録します。
 - `Stop` は `hooks/codex_runtime_summary_logger.py` で bounded runtime summary を書いた後、`hooks/runtime_log_auto_sync.py` で `runtime_log_archive_git.py sync` を best-effort 実行します。これにより hook JSONL、eval report、Codex runtime summary、`reports/agents/` run bundle は通常 agent の手動 push なしで log archive の `logs/<repo-key>` branch に集約されます。network / SSH / archive 不在の失敗は fail-open で作業を止めません。
+- `PreToolUse` は `hooks/direct_rg_context_guard.py` で、repo root や broad scope への direct `rg -n` を `DIRECT_RG_CONTEXT_RISK=warn` として警告します。`rg --files`、`rg -l "<pattern>" <bounded dirs>`、specific file / small dir への `rg -n`、`--max-count` 付き検索、または `.agent-canon/log-archive/**`、`reports/**`、`*.jsonl` を除外した検索は通常 quiet です。この warning は block ではなく、context 汚染を closeout 前の修復 / 記録対象にするための機械 gate です。
 - `PreToolUse` は `hooks/cause_investigation_guard.py` で、`apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を確認します。普通の相談、read-only search、validation command では child guard を起動しません。code edit 前に `reports/agents/<run-id>/cause_investigation.md`、issue、または design note へ `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残します。hook log には `code_paths`、`cause_evidence_status`、`cause_evidence_files` を残し、後続の prompt / skill eval に使います。
 - `PostToolUse` は `hooks/oop_readability_guard.py` で、source 編集後の Python / C++ 変更に OOP readability checker を即時実行します。current finding は warning context と hook log に残し、closeout 前の修復対象にします。
 - `PostToolUse` は `hooks/module_boundary_guard.py` で、changed Python module に `import_responsibility.py` を即時実行し、未使用 import、wildcard import、責務外 local import、public surface 変更、大きな module rewrite と boundary evidence の関係を記録します。finding は通常 warning context とし、closeout gate または明示 validation で修復します。
@@ -164,50 +167,24 @@ or high-risk review. Profiles do not waive workflow gates.
 - hook context は編集手段の毎回説明を要求しません。編集手段の既定は `agents/canonical/CODEX_WORKFLOW.md` の `Edit Execution Surface` に従います。
 - `tools/sync_agent_canon.sh link-root` は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
 
-## Model Policy
+## Model Settings
 
-- `gpt-5.5` + `high`: frontier-required planning, synthesis, broad implementation, and ship decision
-  - `requirements_organizer`
-  - `manager_reviewer`
-  - `execution_planner`
-  - `detailed_designer`
-  - `long_form_writer`
-  - `literature_researcher`
-  - `worker`
-  - `reviewer`
-  - `plan_reviewer`
-  - `detailed_design_reviewer`
-  - `citation_evidence_reviewer`
-  - `notation_definition_reviewer`
-  - `logic_gap_reviewer`
-  - `project_reviewer`
-  - `ship_reviewer`
-- `gpt-5.4-mini` + `medium`: conditional specialist review
-  - `document_flow_reviewer`
-  - `docs_workflow_steward`
-  - `report_reviewer`
-  - `reproducibility_reviewer`
-  - `scientific_computing_reviewer`
-  - `benchmark_reviewer`
-  - `artifact_reviewer`
-  - `fair_data_reviewer`
-  - `ml_science_reviewer`
-  - `oop_readability_reviewer`
-- `gpt-5.3-codex-spark` + `low`: cheap-first survey, test, diff review, and execution-only work
-  - `explorer`
-  - `test_designer`
-  - `python_reviewer`
-  - `cpp_reviewer`
-  - `diff_triage_reviewer`
-  - `spark_worker`
-  - `experiment_runner`
-- code-reading and narrow implementation roles use `gpt-5.3-codex-spark` with `low` reasoning effort to keep output bounded
-- repo default は `high`
-  - `xhigh` は parent が必要と判断したときだけ manual escalation として使う
+- `.codex/agents/*.toml` is the source of truth for each Codex subagent's
+  `model` and `model_reasoning_effort`.
+- `.codex/config.toml` owns project features, runtime limits, MCP registration,
+  skill registration, and the agent registry only; it does not carry a second
+  model settings table.
+- `tools/agent_tools/check_agent_runtime_alignment.py` and
+  `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
+  agent TOML files directly.
+- Narrow survey, test, diff review, and execution-only roles use Spark agent
+  TOML files; bounded review roles use mini reviewer TOML files; broad design,
+  implementation, and ship-decision roles use frontier TOML files.
+- `xhigh` is a manual session escalation, not a project-wide default.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います
-- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model override の正本です
+- `.codex/config.toml` の `[agents.<name>]` が role registry、`.codex/agents/*.toml` が role behavior と model / reasoning 設定の正本です
 
 ## Current Agents
 

@@ -12,6 +12,10 @@ import re
 
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+APPROVE_DECISION_PATTERN = re.compile(
+    r"^(?:[-*]\s*)?(?:decision\s*:\s*)?approve\s*$",
+    re.IGNORECASE,
+)
 
 
 def is_placeholder_only_section(text: str) -> bool:
@@ -110,4 +114,40 @@ def check_work_log_artifact(text: str) -> list[str]:
         return blockers
     if not bullet_rows(text, "## Entries"):
         blockers.append("work_log.md:entries_empty")
+    return blockers
+
+
+def final_review_decision_lines(text: str) -> list[str]:
+    """Return normalized non-placeholder lines from a final-review Decision section."""
+    lines: list[str] = []
+    in_decision = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_decision:
+                break
+            in_decision = stripped == "## Decision"
+            continue
+        if in_decision:
+            normalized = PLACEHOLDER_PATTERN.sub("", line).strip()
+            if normalized:
+                lines.append(normalized)
+    return lines
+
+
+def has_approve_decision(text: str) -> bool:
+    """Return whether a final-review Decision section contains an exact approve decision."""
+    return any(APPROVE_DECISION_PATTERN.fullmatch(line) for line in final_review_decision_lines(text))
+
+
+def check_final_review_artifact(text: str) -> list[str]:
+    """Return blockers for final_review.md."""
+    blockers: list[str] = []
+    if is_placeholder_only_section(text):
+        blockers.append("final_review.md:placeholder_only")
+    if not section_has_content(text, "## Decision"):
+        blockers.append("final_review.md:section_empty_or_missing:decision")
+        return blockers
+    if not has_approve_decision(text):
+        blockers.append("final_review.md:decision_not_approve")
     return blockers

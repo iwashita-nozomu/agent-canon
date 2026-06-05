@@ -72,7 +72,6 @@ HOOK_SURFACE_PREFIXES = (
 HOOK_CONFIG_PATHS = frozenset({".codex/hooks.json"})
 SKILL_SURFACE_PREFIXES = (
     ".agents/skills/",
-    ".claude/skills/",
     "agents/skills/",
 )
 TOOL_SURFACE_PREFIXES = (
@@ -289,15 +288,7 @@ HOOK_RUNTIME_GATE_TEMPLATES = (
         ),
     ),
 )
-SKILL_MIRROR_GATE_TEMPLATES = (
-    GateTemplate(
-        gate="skill_mirror_sync",
-        command_template="python3 tools/docs/mirror_skill_shims.py --check",
-        handoff=(
-            "edit canonical skill text first, then verify .agents/.claude mirror sync"
-        ),
-    ),
-)
+SKILL_MIRROR_GATE_TEMPLATES: tuple[GateTemplate, ...] = ()
 AGENT_PROTOCOL_GATE_TEMPLATES = (
     GateTemplate(
         gate="agent_protocol_convention",

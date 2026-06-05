@@ -42,7 +42,7 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 - `template`: template-local active contracts and parent-repo integration files.
 - `derived-project`: project-owned implementation, experiments, reports, and
   durable project state.
-- `github`: GitHub Actions, PR templates, Copilot configuration, and GitHub
+- `github`: GitHub Actions, PR templates, GitHub automation, and GitHub
   Issue mirror behavior.
 - `external-vendor`: third-party skills or agent components vendored into
   AgentCanon. GitHub-sourced external repositories stay below

@@ -7,8 +7,7 @@ upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
 upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffolds.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
-downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex/Copilot runtimes.
-downstream implementation ../../.claude/skills/formal-proof-workflow/SKILL.md mirrors the skill for Claude-compatible runtimes.
+downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
 

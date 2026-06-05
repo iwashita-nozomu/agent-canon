@@ -61,13 +61,13 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 ルール:
 - 着手前に `workflow=<family>`、`skills=<...>`、`review=<...>` を宣言します
 - repo-changing task では run bundle を先に作り、stage ごとの specialist / subagent を明示します
-- Initial Three-Agent Intake は `requirements_organizer`、`explorer`、`execution_planner` の3責務で固定します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing を持ちます。subagents do not spawn subagents; parent が stage wave と handoff packet を管理します
+- Initial Three-Agent Intake は初期 wave の責務分割であり、同時起動数の cap ではありません。`requirements_organizer`、`explorer`、`execution_planner` の3責務を固定し、以後の stage wave は `agents/task_catalog.yaml` の `spawn_budget.active_subagents` の範囲で parent が管理します。`requirements_organizer` は user-request clauses、`explorer` は evidence / reuse / stale-surface inventory、`execution_planner` は stage order / artifact routing を持ちます。subagents do not spawn subagents; parent が stage wave と handoff packet を管理します
 - repo-changing task では `team_manifest.yaml` の `run.subagent_prompt_packet` と role 別 `prompt_contract` を subagent handoff prompt に含めます
 - `計画レビュー` と `詳細設計レビュー` の分離、`詳細設計レビュー` の強い gate 性、`文書通読レビュー` の着手条件は各 reviewer TOML を正本にします
 - high-risk code や new behavior では `test_designer` を独立に立て、static path と nasty case を先に固定します
 - 大規模 refactor では `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を `refactor_safety_case.md` に先に固定します
 - `実行計画 -> 計画レビュー`、`詳細設計 -> 詳細設計レビュー -> 文書通読レビュー`、`実装 -> 実装 checkpoint review` は、それぞれ review decision が `approve` になるまで同じ段を反復します
-- README、workflow、guide、migration 文書のような長文では `long-form-writing` を追加し、docs-impact がある場合に別 reviewer で docs completeness review も通します
+- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として追加し、docs-impact がある場合に別 reviewer で docs completeness review も通します。長さだけでは選びません
 - slide、presentation、PPT production では `slide-production-workflow.md` を追加し、固定 template、slot mapping、layout review、reference visibility を先に固めます
 - 学術文章では `academic-writing` を追加し、`notation_definition_reviewer`、`logic_gap_reviewer`、docs completeness review を別 reviewer で通します
 - 論文や thesis chapter では `paper-writing` を追加し、`citation_evidence_reviewer` も別 reviewer で通します
@@ -100,7 +100,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 - 考察系 overlay では、仮説なし、expected mechanism なし、candidate comparison なし、反証条件なし、fix surface 妥当性なしで実装へ進みません。実装後も `Hypothesis Decision: supported|rejected|inconclusive` を残し、`supported` でない場合は次仮説へ戻します
-- `/mnt/git` 配下の log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
+- log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
 - specialized path の tuning だけで generic path の usable smoke を満たした扱いにしません
 - spot run、debug run、smoke run、partial run は正式な comparison evidence や method 採否の根拠にしません
 - correctness evidence と performance evidence を同じ evidence として扱いません
@@ -227,7 +227,7 @@ spawn budget ルール:
 
 concurrent spawn budget:
 - global runtime cap は `.codex/config.toml` の `max_threads = 24`
-- `Scoped Change Lite`: parent を除いて同時 3-4 agent を目安にします。cheap-first survey / test / language review / narrow implementation を中心にします
+- `Scoped Change Lite`: parent を除いて最大 4 agent を同時起動できます。cheap-first survey / test / language review / narrow implementation のうち 3 体程度で足りる wave は通常例であり、cap ではありません
 - `Scoped Change`: parent を除いて同時 6-8 agent を目安にします。通常は owner 1 + read-only reviewer / explorer 5-7 まで
 - `Research-Driven Change`: parent を除いて同時 9-12 agent を目安にします。perspective reviewer は batch で回します
 - `Platform And Environment` と `Large Delivery`: parent を除いて同時 8-10 agent を目安にします。planning / design / review を wave に分けます
@@ -263,7 +263,7 @@ concurrent spawn budget:
 1. 共通実装フローをそのまま 1 pass で通す
 1. この full scoped route では `scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、`document_flow_reviewer` を省略しない
 1. code や test を触る task では `test_designer` を省略しない
-1. 長文の docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
+1. 一般説明 prose adapter を使う docs task では `document_flow_reviewer` に加えて docs reviewer を省略しない
 1. 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` を省略しない
 1. 論文や thesis chapter では `citation_evidence_reviewer` も省略しない
 1. active な subagent は同時 8 体までを既定にし、parent は stage 完了ごとに不要 instance を閉じる

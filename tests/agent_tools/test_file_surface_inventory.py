@@ -133,6 +133,76 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             paths = [entry["path"] for entry in payload["scopes"][0]["entries"]]
             self.assertEqual(paths, ["kept.md", "untracked.py"])
 
+    def test_manifest_classifies_github_copy_and_test_mirror(self) -> None:
+        """Manifest-owned root copies and test mirrors should not look product-owned."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            manifest = root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                "\n".join(
+                    [
+                        'version = 1',
+                        'prefix = "vendor/agent-canon"',
+                        '',
+                        '[[group]]',
+                        'mode = "copy"',
+                        'owner = "github-path-constraint"',
+                        'class = "github_copy"',
+                        'paths = [".github/workflows/agent-coordination.yml"]',
+                        '',
+                        '[[group]]',
+                        'mode = "symlink"',
+                        'owner = "agent-canon"',
+                        'class = "test_mirror"',
+                        'paths = ["tests/tools/test_check_bootstrap_docs.py"]',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            self.write_file(root, ".github/workflows/agent-coordination.yml", "name: Agent\n")
+            test_source = root / "vendor" / "agent-canon" / "tests" / "tools"
+            test_source.mkdir(parents=True)
+            (test_source / "test_check_bootstrap_docs.py").write_text("VALUE = 1\n")
+            self.write_file(root, "tests/tools/test_check_bootstrap_docs.py", "VALUE = 1\n")
+            json_out = root / "inventory.json"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(INVENTORY),
+                    "--root",
+                    str(root),
+                    "--root-only",
+                    "--json-out",
+                    str(json_out),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(json_out.read_text(encoding="utf-8"))
+            entries = {entry["path"]: entry for entry in payload["scopes"][0]["entries"]}
+            github_copy = entries[".github/workflows/agent-coordination.yml"]
+            self.assertEqual(github_copy["kind"], "github_copy")
+            self.assertEqual(github_copy["owner"], "github-path-constraint")
+            self.assertEqual(
+                github_copy["canonical_source_path"],
+                "vendor/agent-canon/.github/workflows/agent-coordination.yml",
+            )
+            test_mirror = entries["tests/tools/test_check_bootstrap_docs.py"]
+            self.assertEqual(test_mirror["kind"], "symlink_view")
+            self.assertEqual(test_mirror["surface_class"], "test_mirror")
+
+    def write_file(self, root: Path, relative: str, text: str) -> None:
+        """Write one fixture file."""
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
 
 if __name__ == "__main__":
     unittest.main()

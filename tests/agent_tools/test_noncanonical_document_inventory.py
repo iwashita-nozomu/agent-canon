@@ -2,7 +2,7 @@
 
 # @dependency-start
 # responsibility Tests non-canonical document inventory behavior.
-# upstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py finds document cleanup candidates
+# upstream implementation ../../tools/agent_tools/noncanonical_document_inventory.py forwards legacy calls to Rust document cleanup inventory
 # upstream design ../../agents/skills/document-canon-cleanup.md defines cleanup workflow
 # @dependency-end
 
@@ -22,7 +22,7 @@ TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "noncanonical_document_inventory
 class NoncanonicalDocumentInventoryTest(unittest.TestCase):
     """Verify document-canon cleanup inventory output."""
 
-    def test_reports_mirror_evidence_missing_header_and_duplicate_titles(self) -> None:
+    def test_reports_evidence_missing_header_and_duplicate_titles(self) -> None:
         """The inventory should classify non-canonical document candidates."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -55,16 +55,6 @@ class NoncanonicalDocumentInventoryTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("NONCANONICAL_DOCUMENT_INVENTORY=pass", result.stdout)
-        self.assertIn(
-            (".claude/skills/example/SKILL.md", "runtime_mirror"),
-            findings,
-        )
-        self.assertEqual(
-            findings[(".claude/skills/example/SKILL.md", "runtime_mirror")][
-                "canonical_path"
-            ],
-            ".agents/skills/example/SKILL.md",
-        )
         self.assertIn(
             (
                 "agents/evals/results/skill-workflow-prompt/skill-eval-test-fail-example.md",
@@ -113,11 +103,29 @@ class NoncanonicalDocumentInventoryTest(unittest.TestCase):
         self.assertIn("NONCANONICAL_DOCUMENTS=1", result.stdout)
         self.assertIn("documents/missing-header.md", result.stdout)
 
+    def test_reports_are_excluded_by_default(self) -> None:
+        """Generated report artifacts should not enter source document inventory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_file(root, "documents/missing-header.md", "# Missing Header\n")
+            self.write_file(root, "reports/run-output.md", "# Generated Report\n")
+
+            result = subprocess.run(
+                [sys.executable, str(TOOL), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("NONCANONICAL_DOCUMENTS=1", result.stdout)
+        self.assertIn("documents/missing-header.md", result.stdout)
+        self.assertNotIn("reports/run-output.md", result.stdout)
+
     def write_fixture(self, root: Path) -> None:
         """Write a fixture repository with known document candidates."""
         skill_text = self.manifest("Documents the example skill.") + "# Example Skill\n"
         self.write_file(root, ".agents/skills/example/SKILL.md", skill_text)
-        self.write_file(root, ".claude/skills/example/SKILL.md", skill_text)
         self.write_file(
             root,
             "agents/evals/results/skill-workflow-prompt/skill-eval-test-fail-example.md",

@@ -31,7 +31,8 @@ if __package__ in (None, ""):
 
 from runtime_log_paths import (  # noqa: E402
     agent_canon_root,
-    codex_runtime_summary_dir,
+    codex_runtime_index_path,
+    codex_runtime_summary_path,
     repo_log_key,
 )
 
@@ -52,6 +53,7 @@ HOURS_PER_DAY = 24
 MINUTES_PER_HOUR = 60
 SECONDS_PER_MINUTE = 60
 SUMMARY_ID_DIGEST_LENGTH = 16
+INDEX_SCHEMA = "codex-runtime-summary-index.v1"
 
 
 @dataclass(frozen=True)
@@ -437,6 +439,8 @@ def summary_payload(
         "source_repo_key": repo_log_key(source_root),
         "source_root": source_root.resolve().as_posix(),
         "canon_root": canon_root.resolve().as_posix(),
+        "conversation_id": thread_id,
+        "session_id": thread_id,
         "thread_id": thread_id,
         "recent_days": recent_days if recent_days is not None else "all",
         "history": {
@@ -510,6 +514,50 @@ def read_existing_summary_ids(path: Path) -> set[str]:
     return ids
 
 
+def summary_index_payload(
+    payload: dict[str, object],
+    *,
+    summary_path: Path,
+    index_path: Path,
+) -> dict[str, object]:
+    """Return a compact cross-chat index record for one runtime summary."""
+    tokens = cast(dict[str, object], payload.get("tokens", {}))
+    history = cast(dict[str, object], payload.get("history", {}))
+    sqlite_summary = cast(dict[str, object], payload.get("sqlite", {}))
+    try:
+        relative_summary_path = summary_path.relative_to(index_path.parent).as_posix()
+    except ValueError:
+        relative_summary_path = summary_path.as_posix()
+    return {
+        "schema": INDEX_SCHEMA,
+        "summary_id": payload["summary_id"],
+        "recorded_at": payload["recorded_at"],
+        "source_repo_key": payload["source_repo_key"],
+        "conversation_id": payload["conversation_id"],
+        "session_id": payload["session_id"],
+        "thread_id": payload["thread_id"],
+        "summary_path": relative_summary_path,
+        "history_entry_count": history.get("entry_count", 0),
+        "sqlite_row_count": sqlite_summary.get("row_count", 0),
+        "live_total_usage_tokens": tokens.get("live_total_usage_tokens", 0),
+        "live_turn_count": tokens.get("live_turn_count", 0),
+        "latest_turn_id": tokens.get("latest_turn_id", ""),
+    }
+
+
+def write_summary_index(path: Path, record: dict[str, object], *, dry_run: bool = False) -> str:
+    """Append one idempotent cross-chat index record."""
+    if record["summary_id"] in read_existing_summary_ids(path):
+        return "already-present"
+    if dry_run:
+        return "dry-run"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        json.dump(record, stream, sort_keys=True, separators=(",", ":"))
+        stream.write("\n")
+    return "appended"
+
+
 def write_summary(path: Path, payload: dict[str, object], *, dry_run: bool = False) -> str:
     """Append one idempotent JSONL summary and return the write status."""
     if payload["summary_id"] in read_existing_summary_ids(path):
@@ -552,7 +600,7 @@ def export_summary(
     recent_days: int | None,
     output: Path | None,
     dry_run: bool,
-) -> tuple[str, Path, dict[str, object], HistorySummary, SqliteSummary]:
+) -> tuple[str, str, Path, Path | None, dict[str, object], HistorySummary, SqliteSummary]:
     """Export one Codex runtime summary and return status evidence."""
     cutoff = recent_cutoff(recent_days)
     history = read_history(history_path.expanduser(), thread_id, cutoff)
@@ -569,11 +617,18 @@ def export_summary(
         sessions=sessions,
         recent_days=recent_days,
     )
-    output_path = output or (
-        codex_runtime_summary_dir(source_root, canon_root) / f"{thread_id}.jsonl"
-    )
+    output_path = output or codex_runtime_summary_path(source_root, canon_root, thread_id)
     status = write_summary(output_path, payload, dry_run=dry_run)
-    return status, output_path, payload, history, sqlite_summary
+    index_path: Path | None = None
+    index_status = "skipped-output-override"
+    if output is None:
+        index_path = codex_runtime_index_path(source_root, canon_root)
+        index_status = write_summary_index(
+            index_path,
+            summary_index_payload(payload, summary_path=output_path, index_path=index_path),
+            dry_run=dry_run,
+        )
+    return status, index_status, output_path, index_path, payload, history, sqlite_summary
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -613,12 +668,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     statuses: Counter[str] = Counter()
     payloads: list[dict[str, object]] = []
     last_output: Path | None = None
+    last_index: Path | None = None
+    index_statuses: Counter[str] = Counter()
     total_history_entries = 0
     total_sqlite_rows = 0
     total_live_token_turns = 0
     total_live_tokens = 0
     for thread_id in thread_ids:
-        status, output, payload, history, sqlite_summary = export_summary(
+        status, index_status, output, index_path, payload, history, sqlite_summary = export_summary(
             source_root=source_root,
             canon_root=canon_root,
             thread_id=thread_id,
@@ -630,8 +687,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
         )
         statuses[status] += 1
+        index_statuses[index_status] += 1
         payloads.append(payload)
         last_output = output
+        last_index = index_path or last_index
         total_history_entries += history.entry_count
         total_sqlite_rows += sqlite_summary.row_count
         total_live_token_turns += len(sqlite_summary.token_turns)
@@ -650,6 +709,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     print(f"CODEX_RUNTIME_SUMMARY_STATUS={status_text}")
     print(f"CODEX_RUNTIME_SUMMARY_OUTPUT={last_output or ''}")
+    index_status_text = (
+        next(iter(index_statuses))
+        if len(thread_ids) == 1 and len(index_statuses) == 1
+        else ",".join(f"{key}:{value}" for key, value in sorted(index_statuses.items()))
+    )
+    print(f"CODEX_RUNTIME_SUMMARY_INDEX_STATUS={index_status_text}")
+    print(f"CODEX_RUNTIME_SUMMARY_INDEX={last_index or ''}")
     print(f"CODEX_RUNTIME_SUMMARY_THREADS={len(thread_ids)}")
     print(f"CODEX_RUNTIME_SUMMARY_HISTORY_ENTRIES={total_history_entries}")
     print(f"CODEX_RUNTIME_SUMMARY_SQLITE_ROWS={total_sqlite_rows}")

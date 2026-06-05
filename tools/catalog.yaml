@@ -534,7 +534,7 @@ entries:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, and writing-skill handoff packets.
+    summary: Builds SQLite-backed prose structure graphs, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -693,7 +693,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-github-workflows
-    summary: Validates GitHub Actions, PR templates, and Copilot PR surfaces.
+    summary: Validates GitHub Actions and PR template surfaces.
     path: tools/ci/check_github_workflows.py
     family: ci
     role: checker
@@ -1017,7 +1017,7 @@ entries:
       - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
   - id: evaluate-codex-agent-roles
-    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, cost buckets, and runtime metrics.
+    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
     path: tools/agent_tools/evaluate_codex_agent_roles.py
     family: agent_tools
     role: checker
@@ -1034,24 +1034,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_evaluate_codex_agent_roles.py
-
-  - id: mirror-skill-shims
-    summary: Mirrors canonical skill files into runtime-specific skill shims.
-    path: tools/docs/mirror_skill_shims.py
-    family: docs
-    role: sync
-    status: canonical
-    command: python3 tools/docs/mirror_skill_shims.py
-    writes: true
-    default_wiring:
-      ci: true
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/README.md
-    tests:
-      - tests/tools/test_mirror_skill_shims.py
 
   - id: fix-markdown-math
     summary: Rewrites Markdown math notation to the repo-standard dollar delimiters.
@@ -1072,6 +1054,26 @@ entries:
       - agents/skills/md-style-check.md
     tests:
       - tests/tools/test_fix_markdown_math.py
+
+  - id: fix-mermaid
+    summary: Rewrites Mermaid fenced blocks in Markdown documents.
+    path: tools/docs/fix_mermaid.py
+    family: docs
+    role: helper
+    status: canonical
+    command: python3 tools/docs/fix_mermaid.py <files...>
+    writes: true
+    callable_by_default: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/fix_mermaid.md
+      - agents/skills/md-style-check.md
+    tests:
+      - tests/tools/test_fix_mermaid.py
 
   - id: run-docs-checks
     summary: Runs the shared Markdown, math, and link documentation checks.
@@ -1347,14 +1349,36 @@ entries:
     tests:
       - tests/agent_tools/test_file_surface_inventory.py
 
+  - id: structured-document-inventory
+    summary: Builds the structured-analysis SQLite cache, writes a separate warning DB, and finds document-canon cleanup candidates.
+    path: rust/agent-canon/src/structured_analysis.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon structured-analysis build --root . --profile manual
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/structured-analysis/README.md
+      - documents/structured-analysis/database-design.md
+      - documents/structured-analysis/document-canon-analysis.md
+      - documents/rust-agent-tool-migration.md
+      - agents/skills/document-canon-cleanup.md
+    tests:
+      - rust/agent-canon/src/structured_analysis.rs
+
   - id: noncanonical-document-inventory
-    summary: Finds non-canonical document candidates and likely canonical sources.
+    summary: Legacy migration shim that warns with caller chain and forwards to structured-document-inventory.
     path: tools/agent_tools/noncanonical_document_inventory.py
     family: agent_tools
     role: inventory
-    status: canonical
+    status: compatibility_wrapper
     command: python3 tools/agent_tools/noncanonical_document_inventory.py
-    writes: false
+    writes: true
     default_wiring:
       ci: false
       pr_check: false
@@ -1362,6 +1386,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/skills/document-canon-cleanup.md
+      - documents/structured-analysis/document-canon-analysis.md
     tests:
       - tests/agent_tools/test_noncanonical_document_inventory.py
 

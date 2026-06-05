@@ -20,7 +20,7 @@ only after `gh repo view` and `git remote get-url origin` agree on the same
 The tool requires `--user-task` on every action. The compact stdout and optional
 `--summary-out` JSON include the task, repository, branch, remote verification,
 and next action. It does not use literal URL push, `.git/config` fallback,
-branch-name inference, PR-context inference, or local mirror inference.
+branch-name inference, PR-context inference, or machine-local remote inference.
 
 ## Commands
 

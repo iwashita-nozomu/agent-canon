@@ -18,11 +18,15 @@ SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alig
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from agent_team import (  # noqa: E402
+    TaskCatalog,
+    codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
     resolve_role,
     resolve_role_document_packet,
+    workflow_spawn_budget,
 )
+from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
 
 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
@@ -40,6 +44,66 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+
+    def test_permanent_team_mapping_requires_every_configured_role(self) -> None:
+        """The CODEX_SUBAGENTS mapping should not omit configured team roles."""
+        config = load_team_config()
+        subagents_path = PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        text = subagents_path.read_text(encoding="utf-8")
+        text_without_verifier = text.replace("| `verifier` | parent validation runner |\n", "")
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "permanent-team mapping missing roles: verifier",
+        ):
+            validate_permanent_team_mapping(config, text_without_verifier)
+
+    def test_workflow_spawn_budget_rejects_write_budget_above_active(self) -> None:
+        """Write-capable subagents must be bounded by the active spawn budget."""
+        catalog = TaskCatalog(
+            raw={},
+            workflow_families=(
+                {
+                    "id": "bad-budget",
+                    "spawn_budget": {
+                        "active_subagents": 2,
+                        "max_write_subagents": 3,
+                    },
+                },
+            ),
+            tasks=(),
+            review_packs=(),
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "max_write_subagents exceeds active_subagents",
+        ):
+            workflow_spawn_budget(catalog, "bad-budget")
+
+    def test_workflow_spawn_budget_rejects_active_budget_above_runtime_threads(self) -> None:
+        """Workflow active budget must not exceed Codex runtime max_threads."""
+        runtime_max_threads = codex_runtime_max_threads()
+        catalog = TaskCatalog(
+            raw={},
+            workflow_families=(
+                {
+                    "id": "bad-runtime-budget",
+                    "spawn_budget": {
+                        "active_subagents": runtime_max_threads + 1,
+                        "max_write_subagents": 1,
+                    },
+                },
+            ),
+            tasks=(),
+            review_packs=(),
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "active_subagents exceeds runtime max_threads",
+        ):
+            workflow_spawn_budget(catalog, "bad-runtime-budget")
 
     def test_template_workspace_can_use_agent_canon_shared_docs(self) -> None:
         """Derived workspaces need not expose shared AgentCanon docs at root."""

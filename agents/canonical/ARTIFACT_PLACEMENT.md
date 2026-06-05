@@ -31,7 +31,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 
 - その run だけで意味を持つメモは、新しい repo-wide 文書にしません。
 - run 固有の判断、review、handoff は既存 artifact に追記します。
-- 追加の長文説明が必要なら、まず次のどれに属するか判断します。
+- 追加の reader-facing 説明が必要なら、まず file / document responsibility から次のどれに属するか判断します。
 
 ## どこへ置くか
 
@@ -89,7 +89,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 - agent 間で共有する CLI / skill / subagent の運用
 
 判断基準:
-- Codex / Claude / Copilot 間で揃えたい
+- Codex で再利用したい
 - runtime entrypoint には重複させたくない
 
 ### `notes/`
@@ -106,7 +106,6 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 
 ## Subagent と補助文書
 
-- Claude 固有の subagent 定義は `.claude/agents/` に置きます。
 - subagent 自体の利用方針は `agents/` に置きます。
 - 特定エージェント専用の prompt 断片を repo-wide 正本に昇格させないでください。
 

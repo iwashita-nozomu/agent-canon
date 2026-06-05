@@ -12,6 +12,7 @@ downstream design ./runtime-profiles-and-check-matrix.md runtime profile and val
 downstream design ./template-agent-canon-audit-resolution.md audit resolution ledger
 downstream design ./tool-skill-routing-refactor.md short tool/skill routing policy
 downstream design ./rust-agent-tool-migration.md Rust tool migration policy
+downstream design ./structured-analysis/README.md structured prose and dependency analysis package boundary
 downstream design ./prose-reasoning-graph/dsl-spec.md prose graph DSL contract
 @dependency-end
 -->
@@ -62,6 +63,9 @@ For the broader agent routing path, return to `agents/README.md`.
   public tool/skill names, compatibility aliases, and routing policy.
 - [Rust Agent Tool Migration](./rust-agent-tool-migration.md): Rust CLI,
   devcontainer toolchain, and Python-to-Rust migration boundaries.
+- [Structured Analysis](./structured-analysis/): extraction-oriented document
+  set for prose graph, report contract, dependency header graph, and SQLite
+  adapter boundaries.
 - [Prose Reasoning Graph](./prose-reasoning-graph/): DSL vocabulary,
   graph-layer contract, projection rules, diagnostics, edit operations, and
   future adapter boundaries.
@@ -71,7 +75,7 @@ For the broader agent routing path, return to `agents/README.md`.
 - [Codex Configuration Reference](./codex-configuration-reference.md): Codex CLI
   / config schema / hooks / MCP / skills / subagents reference.
 - [AgentCanon GitHub Remote](./agent-canon-github-remote.md): GitHub canonical
-  remote and local bare mirror compatibility.
+  remote and submodule update workflow.
 - [AgentCanon Update Route](./agent-canon-update-route.md): canonical update
   command hierarchy, parent pin route, TODO route, and AgentCanon PR branch
   separation.
@@ -88,10 +92,6 @@ For the broader agent routing path, return to `agents/README.md`.
   prompt/skill behavior eval checklist, failure taxonomy, and manifest format.
 - [API Surface Traversal Policy](./api-surface-traversal-policy.md): public API
   traversal evidence before negative capability claims.
-- [GitHub Copilot Configuration](./github-copilot-configuration.md): Copilot
-  repository instructions, path-specific instructions, custom agents, MCP, setup
-  workflow, and PR template routing.
-
 ## Coding Policy References
 
 - [Algorithm Implementation Boundary Policy](./algorithm-implementation-boundary.md):

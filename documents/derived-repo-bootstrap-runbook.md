@@ -33,7 +33,7 @@ bash tools/sync_agent_canon.sh check
 ## Source Of Truth
 
 AgentCanon-owned shared surfaces are sourced from `vendor/agent-canon/`:
-`AGENTS.md`, `.agents/`, `.claude/`, `.codex/`, `agents/`, `tools/`, `mcp/`,
+`AGENTS.md`, `.agents/`, `.codex/`, `agents/`, `tools/`, `mcp/`,
 and shared policy docs. Project implementation, experiments, reports, scripts,
 runtime data, and `goal.md` remain repo-local.
 

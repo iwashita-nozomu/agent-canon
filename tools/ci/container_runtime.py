@@ -80,7 +80,6 @@ class HostRuntimeFeatures:
     """Describe host-dependent runtime features shared across container entrypoints."""
 
     has_gpu: bool
-    has_mnt_git: bool
     has_host_codex_home: bool
     has_host_gh_config: bool
     has_host_ssh_dir: bool
@@ -90,7 +89,6 @@ class HostRuntimeFeatures:
 def detect_host_runtime_features() -> HostRuntimeFeatures:
     """Detect host-dependent runtime features once."""
     has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None
-    has_mnt_git = Path("/mnt/git").is_dir()
     has_host_codex_home = HOST_CODEX_HOME.is_dir()
     has_host_gh_config = HOST_GH_CONFIG.is_dir()
     has_host_ssh_dir = HOST_SSH_DIR.is_dir()
@@ -99,7 +97,6 @@ def detect_host_runtime_features() -> HostRuntimeFeatures:
         ssh_auth_sock = None
     return HostRuntimeFeatures(
         has_gpu=has_gpu,
-        has_mnt_git=has_mnt_git,
         has_host_codex_home=has_host_codex_home,
         has_host_gh_config=has_host_gh_config,
         has_host_ssh_dir=has_host_ssh_dir,
@@ -117,8 +114,6 @@ def default_host_mounts(
     """Return host mounts that should appear in canonical container entrypoints."""
     mounts: list[str] = []
     features = detect_host_runtime_features()
-    if features.has_mnt_git:
-        mounts.append("/mnt/git:/mnt/git")
     if auto_mount_host_codex_home and features.has_host_codex_home:
         mounts.append(f"{HOST_CODEX_HOME}:/root/.codex")
     if auto_mount_host_gh_config and features.has_host_gh_config:

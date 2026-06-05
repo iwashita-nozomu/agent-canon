@@ -2,8 +2,8 @@
 @dependency-start
 responsibility Defines AgentCanon issue templates and label taxonomy.
 upstream design ../issues/README.md defines durable local issue storage.
-upstream implementation ../.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml captures maintenance issues.
-upstream implementation ../.github/ISSUE_TEMPLATE/eval-capture.yml captures eval issues.
+downstream implementation ../.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml captures maintenance issues.
+downstream implementation ../.github/ISSUE_TEMPLATE/eval-capture.yml captures eval issues.
 downstream implementation ../.github/PULL_REQUEST_TEMPLATE.md links issue/eval closeout evidence.
 @dependency-end
 -->
@@ -24,7 +24,7 @@ Core labels:
 | `workflow` | Workflow family, task routing, or closeout path. |
 | `tooling` | Tool, hook, checker, CLI, CI, or catalog surface. |
 | `docs` | Reader-facing documentation or runbook surface. |
-| `github` | GitHub Actions, PR template, issue template, or Copilot surface. |
+| `github` | GitHub Actions, PR template, issue template, or GitHub automation surface. |
 | `mcp` | MCP preflight, server, inventory, or fallback behavior. |
 | `submodule` | AgentCanon pin/update/root-view propagation behavior. |
 

@@ -200,7 +200,7 @@ with `--runtime-log <path>` using fields such as `agent`, `tokens`,
 `output_used`. When no runtime metric log exists, the eval reports
 `ROLE_RUNTIME_METRICS_STATUS=missing` without failing; this keeps old logs
 append-only while making the measurement gap visible.
-Use `--accumulate` when role routing or model policy changes should become
+Use `--accumulate` when role routing or model/reasoning setting changes should become
 durable evidence under
 `.agent-canon/log-archive/eval-results/codex-agent-role/`:
 

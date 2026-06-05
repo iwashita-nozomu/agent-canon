@@ -14,10 +14,19 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-CORE_REFS = (
-    "documents/worktree-lifecycle.md",
-    "documents/BRANCH_SCOPE.md",
-    "notes/worktrees/README.md",
+CORE_REF_GROUPS = (
+    (
+        "documents/worktree-lifecycle.md",
+        "vendor/agent-canon/documents/worktree-lifecycle.md",
+    ),
+    (
+        "documents/BRANCH_SCOPE.md",
+        "vendor/agent-canon/documents/BRANCH_SCOPE.md",
+    ),
+    (
+        "notes/worktrees/README.md",
+        "vendor/agent-canon/notes/worktrees/README.md",
+    ),
 )
 PLACEHOLDER_PATTERNS = (
     r"<[^>]+>",
@@ -293,13 +302,13 @@ def lint_scope(workspace_root: Path) -> list[ScopeFinding]:
                         f"{entry}",
                     )
                 )
-        for required_ref in CORE_REFS:
-            if required_ref not in normalized_refs:
+        for required_ref_group in CORE_REF_GROUPS:
+            if not any(required_ref in normalized_refs for required_ref in required_ref_group):
                 findings.append(
                     ScopeFinding(
                         "warning",
                         "Required References Before Editing に core reference が不足しています: "
-                        f"{required_ref}",
+                        f"{required_ref_group[0]}",
                     )
                 )
 

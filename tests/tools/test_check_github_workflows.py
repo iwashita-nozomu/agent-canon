@@ -270,75 +270,6 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:edit_scope:", result.stdout)
 
-    def test_missing_copilot_pr_instruction_fails(self) -> None:
-        """Copilot PR triage instructions are required surfaces."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            (root / ".github" / "instructions" / "pr-processing.instructions.md").unlink()
-
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "path=.github/instructions/pr-processing.instructions.md",
-                result.stdout,
-            )
-
-    def test_missing_copilot_configuration_doc_fails(self) -> None:
-        """Copilot configuration catalog is a required shared surface."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            (root / "documents" / "github-copilot-configuration.md").unlink()
-
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "path=documents/github-copilot-configuration.md",
-                result.stdout,
-            )
-
-    def test_template_mode_uses_vendor_copilot_configuration_doc(self) -> None:
-        """Template roots keep the shared Copilot catalog under AgentCanon."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            self.copy_vendor_surfaces(root)
-            self.write_template_root_pr_template(root)
-            self.copy_template_agent_canon_template(root)
-            (root / "documents" / "github-copilot-configuration.md").unlink()
-            (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
-                "\tpath = vendor/agent-canon\n"
-                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
-
     def write_template_root_pr_template(self, root: Path) -> None:
         """Write a minimal valid template-root PR template."""
         path = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
@@ -356,18 +287,15 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                     "route.py --prompt",
                     "PR Mutation Authority",
                     "Authority / blocker notes",
-                    "Copilot / Automation Output",
-                    "COPILOT_PR_DECISION",
-                    "github_copilot_merge_when_green",
+                    "GitHub Automation Output",
+                    "GITHUB_PR_AUTOMATION_DECISION",
+                    "github_pr_automation_when_green",
                     "Operational Findings / Issues",
                     "vendor/agent-canon/issues/README.md",
                     "vendor/agent-canon/issues/closed/",
                     "Agent Improvement Guide artifact",
                     "Issue Mirror artifact",
                     "run_repo_dependency_review.sh --search-hits-file",
-                    "Copilot Configuration Impact",
-                    "vendor/agent-canon/documents/github-copilot-configuration.md",
-                    "documents/github-copilot-configuration.md",
                     "Template / derived project PR",
                     "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
                     "make ci",
@@ -385,53 +313,6 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         destination = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
-
-    def test_missing_plan_mode_guidance_fails(self) -> None:
-        """Copilot entrypoints must tell agents when to use Plan mode."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            path = root / ".github" / "copilot-instructions.md"
-            path.write_text(
-                path.read_text(encoding="utf-8").replace("Plan mode", "planning"),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_text:Plan mode", result.stdout)
-
-    def test_missing_visible_copilot_output_contract_fails(self) -> None:
-        """Copilot PR surfaces must expose machine-readable decisions."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            path = root / ".github" / "instructions" / "pr-processing.instructions.md"
-            path.write_text(
-                path.read_text(encoding="utf-8").replace(
-                    "COPILOT_PR_DECISION",
-                    "COPILOT_DECISION",
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_text:COPILOT_PR_DECISION", result.stdout)
 
     def test_job_level_permissions_are_accepted(self) -> None:
         """Workflow permissions may be declared on every job."""
@@ -592,7 +473,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:Agent Orchestration Evidence", result.stdout)
 
-    def test_template_mode_uses_vendor_copilot_config(self) -> None:
+    def test_template_mode_does_not_require_standalone_root_docs(self) -> None:
         """Template roots should not require standalone-only root docs or PR templates."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -606,7 +487,6 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".github" / "PULL_REQUEST_TEMPLATE.md").unlink()
-            (root / "documents" / "github-copilot-configuration.md").unlink()
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--root", str(root)],
@@ -679,15 +559,11 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         """Copy non-workflow surfaces required by the checker."""
         for relative in [
             ".github/AGENTS.md",
-            ".github/copilot-instructions.md",
-            ".github/instructions/pr-processing.instructions.md",
-            ".github/agents/pr-maintainer.md",
             ".github/scripts/checkout_agent_canon_submodule.sh",
             "tools/ci/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
-            "documents/github-copilot-configuration.md",
             "issues/README.md",
             "issues/open/AC-20260513-durable-finding-auto-promotion.md",
             "README.md",
@@ -709,11 +585,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         for relative in [
             "README.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
-            "documents/github-copilot-configuration.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
-            "documents/github-copilot-configuration.md",
             "issues/README.md",
             "issues/open/AC-20260513-durable-finding-auto-promotion.md",
         ]:

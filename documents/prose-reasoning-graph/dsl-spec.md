@@ -3,12 +3,13 @@
 responsibility Defines the Prose Reasoning Graph DSL and graph contract.
 upstream design README.md Prose Reasoning Graph canon directory index
 upstream design ../../agents/workflows/workflow-references.md writing and discourse prior art
+coverage dsl_design_trace requires source-truth anchor|source truth|source span; lower graph|lower text unit; typed relation; projection view|derived projection|reader-state|macro-claim
+coverage graph_format_trace requires node record|nodes table; edge record|edges table; payload_json|payload json
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current MVP implementation
 downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py validates current graph behavior
 downstream design ../tools/prose_reasoning_graph.md documents CLI usage
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
 downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
-downstream implementation ../../.claude/skills/prose-reasoning-graph/SKILL.md Claude-compatible skill entrypoint
 @dependency-end
 -->
 
@@ -38,6 +39,7 @@ view, not one prose layer versus another.
 This specification is binding for:
 
 - graph layers and allowed MVP layer names;
+- document responsibility contracts and responsibility-derived coverage checks;
 - document, node, edge, diagnostic, edit operation, judgement, and metadata
   object fields;
 - identifier conventions and source provenance requirements;
@@ -86,6 +88,11 @@ artifacts during a run. The database must not be treated as a durable authoring
 source. A task may delete or regenerate a graph DB from the source document and
 the same analysis profile.
 
+DB creation commands default to
+`${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`;
+callers may pass `--db <path>` only when an explicit artifact location is
+needed.
+
 Durable state consists of:
 
 - the source prose, code, design document, or adapter input;
@@ -93,10 +100,58 @@ Durable state consists of:
 - exported projection, diagnostics, explanation, integration plan, handoff, and
   rewrite packet artifacts when a workflow records them as evidence.
 
+Tool stdout is not a durable graph surface. Full graph, projection,
+diagnostic, explanation, handoff, and rewrite packet structures must be written
+to DB-backed or file artifacts; stdout should contain only compact status,
+counts, and artifact paths so agents do not spend context on raw structures.
+
 The graph database may materialize derived analysis objects for convenience, but
 source-truth must remain recoverable from source text anchors and source spans.
 Projection artifacts may be regenerated with a new projection profile without
 rewriting the source document.
+
+## Document Responsibility Contract
+
+Each repository document may declare its responsibility in the top dependency
+manifest. Responsibility validation is a `document-canon` layer in the
+structured graph. The Rust `agent-canon structured-analysis document-inventory`
+command reads the declared responsibility and upstream design trace, then emits
+generic `document_responsibility_gap` findings when the document does not cover
+the source surface it claims as part of its stated job. The Python
+`prose_reasoning_graph.py` parser does not create this layer directly, but
+workflows materialize the findings in the same structured graph DB before
+diagnostic integration.
+
+When structured-analysis imports those findings into a graph DB, they
+materialize under the `document-canon` layer as diagnostics and finding nodes.
+They participate in the same diagnostic, integration, verification, and rewrite
+loop as prose-source diagnostics.
+The checker must not use superficial predicates such as named-heading presence
+or visual-block presence as standalone warning conditions. A downstream
+document is checked when it cites an upstream design document that declares
+coverage rules; no Rust-side path, section-name, figure, or responsibility-word
+case list decides the rule.
+
+Design documents may declare reusable coverage rules in their dependency
+manifest with `coverage <id> requires <term group>; <term group>`. Each term
+group is satisfied when at least one `|`-separated alternative appears in the
+downstream document that cites the design as `upstream design`. This keeps
+responsibility validation generic: the checker reads the design document's
+declared coverage rules instead of hard-coding path-specific cases. Missing
+coverage is recorded in the finding reason, for example
+`missing_responsibility_coverage=dsl_design_trace` or
+`missing_responsibility_coverage=graph_format_trace`, while the finding kind
+remains `document_responsibility_gap`.
+
+A `document_responsibility_gap` diagnostic must set
+`suggested_action_json.verification_route` to
+`document_responsibility_verification`. The route metadata must identify the
+downstream path, upstream design path, missing coverage reason, required
+evidence, and recursive verification steps. The checker records the route and
+the missing coverage groups; the skill loop owns expansion into child
+questions, downstream span selection, rewrite packet creation, and rerunning the
+same checker until the gap is closed, explicitly limited, or preserved as an
+unresolved finding.
 
 ## Graph Object Model
 
@@ -115,8 +170,9 @@ A document object anchors one ingested source.
 ### Node
 
 A node represents one typed item in one layer. The current MVP implementation
-materializes source, form, concept, phase, argument, evidence, experiment,
-explanation, and projection nodes. The canonical semantic graph contract
+materializes source, form, concept, phase, discourse, argument, evidence,
+experiment, presentation, explanation, and projection nodes. The canonical
+semantic graph contract
 classifies these nodes by authority:
 
 - text-bearing `form` nodes are source-truth nodes for prose content;
@@ -183,17 +239,19 @@ not be edited as if they were source prose.
 ### Corpus Hint Object
 
 A corpus hint object records the academic or domain corpus that should calibrate
-analysis, retrieval, examples, and evaluation. It may be inferred from the
-source document, the user prompt, or an explicit workflow setting. User-prompt
-matches are allowed because the user often names the intended field before the
-draft itself contains field-specific vocabulary.
+analysis, retrieval, examples, and evaluation. In the MVP, corpus management is
+a LocalLLM IR extraction task: `agent-canon local-llm extract-prose-ir` receives
+the source documents, user prompt, and optional terms, splits them into bounded
+parts, and returns merged `corpus_hints`. User-prompt context is allowed because
+the user often names the intended field before the draft itself contains
+field-specific vocabulary.
 
 | Field | Required | Meaning |
 | ----- | -------- | ------- |
 | `corpus_id` | yes | Stable corpus/profile id, such as `academic_writing`, `software_engineering`, `experimental_report`, or `formal_reasoning`. |
 | `label` | yes | Human-readable corpus label. |
-| `score` | yes | Heuristic ranking score. |
-| `basis` | yes | Prompt and source keywords that supported the hint. |
+| `score` | yes | LocalLLM IR ranking score or confidence-like ordering value. |
+| `basis` | yes | LocalLLM IR extraction basis, including signal terms, source path, prompt context indicator, or explicit workflow setting. |
 | `selected` | yes | Whether this hint is the current default corpus for downstream analysis. |
 
 Corpus hints are calibration metadata, not evidence. A downstream literature
@@ -401,11 +459,12 @@ views over canonical anchors, not source-truth replacements. A renderer or LLM
 rewrite pass may accept, reject, or combine them, but must preserve provenance
 back to the member anchors.
 
-Projection may also carry corpus hints. Corpus hints select the field-specific
-norms used to interpret rhetorical moves, expected evidence, diagrams, formulas,
-and evaluation criteria. They should be inferred from both source text and user
-prompt when available, because prompt context may identify the intended
-academic field before the draft does.
+Projection may also carry corpus hints and the LocalLLM prose IR artifact path.
+Corpus hints select the field-specific norms used to interpret rhetorical moves,
+expected evidence, diagrams, formulas, and evaluation criteria. They should be
+inferred from the LocalLLM IR extraction pass over source text, user prompt, and
+optional term inputs, because prompt context may identify the intended academic
+field before the draft does.
 
 Projection implementations may use:
 
@@ -471,6 +530,54 @@ Profiles choose the receiving skill set and diagnostic emphasis.
 The handoff packet must include graph DB path, projection command,
 diagnostics command, explanation command, and rewrite-plan command. The
 receiving skill remains authoritative for its own review gate.
+
+## Verification Route Contract
+
+Uncertain logic and uncertain paragraph connections must not be silently
+rewritten as if they were settled. Diagnostics that identify unsupported claims,
+missing warrants, weak bridges, or incomplete experiment plans should include a
+`suggested_action_json.verification_route` object with:
+
+- `verification_route`: stable route id such as
+  `claim_support_verification`, `connection_verification`, or
+  `experiment_plan_verification`;
+- `verification_question`: the exact question that must be answered before
+  rewrite;
+- `verification_targets`: receiving skills or reviewers that can answer the
+  question;
+- `conditional_verification_targets`: optional routes such as
+  `$formal-proof-workflow` when the claim is mathematical, proof-like, or
+  implementation-derived;
+- `evidence_required`: artifacts or source-packet fields needed to settle the
+  question;
+- `recursive_verification`: skill-local expansion policy with `max_depth`,
+  `closure_condition`, `unresolved_leaf_policy`, and ordered `steps`.
+
+Each recursive step must include:
+
+- `id`: stable step id inside the route;
+- `route`: skill or reviewer that owns the child question;
+- `question`: child question to answer;
+- `if_unresolved`: how to create the next child verification item or unresolved
+  leaf record.
+
+Recursive expansion is bounded by `max_depth` and by the closure condition, not
+by agent patience. If a child remains unresolved at the bound, the workflow must
+record an unresolved leaf with owner, route, missing evidence, and next
+verification command. It must not convert that leaf into settled prose.
+
+The route semantics are:
+
+- `logic-gap-review` verifies inference validity, missing premises, and
+  warrants;
+- `$literature-survey` and `citation-evidence-review` verify external factual
+  or scholarly support;
+- `$formal-proof-workflow` verifies mathematical, proof-like, or
+  implementation-derived claims through proof obligations or checker evidence;
+- `$experiment-lifecycle` verifies testable empirical claims and experiment
+  plan completeness;
+- `$structure-planning` verifies reader-state transitions, section placement,
+  and discourse connection decisions.
 
 ## Diagnostics Contract
 

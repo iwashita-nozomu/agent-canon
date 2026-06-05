@@ -45,14 +45,12 @@ detect_all = [
 extra_top_level_severity = "warn"
 allowed_top_level = [
   ".agents",
-  ".claude",
   ".codex",
   ".devcontainer",
   ".dockerignore",
   ".github",
   ".gitignore",
   "AGENTS.md",
-  "CLAUDE.md",
   "CONTAINER_OPERATIONS.md",
   "LICENSE",
   "README.md",
@@ -206,7 +204,6 @@ detect_all = [
 extra_top_level_severity = "warn"
 allowed_top_level = [
   ".agents",
-  ".claude",
   ".codex",
   ".devcontainer",
   ".dockerignore",
@@ -216,7 +213,6 @@ allowed_top_level = [
   ".markdownlint.json",
   ".vscode",
   "AGENTS.md",
-  "CLAUDE.md",
   "CMakeLists.txt",
   "LICENSE",
   "Makefile",

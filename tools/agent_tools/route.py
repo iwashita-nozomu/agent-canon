@@ -93,7 +93,7 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "remote",
         "remote policy",
-        "Keep GitHub-first remote and compatibility mirror rules separate.",
+        "Keep GitHub-first remote rules separate from machine-local remote repair.",
         "route_remote_policy",
         ("bash tools/update_agent_canon.sh plan",),
         ("remote_policy_router.py", "remote-policy-cleanup", "pr_update_route.py", "pr-route-minimize"),
@@ -130,7 +130,7 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "runtime",
         "runtime capability",
-        "Hide Codex, Claude, Copilot, or CLI examples when unavailable.",
+        "Hide Codex or CLI examples when unavailable.",
         "probe_runtime_capability",
         ("python3 tools/agent_tools/route.py --area runtime",),
         ("runtime_capability_probe.py", "runtime-capability-routing"),
@@ -206,7 +206,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "document canon",
         "Find canonical docs and route mirror/generated/stale docs away from edits.",
         "route_document_canon",
-        ("python3 tools/agent_tools/noncanonical_document_inventory.py",),
+        ("agent-canon structured-analysis document-inventory --root .",),
         ("canon_doc_router.py", "doc-canon-flex", "docs_check_router.py", "docs-lite"),
     ),
     (

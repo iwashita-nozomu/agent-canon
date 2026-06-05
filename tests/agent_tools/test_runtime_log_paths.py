@@ -14,6 +14,8 @@ from pathlib import Path
 
 from tools.agent_tools.runtime_log_paths import (
     agent_report_archive_dir,
+    codex_runtime_index_path,
+    codex_runtime_summary_path,
     hook_result_search_dirs,
     mounted_log_archive_root,
     repo_log_key,
@@ -67,6 +69,22 @@ class RuntimeLogPathsTest(unittest.TestCase):
             report_dir,
             mounted_log_archive_root(canon_root) / "agent-reports" / repo_log_key(parent),
         )
+
+    def test_codex_runtime_summary_path_uses_chat_partition_and_index(self) -> None:
+        """Codex runtime summaries should write per-chat files plus a repo index."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "project"
+            canon_root = Path(temp_dir) / "agent-canon"
+            parent.mkdir()
+            canon_root.mkdir()
+            mounted_log_archive_root(canon_root).mkdir(parents=True)
+
+            summary_path = codex_runtime_summary_path(parent, canon_root, "Thread 1")
+            index_path = codex_runtime_index_path(parent, canon_root)
+
+        runtime_root = mounted_log_archive_root(canon_root) / "codex-runtime" / repo_log_key(parent)
+        self.assertEqual(summary_path, runtime_root / "chats" / "thread-1" / "summary.jsonl")
+        self.assertEqual(index_path, runtime_root / "index.jsonl")
 
 
 if __name__ == "__main__":

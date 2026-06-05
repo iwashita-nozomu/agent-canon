@@ -26,7 +26,6 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 ## WSL / host 前提が怪しい
 
 - repo が Linux filesystem 側にあるか確認します。
-- `/mnt/git` があるか確認します。
 - `docker version` と `id` を見て、今の shell から daemon に到達できるか確認します。
 - VS Code dev container が不安定なら `.devcontainer/` と `documents/linux-wsl-host-requirements.md` を見直します。
 

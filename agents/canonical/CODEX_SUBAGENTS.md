@@ -12,6 +12,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
+permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role ごとの具体的な禁止事項、handoff 条件、review separation は `.codex/agents/*.toml` を正本にします。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -20,6 +21,8 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 ## Principles
 
 - role behavior は docs より `.codex/agents/*.toml` を優先します
+- permanent team ownership、artifact output、write policy は `agents/agents_config.json` を優先します
+- subagent registration と runtime budget は `.codex/config.toml` を優先し、role model / reasoning は `.codex/agents/*.toml` を優先します
 - prompt / config drift を見つけたら、親がその場で policy prose を増やす前に `prompt_config_reviewer` の監査結果を要求します
 - parent agent が最終編集責任を持つ
 - routing と required review を決める前に subagent を乱立させない
@@ -39,11 +42,12 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別の subagent で行う
 - `詳細設計レビュー` を、実装前でもっとも重要な gate とみなす
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
-- Codex の model / reasoning policy は `.codex/config.toml` の `agent_model_policy` を正本にする
-- approved packet で完全に切れる低リスク slice は `agent_model_policy` の Spark coding bucket を first implementation candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier bucket は統合判断、設計判断、最終責任に集中する
-- Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に `.codex/config.toml` の Spark bucket で fresh default subagent を再試行する
-- 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier bucket に残す
+- Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
+- approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier role は統合判断、設計判断、最終責任に集中する
+- user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence であり完了条件ではありません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
+- Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に該当 role TOML の model / reasoning で fresh default subagent を再試行する
+- 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier role TOML に残す
 - plan mode や permissions のような mode は session 単位の設定なので、subagent TOML には持たせず、parent session 側で切り替える
 
 ## Activation Budget
@@ -84,7 +88,7 @@ role 分割が妥当でも input packet が広すぎる場合は routing defect 
 
 ## Initial Three-Agent Intake
 
-Initial Three-Agent Intake は repo-changing task の初期責務を3つに分けます。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、subagents do not spawn subagents の制約の下で次の stage wave を起動します。
+Initial Three-Agent Intake は repo-changing task の初期責務を3つに分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、subagents do not spawn subagents の制約と workflow family の active spawn budget の下で次の stage wave を起動します。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer
@@ -138,6 +142,10 @@ Constraints:
 - Write-capable `worker` / `spark_worker` instances are blocked until
   `goal.md` is parseable, the Codex goal view is mirrored or queued, and the
   Plan-mode output contains evidence mapping.
+- This write-capable block is for goal-driven tasks. Ordinary repo-changing
+  tasks with explicit implementation delegation do not require `goal.md`;
+  they require a run bundle, bounded `allowed_paths`, write scope, validation
+  plan, and tool-rejection preflight before `spark_worker` / `worker`.
 - If rate limits force fewer agents, keep `requirements_organizer` and
   `explorer`; record why `execution_planner` or `plan_reviewer` was deferred.
 - Handoffs must include `agents/workflows/codex-goals-workflow.md`,
@@ -162,22 +170,39 @@ Constraints:
 | ------------------- | ---------------------------- |
 | `manager` | parent + `requirements_organizer` |
 | `manager_reviewer` | `manager_reviewer` |
-| `scheduler` | `execution_planner` |
-| `schedule_reviewer` | `plan_reviewer` |
 | `designer` | `detailed_designer` |
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
-| `citation_evidence_reviewer` | `citation_evidence_reviewer` |
 | `test_designer` | `test_designer` |
-| `notation_definition_reviewer` | `notation_definition_reviewer` |
-| `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `implementer` | `spark_worker` first for design-traced narrow slices; `worker` fallback for broad or ambiguous implementation |
 | `change_reviewer` | `python_reviewer`, `cpp_reviewer`, `diff_triage_reviewer`, then `reviewer` when escalation is needed |
 | `final_reviewer` | `ship_reviewer`, then `reviewer` / `project_reviewer` when final gate escalation is needed |
-| `critical_guardian` | `project_reviewer` |
+| `verifier` | parent validation runner |
+| `auditor` | parent closeout and workflow-monitoring gate |
 | `researcher` | `literature_researcher` or `explorer` |
+| `research_reviewer` | `reviewer` |
+| `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
+| `experiment_reviewer` | `reviewer` |
+| `scheduler` | `execution_planner` |
+| `schedule_reviewer` | `plan_reviewer` |
+| `citation_evidence_reviewer` | `citation_evidence_reviewer` |
+| `notation_definition_reviewer` | `notation_definition_reviewer` |
+| `logic_gap_reviewer` | `logic_gap_reviewer` |
 | `infra_steward` | parent + `docs_workflow_steward` or infrastructure-focused `worker` planning |
+| `infra_reviewer` | `reviewer` |
+| `reproducibility_reviewer` | `reproducibility_reviewer` |
+| `scientific_computing_reviewer` | `scientific_computing_reviewer` |
+| `benchmark_reviewer` | `benchmark_reviewer` |
+| `artifact_reviewer` | `artifact_reviewer` |
+| `fair_data_reviewer` | `fair_data_reviewer` |
+| `ml_science_reviewer` | `ml_science_reviewer` |
+| `project_reviewer` | `project_reviewer` |
+| `docs_workflow_steward` | `docs_workflow_steward` |
 | `prompt_config_reviewer` | `prompt_config_reviewer` |
+| `python_reviewer` | `python_reviewer` |
+| `cpp_reviewer` | `cpp_reviewer` |
+| `report_reviewer` | `report_reviewer` |
+| `critical_guardian` | `project_reviewer` |
 
 ## Built-In Or Project-Scoped Roles
 - `requirements_organizer`
@@ -201,7 +226,7 @@ Constraints:
 - `logic_gap_reviewer`
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
-  - README、workflow、guide、migration 文書のような長文を roadmap-first に起草する
+  - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-first で prose projection する
 - `test_designer`
   - approved design と既存 code path を静的解析し、nasty case と regression case の test plan を起こす
 - `diff_triage_reviewer`
@@ -260,7 +285,7 @@ Constraints:
 | 計画レビュー | 専用の `plan_reviewer` instance |
 | 詳細設計 | `detailed_designer`。既存 code path 調査が要るなら `explorer` を補助に使う |
 | 詳細設計レビュー | 専用の `detailed_design_reviewer` instance |
-| 長文起草 | `long_form_writer`。README、workflow、guide、migration 文書では `long-form-writing` を前提に draft する |
+| 一般説明 prose projection | `long_form_writer`。README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として使う |
 | 学術文章起草 | `long_form_writer`。論文、thesis chapter、scholarly note では `academic-writing` を前提に draft する |
 | 論文 draft 起草 | `long_form_writer`。投稿論文や thesis chapter では `paper-writing` を前提に draft する |
 | 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見る |
@@ -281,7 +306,7 @@ Constraints:
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力をそのまま渡します
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
-- 長文文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
+- 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
 - 論文 draft では `citation_evidence_reviewer` も追加します
 - research-driven change では `report_reviewer` と perspective reviewers を default にします
@@ -296,32 +321,29 @@ Constraints:
 - 複数 worktree は、同一 worktree の wave plan で安全に分離できない場合の選択肢です
 - review role は常に read-only とし、parent-managed write-scope discipline と single-writer-default の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
-## Codex Model Policy
-
-Model policy の正本は `.codex/config.toml` の
-`[agent_model_policy.*]` です。各 bucket が `model`、
-`model_reasoning_effort`、`roles` を持ちます。
+## Codex Model Settings
 
 `.codex/agents/*.toml` は Codex runtime が読む materialized role 定義です。
-role の `model` / `model_reasoning_effort` は設定正本ではなく、
-`.codex/config.toml` に一致しているかを
-`tools/agent_tools/check_agent_runtime_alignment.py` で検証する対象です。
+role の `model` / `model_reasoning_effort` は各 agent TOML が正本です。
+`.codex/config.toml` は project feature、runtime cap、MCP、skill、agent registry
+だけを持ち、role model / reasoning を二重管理しません。
 
-policy を変更するときは、先に `.codex/config.toml` の
-`agent_model_policy` を更新し、その後に該当 `.codex/agents/*.toml` を
-同期します。Python checker、workflow docs、task catalog に role list や
-model list を重複管理しません。
+role の model / reasoning を変更するときは、該当 `.codex/agents/*.toml`
+だけを更新し、`tools/agent_tools/check_agent_runtime_alignment.py` と
+`tools/agent_tools/evaluate_codex_agent_roles.py` で検証します。Python checker、
+workflow docs、task catalog に role list や model list を重複管理しません。
 
 運用メモ:
 - OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
-- この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier bucket、bounded review / report traceability / checklist gate を mini review bucket、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark bucket に寄せます。
+- この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
 - 極端に狭く、待ち時間が支配的な implementation loop では、`worker` ではなく `spark_worker` を first candidate とします
-- mini review bucket は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
-- Spark bucket は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
+- mini review role TOML は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
+- Spark role TOML は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
 - `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
 - 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は mini review wave に切ります。
+- user が coding / implementation / patch work の subagent 委譲を明示した task では、Spark read-only wave は write-capable handoff の準備です。実装可能な scope が固定された後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、read-only role だけで完了扱いにしません。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。純粋な code-only lite fix では省略できます
@@ -339,12 +361,15 @@ model list を重複管理しません。
 
 ## Runtime Surfaces
 
-- human canon: `agents/`
+- human routing and inventory canon: `agents/`
+- permanent team ownership and write policy: `agents/agents_config.json`
 - skill shim: `.agents/skills/`
 - Codex project config: `.codex/config.toml`
 - Codex subagent definitions: `.codex/agents/*.toml`
 
 設定運用メモ:
+- role ownership や required output を変えるときは `agents/agents_config.json` を更新します
+- project subagent registration と runtime budget を変えるときは `.codex/config.toml` を更新し、role model / reasoning を変えるときは `.codex/agents/*.toml` を更新します
 - stage 固有の禁止事項を増やしたいときは、この文書より先に `.codex/agents/*.toml` を更新します
 - wrapper や root entrypoint に同じ規則を重ね書きしません
 
@@ -360,7 +385,7 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 - `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
 - `agents/agents_config.json` の required output が実テンプレートに結び付いている
 - `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
-- `.codex/agents/*.toml` の model split が `.codex/config.toml` の `agent_model_policy` に揃っている
+- `.codex/agents/*.toml` が role ごとの model / reasoning 設定を持っている
 - temporary run bundle を task ごとと full-team で作り、required output が実際に生成される
 - `agents/agents_config.json` に perspective reviewers と artifact mapping がある
 - `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある

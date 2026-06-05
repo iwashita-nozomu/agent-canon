@@ -25,19 +25,17 @@ activate only the profile required by the current change.
 | --- | --- | --- |
 | Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo |
 | Agent runtime | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `mcp/`, shared `tools/` | An agent performs or reviews repo work |
-| Claude compatibility | `CLAUDE.md`, `.claude/` | Claude Code compatibility is explicitly used |
 | Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used |
 | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes |
-| GitHub automation | `.github/`, Copilot docs, PR templates, Actions helpers | GitHub Actions, Copilot, PR automation, or GitHub path-constrained copies change |
+| GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change |
 | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change |
 | C++ | `CMakeLists.txt`, `cmake/`, `src/`, `include/`, `lib/`, C++ OOP checks | C or C++ code, build layout, or native artifacts change |
 | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope |
 | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work |
 
-Compatibility surfaces such as local bare mirrors, legacy subtree routes, and
-multi-runtime mirrors may remain documented, but only under the matching
-compatibility profile. They are not the default path for GitHub/submodule-first
-repositories.
+Compatibility surfaces such as legacy subtree routes may remain documented, but
+only under the matching compatibility profile. They are not the default path for
+GitHub/submodule-first repositories.
 
 
 ## Risk Classes
@@ -65,7 +63,7 @@ set is sufficient.
 | AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; prompt/eval checks when prompt surfaces change |
 | Root shared views or submodule pin | `bash tools/sync_agent_canon.sh check`; `git submodule status vendor/agent-canon` evidence |
 | Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
-| GitHub workflow/PR/Copilot | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
+| GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
 | Experiments | `make experiment-check`; managed run evidence for formal experiment changes |
 | C/C++ | project-native configure/build/test and C++ reviewer/checker where applicable |
 | Memory/eval/hook logging | append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change |

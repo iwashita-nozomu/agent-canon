@@ -23,16 +23,11 @@ GIT_STATUS_PATH_COLUMN = 3
 RENAMED_PATH_SPLIT_MAX = 1
 SHARED_CANON_DIRTY_PATH_PREFIXES = (
     ".agents/",
-    ".claude/",
     ".codex/",
     ".github/AGENTS.md",
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-    ".github/agents/",
-    ".github/copilot-instructions.md",
-    ".github/instructions/",
     ".github/workflows/agent-coordination.yml",
     "AGENTS.md",
-    "CLAUDE.md",
     "ROOT_AGENTS.md",
     "agents/",
     "documents/SHARED_RUNTIME_SURFACES.md",
