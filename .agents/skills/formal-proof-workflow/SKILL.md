@@ -34,10 +34,34 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    proof attempts, adoption decisions, and missing frontier as graph overlay.
    A reader-facing `verified` claim requires a checker-backed certified
    subgraph, not merely a candidate proof path.
+1. Advance proof exploration from the frontier, not from prose order:
+   choose the next target-chain node with no certified incoming proof, reduce it
+   to the weakest local proposition that would advance the final theorem, and
+   immediately classify the attempt as one of `verified`, `refuted`,
+   `unprovable_under_assumptions`, or `unverified_with_next_witness`.
+   Bare `unverified` may describe a raw generated node or stub, but it is not a
+   completed frontier outcome.
+1. For every unverified frontier node, try these routes in order:
+   (a) prove the exact implementation algebra or certificate projection;
+   (b) prove a conditional bridge theorem with explicit theorem variables;
+   (c) refute an over-strong route with a concrete counterexample/model; or
+   (d) prove that the current assumptions do not entail the target and name the
+   missing witness. Do not leave a node as merely "hard" when a weaker terminal
+   result can be checked.
+1. When a node remains open, record the algorithm change that would make it
+   provable: expose a runtime certificate, strengthen an acceptance contract,
+   add a problem-class witness, narrow the theorem, or add a globalization /
+   Phase-I route. Keep this as proof guidance, not as a proof-only production
+   field.
+1. Recursively re-enter the frontier loop on every named
+   `unverified_with_next_witness` item until it is verified, refuted, proved
+   unprovable under the current assumptions, or explicitly remains open with a
+   smaller named witness. Do not close out a proof note with an open frontier
+   row whose remaining obligation is empty or only says "unverified".
 1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan, target-language scaffold, existing-proof queries, and literature queries.
 1. Use a writing skill when producing reader-facing proof text: `$academic-writing` for symbol-dense proof notes, `$long-form-writing` for long guide/note form, and `$report-writing` for checker-evidence or audit summaries.
 1. Keep each proof topic's theorem target, assumptions, checked fragments, and remaining gaps in one canonical proof note whenever possible; implementation code-path explanation may live in Design docs, but the proof note must link that Design entry and the mathematical proof text must not be split across competing truth surfaces.
-1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
+1. Require a proof status table in every reader-facing proof note, with claim/theorem, implementation surface, `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`, checker evidence, and remaining obligation columns; do not hide proof status in prose.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean/mathlib include docs, LeanSearch/Loogle/Moogle-style tools, Zulip archive, and in-editor tactic search when available. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
@@ -94,6 +118,34 @@ Use this after Algorithm Expansion IR and before writing proof text.
 1. Static dispatch, import binding, callbacks, and function-pointer variants may
    create dependency edges, but their structural facts are not mathematical
    lemmas.
+
+## Frontier Exploration Loop
+
+Use this loop after graph generation and before claiming progress on an
+algorithm theorem.
+
+1. Pick a target theorem/profile and compute its uncertified frontier from the
+   lemma graph. Prefer nodes whose proof would unlock multiple downstream
+   edges, but do not skip a refutable over-strong claim.
+1. Normalize each selected node into one of four proposition shapes:
+   exact implementation identity, conditional bridge, reachability/existence
+   statement, or external assumption binding.
+1. Attempt a checker-backed result for the normalized proposition:
+   - `verified`: the proposition is proved by a checker with no escape hatches.
+   - `refuted`: a checker-backed counterexample/model falsifies the proposition.
+   - `unprovable_under_assumptions`: a checker-backed witness shows the current
+     assumptions do not entail the proposition.
+   - `unverified_with_next_witness`: the exact missing theorem variable,
+     runtime certificate, backend evidence, or problem-class witness is named.
+      Immediately re-enter this same loop on that witness or next frontier.
+1. If a weaker proposition is verified, add a bridge edge showing what remains
+   to use it in the target theorem. If a stronger route is refuted, keep the
+   refutation and replace the route with a narrowed theorem or algorithm change.
+1. Update the proof status table and proof note in the same pass. Every open
+   row must state whether the next step is mathematical proof, implementation
+   certificate plumbing, backend evidence binding, or theorem narrowing.
+   Do not close out while a frontier row still has bare `unverified` as its
+   only outcome.
 
 ## Initialize-Rooted Proof Expansion
 

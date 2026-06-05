@@ -77,6 +77,27 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
   graph overlay として provenance 付きで残します。探索途中の path を
   `verified` にせず、checker 済み edge だけで target theorem から必要命題へ
   到達できる certified subgraph を採用します。
+- 証明探索は prose の上から順に進めず、Lemma Dependency Graph の frontier から
+  進めます。target chain 上で certified incoming proof を持たない node を選び、
+  最終命題を一歩進める最弱の局所 proposition へ縮約し、
+  `verified`、`refuted`、`unprovable_under_assumptions`、
+  `unverified_with_next_witness` のいずれかへ分類します。
+  bare `unverified` は raw generated node や stub の途中状態であり、
+  frontier node の完了 outcome ではありません。
+- 未証明 frontier node は、(a) 実装 algebra / certificate projection の直接証明、
+  (b) theorem variable を明示した conditional bridge 証明、
+  (c) 強すぎる route の反例、
+  (d) 現在の assumptions では entail しないことの witness、
+  の順に試します。「難しい」だけで terminal outcome にしてはいけません。
+- open frontier には、証明を進めるために必要な algorithm change を必ず書きます。
+  例: runtime certificate を返す、acceptance contract を強める、problem-class witness を
+  追加する、theorem を warm-start/local tube に狭める、globalization / Phase-I を足す。
+  これは proof guidance であり、proof-only field を production config へ足す口実では
+  ありません。
+- `unverified_with_next_witness` を書いたらそこで止めず、named witness / next frontier を
+  同じ loop へ再投入します。`verified`、`refuted`、
+  `unprovable_under_assumptions` まで到達するか、より小さい named witness を持つ
+  open row へ縮約するまで、proof note を closeout してはいけません。
 - `python3 tools/agent_tools/formal_proof.py` で scaffold と query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
@@ -166,6 +187,9 @@ LLM 生成文、自然言語証明、未実行の theorem stub を証明済み�
      checker command を graph overlay に追加できる
    - 各 attempt は `target_lemma`、`method`、`input_evidence`、`checker_status`、
      `result_status`、`adoption_decision`、`next_frontier` を持つ
+   - `result_status=unverified_with_next_witness` の attempt は、`next_frontier` を
+     次の探索対象として即座に再投入する。bare `unverified` は generated stub や
+     未実行 node の状態に限り、frontier の最終分類には使わない
    - proof note は探索 log 全体ではなく、現在採用する certified subgraph と
      missing frontier を示す。`verified` と言えるのは checker 済み theorem /
      lemma と、それらだけで接続された target chain に限る
@@ -224,7 +248,7 @@ proof_stub=<path>
 proof_library_trace_module=<path>
 proof_checker_command=<command>
 proof_checker_log=<path|not_run>
-proof_status=<verified|refuted|unprovable_under_assumptions|unverified|not_run|blocked>
+proof_status=<verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked>
 proof_terminal_outcome=<verified|refuted|unprovable_under_assumptions|open>
 proof_impossibility_certificate=<path-or-section-anchor|none>
 proof_source_packet=<path>
@@ -251,7 +275,7 @@ Reader-facing proof notes must include a table shaped like this:
 
 | Claim | Formal theorem / lemma | Implementation surface | Status | Evidence | Remaining obligation |
 | --- | --- | --- | --- | --- | --- |
-| `<claim>` | `<theorem>` | `<path::symbol>` | `verified` / `refuted` / `unprovable_under_assumptions` / `unverified` / `not_run` / `blocked` | `<checker command/log/counterexample>` | `<gap or none>` |
+| `<claim>` | `<theorem>` | `<path::symbol>` | `verified` / `refuted` / `unprovable_under_assumptions` / `unverified_with_next_witness` / `unverified` / `not_run` / `blocked` | `<checker command/log/counterexample>` | `<gap or none>` |
 
 Use `verified` only for checker-passing artifacts without proof escape hatches.
 Use `refuted` only when a counterexample, formal model, or implementation trace
@@ -262,6 +286,11 @@ Use `unverified` for prose claims, conditional sketches, assumptions, or
 implementation-instantiation obligations that have not been discharged. Use
 `not_run` when the checker was unavailable, and `blocked` when a missing
 definition, library, or implementation fact prevents progress.
+For frontier rows in a proof note, prefer `unverified_with_next_witness` over
+bare `unverified`, and fill the remaining-obligation cell with the named
+theorem variable, runtime certificate, backend evidence, problem-class witness,
+or theorem narrowing needed next. A bare `unverified` frontier row is not a
+closeout state.
 Only `verified`, `refuted`, and `unprovable_under_assumptions` are terminal
 outcomes for this skill; all other statuses require more proof work or a
 changed claim / assumption ledger.
@@ -364,6 +393,34 @@ Algorithm Expansion IR から補助命題を作る段階では、命題を graph
    証明本文に混ぜません。選ばれた callee / variant の theorem node だけが
    数学的内容を持ちます。
 
+## Frontier Exploration Loop
+
+graph 生成後、algorithm theorem を進めるときは次の loop を回します。
+
+1. target theorem / profile を一つ選び、その target chain 上の uncertified frontier を
+   graph から機械的に取り出します。複数 downstream edge を解放する node を優先しますが、
+   明らかに強すぎる claim は先に反例で潰してよいです。
+1. frontier node を次の四種類へ正規化します。
+   - exact implementation identity: 実装の式変形、projection、reconstruction
+   - conditional bridge: 下位 theorem / certificate があれば上位 theorem へ渡せる命題
+   - reachability / existence: 反復法が tolerance に届く、line search が受理する、など
+   - external assumption binding: backend profile、problem-class、local tube witness
+1. 正規化した命題に対して checker-backed な結果を一つ取りに行きます。
+   - `verified`: escape hatch なしで checker が命題を証明した
+   - `refuted`: counterexample / formal model / implementation trace が命題を否定した
+   - `unprovable_under_assumptions`: 現在の assumptions を満たす witness が結論を否定し、
+     assumption ledger からは命題が導けないことを示した
+   - `unverified_with_next_witness`: 必要な theorem variable、runtime certificate、
+     backend evidence、problem-class witness が特定されている
+     この場合は named witness / next frontier を同じ loop へ即座に再投入し、
+     bare `unverified` のまま proof note を closeout しない
+1. 弱い命題だけが証明できた場合は、その弱い命題から target theorem へ何が不足するかを
+   bridge edge として残します。強い route が refuted の場合は、refutation を残し、
+   theorem narrowing または algorithm change を書きます。
+1. proof status table と proof note を同じ pass で更新します。open row は、次が
+   数学証明、implementation certificate plumbing、backend evidence binding、
+   theorem narrowing のどれかを必ず示します。
+
 Proof path attempt record は次の形を基本にします。
 
 | Field | Meaning |
@@ -426,7 +483,7 @@ Expansion graph record は次の形を基本にします。
 | `child_initialize` | nested initialize function selected by that field |
 | `selection_rule` | static field, variant tag, or method registry rule selecting the child |
 | `role` | correctness certificate, reachability certificate, stopping predicate, or performance-only helper |
-| `status` | `verified`, `unverified`, `not_run`, or `blocked` for the proof scope, not for initialization itself |
+| `status` | `verified`, `refuted`, `unprovable_under_assumptions`, `unverified_with_next_witness`, `unverified`, `not_run`, or `blocked` for the proof scope, not for initialization itself |
 
 ## Nested Iterative Solver Proofs
 
