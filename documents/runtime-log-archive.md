@@ -39,6 +39,23 @@ repo AgentCanon pins.
 
 ## Layout
 
+Use this table first when deciding where a report is kept:
+
+| Purpose | Source During Work | Durable Location | Command |
+| --- | --- | --- | --- |
+| Current task run bundle | `<source-repo>/reports/agents/<run-id>/` | none until archived | `bootstrap_agent_run.py` / task tools create it |
+| Normal accumulated agent reports | `<source-repo>/reports/agents/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on branch `logs/<repo-key>` | `python3 tools/agent_tools/runtime_log_archive_git.py sync` |
+| Immutable run-bundle snapshot | `<source-repo>/reports/agents/<run-id>/` | `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` plus `index.jsonl` on branch `logs/<repo-key>` | `archive-agent-report --report-dir reports/agents/<run-id>` then `push` |
+| Hook chronology | hook runtime | `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl` on branch `logs/<repo-key>` | hooks write it; `push` or `sync` commits it |
+| Accumulated eval reports | eval producer output | `.agent-canon/log-archive/eval-results/<family>/<eval-run-id>-<status>*.md` | `run_accumulated_agent_evals.py --run-id <run-id>` |
+| Codex runtime summaries | local Codex runtime state | `.agent-canon/log-archive/codex-runtime/<repo-key>/<thread-id>.jsonl` | `export_codex_runtime_summary.py` then `sync` |
+
+In short: work in `reports/agents/<run-id>/`; retain across runs in
+`.agent-canon/log-archive/` on `logs/<repo-key>`. `runtime_log_archive_git.py
+status` prints the resolved `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`,
+`RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and
+`RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR` values for the current source repo.
+
 Normal hook writers use:
 
 ```text
@@ -62,7 +79,7 @@ That command runs each registered eval producer with `--accumulate` and
 captures producer stdout/stderr under `reports/agent-eval-runs/<run-id>/`.
 Agents do not hand-author accumulated eval reports.
 
-Agent report archive snapshots use:
+Immutable agent report archive snapshots use:
 
 ```text
 .agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/
@@ -77,7 +94,7 @@ cross-chat index:
 .agent-canon/log-archive/codex-runtime/<repo-key>/index.jsonl
 ```
 
-Agent run reports use:
+Normal `sync` / `archive-agent-reports` copies of agent run reports use:
 
 ```text
 .agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/
@@ -157,6 +174,20 @@ summaries, and agent reports, then commits and pushes the source repository's
 directories, and oversized single files. The source repo's ignored
 `reports/agents/` directory remains run-local working evidence; the log archive
 is the durable accumulated store.
+
+To print the resolved placement without writing anything, run:
+
+```bash
+python3 tools/agent_tools/runtime_log_archive_git.py status
+```
+
+Read these lines first:
+
+```text
+RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL=<source-repo>/reports/agents
+RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/<repo-key>
+RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR=<agent-canon>/.agent-canon/log-archive/agent-reports/<repo-key>
+```
 
 `hooks/runtime_log_auto_sync.py` runs the same `sync` path from the Codex Stop
 hook on a best-effort, fail-open basis. It emits no output on success and does

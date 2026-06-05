@@ -85,6 +85,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={key}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH=logs/{key}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", result.stdout)
 
     def test_ensure_status_and_push_logs_branch(self) -> None:
         """Ensure should create the clone, and push should commit source repo logs."""
@@ -186,6 +189,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES=2", archived.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED=2", archived.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED=1", archived.stdout)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", archived.stdout)
 
             archive = mounted_log_archive_root(canon)
             self.assertTrue((archive / "agent-reports" / key / "run-1" / "summary.md").exists())

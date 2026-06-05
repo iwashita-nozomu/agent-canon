@@ -39,6 +39,10 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 ## Destination Rules
 
 - run-local task evidence: `reports/agents/<run-id>/`
+- normal cross-run agent report accumulation:
+  `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/` on
+  `logs/<repo-key>`; discover exact paths with
+  `python3 tools/agent_tools/runtime_log_archive_git.py status`
 - archived agent report snapshot:
   `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`
 - accumulated skill / workflow eval: `.agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md`
@@ -67,7 +71,11 @@ evidence.
    do not drop them because they are not success evidence.
 1. Use a unique path or append-only JSONL for repeated runs. Do not overwrite
    detailed eval, hook, skill, or experiment results.
-1. When run-local agent reports need cross-run retention, call
+1. When run-local agent reports need normal cross-run retention, call
+   `python3 tools/agent_tools/runtime_log_archive_git.py sync`; it copies
+   `reports/agents/` into `agent-reports/<repo-key>/` and pushes
+   `logs/<repo-key>`.
+1. When a specific run bundle needs an immutable publication snapshot, call
    `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`
    and then `runtime_log_archive_git.py push`. Do not ask an agent to manually
    rewrite the report into the archive; the tool owns snapshot manifests and

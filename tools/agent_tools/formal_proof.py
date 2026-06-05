@@ -403,6 +403,11 @@ def build_obligations(sections: dict[str, list[str]]) -> tuple[str, ...]:
         obligations.append("Split the informal proof sketch into assistant-checkable lemmas.")
     obligations.append("Search existing formal libraries before proving new lemmas.")
     obligations.append("Run the target proof assistant and record the checker log.")
+    obligations.append(
+        "When a fragment is checked, register it in the package-retained proof "
+        "trace and record remaining implementation-instantiation obligations "
+        "as explicit proof boundaries."
+    )
     return tuple(obligations)
 
 

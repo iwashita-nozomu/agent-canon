@@ -52,7 +52,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/agent_tools/eval_accumulation_check.py`
   - mounted runtime log archive の hook JSONL と skill eval report を検査し、AgentCanon-owned evidence が上書きされず読める状態か確認します。source tree の `agents/evals/results/` は正規の読み書き場所ではありません。
 - `tools/agent_tools/runtime_log_archive_git.py`
-  - mounted log archive の ensure / status / import / agent report archive / push 操作を担当します。`archive-agent-report --report-dir reports/agents/<run-id>` は run bundle を `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` に snapshot し、`index.jsonl` を機械的に追記します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
+  - mounted log archive の ensure / status / import / agent report archive / push 操作を担当します。置き場確認は `status` の `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見ます。通常は `sync` が `reports/agents/` を `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>` へ同期します。`archive-agent-report --report-dir reports/agents/<run-id>` は特定 run bundle を `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/` に immutable snapshot し、`index.jsonl` を機械的に追記します。hook/eval result の構造検査は `eval_accumulation_check.py` を使い、旧 log-management checker の互換 wrapper は置きません。
 - `tools/agent_tools/run_accumulated_agent_evals.py`
   - registered eval family の producer をまとめて `--accumulate` で実行し、stdout / stderr は `reports/agent-eval-runs/<run-id>/` に退避します。PR / CI gate はこの tool を先に走らせてから `eval_accumulation_check.py` で archive 構造を検査します。agent が eval report を手書きする経路は使いません。
 - `tools/agent_tools/github_publish.py`
