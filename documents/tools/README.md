@@ -20,6 +20,7 @@ downstream implementation ../../tools/agent_tools/search.py coordinates purpose-
 downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
 downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
 downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
+downstream implementation ../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph DSL vocabulary
 @dependency-end
 -->
@@ -65,6 +66,8 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
   - changed path list から docs / Python / Docker / GitHub / shared-canon / full-confidence 候補を分類し、targeted validation command を出します。`.github/workflows/path-risk-check-matrix-smoke.yml` もこの classifier を使います。
 - `tools/agent_tools/formal_proof.py`
   - 自然言語の数学的 claim、または `--python-symbol path.py::qualname` の Python AST source から `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command を作ります。AST route は対象 module を import / execute しません。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索は `$literature-survey` へ渡し、証明済み判定は Lean / Isabelle / Coq / SMT の実行 log だけに委ねます。
+- `tools/agent_tools/proof_path_analyzer.py`
+  - `algorithm_lemma_graph.py` の lemma graph と topic-local `proof_status.json` を読み、checked fragment の採用漏れ、裸の `unverified` frontier、stale implementation token、重複 B-label、target-chain 切断を検査します。数学的 witness が未接続な箇所は open witness として残し、artifact integrity と proof completion を分けて報告します。
 - `agent-canon local-llm classify-responsibility`
   - Rust CLI の正本入口です。llama.cpp と小型 GGUF model を使い、単一 file の責務分析だけを advisory に行います。repo-wide 解析、依存 closure、CI pass/fail には使いません。
 - `agent-canon local-llm extract-prose-ir`

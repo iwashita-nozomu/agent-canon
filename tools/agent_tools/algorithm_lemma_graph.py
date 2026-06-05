@@ -31,6 +31,11 @@ KNOWN_TARGET_PROFILES = (
     "local_convergence",
     "fp32_floor",
     "solver_chain",
+    "reduced_kkt",
+    "step_update",
+    "floor_preserving_step",
+    "minres_defaults",
+    "pdipm_initialization_path",
 )
 
 
@@ -48,6 +53,7 @@ class LemmaNode:
     source_edges: tuple[str, ...]
     source_symbols: tuple[str, ...]
     source_paths: tuple[str, ...]
+    source_code_facts: tuple[str, ...]
     math_role: str
     residual_unit: str
     precision_model: str
@@ -172,6 +178,7 @@ def node_profiles(node: dict[str, Any], obligation: dict[str, Any]) -> tuple[str
     source_symbol = str(node.get("source_symbol", ""))
     precision_model = str(node.get("precision_model", "none"))
     grain = str(obligation.get("grain", ""))
+    equation_tags = set(tuple_of_strings(node.get("equation_tags")))
 
     if math_role in {"certificate", "diagnostic"} or source_symbol.endswith("Info"):
         profiles.add("certificate_soundness")
@@ -182,6 +189,23 @@ def node_profiles(node: dict[str, Any], obligation: dict[str, Any]) -> tuple[str
     solver_tokens = ("solvers/", "kkt", "minres", "lobpcg", "preconditioner", "rank_r")
     if any(token in source_path or token in source_symbol.lower() for token in solver_tokens):
         profiles.add("solver_chain")
+    if "reduced_kkt" in equation_tags:
+        profiles.add("reduced_kkt")
+        profiles.add("local_convergence")
+        profiles.add("solver_chain")
+    if "step_update" in equation_tags:
+        profiles.add("step_update")
+        profiles.add("local_convergence")
+    if "floor_preserving_step" in equation_tags:
+        profiles.add("floor_preserving_step")
+        profiles.add("fp32_floor")
+        profiles.add("local_convergence")
+    if "minres_defaults" in equation_tags:
+        profiles.add("minres_defaults")
+        profiles.add("solver_chain")
+    if "pdipm_initialization_path" in equation_tags:
+        profiles.add("pdipm_initialization_path")
+        profiles.add("local_convergence")
     return tuple(profile for profile in KNOWN_TARGET_PROFILES if profile in profiles)
 
 
@@ -208,6 +232,7 @@ def make_target_node(profile: str, theorem: str) -> LemmaNode:
         source_edges=(),
         source_symbols=(),
         source_paths=(),
+        source_code_facts=(),
         math_role="target_theorem",
         residual_unit="none",
         precision_model="none",
@@ -223,6 +248,13 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
         for node in ir_payload.get("nodes", [])
         if isinstance(node, dict)
     }
+    code_facts_by_node: dict[str, list[str]] = {}
+    for fact in ir_payload.get("code_facts", []):
+        if not isinstance(fact, dict):
+            continue
+        source_node_id = str(fact.get("source_node_id") or "")
+        if source_node_id:
+            code_facts_by_node.setdefault(source_node_id, []).append(str(fact.get("fact_id", "")))
     raw_nodes: list[dict[str, Any]] = []
     for obligation in ir_payload.get("obligations", []):
         if not isinstance(obligation, dict):
@@ -247,6 +279,7 @@ def build_obligation_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], 
                     source_edges=tuple_of_strings(obligation.get("consumes_edges")),
                     source_symbols=(str(ir_node.get("source_symbol", primary_node_id)),),
                     source_paths=(str(ir_node.get("source_path", "")),),
+                    source_code_facts=tuple(sorted(code_facts_by_node.get(primary_node_id, ()))),
                     math_role=str(ir_node.get("math_role", "unknown")),
                     residual_unit=str(ir_node.get("residual_unit", "none")),
                     precision_model=str(ir_node.get("precision_model", "none")),
@@ -280,6 +313,7 @@ def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str
                     source_edges=(),
                     source_symbols=(str(assumption.get("profile_variable", "")),),
                     source_paths=(str(assumption.get("owning_surface", "")),),
+                    source_code_facts=(),
                     math_role="backend_arithmetic_assumption",
                     residual_unit="backend_error_floor_unit",
                     precision_model="backend_profile",
@@ -288,6 +322,98 @@ def build_backend_assumption_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str
                 ),
                 "primary_node_id": f"backend-assumption:{assumption_id}",
                 "applies_to_nodes": applies_to_nodes,
+            }
+        )
+    return tuple(raw_nodes)
+
+
+def build_backend_profile_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Build lemma nodes for concrete backend profile records from lean/."""
+    raw_nodes: list[dict[str, Any]] = []
+    for assumption in ir_payload.get("backend_assumptions", []):
+        if not isinstance(assumption, dict):
+            continue
+        assumption_id = str(assumption.get("assumption_id", "backend_profile"))
+        profile_library_path = str(assumption.get("profile_library_path", ""))
+        profile_details = assumption.get("profile_details")
+        if not isinstance(profile_details, dict):
+            profile_details = {}
+        profile_ids = tuple_of_strings(assumption.get("profile_ids"))
+        for profile_id in profile_ids:
+            raw_profile = profile_details.get(profile_id, {})
+            profile = raw_profile if isinstance(raw_profile, dict) else {}
+            witnesses = tuple_of_strings(profile.get("required_witnesses"))
+            description = str(profile.get("description", "backend profile"))
+            statement = (
+                f"Backend profile `{profile_id}` from `{profile_library_path}`: "
+                f"{description}"
+            )
+            if witnesses:
+                statement = f"{statement} Required witnesses: {', '.join(witnesses)}."
+            raw_nodes.append(
+                {
+                    "lemma": LemmaNode(
+                        lemma_id=f"lemma__backend_profile__{slug(profile_id)}",
+                        label=f"backend profile: {profile_id}",
+                        statement=statement,
+                        lemma_kind="backend_profile",
+                        proof_status="external_evidence_required",
+                        source_obligation_id=f"{assumption_id}:{profile_id}",
+                        source_nodes=(),
+                        source_edges=(),
+                        source_symbols=(profile_id,),
+                        source_paths=(profile_library_path,),
+                        source_code_facts=(),
+                        math_role="backend_arithmetic_profile",
+                        residual_unit="backend_error_floor_unit",
+                        precision_model="backend_profile",
+                        target_profiles=("all", "fp32_floor"),
+                        remaining_gap=(
+                            "bind lowered IR, compiler flags, and runtime backend "
+                            "semantics before using this arithmetic profile"
+                        ),
+                    ),
+                    "assumption_id": assumption_id,
+                    "profile_id": profile_id,
+                }
+            )
+    return tuple(raw_nodes)
+
+
+def build_code_fact_nodes(ir_payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Build lemma graph nodes for code-derived expression/default facts."""
+    raw_nodes: list[dict[str, Any]] = []
+    for fact in ir_payload.get("code_facts", []):
+        if not isinstance(fact, dict):
+            continue
+        fact_id = str(fact.get("fact_id", "code_fact"))
+        profiles = tuple_of_strings(fact.get("target_profiles")) or ("all",)
+        raw_nodes.append(
+            {
+                "lemma": LemmaNode(
+                    lemma_id=f"lemma__{slug(fact_id)}",
+                    label=str(fact.get("target", fact_id)),
+                    statement=str(fact.get("statement", "")),
+                    lemma_kind="code_fact",
+                    proof_status="code_derived",
+                    source_obligation_id=None,
+                    source_nodes=(
+                        (str(fact.get("source_node_id")),)
+                        if fact.get("source_node_id")
+                        else ()
+                    ),
+                    source_edges=(),
+                    source_symbols=(str(fact.get("source_symbol", "")),),
+                    source_paths=(str(fact.get("source_path", "")),),
+                    source_code_facts=(fact_id,),
+                    math_role="implementation_equation_fact",
+                    residual_unit="none",
+                    precision_model="none",
+                    target_profiles=profiles,
+                    remaining_gap="code-derived fact; mathematical use still requires theorem selection",
+                ),
+                "fact_id": fact_id,
+                "source_node_id": str(fact.get("source_node_id") or ""),
             }
         )
     return tuple(raw_nodes)
@@ -385,6 +511,60 @@ def build_backend_assumption_edges(
                     status="valid",
                 )
             )
+    return dedupe_edges(edges)
+
+
+def build_backend_profile_edges(
+    backend_nodes: tuple[dict[str, Any], ...],
+    profile_nodes: tuple[dict[str, Any], ...],
+) -> tuple[LemmaEdge, ...]:
+    """Connect backend assumptions to concrete profile records."""
+    assumption_by_id = {
+        str(raw["lemma"].source_obligation_id): raw["lemma"].lemma_id for raw in backend_nodes
+    }
+    edges: list[LemmaEdge] = []
+    for raw in profile_nodes:
+        source_obligation_id = str(raw["lemma"].source_obligation_id or "")
+        assumption_id = source_obligation_id.split(":", 1)[0]
+        assumption_lemma = assumption_by_id.get(assumption_id)
+        if assumption_lemma is None:
+            continue
+        edges.append(
+            LemmaEdge(
+                edge_id="pending",
+                source_lemma_id=assumption_lemma,
+                target_lemma_id=raw["lemma"].lemma_id,
+                edge_kind="backend_profile_record",
+                reason="backend assumption is instantiated by a lean/lib backend profile record",
+                source_ir_edge_id=None,
+                status="valid",
+            )
+        )
+    return dedupe_edges(edges)
+
+
+def build_code_fact_edges(
+    code_fact_nodes: tuple[dict[str, Any], ...],
+    lemma_by_ir_node: dict[str, str],
+) -> tuple[LemmaEdge, ...]:
+    """Connect implementation lemmas to code-derived expression facts."""
+    edges: list[LemmaEdge] = []
+    for raw in code_fact_nodes:
+        source_node_id = str(raw.get("source_node_id") or "")
+        source_lemma = lemma_by_ir_node.get(source_node_id)
+        if source_lemma is None:
+            continue
+        edges.append(
+            LemmaEdge(
+                edge_id="pending",
+                source_lemma_id=source_lemma,
+                target_lemma_id=raw["lemma"].lemma_id,
+                edge_kind="lemma_consumes_code_fact",
+                reason="implementation obligation consumes an AST-derived equation/default fact",
+                source_ir_edge_id=None,
+                status="valid",
+            )
+        )
     return dedupe_edges(edges)
 
 
@@ -539,17 +719,34 @@ def build_lemma_graph(ir_payload: dict[str, Any], profiles: tuple[str, ...]) -> 
     target_profiles = profiles or KNOWN_TARGET_PROFILES
     raw_obligation_nodes = build_obligation_nodes(ir_payload)
     raw_backend_nodes = build_backend_assumption_nodes(ir_payload)
+    raw_backend_profile_nodes = build_backend_profile_nodes(ir_payload)
+    raw_code_fact_nodes = build_code_fact_nodes(ir_payload)
     obligation_nodes = tuple(raw["lemma"] for raw in raw_obligation_nodes)
     lemma_by_ir_node = {
         str(raw["primary_node_id"]): raw["lemma"].lemma_id for raw in raw_obligation_nodes
     }
     backend_nodes = tuple(raw["lemma"] for raw in raw_backend_nodes)
+    backend_profile_nodes = tuple(raw["lemma"] for raw in raw_backend_profile_nodes)
+    code_fact_nodes = tuple(raw["lemma"] for raw in raw_code_fact_nodes)
     target_nodes = tuple(make_target_node(profile, theorem) for profile in target_profiles)
     dependency_edges = build_dependency_edges(ir_payload, lemma_by_ir_node)
     backend_edges = build_backend_assumption_edges(raw_backend_nodes, lemma_by_ir_node)
-    proof_nodes = (*obligation_nodes, *backend_nodes)
+    backend_profile_edges = build_backend_profile_edges(
+        raw_backend_nodes,
+        raw_backend_profile_nodes,
+    )
+    code_fact_edges = build_code_fact_edges(raw_code_fact_nodes, lemma_by_ir_node)
+    proof_nodes = (*obligation_nodes, *backend_nodes, *backend_profile_nodes, *code_fact_nodes)
     target_edges = build_target_edges(theorem, target_profiles, proof_nodes)
-    lemma_edges = dedupe_edges([*target_edges, *dependency_edges, *backend_edges])
+    lemma_edges = dedupe_edges(
+        [
+            *target_edges,
+            *dependency_edges,
+            *backend_edges,
+            *backend_profile_edges,
+            *code_fact_edges,
+        ]
+    )
     lemma_nodes = tuple(sorted((*target_nodes, *proof_nodes), key=lambda item: item.lemma_id))
     target_chains = build_target_chains(theorem, target_profiles, proof_nodes, lemma_edges)
     validation = validate_graph(lemma_nodes, lemma_edges, target_chains)
@@ -640,8 +837,8 @@ def render_markdown(report: LemmaGraphReport) -> str:
             "",
             "## Lemma Nodes",
             "",
-            "| Lemma | Kind | Status | Profiles | Source Symbols | Remaining Gap |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Lemma | Kind | Status | Profiles | Source Symbols | Code Facts | Remaining Gap |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
     for node in report.lemma_nodes:
@@ -655,6 +852,7 @@ def render_markdown(report: LemmaGraphReport) -> str:
                     node.proof_status,
                     ", ".join(node.target_profiles),
                     ", ".join(node.source_symbols) or "none",
+                    ", ".join(node.source_code_facts) or "none",
                     node.remaining_gap,
                 )
             )

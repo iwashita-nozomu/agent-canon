@@ -1,0 +1,323 @@
+"""Tests for proof path overlay analysis."""
+
+# @dependency-start
+# responsibility Tests proof_path_analyzer proof-status overlay checks.
+# upstream implementation ../../tools/agent_tools/proof_path_analyzer.py analyzes proof paths.
+# upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py emits lemma graphs.
+# upstream design ../../agents/skills/formal-proof-workflow.md defines proof graph workflow.
+# downstream design ../../documents/tools/proof_path_analyzer.md documents CLI usage.
+# @dependency-end
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "proof_path_analyzer.py"
+
+
+def sample_graph() -> dict[str, object]:
+    """Return a compact lemma graph payload."""
+    return {
+        "status": "lemma_graph_built",
+        "root": "python/app.py::_solve",
+        "theorem": "local_convergence",
+        "target_profiles": ["local_convergence"],
+        "lemma_nodes": [
+            {
+                "lemma_id": "target__local_convergence__local_convergence",
+                "label": "target",
+                "statement": "target theorem",
+                "lemma_kind": "target_theorem",
+                "proof_status": "unverified",
+                "source_symbols": [],
+                "source_paths": [],
+                "remaining_gap": "prove target",
+            },
+            {
+                "lemma_id": "lemma__step",
+                "label": "_step",
+                "statement": "prove step",
+                "lemma_kind": "local_obligation",
+                "proof_status": "unverified",
+                "source_symbols": ["_step"],
+                "source_paths": ["python/app.py"],
+                "remaining_gap": "formal theorem required",
+            },
+            {
+                "lemma_id": "lemma__backend",
+                "label": "backend_profile",
+                "statement": "assume backend",
+                "lemma_kind": "assumption",
+                "proof_status": "assumption",
+                "source_symbols": ["backend_profile"],
+                "source_paths": ["lean/lib/backend_profiles.json"],
+                "remaining_gap": "backend witness",
+            },
+        ],
+        "lemma_edges": [
+            {
+                "edge_id": "edge-1",
+                "source_lemma_id": "target__local_convergence__local_convergence",
+                "target_lemma_id": "lemma__step",
+                "edge_kind": "target_requires",
+                "status": "valid",
+            },
+            {
+                "edge_id": "edge-2",
+                "source_lemma_id": "lemma__step",
+                "target_lemma_id": "lemma__backend",
+                "edge_kind": "backend_profile_dependency",
+                "status": "valid",
+            },
+        ],
+        "target_chains": [
+            {
+                "target_id": "target__local_convergence__local_convergence",
+                "profile": "local_convergence",
+                "theorem": "local_convergence",
+                "lemma_ids": ["lemma__step", "lemma__backend"],
+                "reachable_lemma_ids": ["lemma__step", "lemma__backend"],
+                "missing_lemma_ids": [],
+                "connected": True,
+            }
+        ],
+    }
+
+
+def sample_status() -> dict[str, object]:
+    """Return a compact proof status payload."""
+    return {
+        "checked_fragments": [
+            {
+                "theorem": "Proof.step_handoff",
+                "status": "verified",
+                "checker": "Lean 4",
+                "command": "lean Step.lean",
+                "file": "Step.lean",
+                "remaining_obligation": "instantiate local step",
+                "implementation_surface": "python/app.py::_step",
+            }
+        ],
+        "unprovable_under_assumptions": [],
+        "open_frontier": [
+            {
+                "frontier": "B1 step bridge",
+                "code_derived_facts": [
+                    {
+                        "derivability": "ir_or_lemma_graph",
+                        "fact_id": "B1-F1",
+                        "gap_owner": "none",
+                        "proof_effect": "step obligation is selected by the graph",
+                        "source_id": "lemma__step",
+                        "source_kind": "lemma_node",
+                        "statement": "The step lemma is selected in the lemma graph.",
+                    }
+                ],
+                "implementation_surface": "python/app.py::_step",
+                "next_witness": "local bridge witness",
+                "status": "unverified_with_next_witness",
+            }
+        ],
+        "schema": "test-proof-status",
+    }
+
+
+class ProofPathAnalyzerTest(unittest.TestCase):
+    """Validate proof path analyzer integrity checks."""
+
+    def run_tool(
+        self,
+        graph: dict[str, object],
+        status: dict[str, object],
+        adoption_text: str = "Proof.step_handoff\n",
+        frontier_text: str = "| B1 step bridge | unverified_with_next_witness |\n",
+    ) -> subprocess.CompletedProcess[str]:
+        """Run proof path analyzer with temporary inputs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            graph_path = root / "graph.json"
+            status_path = root / "status.json"
+            adoption_path = root / "adoption.md"
+            frontier_path = root / "frontier.md"
+            graph_path.write_text(json.dumps(graph), encoding="utf-8")
+            status_path.write_text(json.dumps(status), encoding="utf-8")
+            adoption_path.write_text(adoption_text, encoding="utf-8")
+            frontier_path.write_text(frontier_text, encoding="utf-8")
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--lemma-graph",
+                    str(graph_path),
+                    "--proof-status",
+                    str(status_path),
+                    "--proof-frontier",
+                    str(frontier_path),
+                    "--adoption-text",
+                    str(adoption_path),
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+    def test_connected_path_is_valid_but_not_complete_with_open_witness(self) -> None:
+        """Current proof holes should stay connected without pretending completeness."""
+        result = self.run_tool(sample_graph(), sample_status())
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["validation"]["valid"])
+        self.assertTrue(payload["validation"]["connected"])
+        self.assertFalse(payload["proof_complete"])
+        self.assertEqual(payload["open_witness_count"], 1)
+        self.assertEqual(payload["code_fact_count"], 1)
+        self.assertEqual(payload["code_fact_derivability_counts"], {"ir_or_lemma_graph": 1})
+        self.assertEqual(payload["open_witnesses_without_code_facts"], [])
+        self.assertEqual(payload["open_witnesses"][0]["hole_id"], "B1 step bridge")
+        self.assertEqual(payload["open_witnesses"][0]["next_witness"], "local bridge witness")
+        self.assertEqual(payload["findings"], [])
+
+    def test_missing_node_fails_validation(self) -> None:
+        """Edges referencing removed nodes should be reported."""
+        graph = sample_graph()
+        graph["lemma_nodes"] = [  # type: ignore[index]
+            node
+            for node in graph["lemma_nodes"]  # type: ignore[index]
+            if node["lemma_id"] != "lemma__step"
+        ]
+
+        result = self.run_tool(graph, sample_status())
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertIn("lemma__step", payload["graph_connectivity"][0]["missing_node_ids"])
+        self.assertFalse(payload["validation"]["valid"])
+
+    def test_missing_target_edge_fails_connectivity(self) -> None:
+        """Removing a target edge should disconnect the target chain."""
+        graph = sample_graph()
+        graph["lemma_edges"] = [  # type: ignore[index]
+            edge
+            for edge in graph["lemma_edges"]  # type: ignore[index]
+            if edge["edge_id"] != "edge-1"
+        ]
+
+        result = self.run_tool(graph, sample_status())
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertIn(
+            "target__local_convergence__local_convergence",
+            payload["graph_connectivity"][0]["disconnected_target_ids"],
+        )
+        self.assertIn("lemma__step", payload["graph_connectivity"][0]["missing_lemma_ids"])
+
+    def test_bare_unverified_frontier_fails(self) -> None:
+        """Frontier rows must name their next witness."""
+        status = sample_status()
+        status["open_frontier"][0]["status"] = "unverified"  # type: ignore[index]
+
+        result = self.run_tool(status=status, graph=sample_graph())
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["bare_unverified_frontier_count"], 1)
+
+    def test_unadopted_verified_fragment_fails(self) -> None:
+        """A checked fragment must appear in adoption text."""
+        result = self.run_tool(sample_graph(), sample_status(), adoption_text="")
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["unadopted_verified_fragment_count"], 1)
+        self.assertEqual(
+            payload["findings"][0]["kind"],
+            "unadopted_verified_fragment",
+        )
+
+    def test_stale_implementation_token_fails(self) -> None:
+        """Implementation surfaces must match graph tokens or real files."""
+        status = sample_status()
+        status["checked_fragments"][0]["implementation_surface"] = (  # type: ignore[index]
+            "python/app.py::_bogus_token"
+        )
+
+        result = self.run_tool(sample_graph(), status)
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertIn("python/app.py::_bogus_token", payload["stale_implementation_tokens"])
+
+    def test_backend_generated_name_does_not_create_suffix_token(self) -> None:
+        """Underscore suffixes inside prose names should not become implementation tokens."""
+        status = sample_status()
+        status["open_frontier"][0]["implementation_surface"] = (  # type: ignore[index]
+            "lean/lib/backend_profiles.json and generated backend_assumptions"
+        )
+
+        result = self.run_tool(sample_graph(), status)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertNotIn("_assumptions", payload["stale_implementation_tokens"])
+
+    def test_duplicate_frontier_label_fails(self) -> None:
+        """A B-label should identify only one frontier obligation."""
+        frontier_text = (
+            "| B1 step bridge | unverified_with_next_witness |\n"
+            "| B1 different bridge | unverified_with_next_witness |\n"
+        )
+
+        result = self.run_tool(sample_graph(), sample_status(), frontier_text=frontier_text)
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["duplicate_frontier_labels"], ["B1"])
+
+    def test_cross_source_frontier_label_shortening_is_valid(self) -> None:
+        """Different files may shorten a B-label name without creating a collision."""
+        frontier_text = "| B1 step | unverified_with_next_witness |\n"
+
+        result = self.run_tool(sample_graph(), sample_status(), frontier_text=frontier_text)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["duplicate_frontier_labels"], [])
+
+    def test_adoption_text_frontier_references_do_not_define_labels(self) -> None:
+        """Adoption notes may discuss a label without redefining frontier identity."""
+        adoption_text = (
+            "Proof.step_handoff\n"
+            "| B1 different explanatory wording | implementation note |\n"
+        )
+
+        result = self.run_tool(sample_graph(), sample_status(), adoption_text=adoption_text)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["duplicate_frontier_labels"], [])
+
+    def test_ir_backed_code_fact_source_must_exist(self) -> None:
+        """IR-backed code facts must point at graph or IR text evidence."""
+        status = sample_status()
+        status["open_frontier"][0]["code_derived_facts"][0]["source_id"] = "missing_lemma"  # type: ignore[index]
+
+        result = self.run_tool(sample_graph(), status)
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["findings"][0]["kind"], "invalid_code_derived_fact")
+
+
+if __name__ == "__main__":
+    unittest.main()

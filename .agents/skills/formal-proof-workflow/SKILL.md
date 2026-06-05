@@ -7,6 +7,7 @@ description: Use when natural-language mathematical claims, Python AST-derived i
 responsibility Exposes formal-proof-workflow to Codex/Copilot skill discovery.
 upstream design ../../../agents/skills/formal-proof-workflow.md canonical skill document
 upstream implementation ../../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts
+upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks proof-status overlays against lemma graphs
 upstream design ../../../agents/skills/literature-survey.md source search policy
 @dependency-end
 -->
@@ -22,12 +23,26 @@ upstream design ../../../agents/skills/literature-survey.md source search policy
    states, not completion.
 1. For algorithm-derived claims, mechanically and recursively expand the root algorithm into an Algorithm Expansion IR before selecting local proof obligations. The IR is not a proof; it is the intermediate representation used to choose only the local theorems needed by the final target.
 1. Build that IR with `python3 tools/agent_tools/algorithm_expansion_ir.py --python-symbol <path.py::qualname> --target-theorem <target> --format json|markdown`, and retain `proof_algorithm_ir`, `proof_goal_directed_slice`, and `proof_selected_local_obligations` in the proof artifact.
+   Do not add a caller-chosen recursion-depth knob to ordinary proof runs; the
+   IR expands to saturation over AST-resolved calls and stops by already-seen
+   `path.py::qualname` keys.
+1. For implementation algebra, use IR `code_facts` before writing prose-only
+   claims. Reduced-KKT equations, step updates, floor-preserving formulas,
+   initialization-path facts, and solver defaults should be represented as
+   code-derived facts and connected to lemma graph nodes before they are cited
+   in a proof status table.
 1. Keep backend / dtype / IREE / finite-precision semantics as Algorithm Expansion IR `backend_assumptions` and Lemma Dependency Graph overlay variables. Do not add proof-only backend fields to production `InitializeConfig` or algorithm state.
 1. Store checker-facing IR, lemma graphs, profile libraries, and Lean stubs under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `algorithm_expansion_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
 1. Convert Algorithm Expansion IR into a Lemma Dependency Graph with
    `python3 tools/agent_tools/algorithm_lemma_graph.py --target-profile <profile> --format json|markdown`.
    Retain `proof_lemma_graph`, `proof_target_chains`, and graph validation
    evidence before writing proof text.
+1. After a proof-status overlay exists, run
+   `python3 tools/agent_tools/proof_path_analyzer.py --lemma-graph <graph.json> --proof-status <proof_status.json> --proof-frontier <frontier.md> --adoption-text <proof-note.md>`
+   before claiming proof-path progress. Treat `validation.valid=true` as
+   evidence that the proof path is structurally connected and the remaining
+   holes are named; treat `proof_complete=false` as the normal state while open
+   witnesses or unprovable-under-assumption rows remain.
 1. Treat the Lemma Dependency Graph as an editable proof-search surface.
    Keep IR-backed obligation nodes synchronized only by regenerating IR after
    source-program changes; add agent/human auxiliary lemmas, bridge edges,
@@ -82,7 +97,12 @@ Use this pattern before proving implementation-derived algorithm claims.
 
 1. Select the root from the public algorithm entrypoint consumed by the target theorem: `initialize`, `solve`, `step`, or a certificate-returning function.
 1. Expand AST source, `InitializeConfig` ownership, nested solver selection, state updates, certificate projection, and diagnostic construction into nodes and edges without importing or executing the target module.
+   Expansion is saturated over AST-resolved calls; do not tune a proof result
+   by changing a recursion-depth parameter.
 1. Classify nodes as mathematical state transition, linear/nonlinear solve, certificate, stopping predicate, diagnostic, performance-only helper, or implementation bookkeeping.
+1. Preserve AST-derived assignment, return, module-constant, and class-default
+   facts as `code_facts`. Use these facts to cite exact equations and defaults;
+   do not downgrade such facts to prose or broad `code_symbol` anchors.
 1. Backward-slice the IR from the final theorem. Keep selected local obligations and assumptions that are necessary for the final claim; exclude helper structure, type facts, and convenience fields that do not affect that claim.
    Discharge instance method dispatch and constructor binding as `static_checks`
    before proof selection. Do not include dispatch edges in proof obligations;
@@ -100,6 +120,10 @@ Use this after Algorithm Expansion IR and before writing proof text.
 
 1. Store auxiliary lemmas, assumptions, and target theorem/profile nodes as a graph.
 1. Use IR `node_id`, not implementation symbol alone, as the lemma identity.
+1. Connect `code_facts` as graph nodes when they are consumed by the proof
+   path. Connect backend profile records from `lean/lib/` as graph nodes under
+   backend assumptions; production algorithms must not read those proof
+   profiles.
 1. Treat generated graph output as the initial graph. Agents and humans may
    edit the overlay by adding auxiliary lemmas, bridge lemmas, dependency
    edges, proof attempts, failed routes, adoption decisions, and missing
@@ -112,6 +136,11 @@ Use this after Algorithm Expansion IR and before writing proof text.
    `local_convergence`, `fp32_floor`, and `solver_chain`.
 1. Require graph validation for edge endpoints, acyclicity, and target-chain
    reachability before making reader-facing proof claims.
+1. Run `proof_path_analyzer.py` on the lemma graph, `proof_status.json`, and
+   proof frontier/note before every reader-facing progress claim. It should
+   fail on missing graph endpoints, disconnected target chains, unadopted
+   checked fragments, stale implementation tokens, bare `unverified` frontier
+   rows, or duplicate frontier labels.
 1. Proof paths are Try-and-Error artifacts. Keep failed or blocked attempts in
    the overlay, but certify only the subgraph whose lemma nodes and dependency
    edges have checker evidence.
