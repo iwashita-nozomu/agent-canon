@@ -12,13 +12,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from agent_team import (  # noqa: E402
+    TaskCatalog,
     codex_runtime_max_threads,
     load_team_config,
     resolve_cross_cutting_document_packet,
@@ -60,16 +60,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_workflow_spawn_budget_rejects_write_budget_above_active(self) -> None:
         """Write-capable subagents must be bounded by the active spawn budget."""
-        catalog = SimpleNamespace(
-            workflow_families=[
+        catalog = TaskCatalog(
+            raw={},
+            workflow_families=(
                 {
                     "id": "bad-budget",
                     "spawn_budget": {
                         "active_subagents": 2,
                         "max_write_subagents": 3,
                     },
-                }
-            ]
+                },
+            ),
+            tasks=(),
+            review_packs=(),
         )
 
         with self.assertRaisesRegex(
@@ -81,16 +84,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_workflow_spawn_budget_rejects_active_budget_above_runtime_threads(self) -> None:
         """Workflow active budget must not exceed Codex runtime max_threads."""
         runtime_max_threads = codex_runtime_max_threads()
-        catalog = SimpleNamespace(
-            workflow_families=[
+        catalog = TaskCatalog(
+            raw={},
+            workflow_families=(
                 {
                     "id": "bad-runtime-budget",
                     "spawn_budget": {
                         "active_subagents": runtime_max_threads + 1,
                         "max_write_subagents": 1,
                     },
-                }
-            ]
+                },
+            ),
+            tasks=(),
+            review_packs=(),
         )
 
         with self.assertRaisesRegex(
