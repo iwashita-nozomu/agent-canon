@@ -287,7 +287,7 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
      wave plan、disjoint write scope、integration order、review gate を明示した
      場合は、複数 writer を同一 wave で並列化できます。衝突する target は禁止
      でも scope 縮小理由でもなく順序制約として扱い、先行 / 後続 wave に分けます。
-     同一 worktree の wave plan で安全に分離できない場合は separate worktree を使います。
+     current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず後続 wave へ直列化します。
    - repair batch / slice、affected files、forbidden semantic delta、既存 dirty
      state の扱い、validation command を明示して渡します。
    - 親 agent は「どこをどう直すか」を file 単位ではなく object 単位で渡します。

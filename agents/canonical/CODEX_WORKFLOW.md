@@ -453,7 +453,7 @@ default の model / reasoning split は `.codex/agents/*.toml` を正本にし�
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
 - budget を超える場合は例外扱いにし、`schedule.md` と `work_log.md` に理由、追加 role、expected output、write scope を残します。
-- write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、先行 wave の validation と tool rerun 後に後続 wave へ回します。同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います。
+- write-capable subagent は既定 1 体です。ただし parent が `team_manifest.yaml` の write policy と handoff で dependency order、wave plan、disjoint write scope、integration order、review gate を明示した場合は、spawn budget 内で複数体を並列化できます。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として扱い、同じ file / canonical surface / shared root contract に触る作業は同一 wave に置かず、先行 wave の validation と tool rerun 後に後続 wave へ回します。安全に分離できない writer は追加 worktree へ逃がさず、current checkout 内の後続 wave へ直列化します。
 
 Codex runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます。
 
@@ -559,9 +559,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を prompt に含める
 - `spark_worker` は設計判断、scope判断、review判断へ使わない
 - chunk、slice、checkpoint、subpass が終わっても user-facing completion を返さず、remaining planned work units と next gate を確認してから続行する
-- repo-changing task では run bundle の `work_log.md` を継続更新し、worktree では action log も同時に維持する
-- worktree で作業する場合、編集前に `python3 tools/agent_tools/worktree_scope_lint.py --current` を通し、`Branch`、`Worktree path`、`Editable Directories`、`Read-Only Or Avoid Directories` が current state と一致することを確認する
-- worktree では scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残し、各 entry に request clause ID を結び付ける。`WORKTREE_SCOPE.md` に contract path がある場合は `work_log.py` で run bundle `work_log.md` も同時に更新する
+- repo-changing task では current checkout の run bundle `work_log.md` を継続更新する
+- 新規作業を `git worktree` で kickoff しない。`WORKTREE_SCOPE.md` と `worktree_scope_lint.py` は legacy cleanup / drift diagnosis 専用であり、新しい task の作業場所や scope authority ではない
+- stale な `WORKTREE_SCOPE.md`、別 branch、別 path の action log を見つけても、そこへ移動して作業せず、current checkout の `work_log.md` に観測事実と無視理由を残す
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` の分離や、implementation 着手条件は `.codex/agents/*.toml` を正本にする
 - 包括的開発では `project_reviewer` を intake と closeout に追加し、repo-wide な integration risk を確認する
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
@@ -649,7 +649,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance にする
 - 論文 draft では `citation_evidence_reviewer` も別 instance にする
 - 包括的開発では、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定します
-- 複数 writer を要する場合は、衝突 target を同一 wave に置かず、先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ複数 worktree に分けます
+- 複数 writer を要する場合は、衝突 target を同一 wave に置かず、先行 / 後続 wave に分けます。安全に分離できない writer は複数 worktree へ分けず、current checkout 内の後続 wave へ直列化します
 - writer ごとの path / directory / object は `team_manifest.yaml` の write policy で管理します
 - required review が unresolved のまま `worker` 相当の実装を始めない
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしない

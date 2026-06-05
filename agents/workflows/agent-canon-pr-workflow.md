@@ -259,7 +259,7 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
   `GITHUB_AUTOMATION_VISIBLE_EVIDENCE`、`GITHUB_AUTOMATION_BLOCKER` が PR-visible surface に
   出るまで merge 完了扱いにせず、自分では merge しません。
 - 明示許可が無い場合は、merge 可能でも PR body、run bundle、または `goal.md` に "blocked on PR mutation authority" と残して止めます。
-- file 構成変更がある場合は integration worktree で merge します。
+- file 構成変更がある場合も別 `git worktree` は作らず、current checkout 上の integration branch で merge します。
 - `python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 
 8. merge 後に template pin を更新する
@@ -389,7 +389,7 @@ Validation:
 - PR 本文に `issues/` durable finding、または durable finding 不要判断と検索 evidence が記録されている
 - PR 本文に search-to-edit-scope evidence、または search-to-edit-scope 不要判断が記録されている
 - PR 本文に template PR、AgentCanon PR または commit、submodule pin、GitHub `main` SHA、security check 状態が記録されている
-- file 構成変更がある場合は integration worktree merge と tree check が完了
+- file 構成変更がある場合は current-checkout integration branch merge と tree check が完了
 - AgentCanon main へ merge 後、template 側で `make agent-canon-ensure-latest` と parent gitlink commit / push の実行結果、または external block / user stop による未実行理由が残っている
 
 ## GitHub Security Baseline

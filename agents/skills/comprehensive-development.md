@@ -63,7 +63,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 - parent は writer ごとの allowed path / directory を `team_manifest.yaml` の write policy で固定します。
 - same directory / same public API surface の parallel write を許可しません。
-- write scope が重なる場合は serialize するか worktree を分けます。
+- write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 - reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary

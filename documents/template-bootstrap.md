@@ -101,10 +101,10 @@ bash scripts/start_repository.sh --validate-only
   - `agents/README.md`
 - workflow canon:
   - `agents/workflows/README.md`
-- worktree kickoff:
-  - `bash tools/worktree_start.sh <branch-name> [worktree-path]`
+- work log:
+  - `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"`
 
-worktree を使う場合は kickoff 後に継続ログを残します。
+新規作業では追加の `git worktree` を使いません。current checkout の run-local `work_log.md` に継続ログを残します。
 
 ```bash
 python3 tools/agent_tools/work_log.py \

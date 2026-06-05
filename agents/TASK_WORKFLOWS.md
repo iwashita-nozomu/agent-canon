@@ -97,7 +97,7 @@ stage ごとの具体的な禁止事項は prose ではなく `.codex/agents/*.t
 - chunk、slice、checkpoint、subpass は内部進捗であり、user-facing completion ではありません
 - user-facing completion は、全 active clause、全 planned work unit、mechanical completion loop、diff-check agent approval、final review、validation、closeout gate、commit / push が揃ったときだけ返します
 - branch 側で file 構成変更をした pass は、closeout 前に `agents/workflows/main-integration-workflow.md` の integration step まで設計します
-- 構成変更を含む統合では、専用 integration worktree と `tools/ci/check_merge_structure.py` を省略しません
+- 構成変更を含む統合では、current checkout 上の integration branch と `tools/ci/check_merge_structure.py` を省略しません
 - tuning や探索の outer loop は waterfall に押し込まず、`Adaptive Improvement Loop` で backlog-driven に回します
 - 考察系 overlay では、仮説なし、expected mechanism なし、candidate comparison なし、反証条件なし、fix surface 妥当性なしで実装へ進みません。実装後も `Hypothesis Decision: supported|rejected|inconclusive` を残し、`supported` でない場合は次仮説へ戻します
 - log 由来 guardrail は `notes/guardrails/engineering_avoidances.md` を正本にします
@@ -207,7 +207,7 @@ write-scope separation ルール:
 - parent が dependency order、wave plan、disjoint write scope、allowed / forbidden files、integration order、review gate を明示した場合だけ、spawn budget 内で複数の write-capable subagent を並列化できます
 - 複数 writer が必要な場合は、各 writer の編集対象を directory / file / object 単位で交差しないように割り、parent が結果を順番に統合します
 - 衝突リスクは作業禁止でも scope 縮小理由でもなく順序制約として扱います。交差する target は先行 wave と後続 wave に分け、先行 wave の validation と tool rerun 後に後続 writer へ渡します
-- 同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います
+- current checkout 内の wave plan で安全に分離できない writer は、separate worktree へ逃がさず後続 wave へ直列化します
 - parent は writer ごとの結果を順番に統合し、scope drift を review gate へ渡します
 
 spawn budget ルール:
@@ -408,8 +408,8 @@ concurrent spawn budget:
 - `experiment-lifecycle` を run-level loop に使い、改善 backlog は `adaptive-improvement-loop` で管理します
 - tuning 中でも `test_designer` と `report_reviewer` を省略しません。`document_flow_reviewer` は reader-facing report / workflow / design doc を更新する場合に起動します
 - `approved` だけでなく `backlog_continue` と `direction_rethink_required` を正式な decision state として扱います
-- 複数 writer が必要な場合は、dependency order と wave plan で衝突 target を先行 / 後続 wave に分けます。同一 worktree の wave plan で安全に分離できない場合だけ worktree 分割を使います
-- disjoint path / separate worktree の判断は parent-managed write-scope ledger に明記します
+- 複数 writer が必要な場合は、dependency order と wave plan で衝突 target を先行 / 後続 wave に分けます。安全に分離できない writer は current checkout 内の後続 wave へ直列化します
+- disjoint path / sequential wave の判断は parent-managed write-scope ledger に明記します
 - `critical_guardian` は architecture、testing completeness、dependency conflict、implementation gap を cross-cutting に見る
 - 最終 review では `final_reviewer` に加えて `project_reviewer` を使い、slice 単位ではなく全体の整合を確認する
 

@@ -34,6 +34,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 1` を正本にし、parent-launched waves と active spawn budget で fan-out を管理する
 - 追加の subagent wave を立てるときは、parent が owner、input packet、expected output、write scope を明示する
+- 追加の `git worktree`、separate worktree、integration worktree は作成・使用しない。writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解く
 - subagent handoff の input packet は role ごとに bounded にし、`/workspace` や repo root 全体を読む scope として渡さない
 - reviewer には raw repo / raw log / full tree ではなく、対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡す
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
@@ -64,7 +65,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent は既定 1 体です。budget を増やしても、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を明示しない並列 write は許可しません。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract に触れない複数 writer だけを同一 wave で並列化できます
-- 同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います
+- current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず、writer を後続 wave に直列化します
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
@@ -318,7 +319,7 @@ Constraints:
 - 同一 worktree の write-capable subagent は既定 1 人ですが、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合は複数 writer を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は同一 wave に置きません
 - 衝突する target は禁止でも scope 縮小理由でもなく順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
-- 複数 worktree は、同一 worktree の wave plan で安全に分離できない場合の選択肢です
+- 複数 worktree は選択肢にしません。current checkout 内の wave plan で安全に分離できない writer は後続 wave へ直列化します
 - review role は常に read-only とし、parent-managed write-scope discipline と single-writer-default の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 ## Codex Model Settings
