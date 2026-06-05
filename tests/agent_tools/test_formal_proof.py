@@ -69,6 +69,10 @@ class FormalProofToolTest(unittest.TestCase):
                 "Search existing formal libraries",
                 "\n".join(payload["proof_obligations"]),
             )
+            self.assertIn(
+                "package-retained proof trace",
+                "\n".join(payload["proof_obligations"]),
+            )
             self.assertTrue(
                 any("LeanSearch" in query for query in payload["existing_proof_queries"])
             )
