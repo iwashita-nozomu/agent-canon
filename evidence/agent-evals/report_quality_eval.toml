@@ -1,8 +1,8 @@
 # @dependency-start
 # responsibility Defines deterministic report-writing quality checklist evals.
 # upstream design README.md eval usage contract
-# upstream design ../skills/report-writing.md report writing quality checklist
-# upstream design ../skills/result-artifact-writeout.md raw result artifact placement contract
+# upstream design ../../agents/skills/report-writing.md report writing quality checklist
+# upstream design ../../agents/skills/result-artifact-writeout.md raw result artifact placement contract
 # downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs these evals
 # downstream implementation ../../tests/agent_tools/test_evaluate_report_quality.py tests report quality eval behavior
 # @dependency-end
@@ -45,6 +45,16 @@ id = "REPORT-RUNTIME-4"
 critical = true
 description = "Requires report reviewer routing and closeout tokens."
 required_regex = ["report_reviewer", "report_quality_checklist", "report_rule_drift"]
+
+[[evals.checklist]]
+id = "REPORT-RUNTIME-4B"
+critical = true
+description = "Requires presentation asset packet routing for deck/PPT output."
+required_regex = [
+  "slide deck/PPT",
+  "presentation asset packet",
+  "presentation_asset_packet",
+]
 
 [[evals.checklist]]
 id = "REPORT-RUNTIME-5"
@@ -103,6 +113,16 @@ required_regex = [
   "Mermaid diagram",
   "process, dependency, ownership, routing, state, review-gate",
   "table or text-only outline",
+]
+
+[[evals.checklist]]
+id = "REPORT-CHECKLIST-4C"
+critical = true
+description = "Checklist covers presentation asset traceability and separates conceptual visuals from data-backed figures."
+required_regex = [
+  "first visual, ponchi-e/concept diagrams",
+  "Conceptual visuals are labeled separately",
+  "Presentation Asset Packet",
 ]
 
 [[evals.checklist]]

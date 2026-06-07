@@ -58,6 +58,9 @@ checker-backed に採用できることです。
 - 目的の定理が証明された。
 - 現在の仮定と実装経路からは目的の定理を導けない、つまり仮定不足であることが
   証明された。
+- terminal outcome は `verified`、`refuted`、または
+  `unprovable_under_assumptions` のいずれかです。
+  `unverified_with_next_witness` は次に形式証明へ戻す witness queue です。
 
 algorithm blocker の分類、algorithm-change guidance、IR/graph の接続確認、
 formal-proof handoff の明確化は中間成果です。これらだけでは終了しません。

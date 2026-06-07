@@ -19,8 +19,8 @@ upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks
 1. Use `$formal-proof-workflow` with this skill. This skill owns algorithm
    exploration: implementation degrees of freedom, algorithmic blockers,
    candidate changes, runtime certificates, and problem-class witnesses.
-   `$formal-proof-workflow` owns proof-route exploration, final checker-backed
-   proof, refutation, or unprovability claims.
+   `$formal-proof-workflow` owns proof-route exploration, formal proof adoption,
+   final checker-backed proof, refutation, or unprovability claims.
 1. Fix the target theorem first: local convergence, certificate soundness,
    finite-precision floor, solver-chain reachability, infeasibility certificate,
    or another named theorem. Do not explore helpers without a theorem target.
@@ -98,6 +98,8 @@ upstream implementation ../../../tools/agent_tools/proof_path_analyzer.py checks
   final theorem.
 - `algorithm_frontier`: current algorithmic blockers, candidate changes, and
   formal-proof handoff targets.
+- `proof_frontier`: theorem-facing graph frontier sent back to formal proof
+  work when an algorithmic change is not yet justified.
 - `algorithm_change_guidance`: code changes needed to make a theorem provable.
 - `formal_proof_handoff`: exact claims and artifacts for
   `$formal-proof-workflow`.

@@ -81,6 +81,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 - Human-readable public, internal, and compatibility skill docs: `agents/skills/`
 - Codex runtime config and subagent registry: `.codex/config.toml`
 - Codex role behavior: `.codex/agents/*.toml`
+- Eval manifest source contracts: `evidence/agent-evals/`
 
 ## Team Shape
 
@@ -170,7 +171,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は serialize するか worktree を分けます。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 
 `--task-id` を使うと、task catalog の default specialist と default review pack をそのまま bundle に展開できます。狭い例外だけ `--enable` を追加します。
 

@@ -44,7 +44,7 @@ Make convention compliance mechanically checkable and workflow-enforced across A
 - [x] C1: `check_convention_compliance.py` exists and verifies convention sources, tool gates, workflow hooks, closeout prohibitions, prompt eval wiring, skill routing, and convention assertion verification routes.
 - [x] C2: Every `agents/workflows/*.md` workflow is checked for a positive `python3 tools/agent_tools/check_convention_compliance.py` command and for forbidden suppression text.
 - [x] C3: `tools/ci/run_all_checks.sh` invokes `check_convention_compliance.py`.
-- [x] C4: `agents/evals/skill_workflow_prompt_eval.toml` includes convention workflow and skill-routing eval coverage.
+- [x] C4: `evidence/agent-evals/skill_workflow_prompt_eval.toml` includes convention workflow and skill-routing eval coverage.
 - [x] C5: `evaluate_agent_run.py` requires runtime skill invocation behavior evidence, not only `Signals` prose.
 - [x] C6: `$agent-orchestration` skill prompts require convention verification to stay in the execution path and delegate tool-covered rules to the checker.
 - [x] C7: Convention documents with normative assertions expose verification routes, and prohibition-bearing convention documents expose prohibition sections.

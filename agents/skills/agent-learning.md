@@ -33,7 +33,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - `tools/agent_tools/log_agent_learning.py`
 - `tools/agent_tools/evaluate_agent_run.py`
 - `tools/agent_tools/workflow_monitor.py`
-- `agents/evals/agent_behavior_eval.toml`
+- `evidence/agent-evals/agent_behavior_eval.toml`
 
 ## Mandatory Checklist
 
@@ -45,7 +45,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 - eval / hook / skill feedback の結果を書き出すときは `result-artifact-writeout` を使い、raw evidence、summary、manifest、unique artifact path を分ける
 - `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision を run 中に蓄積する
 - 利用中に得られた user / reviewer feedback は `workflow_monitor.py --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> ..."` で構造化し、skill prompt、workflow prompt、eval、memory のどれへ還元したかを残す
-- behavior eval は `agents/evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる
+- behavior eval は `evidence/agent-evals/agent_behavior_eval.toml` を正本にし、`AGENT_EVALUATION_STATUS=pass` まで feedback action を閉じる
 - `memory/` への追記を template local artifact や submodule dirty state だけで終わらせず、`persist_agent_memory.py` で shared canon commit / push と template pin 更新まで closeout する
 - promotion candidate は `AGENTS.md` へ直書きせず、periodic sweep で昇格する
 - 確定した禁止事項は `engineering_avoidances.md` への昇格候補にする
@@ -55,7 +55,7 @@ agent の作業哲学、対話から得た学習、task retrospective を `memor
 ```bash
 python3 tools/agent_tools/evaluate_agent_run.py \
   --report-dir reports/agents/<run-id> \
-  --behavior-manifest agents/evals/agent_behavior_eval.toml \
+  --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml \
   --write
 ```
 

@@ -1164,10 +1164,7 @@ fn experiment_plan_intent(document: &ProseIrDocument) -> Value {
     let assignment_kinds = experiment_assignment_kinds(&document.text);
     let vocabulary_kinds = experiment_vocabulary_kinds(&document.text);
     let has_activity = contains_experiment_activity_cue(&document.text);
-    let status = if assignment_kinds.len() >= 2
-        || (!assignment_kinds.is_empty() && has_activity)
-        || (has_activity && vocabulary_kinds.is_empty())
-    {
+    let status = if assignment_kinds.len() >= 2 || (!assignment_kinds.is_empty() && has_activity) {
         "present"
     } else if !vocabulary_kinds.is_empty() {
         "vocabulary_only"
@@ -1662,6 +1659,24 @@ mod tests {
             responsibility: "Documents corpus metadata.".to_string(),
             kind: "markdown".to_string(),
             text: "The selected corpus id is `experimental_report`, used only as metadata."
+                .to_string(),
+        };
+
+        let intents = analysis_intents_for_ir(&[document]);
+
+        assert_eq!(intents[0]["intent"].as_str(), Some("experiment_plan"));
+        assert_eq!(intents[0]["status"].as_str(), Some("absent"));
+    }
+
+    #[test]
+    fn prose_ir_does_not_mark_activity_word_only_as_experiment_plan() {
+        let document = ProseIrDocument {
+            path: PathBuf::from("docs/structure.md"),
+            relative_path: "docs/structure.md".to_string(),
+            title: "Structure".to_string(),
+            responsibility: "Reports directory structure.".to_string(),
+            kind: "markdown".to_string(),
+            text: "The `experiments` directory warning includes the child term `experiment`."
                 .to_string(),
         };
 

@@ -23,6 +23,9 @@ const HEADER_SCAN_LINES: usize = 120;
 const HEADER_SCAN_BYTES: usize = 64 * 1024;
 const MAX_MARKDOWN_FINDINGS: usize = 200;
 const DOCUMENT_RESPONSIBILITY_GAP: &str = "document_responsibility_gap";
+const DIRECTORY_RESPONSIBILITY_LOW_CHILD_COVERAGE: &str =
+    "directory_responsibility_low_child_coverage";
+const DIRECTORY_RESPONSIBILITY_EVIDENCE_LIMIT: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DocumentRecord {
@@ -68,6 +71,19 @@ struct FileRecord {
     responsibility: String,
     has_dependency_manifest: bool,
     is_document: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DirectoryResponsibility {
+    path: String,
+    responsibility: String,
+    basis: String,
+    readme_path: String,
+    evidence_paths: Vec<String>,
+    descendant_file_count: usize,
+    declared_responsibility_count: usize,
+    child_kind_counts: BTreeMap<String, usize>,
+    missing_child_terms: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -896,7 +912,7 @@ fn direct_findings(
         findings.push(DocumentFinding {
             path: record.path.clone(),
             kind: "accumulated_eval_result".to_string(),
-            canonical_path: "agents/evals/README.md".to_string(),
+            canonical_path: "evidence/agent-evals/README.md".to_string(),
             action: "retain as evidence; do not edit as policy".to_string(),
             reason: "accumulated eval reports are run evidence, not the prompt canon".to_string(),
         });
@@ -1480,8 +1496,10 @@ fn import_artifact_layer(
         }
     }
 
+    let mut file_nodes = BTreeMap::new();
     for file in files {
         let node_id = artifact_file_id(&file.path);
+        file_nodes.insert(file.path.clone(), node_id.clone());
         let label = file_label(file);
         let text = file_text(file);
         let payload_json = json!({
@@ -1527,15 +1545,342 @@ fn import_artifact_layer(
         }
     }
 
+    import_directory_responsibilities(
+        connection,
+        document_id,
+        files,
+        &directory_nodes,
+        &file_nodes,
+    )?;
+
     connection.execute(
         "INSERT OR REPLACE INTO metadata(key, value) VALUES ('artifact_inventory', ?)",
         [json!({
             "file_count": files.len(),
             "directory_count": directories.len(),
+            "directory_responsibility_count": directories.len(),
         })
         .to_string()],
     )?;
     Ok((files.len(), directories.len()))
+}
+
+fn import_directory_responsibilities(
+    connection: &Connection,
+    document_id: &str,
+    files: &[FileRecord],
+    directory_nodes: &BTreeMap<String, String>,
+    file_nodes: &BTreeMap<String, String>,
+) -> rusqlite::Result<()> {
+    for (directory, directory_node_id) in directory_nodes {
+        let responsibility = infer_directory_responsibility(directory, files);
+        let node_id = artifact_directory_responsibility_id(directory);
+        let payload_json = json!({
+            "path": &responsibility.path,
+            "kind": "directory_responsibility",
+            "responsibility": &responsibility.responsibility,
+            "basis": &responsibility.basis,
+            "readme_path": &responsibility.readme_path,
+            "evidence_paths": &responsibility.evidence_paths,
+            "descendant_file_count": responsibility.descendant_file_count,
+            "declared_responsibility_count": responsibility.declared_responsibility_count,
+            "child_kind_counts": &responsibility.child_kind_counts,
+            "missing_child_terms": &responsibility.missing_child_terms,
+            "derived_from_document_structure": true,
+        })
+        .to_string();
+        connection.execute(
+            "INSERT OR REPLACE INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES (?, ?, 'artifact', 'directory_responsibility', ?, ?, 0, 0, 0.8, ?)",
+            params![
+                &node_id,
+                document_id,
+                format!("responsibility: {}", directory_label(directory)),
+                &responsibility.responsibility,
+                payload_json
+            ],
+        )?;
+        insert_artifact_edge(
+            connection,
+            "has_responsibility",
+            directory_node_id,
+            &node_id,
+            "",
+            json!({"directory": directory, "responsibility_node": &node_id}),
+        )?;
+        for evidence_path in responsibility
+            .evidence_paths
+            .iter()
+            .take(DIRECTORY_RESPONSIBILITY_EVIDENCE_LIMIT)
+        {
+            if let Some(evidence_node_id) = file_nodes.get(evidence_path) {
+                insert_artifact_edge(
+                    connection,
+                    "supports",
+                    evidence_node_id,
+                    &node_id,
+                    "",
+                    json!({
+                        "directory": directory,
+                        "evidence_path": evidence_path,
+                        "responsibility_basis": &responsibility.basis,
+                    }),
+                )?;
+            }
+        }
+        if !responsibility.missing_child_terms.is_empty() {
+            insert_artifact_diagnostic(
+                connection,
+                DIRECTORY_RESPONSIBILITY_LOW_CHILD_COVERAGE,
+                &node_id,
+                "warn",
+                &format!(
+                    "Directory `{}` README responsibility has low coverage of child responsibilities; missing child terms: {}.",
+                    directory,
+                    responsibility.missing_child_terms.join(", ")
+                ),
+                directory_responsibility_action_json(&responsibility),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn infer_directory_responsibility(
+    directory: &str,
+    files: &[FileRecord],
+) -> DirectoryResponsibility {
+    let descendants = files
+        .iter()
+        .filter(|file| file_is_under_directory(&file.path, directory))
+        .collect::<Vec<_>>();
+    let readme = descendants
+        .iter()
+        .find(|file| parent_directory(&file.path) == directory && is_readme_file(&file.path));
+    let child_responsibility_files = descendants
+        .iter()
+        .filter(|file| !is_readme_file(&file.path) && !file.responsibility.trim().is_empty())
+        .copied()
+        .collect::<Vec<_>>();
+    let child_responsibilities = child_responsibility_files
+        .iter()
+        .map(|file| file.responsibility.clone())
+        .collect::<Vec<_>>();
+    let child_kind_counts = directory_child_kind_counts(&descendants);
+    let (responsibility, basis, readme_path, mut evidence_paths) = match readme {
+        Some(file) if !file.responsibility.trim().is_empty() => (
+            file.responsibility.clone(),
+            "readme_manifest".to_string(),
+            file.path.clone(),
+            vec![file.path.clone()],
+        ),
+        Some(file) if !file.title.trim().is_empty() => (
+            file.title.clone(),
+            "readme_title".to_string(),
+            file.path.clone(),
+            vec![file.path.clone()],
+        ),
+        _ if !child_responsibilities.is_empty() => (
+            aggregate_child_responsibilities(&child_responsibilities),
+            "descendant_manifest_aggregate".to_string(),
+            String::new(),
+            Vec::new(),
+        ),
+        _ => (
+            format!("Contains tracked artifacts under `{directory}`."),
+            "path_only".to_string(),
+            String::new(),
+            Vec::new(),
+        ),
+    };
+    evidence_paths.extend(
+        child_responsibility_files
+            .iter()
+            .take(DIRECTORY_RESPONSIBILITY_EVIDENCE_LIMIT)
+            .map(|file| file.path.clone()),
+    );
+    evidence_paths.sort();
+    evidence_paths.dedup();
+    let missing_child_terms = readme
+        .map(|file| {
+            missing_directory_child_terms(
+                &format!("{} {}", file.title, file.responsibility),
+                &child_responsibilities,
+            )
+        })
+        .unwrap_or_default();
+    DirectoryResponsibility {
+        path: directory.to_string(),
+        responsibility,
+        basis,
+        readme_path,
+        evidence_paths,
+        descendant_file_count: descendants.len(),
+        declared_responsibility_count: child_responsibilities.len(),
+        child_kind_counts,
+        missing_child_terms,
+    }
+}
+
+fn file_is_under_directory(path: &str, directory: &str) -> bool {
+    if directory == "." {
+        return true;
+    }
+    path.strip_prefix(directory)
+        .is_some_and(|suffix| suffix.starts_with('/'))
+}
+
+fn directory_child_kind_counts(files: &[&FileRecord]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for file in files {
+        *counts.entry(file.file_kind.clone()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn aggregate_child_responsibilities(responsibilities: &[String]) -> String {
+    let mut unique = Vec::new();
+    for responsibility in responsibilities {
+        let trimmed = responsibility.trim();
+        if trimmed.is_empty() || unique.iter().any(|value: &String| value == trimmed) {
+            continue;
+        }
+        unique.push(trimmed.to_string());
+        if unique.len() >= 3 {
+            break;
+        }
+    }
+    format!(
+        "Aggregates child responsibilities: {}.",
+        unique.join("; ").trim_end_matches('.')
+    )
+}
+
+fn missing_directory_child_terms(
+    readme_responsibility_text: &str,
+    child_responsibilities: &[String],
+) -> Vec<String> {
+    if child_responsibilities.len() < 2 {
+        return Vec::new();
+    }
+    let readme_tokens = responsibility_tokens(readme_responsibility_text);
+    let child_tokens = child_responsibilities
+        .iter()
+        .flat_map(|responsibility| responsibility_tokens(responsibility))
+        .collect::<BTreeSet<_>>();
+    if child_tokens.is_empty()
+        || child_tokens
+            .iter()
+            .any(|token| readme_tokens.contains(token))
+    {
+        return Vec::new();
+    }
+    child_tokens
+        .into_iter()
+        .take(DIRECTORY_RESPONSIBILITY_EVIDENCE_LIMIT)
+        .collect()
+}
+
+fn responsibility_tokens(text: &str) -> BTreeSet<String> {
+    text.split(|character: char| !character.is_ascii_alphanumeric())
+        .map(|token| token.to_ascii_lowercase())
+        .filter(|token| token.len() >= 4 && !directory_responsibility_stopword(token))
+        .collect()
+}
+
+fn directory_responsibility_stopword(token: &str) -> bool {
+    matches!(
+        token,
+        "agent"
+            | "agentcanon"
+            | "canon"
+            | "code"
+            | "contract"
+            | "defines"
+            | "directory"
+            | "documents"
+            | "file"
+            | "files"
+            | "implements"
+            | "records"
+            | "repository"
+            | "responsibility"
+            | "runtime"
+            | "shared"
+            | "source"
+            | "tool"
+            | "tools"
+            | "usage"
+            | "validates"
+    )
+}
+
+fn insert_artifact_diagnostic(
+    connection: &Connection,
+    rule: &str,
+    target_node_id: &str,
+    severity: &str,
+    message: &str,
+    action: String,
+) -> rusqlite::Result<()> {
+    connection.execute(
+        "INSERT OR REPLACE INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES (?, 'artifact', ?, '', ?, ?, ?, ?)",
+        params![
+            format!("diag:artifact:{}:{}", rule, hash_or_fallback(target_node_id, 20)),
+            target_node_id,
+            severity,
+            rule,
+            message,
+            action
+        ],
+    )?;
+    Ok(())
+}
+
+fn directory_responsibility_action_json(responsibility: &DirectoryResponsibility) -> String {
+    json!({
+        "action": "align README responsibility with child artifact responsibilities or document why the child scope is intentionally separate",
+        "path": responsibility.path,
+        "readme_path": responsibility.readme_path,
+        "missing_child_terms": responsibility.missing_child_terms,
+        "verification_route": "directory_responsibility_verification",
+        "verification_question": "Does the directory-level responsibility cover the responsibilities of child documents and code artifacts?",
+        "verification_targets": [
+            responsibility.path,
+            responsibility.readme_path
+        ],
+        "evidence_required": [
+            "directory responsibility node",
+            "README dependency manifest or title",
+            "child artifact responsibility nodes",
+            "structured-analysis rerun"
+        ],
+        "recursive_verification": {
+            "max_depth": 3,
+            "closure_condition": "directory responsibility covers child responsibilities, the child scope is explicitly separated, or the warning remains as an accepted unresolved finding",
+            "unresolved_leaf_policy": "keep directory_responsibility_low_child_coverage active and route it to the owning directory document",
+            "steps": [
+                {
+                    "id": "derive_child_responsibilities",
+                    "route": "structured-analysis",
+                    "question": "Which child artifact responsibilities are not represented in the directory responsibility projection?",
+                    "if_unresolved": "preserve the artifact diagnostic"
+                },
+                {
+                    "id": "trace_directory_document",
+                    "route": "prose-reasoning-graph",
+                    "question": "Which README paragraph or dependency manifest line should carry the directory responsibility?",
+                    "if_unresolved": "create a document responsibility child finding"
+                },
+                {
+                    "id": "verify_directory_projection",
+                    "route": "structured-analysis",
+                    "question": "Does rerunning structured-analysis close the directory responsibility warning?",
+                    "if_unresolved": "record the remaining gap as warn"
+                }
+            ]
+        }
+    })
+    .to_string()
 }
 
 fn insert_artifact_edge(
@@ -1961,6 +2306,16 @@ fn artifact_directory_id(path: &str) -> String {
     format!("artifact:directory:{}", hash_or_fallback(path, 20))
 }
 
+fn artifact_directory_responsibility_id(path: &str) -> String {
+    if path == "." {
+        return "artifact:directory-responsibility:root".to_string();
+    }
+    format!(
+        "artifact:directory-responsibility:{}",
+        hash_or_fallback(path, 20)
+    )
+}
+
 fn artifact_file_id(path: &str) -> String {
     format!("artifact:file:{}", hash_or_fallback(path, 20))
 }
@@ -2319,6 +2674,74 @@ mod tests {
             )
             .expect("readme edge count");
         assert_eq!(readme_edges, 1);
+        let directory_responsibility: String = connection
+            .query_row(
+                "SELECT text FROM nodes WHERE layer = 'artifact' AND kind = 'directory_responsibility' AND json_extract(payload_json, '$.path') = 'documents'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("documents directory responsibility");
+        assert_eq!(directory_responsibility, "Documents fixture files.");
+        let responsibility_edges: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE layer = 'artifact' AND kind = 'has_responsibility'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("responsibility edge count");
+        assert!(responsibility_edges >= result.directory_count as i64);
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(out_dir);
+    }
+
+    #[test]
+    fn directory_responsibility_gap_is_reported_from_child_artifacts() {
+        let root = test_root("structured-analysis-directory-responsibility-gap");
+        let out_dir = test_root("structured-analysis-directory-responsibility-out");
+        write_fixture(
+            &root,
+            "docs/README.md",
+            "# Docs\n\n<!--\n@dependency-start\nresponsibility Documents the docs index.\n@dependency-end\n-->\n",
+        );
+        write_fixture(
+            &root,
+            "docs/solver.md",
+            "# Solver\n\n<!--\n@dependency-start\nresponsibility Defines solver API and convergence contracts.\n@dependency-end\n-->\n",
+        );
+        write_fixture(
+            &root,
+            "docs/runtime.md",
+            "# Runtime\n\n<!--\n@dependency-start\nresponsibility Documents runtime cache and bootstrap behavior.\n@dependency-end\n-->\n",
+        );
+
+        let result = build_structured_analysis_cache(&BuildArgs {
+            root: root.clone(),
+            profile: "test".to_string(),
+            out_dir: Some(out_dir.clone()),
+        })
+        .expect("build cache");
+
+        let connection = Connection::open(&result.db).expect("db");
+        let action_json: String = connection
+            .query_row(
+                "SELECT suggested_action_json FROM diagnostics WHERE layer = 'artifact' AND rule = ?",
+                [DIRECTORY_RESPONSIBILITY_LOW_CHILD_COVERAGE],
+                |row| row.get(0),
+            )
+            .expect("directory responsibility diagnostic");
+        let action: Value = serde_json::from_str(&action_json).expect("action json");
+        assert_eq!(
+            action
+                .get("verification_route")
+                .and_then(Value::as_str)
+                .unwrap_or(""),
+            "directory_responsibility_verification"
+        );
+        let warning_summary =
+            analyze_structured_analysis_db(&result.db, &result.diagnostics_db, "test")
+                .expect("analyze");
+        assert!(warning_summary.warn_count >= 1);
 
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);

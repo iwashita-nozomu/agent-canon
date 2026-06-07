@@ -57,7 +57,7 @@ upstream design README.md agent canon overview
 - `詳細設計レビュー` を通す前に実装へ進みません。
 - code 変更では `test_designer` を別 instance で立て、実装前に nasty case を洗います。
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。
-- write scope が重なる場合は serialize するか worktree を分けます。
+- write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
 - 一般説明 prose adapter を使う文書では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。

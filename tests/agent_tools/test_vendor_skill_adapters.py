@@ -60,7 +60,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
         """Write a minimal prompt eval manifest for runtime skill shims."""
         self.write_file(
             root,
-            "agents/evals/skill_workflow_prompt_eval.toml",
+            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
             "\n".join(
                 [
                     "version = 1",

@@ -13,7 +13,7 @@ downstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md requires te
 -->
 
 issue_id: AC-20260513-pr-mutation-authority-visible-output
-status: in_progress
+status: resolved
 source: user
 severity: S1
 evidence: agents/workflows/agent-canon-pr-workflow.md
@@ -21,6 +21,8 @@ affected_surfaces: ROOT_AGENTS.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PUL
 edit_scope: .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md, agents/workflows/codex-goals-workflow.md, agents/workflows/goal-plan-implementation-loop.md, tools/README.md, tools/agent_tools/goal_loop.py, tests/agent_tools/test_goal_loop.py, tools/ci/check_github_workflows.py
 required_action: Define goal-level PR mutation authority and require GitHub-hosted Copilot / PR automation to publish machine-readable PR-visible output before readiness or merge actions.
 close_condition: PR templates, Copilot instructions, goal loop status, workflow docs, and check_github_workflows.py enforce visible Copilot evidence and validation passes.
+resolved_by: PR #175 and PR #176; current PR templates, ROOT_AGENTS.md, AgentCanon PR workflow, and github-copilot configuration expose automation authority fields.
+resolved_at: 2026-06-07
 
 ## Finding
 

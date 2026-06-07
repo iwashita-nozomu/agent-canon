@@ -2,7 +2,7 @@
 # @dependency-start
 # responsibility Logs Codex skill, workflow, tool, and subagent routing signals from hook payloads.
 # upstream implementation ../hooks.json invokes this hook at prompt and stop boundaries.
-# upstream design ../../agents/evals/README.md requires skill-use eval evidence.
+# upstream design ../../evidence/agent-evals/README.md requires skill-use eval evidence.
 # upstream implementation ./hook_event_log.py assigns Canon-owned hook log paths and IDs.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook logging.
 # @dependency-end

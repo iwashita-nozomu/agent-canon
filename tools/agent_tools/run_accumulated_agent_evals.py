@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Runs all registered AgentCanon eval producers in append-only accumulation mode.
-# upstream design ../../agents/evals/README.md eval family and accumulation contract
+# upstream design ../../evidence/agent-evals/README.md eval family and accumulation contract
 # upstream design ../../documents/runtime-log-archive.md external runtime log archive contract
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md user-facing tool index
@@ -28,8 +28,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
+
 DEFAULT_RUN_ID = "agent-canon-accumulated-eval"
-DEFAULT_PROMPT_EVAL_MANIFEST = Path("agents") / "evals" / "skill_workflow_prompt_eval.toml"
+DEFAULT_PROMPT_EVAL_MANIFEST = Path(eval_manifest_path("skill_workflow_prompt_eval.toml"))
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,7 @@ def resolve_log_dir(root: Path, value: Path | None, run_id: str) -> Path:
 
 def resolve_path(root: Path, value: Path) -> Path:
     """Resolve one CLI path against the selected repository root."""
-    return value if value.is_absolute() else root / value
+    return resolve_eval_manifest(root, value)
 
 
 def build_producers(

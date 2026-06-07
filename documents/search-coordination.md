@@ -35,19 +35,93 @@ agent-canon local-llm search \
   --format json
 ```
 
-Use `rg` first when the input is an exact path, symbol, literal error message,
-or short unique token. For broad concepts, long user requests, reuse surveys,
-document consolidation, or thin-document discovery, run bounded semantic search
-before broad `rg`:
+## Local LLM Boundary
+
+`agent-canon local-llm search` is the search command surface for purpose-based
+candidate discovery. Its result surface is a bounded candidate list with
+provider, path, score, and short evidence text; it is not a rewrite packet,
+acceptance decision, or dependency graph proof.
+
+The authority boundary is explicit: Local LLM search may rank ambiguous tools,
+documents, or terms, but it cannot approve edits, settle source truth, replace
+tests, or replace dependency review. The prompt contract is a short purpose
+string plus selected provider names; callers should not paste the full read
+packet or ask the model to return raw vocabulary lists in chat.
+
+Because coordinated search is advisory rather than authority, Prose IR and
+intermediate representation extraction are outside this search surface. The
+skill integration rule is:
+
+1. Use the Local LLM `extract-prose-ir` path through the prose graph skill when
+   a document must become graph seed data.
+1. Use coordinated search only to find supporting context for that graph or for
+   an implementation/review route.
+1. Route search results to `$agent-orchestration`, `$dependency-analysis`,
+   `$prose-reasoning-graph`, or review skills as advisory context, not as final
+   authority.
+
+## Responsibility-First Search Order
+
+Use `rg` first only when the input is an exact path, symbol, literal error
+message, or short unique token. For every broader search, use this order:
+
+1. Write the current task, reviewer question, or reuse purpose to
+   `reports/query.txt`.
+1. Run responsibility-based search before `rg` to identify the responsibility
+   bucket, dependency-header surface, tool/workflow/document family, and
+   candidate source paths.
+1. If directory ownership, README coverage, or source-tree responsibility is
+   the question, add the directory responsibility pass before choosing source
+   directories.
+1. Use `rg -l` only inside the selected source directories or candidate paths,
+   or as comparison evidence for search Eval.
+1. Expand bounded hit paths through dependency review before editing.
+
+The default responsibility pass is:
 
 ```bash
-agent-canon semantic-index search --query-file reports/query.txt --top-k 20 --format text
-agent-canon semantic-index context-pack --query-file reports/query.txt --max-cells 12 --max-total-chars 6000 --format text
+agent-canon semantic-index context-pack \
+  --query-file reports/query.txt \
+  --max-cells 12 \
+  --max-total-chars 6000 \
+  --format text
+
+agent-canon local-llm search \
+  --purpose "find the owning responsibility and existing surface for this task" \
+  --providers llm,tool,header-deps,code-deps,vector \
+  --format json
+
 agent-canon semantic-index thin-docs --top-k 20 --format text
 ```
 
-If the SQLite cache is missing or stale, build it immediately and retry the
-same bounded semantic-index command before falling back to exact search:
+After the default responsibility pass, continue with the directory
+responsibility pass when the result points at directory-level ownership or
+README coverage:
+
+```bash
+agent-canon semantic-index responsibility-tree \
+  --root . \
+  --check-directory-coverage \
+  --report reports/search_responsibility_tree.json
+```
+
+The follow-up dependency expansion is:
+
+```bash
+rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
+bash tools/agent_tools/run_repo_dependency_review.sh \
+  --report-dir reports/dependency-review \
+  --search-hits-file reports/search_hits.txt
+```
+
+Because dependency review is the authority for edit-scope expansion, raw `rg`
+hits do not decide the edit surface until dependency review expands and checks
+them.
+
+After dependency expansion, cache repair is the fallback for the responsibility
+pass itself. If the SQLite cache is missing or stale, build it immediately and
+retry the same bounded semantic-index command before falling back to exact
+search:
 
 ```bash
 agent-canon semantic-index build --root .
@@ -57,10 +131,16 @@ Only use bounded `rg -l` as the next route when the build itself fails because
 of toolchain, permission, or embedding-provider availability. Record that
 reason in the run bundle.
 
-During search-routing Eval collection, run `rg -l` after the bounded semantic
-result so the two surfaces can be compared. Do not use broad raw `rg` output as
-edit authority.
+During search-routing Eval collection, run `rg -l` after the bounded
+responsibility result so the two surfaces can be compared. Do not use broad raw
+`rg` output as edit authority.
 
+## Generated Search State
+
+The responsibility-first order relies on generated search state, so storage
+rules come before provider interpretation.
+
+The first generated-state owner is the local LLM card index.
 `agent-canon local-llm build-index` writes generated cards under
 `.agent-canon/search-index/`. That directory is repo-local ignored state. Do
 not commit generated cards, model outputs, embeddings, or index state. Rebuild
@@ -73,29 +153,33 @@ Local LLM output can rank ambiguous candidates, but it is not a correctness
 authority and must not replace dependency review, `rg`, tests, or static
 analysis evidence.
 
-For template and derived repositories, keep generated indexes in an operator
-home cache or an explicit run artifact, not as tracked repository state.
-AgentCanon owns the search tools and provider contract; each parent repo owns
-the current search index that reflects its own files and submodule pin.
+The same generated-state boundary applies in template and derived repositories:
+keep generated indexes in an operator home cache or an explicit run artifact,
+not as tracked repository state. AgentCanon owns the search tools and provider
+contract; each parent repo owns the current search index that reflects its own
+files and submodule pin.
 
-`agent-canon semantic-index` is a separate Rust-native semantic-vector cache
-for search, similarity, merge-candidate, thin-document, provider-comparison,
-and Eval reports. It writes generated SQLite state under
-`~/.cache/agent-canon/semantic-index/<repo-key>/` by default and remains
-advisory. It does not replace exact `rg`, dependency review, strict structure
-analysis, tests, or static analysis evidence. Use `--query-file` or
-`--query-stdin` for long natural-language prompts, and prefer bounded `--top-k`
-plus `--format text` or `--format jsonl` so agents do not read full JSON
-payloads or long query echoes unnecessarily. The same SQLite index can hold
-the deterministic baseline provider and an LLM-backed embedding provider for
-comparison; the downstream candidate and responsibility-bucket logic is shared.
-When handing evidence to a subagent, use `context-pack` to cap cells and total
-excerpt characters before prompt injection. The parent prompt should contain
-the task, selected workflow/skill route, and bounded cells, not a pasted copy of
-the full read packet. A subagent that needs more context follows the cell path
-and line range back to source.
+## Semantic-Index Evidence
 
-Review workflows should use the same cache as an advisory evidence source.
+The semantic-index evidence contract is:
+
+| Field | Contract |
+| --- | --- |
+| Command surface | `search`, `similarity`, `merge-candidate`, `thin-document`, provider-comparison, and Eval reports. |
+| Cache location | `~/.cache/agent-canon/semantic-index/<repo-key>/` by default. |
+| Authority | Advisory evidence; it does not replace exact `rg`, dependency review, strict structure analysis, tests, or static analysis evidence. |
+| Prompt handling | Use `--query-file` or `--query-stdin` for long natural-language prompts. |
+| Output handling | Prefer bounded `--top-k` plus `--format text` or `--format jsonl` so agents do not read full JSON payloads or long query echoes unnecessarily. |
+| Provider comparison | The same SQLite index can hold deterministic baseline vectors and LLM-backed embedding vectors; downstream candidate and responsibility-bucket logic is shared. |
+
+For subagent handoff, `context-pack` is the supporting evidence route because
+it caps cells and total excerpt characters before prompt injection. The parent
+prompt contains the task, selected workflow/skill route, and bounded cells; a
+subagent that needs more context follows the cell path and line range back to
+source.
+
+The same bounded-evidence rule applies to review workflows. They should use the
+same cache as an advisory evidence source.
 `review_backlog_scan.sh` runs semantic-index by default and writes bounded
 JSONL artifacts for responsibility-scoped merge candidates, thin documents, and
 optional long-query search results. When an LLM embedding provider is explicitly

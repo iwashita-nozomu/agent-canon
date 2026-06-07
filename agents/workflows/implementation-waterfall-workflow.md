@@ -291,7 +291,7 @@ exit 条件:
 - 実行計画は詳細設計の前に必ず確定させます
 - どの subagent / role がどの stage を担当するか明記します
 - 包括的開発では、`Write Scope Ledger:` と `Integration Order:` を書きます
-- 複数 writer が必要な場合は、writer ごとの disjoint path / separate worktree を明記します
+- 複数 writer が必要な場合は、writer ごとの disjoint path と current checkout 内の wave 順序を明記します。separate worktree は使いません
 
 exit 条件:
 - `schedule.md` に stage 順序、担当 agent、exit criteria、validation が書かれている
@@ -360,6 +360,7 @@ exit 条件:
 - `Identifier And Naming Plan:`
 - `Validation And Rollback Plan:`
 - refactor pass では追加で `Behavior Contract:`, `Allowed Structural Delta:`, `Forbidden Semantic Delta:`, `Files To Remove Or Move:`, `Path Mapping:` を残します
+- directory layout、directory README ownership、root view、または responsibility-scope map refactor では追加で `Directory Responsibility Map:`, `Recursive README Sources:`, `Scope Delta:`, `Reader Navigation Delta:`, `Scope Overlap Report:`, `Import Responsibility Report:` を残します
 - 大規模 repo の包括 refactor では追加で `Current Responsibility Map:`, `Target Responsibility Map:`, `OOP Boundary Plan:`, `Refactor Surface Baseline:`, `Target Score:`, `Static Analyzer Limits:` を残します
 
 ルール:
@@ -382,6 +383,7 @@ exit 条件:
 - worker が chat 要約ではなく packet path を実際に読めるよう、document packet は absolute path で明示します
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
+- structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
 - 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の score を design gate に入れます。score pass は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
 - Gate 6 または Gate 7 が `revise` / `escalate` を返したら Gate 5 へ戻ります
 
@@ -711,11 +713,11 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - code、docs、tests、workflow、tools、runtime をまたぐ umbrella pass に使います
 - 背骨は 1 本の waterfall pass のままにし、surface ごとの差分を `schedule.md` の stage owner と write scope で切ります
 - Gate 0-1 では `project_reviewer` を intake gate として使い、repo-wide completeness と collision risk を確認します
-- Gate 3 では `Write Scope Ledger:`、`Additional Writer Worktrees:`、`Integration Order:` を必ず固定します
+- Gate 3 では `Write Scope Ledger:`、`Writer Wave Order:`、`Integration Order:` を必ず固定します
 - Gate 5-7 では `docs_workflow_steward` を canon docs 整理に使いますが、実装 worker と兼務させません
 - Gate 8-9 では言語差分に応じて `python_reviewer` や `cpp_reviewer` と `project_reviewer` を通し、slice 単位ではなく全体整合を見ます
 - parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
-- write scope が重なる場合は、writer ごとに serialize するか worktree を分けてから統合します
+- write scope が重なる場合は、writer ごとに current checkout 内の後続 wave へ serialize してから統合します
 
 ## 8. reuse-first の必須ルール
 

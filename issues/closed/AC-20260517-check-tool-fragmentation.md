@@ -12,7 +12,7 @@ downstream implementation ../../tools/agent_tools/tool_drift.py validates checke
 -->
 
 issue_id: AC-20260517-check-tool-fragmentation
-status: in_progress
+status: resolved
 source: user
 severity: S1
 evidence: User feedback on 2026-05-17: check tools are scattered and should be treated as an operational issue.
@@ -20,6 +20,8 @@ affected_surfaces: tools/catalog.yaml, tools/README.md, documents/tools/README.m
 edit_scope: responsibility-scope.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, documents/responsibility-scope-management.md, tools/agent_tools/responsibility_scope.py, tests/agent_tools/test_responsibility_scope.py
 required_action: Add a responsibility-scope map that ties checker tools to owned surfaces and wire that map into lightweight gates.
 close_condition: A machine check can list which scope owns each checker family and fails when a default checker lacks a scope/tool contract.
+resolved_by: PR #75 and the current responsibility-scope integration; this finding is subsumed by AC-20260517-responsibility-scope-management and the checker/tool catalog route.
+resolved_at: 2026-06-07
 
 ## Finding
 

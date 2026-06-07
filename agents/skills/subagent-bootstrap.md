@@ -90,7 +90,7 @@ goal-driven task では、write-capable implementation subagent は `goal.md` �
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら approved design packet で完全に切れる低リスク implementation slice は `spark_worker` を先に使います。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
-repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、明示許可がある場合に Spark role TOML の read-only wave へ先に切ります。bounded review、report traceability、checklist-style review gate は mini review role TOML へ先に切ります。parent は結果統合、設計判断、scope 判断、最終責任へ集中します。
+repo inventory、tool drift survey、static validation triage、diff-local Python / C++ review、機械 report 要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切ります。user が coding / implementation / patch work を求めている場合、既定の説明は write-capable handoff first にします。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任を持ちます。bounded review、report traceability、checklist-style review gate は implementation slice と並行できる場合だけ mini review role TOML に切ります。
 実装 slice は 1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる場合だけ `spark_worker` first にします。
 `explorer` などの project-defined Spark role が runtime tool compatibility で失敗した場合は、parent へ戻す前に fresh default subagent を該当 `.codex/agents/*.toml` の `model` と `model_reasoning_effort` で再起動します。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt に `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を含めます。
@@ -105,7 +105,7 @@ Codex で planning を含む parent session では、plan-mode command を先に
 runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent は、同じ instance を使い回しません。
 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` も別 instance を使います。
-包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は serialize するか worktree を分けます。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 新規 user request では前 task の subagent に `send_input` せず、run bundle ごとに fresh subagent を起こします。
 subagent handoff prompt には `team_manifest.yaml` の `run.subagent_lifecycle_policy` を含め、`fresh_subagents_required: true` と `reuse_for_new_task: forbidden` を明示します。
 closeout 前に run-local subagent を閉じ、`closeout_gate.md` の `subagents_closed=yes` と `Subagent Lifecycle Evidence` に close evidence を残します。

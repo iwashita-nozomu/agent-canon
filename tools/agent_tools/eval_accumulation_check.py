@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # responsibility Validates append-only AgentCanon eval and hook result accumulation.
-# upstream design ../../agents/evals/README.md eval usage contract
-# upstream design ../../agents/evals/eval_result_families.toml eval family artifact registry
+# upstream design ../../evidence/agent-evals/README.md eval usage contract
+# upstream design ../../evidence/agent-evals/eval_result_families.toml eval family artifact registry
 # upstream design ../../documents/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime-log-archive-migration.md legacy in-tree result migration contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
@@ -33,6 +33,7 @@ except ModuleNotFoundError:  # Python 3.10 compatibility.
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
@@ -57,7 +58,7 @@ WORKFLOW_SELECTION_REPORT_RE = re.compile(
 REPORT_QUALITY_REPORT_RE = re.compile(
     r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
-DEFAULT_FAMILY_REGISTRY = Path("agents") / "evals" / "eval_result_families.toml"
+DEFAULT_FAMILY_REGISTRY = Path(eval_manifest_path("eval_result_families.toml"))
 COMPACT_FINDING_SAMPLE_LIMIT = 25
 
 
@@ -286,8 +287,7 @@ def reports_required(results_dirs: Sequence[Path], *, archive_mounted: bool) -> 
 
 def resolve_family_registry(canon_root: Path, registry_value: str) -> Path:
     """Resolve the eval family registry path."""
-    registry = Path(registry_value)
-    return registry if registry.is_absolute() else canon_root / registry
+    return resolve_eval_manifest(canon_root, registry_value)
 
 
 def load_family_contracts(registry_path: Path) -> tuple[EvalFamilyContract, ...]:

@@ -21,7 +21,7 @@ upstream design ./github-first-module-and-devcontainer-policy.md environment own
 手順:
 
 ```bash
-bash tools/worktree_start.sh work/<topic>-YYYYMMDD
+git switch -c work/<topic>-YYYYMMDD
 python3 tools/agent_tools/worktree_scope_lint.py --current
 git status --short --branch
 git worktree list --porcelain
@@ -29,7 +29,7 @@ git worktree list --porcelain
 
 確認:
 
-- `WORKTREE_SCOPE.md` が current state に合っている
+- stale `WORKTREE_SCOPE.md` を current task の scope authority として扱っていない
 - action log path が concrete になっている
 - `notes/guardrails/README.md` と `notes/failures/README.md` を見ている
 - kickoff 後の次の 1 手が action log に残っている

@@ -48,6 +48,7 @@ class Scope:
 
     scope_id: str
     paths: tuple[str, ...]
+    exclude_paths: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -108,6 +109,8 @@ class ScopeIndex:
         """Return the most specific scope covering a path."""
         matches: list[tuple[int, str]] = []
         for scope in self.scopes:
+            if any(pattern_covers(pattern, path) for pattern in scope.exclude_paths):
+                continue
             for pattern in scope.paths:
                 if pattern_covers(pattern, path):
                     matches.append((len(pattern), scope.scope_id))
@@ -219,6 +222,7 @@ def load_scope_index(path: Path) -> tuple[ScopeIndex, dict[str, ImportRule]]:
         Scope(
             scope_id=str(item.get("id") or ""),
             paths=string_tuple(item.get("paths")),
+            exclude_paths=string_tuple(item.get("exclude_paths")),
         )
         for item in mapping_list(data.get("scope"))
     )

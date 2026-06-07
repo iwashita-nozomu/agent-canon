@@ -205,7 +205,7 @@ the structured-analysis SQLite graph through `import-document-inventory`.
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
   - `search.py` は `--purpose` から text / LLM card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。tool を探すときは `--providers llm,tool,vector` のように絞れます。
   - `search_index.py` は LLM provider 用の semantic card を `.agent-canon/search-index/` に生成します。生成 index は repo-local ignored state で、commit しません。
-  - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索で併用します。
+  - `vector_search.py` は tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。正確な symbol / path は `rg` を優先し、広い概念や再利用候補探索では responsibility-based semantic / local-LLM search を先に走らせた後の比較 evidence として併用します。
   - `route.py` は長い候補 tool / skill 名を短い routing area へ解決し、`ROUTE`、`AREA`、`NEXT_ACTION`、`COMMANDS`、`EVIDENCE` を出します。検索入口を知らない場合は `python3 tools/agent_tools/route.py --area search` から始めます。候補名をそのまま新規 tool 化せず、まず `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳みます。prompt から public skill set を決める場合は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` で `$agent-orchestration` first の `SKILLS` を確認します。
   - `formal_proof.py` は自然言語の数学的 claim、または `--python-symbol path.py::qualname` で指定した Python AST source を `proof_status=scaffold_only_unverified` の plan、既存 proof search query、literature query、proof assistant stub、checker command に分解します。AST route は対象 module を import / execute せず provenance と proof obligation を抽出します。`--out-dir` には Python library 配布に残せる `*_proof_trace.py` module も生成します。外部検索そのものは `$literature-survey` と browser/search tool が担当し、証明 authority は Lean / Isabelle / Coq / SMT の実行 log に残します。
   - `proof_path_analyzer.py` は lemma graph と `proof_status.json` を重ね、証明済み fragment の採用、open witness、frontier minimality、Algorithm Expansion IR fingerprint、stale implementation token、重複 frontier label、target-chain connectivity を検査します。open witness は proof completion の未達として残しつつ、証明 path artifact の整合性とは分けて扱います。
@@ -219,8 +219,8 @@ the structured-analysis SQLite graph through `import-document-inventory`.
   - `eval_accumulation_check.py` は mounted runtime log archive の hook JSONL、skill eval report、local LLM eval report を検査し、duplicate run id、malformed JSONL、ignored evidence path、missing required field を止めます。agent-facing run では `--compact-out` の JSON summary を読み、stdout の finding 全件列挙を避けます。
   - `runtime_log_archive_git.py` は mounted log archive の ensure / status / import / archive-agent-reports / sync / push 操作を担当します。`sync` は hook JSONL、eval reports、Codex runtime summary、`reports/agents/` run bundle を log repo の `logs/<repo-key>` branch にまとめて commit / push する通常経路です。hook path namespace と entry schema の読み取り検査は `eval_accumulation_check.py` に寄せ、旧 log-management checker の互換 wrapper は置きません。
   - `file_responsibility_llm.py` は llama.cpp と小型 GGUF model を使う Python 互換 helper です。operator は `agent-canon local-llm classify-responsibility` を使います。現状の scope は単一 file の責務分析だけで、repo-wide ownership や CI 合否には使いません。
-  - `local_llm_eval.py` は `agents/evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
-  - `evaluate_report_quality.py` は `agents/evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
+  - `local_llm_eval.py` は `evidence/agent-evals/local_llm_responsibility_eval.toml` を読み、Local LLM の単一 file 責務分析プロンプトと任意の model-backed output を評価する内部 engine です。operator は `agent-canon local-llm eval` を使います。既定は prompt-only で、`--accumulate` のときだけ append-only result を書きます。
+  - `evaluate_report_quality.py` は `evidence/agent-evals/report_quality_eval.toml` を読み、reader-facing report の source packet、evidence traceability、limitations、actionability、artifact separation、reviewer routing を評価します。`--accumulate` のときだけ append-only result を書きます。
   - `evaluate_codex_agent_roles.py` は `.codex/agents/*.toml`、`.codex/config.toml`、`agents/agents_config.json`、`agents/task_catalog.yaml` を読み、role ごとの期待動作、禁止動作、model / reasoning 設定、cheap-first routing、optional runtime metric JSONL を評価します。agent-facing run では `--compact-out` の JSON summary を読み、model matrix と finding detail は artifact へ分離します。
   - `reference_materializer.py` は consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。hook が `references/**/*.md` への登録漏れを検査できるよう、参照 URL は Markdown 内に保持します。
   - `cause_investigation_guard.py` は `PreToolUse` で `apply_patch` や編集系 shell / python が code path を触る直前だけ cause investigation evidence を要求します。普通の相談、read-only search、validation command では block せず、code edit 前の原因仮説と修正 surface 妥当性を JSONL に残します。
@@ -451,12 +451,12 @@ lifetime totals. Raw JSONL is reserved for tool implementation, schema
 debugging, or corruption audits with an explicit rationale.
 `eval_accumulation_check.py` is the structural gate for that accumulation
 surface. It confirms hook JSONL and every eval family registered in
-`agents/evals/eval_result_families.toml` are readable, uniquely identified, and
+`evidence/agent-evals/eval_result_families.toml` are readable, uniquely identified, and
 not hidden by ignore rules before the improvement guide tries to mine them.
 PR and CI gates run `run_accumulated_agent_evals.py` before this checker so the
 required reports are written by tools, not composed by agents.
 `evaluate_workflow_selection.py` checks the prompt-intake classifier against
-frozen workflow-routing examples in `agents/evals/workflow_selection_eval.toml`.
+frozen workflow-routing examples in `evidence/agent-evals/workflow_selection_eval.toml`.
 Use `--accumulate` only when the measurement should become durable evidence
 under `.agent-canon/log-archive/eval-results/workflow-selection/`.
 
@@ -717,7 +717,7 @@ agent-facing skills or workflows.
 
 ```bash
 python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest agents/evals/skill_workflow_prompt_eval.toml \
+  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml \
   --accumulate \
   --run-id <run-id> \
   --skill-used agent-orchestration

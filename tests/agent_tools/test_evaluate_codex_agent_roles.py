@@ -1,7 +1,7 @@
 # @dependency-start
 # responsibility Tests Codex agent role eval automation.
 # upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py helper
-# upstream design ../../agents/evals/README.md role eval contract
+# upstream design ../../evidence/agent-evals/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
 

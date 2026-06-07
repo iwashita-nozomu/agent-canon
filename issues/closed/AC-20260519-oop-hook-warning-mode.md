@@ -14,7 +14,7 @@ downstream design ../../documents/runtime-log-archive.md documents hook-run resu
 -->
 
 issue_id: AC-20260519-oop-hook-warning-mode
-status: in_progress
+status: resolved
 source: user
 severity: S2
 evidence: reports/dependency-review/oop-hook-warning-mode-20260519/search_hits.txt
@@ -23,6 +23,8 @@ edit_scope: reports/dependency-review/oop-hook-warning-mode-20260519/dependency_
 required_action: Change the OOP readability hook from a source-edit blocker to a warning/logging hook while keeping explicit readability validation available as a closeout gate.
 close_condition: OOP hook findings no longer stop editing tools, hook logs preserve warning evidence, and targeted hook tests cover the warning behavior.
 github_issue: pending
+resolved_by: PR #144; the OOP hook warning path approves edits while preserving finding evidence, and targeted hook tests cover warning behavior.
+resolved_at: 2026-06-07
 
 ## Finding
 

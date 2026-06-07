@@ -28,12 +28,13 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - routing と required review を決める前に subagent を乱立させない
 - repo-changing task では、stage ごとに適切な subagent を explicit に立てる
 - 調査、レビュー、文書整備は分ける
-- 再帰的 fan-out は避ける
-- subagents do not spawn subagents; parent が stage wave、handoff packet、closeout を管理する
+- 無制限 fan-out は避ける
+- subagents may spawn bounded child subagents only when their handoff packet includes `delegated_spawn_policy` with owner, input packet, expected output, write scope, validation route, review gate, and remaining spawn budget
 - 探索、レビュー、仕様確認の並列化は使うが、parallel write-heavy implementation は避ける
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
-- subagent depth は `.codex/config.toml` の `agents.max_depth = 1` を正本にし、parent-launched waves と active spawn budget で fan-out を管理する
-- 追加の subagent wave を立てるときは、parent が owner、input packet、expected output、write scope を明示する
+- subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
+- 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
+- 追加の `git worktree`、separate worktree、integration worktree は作成・使用しない。writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解く
 - subagent handoff の input packet は role ごとに bounded にし、`/workspace` や repo root 全体を読む scope として渡さない
 - reviewer には raw repo / raw log / full tree ではなく、対象 path list、checker summary、compact dashboard / drilldown、該当 canon 節を先に渡す
 - `計画レビュー` と `詳細設計レビュー` は別の subagent で行う
@@ -44,7 +45,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `.codex/agents/*.toml` を正本にする
 - approved packet で完全に切れる低リスク slice は Spark role TOML を first implementation candidate とする
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は Spark read-only wave を先に使い、bounded review / report traceability は mini review wave を先に使い、parent / frontier role は統合判断、設計判断、最終責任に集中する
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch work が scope にある task では、既定の説明を write-capable handoff first にする。bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が揃い次第、write-capable `spark_worker` / `worker` handoff を schedule し、parent は handoff packet、統合順序、review gate、最終責任に集中する
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、read-only wave は setup evidence であり完了条件ではありません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
 - Spark role が runtime tool compatibility で起動失敗した場合は、同じ task を high-cost parent に戻す前に該当 role TOML の model / reasoning で fresh default subagent を再試行する
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution、ship decision は frontier role TOML に残す
@@ -53,7 +54,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 ## Activation Budget
 
 - runtime hard ceiling は [.codex/config.toml](../../.codex/config.toml) の `[agents].max_threads` を正本にし、現在は `24` です
-- `.codex/config.toml` の `[agents].max_depth` は `1` を正本にし、subagents do not spawn subagents
+- `.codex/config.toml` の `[agents].max_depth` は `2` を正本にし、one bounded child-subagent layer を許可します
 - cap は同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、上位 runtime / developer instruction が要求する subagent spawn 許可を上書きしません
 - active runtime が explicit user request なしの `spawn_agent` を禁止する場合、parent は handoff plan と artifact packet を作って `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を記録し、許可が出るまで実際の spawn を行いません
@@ -64,8 +65,9 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 - 既定 budget は `Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです
 - budget 超過は例外扱いにし、parent が owner、理由、input packet、expected output、write scope、review gate を `schedule.md` と `work_log.md` に残します
 - write-capable subagent は既定 1 体です。budget を増やしても、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を明示しない並列 write は許可しません。衝突する target は禁止対象でも scope 縮小理由でもなく順序制約として先行 / 後続 wave に分け、同じ file / canonical surface / shared root contract に触れない複数 writer だけを同一 wave で並列化できます
-- 同一 worktree の wave plan で安全に分離できない場合だけ separate worktree を使います
+- current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず、writer を後続 wave に直列化します
 - parent はすべての role を同時に起こさず、requirements / planning / design / review / implementation を wave で切り替えます
+- delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
 - role 数が budget を超える review pack は batch に分け、前段の output を parent が束ねて次 batch へ渡します
 - parent は stage をまたいで subagent をぶら下げたままにせず、gate を通過したら不要な instance を閉じます
 - 新規 user request では前 task の subagent instance を使い回さず、新しい run bundle と fresh subagent を起こします
@@ -88,7 +90,7 @@ role 分割が妥当でも input packet が広すぎる場合は routing defect 
 
 ## Initial Three-Agent Intake
 
-Initial Three-Agent Intake は repo-changing task の初期責務を3つに分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、subagents do not spawn subagents の制約と workflow family の active spawn budget の下で次の stage wave を起動します。
+Initial Three-Agent Intake は repo-changing task の初期責務を3つに分ける初期 wave です。これは総同時起動数の cap ではありません。`requirements_organizer` は user-request clauses、acceptance criteria、source bucket を持ちます。`explorer` は evidence / reuse / stale-surface inventory と dependency-expanded bounded path list を持ちます。`execution_planner` は stage order、artifact routing、validation sequence、review route を持ちます。parent はこの3責務の output を統合し、workflow family の active spawn budget と `max_depth = 2` の下で次の stage wave を起動します。stage owner に child-subagent 起動を委譲する場合は、`team_manifest.yaml` の `run.delegated_spawn_policy` を handoff prompt に含めます。
 
 Tool-result route markers:
 - raw checker/stat artifacts -> artifact_reviewer
@@ -318,7 +320,7 @@ Constraints:
 - 同一 worktree の write-capable subagent は既定 1 人ですが、parent が dependency order、wave plan、disjoint write scope、integration order、review gate を固定した場合は複数 writer を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は同一 wave に置きません
 - 衝突する target は禁止でも scope 縮小理由でもなく順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
-- 複数 worktree は、同一 worktree の wave plan で安全に分離できない場合の選択肢です
+- 複数 worktree は選択肢にしません。current checkout 内の wave plan で安全に分離できない writer は後続 wave へ直列化します
 - review role は常に read-only とし、parent-managed write-scope discipline と single-writer-default の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 ## Codex Model Settings
@@ -334,7 +336,8 @@ role の model / reasoning を変更するときは、該当 `.codex/agents/*.to
 workflow docs、task catalog に role list や model list を重複管理しません。
 
 運用メモ:
-- OpenAI の GPT-5.5 release notes では、GPT-5.5 は Codex で利用可能で、agentic coding、computer use、knowledge work、early scientific research での改善が強いとされています。
+- OpenAI / Codex の current product evidence は `$openai-docs` で確認します。
+  この文書は個別 source URL や fallback reference を保持しません。
 - この repo では、設計判断・広域 synthesis・学術主張の精査・final judgment と broad / ambiguous implementation を frontier role TOML、bounded review / report traceability / checklist gate を mini review role TOML、狭い code survey / static test design / language review と設計済み低リスク実装 slice を Spark role TOML に寄せます。
 - repo default の reasoning は `high` にし、`xhigh` は parent が明示的に必要と判断したときの manual escalation に留めます
 - planning session の mode は official Codex CLI なら `/plan`、model / reasoning の切替は `/model`、approval preset は `/permissions` を使います
@@ -342,7 +345,7 @@ workflow docs、task catalog に role list や model list を重複管理しま�
 - mini review role TOML は bounded review と report/checklist gate で使い、final judgment や scope を変える設計判断には使いません
 - Spark role TOML は `spark_worker` や code-reading roles で使い、詳細設計、最終判断、重要 review には使いません
 - `spark_worker` へ渡す条件は、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test plan、write scope がすべて固定済みであることです
-- 明示 spawn 許可がある repo-changing task では、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を parent が抱え込まず、先に Spark read-only wave へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は mini review wave に切ります。
+- 明示 spawn 許可がある repo-changing task でも、repo inventory、tool drift survey、static validation failure triage、diff-local language review、機械 report 要約を常に先行 read-only wave へ切るわけではありません。coding / implementation / patch work が scope にある task では、implementation critical path を固定してから、並行可能な独立検証だけを Spark read-only role へ切ります。文書 flow、requirements / plan の bounded check、report traceability、research perspective checklist は、write-capable handoff を置き換えない範囲で mini review wave に切ります。
 - user が coding / implementation / patch work の subagent 委譲を明示した task では、Spark read-only wave は write-capable handoff の準備です。実装可能な scope が固定された後は、`spark_worker` eligible なら `spark_worker`、それ以外は `worker` を起動または schedule し、read-only role だけで完了扱いにしません。
 - `spark_worker` eligible な実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じるものに限ります
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します

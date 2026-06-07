@@ -36,7 +36,7 @@ required_coverage = [
   ".devcontainer",
   ".github",
   "agents",
-  "agents/evals",
+  "evidence",
   "documents",
   "issues",
   "mcp",
@@ -131,13 +131,16 @@ paths = [
   "agents/**",
   "mcp/**",
 ]
+exclude_paths = [
+  ".codex/hooks/log_archive_mount_warning.py",
+]
 protecting_tools = [
   "tools/agent_tools/check_agent_runtime_alignment.py",
   "tools/agent_tools/tool_rejection_preflight.py",
   "tools/agent_tools/log_surface_inventory.py",
 ]
 issues = [
-  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/closed/AC-20260517-check-tool-fragmentation.md",
   "issues/open/AC-20260517-responsibility-scope-management.md",
 ]
 
@@ -163,7 +166,8 @@ owner = "agent-canon"
 class = "evidence"
 description = "Append-only hook, skill, workflow, and behavior eval evidence consumed by improvement tooling."
 paths = [
-  "agents/evals/**",
+  "evidence",
+  "evidence/**",
   ".codex/hooks/log_archive_mount_warning.py",
   "documents/runtime-log-archive.md",
   "documents/runtime-log-archive-migration.md",
@@ -191,6 +195,10 @@ paths = [
   "rust/**",
   "helper_inventory_guard_policy.json",
 ]
+exclude_paths = [
+  "tools/agent_tools/runtime_log_archive_git.py",
+  "tools/agent_tools/runtime_log_paths.py",
+]
 protecting_tools = [
   "tools/agent_tools/tool_catalog.py",
   "tools/agent_tools/tool_drift.py",
@@ -199,7 +207,7 @@ protecting_tools = [
   "tools/ci/run_all_checks.sh",
 ]
 issues = [
-  "issues/open/AC-20260517-check-tool-fragmentation.md",
+  "issues/closed/AC-20260517-check-tool-fragmentation.md",
   "issues/open/AC-20260517-responsibility-scope-management.md",
 ]
 
@@ -233,6 +241,10 @@ paths = [
   "notes/**",
   "memory/**",
   "references/**",
+]
+exclude_paths = [
+  "documents/runtime-log-archive.md",
+  "documents/runtime-log-archive-migration.md",
 ]
 protecting_tools = [
   "tools/agent_tools/run_repo_dependency_review.sh",

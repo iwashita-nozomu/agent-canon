@@ -34,6 +34,14 @@ paths = [
 ]
 
 [[group]]
+mode = "symlink"
+owner = "agent-canon"
+class = "shared_policy"
+paths = [
+  "evidence",
+]
+
+[[group]]
 mode = "standalone_only"
 owner = "agent-canon-standalone"
 class = "standalone_only"

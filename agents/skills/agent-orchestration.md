@@ -70,7 +70,8 @@ mode の意味:
 - PR を作る task では、同じ routing 宣言と `route.py --prompt "<user request>" --format json` の確認結果を PR body、run bundle、または linked comment に残す
 - 必要な run bundle command と specialist activation
 - `IMPLEMENTATION_CODEX_AGENTS` による `spark_worker` / `worker` routing
-- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime budget の階層
+- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
+- nested subagent が必要な場合は、`run.delegated_spawn_policy` に owner、child role、入力 packet、expected output、write scope、validation route、review gate を固定します
 - parallel write が要るなら file 単位の write-scope 方針
 
 ## Workflow Family Mapping
@@ -98,10 +99,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
 - scope が paper draft と broader academic prose をまたぐなら、`paper-writing` を優先し、必要なときだけ `academic-writing` を追加します
-- PR body、PR evidence comment、status update、decision brief、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
+- PR body、PR evidence comment、status update、decision brief、presentation narrative、PPT storyboard、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。PPT / deck が scope に入る場合は visual asset plan と slide-production workflow も明示します。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
 - HTML output、HTML report、browser-readable page、dashboard、local preview server、external browser publication が明示された場合は `html-output` を使います
 - HTML の experiment / Eval report が明示された場合は `html-experiment-report` と `html-output` を併用します
-- report、experiment plan / report、Eval output、decision brief、HTML view、document、paper、refactor の構造が非自明な場合、または first figure / table / section / slice、source map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
+- report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合、または first figure / table / ponchi-e / slide / section / slice、source map、source-to-slide map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
 - tool、checker、hook、static analysis を走らせて問題を探す、full finding packet と mechanical priority order を作る、implementation / refactor planning に渡す場合は `tool-finding-report` を使います。before / after impact 比較は明示された場合だけ追加します。raw result を保存する場合は `result-artifact-writeout`、reader-facing narrative を作る場合は `report-writing` も併用します。reader-facing narrative が非自明な finding packet、priority policy、metric / count contract、source map を持つ場合は `structure-planning` も併用します
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
 - research-backed implementation や比較改善では `research-workflow` を使います
@@ -109,6 +110,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - アルゴリズムの収束性、停止性、certificate soundness、finite-precision floor、
   solver-chain reachability、または証明可能性のための algorithm change が scope にある場合は
   `algorithm-proof-exploration` と `formal-proof-workflow` を併用します
+- directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します

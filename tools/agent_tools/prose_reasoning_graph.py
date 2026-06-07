@@ -175,6 +175,31 @@ EXPLANATION_DIAGNOSTIC_LIMIT = 8
 EXPLANATION_OPERATION_LIMIT = 6
 STRUCTURED_ANALYSIS_INVENTORY_STDOUT_KEY = "STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY_JSON"
 LOCAL_LLM_PROSE_IR_STDOUT_KEY = "LOCAL_LLM_PROSE_IR_JSON"
+GRAPH_TOPOLOGY_CONCEPTS = frozenset(
+    {
+        "graph",
+        "dag",
+        "node",
+        "edge",
+        "anchor",
+        "projection",
+        "projection-view",
+        "projection_view",
+        "グラフ",
+        "ノード",
+        "エッジ",
+        "図",
+    }
+)
+ALIGNED_ATTRIBUTE_CONCEPTS = frozenset(
+    {"metric", "baseline", "expected", "result", "指標", "ベースライン", "期待"}
+)
+DECISION_SEQUENCE_CONCEPTS = frozenset({"option", "choice", "decision", "step", "選択肢", "判断"})
+DEPENDENCY_MANIFEST_START = "@dependency-start"
+DEPENDENCY_MANIFEST_END = "@dependency-end"
+DEPENDENCY_MANIFEST_RECORD_RE = re.compile(
+    r"^(?P<role>responsibility|(?:upstream|downstream)\s+(?:design|implementation))\s+(?P<body>.+)$"
+)
 
 
 @dataclass(frozen=True)
@@ -245,6 +270,31 @@ class ProjectionView:
     format_reason: str
     inference_basis: dict[str, object]
     confidence: float
+
+
+@dataclass(frozen=True)
+class DependencyManifestRecord:
+    """One dependency-manifest responsibility or dependency entry."""
+
+    role: str
+    body: str
+    text: str
+    source_start: int
+    source_end: int
+
+
+@dataclass(frozen=True)
+class ProjectionFormatEvidence:
+    """Graph-derived evidence used to recommend a presentation form."""
+
+    member_anchor_ids: tuple[str, ...]
+    role: str
+    presentation_features: tuple[str, ...]
+    presentation_feature_edges: tuple[str, ...]
+    derived_layers: tuple[str, ...]
+    derived_kinds: tuple[str, ...]
+    edge_layers: tuple[str, ...]
+    edge_kinds: tuple[str, ...]
 
 
 class MarkdownBlock(TypedDict):
@@ -775,6 +825,15 @@ def verification_action_for_rule(rule: str) -> dict[str, object]:
             "verification_targets": ["$prose-reasoning-graph", "subagent-fallback"],
             "evidence_required": ["local_llm_prose_ir.analysis_intents", "subagent judgement or explicit fallback acceptance"],
         }
+    if rule == "presentation_format_candidate":
+        return {
+            "add": "accepted rendering decision, rejected candidate reason, or combined presentation plan",
+            "verification_route": "presentation_format_verification",
+            "verification_question": "Does the projection view communicate better as the recommended non-prose form while preserving source anchors?",
+            "verification_targets": ["$structure-planning", "$report-writing"],
+            "evidence_required": ["projection view", "member anchors", "format reason", "reader-state before/after"],
+            "recursive_verification": recursive_verification_for_route("presentation_format_verification"),
+        }
     return {}
 
 
@@ -854,6 +913,30 @@ def recursive_verification_for_route(route: str) -> dict[str, object]:
                     "route": "$report-writing",
                     "question": "Does the report claim stay within the verified experiment result and limitations?",
                     "if_unresolved": "downgrade to limitation or keep the claim out of prose",
+                },
+            ],
+        }
+    if route == "presentation_format_verification":
+        return {
+            **common,
+            "steps": [
+                {
+                    "id": "verify_projection_feature",
+                    "route": "$structure-planning",
+                    "question": "Which graph feature makes prose weaker than the recommended format?",
+                    "if_unresolved": "downgrade the candidate to prose or keep an unresolved presentation warning",
+                },
+                {
+                    "id": "verify_renderer_contract",
+                    "route": "$report-writing",
+                    "question": "Can the recommended table, figure, list, or equation preserve member anchors and source evidence?",
+                    "if_unresolved": "keep prose and record why the rendering was rejected",
+                },
+                {
+                    "id": "verify_reader_state",
+                    "route": "$structure-planning",
+                    "question": "Does the format improve the reader-state transition without hiding necessary prose warrants?",
+                    "if_unresolved": "combine prose with the candidate or keep the warning open",
                 },
             ],
         }
@@ -1427,6 +1510,7 @@ def analyze_graph(connection: sqlite3.Connection, profile: str) -> None:
     claims = add_argument_layer(connection, document_id, sentences)
     evidence = add_evidence_layer(connection, document_id, sentences, claims)
     add_experiment_layer(connection, document_id, sentences, profile)
+    add_presentation_feature_layer(connection, document_id, paragraphs, sentences)
     add_explanation_layer(connection, document_id, profile)
     add_section_edges(connection, sections, paragraphs)
     add_diagnostics(connection, paragraphs, claims, evidence, profile)
@@ -1535,6 +1619,46 @@ def add_concept_layer(connection: sqlite3.Connection, document_id: str, paragrap
             confidence=CONCEPT_EDGE_CONFIDENCE,
             payload={"basis": "term_cooccurrence"},
         )
+    for paragraph in paragraphs:
+        paragraph_terms = Counter(tokens(paragraph.text))
+        mentioned_terms = [term for term in candidates if paragraph_terms.get(term, 0) > 0]
+        for term in candidates:
+            count = paragraph_terms.get(term, 0)
+            if count == 0:
+                continue
+            insert_edge(
+                connection,
+                f"concept-mention:{paragraph.node_id}->{concept_id_for(candidates, term)}",
+                "concept",
+                "mentions",
+                paragraph.node_id,
+                concept_id_for(candidates, term),
+                confidence=CONCEPT_EDGE_CONFIDENCE,
+                payload={
+                    "basis": "paragraph_term_membership",
+                    "term_frequency": count,
+                    "participates_in_projection_features": True,
+                },
+            )
+        for left_index, left in enumerate(mentioned_terms):
+            for right in mentioned_terms[left_index + 1 :]:
+                insert_edge(
+                    connection,
+                    (
+                        "concept-cooccurs:"
+                        f"{paragraph.node_id}:{concept_id_for(candidates, left)}->{concept_id_for(candidates, right)}"
+                    ),
+                    "concept",
+                    "cooccurs_in_anchor",
+                    concept_id_for(candidates, left),
+                    concept_id_for(candidates, right),
+                    confidence=CONCEPT_EDGE_CONFIDENCE,
+                    payload={
+                        "basis": "paragraph_concept_subgraph",
+                        "source_anchor_id": paragraph.node_id,
+                        "participates_in_projection_features": True,
+                    },
+                )
 
 
 def concept_id_for(candidates: Sequence[str], term: str) -> str:
@@ -1764,10 +1888,11 @@ def add_evidence_layer(
                     sentence.source_end,
                 )
             )
+    evidence_nodes.extend(add_dependency_manifest_evidence_nodes(connection, document_id))
     for claim in claims:
         evidence = best_supporting_evidence(claim, evidence_nodes)
         if evidence is not None:
-            basis = "document_neighborhood"
+            basis = evidence_support_basis(claim, evidence)
             insert_edge(
                 connection,
                 f"support:{evidence.node_id}->{claim.node_id}",
@@ -1798,6 +1923,107 @@ def add_evidence_layer(
                     },
                 )
     return tuple(evidence_nodes)
+
+
+def add_dependency_manifest_evidence_nodes(connection: sqlite3.Connection, document_id: str) -> tuple[Node, ...]:
+    """Materialize dependency-manifest responsibility entries as evidence."""
+    row = connection.execute(
+        "SELECT id, text, source_start FROM nodes WHERE layer = 'source' AND kind = 'document' AND document_id = ? LIMIT 1",
+        (document_id,),
+    ).fetchone()
+    if row is None:
+        return ()
+    source_node_id = str(row["id"])
+    source_text = str(row["text"])
+    source_start = int(row["source_start"])
+    records = dependency_manifest_records(source_text)
+    evidence_nodes: list[Node] = []
+    for index, record in enumerate(records, start=1):
+        evidence_id = f"evidence:dependency:{index}"
+        kind = "document_responsibility" if record.role == "responsibility" else "dependency_manifest"
+        payload = {
+            "source": "dependency_manifest",
+            "manifest_role": record.role,
+            "responsibility_terms": sorted(set(tokens(record.body)) - STOPWORDS),
+            "strength": "responsibility_contract",
+        }
+        insert_node(
+            connection,
+            evidence_id,
+            document_id,
+            "evidence",
+            kind,
+            first_words(record.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
+            record.text,
+            source_start + record.source_start,
+            source_start + record.source_end,
+            confidence=EXTRACTED_NODE_CONFIDENCE,
+            payload={
+                **payload,
+                "source_anchor_id": source_node_id,
+                "member_anchor_ids": [source_node_id],
+                "derivation_basis": "dependency_manifest",
+            },
+        )
+        evidence_nodes.append(
+            Node(
+                evidence_id,
+                document_id,
+                "evidence",
+                kind,
+                first_words(record.text, EXTRACTED_NODE_LABEL_WORD_LIMIT),
+                record.text,
+                {
+                    **payload,
+                    "source_anchor_id": source_node_id,
+                    "member_anchor_ids": [source_node_id],
+                    "derivation_basis": "dependency_manifest",
+                },
+                source_start + record.source_start,
+                source_start + record.source_end,
+            )
+        )
+    return tuple(evidence_nodes)
+
+
+def dependency_manifest_records(source_text: str) -> tuple[DependencyManifestRecord, ...]:
+    """Return dependency-manifest records from a source document."""
+    records: list[DependencyManifestRecord] = []
+    in_manifest = False
+    offset = 0
+    for line in source_text.splitlines(keepends=True):
+        stripped_line = line.strip()
+        if DEPENDENCY_MANIFEST_START in stripped_line:
+            in_manifest = True
+            offset += len(line)
+            continue
+        if DEPENDENCY_MANIFEST_END in stripped_line:
+            break
+        if in_manifest:
+            cleaned = clean_dependency_manifest_line(stripped_line)
+            match = DEPENDENCY_MANIFEST_RECORD_RE.match(cleaned)
+            if match is not None:
+                role = match.group("role")
+                body = match.group("body").strip()
+                records.append(
+                    DependencyManifestRecord(
+                        role=role,
+                        body=body,
+                        text=f"{role} {body}",
+                        source_start=offset,
+                        source_end=offset + len(line),
+                    )
+                )
+        offset += len(line)
+    return tuple(records)
+
+
+def clean_dependency_manifest_line(line: str) -> str:
+    """Remove comment syntax around a dependency-manifest line."""
+    cleaned = line.strip()
+    cleaned = cleaned.removeprefix("<!--").removesuffix("-->").strip()
+    cleaned = cleaned.removeprefix("#").strip()
+    return cleaned
 
 
 def derived_anchor_payload(anchor_id: str, basis: str) -> dict[str, object]:
@@ -1833,9 +2059,40 @@ def best_supporting_evidence(claim: Node, evidence_nodes: Sequence[Node]) -> Nod
         if str(evidence.payload.get("sentence_id", "")) == claim_sentence_id:
             return evidence
     for evidence in evidence_nodes:
+        if evidence.kind in {"document_responsibility", "dependency_manifest"}:
+            if dependency_manifest_covers_claim(claim, evidence):
+                return evidence
+            continue
         if lexical_overlap(claim.text, evidence.text) >= EVIDENCE_SUPPORT_MIN_OVERLAP:
             return evidence
     return None
+
+
+def dependency_manifest_covers_claim(claim: Node, evidence: Node) -> bool:
+    """Return true when manifest responsibility terms cover claim concepts."""
+    claim_terms = responsibility_terms(claim.text)
+    evidence_terms = responsibility_terms(evidence.text)
+    if not claim_terms or not evidence_terms:
+        return False
+    shared_terms = claim_terms & evidence_terms
+    if shared_terms:
+        return True
+    claim_anchor_terms = responsibility_terms(str(claim.payload.get("section_path", "")))
+    return bool(claim_anchor_terms & evidence_terms)
+
+
+def responsibility_terms(text: str) -> set[str]:
+    """Return concept terms used for responsibility coverage."""
+    return {term for term in tokens(text) if term not in STOPWORDS and len(term) > CONCEPT_MIN_TERM_LENGTH}
+
+
+def evidence_support_basis(claim: Node, evidence: Node) -> str:
+    """Return support edge basis for a claim/evidence relation."""
+    if evidence.kind in {"document_responsibility", "dependency_manifest"}:
+        return "dependency_manifest_concept_coverage"
+    if str(evidence.payload.get("sentence_id", "")) == str(claim.payload.get("sentence_id", "")):
+        return "same_sentence_evidence"
+    return "document_neighborhood"
 
 
 def add_experiment_layer(
@@ -1865,6 +2122,161 @@ def add_experiment_layer(
                 confidence=EXTRACTED_NODE_CONFIDENCE,
                 payload=derived_anchor_payload(sentence.node_id, f"experiment_{kind}_cue"),
             )
+
+
+def add_presentation_feature_layer(
+    connection: sqlite3.Connection,
+    document_id: str,
+    paragraphs: Sequence[Node],
+    sentences: Sequence[Node],
+) -> None:
+    """Materialize presentation feature subgraphs from existing graph evidence."""
+    phase_by_paragraph = {
+        str(row["paragraph_id"]): str(row["label"])
+        for row in connection.execute(
+            """
+            SELECT label, json_extract(payload_json, '$.paragraph_id') AS paragraph_id
+            FROM nodes
+            WHERE layer = 'phase' AND kind = 'move'
+            """
+        ).fetchall()
+        if row["paragraph_id"]
+    }
+    sentence_ids_by_paragraph: dict[str, set[str]] = {}
+    for sentence in sentences:
+        paragraph_id = sentence.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str):
+            sentence_ids_by_paragraph.setdefault(paragraph_id, set()).add(sentence.node_id)
+
+    for paragraph in paragraphs:
+        if is_structured_presentation_block(paragraph.text):
+            continue
+        sentence_ids = sentence_ids_by_paragraph.get(paragraph.node_id, set())
+        role = phase_by_paragraph.get(paragraph.node_id, "")
+        topology_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, GRAPH_TOPOLOGY_CONCEPTS)
+        if topology_edges:
+            insert_presentation_feature(
+                connection,
+                document_id,
+                paragraph,
+                "relational_topology",
+                "concept relation subgraph exists inside the projection anchor",
+                topology_edges,
+            )
+        attribute_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, ALIGNED_ATTRIBUTE_CONCEPTS)
+        if has_formula_signal(paragraph.text):
+            insert_presentation_feature(
+                connection,
+                document_id,
+                paragraph,
+                "formal_constraint",
+                "source anchor contains a formal relation signal",
+                [],
+            )
+        experiment_kinds = experiment_kinds_for_anchors(connection, sentence_ids)
+        if role == "operationalization" or experiment_kinds or attribute_edges:
+            insert_presentation_feature(
+                connection,
+                document_id,
+                paragraph,
+                "aligned_attribute_set",
+                "phase or experiment nodes create an attribute-set subgraph",
+                attribute_edges,
+            )
+        sequence_edges = concept_relation_edges_for_anchor(connection, paragraph.node_id, DECISION_SEQUENCE_CONCEPTS)
+        if role == "recommendation" or sequence_edges:
+            insert_presentation_feature(
+                connection,
+                document_id,
+                paragraph,
+                "dependency_sequence",
+                "recommendation phase creates a decision-sequence projection",
+                sequence_edges,
+            )
+
+
+def concept_relation_edges_for_anchor(
+    connection: sqlite3.Connection,
+    paragraph_id: str,
+    allowed_labels: frozenset[str],
+) -> list[str]:
+    """Return concept-relation edges that match a semantic feature subgraph."""
+    rows = connection.execute(
+        """
+        SELECT e.id, left_node.label AS left_label, right_node.label AS right_label
+        FROM edges e
+        JOIN nodes left_node ON left_node.id = e.from_node_id
+        JOIN nodes right_node ON right_node.id = e.to_node_id
+        WHERE e.layer = 'concept'
+          AND e.kind = 'cooccurs_in_anchor'
+          AND json_extract(e.payload_json, '$.source_anchor_id') = ?
+        ORDER BY e.id
+        """,
+        (paragraph_id,),
+    ).fetchall()
+    edge_ids: list[str] = []
+    for row in rows:
+        left_label = str(row["left_label"]).lower()
+        right_label = str(row["right_label"]).lower()
+        if left_label in allowed_labels and right_label in allowed_labels:
+            edge_ids.append(str(row["id"]))
+    return edge_ids
+
+
+def experiment_kinds_for_anchors(connection: sqlite3.Connection, anchor_ids: set[str]) -> set[str]:
+    """Return experiment node kinds derived from the supplied source anchors."""
+    if not anchor_ids:
+        return set()
+    output: set[str] = set()
+    for node in fetch_nodes(connection, layer="experiment"):
+        if anchor_id_for_derived_node(node) in anchor_ids:
+            output.add(node.kind)
+    return output
+
+
+def insert_presentation_feature(
+    connection: sqlite3.Connection,
+    document_id: str,
+    paragraph: Node,
+    feature_kind: str,
+    basis: str,
+    basis_edge_ids: Sequence[str],
+) -> None:
+    """Insert one presentation feature node and connect it to its source anchor."""
+    feature_id = f"presentation-feature:{paragraph.node_id}:{feature_kind}"
+    insert_node(
+        connection,
+        feature_id,
+        document_id,
+        "presentation",
+        "feature",
+        feature_kind,
+        feature_kind,
+        paragraph.source_start,
+        paragraph.source_end,
+        confidence=EXTRACTED_NODE_CONFIDENCE,
+        payload={
+            "feature_kind": feature_kind,
+            "source_anchor_id": paragraph.node_id,
+            "member_anchor_ids": [paragraph.node_id],
+            "basis": basis,
+            "basis_edge_ids": list(basis_edge_ids),
+        },
+    )
+    insert_edge(
+        connection,
+        f"presentation-feature-edge:{paragraph.node_id}->{feature_id}",
+        "presentation",
+        "has_feature",
+        paragraph.node_id,
+        feature_id,
+        confidence=EXTRACTED_NODE_CONFIDENCE,
+        payload={
+            "feature_kind": feature_kind,
+            "basis_edge_ids": list(basis_edge_ids),
+            "participates_in_projection_features": True,
+        },
+    )
 
 
 def add_section_edges(connection: sqlite3.Connection, sections: Sequence[Node], paragraphs: Sequence[Node]) -> None:
@@ -1989,6 +2401,7 @@ def add_diagnostics(
     if claims and not evidence_nodes:
         insert_document_diagnostic(connection, "claim_without_evidence_layer", "Claims exist but the evidence layer has no evidence nodes.")
     add_layer_coverage_diagnostic(connection, profile)
+    add_presentation_format_diagnostics(connection, profile)
 
 
 def is_structured_presentation_block(text: str) -> bool:
@@ -2056,6 +2469,34 @@ def add_layer_coverage_diagnostic(connection: sqlite3.Connection, profile: str) 
         )
 
 
+def add_presentation_format_diagnostics(connection: sqlite3.Connection, profile: str) -> None:
+    """Record graph-backed non-prose presentation candidates."""
+    for view in build_projection_views(connection, profile):
+        if view.recommended_format == "prose":
+            continue
+        target_node_id = view.members[0] if view.members else ""
+        action = {
+            **verification_action_for_rule("presentation_format_candidate"),
+            "recommended_format": view.recommended_format,
+            "format_reason": view.format_reason,
+            "view_id": view.view_id,
+            "member_anchor_ids": list(view.members),
+        }
+        insert_diagnostic(
+            connection,
+            f"diag:presentation-format:{view.view_id}",
+            "presentation",
+            target_node_id,
+            "warn",
+            "presentation_format_candidate",
+            (
+                f"Projection `{view.view_id}` recommends `{view.recommended_format}`: "
+                f"{view.format_reason}."
+            ),
+            action=action,
+        )
+
+
 def experiment_layer_applicable(connection: sqlite3.Connection) -> bool:
     """Return true when the document actually contains experiment-plan language."""
     if layer_counts(connection).get("experiment", 0) > 0:
@@ -2079,6 +2520,8 @@ def experiment_plan_applicable_for_graph(
     """Return true when LocalLLM IR says experiment-plan analysis is applicable."""
     local_status = local_llm_experiment_plan_status(connection)
     if local_status == "present":
+        return True
+    if local_status == "absent" and profile == "experiment":
         return True
     if local_status in {"absent", "vocabulary_only"}:
         return False
@@ -2444,11 +2887,8 @@ def build_projection_views(connection: sqlite3.Connection, profile: str) -> tupl
         role = str(phase_by_paragraph.get(paragraph.node_id, paragraph).label)
         sentence_ids = sentences_by_paragraph.get(paragraph.node_id, [])
         members = tuple([paragraph.node_id, *sentence_ids])
-        recommended_format, format_reason = presentation_recommendation(
-            paragraph.text,
-            role,
-            len(sentence_ids),
-        )
+        format_evidence = projection_format_evidence(connection, paragraph, members, role)
+        recommended_format, format_reason = presentation_recommendation(format_evidence)
         views.append(
             ProjectionView(
                 view_id=f"view:{profile}:{index}",
@@ -2467,6 +2907,7 @@ def build_projection_views(connection: sqlite3.Connection, profile: str) -> tupl
                     "basis_nodes": [phase_by_paragraph[paragraph.node_id].node_id]
                     if paragraph.node_id in phase_by_paragraph
                     else [],
+                    "presentation_evidence": asdict(format_evidence),
                 },
                 confidence=PHASE_INFERENCE_CONFIDENCE if paragraph.node_id in phase_by_paragraph else 0.4,
             )
@@ -2474,41 +2915,116 @@ def build_projection_views(connection: sqlite3.Connection, profile: str) -> tupl
     return tuple(views)
 
 
-def presentation_recommendation(text: str, role: str, sentence_count: int) -> tuple[str, str]:
+def projection_format_evidence(
+    connection: sqlite3.Connection,
+    paragraph: Node,
+    members: Sequence[str],
+    role: str,
+) -> ProjectionFormatEvidence:
+    """Collect graph evidence for one projection presentation decision."""
+    member_set = set(members)
+    incident_edges = incident_edges_for_members(connection, members)
+    derived_nodes = derived_nodes_for_members(connection, members)
+    feature_nodes, feature_edge_ids = presentation_features_for_members(connection, members)
+    return ProjectionFormatEvidence(
+        member_anchor_ids=tuple(members),
+        role=role,
+        presentation_features=tuple(sorted({node.label for node in feature_nodes})),
+        presentation_feature_edges=tuple(sorted(feature_edge_ids)),
+        derived_layers=tuple(sorted({node.layer for node in derived_nodes if node.node_id not in member_set})),
+        derived_kinds=tuple(sorted({node.kind for node in derived_nodes if node.node_id not in member_set})),
+        edge_layers=tuple(sorted({edge.layer for edge in incident_edges})),
+        edge_kinds=tuple(sorted({edge.kind for edge in incident_edges})),
+    )
+
+
+def presentation_features_for_members(
+    connection: sqlite3.Connection,
+    members: Sequence[str],
+) -> tuple[tuple[Node, ...], list[str]]:
+    """Return presentation feature nodes attached to a projection member set."""
+    feature_ids: set[str] = set()
+    feature_edge_ids: list[str] = []
+    for edge in incident_edges_for_members(connection, members):
+        if edge.layer == "presentation" and edge.kind == "has_feature":
+            feature_ids.add(edge.to_node_id)
+            feature_edge_ids.append(edge.edge_id)
+    if not feature_ids:
+        return (), []
+    return tuple(node for node in fetch_nodes(connection, layer="presentation", kind="feature") if node.node_id in feature_ids), feature_edge_ids
+
+
+def incident_edges_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> tuple[Edge, ...]:
+    """Return graph edges touching one projection member set."""
+    if not members:
+        return ()
+    placeholders = ", ".join("?" for _ in members)
+    rows = connection.execute(
+        f"""
+        SELECT * FROM edges
+        WHERE from_node_id IN ({placeholders}) OR to_node_id IN ({placeholders})
+        ORDER BY id
+        """,
+        [*members, *members],
+    ).fetchall()
+    return tuple(edge_from_row(row) for row in rows)
+
+
+def edge_from_row(row: sqlite3.Row) -> Edge:
+    """Convert a SQLite edge row to an Edge record."""
+    return Edge(
+        edge_id=str(row["id"]),
+        layer=str(row["layer"]),
+        kind=str(row["kind"]),
+        from_node_id=str(row["from_node_id"]),
+        to_node_id=str(row["to_node_id"]),
+        order_kind=str(row["order_kind"] or ""),
+        payload=read_json_object(str(row["payload_json"])),
+    )
+
+
+def derived_nodes_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> tuple[Node, ...]:
+    """Return source and analysis nodes derived from one projection member set."""
+    member_set = set(members)
+    output: list[Node] = []
+    for node in fetch_nodes(connection):
+        if node.node_id in member_set or anchor_id_for_derived_node(node) in member_set:
+            output.append(node)
+            continue
+        paragraph_id = node.payload.get("paragraph_id")
+        if isinstance(paragraph_id, str) and paragraph_id in member_set:
+            output.append(node)
+    return tuple(output)
+
+
+def presentation_recommendation(evidence: ProjectionFormatEvidence) -> tuple[str, str]:
     """Recommend a reader-facing presentation form for one projection view."""
-    lowered = text.lower()
-    if has_formula_signal(text):
-        return ("equation", "formula-like symbols or quantitative relation detected")
-    if role == "operationalization" or any(
-        cue in lowered for cue in ("metric", "baseline", "expected", "指標", "ベースライン", "期待")
-    ):
-        return ("table", "structured planning or comparison fields detected")
-    if any(
-        cue in lowered
-        for cue in (
-            "graph",
-            "dag",
-            "node",
-            "edge",
-            "anchor",
-            "projection view",
-            "グラフ",
-            "ノード",
-            "エッジ",
-            "図",
-        )
-    ):
-        return ("figure", "graph or spatial-relation vocabulary detected")
-    if role == "recommendation" or any(cue in lowered for cue in ("option", "choice", "選択肢", "次の選択")):
-        return ("ordered_list", "decision options or action order detected")
-    if sentence_count > SPLIT_PARAGRAPH_SENTENCE_LIMIT:
-        return ("bulleted_list", "multiple sentence units can be scanned as sibling points")
+    features = set(evidence.presentation_features)
+    if "formal_constraint" in features:
+        return ("equation", "presentation feature subgraph formal_constraint")
+    if "aligned_attribute_set" in features:
+        return ("table", "presentation feature subgraph aligned_attribute_set")
+    if "relational_topology" in features:
+        return ("figure", "presentation feature subgraph relational_topology")
+    if "dependency_sequence" in features:
+        return ("ordered_list", "presentation feature subgraph dependency_sequence")
+    if "parallel_sibling_set" in features:
+        return ("bulleted_list", "presentation feature subgraph parallel_sibling_set")
     return ("prose", "continuous explanation preserves local flow")
 
 
 def has_formula_signal(text: str) -> bool:
     """Return true when text looks better represented as a formula."""
-    return bool(re.search(r"[∑∏√≤≥≈→↦]|(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:=|<=|>=|<|>))", text))
+    if re.search(r"[∑∏√≤≥≈→↦]", text):
+        return True
+    if re.search(r"(?:\$[^$]*[=<>][^$]*\$|\\\([^)]*[=<>][^)]*\\\))", text):
+        return True
+    return bool(
+        re.search(
+            r"\b[a-z][a-z0-9_]*\s*(?:=|<=|>=)\s*(?:[-+]?\d|[a-z][a-z0-9_]*\s*[+\-*/^])",
+            text,
+        )
+    )
 
 
 def basis_edges_for_members(connection: sqlite3.Connection, members: Sequence[str]) -> list[str]:

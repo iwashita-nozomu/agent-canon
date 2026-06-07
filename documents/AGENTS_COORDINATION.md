@@ -112,5 +112,5 @@ artifact-only role や review role の write scope を確認するときは、`v
 - 論文 draft では `citation_evidence_reviewer` も兼務させません。
 - repo ファイルを直接編集する role は parent-assigned write policy を持つ write-capable role に限ります。
 - 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。
-- scope が重なる場合は serialize するか worktree を分けます。
+- scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
 - run 固有の artifact は `reports/agents/<run-id>/` に寄せ、repo-wide の正本と混ぜません。

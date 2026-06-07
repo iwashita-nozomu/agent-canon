@@ -21,7 +21,7 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - dependency edge、reverse edge、kind、cycle の問題を診断したい
 - closeout 前に dependency manifest evidence を揃えたい
 - 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
-- repo-wide text search の hit から、どの file を編集・確認すべきか dependency graph で展開したい
+- repo-wide search の responsibility-based candidate と bounded `rg` hit から、どの file を編集・確認すべきか dependency graph で展開したい
 - requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
 - refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
 
@@ -60,10 +60,16 @@ bash tools/agent_tools/scan_dependency_headers.sh
 bash tools/agent_tools/check_dependency_graph.sh --print-edges
 ```
 
-Search-to-edit-scope expansion:
+Responsibility-first search-to-edit-scope expansion:
 
 ```bash
-rg -l "search phrase" > reports/search_hits.txt
+printf '%s\n' "search purpose or user request" > reports/search_query.txt
+agent-canon semantic-index context-pack \
+  --query-file reports/search_query.txt \
+  --max-cells 12 \
+  --format text \
+  > reports/search_responsibility_context.txt
+rg -l "search phrase" <responsibility-scoped dirs> > reports/search_hits.txt
 bash tools/agent_tools/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
@@ -78,7 +84,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
-- search result を編集対象に変換するときは、raw `rg` hit に加えて `dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。
+- search result を編集対象に変換するときは、responsibility-based context、bounded `rg` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw `rg` hit だけで編集対象を決めません。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
@@ -100,8 +106,8 @@ Packet には最低限次を含めます。
   direct callees、direct callers、re-export / public import surface
 - `header_dependency_surface`: dependency manifest の upstream / downstream
   design、implementation、environment、test、workflow edge
-- `search_surface`: text search が seed の場合の `rg -l` hit と
-  `dependency_edit_scope.txt`
+- `search_surface`: responsibility-based context、text search が seed の場合の
+  bounded `rg -l` hit、`dependency_edit_scope.txt`
 - `structural_surface`: `tool-finding-report` や structural checker が seed の
   場合の full finding packet、priority order、repair slice
 - `tests_docs_config_log_info_edges`: test、doc、config、log、Info など code 以外の

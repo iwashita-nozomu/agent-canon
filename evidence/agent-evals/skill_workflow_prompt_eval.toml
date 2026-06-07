@@ -1,11 +1,11 @@
 # @dependency-start
 # responsibility Defines deterministic evals for skill and workflow prompt drift.
 # upstream design README.md prompt eval directory contract
-# upstream design ../skills/adaptive-improvement-loop.md adaptive improvement skill contract
-# upstream design ../skills/academic-writing.md Academic Writing TeX routing contract
-# upstream design ../skills/algorithm-proof-exploration.md proof-guided algorithm exploration skill contract
-# upstream design ../skills/structure-planning.md reusable structure planning skill contract
-# upstream design ../skills/html-output.md explicit HTML output and browser publication skill contract
+# upstream design ../../agents/skills/adaptive-improvement-loop.md adaptive improvement skill contract
+# upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
+# upstream design ../../agents/skills/algorithm-proof-exploration.md proof-guided algorithm exploration skill contract
+# upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
+# upstream design ../../agents/skills/html-output.md explicit HTML output and browser publication skill contract
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
 
@@ -14,7 +14,7 @@ version = 1
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
-expected_count = 43
+expected_count = 44
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -39,7 +39,7 @@ required_regex = ["(?m)^1\\.\\s+"]
 [[evals]]
 id = "all-human-skill-docs"
 target_glob = "agents/skills/*.md"
-expected_count = 63
+expected_count = 64
 kind = "skill"
 description = "Every human-facing skill document must be dependency-linked and reader-addressable."
 
@@ -940,7 +940,7 @@ required_regex = ["goal\\.md", "goal_loop\\.py"]
 id = "AIL-SHIM-2"
 critical = true
 description = "Requires frozen eval definitions before prompt or workflow tuning."
-required_regex = ["agents/evals/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
+required_regex = ["evidence/agent-evals/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
 
 [[evals.checklist]]
 id = "AIL-SHIM-3"
@@ -1030,7 +1030,7 @@ description = "The workflow must make eval definition, measurement, prompt repai
 id = "AIL-WF-1"
 critical = true
 description = "Defines evals before choosing or changing an iteration."
-required_regex = ["skill/workflow eval", "agents/evals/skill_workflow_prompt_eval\\.toml"]
+required_regex = ["skill/workflow eval", "evidence/agent-evals/skill_workflow_prompt_eval\\.toml"]
 
 [[evals.checklist]]
 id = "AIL-WF-2"
@@ -1474,7 +1474,7 @@ required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-
 
 [[evals]]
 id = "agent-behavior-eval-manifest"
-target = "agents/evals/agent_behavior_eval.toml"
+target = "evidence/agent-evals/agent_behavior_eval.toml"
 kind = "eval"
 description = "The behavior eval manifest must cover observable run behavior families."
 
@@ -1546,7 +1546,7 @@ required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_re
 
 [[evals]]
 id = "evals-readme-behavior-eval"
-target = "agents/evals/README.md"
+target = "evidence/agent-evals/README.md"
 kind = "eval"
 description = "The eval directory README must document prompt and behavior eval management."
 

@@ -87,6 +87,10 @@ paths = [
   "tools/**",
   "AGENTS.md",
 ]
+# Optional:
+# exclude_paths = [
+#   "evidence/agent-evals/**",
+# ]
 protecting_tools = [
   "tools/agent_tools/responsibility_scope.py",
   "tools/sync_agent_canon.sh",
