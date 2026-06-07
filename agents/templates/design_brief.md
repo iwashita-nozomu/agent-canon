@@ -15,6 +15,17 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 
 <!-- Describe the design goal in implementation-facing terms. The goal is to produce the design document that implementation will follow. -->
 
+## Abstract Design Frame
+
+<!-- Before narrowing to files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
+
+- Responsibility model:
+- Concept or layer model:
+- Non-goals:
+- Future extension layers:
+- Evaluation axes:
+- Canonical-surface relationships:
+
 ## Existing Code And Docs To Reuse
 
 <!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->

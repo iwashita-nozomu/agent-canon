@@ -101,7 +101,7 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
     parser.add_argument(
         "--workspace-root",
         default=".",
-        help="Workspace root used to resolve WORKTREE_SCOPE.md and write permissions.",
+        help="Workspace root used to resolve run-local reports and current-checkout path authority.",
     )
     return parser
 

@@ -37,6 +37,8 @@ upstream design README.md canonical workflow index
   - skill / tool / workflow / hook / eval の蓄積ログを compact summary に変換してから分析する
 - `agent-canon-update`
   - AgentCanon source、parent submodule pin、root runtime view、parent update TODO を正規 route で更新する
+- `pr-processing`
+  - PR / Issue queue の inventory、authority、conflict 解消、merge 順、validation、Issue triage、closeout evidence を固定する
 - `agent-update-branch`
   - memory / eval / AgentCanon pin などの agent-runtime 更新を update branch に分離する
 - `report-writing`
@@ -54,7 +56,7 @@ upstream design README.md canonical workflow index
 - `mvp-skeleton`
   - MVP、prototype、v0、first working version、thin slice の初手を 1 core loop と明示 deferral に抑える
 - `worktree-start`
-  - worktree 開始時の scope、action log、kickoff を整える
+  - stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を cleanup evidence として診断する。new worktree kickoff には使わない
 - `worktree-health`
   - worktree の scope drift と cleanup risk を確認
 - `experiment-lifecycle`

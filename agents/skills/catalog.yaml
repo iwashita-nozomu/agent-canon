@@ -61,6 +61,10 @@ skill_families:
     purpose: Update AgentCanon source, parent submodule pins, root runtime views, and parent update TODO state through the canonical high-level route.
     canonical_doc: agents/skills/agent-canon-update.md
     shim: .agents/skills/agent-canon-update/SKILL.md
+  - id: pr-processing
+    purpose: Process GitHub pull request and issue queues by inventorying state, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    canonical_doc: agents/skills/pr-processing.md
+    shim: .agents/skills/pr-processing/SKILL.md
   - id: agent-update-branch
     purpose: Isolate memory, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
     canonical_doc: agents/skills/agent-update-branch.md
@@ -130,7 +134,7 @@ skill_families:
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .agents/skills/dependency-analysis/SKILL.md
   - id: worktree-start
-    purpose: Initialize or refresh worktree scope, action-log targets, and kickoff checks before editing.
+    purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md
     shim: .agents/skills/worktree-start/SKILL.md
   - id: worktree-health

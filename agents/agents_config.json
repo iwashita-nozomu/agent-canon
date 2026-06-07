@@ -11,7 +11,7 @@
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
     "branch_prefix": "agent",
-    "worktree_scope_required": true,
+    "worktree_scope_required": false,
     "default_runtime_policy": "design_first_parent_managed_write_scope_team",
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
@@ -199,13 +199,16 @@
         "work_log.md"
       ],
       "write_policy": {
-        "mode": "worktree_scope_plus_artifacts",
+        "mode": "parent_assigned_scope_plus_artifacts",
         "allowed_artifacts": [
           "decision_log",
           "work_log"
         ],
-        "requires_worktree_scope": true,
-        "notes": "The implementer may modify repository files only inside its parent-assigned editable directories and only for paths allocated to its implementation slice. Multiple write-capable roles require disjoint scopes in the current checkout; colliding writers must be serialized into later waves and must not be moved to separate worktrees. WORKTREE_SCOPE.md is a legacy cleanup/drift artifact name, not permission to create or use a separate git worktree. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
+        "allowed_directories": [
+          "."
+        ],
+        "requires_worktree_scope": false,
+        "notes": "The implementer may modify repository files only inside the parent-assigned allowed paths, team_manifest.yaml write scope, and approved Implementation Source Packet for its implementation slice. Multiple write-capable roles require disjoint scopes in the current checkout; colliding writers must be serialized into later waves and must not be moved to separate worktrees. WORKTREE_SCOPE.md is legacy cleanup/drift evidence, not scope authority. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
       }
     },
     {
@@ -368,8 +371,12 @@
           "experiment_log",
           "experiment_change_loop"
         ],
-        "requires_worktree_scope": true,
-        "notes": "The experimenter may write only run artifacts and runtime output directories explicitly listed in WORKTREE_SCOPE.md. It may not edit repository source files."
+        "allowed_directories": [
+          "reports",
+          "experiments"
+        ],
+        "requires_worktree_scope": false,
+        "notes": "The experimenter may write only run artifacts and runtime output directories explicitly assigned in the current run handoff. WORKTREE_SCOPE.md is legacy cleanup/drift evidence and is not runtime output scope authority. It may not edit repository source files."
       }
     },
     {

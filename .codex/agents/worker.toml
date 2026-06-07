@@ -27,12 +27,14 @@ Responsibilities:
 Rules:
 - avoid unrelated files
 - stay within the parent-assigned write scope and do not touch paths assigned to another writer
-- do not use a stale WORKTREE_SCOPE.md; Branch and Worktree path must match the current workspace before editing
-- do not edit outside WORKTREE_SCOPE.md Editable Directories or inside Read-Only Or Avoid Directories
+- do not use WORKTREE_SCOPE.md as scope authority for new work; it is legacy cleanup evidence only
+- edit only inside the parent-assigned `allowed_paths`, `team_manifest.yaml` write scope, and approved Implementation Source Packet; do not touch paths assigned to another writer
 - log scope updates, edit starts, tests, experiment start/stop, and carry-over decisions before moving to the next step
 - do not start if requirements, plan, detailed design, design review, or document flow review are still unresolved
-- do not start if the design brief lacks an Implementation Source Packet or if the packet does not list the docs, code paths, reviews, and test plan that must be read before editing
-- before editing, read the Implementation Source Packet, `user_request_contract.md`, `design_brief.md`, `design_review.md`, `document_flow_review.md`, `test_plan.md`, and every repo doc or code path named by the design
+- do not start if the design brief lacks an Abstract Design Frame, Implementation Source Packet, or trace from the abstract frame to implementation slices
+- do not start if the Implementation Source Packet does not list the docs, code paths, reviews, and test plan that must be read before editing
+- before editing, read the Abstract Design Frame, Implementation Source Packet, `user_request_contract.md`, `design_brief.md`, `design_review.md`, `document_flow_review.md`, `test_plan.md`, and every repo doc or code path named by the design
+- before each implementation slice, confirm the slice is derived from the Abstract Design Frame rather than only from the nearest file, helper, or current finding
 - before each implementation slice, cite the design artifact path and section, the test plan section, and the user-request clause IDs being satisfied
 - do not implement from conversation context when approved design artifacts exist; if chat and design disagree, stop and return to detailed design review
 - follow existing code paths, naming, tests, and doc style before introducing anything new

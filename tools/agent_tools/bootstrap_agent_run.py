@@ -9,12 +9,15 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agent_canon_preflight import run_agent_canon_preflight
+from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 from agent_team import (
+    Role,
     RunBundleSpec,
+    TaskCatalog,
     TeamConfig,
     auto_language_specialists,
     codex_agent_model_matrix_for_roles,
@@ -35,7 +38,34 @@ from agent_team import (
     task_ids,
     workflow_spawn_budget,
 )
+from task_authority import write_task_authority_baselines
 from workflow_monitor import append_monitoring
+
+
+@dataclass(frozen=True)
+class BootstrapRunContext:
+    """Resolved run metadata for bootstrap output and bundle creation."""
+
+    created_at_iso: str
+    report_root: Path
+    run_id: str
+    report_dir: Path
+    enabled_specialists: tuple[str, ...]
+    task_default_specialists: tuple[str, ...]
+    auto_specialists: tuple[str, ...]
+    workflow_family_id: str | None
+    workflow_family_name: str | None
+    workflow_active_spawn_budget: int | None
+    workflow_max_write_subagents: int | None
+
+
+@dataclass(frozen=True)
+class BootstrapRuntime:
+    """Runtime objects created by bootstrap before output."""
+
+    roles: tuple[Role, ...]
+    created_files: tuple[str, ...]
+    active_pointer: Path
 
 
 def suggested_skills(
@@ -168,7 +198,7 @@ def build_parser(enable_names: tuple[str, ...], task_choices: tuple[str, ...]) -
     parser.add_argument(
         "--workspace-root",
         default=".",
-        help="Workspace root used to resolve WORKTREE_SCOPE.md and write permissions.",
+        help="Workspace root used to resolve run-local reports and current-checkout path authority.",
     )
     parser.add_argument(
         "--skip-agent-canon-preflight",
@@ -176,6 +206,161 @@ def build_parser(enable_names: tuple[str, ...], task_choices: tuple[str, ...]) -
         help="Skip the automatic make agent-canon-ensure-latest preflight.",
     )
     return parser
+
+
+def resolve_bootstrap_context(
+    args: argparse.Namespace,
+    config: TeamConfig,
+    catalog: TaskCatalog,
+    workspace_root: Path,
+) -> BootstrapRunContext:
+    """Resolve workflow family, specialists, and report paths for one run."""
+    created_at = datetime.now(UTC).replace(microsecond=0)
+    created_at_iso = created_at.isoformat().replace("+00:00", "Z")
+    report_root = resolve_report_root(args.report_root, workspace_root)
+    run_id = args.run_id or make_run_id(args.task, created_at)
+    report_dir = report_root / run_id
+    enabled_specialists = list(expand_enabled_specialists(config, catalog, tuple(args.enable)))
+    task_default_specialists: tuple[str, ...] = ()
+    workflow_family_id: str | None = None
+    workflow_family_name: str | None = None
+    workflow_active_spawn_budget: int | None = None
+    workflow_max_write_subagents: int | None = None
+    if args.task_id is not None:
+        task_spec = resolve_task_spec(catalog, args.task_id)
+        workflow_family_id = str(task_spec["family"])
+        workflow_family = resolve_workflow_family(catalog, workflow_family_id)
+        workflow_family_name = str(workflow_family["name"])
+        workflow_active_spawn_budget, workflow_max_write_subagents = workflow_spawn_budget(
+            catalog,
+            workflow_family_id,
+        )
+        task_default_specialists = default_specialists_for_task(
+            config=config,
+            catalog=catalog,
+            task_id=args.task_id,
+            include_default_review_packs=not args.no_default_review_packs,
+        )
+        for role_id in task_default_specialists:
+            if role_id not in enabled_specialists:
+                enabled_specialists.append(role_id)
+    auto_specialists: tuple[str, ...] = ()
+    if not args.no_auto_language_reviewers:
+        auto_specialists = auto_language_specialists(
+            workspace_root=workspace_root,
+            changed_paths=tuple(args.changed_path),
+        )
+        for role_id in auto_specialists:
+            if role_id not in enabled_specialists:
+                enabled_specialists.append(role_id)
+    return BootstrapRunContext(
+        created_at_iso=created_at_iso,
+        report_root=report_root,
+        run_id=run_id,
+        report_dir=report_dir,
+        enabled_specialists=tuple(enabled_specialists),
+        task_default_specialists=task_default_specialists,
+        auto_specialists=auto_specialists,
+        workflow_family_id=workflow_family_id,
+        workflow_family_name=workflow_family_name,
+        workflow_active_spawn_budget=workflow_active_spawn_budget,
+        workflow_max_write_subagents=workflow_max_write_subagents,
+    )
+
+
+def selected_review_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
+    """Return role ids that should appear in the review declaration."""
+    fixed_review_roles = {
+        "reviewer",
+        "verifier",
+        "auditor",
+        "docs_workflow_steward",
+        "critical_guardian",
+    }
+    return tuple(
+        role.id
+        for role in roles
+        if role.id.endswith("_reviewer") or role.id in fixed_review_roles
+    )
+
+
+def emit_bootstrap_output(
+    *,
+    args: argparse.Namespace,
+    config: TeamConfig,
+    context: BootstrapRunContext,
+    workspace_root: Path,
+    preflight: AgentCanonPreflightResult,
+    runtime: BootstrapRuntime,
+) -> None:
+    """Print the machine-readable bootstrap summary."""
+    selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    review_roles = selected_review_roles(runtime.roles)
+    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
+    print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
+    print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
+    print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
+    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST={preflight.checklist_path}")
+    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS={preflight.checklist_status}")
+    print(f"RUN_ID={context.run_id}")
+    print(f"REPORT_DIR={context.report_dir}")
+    print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
+    print(f"WORKSPACE_ROOT={workspace_root}")
+    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
+    print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
+    print(
+        "START_DECLARATION="
+        f"workflow={context.workflow_family_name or 'Unspecified'}, "
+        f"skills={','.join(selected_skills)}, "
+        f"review={','.join(review_roles) or '-'}"
+    )
+    if args.task_id is not None:
+        print(f"TASK_ID={args.task_id}")
+        print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
+        print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
+        print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
+        print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
+    if not args.no_auto_language_reviewers:
+        print(f"AUTO_SPECIALISTS={','.join(context.auto_specialists)}")
+    print("IMPLEMENTATION_CODEX_AGENTS=" f"{','.join(codex_agents_for_role(config, 'implementer'))}")
+    print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(runtime.roles))}")
+    print("CROSS_CUTTING_DOCUMENT_PACKET=" f"{cross_cutting_document_packet_output(workspace_root)}")
+    print(
+        "DESIGN_DOCUMENT_PACKET="
+        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root)}"
+    )
+    print(
+        "IMPLEMENTATION_DOCUMENT_PACKET="
+        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root)}"
+    )
+    print(f"ACTIVE_ROLES={','.join(role.id for role in runtime.roles)}")
+    print(f"CREATED_FILES={','.join(runtime.created_files)}")
+    print(f"AGENT_CANON_ACTIVE_RUN_POINTER={runtime.active_pointer}")
+
+
+def record_bootstrap_monitoring(
+    context: BootstrapRunContext,
+    roles: tuple[Role, ...],
+    selected_skills: tuple[str, ...],
+    review_roles: tuple[str, ...],
+    preflight_status: str,
+) -> None:
+    """Record bootstrap monitoring evidence."""
+    append_monitoring(
+        context.report_dir,
+        signals=[
+            (
+                f"workflow={context.workflow_family_name or 'Unspecified'}, "
+                f"skills={','.join(selected_skills)}, "
+                f"review={','.join(review_roles) or '-'}"
+            ),
+            "stage owner routing active_roles=" f"{','.join(role.id for role in roles)}",
+            f"agent_canon_preflight={preflight_status}",
+            "web_research_not_required: bootstrap does not decide external research",
+        ],
+        interventions=[f"created run bundle and workflow_monitoring.md at {context.report_dir}"],
+        behavior_events=["token_efficiency_not_required reason=bootstrap_default"],
+    )
 
 
 def main() -> int:
@@ -192,159 +377,48 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 1
-    created_at = datetime.now(UTC).replace(microsecond=0)
-    created_at_iso = created_at.isoformat().replace("+00:00", "Z")
-    report_root = resolve_report_root(args.report_root, workspace_root)
-    run_id = args.run_id or make_run_id(args.task, created_at)
-    report_dir = report_root / run_id
-    enabled_specialists = list(
-        expand_enabled_specialists(config, catalog, tuple(args.enable))
-    )
-    task_default_specialists: tuple[str, ...] = ()
-    auto_specialists: tuple[str, ...] = ()
-    workflow_family_id: str | None = None
-    workflow_family_name: str | None = None
-    workflow_active_spawn_budget: int | None = None
-    workflow_max_write_subagents: int | None = None
-    if args.task_id is not None:
-        task_spec = resolve_task_spec(catalog, args.task_id)
-        workflow_family_id = str(task_spec["family"])
-        workflow_family = resolve_workflow_family(catalog, workflow_family_id)
-        workflow_family_name = str(workflow_family["name"])
-        (
-            workflow_active_spawn_budget,
-            workflow_max_write_subagents,
-        ) = workflow_spawn_budget(
-            catalog,
-            workflow_family_id,
-        )
-        task_default_specialists = default_specialists_for_task(
-            config=config,
-            catalog=catalog,
-            task_id=args.task_id,
-            include_default_review_packs=not args.no_default_review_packs,
-        )
-        for role_id in task_default_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
-    if not args.no_auto_language_reviewers:
-        auto_specialists = auto_language_specialists(
-            workspace_root=workspace_root,
-            changed_paths=tuple(args.changed_path),
-        )
-        for role_id in auto_specialists:
-            if role_id not in enabled_specialists:
-                enabled_specialists.append(role_id)
+    context = resolve_bootstrap_context(args, config, catalog, workspace_root)
     roles = select_roles(
         config,
-        enabled_specialists,
+        list(context.enabled_specialists),
         args.full_team,
         catalog=catalog,
-        workflow_family_id=workflow_family_id,
+        workflow_family_id=context.workflow_family_id,
     )
-    created_files: tuple[str, ...] = ()
-
     created_files = create_run_bundle(
         RunBundleSpec(
             config=config,
-            report_dir=report_dir,
-            run_id=run_id,
+            report_dir=context.report_dir,
+            run_id=context.run_id,
             task=args.task,
             owner=args.owner,
-            created_at_iso=created_at_iso,
+            created_at_iso=context.created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
-            workflow_family_id=workflow_family_id or "",
+            workflow_family_id=context.workflow_family_id or "",
         )
     )
-    active_pointer = report_root / ".active_run"
-    active_pointer.write_text(str(report_dir.resolve()) + "\n", encoding="utf-8")
-
-    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-ensure-latest")
-    print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
-    print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
-    print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
-    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST={preflight.checklist_path}")
-    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS={preflight.checklist_status}")
-    print(f"RUN_ID={run_id}")
-    print(f"REPORT_DIR={report_dir}")
-    print(f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}")
-    print(f"WORKSPACE_ROOT={workspace_root}")
-    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
-    selected_skills = suggested_skills(args.task_id, workflow_family_id)
-    review_roles = tuple(
-        role.id
-        for role in roles
-        if role.id.endswith("_reviewer")
-        or role.id
-        in {
-            "reviewer",
-            "verifier",
-            "auditor",
-            "docs_workflow_steward",
-            "critical_guardian",
-        }
+    active_pointer = context.report_root / ".active_run"
+    active_pointer.write_text(str(context.report_dir.resolve()) + "\n", encoding="utf-8")
+    write_task_authority_baselines(context.report_dir, context.report_root)
+    runtime = BootstrapRuntime(roles=roles, created_files=created_files, active_pointer=active_pointer)
+    selected_skills = suggested_skills(args.task_id, context.workflow_family_id)
+    review_roles = selected_review_roles(roles)
+    emit_bootstrap_output(
+        args=args,
+        config=config,
+        context=context,
+        workspace_root=workspace_root,
+        preflight=preflight,
+        runtime=runtime,
     )
-    print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
-    print(
-        "START_DECLARATION="
-        f"workflow={workflow_family_name or 'Unspecified'}, "
-        f"skills={','.join(selected_skills)}, "
-        f"review={','.join(review_roles) or '-'}"
+    record_bootstrap_monitoring(
+        context,
+        roles,
+        selected_skills,
+        review_roles,
+        preflight.status,
     )
-    if args.task_id is not None:
-        print(f"TASK_ID={args.task_id}")
-        print("WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet")
-        print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={workflow_active_spawn_budget}")
-        print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={workflow_max_write_subagents}")
-        print(f"TASK_DEFAULT_SPECIALISTS={','.join(task_default_specialists)}")
-    if not args.no_auto_language_reviewers:
-        print(f"AUTO_SPECIALISTS={','.join(auto_specialists)}")
-    print(
-        "IMPLEMENTATION_CODEX_AGENTS="
-        f"{','.join(codex_agents_for_role(config, 'implementer'))}"
-    )
-    print(f"ROLE_MODEL_MATRIX={';'.join(codex_agent_model_matrix_for_roles(roles))}")
-    print(
-        "CROSS_CUTTING_DOCUMENT_PACKET="
-        f"{cross_cutting_document_packet_output(workspace_root)}"
-    )
-    print(
-        "DESIGN_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'designer', report_dir, workspace_root)}"
-    )
-    print(
-        "IMPLEMENTATION_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'implementer', report_dir, workspace_root)}"
-    )
-    append_monitoring(
-        report_dir,
-        signals=[
-            (
-                f"workflow={workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(selected_skills)}, "
-                f"review={','.join(review_roles) or '-'}"
-            ),
-            (
-                "stage owner routing active_roles="
-                f"{','.join(role.id for role in roles)}"
-            ),
-            f"agent_canon_preflight={preflight.status}",
-            (
-                "web_research_not_required: bootstrap does not decide "
-                "external research"
-            ),
-        ],
-        interventions=[
-            f"created run bundle and workflow_monitoring.md at {report_dir}",
-        ],
-        behavior_events=[
-            "token_efficiency_not_required reason=bootstrap_default",
-        ],
-    )
-    print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
-    print(f"CREATED_FILES={','.join(created_files)}")
-    print(f"AGENT_CANON_ACTIVE_RUN_POINTER={active_pointer}")
     return 0
 
 

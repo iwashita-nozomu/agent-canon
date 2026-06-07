@@ -137,6 +137,6 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - user が coding / implementation / patch work の subagent 委譲を明示した task は、read-only survey / review role だけで完了扱いにしません。requirements、bounded `allowed_paths`、write scope、validation plan、tool-rejection preflight が固定できたら、追加の read-only wave より先に `spark_worker` / `worker` を起動または schedule します。
 - Runtime authorization や tool gate で write-capable subagent を起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残します。parent-direct 実装は、その blocker を記録した後の fallback として扱います。
-- Routine docs / Focused code では parent-direct を許可します。subagent 実装では、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
+- Routine docs / Focused code では parent-direct を許可します。subagent 実装では、Abstract Design Frame から導かれ、design trace、identifier naming、test plan、write scope が固定済みで、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、局所 validation で閉じる低リスク slice は `spark_worker` を先に使います。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。

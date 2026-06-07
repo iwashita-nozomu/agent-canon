@@ -4,7 +4,6 @@
 # responsibility Tests proof trace code path and proposition alignment checker.
 # upstream implementation ../../tools/agent_tools/check_proof_trace_alignment.py checks anchors.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines trace policy.
-# downstream design ../../documents/tools/check_proof_trace_alignment.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations

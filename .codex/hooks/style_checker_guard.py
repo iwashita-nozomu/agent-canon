@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/ci/run_all_checks.sh runs Python ruff style checks.
 # upstream implementation ../../tools/docs/check_markdown_lint.py checks Markdown style.
 # upstream implementation ../../tools/docs/check_markdown_math.py checks Markdown math notation.
+# upstream implementation ../../codex-cli-guide/tools/validate_split.py checks generated Codex guide split coherence.
 # upstream implementation ../../tools/oop/cpp/readability.py checks C++ readability style.
 # upstream implementation ../../tools/validation/notebook_quality.py checks notebook quality.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates style hook behavior.
@@ -54,6 +55,10 @@ EXCLUDED_PARTS = {".git", "__pycache__", "reports", ".pytest_cache", ".ruff_cach
 EXCLUDED_SUFFIXES = {".jsonl"}
 EXCLUDED_PREFIXES = (
     ("agents", "evals", "results"),
+)
+CODEX_CLI_GUIDE_GENERATED_PREFIXES = (
+    ("codex-cli-guide", "sections"),
+    ("codex-cli-guide", "source"),
 )
 
 
@@ -261,31 +266,58 @@ def files_with_suffixes(paths: tuple[str, ...], suffixes: set[str]) -> tuple[str
 
 def markdown_commands(root: Path, paths: tuple[str, ...]) -> tuple[StyleCommand, ...]:
     """Return Markdown style commands."""
-    if not paths:
-        return ()
-    return (
-        StyleCommand(
-            checker="markdown_lint",
-            family="markdown",
-            command=(
-                "python3",
-                str(root / "tools" / "docs" / "check_markdown_lint.py"),
-                "--check",
-                *paths,
-            ),
-            paths=paths,
-        ),
-        StyleCommand(
-            checker="markdown_math",
-            family="markdown",
-            command=(
-                "python3",
-                str(root / "tools" / "docs" / "check_markdown_math.py"),
-                *paths,
-            ),
-            paths=paths,
-        ),
-    )
+    generated_guide_paths = codex_cli_guide_generated_paths(paths)
+    standard_paths = tuple(path for path in paths if path not in generated_guide_paths)
+    commands: list[StyleCommand] = []
+    if standard_paths:
+        commands.extend(
+            (
+                StyleCommand(
+                    checker="markdown_lint",
+                    family="markdown",
+                    command=(
+                        "python3",
+                        str(root / "tools" / "docs" / "check_markdown_lint.py"),
+                        "--check",
+                        *standard_paths,
+                    ),
+                    paths=standard_paths,
+                ),
+                StyleCommand(
+                    checker="markdown_math",
+                    family="markdown",
+                    command=(
+                        "python3",
+                        str(root / "tools" / "docs" / "check_markdown_math.py"),
+                        *standard_paths,
+                    ),
+                    paths=standard_paths,
+                ),
+            )
+        )
+    if generated_guide_paths:
+        commands.append(
+            StyleCommand(
+                checker="codex_cli_guide_split",
+                family="markdown",
+                command=(
+                    "python3",
+                    str(root / "codex-cli-guide" / "tools" / "validate_split.py"),
+                ),
+                paths=generated_guide_paths,
+            )
+        )
+    return tuple(commands)
+
+
+def codex_cli_guide_generated_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    """Return generated Codex guide source/section Markdown paths."""
+    selected: list[str] = []
+    for path in paths:
+        parts = Path(path).parts
+        if any(parts[: len(prefix)] == prefix for prefix in CODEX_CLI_GUIDE_GENERATED_PREFIXES):
+            selected.append(path)
+    return tuple(selected)
 
 
 def build_style_plan(root: Path) -> RootStylePlan:

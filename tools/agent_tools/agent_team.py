@@ -17,7 +17,6 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
-
 from task_authority import AUTHORITY_FILE_NAME, build_default_task_authority
 
 try:
@@ -196,6 +195,7 @@ class WritePolicy:
 
     mode: str
     allowed_artifacts: tuple[str, ...]
+    allowed_directories: tuple[str, ...] = ()
     requires_worktree_scope: bool = False
     notes: str = ""
 
@@ -819,7 +819,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     )
     authority_roles = {
         role.id: role.write_policy.mode
-        in {"worktree_scope_plus_artifacts", "runtime_outputs_plus_artifacts"}
+        not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
     (spec.report_dir / AUTHORITY_FILE_NAME).write_text(
@@ -897,7 +897,7 @@ def manifest_run_lines(
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
         lines.append("    disjoint_write_scopes_required: true")
-        lines.append("    overlapping_write_scopes: serialize_or_split_worktree")
+        lines.append("    overlapping_write_scopes: serialize_current_checkout_waves")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append("  workflow_family:")
         lines.append(f"    id: {spec.workflow_family_id}")
@@ -1103,13 +1103,52 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     ]
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
+    if role.id == "designer":
+        common.extend(
+            (
+                "abstract_design_frame",
+                "responsibility_model",
+                "concept_or_layer_model",
+                "non_goals",
+                "future_extension_layers",
+                "evaluation_axes",
+                "canonical_surface_relationships",
+            )
+        )
+    if role.id == "design_reviewer":
+        common.extend(
+            (
+                "abstract_design_frame_review",
+                "adf_before_file_scope",
+                "adf_to_implementation_trace",
+                "revise_if_design_starts_from_files_or_current_findings",
+            )
+        )
     if role.id == "implementer":
         common.extend(
             (
+                "abstract_design_frame",
                 "implementation_source_packet",
                 "design_to_implementation_trace",
                 "test_plan_item",
                 "remaining_planned_work_units",
+            )
+        )
+    if role.id == "change_reviewer":
+        common.extend(
+            (
+                "abstract_design_frame_trace",
+                "implementation_source_packet_entry",
+                "design_to_implementation_trace",
+                "revise_if_slice_only_justified_by_nearest_file_helper_or_current_finding",
+            )
+        )
+    if role.id == "final_reviewer":
+        common.extend(
+            (
+                "abstract_design_frame_trace",
+                "spec_to_product_trace",
+                "review_finding_incorporation_trace",
             )
         )
     if role.id.endswith("_reviewer") or role.id in {"change_reviewer", "final_reviewer"}:
@@ -1125,16 +1164,15 @@ def resolve_role_write_scope(
 ) -> RoleWriteScope:
     """Resolve concrete write paths for one role."""
     allowed_files = role_allowed_artifact_files(config, role, report_dir)
-    scope_file = find_worktree_scope_file(workspace_root)
-    allowed_directories = role_allowed_directories(role, workspace_root, scope_file)
-    unresolved_reason = role_write_scope_unresolved_reason(role, scope_file, allowed_directories)
+    allowed_directories = role_allowed_directories(role, workspace_root)
+    unresolved_reason = role_write_scope_unresolved_reason(role, allowed_directories)
     return RoleWriteScope(
         role_id=role.id,
         mode=role.write_policy.mode,
         allowed_files=allowed_files,
         allowed_directories=allowed_directories,
         requires_worktree_scope=role.write_policy.requires_worktree_scope,
-        worktree_scope_file=scope_file,
+        worktree_scope_file=None,
         unresolved_reason=unresolved_reason,
         notes=role.write_policy.notes,
     )
@@ -1160,40 +1198,34 @@ def role_allowed_artifact_files(
 def role_allowed_directories(
     role: Role,
     workspace_root: Path,
-    scope_file: Path | None,
 ) -> tuple[Path, ...]:
-    """Resolve worktree-scope directories one role may write."""
-    section_heading = role_write_scope_section(role.write_policy.mode)
-    if section_heading == "":
-        return ()
-    directories = _resolve_scope_directories(scope_file, workspace_root, section_heading)
-    return tuple(sorted(directories, key=str))
-
-
-def role_write_scope_section(mode: str) -> str:
-    """Return the WORKTREE_SCOPE.md section used by one write-policy mode."""
-    sections = {
-        "worktree_scope_plus_artifacts": "## Editable Directories",
-        "runtime_outputs_plus_artifacts": "## Runtime Output Directories",
-    }
-    return sections.get(mode, "")
+    """Resolve configured current-checkout directories one role may write."""
+    if role.write_policy.allowed_directories:
+        return tuple(
+            sorted(
+                (
+                    (workspace_root / directory).resolve()
+                    for directory in role.write_policy.allowed_directories
+                ),
+                key=str,
+            )
+        )
+    return ()
 
 
 def role_write_scope_unresolved_reason(
     role: Role,
-    scope_file: Path | None,
     allowed_directories: tuple[Path, ...],
 ) -> str | None:
-    """Return why a write policy requiring worktree scope is unresolved."""
+    """Return why a configured current-checkout write policy is unresolved."""
     if not role.write_policy.requires_worktree_scope:
         return None
-    if scope_file is None:
-        return "WORKTREE_SCOPE.md is required but was not found in the workspace root."
     if allowed_directories:
         return None
-    if role.write_policy.mode == "runtime_outputs_plus_artifacts":
-        return "WORKTREE_SCOPE.md was found, but no runtime output directories could be parsed."
-    return "WORKTREE_SCOPE.md was found, but no editable directories could be parsed."
+    return (
+        "Legacy WORKTREE_SCOPE write scope is disabled; configure explicit "
+        "write_policy.allowed_directories in agents/agents_config.json."
+    )
 
 
 def collect_changed_files(
@@ -1293,6 +1325,9 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
     write_policy = WritePolicy(
         mode=str(raw_write_policy["mode"]),
         allowed_artifacts=tuple(str(item) for item in raw_write_policy["allowed_artifacts"]),
+        allowed_directories=tuple(
+            str(item) for item in raw_write_policy.get("allowed_directories", ())
+        ),
         requires_worktree_scope=bool(raw_write_policy.get("requires_worktree_scope", False)),
         notes=str(raw_write_policy.get("notes", "")),
     )
@@ -1304,51 +1339,6 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
         write_policy=write_policy,
         codex_agents=tuple(str(item) for item in raw_role.get("codex_agents", ())),
     )
-
-
-def find_worktree_scope_file(workspace_root: Path) -> Path | None:
-    """Return the worktree scope file if present."""
-    candidate = workspace_root.resolve() / "WORKTREE_SCOPE.md"
-    if candidate.is_file():
-        return candidate
-    return None
-
-
-def _resolve_scope_directories(
-    scope_file: Path | None,
-    workspace_root: Path,
-    section_heading: str,
-) -> list[Path]:
-    """Parse directories from one named WORKTREE_SCOPE.md section."""
-    if scope_file is None:
-        return []
-    content = scope_file.read_text(encoding="utf-8")
-    in_section = False
-    directories: list[Path] = []
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            in_section = stripped == section_heading
-            continue
-        if not in_section or not stripped.startswith("- "):
-            continue
-        path_text = _extract_markdown_code_or_bullet_value(stripped[2:])
-        if not path_text:
-            continue
-        path_text = path_text.rstrip("/").strip()
-        directories.append((workspace_root / path_text).resolve())
-    return directories
-
-
-def _extract_markdown_code_or_bullet_value(text: str) -> str:
-    """Extract the primary path token from a markdown bullet."""
-    code_match = re.search(r"`([^`]+)`", text)
-    if code_match is not None:
-        return code_match.group(1)
-    plain_text = text.split(" -- ", 1)[0]
-    plain_text = text.split(" - ", 1)[0] if plain_text == text else plain_text
-    plain_text = text.split(" (", 1)[0] if plain_text == text else plain_text
-    return plain_text.strip()
 
 
 def _git_paths(workspace_root: Path, args: list[str]) -> set[Path]:

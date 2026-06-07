@@ -22,8 +22,29 @@ from report_artifact_checks import (
     table_body_rows,
 )
 
-
 DECISION_PATTERN = re.compile(r"\b(approve|revise|escalate)\b", re.IGNORECASE)
+ABSTRACT_DESIGN_FRAME_REQUIRED_TERMS: dict[str, tuple[str, ...]] = {
+    "responsibility_model": ("responsibility model", "responsibility_model"),
+    "concept_or_layer_model": (
+        "concept graph",
+        "concept or layer model",
+        "layer model",
+        "concept/layer",
+        "concept_or_layer_model",
+    ),
+    "non_goals": ("non-goals", "non_goals", "non goals"),
+    "future_extension_layers": (
+        "future extension layers",
+        "future_extension_layers",
+    ),
+    "evaluation_axes": ("evaluation axes", "evaluation_axes"),
+    "canonical_surface_relationships": (
+        "canonical-surface relationships",
+        "canonical surface relationships",
+        "relationship to existing canonical surfaces",
+        "canonical_surface_relationships",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -74,6 +95,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             require_filled=True,
             required_sections=(
                 "## Upstream Requirement Packet",
+                "## Abstract Design Frame",
                 "## Implementation Source Packet",
                 "## Canonical Tree-Head Plan",
                 "## Design-To-Implementation Trace",
@@ -85,6 +107,7 @@ GATE_CHECKS: dict[str, tuple[ArtifactCheck, ...]] = {
             require_approve=True,
             required_sections=(
                 "## Upstream Requirement Packet Review",
+                "## Abstract Design Frame Review",
                 "## Implementation Source Packet Review",
                 "## Canonical Tree-Head Review",
                 "## Design-To-Implementation Trace Review",
@@ -186,6 +209,53 @@ def check_user_request_contract(text: str) -> list[str]:
     return blockers
 
 
+def section_body(text: str, heading: str) -> str:
+    """Return the body text for one second-level Markdown section."""
+    lines = text.splitlines()
+    in_section = False
+    body: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_section:
+                break
+            in_section = stripped == heading
+            continue
+        if in_section:
+            body.append(line)
+    return "\n".join(body)
+
+
+def check_abstract_design_frame(text: str) -> list[str]:
+    """Return blockers when the abstract design frame is under-specified."""
+    body = section_body(text, "## Abstract Design Frame")
+    blockers: list[str] = []
+    for term_id, accepted_terms in ABSTRACT_DESIGN_FRAME_REQUIRED_TERMS.items():
+        if not abstract_term_has_content(body, accepted_terms):
+            blockers.append(f"design_brief.md:abstract_design_frame_missing:{term_id}")
+    return blockers
+
+
+def abstract_term_has_content(body: str, accepted_terms: tuple[str, ...]) -> bool:
+    """Return whether one abstract-frame dimension is named with concrete content."""
+    placeholder_values = {"", "-", "todo", "tbd", "none", "n/a"}
+    for line in body.splitlines():
+        normalized = line.strip().lstrip("-* ").lower()
+        matched_term = next(
+            (term for term in accepted_terms if normalized.startswith(term)),
+            "",
+        )
+        if not matched_term:
+            continue
+        remainder = normalized.removeprefix(matched_term).strip()
+        if not (remainder.startswith(":") or remainder.startswith("-")):
+            continue
+        value = remainder[1:].strip()
+        if value not in placeholder_values:
+            return True
+    return False
+
+
 def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
     """Return blockers for one artifact."""
     blockers: list[str] = []
@@ -201,6 +271,8 @@ def check_artifact(report_dir: Path, check: ArtifactCheck) -> list[str]:
             blockers.append(f"{check.path}:section_empty_or_missing:{slug}")
     if check.path == "user_request_contract.md":
         blockers.extend(check_user_request_contract(text))
+    elif check.path == "design_brief.md":
+        blockers.extend(check_abstract_design_frame(text))
     elif check.path == "schedule.md":
         blockers.extend(check_schedule_artifact(text))
     elif check.path == "work_log.md":

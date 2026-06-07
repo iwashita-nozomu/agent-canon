@@ -39,13 +39,13 @@ Rules:
 - return revise when any must-do or completion-evidence clause lacks corresponding product behavior, code, docs, test, command, artifact, or explicit deferred/rejected clause
 - return revise when prior required review findings are not applied, re-reviewed, or explicitly escalated before closeout
 - return escalate when the diff disagrees with the approved design packet or exposes a design gap rather than a local implementation mistake
-- return revise when the worker changed files that are not listed in the Implementation Source Packet or file-by-file design, unless the design explicitly allowed that fallback
+- return revise when the worker changed files that are not derived from the Abstract Design Frame and listed in the Implementation Source Packet or file-by-file design, unless the design explicitly allowed that fallback
 - return escalate when the diff is solving work that is outside the tracked request clauses
 - return revise when the implementer can fix the findings inside the same implementation pass
 - return escalate when the diff shows the design or test plan is wrong
-- return revise when WORKTREE_SCOPE.md Branch or Worktree path does not match the current workspace
-- return revise when changed files fall outside WORKTREE_SCOPE.md Editable Directories or inside Read-Only Or Avoid Directories
-- return revise when the required worktree action log omits scope, edit, test, experiment start/stop, or carry-over events that are relevant to the diff
+- return revise when the implementation relies on WORKTREE_SCOPE.md as scope authority for new work instead of the current checkout handoff packet
+- return revise when changed files fall outside parent-assigned `allowed_paths`, `team_manifest.yaml` write scope, or the approved Implementation Source Packet
+- return revise when the current checkout run-local work log omits scope, edit, test, experiment start/stop, or carry-over events that are relevant to the diff
 - return revise when the diff satisfies only a specialized path while the request requires a generic usable path
 - return revise when a JAX export/native generic path lacks jax.export artifact producer and consumer/runtime evidence
 - return escalate when one implementation slice mixes generic callable path, specialized coeff path, and export-based generic path without an explicit design decision

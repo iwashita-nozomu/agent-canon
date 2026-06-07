@@ -23,9 +23,13 @@ sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
 from hook_event_log import HookLogContext, fingerprint_json, utc_now  # noqa: E402
 from task_authority import (  # noqa: E402
+    ACTIVE_RUN_BASELINE_POINTER,
+    ACTIVE_RUN_POINTER,
     AUTHORITY_ENV,
     AuthorityFinding,
+    authority_baseline_path,
     load_task_authority,
+    path_changed_from_baseline,
     validate_authority_payload,
 )
 
@@ -85,8 +89,8 @@ def repo_root() -> Path:
     return Path.cwd()
 
 
-def changed_files(root: Path) -> tuple[str, ...]:
-    """Return changed paths visible to task-authority enforcement."""
+def git_changed_files(root: Path) -> tuple[str, ...]:
+    """Return changed paths visible to hook enforcement."""
     names: set[str] = set()
     for args in (
         ("diff", "--name-only", "--diff-filter=ACMRTD", "HEAD", "--"),
@@ -102,7 +106,65 @@ def changed_files(root: Path) -> tuple[str, ...]:
         )
         if result.returncode == 0:
             names.update(line.strip() for line in result.stdout.splitlines() if line.strip())
-    return tuple(sorted(path for path in names if not path.startswith("reports/agents/")))
+    return tuple(sorted(names))
+
+
+def changed_files(root: Path) -> tuple[str, ...]:
+    """Return changed repo paths that need task authority."""
+    return tuple(
+        path for path in git_changed_files(root) if not path.startswith("reports/agents/")
+    )
+
+
+def relative_path(root: Path, path: Path) -> str:
+    """Return a repo-relative path string when possible."""
+    resolved_root = root.resolve()
+    resolved_path = path.resolve()
+    try:
+        return resolved_path.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return resolved_path.as_posix()
+
+
+def dirty_active_pointer_findings(
+    root: Path,
+    repo_paths: tuple[str, ...],
+    all_paths: tuple[str, ...],
+) -> tuple[AuthorityFinding, ...]:
+    """Return findings for self-mutating active-run pointer edits."""
+    if not repo_paths:
+        return ()
+    findings: list[AuthorityFinding] = []
+    dirty = set(all_paths)
+    active_pointer = ACTIVE_RUN_POINTER.as_posix()
+    baseline_changed = path_changed_from_baseline(
+        root / ACTIVE_RUN_POINTER,
+        root / ACTIVE_RUN_BASELINE_POINTER,
+    )
+    if active_pointer in dirty or baseline_changed:
+        findings.append(AuthorityFinding("active-run-pointer-mutated-with-repo-edit", active_pointer))
+    return tuple(findings)
+
+
+def dirty_authority_path_findings(
+    root: Path,
+    authority_path: Path,
+    repo_paths: tuple[str, ...],
+    all_paths: tuple[str, ...],
+) -> tuple[AuthorityFinding, ...]:
+    """Return findings for self-mutating authority file edits."""
+    if not repo_paths:
+        return ()
+    findings: list[AuthorityFinding] = []
+    dirty = set(all_paths)
+    authority_rel = relative_path(root, authority_path)
+    baseline_changed = path_changed_from_baseline(
+        authority_path,
+        authority_baseline_path(authority_path),
+    )
+    if authority_rel in dirty or baseline_changed:
+        findings.append(AuthorityFinding("authority-mutated-with-repo-edit", authority_rel))
+    return tuple(findings)
 
 
 def block_payload(findings: tuple[AuthorityFinding, ...]) -> dict[str, object]:
@@ -133,6 +195,7 @@ def main() -> int:
         return 0
     root = repo_root()
     authority = load_task_authority(root)
+    all_paths = git_changed_files(root)
     paths = changed_files(root)
     findings: list[AuthorityFinding] = []
     if authority is None:
@@ -140,6 +203,9 @@ def main() -> int:
             findings.append(AuthorityFinding("missing-authority", ",".join(paths[:5])))
     else:
         findings.extend(validate_authority_payload(authority.payload))
+    findings.extend(dirty_active_pointer_findings(root, paths, all_paths))
+    if authority is not None:
+        findings.extend(dirty_authority_path_findings(root, authority.path, paths, all_paths))
     context = HookLogContext(
         active_root=root,
         hook_name="task_authority_schema_guard",

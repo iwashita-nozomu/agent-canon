@@ -1,0 +1,75 @@
+---
+name: pr-processing
+description: Use when processing GitHub pull requests or issue queues: inventory open PRs, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs.
+---
+<!--
+@dependency-start
+responsibility Documents PR Processing runtime skill for this repository.
+upstream design ../../../agents/skills/pr-processing.md documents the human-facing workflow
+upstream design ../../../agents/workflows/pr-queue-cleanup-workflow.md defines AgentCanon source and parent pin queue cleanup
+upstream design ../../../agents/workflows/agent-canon-pr-workflow.md defines AgentCanon source PR gates
+upstream design ../../../documents/agent-canon-update-route.md defines source PR versus parent pin update routing
+upstream design ../../../agents/skills/result-artifact-writeout.md defines run-local result artifact writeout
+upstream implementation ../../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
+upstream implementation ../../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
+@dependency-end
+-->
+
+# PR Processing
+
+1. Read `agents/skills/pr-processing.md`.
+1. If AgentCanon source PRs or parent pin PRs are involved, also read
+   `agents/workflows/pr-queue-cleanup-workflow.md` and
+   `agents/workflows/agent-canon-pr-workflow.md`.
+1. Before creating or updating a PR, identify the active run bundle. If none
+   exists, run `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>"
+   --owner codex --workspace-root "$PWD"` and record `RUN_ID`, `REPORT_DIR`,
+   and `AGENT_CANON_PREFLIGHT_*` lines in `work_log.md` or
+   `workflow_monitoring.md`.
+1. Keep PR publication artifacts inside the run bundle:
+   - write the reviewed PR body to `reports/agents/<run-id>/pr_body.md`;
+   - pass `--summary-out reports/agents/<run-id>/github_publish.json` to
+     `github_publish.py publish-pr`;
+   - record PR number / URL, branch, head SHA, authority decision, checks
+     summary, issue actions, and blockers in `work_log.md` or a run-local
+     `pr_processing_log.md`.
+1. Fix the authority boundary before mutation:
+   - inspecting PRs, checks, comments, reviews, and issues is allowed when the
+     task asks for PR / Issue processing;
+   - merging, closing, marking ready, deleting branches, or dismissing reviews
+     needs current user authority or tracked maintainer policy for that action;
+   - never bypass failed checks, branch protection, requested reviews, or draft
+     state.
+1. Snapshot the queue before editing:
+   - `gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt`
+   - `gh issue list --state open --json number,title,labels,updatedAt,url`
+   - for each candidate PR, inspect `gh pr view` and `gh pr checks`.
+1. Classify each PR as `ready`, `behind`, `conflicting`, `draft`,
+   `checks-failing`, `review-blocked`, `stale`, or `dependent-pin`.
+1. Plan merge order from dependency and conflict evidence:
+   - source / library / AgentCanon PRs before parent pin or template PRs;
+   - PRs touching shared root/runtime surfaces before dependent docs-only PRs;
+   - conflicting PRs after the branch they conflict with has landed, unless the
+     conflict repair is independent.
+1. Resolve conflicts on the PR head branch, then rerun the smallest validation
+   that covers the touched surface. Do not resolve conflicts by discarding user
+   changes or force-pushing without explicit authority.
+1. Before merging a PR, require:
+   - open, non-draft PR;
+   - mergeable state;
+   - required checks passing;
+   - no blocking review request or requested-change review;
+   - PR body, comment, or run bundle includes validation evidence and any
+     automation authority lines required by the repo.
+1. For AgentCanon source PRs, merge source first, then update parent repos with
+   `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
+   and the parent PR gate.
+1. Process issues with the same evidence rule:
+   - close only resolved, duplicate, obsolete, or intentionally not-planned
+     issues with a concrete PR, commit, or policy reference;
+   - update active issues with residual work and owner;
+   - keep stale issues open when evidence is insufficient.
+1. Close out with a table of PR actions, issue actions, merge SHAs, remaining
+   blockers, validation commands, final open PR / Issue counts, and the run
+   bundle paths that contain the bootstrap log, PR body, publish summary, and
+   check evidence.

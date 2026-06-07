@@ -6,6 +6,8 @@ upstream implementation ../../tools/sync_agent_canon.sh sync implementation
 upstream implementation ../../tools/update_agent_canon.sh tool-first latest update and conflict handoff
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh PR gate implementation
 upstream implementation ../../tools/ci/check_github_workflows.py GitHub workflow and PR checklist gate
+upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py creates run-local report bundles
+upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
 upstream implementation ../../tools/agent_tools/tool_drift.py tool/convention trace gate
 upstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility scope gate
 upstream implementation ../../tools/agent_tools/issue_sync.py local/GitHub issue sync gate
@@ -17,6 +19,8 @@ upstream design ../../issues/README.md durable operational finding storage
 upstream design ../../documents/dependency-manifest-design.md dependency graph and search-to-edit-scope evidence
 upstream design ../../documents/agent-canon-github-remote.md defines canonical remote evidence
 upstream design ../../documents/template-github-remote.md defines template remote evidence
+upstream design ../canonical/ARTIFACT_PLACEMENT.md defines run-local artifact placement
+upstream design ../skills/result-artifact-writeout.md defines result artifact writeout
 downstream design derived-agent-canon-diff-workflow.md derived diff workflow consumes PR gates
 @dependency-end
 -->
@@ -238,6 +242,17 @@ template / derived repo でこの段階の `make agent-canon-pr-check` が `AGEN
 
 6. PR を作る
 
+- PR 作成 / 更新の前に run-local report を固定します。active run bundle が無い場合は
+  `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex --workspace-root "$PWD"`
+  を実行し、`RUN_ID`、`REPORT_DIR`、`AGENT_CANON_PREFLIGHT_*` を
+  `work_log.md` または `workflow_monitoring.md` に残します。
+- PR body は先に `reports/agents/<run-id>/pr_body.md` へ展開し、agent が
+  body 全文、validation、authority、blocker、Issue reference を確認してから publish します。
+- `github_publish.py publish-pr` には
+  `--summary-out reports/agents/<run-id>/github_publish.json` を付けます。
+  PR 作成 / 更新後は PR number / URL、branch、head SHA、mutation authority、
+  check summary、Issue action、remaining blocker を `work_log.md` または
+  `pr_processing_log.md` に追記します。
 - standalone AgentCanon repo へ shared canon source change を出す PR では `.github/PULL_REQUEST_TEMPLATE.md` を使います。
 - template / derived repo 側で `vendor/agent-canon/` の pin、root copy、または shared surface を変える PR では `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` を使います。
 - 変更した surface、validation、upstream sync result または block reason を PR 本文に書きます。

@@ -233,7 +233,7 @@ ownership と validation は [SHARED_RUNTIME_SURFACES.md](../SHARED_RUNTIME_SURF
 - `tools/audit/audit_logger.py`
   - audit profile で agent / repo automation event を JSONL audit log として保存します。
 - `tools/worktree_start.sh`
-  - worktree kickoff の user-facing 入口です。
+  - legacy `WORKTREE_SCOPE.md` / action log の cleanup 診断入口です。新規 worktree kickoff には使いません。
 - `tools/update_agent_canon.sh`
   - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-latest` で tool-first に適用します。
   - `latest` は safe な AgentCanon `main` 更新、legacy eval / hook log parking、root view check、親 repo update TODO routing / acknowledge まで進めます。dirty submodule が legacy `agents/evals/results/` だけなら `runtime_log_archive_git.py import-legacy|import-eval-results --delete-source` で `.agent-canon/log-archive/legacy-import/` へ退避してから続行します。新規蓄積は `.agent-canon/log-archive/` を使い、source tree の `agents/evals/results/` を新規作成しません。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。runtime source、local shared-canon branch、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW`、`AGENT_CANON_LATEST_CONFLICT_COMMAND`、`NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。
@@ -417,8 +417,8 @@ closeout では raw log だけでなく、summary/report path と可視化 path�
 
 ## 補足
 
-- `setup_worktree.sh` などの branch/worktree 補助は例外運用用です。
-- 既定運用は `main` であり、通常作業の入口にはしません。
+- `setup_worktree.sh` / `tools/docs/create_worktree.sh` は deprecated wrapper です。呼ばれた場合は caller chain と移行先を stderr に出し、新規 worktree を作らず停止します。
+- 既定運用は current checkout の run bundle と `team_manifest.yaml` write scope です。
 
 ## 参照先
 

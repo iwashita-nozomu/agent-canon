@@ -129,6 +129,10 @@ path = "../.agents/skills/prose-reasoning-graph/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/pr-processing/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/python-review/SKILL.md"
 enabled = true
 
@@ -322,7 +326,7 @@ description = "High-assurance read-only reviewer for final clause coverage and r
 config_file = "agents/ship_reviewer.toml"
 
 [agents.spark_worker]
-description = "Low-latency implementation agent for narrow, design-traced code, docs, tests, or mechanical cleanup slices."
+description = "Low-latency implementation agent for narrow code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace."
 config_file = "agents/spark_worker.toml"
 
 [agents.test_designer]

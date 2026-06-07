@@ -25,7 +25,8 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   - 具体値は `python3 tools/agent_tools/runtime_log_archive_git.py status` の
     `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見る
 - 一時的な runtime output:
-  - `WORKTREE_SCOPE.md` の `## Runtime Output Directories` に書かれた場所
+  - current checkout の run-local handoff、`team_manifest.yaml` write policy、または `task_authority.yaml` `allowed_paths` に明示された場所
+  - `WORKTREE_SCOPE.md` は legacy cleanup evidence であり、新しい runtime output や write scope の authority ではありません
 
 ## Task 中の拡張文書
 

@@ -52,10 +52,10 @@ upstream design README.md notes lifecycle index
 - scope で禁止された runner 変更、function fusion、別経路追加を、性能改善のために横滑りで入れる
 - user request clause にない実装 slice を「ついで」として入れる
 - 詳細設計または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を worker が自由裁量で作る
-- worktree scope を更新せずに編集範囲を広げる
+- `task_authority.yaml` `allowed_paths`、`team_manifest.yaml` write scope、review gate を固定せずに編集範囲を広げる
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を現在の worktree に流用する
-- `WORKTREE_SCOPE.md` の `Editable Directories` 外や `Read-Only Or Avoid Directories` 内を編集する
-- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を action log に残さず進める
+- parent-assigned `allowed_paths`、`team_manifest.yaml` write scope、approved `Implementation Source Packet` 外を編集する
+- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を run-local `work_log.md` に残さず進める
 - raw 結果だけ残して、読み方や判断を note / report に落とさない
 - JAX の任意 callable を current native runtime が直接理解できるものとして扱う
 - generic callable path、specialized coeff path、export-based generic path を 1 つの実装 slice で混同する

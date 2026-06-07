@@ -162,6 +162,20 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("prose-reasoning-graph", decision["skills"])
         self.assertIn("prose-reasoning-graph", decision["matched_skills"])
 
+    def test_prompt_routes_pr_processing(self) -> None:
+        """PR queue work should route to the public PR processing skill."""
+        result = self.run_route(
+            "--prompt",
+            "PRの処理をスキル化して、conflict 解消と Issue triage まで扱って",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("pr-processing", decision["skills"])
+        self.assertIn("pr-processing", decision["matched_skills"])
+
     def test_unknown_name_fails_closed(self) -> None:
         """Unknown aliases should be explicit failures."""
         result = self.run_route("--name", "unknown_super_router.py")

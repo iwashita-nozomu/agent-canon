@@ -23,7 +23,16 @@ sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
 from agent_team import load_team_config, validate_role_write_scope  # noqa: E402
 from hook_event_log import HookLogContext, fingerprint_json, utc_now  # noqa: E402
-from task_authority import load_task_authority  # noqa: E402
+from task_authority import (  # noqa: E402
+    ACTIVE_RUN_BASELINE_POINTER,
+    ACTIVE_RUN_POINTER,
+    TaskAuthority,
+    authority_baseline_path,
+    entry_matches_path,
+    load_task_authority,
+    path_authority_entries,
+    path_changed_from_baseline,
+)
 
 PAYLOAD_STATUS_KEY = "_agent_canon_payload_status"
 LOG_PATH_ENV = "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH"
@@ -94,8 +103,8 @@ def repo_root() -> Path:
     return Path.cwd()
 
 
-def changed_files(root: Path) -> tuple[str, ...]:
-    """Return changed repo paths excluding run artifacts."""
+def git_changed_files(root: Path) -> tuple[str, ...]:
+    """Return all changed paths visible to hook enforcement."""
     names: set[str] = set()
     for args in (
         ("diff", "--name-only", "--diff-filter=ACMRTD", "HEAD", "--"),
@@ -111,20 +120,97 @@ def changed_files(root: Path) -> tuple[str, ...]:
         )
         if result.returncode == 0:
             names.update(line.strip() for line in result.stdout.splitlines() if line.strip())
-    return tuple(sorted(path for path in names if not path.startswith("reports/agents/")))
+    return tuple(sorted(names))
 
 
-def active_role(root: Path) -> tuple[str, str, Path | None]:
+def changed_files(root: Path) -> tuple[str, ...]:
+    """Return changed repo paths excluding run artifacts."""
+    return tuple(
+        path for path in git_changed_files(root) if not path.startswith("reports/agents/")
+    )
+
+
+def relative_path(root: Path, path: Path) -> str:
+    """Return a repo-relative path string when possible."""
+    resolved_root = root.resolve()
+    resolved_path = path.resolve()
+    try:
+        return resolved_path.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return resolved_path.as_posix()
+
+
+def active_role(root: Path) -> tuple[str, str, TaskAuthority | None]:
     """Resolve active role from env or task authority."""
     for env_name in ACTIVE_ROLE_ENVS:
         value = os.environ.get(env_name, "").strip()
         if value:
             authority = load_task_authority(root)
-            return value, f"env:{env_name}", authority.path if authority else None
+            return value, f"env:{env_name}", authority
     authority = load_task_authority(root)
     if authority is not None and authority.active_role:
-        return authority.active_role, "task_authority", authority.path
-    return "", "missing", authority.path if authority else None
+        return authority.active_role, "task_authority", authority
+    return "", "missing", authority
+
+
+def task_authority_path_findings(
+    authority: TaskAuthority,
+    paths: tuple[str, ...],
+) -> tuple[RoleWriteFinding, ...]:
+    """Return request-local path-authority findings for changed repo paths."""
+    if not paths:
+        return ()
+    findings: list[RoleWriteFinding] = []
+    allowed_entries = path_authority_entries(authority.payload.get("allowed_paths", []))
+    forbidden_entries = path_authority_entries(authority.payload.get("forbidden_paths", []))
+    for path in paths:
+        if any(entry_matches_path(entry, path) for entry in forbidden_entries):
+            findings.append(RoleWriteFinding("task-authority-forbidden-path", path))
+            continue
+        if not any(entry_matches_path(entry, path) for entry in allowed_entries):
+            findings.append(RoleWriteFinding("task-authority-path-violation", path))
+    return tuple(findings)
+
+
+def dirty_active_pointer_findings(
+    root: Path,
+    repo_paths: tuple[str, ...],
+    all_paths: tuple[str, ...],
+) -> tuple[RoleWriteFinding, ...]:
+    """Return findings when an edit changes active-run pointer and repo files together."""
+    if not repo_paths:
+        return ()
+    findings: list[RoleWriteFinding] = []
+    dirty = set(all_paths)
+    active_pointer = ACTIVE_RUN_POINTER.as_posix()
+    baseline_changed = path_changed_from_baseline(
+        root / ACTIVE_RUN_POINTER,
+        root / ACTIVE_RUN_BASELINE_POINTER,
+    )
+    if active_pointer in dirty or baseline_changed:
+        findings.append(RoleWriteFinding("active-run-pointer-mutated-with-repo-edit", active_pointer))
+    return tuple(findings)
+
+
+def dirty_authority_path_findings(
+    root: Path,
+    authority: TaskAuthority,
+    repo_paths: tuple[str, ...],
+    all_paths: tuple[str, ...],
+) -> tuple[RoleWriteFinding, ...]:
+    """Return findings when an edit changes authority file and repo files together."""
+    if not repo_paths:
+        return ()
+    findings: list[RoleWriteFinding] = []
+    dirty = set(all_paths)
+    authority_rel = relative_path(root, authority.path)
+    baseline_changed = path_changed_from_baseline(
+        authority.path,
+        authority_baseline_path(authority.path),
+    )
+    if authority_rel in dirty or baseline_changed:
+        findings.append(RoleWriteFinding("authority-mutated-with-repo-edit", authority_rel))
+    return tuple(findings)
 
 
 def block_payload(findings: tuple[RoleWriteFinding, ...]) -> dict[str, object]:
@@ -136,7 +222,7 @@ def block_payload(findings: tuple[RoleWriteFinding, ...]) -> dict[str, object]:
         "remediation": [
             "Set AGENT_CANON_ACTIVE_ROLE or task_authority.yaml active_role for the current stage.",
             "Keep reviewer/designer/research roles artifact-only.",
-            "For implementer edits, add a WORKTREE_SCOPE.md editable directory or shrink the edit.",
+            "For implementer edits, update task_authority.yaml allowed_paths, team_manifest.yaml write scope, or shrink the edit.",
         ],
         "findings": [finding.render() for finding in findings],
     }
@@ -154,8 +240,10 @@ def main() -> int:
     if not should_check(payload):
         return 0
     root = repo_root()
+    all_paths = git_changed_files(root)
     paths = changed_files(root)
-    role, role_source, authority_path = active_role(root)
+    role, role_source, authority = active_role(root)
+    authority_path = authority.path if authority is not None else None
     findings: list[RoleWriteFinding] = []
     violations: tuple[Path, ...] = ()
     if paths and not role:
@@ -176,6 +264,10 @@ def main() -> int:
             RoleWriteFinding("write-scope-violation", str(path))
             for path in violations
         )
+        if authority is not None:
+            findings.extend(task_authority_path_findings(authority, paths))
+            findings.extend(dirty_authority_path_findings(root, authority, paths, all_paths))
+    findings.extend(dirty_active_pointer_findings(root, paths, all_paths))
     context = HookLogContext(
         active_root=root,
         hook_name="role_write_policy_guard",

@@ -19,7 +19,7 @@ upstream design ../../documents/dependency-manifest-design.md dependency review 
 
 ## Design Trace Acceptance
 
-<!-- Confirm that the final diff remains traceable to approved design sections, user-request clause IDs, implementation source packet entries, and test-plan items. Record blockers or escalation points. -->
+<!-- Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items. Return revise if a changed slice is only justified by the nearest file, helper, current finding, or chat context instead of the abstract responsibility model. Record blockers or escalation points. -->
 
 ## Planned Work Completion Review
 

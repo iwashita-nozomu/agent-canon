@@ -207,7 +207,7 @@ Choose one subagent mode before delegation:
 
 - `parent-direct`: no subagent, only for trivial or mechanical work.
 - `scout-only`: read-only `explorer` / reviewer answers bounded questions.
-- `spark-slice`: `spark_worker` handles approved, design-traced low-risk slices.
+- `spark-slice`: `spark_worker` handles approved low-risk slices derived from the Abstract Design Frame and design trace.
 - `full-stage`: normal staged requirements, planning, design, review, and
   implementation agents.
 - `deep-review`: additional independent read-only reviewers for high-risk work.
@@ -377,7 +377,7 @@ checked and cited.
   - `academic-writing`
 - Markdown diff:
   - `md-style-check`
-- worktree kickoff:
+- legacy worktree cleanup / drift diagnosis:
   - `worktree-start`
 - worktree drift and cleanup:
   - `worktree-health`
@@ -448,7 +448,7 @@ Codex subagent では、`requirements_organizer`、`manager_reviewer`、`executi
 学術文章では、これに `notation_definition_reviewer` と `logic_gap_reviewer` を追加します。
 論文や thesis chapter では、さらに `citation_evidence_reviewer` を追加します。
 interactive Codex で要件整理と実行計画立案を行う場合は、parent session 側の plan-mode command を使ってから planning specialist を起動します。official Codex CLI では `/plan` です。
-default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、bounded review / report traceability / checklist gate は mini reviewer TOML、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして設計 packet で完全に切れる狭い実装 slice は Spark role TOML に寄せます。
+default の model / reasoning split は `.codex/agents/*.toml` を正本にします。設計判断、scope 判断、final judgment、broad / ambiguous implementation は frontier role TOML に残し、bounded review / report traceability / checklist gate は mini reviewer TOML、code survey、tool drift survey、static validation triage、language-specific code review、機械 report 要約、そして Abstract Design Frame と design trace で完全に切れる狭い実装 slice は Spark role TOML に寄せます。
 - subagent の depth は固定値で規定しません。必要な追加層がある場合だけ parent が owner、入力 packet、write scope、review gate を明示して展開します。
 - active spawn budget は workflow family に従って縛ります。機械設定の正本は `agents/task_catalog.yaml` の `workflow_families[].spawn_budget` です。現在の既定は `Scoped Change Lite` で同時 4 体、`Scoped Change` で同時 8 体、`Large Delivery` / `Platform And Environment` で同時 10 体、`Research-Driven Change` / `Comprehensive Development` / `Adaptive Improvement Loop` で同時 12 体までです。
 - workflow family ごとの subagent prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です。
@@ -546,13 +546,13 @@ cost を無視して review coverage を優先する run では、research-drive
 
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
 - Gate 1 / 4 / 6 / 7 / 8 / 9 の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes` でない場合は指示された owner stage へ戻る
-- 実装前に `design_brief.md` の `Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design-To-Implementation Trace` を読み、そこにある artifact、repo docs、dependency surface、code path、test plan を読了する
+- 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path、test plan を読了する
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker は会話文脈を実装入力にせず、各 implementation slice の前に design artifact path、design section、test plan item、request clause ID を明示する
-- `Installed Libraries And Existing Implementation Survey` または `Implementation Source Packet` がない、または design と現行 repo docs / code / dependency surface が矛盾する場合は実装せず Gate 5-6 へ戻る
+- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、または `Implementation Source Packet` がない、または design と現行 repo docs / code / dependency surface が矛盾する場合は実装せず Gate 5-6 へ戻る
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
+- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS` を確認し、`spark_worker,worker` なら Abstract Design Frame から導かれ、design trace、naming、test plan、write scope が固定済みの低リスクsliceを `spark_worker` へ先に渡す
 - 明示 spawn 許可がある場合、実装前の repo inventory、tool drift survey、static validation failure triage、diff-local language review は Spark role TOML へ先に渡し、bounded review / report traceability は mini review role TOML へ渡します。parent は統合判断と次 gate 判定に集中する
 - `spark_worker` に渡す実装は、1 file または単一抽象ユニット、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする
 - 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
@@ -576,9 +576,9 @@ cost を無視して review coverage を優先する run では、research-drive
 - まず導入済みライブラリ、既存 code path、既存 helper、既存 style を調べ、再利用と拡張を優先する
 - 新規 helper や新規 module を足すときは、既存実装では足りない理由と、導入済みライブラリの設定変更や薄い wrapper で済まない理由を design packet に結び付ける
 - worker は approved design または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を発明しない
-- checkpoint review は diff だけでなく approved design packet と source packet citation の一致を確認する
+- checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、source packet citation の一致を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
-- broad worker は frontier role TOML、design-traced narrow slice と execution-only experiment/log work の first candidate は Spark role TOML とする
+- broad worker は frontier role TOML、Abstract Design Frame と design trace から導かれた narrow slice と execution-only experiment/log work の first candidate は Spark role TOML とする
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
 - 正本は `agents/` と `documents/` から先に直す
 - runtime entrypoint は薄く保つ

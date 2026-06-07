@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -70,6 +71,11 @@ NOTEBOOK_MINOR_VERSION = 5
 OOP_READABILITY_MIN_SCORE = 95
 EXPECTED_PROMPT_FEEDBACK_MIN = 3
 EXPECTED_HOOK_EVENT_COUNT = 4
+
+
+def write_sha256_baseline(path: Path, baseline_path: Path) -> None:
+    """Write a test baseline sidecar for a runtime authority file."""
+    baseline_path.write_text(hashlib.sha256(path.read_bytes()).hexdigest() + "\n", encoding="utf-8")
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -1343,6 +1349,75 @@ class CodexHooksTest(unittest.TestCase):
             ["data.lock"],
         )
 
+    def test_style_checker_guard_routes_generated_codex_guide_to_split_validator(self) -> None:
+        """Generated Codex guide Markdown should use split validation, not prose lint."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=temp_root,
+                check=True,
+                capture_output=True,
+            )
+            docs_dir = temp_root / "tools" / "docs"
+            docs_dir.mkdir(parents=True)
+            fail_checker = "#!/usr/bin/env python3\nraise SystemExit(99)\n"
+            (docs_dir / "check_markdown_lint.py").write_text(fail_checker, encoding="utf-8")
+            (docs_dir / "check_markdown_math.py").write_text(fail_checker, encoding="utf-8")
+            validator = temp_root / "codex-cli-guide" / "tools" / "validate_split.py"
+            validator.parent.mkdir(parents=True)
+            validator.write_text(
+                "#!/usr/bin/env python3\nprint('split validation passed')\n",
+                encoding="utf-8",
+            )
+            section = (
+                temp_root
+                / "codex-cli-guide"
+                / "sections"
+                / "08-additional-configuration-recipes-114-253.md"
+            )
+            section.parent.mkdir(parents=True)
+            section.write_text("# Generated section\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            section.write_text("# Generated section\n\nChanged.\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "style.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(STYLE_CHECKER_GUARD)],
+                cwd=temp_root,
+                input=json.dumps(
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": "apply_patch",
+                    }
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_STYLE_CHECKER_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+
+            log_entry = cast(
+                "dict[str, object]",
+                json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]),
+            )
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+        self.assertEqual(log_entry["selected_checkers"], ["codex_cli_guide_split"])
+        self.assertEqual(log_entry["unchecked_count"], 0)
+
     def test_module_boundary_guard_blocks_public_surface_change_without_evidence(self) -> None:
         """Module hook should block forced module rewrites without tests or docs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1593,9 +1668,6 @@ class CodexHooksTest(unittest.TestCase):
             subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
             module = temp_root / "app.py"
             module.write_text("VALUE = 1\n", encoding="utf-8")
-            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
-            module.write_text("VALUE = 2\n", encoding="utf-8")
             authority = temp_root / "reports" / "agents" / "run-1" / "task_authority.yaml"
             authority.parent.mkdir(parents=True)
             authority.write_text(
@@ -1618,6 +1690,9 @@ class CodexHooksTest(unittest.TestCase):
                 "    can_modify_repo: true\n",
                 encoding="utf-8",
             )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("VALUE = 2\n", encoding="utf-8")
             log_path = temp_root / "reports" / "hooks" / "authority.jsonl"
 
             result = subprocess.run(
@@ -1680,7 +1755,293 @@ class CodexHooksTest(unittest.TestCase):
 
         self.assertEqual(payload["decision"], "block")
         self.assertIn("write-scope-violation", "\n".join(cast("list[str]", payload["findings"])))
+        self.assertNotIn("WORKTREE_SCOPE", "\n".join(cast("list[str]", payload["remediation"])))
         self.assertEqual(log_entry["status"], "fail")
+
+    def test_role_write_policy_guard_allows_implementer_allowed_path_without_scope_file(
+        self,
+    ) -> None:
+        """Implementer writes should use task authority paths, not WORKTREE_SCOPE.md."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            module = temp_root / "app.py"
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            report_dir = temp_root / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            authority = report_dir / "task_authority.yaml"
+            authority.write_text(
+                "version: 1\n"
+                "run_id: run-1\n"
+                "active_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n"
+                "  - path: app.py\n"
+                "    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {implementer: {can_modify_repo: true}}\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            module.write_text("VALUE = 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "role.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
+                    "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(log_entry["status"], "pass")
+
+    def test_role_write_policy_guard_blocks_implementer_outside_allowed_paths(
+        self,
+    ) -> None:
+        """Task authority allowed_paths should be an active runtime write boundary."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            module = temp_root / "app.py"
+            module.write_text("VALUE = 1\n", encoding="utf-8")
+            other = temp_root / "other.py"
+            other.write_text("VALUE = 1\n", encoding="utf-8")
+            report_dir = temp_root / "reports" / "agents" / "run-1"
+            report_dir.mkdir(parents=True)
+            authority = report_dir / "task_authority.yaml"
+            authority.write_text(
+                "version: 1\n"
+                "run_id: run-1\n"
+                "active_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n"
+                "  - path: app.py\n"
+                "    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {implementer: {can_modify_repo: true}}\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            other.write_text("VALUE = 2\n", encoding="utf-8")
+            log_path = temp_root / "reports" / "hooks" / "role.jsonl"
+
+            result = subprocess.run(
+                [sys.executable, str(ROLE_WRITE_POLICY_GUARD)],
+                cwd=temp_root,
+                input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_TASK_AUTHORITY": str(authority),
+                    "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(log_path),
+                },
+            )
+            payload = cast("dict[str, object]", json.loads(result.stdout))
+            log_entry = cast("dict[str, object]", json.loads(log_path.read_text(encoding="utf-8").splitlines()[0]))
+
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn(
+            "task-authority-path-violation",
+            "\n".join(cast("list[str]", payload["findings"])),
+        )
+        self.assertEqual(log_entry["status"], "fail")
+
+    def test_authority_guards_block_self_expansion_with_repo_edit(self) -> None:
+        """Authority edits cannot authorize repo edits in the same hook cycle."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            (temp_root / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+            other = temp_root / "other.py"
+            other.write_text("VALUE = 1\n", encoding="utf-8")
+            report_root = temp_root / "reports" / "agents"
+            report_dir = report_root / "run-1"
+            report_dir.mkdir(parents=True)
+            (report_root / ".active_run").write_text("reports/agents/run-1\n", encoding="utf-8")
+            authority = report_dir / "task_authority.yaml"
+            base_authority = (
+                "version: 1\nrun_id: run-1\nactive_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n  - path: app.py\n    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {implementer: {can_modify_repo: true}}\n"
+            )
+            authority.write_text(base_authority, encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+            authority.write_text(
+                base_authority.replace("allowed_paths:\n", "allowed_paths:\n  - path: other.py\n    actions: [modify]\n"),
+                encoding="utf-8",
+            )
+            other.write_text("VALUE = 2\n", encoding="utf-8")
+            hook_env = dict(os.environ)
+            hook_env.pop("AGENT_CANON_TASK_AUTHORITY", None)
+
+            for hook_script, log_name in (
+                (TASK_AUTHORITY_SCHEMA_GUARD, "authority.jsonl"),
+                (ROLE_WRITE_POLICY_GUARD, "role.jsonl"),
+            ):
+                result = subprocess.run(
+                    [sys.executable, str(hook_script)],
+                    cwd=temp_root,
+                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **hook_env,
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                    },
+                )
+                payload = cast("dict[str, object]", json.loads(result.stdout))
+                self.assertEqual(payload["decision"], "block")
+                self.assertIn(
+                    "authority-mutated-with-repo-edit",
+                    "\n".join(cast("list[str]", payload["findings"])),
+                )
+
+    def test_authority_guards_block_ignored_authority_self_expansion(self) -> None:
+        """Ignored run-bundle authority edits cannot authorize repo edits."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            (temp_root / ".gitignore").write_text("reports/agents/\nreports/hooks/\n", encoding="utf-8")
+            (temp_root / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+            other = temp_root / "other.py"
+            other.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+
+            report_root = temp_root / "reports" / "agents"
+            report_dir = report_root / "run-1"
+            report_dir.mkdir(parents=True)
+            active_pointer = report_root / ".active_run"
+            active_pointer.write_text("reports/agents/run-1\n", encoding="utf-8")
+            authority = report_dir / "task_authority.yaml"
+            base_authority = (
+                "version: 1\nrun_id: run-1\nactive_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n  - path: app.py\n    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {implementer: {can_modify_repo: true}}\n"
+            )
+            authority.write_text(base_authority, encoding="utf-8")
+            write_sha256_baseline(active_pointer, report_root / ".active_run.sha256")
+            write_sha256_baseline(authority, report_dir / "task_authority.yaml.sha256")
+            authority.write_text(
+                base_authority.replace("allowed_paths:\n", "allowed_paths:\n  - path: other.py\n    actions: [modify]\n"),
+                encoding="utf-8",
+            )
+            other.write_text("VALUE = 2\n", encoding="utf-8")
+            hook_env = dict(os.environ)
+            hook_env.pop("AGENT_CANON_TASK_AUTHORITY", None)
+
+            for hook_script, log_name in (
+                (TASK_AUTHORITY_SCHEMA_GUARD, "authority.jsonl"),
+                (ROLE_WRITE_POLICY_GUARD, "role.jsonl"),
+            ):
+                result = subprocess.run(
+                    [sys.executable, str(hook_script)],
+                    cwd=temp_root,
+                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **hook_env,
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                    },
+                )
+                payload = cast("dict[str, object]", json.loads(result.stdout))
+                self.assertEqual(payload["decision"], "block")
+                self.assertIn(
+                    "authority-mutated-with-repo-edit",
+                    "\n".join(cast("list[str]", payload["findings"])),
+                )
+
+    def test_authority_guards_block_active_run_pointer_self_expansion(self) -> None:
+        """Ignored active-run pointer edits cannot be paired with repo edits."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            subprocess.run(["git", "init"], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=temp_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=temp_root, check=True)
+            (temp_root / ".gitignore").write_text("reports/agents/\nreports/hooks/\n", encoding="utf-8")
+            app = temp_root / "app.py"
+            app.write_text("VALUE = 1\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=temp_root, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=temp_root, check=True, capture_output=True)
+
+            report_root = temp_root / "reports" / "agents"
+            report_dir = report_root / "run-1"
+            report_dir.mkdir(parents=True)
+            active_pointer = report_root / ".active_run"
+            active_pointer.write_text("reports/agents/run-1\n", encoding="utf-8")
+            (report_dir / "task_authority.yaml").write_text(
+                "version: 1\nrun_id: run-1\nactive_role: implementer\n"
+                "request_clauses: []\n"
+                "allowed_paths:\n  - path: app.py\n    actions: [modify]\n"
+                "forbidden_paths: []\n"
+                "risky_authorities: {helper_change: [], first_party_library_change: [], public_api_change: [], workflow_change: [], shared_canon_change: []}\n"
+                "roles: {implementer: {can_modify_repo: true}}\n",
+                encoding="utf-8",
+            )
+            write_sha256_baseline(active_pointer, report_root / ".active_run.sha256")
+            active_pointer.write_text("reports/agents/run-2\n", encoding="utf-8")
+            app.write_text("VALUE = 2\n", encoding="utf-8")
+            hook_env = dict(os.environ)
+            hook_env.pop("AGENT_CANON_TASK_AUTHORITY", None)
+
+            for hook_script, log_name in (
+                (TASK_AUTHORITY_SCHEMA_GUARD, "authority.jsonl"),
+                (ROLE_WRITE_POLICY_GUARD, "role.jsonl"),
+            ):
+                result = subprocess.run(
+                    [sys.executable, str(hook_script)],
+                    cwd=temp_root,
+                    input=json.dumps({"hookEventName": "PostToolUse", "tool_name": "apply_patch"}),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **hook_env,
+                        "AGENT_CANON_TASK_AUTHORITY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                        "AGENT_CANON_ROLE_WRITE_POLICY_HOOK_LOG_PATH": str(temp_root / "reports" / "hooks" / log_name),
+                    },
+                )
+                payload = cast("dict[str, object]", json.loads(result.stdout))
+                self.assertEqual(payload["decision"], "block")
+                self.assertIn(
+                    "active-run-pointer-mutated-with-repo-edit",
+                    "\n".join(cast("list[str]", payload["findings"])),
+                )
 
     def test_first_party_library_guard_blocks_api_rewrite_without_authority(self) -> None:
         """First-party guard should block reusable API edits without task authority."""

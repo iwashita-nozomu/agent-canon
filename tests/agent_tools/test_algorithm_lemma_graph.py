@@ -5,7 +5,6 @@
 # upstream implementation ../../tools/agent_tools/algorithm_lemma_graph.py builds lemma graphs.
 # upstream implementation ../../tools/agent_tools/algorithm_expansion_ir.py emits source IR.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof graph workflow.
-# downstream design ../../documents/tools/algorithm_lemma_graph.md documents CLI usage.
 # @dependency-end
 
 from __future__ import annotations

@@ -39,7 +39,7 @@ upstream design ../canonical/skills.md skill canon registry
 - Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を追加します。
 - Markdown 中心の変更では `make docs-check` を追加します。
 - Docker / runtime / dependency 変更では `make docker-build-check` を追加します。
-- 失敗が出た場合は、ad hoc にコマンドを増やす前に、どの gate が不足しているかを明示します。
+- 失敗が出た場合は、追加コマンドを増やす前に、どの gate が不足しているかを明示します。
 
 ## Default Sequence
 

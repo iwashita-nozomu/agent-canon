@@ -4,6 +4,7 @@
 # upstream design ../../documents/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../agents/skills/task-routing.md task routing skill contract
 # upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
+# upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
 # downstream design ../../documents/tools/route.md reader-facing route tool documentation
 # downstream implementation ../../tests/agent_tools/test_route.py tests route output and aliases
 # @dependency-end
@@ -346,6 +347,25 @@ SKILL_RULES: tuple[SkillRuleData, ...] = (
             ("prose", "reasoning"),
             ("rewrite", "packet"),
             ("claim", "evidence", "graph"),
+        ),
+    ),
+    (
+        "pr-processing",
+        "pull request, merge queue, conflict repair, or issue triage processing is in scope",
+        (
+            ("pr", "処理"),
+            ("pr", "merge"),
+            ("pr", "マージ"),
+            ("pull request",),
+            ("pull request", "merge"),
+            ("merge queue",),
+            ("queue cleanup",),
+            ("conflict", "解消"),
+            ("コンフリクト", "解消"),
+            ("issue", "triage"),
+            ("issue", "処理"),
+            ("branch protection",),
+            ("required checks",),
         ),
     ),
 )

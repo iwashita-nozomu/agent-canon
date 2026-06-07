@@ -54,8 +54,7 @@ Select one mode before spawning subagents:
   Record why no subagent is needed.
 - `scout-only`: spawn read-only `explorer` or reviewer agents to answer bounded
   questions while parent keeps the critical path.
-- `spark-slice`: use `spark_worker` only for approved, design-traced, low-risk
-  slices with fixed naming, write scope, and tests.
+- `spark-slice`: use `spark_worker` only for approved low-risk slices derived from the Abstract Design Frame and design trace, with fixed naming, write scope, and tests.
 - `full-stage`: use the normal staged specialist set for requirements, plan,
   design, review, implementation, and closeout.
 - `deep-review`: keep implementation local or in `worker`, but add independent
@@ -64,7 +63,7 @@ Select one mode before spawning subagents:
 Mode selection rules:
 
 - Start in `parent-direct` or `scout-only` for narrow diagnosis.
-- Escalate to `spark-slice` only after design trace and reuse targets are fixed.
+- Escalate to `spark-slice` only after the Abstract Design Frame, design trace, and reuse targets are fixed.
 - Escalate to `full-stage` when a task touches multiple durable surfaces,
   introduces public names, changes workflow/config, or has open requirements.
 - Escalate to `deep-review` when correctness, evidence, or architecture risk is
