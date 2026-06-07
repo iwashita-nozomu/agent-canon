@@ -33,15 +33,6 @@ AgentCanon の source of truth は GitHub remote です。
 ## Default Sequence
 
 1. `git status --short --branch` で clone 直後の状態を確認します。
-1. 必要なら dry run します。
-
-```bash
-bash scripts/start_repository.sh \
-  --project-slug your-project \
-  --display-name "Your Project" \
-  --dry-run
-```
-
 1. 初期化します。wrapper は AgentCanon update surface が repairable なら実 init の前に `make agent-canon-ensure-latest` を実行します。unsafe な update surface があれば preflight の route を出して init を続行します。
 
 ```bash
@@ -58,5 +49,4 @@ bash scripts/start_repository.sh --validate-only
 
 ## Safety Rules
 
-- `--dry-run` では file rewrite や remote mutation を行いません。
 - template 固有の clone bootstrap は `scripts/` に置き、shared automation の `tools/` へ移しません。

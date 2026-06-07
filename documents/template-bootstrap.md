@@ -29,15 +29,6 @@ bash scripts/start_repository.sh \
   --display-name "Your Project"
 ```
 
-必要なら dry-run:
-
-```bash
-bash scripts/start_repository.sh \
-  --project-slug your-project \
-  --display-name "Your Project" \
-  --dry-run
-```
-
 GitHub-backed template では、`vendor/agent-canon` submodule は
 `https://github.com/iwashita-nozomu/agent-canon.git` を canonical remote として使います。
 `--force` を init に渡すと wrapper は agent-canon preflight を block 扱いで skip し、dirty worktree override を優先します。
